@@ -1,0 +1,11 @@
+/.bundle/
+/doc/
+/log/*.log
+/pkg/
+/tmp/
+
+/.idea
+/.vscode
+.DS_Store
+
+Gemfile.lock
