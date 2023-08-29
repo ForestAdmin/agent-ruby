@@ -22,9 +22,5 @@ admin work on any Rails application (Rails >= 6.1)."
   end
 
   spec.add_dependency "rails", "~> 6.1"
-  # spec.add_dependency "puma"
-  # spec.add_dependency "sqlite3"
-  spec.add_dependency "rubocop", "~> 1.33"
-  spec.add_dependency "rubocop-performance", "~> 1.19"
-  spec.add_dependency "rubocop-rspec", "~> 2.23"
+  spec.add_dependency "zeitwerk", "~> 2.3"
 end
