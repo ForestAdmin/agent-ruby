@@ -2,7 +2,7 @@ source "https://rubygems.org"
 
 gemspec
 
-group :development, :test do
+group :development, :tests do
   gem "overcommit", "~> 0.60"
   gem "rspec", "~> 3.0"
   gem "rubocop", "~> 1.33"

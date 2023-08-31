@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+require 'rspec'
+require 'rspec/core/rake_task'
+
+# Liste des dossiers à parcourir pour les tests
+folders_to_test = %w[./packages/forestadmin_agent ./packages/forestadmin_rails]
+
+# Boucle à travers les dossiers et exécute les tests RSpec avec la configuration spécifique
+folders_to_test.each do |folder|
+  if File.directory?(folder)
+
+    if File.exist?(folder)
+      puts "Exécution des tests RSpec dans le dossier : #{folder}"
+      RSpec::Core::Runner.run(%W[--require #{folder}/spec/spec_helper.rb #{folder}])
+    else
+      puts "Fichier de configuration RSpec non trouvé dans le dossier : #{folder}/spec"
+    end
+  else
+    puts "Dossier non trouvé : #{folder}"
+  end
+end

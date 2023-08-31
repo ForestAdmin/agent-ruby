@@ -1,4 +1,6 @@
 require_relative "lib/agent_ruby/version"
+lib = File.expand_path('../lib', __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name = "agent_ruby"
@@ -25,7 +27,8 @@ repository (monorepo) for the Ruby agent."
         f.start_with?(*%w[bin/ test/ spec/ features/ .git Gemfile])
     end
   end
-  spec.bindir = "exe"
-  spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  # spec.bindir = "exe"
+  # spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
+  spec.executables = ["run_rspec"]
   spec.require_paths = ["lib"]
 end
