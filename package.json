@@ -1,0 +1,24 @@
+{
+  "name": "agent-php",
+  "version": "0.0.1",
+  "description": "The official agent Ruby for Forest.",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ForestAdmin/agent-ruby.git"
+  },
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/ForestAdmin/agent-ruby/issues"
+  },
+  "homepage": "https://github.com/ForestAdmin/agent-ruby#readme",
+  "devDependencies": {
+    "@commitlint/cli": "17.7.1",
+    "@commitlint/config-conventional": "17.7.0",
+    "@semantic-release/changelog": "6.0.3",
+    "@semantic-release/exec": "6.0.3",
+    "@semantic-release/git": "10.0.1",
+    "semantic-release": "21.1.1",
+    "semantic-release-slack-bot": "4.0.2"
+  }
+}
