@@ -27,5 +27,5 @@ PreCommit:
 PrePush:
   RSpec:
     enabled: true
-    command: ["rspec", "-f" , "p"]
+    command: ["run_rspec"]
     quiet: false
