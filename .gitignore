@@ -1,10 +1,19 @@
+# IDE
 /.idea
 /.vscode
 .DS_Store
-
 *.iml
-*.gem
 
-Gemfile.lock
-
+# RSPEC
 .rspec_status
+
+# npm
+node_modules
+
+# composer
+vendor
+
+# GEM
+Gemfile.lock
+*.gem
+pkg/
