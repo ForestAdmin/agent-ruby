@@ -7,15 +7,16 @@ CommitMsg:
     sample_message: 'feat(datasource): add onboarding flow'
 
 PreCommit:
+  RuboCop:
+    enabled: true
+    on_warn: fail
+
   TrailingWhitespace:
     enabled: true
     #exclude:
     #  - '**/db/structure.sql' # Ignore trailing whitespace in generated files
 
   BundleOutdated:
-    enabled: true
-
-  RuboCop:
     enabled: true
 
   BundleAudit:
