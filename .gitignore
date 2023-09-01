@@ -6,6 +6,7 @@
 
 # RSPEC
 .rspec_status
+coverage/
 
 # npm
 node_modules

@@ -54,7 +54,7 @@ jobs:
 #          - forestadmin_rails
 #    steps:
       - name: Test
-        run: cd packages/${{ matrix.package }} && bundle exec rspec && cd -
+        run: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc && cd -
 
       - name: Send coverage
         uses: paambaati/codeclimate-action@v5.0.0
