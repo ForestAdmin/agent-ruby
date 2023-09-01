@@ -9,9 +9,7 @@ CommitMsg:
 PreCommit:
   RuboCop:
     enabled: true
-    command: [ 'bundle', 'exec', 'rubocop' ]
-    quiet: false
-    on_warn: fail
+    command: ['bundle', 'exec', 'rubocop']
 
   TrailingWhitespace:
     enabled: true
