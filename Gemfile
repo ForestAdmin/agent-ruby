@@ -8,4 +8,5 @@ group :development, :tests do
   gem "rubocop", "~> 1.33"
   gem "rubocop-performance", "~> 1.19"
   gem "rubocop-rspec", "~> 2.23"
+  gem 'simplecov', "~> 0.22", require: false
 end
