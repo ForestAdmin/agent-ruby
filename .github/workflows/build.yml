@@ -61,9 +61,11 @@ jobs:
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
+          coverageCommand: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc
           coverageLocations: |
             ${{github.workspace}}/packages/forestadmin_agent/coverage/coverage.json
 #            ${{github.workspace}}/packages/forestadmin_rails/coverage/coverage.json
+        debug: true
 
   deploy:
     name: Release package
