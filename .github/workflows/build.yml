@@ -54,7 +54,7 @@ jobs:
     name: Release package
     runs-on: ubuntu-latest
 
-    needs: [test]
+    needs: [lint]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     steps:
       - uses: actions/checkout@v3
