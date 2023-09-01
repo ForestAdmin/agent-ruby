@@ -24,6 +24,11 @@ Lint/EmptyFile:
   Exclude:
     - 'packages/forestadmin_rails/app/models/forestadmin_rails/application_record.rb'
 
+Style/BlockComments:
+  Exclude:
+    - 'packages/forestadmin_agent/spec/spec_helper.rb'
+    - 'packages/forestadmin_rails/spec/spec_helper.rb'
+
 # Offense count: 3
 # Configuration parameters: AllowedConstants.
 Style/Documentation:
