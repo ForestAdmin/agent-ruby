@@ -41,22 +41,22 @@ jobs:
         run: bundle exec rubocop
 
   test:
-    - name: Test
-      runs-on: ubuntu-latest
-      needs: [lint]
-      strategy:
-        matrix:
-          package:
-            - forestadmin_agent
-            - forestadmin_rails
-      steps:
-        - name: Test
-          run: (cd packages/${{ matrix.package }} && bundle exec rspec)
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint]
+    strategy:
+      matrix:
+        package:
+          - forestadmin_agent
+          - forestadmin_rails
+    steps:
+      - name: Test
+        run: (cd packages/${{ matrix.package }} && bundle exec rspec)
 
-        - name: Send coverage
-          uses: paambaati/codeclimate-action@v5.0.0
-          env:
-            CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+      - name: Send coverage
+        uses: paambaati/codeclimate-action@v5.0.0
+        env:
+          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
 
   deploy:
     name: Release package
