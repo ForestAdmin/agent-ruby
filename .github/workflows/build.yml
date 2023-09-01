@@ -17,6 +17,7 @@ jobs:
         package:
           - forestadmin_agent
           - forestadmin_rails
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -42,8 +43,18 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop
 
+#  test:
+#    name: Test
+#    runs-on: ubuntu-latest
+#    needs: [lint]
+#    strategy:
+#      matrix:
+#        package:
+#          - forestadmin_agent
+#          - forestadmin_rails
+#    steps:
       - name: Test
-        run: cd packages/${{ matrix.package }} && bundle exec rspec && cd -
+        run: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc && cd -
 
       - name: Send coverage
         uses: paambaati/codeclimate-action@v5.0.0
@@ -53,7 +64,6 @@ jobs:
   deploy:
     name: Release package
     runs-on: ubuntu-latest
-
     needs: [lint]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     steps:
