@@ -60,6 +60,10 @@ jobs:
         uses: paambaati/codeclimate-action@v5.0.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+        with:
+          coverageLocations: |
+            ${{github.workspace}}/packages/forestadmin_agent/coverage/.resultset.json
+            ${{github.workspace}}/packages/forestadmin_rails/coverage/.resultset.json
 
   deploy:
     name: Release package
