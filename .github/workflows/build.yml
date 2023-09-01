@@ -62,8 +62,8 @@ jobs:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
           coverageLocations: |
-            ${{github.workspace}}/packages/forestadmin_agent/coverage/.resultset.json
-            ${{github.workspace}}/packages/forestadmin_rails/coverage/.resultset.json
+            ${{github.workspace}}/packages/forestadmin_agent/coverage/coverage.json
+#            ${{github.workspace}}/packages/forestadmin_rails/coverage/coverage.json
 
   deploy:
     name: Release package
