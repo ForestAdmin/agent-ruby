@@ -49,6 +49,7 @@ Style/FrozenStringLiteralComment:
     - 'Gemfile'
     - 'Rakefile'
     - 'bin/console'
+    - 'bin/run_rspec'
     - 'lib/agent_ruby.rb'
     - 'lib/agent_ruby/version.rb'
     - 'packages/forestadmin_agent/forestadmin_agent.gemspec'
