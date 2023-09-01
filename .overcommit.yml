@@ -9,7 +9,7 @@ CommitMsg:
 PreCommit:
   RuboCop:
     enabled: true
-    command: ["rubocop", "-P"]
+    command: [ 'bundle', 'exec', 'rubocop' ]
     quiet: false
     on_warn: fail
 
