@@ -20,7 +20,13 @@ module.exports = {
             'sed -i \'s/"version": ".*"/"version": "${nextRelease.version}"/g\' package.json; ' +
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forestadmin_agent/lib/forestadmin_agent/version.rb; ' +
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forestadmin_rails/lib/forestadmin_rails/version.rb; ',
-        successCmd: 'touch .trigger-rubygem-release',
+        successCmd:
+            'mkdir -p $HOME/.gem '+
+            'touch $HOME/.gem/credentials '+
+            'chmod 0600 $HOME/.gem/credentials '+
+            'printf -- "---\n:rubygems_api_key: ${env.GEM_HOST_API_KEY}\n" > $HOME/.gem/credentials '+
+            '( cd packages/forestadmin_agent && gem build && gem push forestadmin_agent-${nextRelease.version}.gem )' +
+            '( cd packages/forestadmin_rails && gem build && gem push forestadmin_rails-${nextRelease.version}.gem )' ,
       },
     ],
     [
