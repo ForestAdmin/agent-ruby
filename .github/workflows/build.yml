@@ -65,7 +65,7 @@ jobs:
           coverageLocations: |
             ${{github.workspace}}/packages/forestadmin_agent/coverage/coverage.json
 #            ${{github.workspace}}/packages/forestadmin_rails/coverage/coverage.json
-        debug: true
+          debug: true
 
   deploy:
     name: Release package
