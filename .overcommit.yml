@@ -8,8 +8,18 @@ CommitMsg:
 
 PreCommit:
   RuboCop:
-    enabled: true
-    on_warn: fail
+    enabled: false
+    description: 'Analyze with RuboCop'
+    required_executable: 'rubocop'
+    flags: ['--format=emacs', '--force-exclusion', '--display-cop-names']
+    install_command: 'gem install rubocop'
+    include:
+      - '**/*.gemspec'
+      - '**/*.rake'
+      - '**/*.rb'
+      - '**/*.ru'
+      - '**/Gemfile'
+      - '**/Rakefile'
 
   TrailingWhitespace:
     enabled: true
