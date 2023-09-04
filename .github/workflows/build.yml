@@ -90,7 +90,7 @@ jobs:
         with:
           path: reports
       - name: run ls
-        run: ls -la
+        run: ls -laR
       - name: Send coverage
         uses: paambaati/codeclimate-action@v5.0.0
         env:
