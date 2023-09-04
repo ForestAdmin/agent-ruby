@@ -96,7 +96,6 @@ jobs:
         with:
           coverageLocations: |
             ${{github.workspace}}/reports/forestadmin_agent/*.json:simplecov
-            ${{github.workspace}}/reports/forestadmin_rails/*.json:simplecov
           debug: true
 
   deploy:
