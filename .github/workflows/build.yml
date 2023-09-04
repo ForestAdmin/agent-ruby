@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Test
-        run: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc && cd -
+        run: cd packages/${{ matrix.package }} && rspec --color --format doc && cd -
 
       - name: Upload coverage
         uses: actions/upload-artifact@v3
