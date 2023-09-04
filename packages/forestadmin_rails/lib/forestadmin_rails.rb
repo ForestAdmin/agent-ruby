@@ -1,9 +1,9 @@
-require "forestadmin/version"
-require "forestadmin/engine"
+require "forestadmin_rails/version"
+require "forestadmin_rails/engine"
 require "zeitwerk"
 loader = Zeitwerk::Loader.for_gem
 loader.setup
 
-module Forestadmin
+module ForestadminRails
   # Your code goes here...
 end
