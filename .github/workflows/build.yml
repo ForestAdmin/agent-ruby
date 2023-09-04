@@ -56,8 +56,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Set up Ruby ${{ matrix.ruby-version }}
+        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+
+      - name: Install dependencies on main repo
+        run: |
+          gem install bundler
+          bundle install
+
       - name: Test
-        run: cd packages/${{ matrix.package }} && gem install bundler && bundle exec rspec --color --format doc && cd -
+        run: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc && cd -
 
       - name: Upload coverage
         uses: actions/upload-artifact@v3
@@ -80,11 +90,10 @@ jobs:
           path: reports
 
       - name: Send coverage
-        uses: paambaati/codeclimate-action@v5.0.0 #paambaati/codeclimate-action@84cea27117a473d605400ca3a97fcef7e433e2d6
+        uses: paambaati/codeclimate-action@v5.0.0
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
-          #coverageCommand: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc
           coverageLocations: |
             ${{github.workspace}}/reports/forestadmin_agent/coverage.json
             ${{github.workspace}}/reports/forestadmin_rails/coverage.json
