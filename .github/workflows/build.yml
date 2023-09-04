@@ -95,7 +95,7 @@ jobs:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
           coverageLocations: |
-            ${{github.workspace}}/reports/forestadmin_agent/*.json:simplecov
+            ${{github.workspace}}/reports/forestadmin_agent/.resultset.json:simplecov
           debug: true
 
   deploy:
