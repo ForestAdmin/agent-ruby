@@ -1,4 +1,4 @@
-name: Build, Test and Deploy
+name: Lint, Test, Coverage and Deploy
 
 on:
   push:
@@ -43,37 +43,61 @@ jobs:
       - name: Run RuboCop
         run: bundle exec rubocop
 
-#  test:
-#    name: Test
-#    runs-on: ubuntu-latest
-#    needs: [lint]
-#    strategy:
-#      matrix:
-#        package:
-#          - forestadmin_agent
-#          - forestadmin_rails
-#    steps:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint]
+    strategy:
+      matrix:
+        package:
+          - forestadmin_agent
+          - forestadmin_rails
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
       - name: Test
         run: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc && cd -
 
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.package }}
+          path: packages/${{ matrix.package }}/coverage/coverage.json
+          retention-days: 1
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: reports
+
       - name: Send coverage
-        uses: paambaati/codeclimate-action@v5.0.0
+        uses: paambaati/codeclimate-action@v5.0.0 #paambaati/codeclimate-action@84cea27117a473d605400ca3a97fcef7e433e2d6
         env:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
-          coverageCommand: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc
+          #coverageCommand: cd packages/${{ matrix.package }} && bundle exec rspec --color --format doc
           coverageLocations: |
-            ${{github.workspace}}/packages/forestadmin_agent/coverage/coverage.json
-#            ${{github.workspace}}/packages/forestadmin_rails/coverage/coverage.json
+            ${{github.workspace}}/reports/forestadmin_agent/coverage.json
+            ${{github.workspace}}/reports/forestadmin_rails/coverage.json
           debug: true
 
   deploy:
     name: Release package
     runs-on: ubuntu-latest
-    needs: [lint]
+    needs: [coverage]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
           persist-credentials: false # GITHUB_TOKEN must not be set for the semantic release
 
