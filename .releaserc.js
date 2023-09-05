@@ -1,5 +1,5 @@
 module.exports = {
-  branches: ['main', {name: 'beta', prerelease: true}],
+  branches: ['main', {name: 'chore/setup-config', prerelease: true}],
   plugins: [
     [
       '@semantic-release/commit-analyzer', {
