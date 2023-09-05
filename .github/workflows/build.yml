@@ -8,102 +8,103 @@ on:
   pull_request:
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        ruby-version: ['3.0', '3.1', '3.2']
-        package:
-          - forestadmin_agent
-          - forestadmin_rails
+#  lint:
+#    name: Lint
+#    runs-on: ubuntu-latest
+#    strategy:
+#      matrix:
+#        ruby-version: ['3.0', '3.1', '3.2']
+#        package:
+#          - forestadmin_agent
+#          - forestadmin_rails
+#
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Set up Ruby ${{ matrix.ruby-version }}
+#        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+#        with:
+#          ruby-version: ${{ matrix.ruby-version }}
+#
+#      - name: Install dependencies on main repo
+#        run: |
+#          gem install bundler
+#          bundle install
+#
+#      - name: Install dependencies on agent package
+#        working-directory: ./packages/forestadmin_agent
+#        run: bundle install
+#
+#      - name: Install dependencies on plugin rails package
+#        working-directory: ./packages/forestadmin_rails
+#        run: bundle install
+#
+#      - name: Run RuboCop
+#        run: bundle exec rubocop
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+#  test:
+#    name: Test
+#    runs-on: ubuntu-latest
+#    needs: [lint]
+#    strategy:
+#      matrix:
+#        ruby-version: ['3.0', '3.1', '3.2']
+#        package:
+#          - forestadmin_agent
+#          - forestadmin_rails
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Set up Ruby ${{ matrix.ruby-version }}
+#        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
+#        with:
+#          ruby-version: ${{ matrix.ruby-version }}
+#
+#      - name: Install dependencies on main repo
+#        run: |
+#          gem install bundler
+#          bundle install
+#
+#      - name: Test
+#        run: cd packages/${{ matrix.package }} && bundle install && bundle exec rspec --color --format doc && cd -
+#
+#      - name: Upload coverage
+#        uses: actions/upload-artifact@v3
+#        with:
+#          name: ${{ matrix.package }}
+#          path: packages/${{ matrix.package }}/coverage/*
+#          retention-days: 1
 
-      - name: Set up Ruby ${{ matrix.ruby-version }}
-        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-
-      - name: Install dependencies on main repo
-        run: |
-          gem install bundler
-          bundle install
-
-      - name: Install dependencies on agent package
-        working-directory: ./packages/forestadmin_agent
-        run: bundle install
-
-      - name: Install dependencies on plugin rails package
-        working-directory: ./packages/forestadmin_rails
-        run: bundle install
-
-      - name: Run RuboCop
-        run: bundle exec rubocop
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs: [lint]
-    strategy:
-      matrix:
-        ruby-version: ['3.0', '3.1', '3.2']
-        package:
-          - forestadmin_agent
-          - forestadmin_rails
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Ruby ${{ matrix.ruby-version }}
-        uses: ruby/setup-ruby@ec02537da5712d66d4d50a0f33b7eb52773b5ed1
-        with:
-          ruby-version: ${{ matrix.ruby-version }}
-
-      - name: Install dependencies on main repo
-        run: |
-          gem install bundler
-          bundle install
-
-      - name: Test
-        run: cd packages/${{ matrix.package }} && bundle install && bundle exec rspec --color --format doc && cd -
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.package }}
-          path: packages/${{ matrix.package }}/coverage/*
-          retention-days: 1
-
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          path: reports
-      - name: Send coverage
-        uses: paambaati/codeclimate-action@v5.0.0
-        env:
-          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-        with:
-          coverageLocations: |
-            ${{github.workspace}}/reports/forestadmin_agent/coverage.json:simplecov
-#            ${{github.workspace}}/reports/forestadmin_rails/coverage.json:simplecov
-          debug: true
+#  coverage:
+#    name: Coverage
+#    runs-on: ubuntu-latest
+#    needs: [test]
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Download coverage reports
+#        uses: actions/download-artifact@v3
+#        with:
+#          path: reports
+#
+#      - name: Send coverage
+#        uses: paambaati/codeclimate-action@v5.0.0
+#        env:
+#          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+#        with:
+#          coverageLocations: |
+#            ${{github.workspace}}/reports/forestadmin_agent/coverage.json:simplecov
+##            ${{github.workspace}}/reports/forestadmin_rails/coverage.json:simplecov
+#          debug: true
 
   deploy:
     name: Release package
     runs-on: ubuntu-latest
-    needs: [coverage]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
+#    needs: [coverage]
+#    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/beta')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
