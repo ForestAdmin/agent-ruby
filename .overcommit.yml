@@ -1,0 +1,27 @@
+CommitMsg:
+  MessageFormat:
+    enabled: true
+    description: 'Check commit message matches expected pattern'
+    pattern: '^(?<type>build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?<scope>\(\w+\)?((?=:\s)|(?=!:\s)))?(?<breaking>!)?(?<subject>:\s.*)'
+    expected_pattern_message: '<type>(<scope>): <subject>'
+    sample_message: 'feat(datasource): add onboarding flow'
+
+PreCommit:
+  RuboCop:
+    enabled: true
+    on_warn: fail
+
+  TrailingWhitespace:
+    enabled: true
+
+  BundleOutdated:
+    enabled: true
+
+  BundleAudit:
+    enabled: true
+
+PrePush:
+  RSpec:
+    enabled: true
+    command: ["run_rspec"]
+    quiet: false
