@@ -113,7 +113,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: 16.14.0
+          node-version: 18.14.0
 
       - uses: actions/cache@v2
         with:
