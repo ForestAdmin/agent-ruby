@@ -32,49 +32,14 @@ Style/BlockComments:
 # Offense count: 3
 # Configuration parameters: AllowedConstants.
 Style/Documentation:
-  Exclude:
-    - 'packages/forestadmin_agent/spec/**/*'
-    - 'packages/forestadmin_rails/spec/**/*'
-    - 'packages/forestadmin_rails/app/helpers/forestadmin_rails/application_helper.rb'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails.rb'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails/engine.rb'
+  Enabled: false
 
 # Offense count: 9
 # This cop supports unsafe autocorrection (--autocorrect-all).
 # Configuration parameters: EnforcedStyle.
 # SupportedStyles: always, always_true, never
 Style/FrozenStringLiteralComment:
-  Exclude:
-    - 'agent_ruby.gemspec'
-    - 'Gemfile'
-    - 'Rakefile'
-    - 'bin/console'
-    - 'bin/run_rspec'
-    - 'lib/agent_ruby.rb'
-    - 'lib/agent_ruby/version.rb'
-    - 'packages/forestadmin_agent/forestadmin_agent.gemspec'
-    - 'packages/forestadmin_agent/Gemfile'
-    - 'packages/forestadmin_agent/Rakefile'
-    - 'packages/forestadmin_agent/bin/console'
-    - 'packages/forestadmin_agent/lib/forestadmin_agent.rb'
-    - 'packages/forestadmin_agent/lib/forestadmin_agent/version.rb'
-    - 'packages/forestadmin_agent/spec/forestadmin_agent_spec.rb'
-    - 'packages/forestadmin_agent/spec/spec_helper.rb'
-    - 'packages/forestadmin_rails/forestadmin_rails.gemspec'
-    - 'packages/forestadmin_rails/Gemfile'
-    - 'packages/forestadmin_rails/Rakefile'
-    - 'packages/forestadmin_rails/bin/console'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails/version.rb'
-    - 'packages/forestadmin_rails/spec/rails_helper.rb'
-    - 'packages/forestadmin_rails/spec/spec_helper.rb'
-    - 'packages/forestadmin_rails/bin/rails'
-    - 'packages/forestadmin_rails/app/controllers/forestadmin_rails/application_controller.rb'
-    - 'packages/forestadmin_rails/app/helpers/forestadmin_rails/application_helper.rb'
-    - 'packages/forestadmin_rails/config/routes.rb'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails.rb'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails/engine.rb'
-    - 'packages/forestadmin_rails/lib/forestadmin_rails/version.rb'
-    - 'packages/forestadmin_rails/lib/tasks/forestadmin_rails_tasks.rake'
+  Enabled: false
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
