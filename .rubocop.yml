@@ -65,7 +65,7 @@ Style/FrozenStringLiteralComment:
     - 'packages/forestadmin_rails/Rakefile'
     - 'packages/forestadmin_rails/bin/console'
     - 'packages/forestadmin_rails/lib/forestadmin_rails/version.rb'
-    - 'packages/forestadmin_rails/spec/forestadmin_rails_spec.rb'
+    - 'packages/forestadmin_rails/spec/rails_helper.rb'
     - 'packages/forestadmin_rails/spec/spec_helper.rb'
     - 'packages/forestadmin_rails/bin/rails'
     - 'packages/forestadmin_rails/app/controllers/forestadmin_rails/application_controller.rb'
@@ -113,7 +113,7 @@ Style/StringLiterals:
     - 'packages/forestadmin_rails/bin/rails'
     - 'packages/forestadmin_rails/lib/forestadmin_rails.rb'
     - 'packages/forestadmin_rails/lib/forestadmin_rails/version.rb'
-    - 'packages/forestadmin_rails/spec/forestadmin_rails_spec.rb'
+    - 'packages/forestadmin_rails/spec/rails_helper.rb'
     - 'packages/forestadmin_rails/spec/spec_helper.rb'
 
 # Offense count: 1
@@ -127,6 +127,10 @@ Style/WordArray:
 Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: double_quotes
+
+Style/RedundantConstantBase:
+  Exclude:
+    - 'packages/forestadmin_rails/spec/rails_helper.rb'
 
 Layout/LineLength:
   Max: 120
