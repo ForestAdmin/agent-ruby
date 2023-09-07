@@ -7,9 +7,9 @@ module ForestadminRails
       def install
         @auth_secret = SecureRandom.hex(20)
         @env_secret = env_secret
-        template 'config.rb', 'config/initializers/forestadmin_rails.rb'
-
-        # mount ForestRails::Engine, at: '/forest'
+        template 'initializers/config.rb', 'config/initializers/forestadmin_rails.rb'
+        template 'forest_admin.rb', 'config/forest_admin.rb'
+        # route "mount ForestadminRails::Engine => '/forest'"
       end
     end
   end
