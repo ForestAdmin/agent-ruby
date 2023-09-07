@@ -29,7 +29,7 @@ module ForestadminRails
       private
 
       def send_schema
-        # TODO
+        # todo
       end
 
       def build_container
