@@ -21,6 +21,8 @@ module ForestadminRails
   setting :cache_dir, default: :memory_store
   setting :schema_path # , default: app_root.join('.forestadmin-schema.json')
   setting :project_dir # , default: app_root
+  setting :loggerLevel, default: ENV['FOREST_LOGGER_LEVEL'] || 'info'
+  setting :logger, default: nil
 
   autoload :Registry, 'forestadmin_rails/registry'
 

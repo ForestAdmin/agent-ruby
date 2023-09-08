@@ -15,7 +15,6 @@ module ForestadminRails
       # callback.call(self)
 
       Registry::AgentFactory.instance.build
-      # loadRoutes should be already loaded by the engine (need to check)
     end
   end
 end

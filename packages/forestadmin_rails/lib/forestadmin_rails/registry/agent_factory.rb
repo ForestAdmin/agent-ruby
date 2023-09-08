@@ -38,7 +38,10 @@ module ForestadminRails
 
       def build_cache; end
 
-      def build_logger; end
+      def build_logger
+        logger = LoggerService.new(@options[:loggerLevel], @options[:logger])
+        @container.register('logger', logger)
+      end
     end
   end
 end
