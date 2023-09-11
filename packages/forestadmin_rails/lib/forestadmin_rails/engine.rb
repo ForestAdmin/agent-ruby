@@ -11,8 +11,7 @@ module ForestadminRails
     def load_configuration
       return unless File.exist?(Rails.root.join('config', 'forest_admin.rb'))
 
-      # callback = require Rails.root.join('config', 'forest_admin.rb')
-      # callback.call(self)
+      require Rails.root.join('config', 'forest_admin.rb')
 
       Registry::AgentFactory.instance.build
     end

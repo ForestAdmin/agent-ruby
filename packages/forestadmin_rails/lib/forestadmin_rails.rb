@@ -18,7 +18,7 @@ module ForestadminRails
   setting :is_production, default: (ENV['FOREST_ENVIRONMENT'] || 'dev') == 'prod'
   setting :prefix, default: ENV['FOREST_PREFIX'] || 'forest'
   setting :permission_expiration, default: ENV['FOREST_PERMISSIONS_EXPIRATION_IN_SECONDS'] || 300
-  setting :cache_dir, default: :memory_store
+  setting :cache_dir, default: :'tmp/cache/forestadmin'
   setting :schema_path # , default: app_root.join('.forestadmin-schema.json')
   setting :project_dir # , default: app_root
   setting :loggerLevel, default: ENV['FOREST_LOGGER_LEVEL'] || 'info'

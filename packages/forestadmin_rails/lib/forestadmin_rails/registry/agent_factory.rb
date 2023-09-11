@@ -1,4 +1,5 @@
 require 'dry-container'
+require 'lightly'
 
 # TODO: move to a new agent package
 module ForestadminRails
@@ -22,13 +23,13 @@ module ForestadminRails
 
       def build
         # @customizer.datasource
-        @container.register('datasource', {})
+        @container.register(:datasource, {})
         send_schema
       end
 
       private
 
-      def send_schema
+      def send_schema(force: false)
         # todo
       end
 
@@ -36,11 +37,19 @@ module ForestadminRails
         @container = Dry::Container.new
       end
 
-      def build_cache; end
+      def build_cache
+        @container.register(:cache, Lightly.new(life: TTL_CONFIG, dir: @options[:cache_dir].to_s))
+        return unless @has_env_secret
+
+        cache = @container.resolve(:cache)
+        cache.get 'config' do
+          @options.to_h
+        end
+      end
 
       def build_logger
         logger = LoggerService.new(@options[:loggerLevel], @options[:logger])
-        @container.register('logger', logger)
+        @container.register(:logger, logger)
       end
     end
   end
