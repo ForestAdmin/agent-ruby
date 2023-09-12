@@ -1,9 +1,11 @@
+require 'forest_admin_agent'
+
 module ForestAdminRails
   class Engine < ::Rails::Engine
     isolate_namespace ForestAdminRails
 
     config.after_initialize do
-      agent_factory = Registry::AgentFactory.instance
+      agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
       agent_factory.setup(ForestAdminRails.config)
       load_configuration
     end
@@ -13,7 +15,7 @@ module ForestAdminRails
 
       require Rails.root.join('config', 'forest_admin.rb')
 
-      Registry::AgentFactory.instance.build
+      ForestAdminAgent::Builder::AgentFactory.instance.build
     end
   end
 end

@@ -1,9 +1,8 @@
 require 'dry-container'
 require 'lightly'
 
-# TODO: move to a new agent package
-module ForestAdminRails
-  module Registry
+module ForestAdminAgent
+  module Builder
     class AgentFactory
       include Singleton
 
@@ -48,7 +47,7 @@ module ForestAdminRails
       end
 
       def build_logger
-        logger = LoggerService.new(@options[:loggerLevel], @options[:logger])
+        logger = Services::LoggerService.new(@options[:loggerLevel], @options[:logger])
         @container.register(:logger, logger)
       end
     end

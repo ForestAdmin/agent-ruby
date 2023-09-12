@@ -2,8 +2,8 @@ module ForestAdminRails
   class ForestController < ActionController::Base
     def index
       route_alias = request.routes.named_routes.helper_names.first.delete_suffix('_path')
-      if ForestAdminRails::Registry::Router.routes.key? route_alias
-        route = ForestAdminRails::Registry::Router.routes[route_alias]
+      if ForestAdminAgent::Http::Router.routes.key? route_alias
+        route = ForestAdminAgent::Http::Router.routes[route_alias]
 
         forest_response route[:closure]
       else

@@ -1,6 +1,5 @@
-# TODO: move to a new toolkit package
-module ForestAdminRails
-  module Registry
+module ForestAdminAgent
+  module Routes
     class AbstractRoute
       attr_reader :request
 

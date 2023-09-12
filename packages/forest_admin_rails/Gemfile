@@ -3,6 +3,8 @@ git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 gemspec
 
+gem 'forest_admin_agent', path: '/Users/matthieuvideaud/Sites/agents/in-app/agent-ruby/packages/forest_admin_agent'
+
 group :development, :test do
   gem 'rspec-rails', '~> 6.0.0'
   gem 'simplecov', "~> 0.22", require: false

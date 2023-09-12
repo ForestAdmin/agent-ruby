@@ -1,12 +1,11 @@
-# TODO: move to a new agent package
-module ForestAdminRails
-  module Registry
+module ForestAdminAgent
+  module Http
     class Router
       def self.routes
         [
           # actions_routes,
           # api_charts_routes,
-          HealthCheck.new.routes
+          ForestAdminAgent::Routes::System::HealthCheck.new.routes
         ].inject(&:merge)
       end
 

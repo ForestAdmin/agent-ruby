@@ -1,3 +1,6 @@
+lib = File.expand_path('lib', __dir__)
+$LOAD_PATH.unshift lib unless $LOAD_PATH.include?(lib)
+
 require_relative "lib/forest_admin_agent/version"
 
 Gem::Specification.new do |spec|
@@ -30,6 +33,9 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "dry-container", "~> 0.11"
+  spec.add_dependency "lightly", "~> 0.4.0"
+  spec.add_dependency "mono_logger", "~> 1.1"
   spec.add_dependency "rake", "~> 13.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end

@@ -1,8 +1,7 @@
 require 'mono_logger'
 
-# TODO: move to a new agent package
-module ForestAdminRails
-  module Registry
+module ForestAdminAgent
+  module Services
     class LoggerService
       attr_reader :default_logger
 

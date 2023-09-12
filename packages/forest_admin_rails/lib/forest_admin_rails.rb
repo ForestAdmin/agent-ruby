@@ -1,8 +1,9 @@
 require 'dry-configurable'
-require "forest_admin_rails/version"
-require "forest_admin_rails/engine"
-require "zeitwerk"
+require 'forest_admin_rails/version'
+require 'forest_admin_rails/engine'
+require 'zeitwerk'
 require 'rails/railtie'
+require 'forest_admin_agent'
 
 loader = Zeitwerk::Loader.for_gem
 loader.ignore("#{__dir__}/generators")
@@ -23,8 +24,6 @@ module ForestAdminRails
   setting :project_dir # , default: app_root
   setting :loggerLevel, default: ENV['FOREST_LOGGER_LEVEL'] || 'info'
   setting :logger, default: nil
-
-  autoload :Registry, 'forest_admin_rails/registry'
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine
