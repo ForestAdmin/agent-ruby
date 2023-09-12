@@ -15,8 +15,8 @@ jobs:
       matrix:
         ruby-version: ['3.0', '3.1', '3.2']
         package:
-          - forestadmin_agent
-          - forestadmin_rails
+          - forest_admin_agent
+          - forest_admin_rails
 
     steps:
       - name: Checkout
@@ -33,11 +33,11 @@ jobs:
           bundle install
 
       - name: Install dependencies on agent package
-        working-directory: ./packages/forestadmin_agent
+        working-directory: ./packages/forest_admin_agent
         run: bundle install
 
       - name: Install dependencies on plugin rails package
-        working-directory: ./packages/forestadmin_rails
+        working-directory: ./packages/forest_admin_rails
         run: bundle install
 
       - name: Run RuboCop
@@ -51,8 +51,8 @@ jobs:
       matrix:
         ruby-version: ['3.0', '3.1', '3.2']
         package:
-          - forestadmin_agent
-          - forestadmin_rails
+          - forest_admin_agent
+          - forest_admin_rails
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,8 +96,8 @@ jobs:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
           coverageLocations: |
-            ${{github.workspace}}/reports/forestadmin_agent/coverage.json:simplecov
-#            ${{github.workspace}}/reports/forestadmin_rails/coverage.json:simplecov
+            ${{github.workspace}}/reports/forest_admin_agent/coverage.json:simplecov
+#            ${{github.workspace}}/reports/forest_admin_rails/coverage.json:simplecov
           debug: true
 
   deploy:
