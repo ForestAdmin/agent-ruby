@@ -4,10 +4,10 @@ module ForestadminRails
     class Router
       def self.routes
         [
-          actions_routes,
-          api_charts_routes
-          # HealthCheck.make.routes,
-        ]
+          # actions_routes,
+          # api_charts_routes,
+          HealthCheck.new.routes
+        ].inject(&:merge)
       end
 
       def self.actions_routes
