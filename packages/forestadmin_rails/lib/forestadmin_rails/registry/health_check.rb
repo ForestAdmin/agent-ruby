@@ -3,7 +3,7 @@ module ForestadminRails
   module Registry
     class HealthCheck < AbstractRoute
       def setup_routes
-        add_route('aaaaa', 'GET', '/', handle_request)
+        add_route('forest', 'GET', '/', handle_request)
 
         self
       end
