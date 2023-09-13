@@ -10,13 +10,15 @@ Gemspec/OrderedDependencies:
   Exclude:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
-    - 'forest_admin_rails.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
 Lint/PercentStringArray:
   Exclude:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
+    - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
 
 # Offense count: 1
 # Configuration parameters: AllowComments.
@@ -43,6 +45,7 @@ Style/BlockComments:
   Exclude:
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
 
 # Offense count: 3
 # Configuration parameters: AllowedConstants.
@@ -65,6 +68,7 @@ Style/MutableConstant:
     - 'lib/agent_ruby/version.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/version.rb'
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
 
 # Offense count: 38
 # This cop supports safe autocorrection (--autocorrect).
@@ -95,6 +99,13 @@ Style/StringLiterals:
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
     - 'packages/forest_admin_rails/spec/rails_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/Gemfile'
+    - 'packages/forest_admin_datasource_toolkit/Rakefile'
+    - 'packages/forest_admin_datasource_toolkit/bin/console'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
+    - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
