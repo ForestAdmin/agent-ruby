@@ -1,11 +1,15 @@
 module ForestAdminAgent
   module Http
     class Router
+      include ForestAdminAgent::Routes
+
       def self.routes
         [
           # actions_routes,
           # api_charts_routes,
-          ForestAdminAgent::Routes::System::HealthCheck.new.routes
+          System::HealthCheck.new.routes,
+          Security::Authentication.new.routes,
+          Resources::List.new.routes
         ].inject(&:merge)
       end
 

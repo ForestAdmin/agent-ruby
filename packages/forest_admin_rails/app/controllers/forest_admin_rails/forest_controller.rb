@@ -5,7 +5,7 @@ module ForestAdminRails
       if ForestAdminAgent::Http::Router.routes.key? route_alias
         route = ForestAdminAgent::Http::Router.routes[route_alias]
 
-        forest_response route[:closure]
+        forest_response route[:closure].call(params)
       else
         render json: { error: 'Route not found' }, status: 404
       end
