@@ -1,0 +1,29 @@
+module ForestAdminDatasourceToolkit
+  module Components
+    module Contracts
+      class CollectionContract
+        def aggregate: -> untyped
+
+        def create: -> untyped
+
+        def datasource: -> untyped
+
+        def delete: -> untyped
+
+        def execute: -> untyped
+
+        def form: -> untyped
+
+        def list: -> untyped
+
+        def name: -> untyped
+
+        def render_chart: -> untyped
+
+        def schema: -> untyped
+
+        def update: -> untyped
+      end
+    end
+  end
+end

@@ -1,0 +1,17 @@
+module ForestAdminDatasourceToolkit
+  module Components
+    module Contracts
+      module DatasourceContract
+        def add_collection:(CollectionContract collection) -> untyped
+
+        def charts: -> untyped
+
+        def collection:(string name) -> untyped
+
+        def collections: -> untyped
+
+        def render_chart:(untyped caller, string name) -> untyped
+      end
+    end
+  end
+end
