@@ -127,6 +127,11 @@ Naming/PredicateName:
   Exclude:
     - 'packages/forest_admin_datasource_toolkit/lib/collection.rb'
 
+Metrics/ParameterLists:
+  Exclude:
+    - 'packages/forest_admin_datasource_toolkit/lib/Schema/Relations/many_to_many_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/Schema/column_schema.rb'
+
 Layout/LineLength:
   Max: 120
 
