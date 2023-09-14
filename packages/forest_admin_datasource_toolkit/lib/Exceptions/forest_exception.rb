@@ -1,5 +1,5 @@
 module ForestAdminDatasourceToolkit
-  module Exception
+  module Exceptions
     class ForestException < RuntimeError
       def initialize(msg = '')
         msg = "🌳🌳🌳 #{msg}"
