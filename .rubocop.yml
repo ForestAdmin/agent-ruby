@@ -99,3 +99,5 @@ Style/RedundantConstantBase:
 
 Layout/LineLength:
   Max: 120
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/error_messages.rb'
