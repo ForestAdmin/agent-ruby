@@ -4,7 +4,6 @@ module ForestAdminAgent
       attr_reader :request
 
       def initialize
-        @request = ActionDispatch::Request.new({})
         @routes = {}
         setup_routes
       end
