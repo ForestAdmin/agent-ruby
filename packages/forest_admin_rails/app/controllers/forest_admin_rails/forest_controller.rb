@@ -1,9 +1,10 @@
 module ForestAdminRails
   class ForestController < ActionController::Base
+    skip_forgery_protection
+
     def index
-      route_alias = request.routes.named_routes.helper_names.first.delete_suffix('_path')
-      if ForestAdminAgent::Http::Router.routes.key? route_alias
-        route = ForestAdminAgent::Http::Router.routes[route_alias]
+      if ForestAdminAgent::Http::Router.routes.key? params['route_alias']
+        route = ForestAdminAgent::Http::Router.routes[params['route_alias']]
 
         forest_response route[:closure].call(params)
       else
