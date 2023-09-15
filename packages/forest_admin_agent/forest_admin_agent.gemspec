@@ -36,6 +36,7 @@ admin work on any Ruby application."
   spec.add_dependency "dry-container", "~> 0.11"
   spec.add_dependency "lightly", "~> 0.4.0"
   spec.add_dependency "mono_logger", "~> 1.1"
+  spec.add_dependency "openid_connect", "~> 2.2"
   spec.add_dependency "rake", "~> 13.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end
