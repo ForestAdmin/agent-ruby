@@ -42,10 +42,9 @@ module ForestAdminRails
         allow do
           hostnames = [/\A.*\.forestadmin\.com\z/]
           hostnames += ENV['CORS_ORIGINS'].split(',') if ENV['CORS_ORIGINS']
-          forest_prefix = ForestAdminRails.config[:prefix]
 
           origins hostnames
-          resource "/#{forest_prefix}/*", headers: :any, methods: :any, credentials: true, max_age: 86_400
+          resource '*', headers: :any, methods: :any, credentials: true, max_age: 86_400
         end
       end
     end
