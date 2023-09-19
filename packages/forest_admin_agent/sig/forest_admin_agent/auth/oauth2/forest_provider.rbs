@@ -1,0 +1,14 @@
+module ForestAdminAgent
+  module Auth
+    module OAuth2
+      class ForestProvider
+        def initialize: (Integer , Array[String]) -> void
+        def get_resource_owner: -> ForestResourceOwner
+
+        private
+        def create_resource_owner: -> ForestResourceOwner
+        def check_response: -> Array[String]
+      end
+    end
+  end
+end

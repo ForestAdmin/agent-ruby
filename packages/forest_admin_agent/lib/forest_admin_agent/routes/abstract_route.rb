@@ -1,8 +1,6 @@
 module ForestAdminAgent
   module Routes
     class AbstractRoute
-      attr_reader :request
-
       def initialize
         @routes = {}
         setup_routes

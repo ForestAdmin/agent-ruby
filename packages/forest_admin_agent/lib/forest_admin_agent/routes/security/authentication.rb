@@ -73,7 +73,7 @@ module ForestAdminAgent
             raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
           end
 
-          params['renderingId']
+          params['renderingId'].to_i
         end
       end
     end
