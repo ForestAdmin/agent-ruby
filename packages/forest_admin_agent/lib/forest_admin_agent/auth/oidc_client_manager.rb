@@ -8,11 +8,11 @@ module ForestAdminAgent
       TTL = 60 * 60 * 24
 
       def make_forest_provider(rendering_id)
-        config_agent = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache).get('config')
+        config_agent = Facades::Container.config_from_cache
         cache_key = "#{config_agent[:env_secret]}-client-data"
         cache = setup_cache(cache_key, config_agent)
 
-        render_provider(cache, rendering_id)
+        render_provider(cache, rendering_id, config_agent[:env_secret])
       end
 
       private
@@ -49,13 +49,14 @@ module ForestAdminAgent
         response.body
       end
 
-      def render_provider(cache, rendering_id)
+      def render_provider(cache, rendering_id, secret)
         OAuth2::ForestProvider.new(
           rendering_id,
           {
             identifier: cache[:client_id],
             redirect_uri: cache[:redirect_uri],
-            host: cache[:issuer].to_s.sub(%r{^https?://(www.)?}, '')
+            host: cache[:issuer].to_s.sub(%r{^https?://(www.)?}, ''),
+            secret: secret
           }
         )
       end
