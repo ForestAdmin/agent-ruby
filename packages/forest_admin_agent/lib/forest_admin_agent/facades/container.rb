@@ -12,7 +12,7 @@ module ForestAdminAgent
       def self.get(key)
         raise "Key #{key} not found in container" unless config_from_cache.key?(key)
 
-        cache[key]
+        config_from_cache[key]
       end
     end
   end
