@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
                     :column_type
 
       def initialize(
-        column_type,
+        column_type:,
         filter_operators: [],
         is_primary_key: false,
         is_read_only: false,
