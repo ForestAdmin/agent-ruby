@@ -1,0 +1,11 @@
+module ForestAdminDatasourceActiveRecord
+  class Collection
+    @model: untyped
+
+    private
+
+    def fetch_fields: -> void
+
+    def get_enum_values: -> [String]
+  end
+end
