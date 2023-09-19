@@ -24,6 +24,20 @@ Lint/EmptyFile:
   Exclude:
     - 'packages/forest_admin_rails/app/models/forest_admin_rails/application_record.rb'
 
+Metrics/AbcSize:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/auth_manager.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+
+Metrics/MethodLength:
+  Max: 20
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+
 Style/BlockComments:
   Exclude:
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
@@ -99,6 +113,3 @@ Style/RedundantConstantBase:
 
 Layout/LineLength:
   Max: 120
-
-Metrics/MethodLength:
-  Max: 20

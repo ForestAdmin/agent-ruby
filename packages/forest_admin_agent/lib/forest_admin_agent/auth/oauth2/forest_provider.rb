@@ -15,29 +15,47 @@ module ForestAdminAgent
           self.userinfo_endpoint = "/liana/v2/renderings/#{rendering_id}/authorization"
         end
 
-        # public function getResourceOwner(AccessToken $token)
-        #     {
-        #         $response = $this->fetchResourceOwnerDetails($token);
-        #
-        #         return $this->createResourceOwner($response, $token);
-        #     }
+        def get_resource_owner(access_token)
+          headers = { 'forest-token': access_token.access_token, 'forest-secret-key': secret }
+          hash = check_response do
+            OpenIDConnect.http_client.get access_token.client.userinfo_uri, {}, headers
+          end
 
-        #  protected function fetchResourceOwnerDetails(AccessToken $token)
-        #     {
-        #         $url = $this->getResourceOwnerDetailsUrl($token);
-        #
-        #         $request = $this->getAuthenticatedRequest(self::METHOD_GET, $url, $token);
-        #
-        #         $response = $this->getParsedResponse($request);
-        #
-        #         if (false === is_array($response)) {
-        #             throw new UnexpectedValueException(
-        #                 'Invalid response received from Authorization Server. Expected JSON.'
-        #             );
-        #         }
-        #
-        #         return $response;
-        #     }
+          response = OpenIDConnect::ResponseObject::UserInfo.new hash
+
+          create_resource_owner response.raw_attributes[:data]
+        end
+
+        private
+
+        def create_resource_owner(data)
+          ForestResourceOwner.new data, rendering_id
+        end
+
+        def check_response
+          response = yield
+          case response.status
+          when 200
+            server_error = response.body.key?('errors') ? response.body['errors'][0] : nil
+            if server_error &&
+               server_error['name'] == ForestAdminAgent::Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
+              raise Error, ForestAdminAgent::Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
+            end
+
+            response.body.with_indifferent_access
+          when 400
+            raise BadRequest.new('API Access Failed', response)
+          when 401
+            raise Unauthorized.new(ForestAdminAgent::Utils::ErrorMessages::AUTHORIZATION_FAILED, response)
+          when 404
+            raise HttpError.new(res.status, ForestAdminAgent::Utils::ErrorMessages::SECRET_NOT_FOUND, response)
+          when 422
+            raise HttpError.new(res.status,
+                                ForestAdminAgent::Utils::ErrorMessages::SECRET_AND_RENDERINGID_INCONSISTENT, response)
+          else
+            raise HttpError.new(res.status, 'Unknown HttpError', response)
+          end
+        end
       end
     end
   end
