@@ -5,6 +5,8 @@ module ForestAdminAgent
   module Routes
     module System
       describe HealthCheck do
+        subject(:healthcheck) { described_class.new }
+
         before do
           agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
           agent_factory.setup(
@@ -19,15 +21,15 @@ module ForestAdminAgent
 
         context 'when testing the HealthCheck class' do
           it 'returns an empty content and a 204 status' do
-            result = described_class.handle_request
+            result = healthcheck.handle_request
             expect(result[:content]).to be_nil
             expect(result[:status]).to eq 204
           end
 
           it 'adds the route forest' do
-            described_class.setup_routes
-            expect(described_class.routes.include?('forest')).to be true
-            expect(described_class.routes.length).to eq 1
+            healthcheck.setup_routes
+            expect(healthcheck.routes.include?('forest')).to be true
+            expect(healthcheck.routes.length).to eq 1
           end
         end
       end
