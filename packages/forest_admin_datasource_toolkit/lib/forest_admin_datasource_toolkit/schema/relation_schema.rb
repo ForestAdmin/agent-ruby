@@ -1,8 +1,6 @@
 module ForestAdminDatasourceToolkit
   module Schema
     class RelationSchema
-      self.abstract_class = true
-
       attr_accessor :foreign_collection
       attr_reader :type
 

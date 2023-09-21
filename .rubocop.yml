@@ -136,12 +136,29 @@ Style/RedundantConstantBase:
 
 Naming/PredicateName:
   Exclude:
-    - 'packages/forest_admin_datasource_toolkit/lib/collection.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
 
 Metrics/ParameterLists:
   Exclude:
-    - 'packages/forest_admin_datasource_toolkit/lib/Schema/Relations/many_to_many_schema.rb'
-    - 'packages/forest_admin_datasource_toolkit/lib/Schema/column_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/many_to_many_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
+
+Metrics/MethodLength:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
+
+Metrics/AbcSize:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
 
 Layout/LineLength:
   Max: 120
