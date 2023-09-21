@@ -116,3 +116,6 @@ Layout/LineLength:
 
 RSpec/MultipleExpectations:
   Max: 5
+
+RSpec/ExampleLength:
+  Max: 20

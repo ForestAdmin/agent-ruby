@@ -43,6 +43,7 @@ module ForestAdminAgent
             true,
             { algorithm: 'HS256' }
           )[0]
+
           {
             content: {
               token: token,
