@@ -113,3 +113,6 @@ Style/RedundantConstantBase:
 
 Layout/LineLength:
   Max: 120
+
+RSpec/MultipleExpectations:
+  Max: 5
