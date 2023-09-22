@@ -5,6 +5,7 @@ require 'forest_admin_agent'
 SimpleCov.formatter = SimpleCov::Formatter::JSONFormatter
 SimpleCov.start do
   add_filter 'spec'
+  add_filter 'lib/forest_admin_agent/auth/oauth2/oidc_config.rb'
 end
 
 # Previous content of test helper now starts here
@@ -24,6 +25,7 @@ end
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
+  config.exclude_pattern = 'spec/**/spec_helper.rb'
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
   # assertions if you prefer.
