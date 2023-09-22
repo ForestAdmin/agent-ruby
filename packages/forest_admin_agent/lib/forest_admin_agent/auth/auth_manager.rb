@@ -15,7 +15,7 @@ module ForestAdminAgent
       def verify_code_and_generate_token(params)
         raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_MISSING unless params['state']
 
-        if Rails.env.development? || Rails.env.test?
+        if Facades::Container.get(:debug)
           OpenIDConnect.http_config do |options|
             options.ssl.verify = false
           end
