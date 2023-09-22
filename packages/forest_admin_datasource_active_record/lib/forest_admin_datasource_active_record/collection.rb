@@ -39,7 +39,7 @@ module ForestAdminDatasourceActiveRecord
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-              foreign_collection: association.name,
+              foreign_collection: association.class_name,
               origin_key: association.foreign_key,
               origin_key_target: association.join_foreign_key
             )
@@ -48,7 +48,7 @@ module ForestAdminDatasourceActiveRecord
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-              foreign_collection: association.name,
+              foreign_collection: association.class_name,
               foreign_key: association.foreign_key,
               foreign_key_target: association.join_foreign_key
             )
@@ -58,19 +58,19 @@ module ForestAdminDatasourceActiveRecord
             add_field(
               association.name.to_s,
               ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                foreign_collection: association.name,
-                origin_key: association.through_reflection.foreign_key,
-                origin_key_target: association.through_reflection.join_foreign_key,
-                foreign_key: association.association_primary_key,
-                foreign_key_target: association.join_foreign_key,
-                through_collection: association.through_reflection.name
+                foreign_collection: association.class_name,
+                origin_key: association.through_reflection.join_foreign_key,
+                origin_key_target: association.through_reflection.foreign_key,
+                foreign_key: association.join_foreign_key,
+                foreign_key_target: association.association_primary_key,
+                through_collection: association.through_reflection.class_name
               )
             )
           else
             add_field(
               association.name.to_s,
               ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-                foreign_collection: association.name,
+                foreign_collection: association.class_name,
                 origin_key: association.foreign_key, # TODO: remove hardcoded id
                 origin_key_target: association.join_foreign_key
               )

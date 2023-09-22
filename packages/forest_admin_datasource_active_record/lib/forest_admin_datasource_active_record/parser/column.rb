@@ -15,7 +15,8 @@ module ForestAdminDatasourceActiveRecord
         text: 'String',
         citext: 'String',
         time: 'Time',
-        uuid: 'Uuid'
+        uuid: 'Uuid',
+        binary: 'Binary'
       }.freeze
 
       def get_column_type(column)

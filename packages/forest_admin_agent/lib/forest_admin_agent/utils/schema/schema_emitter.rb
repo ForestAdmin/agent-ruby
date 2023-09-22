@@ -1,0 +1,103 @@
+require 'digest/sha1'
+require 'json'
+
+module ForestAdminAgent
+  module Utils
+    module Schema
+      class SchemaEmitter
+        LIANA_NAME = 'agent-ruby'.freeze
+
+        LIANA_VERSION = 'beta'.freeze
+
+        def self.get_serialized_schema(datasource)
+          config = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache).get('config')
+          if config[:is_production]
+            schema = if config[:schema_path] && File.exist?(config[:schema_path])
+                       JSON.parse(File.read(config[:schema_path]))
+                     else
+                       # TODO: Logger::log('Warn', 'The .forestadmin-schema.json file doesn\'t exist')
+                       {
+                         meta: meta(hash),
+                         collections: {}
+                       }
+                     end
+          else
+            schema = generate(datasource)
+            hash = Digest::SHA1.hexdigest(schema.to_json)
+            schema = {
+              meta: meta(hash),
+              collections: schema
+            }
+
+            File.write(config[:schema_path], JSON.pretty_generate(schema))
+          end
+
+          serialize(schema)
+        end
+
+        class << self
+          private
+
+          def generate(datasource)
+            datasource.collections
+                      .map { |_name, collection| GeneratorCollection.build_schema(collection) }
+                      .sort_by { |collection| collection[:name] }
+          end
+
+          def meta(hash)
+            {
+              liana: LIANA_NAME,
+              liana_version: LIANA_VERSION,
+              stack: {
+                engine: 'ruby',
+                engine_version: RUBY_VERSION
+              },
+              schemaFileHash: hash
+            }
+          end
+
+          def serialize(schema)
+            data = []
+            included = []
+            schema[:collections].each do |collection|
+              collection_actions = collection[:actions]
+              collection_segments = collection[:segments]
+              collection.delete(:actions)
+              collection.delete(:segments)
+
+              included.push(get_smart_features_by_collection('actions', collection_actions, with_attributes: true))
+              included.push(get_smart_features_by_collection('segments', collection_segments, with_attributes: true))
+
+              data.push(
+                {
+                  id: collection[:name],
+                  type: 'collections',
+                  attributes: collection,
+                  relationships: {
+                    actions: { data: get_smart_features_by_collection('actions', collection_actions) },
+                    segments: { data: get_smart_features_by_collection('segments', collection_actions) }
+                  }
+                }
+              )
+            end
+
+            {
+              data: data,
+              included: included.reject!(&:empty),
+              meta: schema[:meta]
+            }
+          end
+
+          def get_smart_features_by_collection(type, data, with_attributes: false)
+            smart_features = []
+            data.each do |value|
+              smart_feature = { id: value[:id], type: type }
+              smart_feature[:attributes] = value if with_attributes
+              smart_features.push(smart_feature)
+            end
+          end
+        end
+      end
+    end
+  end
+end

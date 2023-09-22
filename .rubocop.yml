@@ -33,15 +33,15 @@ Metrics/AbcSize:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/auth_manager.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oidc_client_manager.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
 
 Metrics/CyclomaticComplexity:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
-
-Metrics/MethodLength:
-  Max: 20
-  Exclude:
-    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
 
 Style/BlockComments:
   Exclude:
@@ -144,7 +144,10 @@ Metrics/ParameterLists:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
 
 Metrics/MethodLength:
+  CountAsOne: ['array', 'hash', 'method_call']
+  Max: 20
   Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
@@ -153,18 +156,13 @@ Metrics/BlockLength:
   Exclude:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
 
-Metrics/AbcSize:
-  Exclude:
-    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
-    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
-
-Metrics/CyclomaticComplexity:
-  Exclude:
-    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
-
 Metrics/PerceivedComplexity:
   Exclude:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+
+Metrics/ClassLength:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
 
 Layout/LineLength:
   Max: 120
