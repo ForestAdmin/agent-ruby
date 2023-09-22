@@ -164,14 +164,16 @@ Metrics/ClassLength:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
 
-Layout/LineLength:
-  Max: 120
-
 RSpec/ExampleLength:
+  CountAsOne: [ 'array', 'hash', 'method_call' ]
   Max: 20
+
 
 RSpec/MultipleExpectations:
   Max: 5
+
+Layout/LineLength:
+  Max: 120
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
