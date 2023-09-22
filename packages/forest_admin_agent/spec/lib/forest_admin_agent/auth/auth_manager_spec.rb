@@ -67,19 +67,3 @@ module ForestAdminAgent
     end
   end
 end
-# def build_stack
-#         container = Dry::Container.new.register(:cache, Lightly.new(life: 1))
-#         container.register(:cache, Lightly.new(life: 1))
-#         container.resolve(:cache).get 'config' do
-#           {
-#             auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
-#             env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb'
-#           }
-#         end
-#
-#         container
-#       end
-#
-#       before do
-#         allow(ForestAdminAgent::Facades::Container).to receive(:instance).and_return(build_stack)
-#       end
