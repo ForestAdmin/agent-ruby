@@ -2,6 +2,8 @@ module ForestAdminAgent
   module Auth
     module OAuth2
       class ForestProvider
+        attr_reader rendering_id: Integer
+
         def initialize: (Integer , Array[String]) -> void
         def get_resource_owner: -> ForestResourceOwner
 
