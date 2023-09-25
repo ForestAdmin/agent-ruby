@@ -28,6 +28,7 @@ Metrics/AbcSize:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/auth_manager.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oidc_client_manager.rb'
 
 Metrics/CyclomaticComplexity:
   Exclude:

@@ -36,6 +36,8 @@ module ForestAdminAgent
             issuer: oidc_config.raw['issuer'],
             redirect_uri: credentials['redirect_uris'].first
           }
+        rescue OpenIDConnect::Discovery::DiscoveryFailed
+          raise Error, ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN
         end
       end
 

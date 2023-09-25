@@ -11,7 +11,7 @@ module ForestAdminAgent
             response.validate!
           end
         rescue SWD::Exception, OpenIDConnect::ValidationFailed => e
-          raise OpenIDConnect::DiscoveryFailed, e.message
+          raise OpenIDConnect::Discovery::DiscoveryFailed, e.message
         end
 
         class Resource < OpenIDConnect::Discovery::Provider::Config::Resource
