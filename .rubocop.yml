@@ -114,8 +114,11 @@ Style/RedundantConstantBase:
 Layout/LineLength:
   Max: 120
 
+RSpec/ExampleLength:
+  Max: 20
+
 RSpec/MultipleExpectations:
   Max: 5
 
-RSpec/ExampleLength:
-  Max: 20
+RSpec/MultipleMemoizedHelpers:
+  Max: 10
