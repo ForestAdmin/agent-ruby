@@ -38,22 +38,22 @@ module ForestAdminAgent
           when 200
             server_error = response.body.key?('errors') ? response.body['errors'][0] : nil
             if server_error &&
-               server_error['name'] == ForestAdminAgent::Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
-              raise Error, ForestAdminAgent::Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
+               server_error['name'] == Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
+              raise Error, Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
             end
 
             response.body.with_indifferent_access
           when 400
-            raise BadRequest.new('API Access Failed', response)
+            raise OpenIDConnect::BadRequest.new('API Access Failed', response)
           when 401
-            raise Unauthorized.new(ForestAdminAgent::Utils::ErrorMessages::AUTHORIZATION_FAILED, response)
+            raise OpenIDConnect::Unauthorized.new(Utils::ErrorMessages::AUTHORIZATION_FAILED, response)
           when 404
-            raise HttpError.new(res.status, ForestAdminAgent::Utils::ErrorMessages::SECRET_NOT_FOUND, response)
+            raise OpenIDConnect::HttpError.new(response.status, Utils::ErrorMessages::SECRET_NOT_FOUND, response)
           when 422
-            raise HttpError.new(res.status,
-                                ForestAdminAgent::Utils::ErrorMessages::SECRET_AND_RENDERINGID_INCONSISTENT, response)
+            raise OpenIDConnect::HttpError.new(response.status,
+                                               Utils::ErrorMessages::SECRET_AND_RENDERINGID_INCONSISTENT, response)
           else
-            raise HttpError.new(res.status, 'Unknown HttpError', response)
+            raise OpenIDConnect::HttpError.new(response.status, 'Unknown HttpError', response)
           end
         end
       end
