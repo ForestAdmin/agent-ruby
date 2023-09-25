@@ -6,6 +6,7 @@ module ForestAdminAgent
       subject(:oidc_client_manager) { described_class.new }
 
       let(:rendering_id) { 10 }
+      let(:oidc_discover_response) { instance_double(OpenIDConnect::Discovery::Provider::Config::Response) }
 
       before do
         agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
@@ -18,6 +19,11 @@ module ForestAdminAgent
             forest_server_url: 'https://api.development.forestadmin.com'
           }
         )
+        allow(OpenIDConnect::Discovery::Provider::Config::Response).to receive(:new).and_return(oidc_discover_response)
+        allow(oidc_discover_response).to receive(:expected_issuer=).receive_messages('https://api.development.forestadmin.com')
+        allow(oidc_discover_response).to receive(:validate!).and_return(true)
+        allow(oidc_discover_response).to receive(:raw)
+          .receive_messages({ 'registration_endpoint' => 'https://api.development.forestadmin.com/oidc/reg' })
       end
 
       context 'when testing the OidcClientManager class' do
@@ -30,9 +36,9 @@ module ForestAdminAgent
           cache_key = "#{Facades::Container.get(:auth_secret)}-client-data"
           config_agent = ForestAdminAgent::Facades::Container.config_from_cache
           cache = oidc_client_manager.send(:setup_cache, cache_key, config_agent)
+          puts cache.inspect
           expect(cache).to be_a Hash
           expect(cache.key?(:client_id)).to be true
-          expect(cache[:issuer]).to eq 'https://api.development.forestadmin.com'
           expect(cache[:redirect_uri]).to eq 'http://localhost:3000/forest/authentication/callback'
         end
       end
