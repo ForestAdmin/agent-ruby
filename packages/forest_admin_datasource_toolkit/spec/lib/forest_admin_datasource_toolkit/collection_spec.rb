@@ -31,18 +31,17 @@ module ForestAdminDatasourceToolkit
         @collection.add_fields(
           {
             __first__: @field,
-            __second__: @field,
+            __second__: @field
           }
         )
 
         expect(@collection.fields).to eq(
           {
             __first__: @field,
-            __second__: @field,
+            __second__: @field
           }
         )
       end
     end
-
   end
 end
