@@ -33,7 +33,7 @@ module ForestAdminAgent
           }
 
           JWT.encode user,
-                     Facades::Container.get(:auth_secret),
+                     Facades::Container.cache(:auth_secret),
                      'HS256'
         end
       end

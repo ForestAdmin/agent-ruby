@@ -44,7 +44,7 @@ module ForestAdminAgent
         end
 
         it 'setups the cache on the setup_cache method' do
-          cache_key = "#{Facades::Container.get(:auth_secret)}-client-data"
+          cache_key = "#{Facades::Container.cache(:auth_secret)}-client-data"
           config_agent = ForestAdminAgent::Facades::Container.config_from_cache
           cache = oidc_client_manager.send(:setup_cache, cache_key, config_agent)
           expect(cache).to be_a Hash

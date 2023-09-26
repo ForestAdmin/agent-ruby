@@ -74,7 +74,7 @@ module ForestAdminAgent
             expect(result[:content][:token]).to eq token
             expect(result[:content][:tokenData]).to eq JWT.decode(
               token,
-              Facades::Container.get(:auth_secret),
+              Facades::Container.cache(:auth_secret),
               true,
               { algorithm: 'HS256' }
             )[0]

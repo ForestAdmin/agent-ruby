@@ -39,7 +39,7 @@ module ForestAdminAgent
           token = auth.verify_code_and_generate_token(args)
           token_data = JWT.decode(
             token,
-            Facades::Container.get(:auth_secret),
+            Facades::Container.cache(:auth_secret),
             true,
             { algorithm: 'HS256' }
           )[0]

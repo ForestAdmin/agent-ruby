@@ -30,7 +30,7 @@ module ForestAdminAgent
 
           it 'makes a jwt' do
             jwt = forest_resource_owner.make_jwt
-            decoded_jwt = JWT.decode jwt, Facades::Container.get(:auth_secret), true, { algorithm: 'HS256' }
+            decoded_jwt = JWT.decode jwt, Facades::Container.cache(:auth_secret), true, { algorithm: 'HS256' }
             puts decoded_jwt
             h = {
               'id' => 'id',
