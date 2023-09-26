@@ -12,17 +12,6 @@ module ForestAdminAgent
       let(:access_token) { instance_double(OpenIDConnect::AccessToken) }
 
       before do
-        agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
-        agent_factory.setup(
-          {
-            auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
-            env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
-            is_production: false,
-            cache_dir: 'tmp/cache/forest_admin',
-            debug: true
-          }
-        )
-
         allow(ForestAdminAgent::Auth::OidcClientManager).to receive(:new).and_return(oidc)
         allow(oidc).to receive(:make_forest_provider).with(any_args).and_return(forest_provider)
         allow(forest_provider).to receive(:authorization_uri).with(any_args).and_return('https://api.development.forestadmin.com/oidc/...')

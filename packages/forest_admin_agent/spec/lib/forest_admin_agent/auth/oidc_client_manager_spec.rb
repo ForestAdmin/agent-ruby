@@ -9,25 +9,21 @@ module ForestAdminAgent
       let(:oidc_discover_response) { instance_double(OpenIDConnect::Discovery::Provider::Config::Response) }
       let(:oidc_discover_resource) { instance_double(OpenIDConnect::Discovery::Provider::Config::Resource) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
-      let(:register) do
-        instance_double(Faraday::Response, body: { 'client_id' => 'client_id', 'redirect_uris' => ['redirect_uri'] })
-      end
 
-      before do
-        Dir.mkdir('tmp/cache/forest_admin') unless Dir.exist?('tmp/cache/forest_admin')
-        agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
-        agent_factory.setup(
-          {
-            auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
-            env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
-            is_production: false,
-            cache_dir: 'tmp/cache/forest_admin',
-            forest_server_url: 'https://api.development.forestadmin.com'
-          }
-        )
+      context 'when then oidc is called and forest api is down' do
+        it 'raises an error' do
+          class_double(ForestAdminAgent::Auth::OAuth2::OidcConfig, discover!: OpenIDConnect::Discovery::DiscoveryFailed)
+          expect do
+            oidc_client_manager.make_forest_provider :rendering_id
+          end.to raise_error(ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN)
+        end
       end
 
       context 'when then oidc is called' do
+        let(:register) do
+          instance_double(Faraday::Response, body: { 'client_id' => 'client_id', 'redirect_uris' => ['redirect_uri'] })
+        end
+
         before do
           allow(OpenIDConnect::Discovery::Provider::Config::Response).to receive(:new)
             .and_return(oidc_discover_response)
@@ -54,14 +50,6 @@ module ForestAdminAgent
           expect(cache).to be_a Hash
           expect(cache.key?(:client_id)).to be true
           expect(cache[:redirect_uri]).to eq 'redirect_uri'
-        end
-      end
-
-      context 'when then oidc is called and forest api is down' do
-        it 'raises an error' do
-          expect do
-            oidc_client_manager.make_forest_provider :rendering_id
-          end.to raise_error(ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN)
         end
       end
     end

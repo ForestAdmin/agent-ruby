@@ -1,3 +1,4 @@
+require 'lightly'
 require 'simplecov'
 require 'simplecov_json_formatter'
 require 'forest_admin_agent'
@@ -26,6 +27,22 @@ end
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
   config.exclude_pattern = 'spec/**/spec_helper.rb'
+  config.before do
+    lightly = Lightly.new
+    lightly.clear 'config'
+
+    agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+    agent_factory.setup(
+      {
+        auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+        env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+        is_production: false,
+        cache_dir: 'tmp/cache/forest_admin',
+        forest_server_url: 'https://api.development.forestadmin.com',
+        debug: true
+      }
+    )
+  end
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
   # assertions if you prefer.
