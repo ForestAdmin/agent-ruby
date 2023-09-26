@@ -123,3 +123,6 @@ RSpec/MultipleExpectations:
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
+
+Lint/NonAtomicFileOperation:
+  Enabled: false
