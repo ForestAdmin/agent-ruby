@@ -14,6 +14,7 @@ module ForestAdminAgent
       end
 
       before do
+        Dir.mkdir('tmp/cache/forest_admin')
         agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
         agent_factory.setup(
           {
