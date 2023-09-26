@@ -37,7 +37,7 @@ module ForestAdminAgent
               'permission_level' => 'admin'
             }
           end
-          let(:token) { JWT.encode :user, ForestAdminAgent::Facades::Container.get(:auth_secret), 'HS256' }
+          let(:token) { JWT.encode :user, ForestAdminAgent::Facades::Container.cache(:auth_secret), 'HS256' }
           let(:auth_manager) { instance_double(ForestAdminAgent::Auth::AuthManager) }
 
           before do
