@@ -20,7 +20,7 @@ module ForestAdminAgent
       def setup_cache(env_secret, config_agent)
         lightly = Lightly.new(life: TTL, dir: "#{config_agent[:cache_dir]}/issuer")
         lightly.get env_secret do
-          oidc_config = OAuth2::OidcConfig.discover! config_agent[:forest_server_url]
+          oidc_config = retrieve_config(config_agent[:forest_server_url])
           credentials = register(
             config_agent[:env_secret],
             oidc_config.raw['registration_endpoint'],
@@ -36,8 +36,6 @@ module ForestAdminAgent
             issuer: oidc_config.raw['issuer'],
             redirect_uri: credentials['redirect_uris'].first
           }
-        rescue OpenIDConnect::Discovery::DiscoveryFailed
-          raise Error, ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN
         end
       end
 
@@ -61,6 +59,12 @@ module ForestAdminAgent
             secret: secret
           }
         )
+      end
+
+      def retrieve_config(uri)
+        OAuth2::OidcConfig.discover! uri
+      rescue OpenIDConnect::Discovery::DiscoveryFailed
+        raise Error, ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN
       end
     end
   end
