@@ -26,7 +26,6 @@ end
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
-  config.exclude_pattern = 'spec/**/spec_helper.rb'
   config.before do
     lightly = Lightly.new
     lightly.clear 'config'
