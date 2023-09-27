@@ -1,8 +1,9 @@
 require 'simplecov'
 require 'simplecov_json_formatter'
-require "forest_admin_datasource_toolkit"
+require 'simplecov-html'
+require 'forest_admin_datasource_toolkit'
 
-SimpleCov.formatter = SimpleCov::Formatter::JSONFormatter
+SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
   add_filter 'spec'
 end

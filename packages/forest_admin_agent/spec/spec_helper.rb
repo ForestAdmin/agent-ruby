@@ -1,9 +1,10 @@
 require 'lightly'
 require 'simplecov'
 require 'simplecov_json_formatter'
+require 'simplecov-html'
 require 'forest_admin_agent'
 
-SimpleCov.formatter = SimpleCov::Formatter::JSONFormatter
+SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
   add_filter 'spec'
   add_filter 'lib/forest_admin_agent/auth/oauth2/oidc_config.rb'

@@ -5,15 +5,16 @@ gemspec
 
 gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
 
-gem "rake", "~> 13.0"
+gem 'rake', '~> 13.0'
 
-gem "rubocop", "~> 1.21"
+gem 'rubocop', '~> 1.21'
 
-group :test do
-  gem "rspec-rails", "~> 3.0"
+group :development, :test do
+  gem 'rspec-rails', '~> 3.0'
   gem 'rails'
   gem 'database_cleaner-active_record'
   gem 'sqlite3'
-  gem 'simplecov', "~> 0.22", require: false
-  gem 'simplecov_json_formatter', "~> 0.1.4"
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov_json_formatter', '~> 0.1.4'
+  gem 'simplecov-html', '~> 0.10.0'
 end

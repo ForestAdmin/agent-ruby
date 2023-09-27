@@ -1,14 +1,15 @@
 require 'simplecov'
-# require 'simplecov_json_formatter'
-# SimpleCov.formatter = SimpleCov::Formatter::JSONFormatter
+require 'simplecov_json_formatter'
+require 'simplecov-html'
+require 'forest_admin_datasource_active_record'
+require 'active_record'
+require 'database_cleaner-active_record'
+
+SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start  do
   add_filter 'spec'
   add_group "Lib", "lib"
 end
-
-require 'forest_admin_datasource_active_record'
-require 'active_record'
-require 'database_cleaner-active_record'
 
 ENV['RAILS_ENV'] ||= 'test'
 require File.expand_path('../dummy/config/environment', __FILE__)
