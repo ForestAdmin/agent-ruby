@@ -16,6 +16,7 @@ module ForestAdminDatasourceToolkit
         it { expect { collection.update }.to raise_error(NotImplementedError) }
         it { expect { collection.delete }.to raise_error(NotImplementedError) }
         it { expect { collection.aggregate }.to raise_error(NotImplementedError) }
+        it { expect { collection.render_chart }.to raise_error(NotImplementedError) }
       end
     end
   end
