@@ -3,6 +3,8 @@ require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_agent'
+require 'forest_admin_datasource_toolkit'
+require 'singleton'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do

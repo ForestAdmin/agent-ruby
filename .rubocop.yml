@@ -128,6 +128,10 @@ Style/WordArray:
   EnforcedStyle: percent
   MinSize: 3
 
+Style/SymbolArray:
+  Exclude:
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/schema/generator_field_many_to_many_spec.rb'
+
 Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: double_quotes
@@ -144,6 +148,9 @@ Metrics/ParameterLists:
   Exclude:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/many_to_many_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
+
+Metrics/ModuleLength:
+  CountAsOne: [ 'array', 'hash', 'method_call' ]
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']

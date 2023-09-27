@@ -3,10 +3,10 @@ module ForestAdminAgent
     module Schema
       class GeneratorField
         RELATION_MAP = {
-          ManyToMany: 'BelongsToMany',
-          ManyToOne: 'BelongsTo',
-          OneToMany: 'HasMany',
-          OneToOne: 'HasOne'
+          'ManyToMany' => 'BelongsToMany',
+          'ManyToOne' => 'BelongsTo',
+          'OneToMany' => 'HasMany',
+          'OneToOne' => 'HasOne'
         }.freeze
 
         def self.build_schema(collection, name)
@@ -37,7 +37,7 @@ module ForestAdminAgent
               field: name,
               integration: nil,
               inverseOf: nil,
-              isFilterable: true, # TODO: FrontendFilterableUtils.isFilterable(),
+              isFilterable: false, # TODO: FrontendFilterableUtils.isFilterable(),
               isPrimaryKey: column.is_primary_key,
 
               # When a column is a foreign key, it is readonly.
@@ -82,7 +82,7 @@ module ForestAdminAgent
 
             base_schema.merge(
               {
-                type: target_field.column_type,
+                type: [target_field.column_type],
                 defaultValue: nil,
                 isFilterable: false,
                 isPrimaryKey: false,
@@ -102,7 +102,7 @@ module ForestAdminAgent
 
             base_schema.merge(
               {
-                type: target_field.column_type,
+                type: [target_field.column_type],
                 defaultValue: nil,
                 isFilterable: false,
                 isPrimaryKey: false,
@@ -161,7 +161,7 @@ module ForestAdminAgent
               enums: nil,
               integration: nil,
               isReadOnly: nil,
-              isVirtual: nil,
+              isVirtual: false,
               inverseOf: nil, # TODO: CollectionUtils::getInverseRelation(collection, name)
               relationship: RELATION_MAP[relation.type]
             }

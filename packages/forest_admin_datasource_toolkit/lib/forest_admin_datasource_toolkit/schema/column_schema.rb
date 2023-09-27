@@ -14,7 +14,7 @@ module ForestAdminDatasourceToolkit
         filter_operators: [],
         is_primary_key: false,
         is_read_only: false,
-        is_sortable: true,
+        is_sortable: false,
         default_value: nil,
         enum_values: [],
         validations: []
