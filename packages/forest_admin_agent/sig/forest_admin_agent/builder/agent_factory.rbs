@@ -1,0 +1,21 @@
+module ForestAdminAgent
+  module Builder
+    class AgentFactory
+      TTL_CONFIG: Integer
+      TTL_SCHEMA: Integer
+      @options: untyped
+
+      attr_reader customizer: untyped
+      attr_reader container: untyped
+      attr_reader has_env_secret: untyped
+      def setup: (Array[string] options) -> untyped
+      def build: -> nil
+
+      private
+      def send_schema: (?force: false) -> nil
+      def build_container: -> untyped
+      def build_cache: -> nil
+      def build_logger: -> untyped
+    end
+  end
+end

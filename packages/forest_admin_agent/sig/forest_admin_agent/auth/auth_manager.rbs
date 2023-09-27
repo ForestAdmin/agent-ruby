@@ -1,0 +1,14 @@
+module ForestAdminAgent
+  module Auth
+    class AuthManager
+      @oidc: ForestAdminAgent::Auth::OidcClientManager
+
+      def initialize: -> void
+      def start: (untyped rendering_id) -> untyped
+      def verify_code_and_generate_token: (untyped params) -> untyped
+
+      private
+      def get_rendering_id_from_state: (untyped state) -> untyped
+    end
+  end
+end

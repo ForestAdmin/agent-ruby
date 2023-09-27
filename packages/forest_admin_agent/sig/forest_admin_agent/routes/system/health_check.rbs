@@ -1,0 +1,10 @@
+module ForestAdminAgent
+  module Routes
+    module System
+      class HealthCheck
+        def setup_routes: -> HealthCheck
+        def handle_request: (?Hash[untyped, untyped] _args) -> {content: nil, status: Integer}
+      end
+    end
+  end
+end

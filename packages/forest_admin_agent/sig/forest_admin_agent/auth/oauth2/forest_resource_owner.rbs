@@ -1,0 +1,15 @@
+module ForestAdminAgent
+  module Auth
+    module OAuth2
+      class ForestResourceOwner
+        @data: Array[String]
+        @rendering_id: Integer
+
+        def initialize: (Array[String] data, Integer rendering_id) -> void
+        def id: -> Integer
+        def expiration_in_seconds: -> Integer
+        def make_jwt: -> String
+      end
+    end
+  end
+end

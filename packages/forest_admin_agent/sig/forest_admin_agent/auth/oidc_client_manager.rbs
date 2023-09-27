@@ -1,0 +1,15 @@
+module ForestAdminAgent
+  module Auth
+    class OidcClientManager
+      TTL_CONFIG: Integer
+
+      def make_forest_provider: -> untyped
+
+      private
+
+      def setup_cache: -> { client_id: String, issuer: String, redirect_uri: String }
+      def register: -> Array[String]
+      def render_provider: -> untyped
+    end
+  end
+end

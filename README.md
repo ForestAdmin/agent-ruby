@@ -1,4 +1,4 @@
-# Forest Admin agent PHP
+# Forest Admin agent Ruby
 
 
 Forest Admin provides an off-the-shelf administration panel based on a highly-extensible API plugged into your application.

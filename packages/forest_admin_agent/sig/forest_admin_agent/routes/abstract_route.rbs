@@ -1,0 +1,12 @@
+module ForestAdminAgent
+  module Routes
+    class AbstractRoute
+      def initialize :  -> void
+      def routes: -> {}
+      def add_route: (String, String,String, String) -> void
+      def setup: -> AbstractRoute
+
+      def setup_routes: -> void
+    end
+  end
+end
