@@ -19,25 +19,30 @@ module ForestAdminDatasourceActiveRecord
         binary: 'Binary'
       }.freeze
 
-      def get_column_type(column)
+      def get_column_type(model, column)
+        if model.respond_to?(:defined_enums) &&
+           model.defined_enums.key?(column.name)
+          return 'Enum'
+        end
+
         is_array = (column.respond_to?(:array) && column.array == true)
         is_array ? "[#{TYPES[column.type]}]" : TYPES[column.type]
       end
 
-      def get_enum_values(column)
+      def get_enum_values(model, column)
         enum_values = []
-        if get_column_type(column) == 'Enum'
-          if sti_column?(column)
-            @model.descendants.each { |sti_model| enum_values << sti_model.name }
+        if get_column_type(model, column) == 'Enum'
+          if sti_column?(model, column)
+            model.descendants.each { |sti_model| enum_values << sti_model.name }
           else
-            @model.defined_enums[column.name].each { |name, _value| enum_values << name }
+            model.defined_enums[column.name].each { |name, _value| enum_values << name }
           end
         end
         enum_values
       end
 
-      def sti_column?(column)
-        @model.inheritance_column && column.name == @model.inheritance_column
+      def sti_column?(model, column)
+        model.inheritance_column && column.name == model.inheritance_column
       end
     end
   end

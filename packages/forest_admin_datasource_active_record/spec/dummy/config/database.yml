@@ -1,0 +1,12 @@
+default: &default
+  adapter: sqlite3
+  database: 'db/database.db'
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

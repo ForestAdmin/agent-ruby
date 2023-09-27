@@ -17,13 +17,13 @@ module ForestAdminDatasourceActiveRecord
       @model.columns_hash.each do |column_name, column|
         # TODO: check is not sti column
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-          column_type: get_column_type(column),
+          column_type: get_column_type(@model, column),
           # filter_operators: [],
           is_primary_key: column_name == @model.primary_key,
           is_read_only: false,
           is_sortable: true,
           default_value: column.default,
-          enum_values: get_enum_values(column),
+          enum_values: get_enum_values(@model, column),
           # validations: get_validations(column)
           validations: []
         )

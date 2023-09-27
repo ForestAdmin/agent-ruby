@@ -2,8 +2,6 @@ require 'active_record'
 
 module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
-    attr_reader :collections, :charts
-
     def initialize(db_config = {})
       super()
       @models = []

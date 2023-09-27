@@ -150,6 +150,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
 
 Metrics/BlockLength:
