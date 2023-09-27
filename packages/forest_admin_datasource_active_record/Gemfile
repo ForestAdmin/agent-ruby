@@ -10,11 +10,11 @@ gem 'rake', '~> 13.0'
 gem 'rubocop', '~> 1.21'
 
 group :development, :test do
-  gem 'rspec-rails', '~> 3.0'
-  gem 'rails'
   gem 'database_cleaner-active_record'
-  gem 'sqlite3'
+  gem 'rails'
+  gem 'rspec-rails', '~> 3.0'
   gem 'simplecov', '~> 0.22', require: false
-  gem 'simplecov_json_formatter', '~> 0.1.4'
   gem 'simplecov-html', '~> 0.12.3'
+  gem 'simplecov_json_formatter', '~> 0.1.4'
+  gem 'sqlite3'
 end

@@ -6,13 +6,13 @@ require 'active_record'
 require 'database_cleaner-active_record'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
-SimpleCov.start  do
+SimpleCov.start do
   add_filter 'spec'
   add_group "Lib", "lib"
 end
 
 ENV['RAILS_ENV'] ||= 'test'
-require File.expand_path('../dummy/config/environment', __FILE__)
+require File.expand_path('dummy/config/environment', __dir__)
 Rails.application.eager_load!
 
 ActiveRecord::Migration.verbose = false
@@ -25,7 +25,6 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
-
 
   # database_cleaner config
   config.before(:suite) do

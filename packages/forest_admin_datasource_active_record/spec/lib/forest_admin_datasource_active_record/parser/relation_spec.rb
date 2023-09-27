@@ -13,7 +13,7 @@ module ForestAdminDatasourceActiveRecord
           expect(association).not_to be_nil
         end
 
-        it 'fetch belongs_to relation' do
+        it 'fetch has_one relation' do
           associations = dummy_class.associations(Car)
           association = associations.select { |a| a.macro == :has_one }
 

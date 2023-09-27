@@ -24,6 +24,7 @@ module ForestAdminDatasourceActiveRecord
         )
       end
     end
+
     describe 'fetch_associations' do
       it 'add all relation of model to the collection' do
         expect(collection.fields.keys).to include('category', 'user', 'car_checks', 'checks')
