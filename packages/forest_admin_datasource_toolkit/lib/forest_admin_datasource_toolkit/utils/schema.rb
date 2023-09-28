@@ -9,6 +9,12 @@ module ForestAdminDatasourceToolkit
             relation.type == 'ManyToOne' && relation.foreign_key == name
           end
       end
+
+      def self.primary_key?(collection, name)
+        field = collection.fields[name]
+
+        field.type == 'Column' && field.is_primary_key
+      end
     end
   end
 end
