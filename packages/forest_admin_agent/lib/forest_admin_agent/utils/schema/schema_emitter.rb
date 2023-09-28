@@ -10,14 +10,14 @@ module ForestAdminAgent
         LIANA_VERSION = 'beta'.freeze
 
         def self.get_serialized_schema(datasource)
-          config = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache).get('config')
-          if config[:is_production]
-            schema = if config[:schema_path] && File.exist?(config[:schema_path])
-                       JSON.parse(File.read(config[:schema_path]))
+          schema_path = Facades::Container.cache(:schema_path)
+          if Facades::Container.cache(:is_production)
+            schema = if schema_path && File.exist?(schema_path)
+                       JSON.parse(File.read(schema_path), { symbolize_names: true })
                      else
                        # TODO: Logger::log('Warn', 'The .forestadmin-schema.json file doesn\'t exist')
                        {
-                         meta: meta(hash),
+                         meta: meta(Digest::SHA1.hexdigest('')),
                          collections: {}
                        }
                      end
@@ -29,7 +29,7 @@ module ForestAdminAgent
               collections: schema
             }
 
-            File.write(config[:schema_path], JSON.pretty_generate(schema))
+            File.write(schema_path, JSON.pretty_generate(schema))
           end
 
           serialize(schema)
@@ -65,8 +65,8 @@ module ForestAdminAgent
               collection.delete(:actions)
               collection.delete(:segments)
 
-              included.push(get_smart_features_by_collection('actions', collection_actions, with_attributes: true))
-              included.push(get_smart_features_by_collection('segments', collection_segments, with_attributes: true))
+              included << get_smart_features_by_collection('actions', collection_actions, with_attributes: true)
+              included << get_smart_features_by_collection('segments', collection_segments, with_attributes: true)
 
               data.push(
                 {
@@ -83,7 +83,7 @@ module ForestAdminAgent
 
             {
               data: data,
-              included: included.reject!(&:empty),
+              included: included.reject!(&:empty?),
               meta: schema[:meta]
             }
           end
@@ -93,7 +93,7 @@ module ForestAdminAgent
             data.each do |value|
               smart_feature = { id: value[:id], type: type }
               smart_feature[:attributes] = value if with_attributes
-              smart_features.push(smart_feature)
+              smart_features << smart_feature
             end
           end
         end

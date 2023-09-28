@@ -180,7 +180,7 @@ RSpec/ExampleLength:
 
 
 RSpec/MultipleExpectations:
-  Max: 5
+  Max: 6
 
 Layout/LineLength:
   Max: 120

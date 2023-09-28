@@ -40,6 +40,7 @@ RSpec.configure do |config|
         env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
         is_production: false,
         cache_dir: 'tmp/cache/forest_admin',
+        schema_path: File.join('tmp', '.forestadmin-schema.json'),
         forest_server_url: 'https://api.development.forestadmin.com',
         debug: true
       }
