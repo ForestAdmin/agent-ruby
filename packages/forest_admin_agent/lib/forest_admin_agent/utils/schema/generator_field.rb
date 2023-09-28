@@ -17,8 +17,6 @@ module ForestAdminAgent
             schema = build_column_schema(collection, name)
           when 'ManyToOne', 'OneToMany', 'ManyToMany', 'OneToOne'
             schema = build_relation_schema(collection, name)
-          else
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Invalid field type'
           end
 
           schema.sort_by { |k, _v| k }.to_h
@@ -44,7 +42,7 @@ module ForestAdminAgent
               # This may sound counter-intuitive: it is so that the user don't have two fields which
               # allow updating the same foreign key in the detail-view form (fk + many to one)
               isReadOnly: is_foreign_key || column.is_read_only,
-              isRequired: column.validations.any? { |_k, v| v.operator == 'Present' },
+              isRequired: column.validations.any? { |v| v[:operator] == 'Present' },
               isSortable: column.is_sortable,
               isVirtual: false,
               reference: nil,
@@ -59,10 +57,10 @@ module ForestAdminAgent
             return [convert_column_type(type.first)] if type.instance_of? Array
 
             {
-              fields: type.map do |key, _sub_type|
+              fields: type.map do |key, sub_type|
                 {
                   field: key,
-                  type: convert_column_type(type.first)
+                  type: convert_column_type(sub_type)
                 }
               end
             }
