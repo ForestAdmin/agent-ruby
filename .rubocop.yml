@@ -7,6 +7,7 @@ AllCops:
   NewCops: enable
   Exclude:
     - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
+    - 'node_modules/semantic-release-rubygem/**/*'
 
 Gemspec/OrderedDependencies:
   Exclude:
@@ -72,6 +73,7 @@ Style/MutableConstant:
   Exclude:
     - 'lib/agent_ruby/version.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/version.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
@@ -96,6 +98,7 @@ Style/StringLiterals:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/version.rb'
     - 'packages/forest_admin_agent/spec/forest_admin_agent_spec.rb'
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_rails/Gemfile'
     - 'packages/forest_admin_rails/Rakefile'

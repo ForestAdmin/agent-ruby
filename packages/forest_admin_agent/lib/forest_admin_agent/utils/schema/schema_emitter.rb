@@ -5,9 +5,9 @@ module ForestAdminAgent
   module Utils
     module Schema
       class SchemaEmitter
-        LIANA_NAME = 'agent-ruby'.freeze
+        LIANA_NAME = "agent-ruby"
 
-        LIANA_VERSION = 'beta'.freeze
+        LIANA_VERSION = "beta"
 
         def self.get_serialized_schema(datasource)
           schema_path = Facades::Container.cache(:schema_path)
