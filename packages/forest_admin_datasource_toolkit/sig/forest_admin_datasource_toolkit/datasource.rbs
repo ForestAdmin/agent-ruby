@@ -1,0 +1,12 @@
+module ForestAdminDatasourceToolkit
+  class Datasource
+    @charts: Hash[string, string]
+    @collections: Hash[string, string]
+
+    def add_collection:(Components::Contracts::CollectionContract collection) -> void
+
+    def collection:(string name) -> Components::Contracts::CollectionContract
+
+    def render_chart:(untyped caller, string name) -> untyped
+  end
+end

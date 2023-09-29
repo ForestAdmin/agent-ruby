@@ -35,6 +35,9 @@ module ForestAdminRails
       require Rails.root.join('config', 'forest_admin.rb')
 
       ForestAdminAgent::Builder::AgentFactory.instance.build
+
+      # force eager loading models
+      Rails.application.eager_load!
     end
 
     def load_cors

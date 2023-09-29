@@ -1,0 +1,11 @@
+module ForestAdminDatasourceToolkit
+  module Schema
+    module Relations
+      class ManyToManySchema
+        attr_accessor origin_key: String
+        attr_reader origin_key_target: String
+        attr_accessor through_collection: String
+      end
+    end
+  end
+end

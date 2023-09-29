@@ -1,0 +1,26 @@
+module ForestAdminDatasourceToolkit
+  class Collection
+    attr_reader actions: Hash[string, string]
+    attr_reader charts: Hash[string, string]
+    attr_writer countable: bool
+    attr_reader datasource: Components::Contracts::DatasourceContract
+    attr_reader fields: Hash[string, string]
+    attr_writer fields: void
+    attr_reader name: string
+    attr_reader native_driver: untyped | nil
+    attr_reader schema: Hash[string, string]
+    attr_writer searchable: bool
+    attr_reader segments: Hash[string, string]
+    attr_writer segments: void
+
+    # replace untyped by  ColumnSchema|RelationSchema
+    def add_field: (string, untyped) -> void
+
+    # replace untyped by  ColumnSchema|RelationSchema
+    def add_fields:(Hash[string, untyped]) -> void
+
+    def is_countable?: -> bool
+
+    def is_searchable?: -> bool
+  end
+end

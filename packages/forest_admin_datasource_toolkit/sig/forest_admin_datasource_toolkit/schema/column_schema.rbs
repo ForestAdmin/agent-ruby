@@ -1,0 +1,15 @@
+module ForestAdminDatasourceToolkit
+  module Schema
+    class ColumnSchema
+      attr_accessor column_type: Array[String] | String
+      attr_reader default_value: untyped
+      attr_reader enum_values: Array[String]
+      attr_accessor filter_operators: Array[String]
+      attr_reader is_primary_key: bool
+      attr_accessor is_read_only: bool
+      attr_accessor is_sortable: bool
+      attr_reader type: String
+      attr_accessor validations: Array[String]
+    end
+  end
+end

@@ -19,6 +19,9 @@ module.exports = {
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' lib/agent_ruby/version.rb; ' +
             'sed -i \'s/"version": ".*"/"version": "${nextRelease.version}"/g\' package.json; ' +
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/version.rb; ' +
+            'sed -i \'s/LIANA_VERSION = ".*"/LIANA_VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb; ' +
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
         successCmd:
             'mkdir -p $HOME/.gem '+
@@ -26,6 +29,8 @@ module.exports = {
             'chmod 0600 $HOME/.gem/credentials '+
             'printf -- "---\n:rubygems_api_key: ${env.GEM_HOST_API_KEY}\n" > $HOME/.gem/credentials '+
             '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-${nextRelease.version}.gem )' +
+            '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-${nextRelease.version}.gem )' +
+            '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-${nextRelease.version}.gem )' +
             '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-${nextRelease.version}.gem )' ,
       },
     ],
@@ -36,6 +41,9 @@ module.exports = {
           'CHANGELOG.md',
           'lib/agent_ruby/version.rb',
           'packages/forest_admin_agent/lib/forest_admin_agent/version.rb',
+          'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb',
+          'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb',
+          'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb',
           'packages/forest_admin_rails/lib/forest_admin_rails/version.rb',
           'package.json'
         ],

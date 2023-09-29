@@ -5,18 +5,25 @@ require:
 AllCops:
   TargetRubyVersion: 3.0
   NewCops: enable
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
+    - 'node_modules/semantic-release-rubygem/**/*'
 
 Gemspec/OrderedDependencies:
   Exclude:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
-    - 'forest_admin_rails.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
 Lint/PercentStringArray:
   Exclude:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
+    - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
 # Offense count: 1
 # Configuration parameters: AllowComments.
@@ -29,20 +36,22 @@ Metrics/AbcSize:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/auth_manager.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oidc_client_manager.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
 
 Metrics/CyclomaticComplexity:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
-
-Metrics/MethodLength:
-  Max: 20
-  Exclude:
-    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
 
 Style/BlockComments:
   Exclude:
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
 
 # Offense count: 3
 # Configuration parameters: AllowedConstants.
@@ -64,7 +73,10 @@ Style/MutableConstant:
   Exclude:
     - 'lib/agent_ruby/version.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/version.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
 
 # Offense count: 38
 # This cop supports safe autocorrection (--autocorrect).
@@ -86,6 +98,7 @@ Style/StringLiterals:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/version.rb'
     - 'packages/forest_admin_agent/spec/forest_admin_agent_spec.rb'
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_rails/Gemfile'
     - 'packages/forest_admin_rails/Rakefile'
@@ -95,6 +108,20 @@ Style/StringLiterals:
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
     - 'packages/forest_admin_rails/spec/rails_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/Gemfile'
+    - 'packages/forest_admin_datasource_toolkit/Rakefile'
+    - 'packages/forest_admin_datasource_toolkit/bin/console'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
+    - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
+    - 'packages/forest_admin_datasource_active_record/Gemfile'
+    - 'packages/forest_admin_datasource_active_record/Rakefile'
+    - 'packages/forest_admin_datasource_active_record/bin/console'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
+    - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
@@ -104,6 +131,10 @@ Style/WordArray:
   EnforcedStyle: percent
   MinSize: 3
 
+Style/SymbolArray:
+  Exclude:
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/schema/generator_field_many_to_many_spec.rb'
+
 Style/StringLiteralsInInterpolation:
   Enabled: true
   EnforcedStyle: double_quotes
@@ -112,14 +143,50 @@ Style/RedundantConstantBase:
   Exclude:
     - 'packages/forest_admin_rails/spec/rails_helper.rb'
 
-Layout/LineLength:
-  Max: 120
+Naming/PredicateName:
+  Exclude:
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
+
+Metrics/ParameterLists:
+  Exclude:
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/many_to_many_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
+
+Metrics/ModuleLength:
+  CountAsOne: [ 'array', 'hash', 'method_call' ]
+
+Metrics/MethodLength:
+  CountAsOne: ['array', 'hash', 'method_call']
+  Max: 20
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+
+Metrics/ClassLength:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
 
 RSpec/ExampleLength:
+  CountAsOne: [ 'array', 'hash', 'method_call' ]
   Max: 20
 
+
 RSpec/MultipleExpectations:
-  Max: 5
+  Max: 6
+
+Layout/LineLength:
+  Max: 120
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10

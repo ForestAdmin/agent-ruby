@@ -1,9 +1,12 @@
 require 'lightly'
 require 'simplecov'
 require 'simplecov_json_formatter'
+require 'simplecov-html'
 require 'forest_admin_agent'
+require 'forest_admin_datasource_toolkit'
+require 'singleton'
 
-SimpleCov.formatter = SimpleCov::Formatter::JSONFormatter
+SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
   add_filter 'spec'
   add_filter 'lib/forest_admin_agent/auth/oauth2/oidc_config.rb'
@@ -37,6 +40,7 @@ RSpec.configure do |config|
         env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
         is_production: false,
         cache_dir: 'tmp/cache/forest_admin',
+        schema_path: File.join('tmp', '.forestadmin-schema.json'),
         forest_server_url: 'https://api.development.forestadmin.com',
         debug: true
       }

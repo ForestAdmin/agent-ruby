@@ -1,0 +1,8 @@
+module ForestAdminDatasourceToolkit
+  module Schema
+    class RelationSchema
+      attr_accessor foreign_collection: String
+      attr_reader type: String
+    end
+  end
+end
