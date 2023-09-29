@@ -5,7 +5,7 @@ module ForestAdminDatasourceToolkit
         field = collection.fields[name]
 
         field.type == 'Column' &&
-          collection.fields.any? do |_name, relation|
+          collection.fields.any? do |_key, relation|
             relation.type == 'ManyToOne' && relation.foreign_key == name
           end
       end

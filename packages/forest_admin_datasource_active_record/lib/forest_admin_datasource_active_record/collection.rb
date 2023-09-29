@@ -71,7 +71,7 @@ module ForestAdminDatasourceActiveRecord
               association.name.to_s,
               ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
                 foreign_collection: association.class_name,
-                origin_key: association.foreign_key, # TODO: remove hardcoded id
+                origin_key: association.foreign_key,
                 origin_key_target: association.join_foreign_key
               )
             )
