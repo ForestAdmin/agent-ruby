@@ -100,7 +100,7 @@ module ForestAdminAgent
           schema = described_class.build_schema(@datasource.collection('Book'), 'array_of_composite')
 
           expect(schema[:type]).to match(
-           [
+            [
               {
                 fields: [
                   { field: :firstname, type: 'String' },
