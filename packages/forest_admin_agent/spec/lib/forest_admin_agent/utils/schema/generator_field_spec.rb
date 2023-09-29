@@ -29,7 +29,7 @@ module ForestAdminAgent
                 column_type: { firstname: 'String', lastname: 'String' }
               ),
               'array_of_composite' => ColumnSchema.new(
-                column_type: { firstname: 'String', lastname: 'String' }
+                column_type: [{ firstname: 'String', lastname: 'String' }]
               )
             }
           )
@@ -100,12 +100,14 @@ module ForestAdminAgent
           schema = described_class.build_schema(@datasource.collection('Book'), 'array_of_composite')
 
           expect(schema[:type]).to match(
-            {
-              fields: [
-                { field: :firstname, type: 'String' },
-                { field: :lastname, type: 'String' }
-              ]
-            }
+           [
+              {
+                fields: [
+                  { field: :firstname, type: 'String' },
+                  { field: :lastname, type: 'String' }
+                ]
+              }
+            ]
           )
         end
       end
