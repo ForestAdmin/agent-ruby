@@ -40,11 +40,23 @@ Metrics/AbcSize:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
 
 Metrics/CyclomaticComplexity:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
+
+Metrics/MethodLength:
+  Max: 20
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
 
 Style/BlockComments:
   Exclude:
