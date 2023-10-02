@@ -14,22 +14,41 @@ module ForestAdminAgent
       def setup(options)
         @options = options
         @has_env_secret = options.to_h.key?(:env_secret)
-        # @customizer = DatasourceCustomizer.new
+        @customizer = ForestAdminDatasourceToolkit::Datasource.new
         build_container
         build_cache
         build_logger
       end
 
+      def add_datasource(datasource)
+        datasource.collections.each { |_name, collection| @customizer.add_collection(collection) }
+        self
+      end
+
       def build
-        # @customizer.datasource
-        @container.register(:datasource, {})
+        @container.register(:datasource, @customizer)
         send_schema
       end
 
       private
 
       def send_schema(force: false)
-        # todo
+        return unless @has_env_secret
+
+        schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@customizer)
+        schema_is_know = false
+        # if (Cache::get('schemaFileHash') === $schema['meta']['schemaFileHash']) {
+        #   $schemaIsKnown = true;
+        # }
+
+        if !schema_is_know || force
+          #   Logger::log('Info', 'schema was updated, sending new version');
+          client = ForestAdminAgent::Http::ForestAdminApiRequester.new
+          client.post('/forest/apimaps', schema)
+        else
+          @container.resolve(:logger)
+          # TODO:  Logger::log('Info', 'Schema was not updated since last run');
+        end
       end
 
       def build_container

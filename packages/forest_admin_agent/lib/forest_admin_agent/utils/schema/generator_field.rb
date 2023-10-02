@@ -47,7 +47,7 @@ module ForestAdminAgent
               isVirtual: false,
               reference: nil,
               type: convert_column_type(column.column_type),
-              validations: {} # TODO: FrontendValidationUtils.convertValidationList(column),
+              validations: [] # TODO: FrontendValidationUtils.convertValidationList(column),
             }
           end
 
@@ -87,7 +87,7 @@ module ForestAdminAgent
                 isRequired: false,
                 isReadOnly: origin_key.is_read_only || foreign_schema.is_read_only,
                 isSortable: true,
-                validations: {},
+                validations: [],
                 reference: "#{foreign_collection.name}.#{target_name}"
               }
             )
@@ -107,7 +107,7 @@ module ForestAdminAgent
                 isRequired: false,
                 isReadOnly: origin_key.is_read_only,
                 isSortable: true,
-                validations: {},
+                validations: [],
                 reference: "#{foreign_collection.name}.#{target_name}"
               }
             )
@@ -126,7 +126,7 @@ module ForestAdminAgent
                 isRequired: false,
                 isReadOnly: key_field.is_read_only,
                 isSortable: target_field.is_sortable,
-                validations: {},
+                validations: [],
                 reference: "#{foreign_collection.name}.#{relation.origin_key_target}"
               }
             )
@@ -144,7 +144,7 @@ module ForestAdminAgent
                 isRequired: false, # TODO: check with validations
                 isReadOnly: key_field.is_read_only,
                 isSortable: key_field.is_sortable,
-                validations: {}, # TODO: FrontendValidation::convertValidationList(foreignTargetColumn)
+                validations: [], # TODO: FrontendValidation::convertValidationList(foreignTargetColumn)
                 reference: "#{foreign_collection.name}.#{relation.foreign_key_target}"
               }
             )
