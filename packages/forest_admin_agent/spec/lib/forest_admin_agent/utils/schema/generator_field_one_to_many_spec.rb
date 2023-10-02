@@ -57,7 +57,7 @@ module ForestAdminAgent
                 isRequired: false,
                 isSortable: true,
                 isVirtual: false,
-                validations: {}
+                validations: []
               }
             )
           end
@@ -81,7 +81,7 @@ module ForestAdminAgent
                 isReadOnly: true,
                 isRequired: false,
                 isVirtual: false,
-                validations: {}
+                validations: []
               }
             )
           end
