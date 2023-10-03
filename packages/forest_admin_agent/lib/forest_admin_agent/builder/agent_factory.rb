@@ -36,15 +36,18 @@ module ForestAdminAgent
         return unless @has_env_secret
 
         schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@customizer)
-        schema_is_know = false
-        # if (Cache::get('schemaFileHash') === $schema['meta']['schemaFileHash']) {
-        #   $schemaIsKnown = true;
-        # }
+        schema_is_know = @container.key?(:schema_file_hash) &&
+          @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
 
         if !schema_is_know || force
           #   Logger::log('Info', 'schema was updated, sending new version');
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
           client.post('/forest/apimaps', schema)
+          schema_file_hash_cache = Lightly.new(life: TTL_SCHEMA, dir: @options[:cache_dir].to_s)
+          schema_file_hash_cache.get 'value' do
+            schema[:meta][:schemaFileHash]
+          end
+          @container.register(:schema_file_hash, schema_file_hash_cache)
         else
           @container.resolve(:logger)
           # TODO:  Logger::log('Info', 'Schema was not updated since last run');
