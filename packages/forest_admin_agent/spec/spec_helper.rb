@@ -10,6 +10,7 @@ SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatte
 SimpleCov.start do
   add_filter 'spec'
   add_filter 'lib/forest_admin_agent/auth/oauth2/oidc_config.rb'
+  add_filter 'lib/forest_admin_agent/serializer/json_api_serializer.rb'
 end
 
 # Previous content of test helper now starts here

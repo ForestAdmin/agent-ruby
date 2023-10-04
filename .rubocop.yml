@@ -7,6 +7,7 @@ AllCops:
   NewCops: enable
   Exclude:
     - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer.rb'
     - 'node_modules/semantic-release-rubygem/**/*'
 
 Gemspec/OrderedDependencies:
@@ -181,6 +182,10 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
+
+Style/OpenStructUse:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/**/*.rb'
 
 RSpec/ExampleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
