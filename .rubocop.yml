@@ -159,6 +159,7 @@ Metrics/ParameterLists:
   Exclude:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/many_to_many_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/caller.rb'
 
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]

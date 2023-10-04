@@ -6,6 +6,11 @@ module ForestAdminAgent
         setup_routes
       end
 
+      def build(args)
+        @datasource = ForestAdminAgent::Facades::Container.datasource
+        @collection = @datasource.collection(args[:params]['collection_name'])
+      end
+
       def routes
         @routes ||= {}
       end
