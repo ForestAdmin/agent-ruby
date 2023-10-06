@@ -10,7 +10,8 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          { name: args['collection_name'], content: args['collection_name'] }
+          # is_collection true for a list false for a single record
+          # JSONAPI::Serializer.serialize(record, is_collection: true, serializer: Serializer::ForestSerializer)
         end
       end
     end

@@ -11,8 +11,13 @@ module ForestAdminAgent
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       context 'when then oidc is called and forest api is down' do
+        let(:response_bad_request) { instance_double(Faraday::Response, status: 500, body: {}) }
+        let(:oidc_resource) { instance_double(ForestAdminAgent::Auth::OAuth2::OidcConfig::Resource) }
+
         it 'raises an error' do
-          class_double(ForestAdminAgent::Auth::OAuth2::OidcConfig, discover!: OpenIDConnect::Discovery::DiscoveryFailed)
+          allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+          allow(faraday_connection).to receive(:get).and_return(response_bad_request)
+
           expect do
             oidc_client_manager.make_forest_provider :rendering_id
           end.to raise_error(ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN)
