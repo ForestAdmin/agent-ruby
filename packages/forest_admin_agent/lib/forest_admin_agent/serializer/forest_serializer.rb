@@ -30,7 +30,8 @@ module ForestAdminAgent
       def attributes
         # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
         # fields = forest_collection.getFields.reject { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::RelationSchema) }
-        fields = [:first_name, :last_name]
+        # TO REMOVE
+        fields = []
         fields.each { |field| add_attribute(field.name) }
 
         return {} if attributes_map.nil?
