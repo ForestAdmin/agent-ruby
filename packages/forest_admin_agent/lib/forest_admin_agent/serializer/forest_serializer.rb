@@ -14,7 +14,8 @@ module ForestAdminAgent
       end
 
       def type
-        @options[:context]
+        class_name = object.class.name
+        @@class_names[class_name] ||= class_name.demodulize.underscore.freeze
       end
 
       def format_name(attribute_name)
@@ -27,7 +28,7 @@ module ForestAdminAgent
       end
 
       def attributes
-        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(@options[:context])
+        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
         # fields = forest_collection.getFields.reject { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::RelationSchema) }
         fields = [:first_name, :last_name]
         fields.each { |field| add_attribute(field.name) }
@@ -74,11 +75,12 @@ module ForestAdminAgent
       end
 
       def relationships
-        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(@options[:context])
+        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
         # relations_many_to_one = forest_collection.getFields.select { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema) }
         # relations_one_to_one = forest_collection.getFields.select { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema) }
 
-        relations_one_to_one = [:category]
+        # TO REMOVE
+        relations_one_to_one = []
         relations_one_to_one.each { |name| add_to_one_association(name) }
 
         data = {}
@@ -98,7 +100,7 @@ module ForestAdminAgent
           if object.nil?
             data[formatted_attribute_name]['data'] = nil
           else
-            related_object_serializer = ForestSerializer.new(OpenStruct.new(object), @options.merge(context: attribute_name.to_s))
+            related_object_serializer = ForestSerializer.new(object, @options)
             data[formatted_attribute_name]['data'] = {
               'type' => related_object_serializer.type.to_s,
               'id' => related_object_serializer.id.to_s,
@@ -106,7 +108,8 @@ module ForestAdminAgent
           end
         end
 
-        relations_many_to_one = [:orders]
+        # TO REMOVE
+        relations_many_to_one = []
         relations_many_to_one.each { |name| add_to_many_association(name) }
 
         has_relationships('many').each do |attribute_name, attr_data|
