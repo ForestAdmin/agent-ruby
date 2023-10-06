@@ -10,7 +10,7 @@ module ForestAdminAgent
       attr_accessor :to_many_associations
 
       def base_url
-        ForestAdminRails.config[:prefix]
+        Facades::Container.cache(:prefix)
       end
 
       def type
