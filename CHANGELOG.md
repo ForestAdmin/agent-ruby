@@ -1,3 +1,10 @@
+# [1.0.0-beta.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2023-10-06)
+
+
+### Features
+
+* add jsonapi serializer ([#5](https://github.com/ForestAdmin/agent-ruby/issues/5)) ([3528191](https://github.com/ForestAdmin/agent-ruby/commit/35281919260084dbe20b32e2e3cd7f5ee1cdc54b))
+
 # [1.0.0-beta.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2023-09-29)
 
 
