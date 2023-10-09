@@ -34,7 +34,7 @@ module ForestAdminDatasourceActiveRecord
         relation_table = self.datasource.collection(relation).model.table_name
         fields.each { |field| query += ", #{relation_table}.#{field}" }
       end
-      debugger
+
       @model.select(query)
     end
 

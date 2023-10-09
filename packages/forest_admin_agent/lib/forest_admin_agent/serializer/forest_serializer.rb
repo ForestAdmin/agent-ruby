@@ -9,6 +9,12 @@ module ForestAdminAgent
       attr_accessor :to_one_associations
       attr_accessor :to_many_associations
 
+      JSONAPI::Serializer.send(:include, ForestSerializerOverride)
+
+      def initialize(object, options = nil)
+        super
+      end
+
       def base_url
         Facades::Container.cache(:prefix)
       end
@@ -27,12 +33,17 @@ module ForestAdminAgent
         @attributes_map[name] = format_field(name, options)
       end
 
+      def format_field(name, options)
+        {
+          attr_or_block: block_given? ? block : name,
+          options: options,
+        }
+      end
+
       def attributes
-        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        # fields = forest_collection.getFields.reject { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::RelationSchema) }
-        # TO REMOVE
-        fields = []
-        fields.each { |field| add_attribute(field.name) }
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
+        fields = forest_collection.fields.select { |_field_name, field| field.type == 'Column' }
+        fields.each { |field_name, _field| add_attribute(field_name) }
 
         return {} if attributes_map.nil?
         attributes = {}
@@ -51,6 +62,26 @@ module ForestAdminAgent
         @to_one_associations[name] = format_field(name, options)
       end
 
+      def has_one_relationships
+        return {} if @to_one_associations.nil?
+        data = {}
+        @to_one_associations.each do |attribute_name, attr_data|
+          next if !should_include_attr?(attribute_name, attr_data)
+          data[attribute_name.to_sym] = attr_data
+        end
+        data
+      end
+
+      def has_many_relationships
+        return {} if @to_many_associations.nil?
+        data = {}
+        @to_many_associations.each do |attribute_name, attr_data|
+          next if !should_include_attr?(attribute_name, attr_data)
+          data[attribute_name.to_sym] = attr_data
+        end
+        data
+      end
+
       def add_to_many_association(name, options = {}, &block)
         options[:include_links] = options.fetch(:include_links, true)
         options[:include_data] = options.fetch(:include_data, false)
@@ -58,34 +89,15 @@ module ForestAdminAgent
         @to_many_associations[name] = format_field(name, options)
       end
 
-      def has_relationships(type)
-        return {} if send("to_#{type}_associations").nil?
-        data = {}
-        send("to_#{type}_associations").each do |attribute_name, attr_data|
-          next if !should_include_attr?(attribute_name, attr_data)
-          data[attribute_name] = attr_data
-        end
-        data
-      end
-
-      def format_field(name, options)
-        {
-          attr_or_block: block_given? ? block : name,
-          options: options,
-        }
-      end
-
       def relationships
-        # forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        # relations_many_to_one = forest_collection.getFields.select { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema) }
-        # relations_one_to_one = forest_collection.getFields.select { |field| field.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema) }
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
+        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'HasMany' || field.type == 'ManyToMany' }
+        relations_to_one = forest_collection.fields.select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
-        # TO REMOVE
-        relations_one_to_one = []
-        relations_one_to_one.each { |name| add_to_one_association(name) }
+        relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
 
         data = {}
-        has_relationships('one').each do |attribute_name, attr_data|
+        has_one_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
           data[formatted_attribute_name] = {}
 
@@ -109,11 +121,9 @@ module ForestAdminAgent
           end
         end
 
-        # TO REMOVE
-        relations_many_to_one = []
-        relations_many_to_one.each { |name| add_to_many_association(name) }
+        relations_to_many.each { |field_name, _field| add_to_many_association(field_name) }
 
-        has_relationships('many').each do |attribute_name, attr_data|
+        has_many_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
 
           data[formatted_attribute_name] = {}
