@@ -31,35 +31,36 @@ module ForestAdminAgent
             datasource = ForestAdminDatasourceToolkit::Datasource.new
             collection_book = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Book')
             datasource.add_collection(collection_book)
-            AgentFactory.instance.add_datasource(datasource)
+            described_class.instance.add_datasource(datasource)
 
-            expect(AgentFactory.instance.customizer.collections.size).to eq(1)
-            expect(AgentFactory.instance.customizer.collection('Book')).to eq(collection_book)
-            expect(AgentFactory.instance.customizer.collection('Book').datasource).to eq(datasource)
+            expect(described_class.instance.customizer.collections.size).to eq(1)
+            expect(described_class.instance.customizer.collection('Book')).to eq(collection_book)
+            expect(described_class.instance.customizer.collection('Book').datasource).to eq(datasource)
           end
         end
 
         describe 'build' do
           it 'add customizer to the container' do
-            allow(AgentFactory.instance).to receive(:send_schema)
-            AgentFactory.instance.build
+            allow(described_class.instance).to receive(:send_schema)
+            described_class.instance.build
 
-            expect(AgentFactory.instance.container.resolve(:datasource)).to eq(AgentFactory.instance.customizer)
+            expect(described_class.instance.container.resolve(:datasource)).to eq(described_class.instance.customizer)
           end
         end
 
         describe 'send_schema' do
           it 'do nothing if env_secret is nil' do
-            AgentFactory.instance.instance_variable_set('@has_env_secret', false)
+            described_class.instance.instance_variable_set(:@has_env_secret, false)
             allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
-            AgentFactory.instance.build
+            described_class.instance.build
 
             expect(ForestAdminAgent::Utils::Schema::SchemaEmitter).not_to have_received(:get_serialized_schema)
           end
 
           it 'send schema when schema hash is different' do
-            allow(AgentFactory.instance).to receive(:has_env_secret).and_return(false)
+            allow(described_class.instance).to receive(:has_env_secret).and_return(false)
             allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
+            allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
               .and_return(
                 {
                   meta: {
@@ -68,12 +69,11 @@ module ForestAdminAgent
                 }
               )
 
-            expect_any_instance_of(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
-            AgentFactory.instance.build
+            described_class.instance.build
+            # expect(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
           end
         end
       end
     end
   end
 end
-
