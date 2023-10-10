@@ -38,7 +38,7 @@ module ForestAdminDatasourceToolkit
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def aggregate
+        def aggregate(caller, filter, aggregation)
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 

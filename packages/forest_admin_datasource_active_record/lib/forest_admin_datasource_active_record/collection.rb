@@ -2,6 +2,7 @@ module ForestAdminDatasourceActiveRecord
   class Collection < ForestAdminDatasourceToolkit::Collection
     include Parser::Column
     include Parser::Relation
+    include ForestAdminDatasourceToolkit::Components::Query
 
     attr_reader :model
 
@@ -18,6 +19,18 @@ module ForestAdminDatasourceActiveRecord
       query_select(projection)
 
       @model.offset(filter.page.offset).limit(filter.page.limit).all
+    end
+
+    def aggregate(caller, filter, aggregation)
+      field = aggregation.field ? aggregation.field : '*'
+
+      [
+        {
+          value: @model.send(aggregation.operation.downcase, field),
+          group: []
+        }
+      ]
+
     end
 
     private
