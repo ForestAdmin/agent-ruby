@@ -4,42 +4,39 @@ module ForestAdminDatasourceToolkit
       class Projection < Array
         include ForestAdminDatasourceToolkit::Utils
         def with_pks(collection)
-          ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection).each do | key |
-            self.push(key) unless self.include?(key)
+          ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection).each do |key|
+            push(key) unless include?(key)
           end
 
-          self.relations.each do | relation, projection |
+          relations.each do |relation, projection|
             schema = collection.fields[relation]
             association = collection.datasource.collection(schema.foreign_collection)
             projection_with_pks = projection.with_pks(association).nest(prefix: relation)
 
-            projection_with_pks.each { | field | self.push(field) unless self.include?(field) }
+            projection_with_pks.each { |field| push(field) unless include?(field) }
           end
 
-          return self
+          self
         end
 
         def columns
-          self.select { |field| !field.include?(':') }
+          reject { |field| field.include?(':') }
         end
 
         def relations
-          self.reduce({}) do |memo, path|
-            if(path.include?(':'))
-              split_path = path.split(':')
-              relation = split_path[0]
-              memo[relation] = Projection.new([split_path[1]].union(memo[relation] || []))
-            end
+          each_with_object({}) do |path, memo|
+            next unless path.include?(':')
 
-            memo
+            split_path = path.split(':')
+            relation = split_path[0]
+            memo[relation] = Projection.new([split_path[1]].union(memo[relation] || []))
           end
         end
 
         def nest(prefix: nil)
-          prefix ? Projection.new(self.map { | path | "#{prefix}:#{path}"}) : self
+          prefix ? Projection.new(map { |path| "#{prefix}:#{path}" }) : self
         end
       end
     end
   end
 end
-

@@ -12,9 +12,9 @@ module ForestAdminDatasourceToolkit
         end
 
         def validate(operation)
-          unless %w[Count Sum Avg Max Min].include? operation
-            raise Exceptions::ForestException("Aggregate operation #{operation} not allowed")
-          end
+          return if %w[Count Sum Avg Max Min].include? operation
+
+          raise Exceptions::ForestException("Aggregate operation #{operation} not allowed")
         end
       end
     end

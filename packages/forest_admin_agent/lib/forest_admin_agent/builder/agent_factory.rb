@@ -37,7 +37,7 @@ module ForestAdminAgent
 
         schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@customizer)
         schema_is_know = @container.key?(:schema_file_hash) &&
-          @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
+                         @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
 
         if !schema_is_know || force
           #   Logger::log('Info', 'schema was updated, sending new version');

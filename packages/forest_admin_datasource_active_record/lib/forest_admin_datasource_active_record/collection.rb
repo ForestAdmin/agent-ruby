@@ -14,15 +14,15 @@ module ForestAdminDatasourceActiveRecord
       fetch_associations
     end
 
-    def list(caller, filter, projection)
+    def list(_caller, filter, projection)
       query_joins(projection)
       query_select(projection)
 
       @model.offset(filter.page.offset).limit(filter.page.limit).all
     end
 
-    def aggregate(caller, filter, aggregation)
-      field = aggregation.field ? aggregation.field : '*'
+    def aggregate(_caller, _filter, aggregation)
+      field = aggregation.field || '*'
 
       [
         {
@@ -30,21 +30,19 @@ module ForestAdminDatasourceActiveRecord
           group: []
         }
       ]
-
     end
 
     private
 
-
     def query_joins(projection)
-      @model.joins(projection.relations.keys.map { | key | key.to_sym })
+      @model.joins(projection.relations.keys.map(&:to_sym))
     end
 
     def query_select(projection)
       query = projection.columns.join(', ')
 
       projection.relations.each do |relation, fields|
-        relation_table = self.datasource.collection(relation).model.table_name
+        relation_table = datasource.collection(relation).model.table_name
         fields.each { |field| query += ", #{relation_table}.#{field}" }
       end
 

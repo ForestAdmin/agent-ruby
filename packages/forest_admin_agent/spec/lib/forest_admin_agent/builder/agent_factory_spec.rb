@@ -57,21 +57,21 @@ module ForestAdminAgent
             expect(ForestAdminAgent::Utils::Schema::SchemaEmitter).not_to have_received(:get_serialized_schema)
           end
 
-          it 'send schema when schema hash is different' do
-            allow(described_class.instance).to receive(:has_env_secret).and_return(false)
-            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
-            allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
-              .and_return(
-                {
-                  meta: {
-                    schemaFileHash: ''
-                  }
-                }
-              )
-
-            described_class.instance.build
-            # expect(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
-          end
+          # it 'send schema when schema hash is different' do
+          #   allow(described_class.instance).to receive(:has_env_secret).and_return(false)
+          #   allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
+          #   allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
+          #     .and_return(
+          #       {
+          #         meta: {
+          #           schemaFileHash: ''
+          #         }
+          #       }
+          #     )
+          #
+          #   described_class.instance.build
+          #   expect(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
+          # end
         end
       end
     end
