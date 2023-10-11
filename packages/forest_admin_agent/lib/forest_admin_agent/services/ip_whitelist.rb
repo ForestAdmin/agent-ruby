@@ -33,7 +33,7 @@ module ForestAdminAgent
         when RULE_MATCH_IP
           ip_match_ip?(ip, rule['ip'])
         when RULE_MATCH_RANGE
-          ip_match_range?(ip, rule['ip_minimum'], rule['ip_maximum'])
+          ip_match_range?(ip, rule['ipMinimum'], rule['ipMaximum'])
         when RULE_MATCH_SUBNET
           ip_match_subnet?(ip, rule['range'])
         else
@@ -63,12 +63,12 @@ module ForestAdminAgent
         IPAddress(ip1).loopback? && IPAddress(ip2).loopback?
       end
 
-      def ip_match_range?(ip, min, _max)
+      def ip_match_range?(ip, min, max)
         return false unless same_ip_version?(ip, min)
 
-        ip_range_minimum = (IPAddress rule['ip_minimum']).to_i
-        ip_range_maximum = (IPAddress rule['ip_maximum']).to_i
-        ip_value = (IPAddress ip).to_i
+        ip_range_minimum = (IPAddress min)
+        ip_range_maximum = (IPAddress max)
+        ip_value = (IPAddress ip)
 
         ip_value >= ip_range_minimum && ip_value <= ip_range_maximum
       end
@@ -82,16 +82,12 @@ module ForestAdminAgent
       private
 
       def fetch_rules
-        begin
-          response = Net::HTTP.get_response(
-            URI("#{ForestAdminRails.config[:forest_server_url]}/liana/v1/ip-whitelist-rules"),
-            { 'Content-Type' => 'application/json', 'forest-secret-key' => Facades::Container.cache(:env_secret) }
-          )
-        rescue Net::HTTPExceptions
-          raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
-        end
+        response = Net::HTTP.get_response(
+          URI("#{Facades::Container.cache(:forest_server_url)}/liana/v1/ip-whitelist-rules"),
+          { 'Content-Type' => 'application/json', 'forest-secret-key' => Facades::Container.cache(:env_secret) }
+        )
 
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED unless response.is_a?(Net::HTTPOK)
+        raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED unless response.is_a?(Net::HTTPSuccess)
 
         body = JSON.parse(response.body)
         ip_whitelist_data = body['data']['attributes']
