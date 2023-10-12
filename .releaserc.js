@@ -28,10 +28,10 @@ module.exports = {
             'touch $HOME/.gem/credentials '+
             'chmod 0600 $HOME/.gem/credentials '+
             'printf -- "---\n:rubygems_api_key: ${env.GEM_HOST_API_KEY}\n" > $HOME/.gem/credentials '+
-            '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-${nextRelease.version}.gem )' +
-            '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-${nextRelease.version}.gem )' +
-            '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-${nextRelease.version}.gem )' +
-            '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-${nextRelease.version}.gem )' ,
+            '( cd packages/forest_admin_agent && gem build && touch .trigger-rubygem-release )' +
+            '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
+            '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
+            '( cd packages/forest_admin_rails && gem build && touch .trigger-rubygem-release )' ,
       },
     ],
     [
