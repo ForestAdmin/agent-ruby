@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
         it { expect(column.is_primary_key).to be false }
         it { expect(column.default_value).to be_nil }
         it { expect(column.is_read_only).to be false }
-        it { expect(column.is_sortable).to be true }
+        it { expect(column.is_sortable).to be false }
         it { expect(column.filter_operators).to eq [] }
         it { expect(column.enum_values).to eq [] }
         it { expect(column.validations).to eq [] }

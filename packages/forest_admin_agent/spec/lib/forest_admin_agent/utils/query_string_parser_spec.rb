@@ -8,7 +8,7 @@ module ForestAdminAgent
     include ForestAdminDatasourceToolkit::Components::Query
 
     describe QueryStringParser do
-      include_context :caller
+      include_context 'with caller'
 
       describe 'parse_caller' do
         it 'return an instance of caller' do
@@ -34,9 +34,9 @@ module ForestAdminAgent
           expect do
             described_class.parse_caller(args)
           end.to raise_error(
-                   ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                   '🌳🌳🌳 Missing timezone'
-                 )
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Missing timezone'
+          )
         end
 
         it 'raise an error if timezone is invalid' do
@@ -51,9 +51,9 @@ module ForestAdminAgent
           expect do
             described_class.parse_caller(args)
           end.to raise_error(
-                   ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                   '🌳🌳🌳 Invalid timezone: foo/timezone'
-                 )
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Invalid timezone: foo/timezone'
+          )
         end
 
         it 'raise if the user is not connected' do
@@ -66,9 +66,9 @@ module ForestAdminAgent
           expect do
             described_class.parse_caller(args)
           end.to raise_error(
-                   ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                   '🌳🌳🌳 You must be logged in to access at this resource.'
-                 )
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 You must be logged in to access at this resource.'
+          )
         end
       end
 
@@ -109,7 +109,8 @@ module ForestAdminAgent
 
           return collection
         end
-        context 'on a flat collection and a well formed request' do
+
+        context 'when request is well formed' do
           it 'convert the request to a valid projection' do
             args = {
               params: {
@@ -132,7 +133,7 @@ module ForestAdminAgent
             )
           end
 
-          it 'return the requested project without the primary keys when the request does not contain the primary keys' do
+          it 'return the requested project without the primary keys when the request does not have the primary keys' do
             args = {
               params: {
                 fields: { 'Book' => 'title' }
@@ -159,7 +160,7 @@ module ForestAdminAgent
             args = {
               params: {
                 fields: {
-                  'Book' => 'foo',
+                  'Book' => 'foo'
                 }
               }
             }
@@ -167,9 +168,9 @@ module ForestAdminAgent
             expect do
               described_class.parse_projection(collection, args)
             end.to raise_error(
-                     ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                     '🌳🌳🌳 Invalid projection'
-                   )
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid projection'
+            )
           end
         end
       end
@@ -222,7 +223,7 @@ module ForestAdminAgent
           expect(described_class.parse_projection_with_pks(collection, args)).to eq(Projection.new(%w[title id]))
         end
 
-        it 'convert the request to a valid projection when the request does not contain the primary keys on a collection with relationships' do
+        it 'convert the request to a valid projection with pks on a collection with relationships' do
           args = {
             params: {
               fields: {
@@ -232,7 +233,8 @@ module ForestAdminAgent
             }
           }
 
-          expect(described_class.parse_projection_with_pks(collection, args)).to eq(Projection.new(%w[id author:name author:id]))
+          expect(described_class.parse_projection_with_pks(collection,
+                                                           args)).to eq(Projection.new(%w[id author:name author:id]))
         end
       end
 
@@ -240,7 +242,7 @@ module ForestAdminAgent
         it 'return the pagination parameter' do
           args = {
             params: {
-              page: { size: '10', number: '3'}
+              page: { size: '10', number: '3' }
             }
           }
 
@@ -254,16 +256,16 @@ module ForestAdminAgent
         it 'raise an error when request provides invalid values' do
           args = {
             params: {
-              page: { size: -5, number: 'NaN'}
+              page: { size: -5, number: 'NaN' }
             }
           }
 
           expect do
             described_class.parse_pagination(args)
           end.to raise_error(
-                   ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                   '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
-                 )
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
+          )
         end
       end
     end

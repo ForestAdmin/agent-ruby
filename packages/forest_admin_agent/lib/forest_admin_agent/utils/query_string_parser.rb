@@ -8,19 +8,19 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components
       include ForestAdminDatasourceToolkit::Components::Query
 
-      DEFAULT_ITEMS_PER_PAGE = '15'
-      DEFAULT_PAGE_TO_SKIP = '1'
+      DEFAULT_ITEMS_PER_PAGE = '15'.freeze
+      DEFAULT_PAGE_TO_SKIP = '1'.freeze
 
       def self.parse_caller(args)
         unless args[:headers]['HTTP_AUTHORIZATION']
-          #TODO: replace by http exception
-          raise ForestException.new 'You must be logged in to access at this resource.'
+          # TODO: replace by http exception
+          raise ForestException, 'You must be logged in to access at this resource.'
         end
 
         timezone = args[:params]['timezone']
-        raise ForestException.new 'Missing timezone' unless timezone
+        raise ForestException, 'Missing timezone' unless timezone
 
-        raise ForestException.new "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
+        raise ForestException, "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
 
         token = args[:headers]['HTTP_AUTHORIZATION'].split[1]
         token_data = JWT.decode(
@@ -46,8 +46,8 @@ module ForestAdminAgent
         end
 
         Projection.new(fields)
-      rescue
-        raise ForestException.new 'Invalid projection'
+      rescue StandardError
+        raise ForestException, 'Invalid projection'
       end
 
       def self.parse_projection_with_pks(collection, args)
@@ -64,7 +64,7 @@ module ForestAdminAgent
                args.dig(:params, :page, :number) || DEFAULT_PAGE_TO_SKIP
 
         unless !items_per_pages.to_s.match(/\A[+]?\d+\z/).nil? || !page.to_s.match(/\A[+]?\d+\z/).nil?
-          raise ForestException.new "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
+          raise ForestException, "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
         end
 
         offset = (page.to_i - 1) * items_per_pages.to_i

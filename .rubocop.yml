@@ -46,6 +46,8 @@ Metrics/AbcSize:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/projection.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/projection_factory.rb'
+    -
 
 Metrics/CyclomaticComplexity:
   Exclude:
@@ -203,6 +205,8 @@ RSpec/MultipleExpectations:
 
 Layout/LineLength:
   Max: 120
+  Exclude:
+    - 'packages/forest_admin_agent/spec/shared/caller.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
