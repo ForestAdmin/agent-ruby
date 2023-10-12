@@ -10,13 +10,6 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Schema
       describe List do
         include_context 'with caller'
-
-        class User
-          def name
-            'user'
-          end
-        end
-
         subject(:list) { described_class.new }
         let(:args) do
           {
@@ -29,6 +22,13 @@ module ForestAdminAgent
         end
 
         before do
+          user_class = Struct.new(:id, :first_name, :last_name) do
+            def name
+              'user'
+            end
+          end
+          stub_const('User', user_class)
+
           datasource = Datasource.new
           collection = Collection.new(datasource, 'user')
           collection.add_fields(
@@ -40,11 +40,10 @@ module ForestAdminAgent
           )
           allow(collection).to receive(:list).and_return(
             [
-              OpenStruct.new(id: 1, first_name: 'foo', last_name: 'foo', class: :User)
+              User.new(id: 1, first_name: 'foo', last_name: 'foo')
             ]
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-
 
           datasource.add_collection(collection)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
@@ -62,7 +61,7 @@ module ForestAdminAgent
                 'attributes' => {
                   'id' => 1,
                   'first_name' => 'foo',
-                  'last_name' => 'foo',
+                  'last_name' => 'foo'
                 },
                 'links' => { 'self' => 'forest/user/1' }
               }
