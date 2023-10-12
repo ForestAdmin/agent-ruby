@@ -1,4 +1,5 @@
 require 'jwt'
+require 'active_support/time'
 
 module ForestAdminAgent
   module Utils
@@ -7,18 +8,19 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components
       include ForestAdminDatasourceToolkit::Components::Query
 
-      DEFAULT_ITEMS_PER_PAGE = 15
-      DEFAULT_PAGE_TO_SKIP = 1
+      DEFAULT_ITEMS_PER_PAGE = '15'
+      DEFAULT_PAGE_TO_SKIP = '1'
 
       def self.parse_caller(args)
         unless args[:headers]['HTTP_AUTHORIZATION']
-          raise Exceptions::ForestException 'You must be logged in to access at this resource.'
+          #TODO: replace by http exception
+          raise ForestException.new 'You must be logged in to access at this resource.'
         end
 
         timezone = args[:params]['timezone']
-        raise Exceptions::ForestException 'You must be logged in to access at this resource.' unless timezone
+        raise ForestException.new 'Missing timezone' unless timezone
 
-        raise Exceptions::ForestException, "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
+        raise ForestException.new "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
 
         token = args[:headers]['HTTP_AUTHORIZATION'].split[1]
         token_data = JWT.decode(
@@ -39,13 +41,13 @@ module ForestAdminAgent
         return ProjectionFactory.all(collection) unless fields != '' && !fields.nil?
 
         fields = fields.split(',').map do |field_name|
-          column = collection.fields[field_name]
-          column.type == 'Column' ? field_name : "#{field_name}:#{args[:params][:fields][field_name]}"
+          column = collection.fields[field_name.strip]
+          column.type == 'Column' ? field_name.strip : "#{field_name.strip}:#{args[:params][:fields][field_name.strip]}"
         end
 
         Projection.new(fields)
-      rescue StandardError
-        # TODO: raise
+      rescue
+        raise ForestException.new 'Invalid projection'
       end
 
       def self.parse_projection_with_pks(collection, args)
@@ -61,13 +63,13 @@ module ForestAdminAgent
         page = args.dig(:params, :data, :attributes, :all_records_subset_query, :number) ||
                args.dig(:params, :page, :number) || DEFAULT_PAGE_TO_SKIP
 
-        unless !items_per_pages.match(/\A[-+]?\d+\z/).nil? || !page.match(/\A[-+]?\d+\z/).nil?
-          raise ForestException "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
+        unless !items_per_pages.to_s.match(/\A[+]?\d+\z/).nil? || !page.to_s.match(/\A[+]?\d+\z/).nil?
+          raise ForestException.new "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
         end
 
         offset = (page.to_i - 1) * items_per_pages.to_i
 
-        Page.new(offset: offset, limit: items_per_pages)
+        Page.new(offset: offset, limit: items_per_pages.to_i)
       end
     end
   end

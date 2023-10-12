@@ -44,4 +44,5 @@ admin work on any Ruby application."
   spec.add_dependency "rack-cors", "~> 2.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
   spec.add_dependency "faraday", "~> 2.7"
+  spec.add_dependency "activesupport", "~> 7.0"
 end
