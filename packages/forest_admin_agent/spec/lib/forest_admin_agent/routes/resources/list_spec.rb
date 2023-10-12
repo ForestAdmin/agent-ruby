@@ -53,6 +53,7 @@ module ForestAdminAgent
         it 'return an serialized content' do
           result = list.handle_request(args)
 
+          expect(result[:name]).to eq('user')
           expect(result[:content]).to eq(
             'data' => [
               {
