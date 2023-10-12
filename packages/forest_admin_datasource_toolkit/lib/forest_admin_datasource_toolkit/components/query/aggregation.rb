@@ -2,6 +2,7 @@ module ForestAdminDatasourceToolkit
   module Components
     module Query
       class Aggregation
+        include ForestAdminDatasourceToolkit::Exceptions
         attr_reader :operation, :field, :groups
 
         def initialize(operation:, field: nil, groups: [])
@@ -14,7 +15,7 @@ module ForestAdminDatasourceToolkit
         def validate(operation)
           return if %w[Count Sum Avg Max Min].include? operation
 
-          raise Exceptions::ForestException("Aggregate operation #{operation} not allowed")
+          raise ForestException.new("Aggregate operation #{operation} not allowed")
         end
       end
     end
