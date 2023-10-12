@@ -43,7 +43,8 @@ RSpec.configure do |config|
         cache_dir: 'tmp/cache/forest_admin',
         schema_path: File.join('tmp', '.forestadmin-schema.json'),
         forest_server_url: 'https://api.development.forestadmin.com',
-        debug: true
+        debug: true,
+        prefix: 'forest'
       }
     )
   end

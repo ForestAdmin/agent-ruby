@@ -12,7 +12,7 @@ module ForestAdminAgent
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
 
       def self.parse_caller(args)
-        unless args[:headers]['HTTP_AUTHORIZATION']
+        unless args.dig(:headers, 'HTTP_AUTHORIZATION')
           # TODO: replace by http exception
           raise ForestException, 'You must be logged in to access at this resource.'
         end
@@ -36,7 +36,7 @@ module ForestAdminAgent
       end
 
       def self.parse_projection(collection, args)
-        fields = args[:params][:fields][collection.name]
+        fields = args.dig(:params, :fields, collection.name) || ''
 
         return ProjectionFactory.all(collection) unless fields != '' && !fields.nil?
 
