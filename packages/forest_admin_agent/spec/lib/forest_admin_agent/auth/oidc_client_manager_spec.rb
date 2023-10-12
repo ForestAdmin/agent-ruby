@@ -10,6 +10,11 @@ module ForestAdminAgent
       let(:oidc_discover_resource) { instance_double(OpenIDConnect::Discovery::Provider::Config::Resource) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
+      before do
+        lightly = Lightly.new(dir: "#{Facades::Container.cache(:cache_dir)}/issuer")
+        lightly.flush
+      end
+
       context 'when then oidc is called and forest api is down' do
         let(:response_bad_request) { instance_double(Faraday::Response, status: 500, body: {}) }
         let(:oidc_resource) { instance_double(ForestAdminAgent::Auth::OAuth2::OidcConfig::Resource) }
