@@ -1,3 +1,10 @@
+# [1.0.0-beta.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2023-10-12)
+
+
+### Features
+
+* add ipwhitelist support ([#7](https://github.com/ForestAdmin/agent-ruby/issues/7)) ([680a17d](https://github.com/ForestAdmin/agent-ruby/commit/680a17dd8642d345444ef39d32285847c7992043))
+
 # [1.0.0-beta.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.2...v1.0.0-beta.3) (2023-10-06)
 
 
