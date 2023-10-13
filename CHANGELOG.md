@@ -1,3 +1,10 @@
+# [1.0.0-beta.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.4...v1.0.0-beta.5) (2023-10-13)
+
+
+### Features
+
+* add list and count api ([#6](https://github.com/ForestAdmin/agent-ruby/issues/6)) ([19b5bd9](https://github.com/ForestAdmin/agent-ruby/commit/19b5bd9ebb121f4c40e11f340d914dee4a84dc68))
+
 # [1.0.0-beta.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.3...v1.0.0-beta.4) (2023-10-12)
 
 
