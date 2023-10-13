@@ -40,7 +40,7 @@ module ForestAdminAgent
           )
           allow(collection).to receive(:list).and_return(
             [
-              User.new(id: 1, first_name: 'foo', last_name: 'foo')
+              User.new(1,'foo','foo')
             ]
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
