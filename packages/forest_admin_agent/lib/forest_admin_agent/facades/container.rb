@@ -5,6 +5,10 @@ module ForestAdminAgent
         ForestAdminAgent::Builder::AgentFactory.instance.container
       end
 
+      def self.datasource
+        instance.resolve(:datasource)
+      end
+
       def self.config_from_cache
         instance.resolve(:cache).get('config')
       end

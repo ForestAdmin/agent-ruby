@@ -1,0 +1,5 @@
+RSpec.shared_context 'with caller' do
+  let(:bearer) do
+    'Bearer eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEiLCJlbWFpbCI6Im5pY29sYXNhQGZvcmVzdGFkbWluLmNvbSIsImZpcnN0X25hbWUiOiJOaWNvbGFzIiwibGFzdF9uYW1lIjoiQWxleGFuZHJlIiwidGVhbSI6Ik9wZXJhdGlvbnMiLCJ0YWdzIjpbXSwicmVuZGVyaW5nX2lkIjoxMTQsImV4cCI6MTk5ODAzNjQ0OSwicGVybWlzc2lvbl9sZXZlbCI6ImFkbWluIn0.5LFmtMqZMfinLZLGdPvTlr22YDfU-B30z7MQxlb8vng'
+  end
+end

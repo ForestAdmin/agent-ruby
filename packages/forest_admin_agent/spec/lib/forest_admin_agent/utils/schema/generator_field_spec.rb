@@ -55,7 +55,7 @@ module ForestAdminAgent
               isRequired: true,
               isVirtual: false,
               reference: nil,
-              validations: {}
+              validations: []
             }
           )
         end
@@ -78,7 +78,7 @@ module ForestAdminAgent
               isRequired: false,
               isVirtual: false,
               reference: nil,
-              validations: {}
+              validations: []
             }
           )
         end

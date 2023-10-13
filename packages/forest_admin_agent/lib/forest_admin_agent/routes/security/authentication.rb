@@ -26,8 +26,10 @@ module ForestAdminAgent
         end
 
         def handle_authentication(args = {})
-          # Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
-          rendering_id = get_and_check_rendering_id args
+          if args.dig(:headers, 'action_dispatch.remote_ip')
+            Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
+          end
+          rendering_id = get_and_check_rendering_id args[:params]
 
           {
             content: {
@@ -37,8 +39,10 @@ module ForestAdminAgent
         end
 
         def handle_authentication_callback(args = {})
-          # Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
-          token = auth.verify_code_and_generate_token(args)
+          if args.dig(:headers, 'action_dispatch.remote_ip')
+            Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
+          end
+          token = auth.verify_code_and_generate_token(args[:params])
           token_data = JWT.decode(
             token,
             Facades::Container.cache(:auth_secret),

@@ -31,7 +31,6 @@ module ForestAdminAgent
           it 'makes a jwt' do
             jwt = forest_resource_owner.make_jwt
             decoded_jwt = JWT.decode jwt, Facades::Container.cache(:auth_secret), true, { algorithm: 'HS256' }
-            puts decoded_jwt
             h = {
               'id' => 'id',
               'email' => 'email',
@@ -43,6 +42,7 @@ module ForestAdminAgent
               'exp' => forest_resource_owner.expiration_in_seconds,
               'permission_level' => 'permission_level'
             }
+
             expect(decoded_jwt[0]).to eq h
           end
         end

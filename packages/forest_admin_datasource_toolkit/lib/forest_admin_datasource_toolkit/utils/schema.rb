@@ -15,6 +15,13 @@ module ForestAdminDatasourceToolkit
 
         field.type == 'Column' && field.is_primary_key
       end
+
+      def self.primary_keys(collection)
+        collection.fields.keys.select do |field_name|
+          field = collection.fields[field_name]
+          field.type == 'Column' && field.is_primary_key
+        end
+      end
     end
   end
 end

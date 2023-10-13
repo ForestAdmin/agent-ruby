@@ -30,10 +30,8 @@ module ForestAdminAgent
 
         context 'when getting the resource owner' do
           before do
-            allow(forest_provider).to receive_messages(secret: 'secret')
-            allow(forest_provider).to receive_messages(check_response: { data: 'data' })
-            allow(access_token).to receive_messages(access_token: 'access_token')
-            allow(access_token).to receive_messages(client: forest_provider)
+            allow(forest_provider).to receive_messages(secret: 'secret', check_response: { data: 'data' })
+            allow(access_token).to receive_messages(access_token: 'access_token', client: forest_provider)
           end
 
           it 'returns the resource owner' do
@@ -44,8 +42,7 @@ module ForestAdminAgent
 
         context 'when check response is called' do
           before do
-            allow(access_token).to receive_messages(access_token: 'access_token')
-            allow(access_token).to receive_messages(client: forest_provider)
+            allow(access_token).to receive_messages(access_token: 'access_token', client: forest_provider)
             allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
           end
 

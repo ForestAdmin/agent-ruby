@@ -31,8 +31,8 @@ end
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
   config.before do
-    lightly = Lightly.new
-    lightly.clear 'config'
+    lightly = Lightly.new(dir: 'tmp/cache/forest_admin')
+    lightly.flush
 
     agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
     agent_factory.setup(
@@ -43,7 +43,8 @@ RSpec.configure do |config|
         cache_dir: 'tmp/cache/forest_admin',
         schema_path: File.join('tmp', '.forestadmin-schema.json'),
         forest_server_url: 'https://api.development.forestadmin.com',
-        debug: true
+        debug: true,
+        prefix: 'forest'
       }
     )
   end
