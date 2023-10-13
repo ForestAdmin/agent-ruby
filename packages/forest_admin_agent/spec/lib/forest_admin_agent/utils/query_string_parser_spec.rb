@@ -155,23 +155,6 @@ module ForestAdminAgent
 
             expect(described_class.parse_projection(collection, args)).to eq(Projection.new(%w[id title author:id]))
           end
-
-          it 'raise a ForestException on a request with an unknown field' do
-            args = {
-              params: {
-                fields: {
-                  'Book' => 'foo'
-                }
-              }
-            }
-
-            expect do
-              described_class.parse_projection(collection, args)
-            end.to raise_error(
-              ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid projection'
-            )
-          end
         end
       end
 

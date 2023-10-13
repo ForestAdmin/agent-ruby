@@ -47,23 +47,23 @@ module ForestAdminAgent
           end
 
           it 'returns an auth url on the handle_authentication method' do
-            params = { 'renderingId' => rendering_id }
-            result = authentication.handle_authentication params
+            args = { params: { 'renderingId' => rendering_id } }
+            result = authentication.handle_authentication args
             expect(result[:content][:authorizationUrl]).to eq 'https://api.development.forestadmin.com/oidc/...'
           end
 
           it 'raises an error if renderingId is not present' do
-            params = {}
+            args = { params: {} }
             expect do
-              authentication.handle_authentication params
+              authentication.handle_authentication args
             end.to raise_error(Error,
                                ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID)
           end
 
           it 'raises an error if renderingId is not an integer' do
-            params = { 'renderingId' => 'abc' }
+            args = { params: { 'renderingId' => 'abc' } }
             expect do
-              authentication.handle_authentication params
+              authentication.handle_authentication args
             end.to raise_error(Error,
                                ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID)
           end

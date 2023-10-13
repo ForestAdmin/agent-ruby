@@ -46,8 +46,6 @@ module ForestAdminAgent
         end
 
         Projection.new(fields)
-      rescue StandardError
-        raise ForestException, 'Invalid projection'
       end
 
       def self.parse_projection_with_pks(collection, args)
