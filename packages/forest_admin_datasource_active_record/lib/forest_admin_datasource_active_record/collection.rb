@@ -32,6 +32,10 @@ module ForestAdminDatasourceActiveRecord
       ]
     end
 
+    def create(caller, data)
+      @model.create(data)
+    end
+
     private
 
     def query_joins(projection)

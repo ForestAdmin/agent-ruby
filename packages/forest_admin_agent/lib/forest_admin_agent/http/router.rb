@@ -10,7 +10,8 @@ module ForestAdminAgent
           System::HealthCheck.new.routes,
           Security::Authentication.new.routes,
           Resources::List.new.routes,
-          Resources::Count.new.routes
+          Resources::Count.new.routes,
+          Resources::Store.new.routes
         ].inject(&:merge)
       end
 

@@ -22,7 +22,7 @@ module ForestAdminDatasourceToolkit
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def create
+        def create(caller, data)
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
