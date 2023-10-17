@@ -12,6 +12,20 @@ module ForestAdminDatasourceToolkit
           @sort = sort
           @page = page
         end
+
+        def nestable?
+          !@search && !@segment
+        end
+
+        def override(*args)
+          Filter.new(*to_h.merge(args))
+        end
+
+        def nest(prefix)
+          raise ForestException, "Filter can't be nested" unless nestable?
+
+          override(condition_tree: @condition_tree&.nest(prefix))
+        end
       end
     end
   end
