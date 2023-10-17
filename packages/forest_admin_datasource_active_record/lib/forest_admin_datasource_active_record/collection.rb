@@ -15,10 +15,8 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def list(_caller, filter, projection)
-      query_joins(projection)
-      query_select(projection)
-
-      @model.offset(filter.page.offset).limit(filter.page.limit).all
+      query = Utils::Query.new(model, projection, filter).build
+      query.offset(filter.page.offset).limit(filter.page.limit).all
     end
 
     def aggregate(_caller, _filter, aggregation)
@@ -32,26 +30,26 @@ module ForestAdminDatasourceActiveRecord
       ]
     end
 
-    def create(caller, data)
+    def create(_caller, data)
       @model.create(data)
     end
 
     private
 
-    def query_joins(projection)
-      @model.joins(projection.relations.keys.map(&:to_sym))
-    end
-
-    def query_select(projection)
-      query = projection.columns.join(', ')
-
-      projection.relations.each do |relation, fields|
-        relation_table = datasource.collection(relation).model.table_name
-        fields.each { |field| query += ", #{relation_table}.#{field}" }
-      end
-
-      @model.select(query)
-    end
+    # def query_joins(projection)
+    #   @model.joins(projection.relations.keys.map(&:to_sym))
+    # end
+    #
+    # def query_select(projection)
+    #   query = projection.columns.join(', ')
+    #
+    #   projection.relations.each do |relation, fields|
+    #     relation_table = datasource.collection(relation).model.table_name
+    #     fields.each { |field| query += ", #{relation_table}.#{field}" }
+    #   end
+    #
+    #   @model.select(query)
+    # end
 
     def fetch_fields
       @model.columns_hash.each do |column_name, column|
