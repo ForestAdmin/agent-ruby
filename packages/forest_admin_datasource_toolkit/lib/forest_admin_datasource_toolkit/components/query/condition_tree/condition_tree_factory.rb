@@ -66,52 +66,40 @@ module ForestAdminDatasourceToolkit
           conditions.length == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
         end
 
-        #   private static function matchFields(array $fields, array $values): ConditionTree
-        #     {
-        #         if (count($values) === 0) {
-        #             return new ConditionTreeBranch('Or', []);
-        #         }
-        #
-        #         if (count($fields) === 1) {
-        #             $fieldValues = [];
-        #             foreach ($values as $value) {
-        #                 $fieldValues[] = $value[0];
-        #             }
-        #
-        #             return count($fieldValues) > 1
-        #                 ? new ConditionTreeLeaf($fields[0], 'In', $fieldValues)
-        #                 : new ConditionTreeLeaf($fields[0], 'Equal', $fieldValues[0]);
-        #         }
-        #
-        #         $firstField = $fields[0];
-        #         unset($fields[0]);
-        #         $otherFields = array_values($fields);
-        #
-        #         $group = new IlluminateCollection();
-        #         foreach ($values as $value) {
-        #             $firstValue = $value[0];
-        #             unset($value[0]);
-        #             $otherValues = array_values($value);
-        #             if ($group->has($firstValue)) {
-        #                 $group->get($firstValue)->push($otherValues);
-        #             } else {
-        #                 $group->put($firstValue, collect([$otherValues]));
-        #             }
-        #         }
-        #
-        #         return self::union(
-        #             $group->map(
-        #                 fn ($subValues, $firstValue) => self::intersect(
-        #                     [
-        #                         self::matchFields([$firstField], [[$firstValue]]),
-        #                         self::matchFields($otherFields, $subValues->toArray()),
-        #                     ]
-        #                 )
-        #             )->all(),
-        #         );
-        #     }
+        def self.match_fields(fields, values)
+          return ConditionTreeBranch.new('Or', []) if values.empty?
 
-        def self.match_fields(fields, values); end
+          if fields.length == 1
+            field_values = values.map { |value| value[0] }
+
+            field_values.length > 1 ? ConditionTreeLeaf.new(fields[0], 'In', field_values) : ConditionTreeLeaf.new(fields[0], 'Equal', field_values[0])
+          else
+            first_field = fields[0]
+            other_fields = fields[1..]
+
+            group = values.each_with_object({}) do |memo, value|
+              first_value = value[0]
+              other_values = value[1..]
+
+              if memo.key?(first_value)
+                memo[first_value] << other_values
+              else
+                memo[first_value] = [other_values]
+              end
+
+              memo
+            end
+
+            group.map do |first_value, sub_values|
+              intersect(
+                [
+                  match_fields([first_field], [[first_value]]),
+                  match_fields(other_fields, sub_values)
+                ]
+              )
+            end
+          end
+        end
 
         def self.leaf?(tree)
           tree.key?('field') && tree.key?('operator') && (tree['operator'] == 'Present' || tree.key?('value'))
