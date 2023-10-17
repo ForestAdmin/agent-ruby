@@ -11,20 +11,20 @@ module ForestAdminDatasourceActiveRecord
         @query = select
         @query = apply_filter
 
-        return @query
+        @query
       end
 
       def apply_filter
         @query = apply_condition_tree(@filter.condition_tree) unless @filter.condition_tree.nil?
 
-        return @query
+        @query
       end
 
       def apply_condition_tree(condition_tree, aggregator = nil)
         # if condition_tree.is_a ConditionTreeBranch
-          #TODO: add for ConditionTreeBranch
+        # TODO: add for ConditionTreeBranch
         # else
-          compute_main_operator(condition_tree, aggregator || 'and')
+        compute_main_operator(condition_tree, aggregator || 'and')
         # end
       end
 
@@ -36,7 +36,7 @@ module ForestAdminDatasourceActiveRecord
           @query = @query.send(aggregator, @query.where({ field => value }))
         end
 
-        return @query
+        @query
       end
 
       def select
@@ -44,7 +44,7 @@ module ForestAdminDatasourceActiveRecord
 
         @projection.relations.each do |relation, fields|
           relation_table = datasource.collection(relation).model.table_name
-          fields.each { |field| query += ", #{relation_table}.#{field}" }
+          fields.each { |field| query_select += ", #{relation_table}.#{field}" }
         end
 
         @query = @query.select(query_select)
