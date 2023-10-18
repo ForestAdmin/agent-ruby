@@ -13,9 +13,8 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
-          caller = ForestAdminAgent::Utils::QueryStringParser.parse_caller(args)
-          data = args[:params][:data][:attributes].permit(@collection.fields.keys).to_h
-          record = @collection.create(caller, data)
+          data, relationships = format_attributes(args)
+          record = @collection.create(@caller, data)
 
           {
             name: args[:params]['collection_name'],
@@ -25,6 +24,23 @@ module ForestAdminAgent
               serializer: Serializer::ForestSerializer
             )
           }
+        end
+
+        private
+
+        def format_attributes(args)
+          record = args[:params][:data][:attributes].permit(@collection.fields.keys).to_h
+          relations = {}
+
+          args[:params][:data][:relationships].to_unsafe_h.map do |field, value|
+            schema = @collection.fields[field]
+
+            if (schema.type == 'ManyToOne')
+              record[schema.foreign_key] = value[:data][schema.foreign_key_target]
+            end
+          end
+
+          [record, relations]
         end
       end
     end

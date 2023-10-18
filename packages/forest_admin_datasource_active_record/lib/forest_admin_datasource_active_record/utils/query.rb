@@ -1,8 +1,9 @@
 module ForestAdminDatasourceActiveRecord
   module Utils
     class Query
-      def initialize(model, projection, filter)
-        @query = model
+      def initialize(collection, projection, filter)
+        @collection = collection
+        @query = @collection.model
         @projection = projection
         @filter = filter
       end
@@ -40,15 +41,18 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def select
-        query_select = @projection.columns.join(', ')
+        query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
 
         @projection.relations.each do |relation, fields|
-          relation_table = datasource.collection(relation).model.table_name
-          fields.each { |field| query_select += ", #{relation_table}.#{field}" }
+          relation_schema = @collection.fields[relation]
+          query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
+          # fields.each { |field| query_select += ", #{relation_table}.#{field}" }
         end
 
         @query = @query.select(query_select)
-        @query = @query.joins(@projection.relations.keys.map(&:to_sym))
+        @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
+        # TODO: replace eager_load by joins because eager_load select ALL columns of relation
+        # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
       end
     end
   end
