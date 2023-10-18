@@ -56,6 +56,7 @@ Metrics/AbcSize:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/projection_factory.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/nodes/condition_tree.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
     - 'packages/forest_admin_rails/app/controllers/forest_admin_rails/forest_controller.rb'
 
 Metrics/CyclomaticComplexity:
@@ -64,12 +65,14 @@ Metrics/CyclomaticComplexity:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
 
 Metrics/PerceivedComplexity:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
 
 Style/BlockComments:
   Exclude:
@@ -178,6 +181,7 @@ Metrics/ParameterLists:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/caller.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
 
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
@@ -202,6 +206,7 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
 
 Style/OpenStructUse:
   Exclude:
@@ -220,6 +225,7 @@ Layout/LineLength:
   Exclude:
     - 'packages/forest_admin_agent/spec/shared/caller.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
