@@ -13,7 +13,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
-          data, relationships = format_attributes(args)
+          data, = format_attributes(args)
           record = @collection.create(@caller, data)
 
           {
@@ -35,9 +35,7 @@ module ForestAdminAgent
           args[:params][:data][:relationships].to_unsafe_h.map do |field, value|
             schema = @collection.fields[field]
 
-            if (schema.type == 'ManyToOne')
-              record[schema.foreign_key] = value[:data][schema.foreign_key_target]
-            end
+            record[schema.foreign_key] = value[:data][schema.foreign_key_target] if schema.type == 'ManyToOne'
           end
 
           [record, relations]

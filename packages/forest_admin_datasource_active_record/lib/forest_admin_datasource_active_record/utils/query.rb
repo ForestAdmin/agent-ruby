@@ -43,7 +43,7 @@ module ForestAdminDatasourceActiveRecord
       def select
         query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
 
-        @projection.relations.each do |relation, fields|
+        @projection.relations.each do |relation, _fields|
           relation_schema = @collection.fields[relation]
           query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
           # fields.each { |field| query_select += ", #{relation_table}.#{field}" }
