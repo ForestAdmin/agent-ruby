@@ -13,12 +13,10 @@ module ForestAdminAgent
         record = args[:params][:data][:attributes].permit(@collection.fields.keys).to_h
         relations = {}
 
-        if ! args[:params][:data][:relationships].nil?
-          args[:params][:data][:relationships].to_unsafe_h.map do |field, value|
-            schema = @collection.fields[field]
+        args[:params][:data][:relationships]&.to_unsafe_h&.map do |field, value|
+          schema = @collection.fields[field]
 
-            record[schema.foreign_key] = value[:data][schema.foreign_key_target] if schema.type == 'ManyToOne'
-          end
+          record[schema.foreign_key] = value[:data][schema.foreign_key_target] if schema.type == 'ManyToOne'
         end
 
         [record, relations]

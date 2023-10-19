@@ -35,7 +35,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def update(_caller, filter, data)
-      entity = Utils::Query.new(self,nil, filter).build.first
+      entity = Utils::Query.new(self, nil, filter).build.first
       entity.update(data)
     end
 

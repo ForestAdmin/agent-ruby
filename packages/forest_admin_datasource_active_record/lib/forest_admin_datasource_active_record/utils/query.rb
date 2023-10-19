@@ -41,7 +41,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def select
-        if !@projection.nil?
+        unless @projection.nil?
           query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
 
           @projection.relations.each do |relation, _fields|
