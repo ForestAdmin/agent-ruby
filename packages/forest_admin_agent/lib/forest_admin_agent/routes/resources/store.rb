@@ -25,21 +25,6 @@ module ForestAdminAgent
             )
           }
         end
-
-        private
-
-        def format_attributes(args)
-          record = args[:params][:data][:attributes].permit(@collection.fields.keys).to_h
-          relations = {}
-
-          args[:params][:data][:relationships].to_unsafe_h.map do |field, value|
-            schema = @collection.fields[field]
-
-            record[schema.foreign_key] = value[:data][schema.foreign_key_target] if schema.type == 'ManyToOne'
-          end
-
-          [record, relations]
-        end
       end
     end
   end

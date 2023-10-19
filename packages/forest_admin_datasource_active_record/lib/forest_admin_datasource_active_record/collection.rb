@@ -34,6 +34,11 @@ module ForestAdminDatasourceActiveRecord
       @model.create(data)
     end
 
+    def update(_caller, filter, data)
+      entity = Utils::Query.new(self,nil, filter).build.first
+      entity.update(data)
+    end
+
     private
 
     def fetch_fields

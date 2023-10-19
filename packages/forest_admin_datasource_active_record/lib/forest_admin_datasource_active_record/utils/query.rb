@@ -41,18 +41,22 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def select
-        query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
+        if !@projection.nil?
+          query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
 
-        @projection.relations.each do |relation, _fields|
-          relation_schema = @collection.fields[relation]
-          query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
-          # fields.each { |field| query_select += ", #{relation_table}.#{field}" }
+          @projection.relations.each do |relation, _fields|
+            relation_schema = @collection.fields[relation]
+            query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
+            # fields.each { |field| query_select += ", #{relation_table}.#{field}" }
+          end
+
+          @query = @query.select(query_select)
+          @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
+          # TODO: replace eager_load by joins because eager_load select ALL columns of relation
+          # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
         end
 
-        @query = @query.select(query_select)
-        @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
-        # TODO: replace eager_load by joins because eager_load select ALL columns of relation
-        # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
+        @query
       end
     end
   end
