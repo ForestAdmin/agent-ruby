@@ -29,14 +29,18 @@ module ForestAdminRails
       load_cors
     end
 
+    # config.eager_load_paths << "#{Rails.root}/lib/forest_admin_rails/agent.rb"
+
     def load_configuration
-      return unless File.exist?(Rails.root.join('config', 'forest_admin.rb'))
+      # return unless File.exist?(Rails.root.join('config', 'forest_admin.rb'))
 
       # force eager loading models
       Rails.application.eager_load!
+      require Rails.root.join('lib', 'forest_admin_rails', 'create_agent')
+      ForestAdminRails::CreateAgent.setup!
 
-      require Rails.root.join('config', 'forest_admin.rb')
-      forest_admin_configuration
+      # require Rails.root.join('config', 'forest_admin.rb')
+      # forest_admin_configuration
     end
 
     def load_cors
