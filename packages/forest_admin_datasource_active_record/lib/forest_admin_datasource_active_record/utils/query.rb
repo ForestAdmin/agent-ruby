@@ -33,7 +33,7 @@ module ForestAdminDatasourceActiveRecord
         field = condition_tree.field
         value = condition_tree.value
         case condition_tree.operator
-        when 'EQUAL'
+        when 'EQUAL', 'IN'
           @query = @query.send(aggregator, @query.where({ field => value }))
         end
 

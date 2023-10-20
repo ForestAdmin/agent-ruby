@@ -34,7 +34,7 @@ module ForestAdminDatasourceToolkit
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def delete
+        def delete(caller, filter)
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 

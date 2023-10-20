@@ -44,6 +44,7 @@ Metrics/AbcSize:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/id.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/http/router.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/abstract_authenticated_route.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/show.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/store.rb'
