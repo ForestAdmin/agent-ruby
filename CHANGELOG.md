@@ -1,3 +1,10 @@
+# [1.0.0-beta.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.5...v1.0.0-beta.6) (2023-10-23)
+
+
+### Features
+
+* **engine:** improve setup agent ([#8](https://github.com/ForestAdmin/agent-ruby/issues/8)) ([8fb5c29](https://github.com/ForestAdmin/agent-ruby/commit/8fb5c29b3cb611f6847985c099d6a9bd33e442b3))
+
 # [1.0.0-beta.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.4...v1.0.0-beta.5) (2023-10-13)
 
 
