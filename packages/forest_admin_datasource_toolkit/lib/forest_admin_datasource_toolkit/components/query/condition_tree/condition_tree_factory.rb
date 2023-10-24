@@ -4,6 +4,15 @@ module ForestAdminDatasourceToolkit
       module ConditionTree
         class ConditionTreeFactory
           include Nodes
+          include ForestAdminDatasourceToolkit::Exceptions
+
+          def self.match_none
+            ConditionTreeBranch.new('Or', [])
+          end
+
+          def self.match_all
+            nil
+          end
 
           def self.match_records(collection, records)
             ids = records.map { |record| ForestAdminDatasourceToolkit::Utils::Record.primary_keys(collection, record) }
@@ -27,7 +36,7 @@ module ForestAdminDatasourceToolkit
             match_fields(primary_key_names, ids)
           end
 
-          def self.intersect(trees)
+          def self.intersect(trees = nil)
             result = group('And', trees)
             is_empty_and = result.is_a?(ConditionTreeBranch) && result.aggregator == 'And' && result.conditions.empty?
 
@@ -42,11 +51,11 @@ module ForestAdminDatasourceToolkit
             return nil if json.nil?
 
             if leaf?(json)
-              ConditionTreeLeaf.new(json.field, json.operator, json.value)
+              ConditionTreeLeaf.new(json[:field], json[:operator], json[:value])
             elsif branch?(json)
               branch = ConditionTreeBranch.new(
-                json.aggregator,
-                json.conditions.map { |sub_tree| from_plain_object(sub_tree) }
+                json[:aggregator],
+                json[:conditions].map { |sub_tree| from_plain_object(sub_tree) }
               )
 
               branch.conditions.length == 1 ? branch.conditions[0] : branch
@@ -55,9 +64,10 @@ module ForestAdminDatasourceToolkit
             end
           end
 
-          def self.group(aggregator, trees)
+          def self.group(aggregator, trees = nil)
+            trees = [] if trees.nil?
             conditions = trees
-                         .filter { |tree| !tree.nil? }
+                         .compact
                          .reduce([]) do |current_conditions, tree|
               if tree.is_a?(ConditionTreeBranch) && tree.aggregator == aggregator
                 current_conditions + tree.conditions
@@ -70,7 +80,7 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.match_fields(fields, values)
-            return ConditionTreeBranch.new('Or', []) if values.empty?
+            return match_none if values.empty?
 
             if fields.length == 1
               field_values = values.map { |value| value[0] }
@@ -105,11 +115,15 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.leaf?(tree)
-            tree.key?('field') && tree.key?('operator') && (tree['operator'] == 'Present' || tree.key?('value'))
+            return false unless tree.is_a?(Hash)
+
+            tree.key?(:field) && tree.key?(:operator) && (tree[:operator] == 'Present' || tree.key?(:value))
           end
 
           def self.branch?(tree)
-            tree.key?('aggregator') && tree.key?('conditions')
+            return false unless tree.is_a?(Hash)
+
+            tree.key?(:aggregator) && tree.key?(:conditions)
           end
         end
       end
