@@ -47,12 +47,23 @@ module ForestAdminAgent
 
         return {} if attributes_map.nil?
         attributes = {}
+
         attributes_map.each do |attribute_name, attr_data|
           next if !should_include_attr?(attribute_name, attr_data)
           value = evaluate_attr_or_block(attribute_name, attr_data[:attr_or_block])
           attributes[format_name(attribute_name)] = value
         end
         attributes
+      end
+
+      def evaluate_attr_or_block(attribute_name, attr_or_block)
+        if attr_or_block.is_a?(Proc)
+          # A custom block was given, call it to get the value.
+          instance_eval(&attr_or_block)
+        else
+          # Default behavior, call a method by the name of the attribute.
+          object.try(attr_or_block)
+        end
       end
 
       def add_to_one_association(name, options = {}, &block)
