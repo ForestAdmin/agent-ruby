@@ -1,4 +1,5 @@
 require 'jsonapi-serializers'
+require 'ostruct'
 
 module ForestAdminAgent
   module Routes
@@ -23,7 +24,7 @@ module ForestAdminAgent
             condition_tree: condition_tree,
             page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
           )
-          data, = format_attributes(args)
+          data = format_attributes(args)
           @collection.update(@caller, filter, data)
           records = @collection.list(caller, filter, ProjectionFactory.all(@collection))
 

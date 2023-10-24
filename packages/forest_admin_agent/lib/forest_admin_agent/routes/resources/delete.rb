@@ -1,4 +1,5 @@
 require 'jsonapi-serializers'
+require 'ostruct'
 
 module ForestAdminAgent
   module Routes

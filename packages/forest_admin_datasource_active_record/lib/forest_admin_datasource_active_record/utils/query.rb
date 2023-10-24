@@ -46,7 +46,11 @@ module ForestAdminDatasourceActiveRecord
 
           @projection.relations.each do |relation, _fields|
             relation_schema = @collection.fields[relation]
-            query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
+            if relation_schema.type == 'OneToOne'
+              query_select += ", #{@collection.model.table_name}.#{relation_schema.origin_key_target}"
+            else
+              query_select += ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
+            end
             # fields.each { |field| query_select += ", #{relation_table}.#{field}" }
           end
 
