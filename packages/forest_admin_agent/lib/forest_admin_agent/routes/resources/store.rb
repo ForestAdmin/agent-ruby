@@ -44,7 +44,7 @@ module ForestAdminAgent
               # TODO: replace by ConditionTreeFactory.matchRecords(foreignCollection.schema, [linked]);
               condition_tree = OpenStruct.new(field: 'id', operator: 'EQUAL', value: id['id'])
               filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree)
-              foreign_collection.update(@caller, filter, {schema.origin_key => origin_value})
+              foreign_collection.update(@caller, filter, { schema.origin_key => origin_value })
             end
           end
         end
