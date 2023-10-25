@@ -26,7 +26,7 @@ module ForestAdminDatasourceToolkit
               raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
             end
 
-            def some_leaf(handler)
+            def some_leaf(&handler)
               raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
             end
 
@@ -42,27 +42,25 @@ module ForestAdminDatasourceToolkit
               if prefix.empty?
                 self
               else
-                replaceLeafs { |leaf| leaf.override(field: "#{prefix}:#{leaf.getField}") }
+                replace_leafs { |leaf| leaf.override(field: "#{prefix}:#{leaf.field}") }
               end
             end
 
             def unnest
-              field = if is_a?(ConditionTreeBranch)
-                        getConditions[0].getField
-                      else
-                        getField
-                      end
-              prefix = field.split(':')[0]
-
-              unless every_leaf { |leaf| leaf.getField.start_with?("#{prefix}:") }
+              prefix = nil
+              some_leaf do |leaf|
+                prefix = leaf.field.split(':').first
+                false
+              end
+              unless every_leaf { |leaf| leaf.field.start_with?(prefix) }
                 raise ForestException, 'Cannot unnest condition tree.'
               end
 
-              replace_leafs { |leaf| leaf.override(field: leaf.getField[(prefix.length + 1)..]) }
+              replace_leafs { |leaf| leaf.override(field: leaf.field[prefix.length + 1..]) }
             end
 
-            def replace_fields(handler)
-              replace_leafs { |leaf| leaf.override(field: handler.call(leaf.getField)) }
+            def replace_fields
+              replace_leafs { |leaf| leaf.override(field: yield(leaf.field)) }
             end
           end
         end
