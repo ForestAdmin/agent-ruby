@@ -10,10 +10,6 @@ module ForestAdminDatasourceToolkit
             ConditionTreeBranch.new('Or', [])
           end
 
-          def self.match_all
-            nil
-          end
-
           def self.match_records(collection, records)
             ids = records.map { |record| ForestAdminDatasourceToolkit::Utils::Record.primary_keys(collection, record) }
 
@@ -65,9 +61,8 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.group(aggregator, trees = nil)
-            trees = [] if trees.nil?
             conditions = trees
-                         .compact
+                         .filter { |tree| !tree.nil? }
                          .reduce([]) do |current_conditions, tree|
               if tree.is_a?(ConditionTreeBranch) && tree.aggregator == aggregator
                 current_conditions + tree.conditions
@@ -80,38 +75,33 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.match_fields(fields, values)
-            return match_none if values.empty?
+            return ConditionTreeFactory.match_none if values.empty?
 
             if fields.length == 1
-              field_values = values.map { |value| value[0] }
+              field_values = values.map { |tuple| tuple[0] }
 
-              field_values.length > 1 ? ConditionTreeLeaf.new(fields[0], 'In', field_values) : ConditionTreeLeaf.new(fields[0], 'Equal', field_values[0])
-            else
-              first_field = fields[0]
-              other_fields = fields[1..]
+              return field_values.length > 1 ? ConditionTreeLeaf.new(fields[0], 'In', field_values) : ConditionTreeLeaf.new(fields[0], 'Equal', field_values[0])
+            end
 
-              group = values.each_with_object({}) do |memo, value|
-                first_value = value[0]
-                other_values = value[1..]
+            first_field, *other_fields = fields
+            groups = {}
 
-                if memo.key?(first_value)
-                  memo[first_value] << other_values
-                else
-                  memo[first_value] = [other_values]
-                end
-
-                memo
-              end
-
-              group.map do |first_value, sub_values|
-                intersect(
-                  [
-                    match_fields([first_field], [[first_value]]),
-                    match_fields(other_fields, sub_values)
-                  ]
-                )
+            values.each do |first_value, *other_values|
+              if groups.key?(first_value)
+                groups[first_value].push(other_values)
+              else
+                groups[first_value] = [other_values]
               end
             end
+
+            ConditionTreeFactory.union(
+              groups.map do |first_value, sub_values|
+                ConditionTreeFactory.intersect([
+                                                 ConditionTreeFactory.match_fields([first_field], [[first_value]]),
+                                                 ConditionTreeFactory.match_fields(other_fields, sub_values)
+                                               ])
+              end
+            )
           end
 
           def self.leaf?(tree)
