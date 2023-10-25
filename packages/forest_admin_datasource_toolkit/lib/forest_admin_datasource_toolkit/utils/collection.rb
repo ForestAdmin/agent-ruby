@@ -1,7 +1,7 @@
 module ForestAdminDatasourceToolkit
   module Utils
     class Collection
-      include ForestAdminDatasourceToolkit::Schemas
+      include ForestAdminDatasourceToolkit::Schema
 
       def self.get_inverse_relation(collection, relation_name)
         relation_field = collection.fields[relation_name]
