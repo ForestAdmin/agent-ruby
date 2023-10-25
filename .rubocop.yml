@@ -195,8 +195,6 @@ Metrics/ParameterLists:
 
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
-  Exclude:
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory_spec.rb'
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']
@@ -235,8 +233,6 @@ RSpec/ExampleLength:
 
 RSpec/MultipleExpectations:
   Max: 10
-  Exclude:
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory_spec.rb'
 
 Layout/LineLength:
   Max: 120
