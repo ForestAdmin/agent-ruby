@@ -61,6 +61,8 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.group(aggregator, trees = nil)
+            return nil if trees.nil? || trees.empty?
+
             conditions = trees
                          .filter { |tree| !tree.nil? }
                          .reduce([]) do |current_conditions, tree|
