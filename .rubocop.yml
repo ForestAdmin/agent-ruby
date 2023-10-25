@@ -221,6 +221,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter_factory.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/nodes/condition_tree_leaf.rb'
 
 Style/OpenStructUse:
   Exclude:

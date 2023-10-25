@@ -35,8 +35,8 @@ module ForestAdminDatasourceToolkit
               end
             end
 
-            def for_each_leaf(handler)
-              @conditions.each { |condition| condition.for_each_leaf(handler) }
+            def for_each_leaf(&handler)
+              @conditions.each { |condition| condition.for_each_leaf(&handler) }
               self
             end
 

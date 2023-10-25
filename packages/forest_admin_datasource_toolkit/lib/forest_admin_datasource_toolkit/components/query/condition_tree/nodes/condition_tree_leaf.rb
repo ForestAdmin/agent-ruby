@@ -32,8 +32,10 @@ module ForestAdminDatasourceToolkit
             end
 
             def inverse
-              override(operator: "Not_#{@operator}") if Operators.all_operators.include?("Not_#{@operator}")
-              override(operator: @operator[4..]) if @operator.start_with?('Not')
+              if Operators.all_operators.include?("Not_#{@operator}".upcase.to_sym)
+                return override(operator: "Not_#{@operator}")
+              end
+              return override(operator: @operator[4..]) if @operator.start_with?('Not')
 
               case @operator
               when 'Blank'
@@ -58,7 +60,8 @@ module ForestAdminDatasourceToolkit
 
             def match(record, collection, timezone)
               field_value = Record.field_value(record, @field)
-              column_type = Collection.get_field_schema(collection, @field).column_type
+              column_type = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection,
+                                                                                             @field).column_type
               supported = %w[In Equal LessThan GreaterThan Match StartsWith EndsWith LongerThan ShorterThan IncludesAll
                              NotIn NotEqual NotContains]
 
@@ -111,8 +114,12 @@ module ForestAdminDatasourceToolkit
               Projection.new([@field])
             end
 
-            def override(*args)
-              ConditionTreeLeaf.new(*to_a.concat(args))
+            def override(args)
+              ConditionTreeLeaf.new(
+                args[:field] || @field,
+                args[:operator] || @operator,
+                args[:value] || @value
+              )
             end
 
             def use_interval_operator
