@@ -10,12 +10,12 @@ module ForestAdminAgent
       end
 
       def format_attributes(args)
-        record = args[:params][:data][:attributes].permit(@collection.fields.keys).to_h
+        record = args[:params][:data][:attributes]
 
-        args[:params][:data][:relationships]&.to_unsafe_h&.map do |field, value|
+        args[:params][:data][:relationships]&.map do |field, value|
           schema = @collection.fields[field]
 
-          record[schema.foreign_key] = value[:data][schema.foreign_key_target] if schema.type == 'ManyToOne'
+          record[schema.foreign_key] = value['data'][schema.foreign_key_target] if schema.type == 'ManyToOne'
         end
 
         record

@@ -7,7 +7,7 @@ module ForestAdminAgent
       class Store < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         def setup_routes
-          add_route('forest_create', 'post', '/:collection_name', ->(args) { handle_request(args) })
+          add_route('forest_store', 'post', '/:collection_name', ->(args) { handle_request(args) })
 
           self
         end
@@ -31,7 +31,7 @@ module ForestAdminAgent
         def link_one_to_one_relations(args, record)
           relations = {}
 
-          args[:params][:data][:relationships]&.to_unsafe_h&.map do |field, value|
+          args[:params][:data][:relationships]&.map do |field, value|
             schema = @collection.fields[field]
             if schema.type == 'OneToOne'
               id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)

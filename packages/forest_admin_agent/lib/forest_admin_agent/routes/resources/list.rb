@@ -26,8 +26,7 @@ module ForestAdminAgent
               records,
               is_collection: true,
               serializer: Serializer::ForestSerializer,
-              include: projection.relations.keys,
-              fields: { @collection.model.model_name.plural.to_sym => projection }
+              include: projection.relations.keys
             )
           }
         end

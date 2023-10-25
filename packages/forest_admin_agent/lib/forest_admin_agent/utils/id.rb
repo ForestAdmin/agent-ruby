@@ -4,7 +4,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Utils
       def self.unpack_id(collection, packed_id, with_key: false)
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
-        primary_key_values = packed_id.split('|')
+        primary_key_values = packed_id.to_s.split('|')
         if (nb_pks = primary_keys.size) != (nb_values = primary_key_values.size)
           raise Exceptions::ForestException, "Expected $primaryKeyNames a size of #{nb_pks} values, found #{nb_values}"
         end
