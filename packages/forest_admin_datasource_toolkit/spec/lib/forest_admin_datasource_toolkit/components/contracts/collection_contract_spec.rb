@@ -27,10 +27,10 @@ module ForestAdminDatasourceToolkit
         it { expect { collection.name }.to raise_error(NotImplementedError) }
         it { expect { collection.execute }.to raise_error(NotImplementedError) }
         it { expect { collection.form }.to raise_error(NotImplementedError) }
-        it { expect { collection.create }.to raise_error(NotImplementedError) }
+        it { expect { collection.create(caller, {}) }.to raise_error(NotImplementedError) }
         it { expect { collection.list(caller, Filter.new, Projection.new) }.to raise_error(NotImplementedError) }
-        it { expect { collection.update }.to raise_error(NotImplementedError) }
-        it { expect { collection.delete }.to raise_error(NotImplementedError) }
+        it { expect { collection.update(caller, Filter.new, {}) }.to raise_error(NotImplementedError) }
+        it { expect { collection.delete(caller, Filter.new) }.to raise_error(NotImplementedError) }
         it { expect { collection.render_chart }.to raise_error(NotImplementedError) }
 
         it {

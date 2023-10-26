@@ -8,9 +8,9 @@ module ForestAdminAgent
     module Resources
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
-      describe List do
+      describe Show do
         include_context 'with caller'
-        subject(:list) { described_class.new }
+        subject(:show) { described_class.new }
         let(:args) do
           {
             headers: { 'HTTP_AUTHORIZATION' => bearer },
@@ -21,8 +21,14 @@ module ForestAdminAgent
           }
         end
 
-        before do
-          user_class = Struct.new(:id, :first_name, :last_name)
+        let(:datasource) do
+          user_class = Struct.new(:id, :first_name, :last_name) do
+            def respond_to?(arg)
+              return false if arg == :each
+
+              super arg
+            end
+          end
           stub_const('User', user_class)
 
           datasource = Datasource.new
@@ -34,43 +40,44 @@ module ForestAdminAgent
               'last_name' => ColumnSchema.new(column_type: 'String')
             }
           )
-          allow(collection).to receive(:list).and_return(
+          allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+          datasource.add_collection(collection)
+          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+          ForestAdminAgent::Builder::AgentFactory.instance.build
+
+          datasource
+        end
+
+        it 'adds the route forest_list' do
+          show.setup_routes
+          expect(show.routes.include?('forest_show')).to be true
+          expect(show.routes.length).to eq 1
+        end
+
+        it 'return an serialized content' do
+          allow(datasource.collection('user')).to receive(:list).and_return(
             [
               User.new(1, 'foo', 'foo')
             ]
           )
-          allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+          args[:params]['id'] = 1
 
-          datasource.add_collection(collection)
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
-          ForestAdminAgent::Builder::AgentFactory.instance.build
-        end
-
-        it 'return an serialized content' do
-          result = list.handle_request(args)
+          result = show.handle_request(args)
 
           expect(result[:name]).to eq('user')
           expect(result[:content]).to eq(
-            'data' => [
-              {
-                'type' => 'user',
-                'id' => '1',
-                'attributes' => {
-                  'id' => 1,
-                  'first_name' => 'foo',
-                  'last_name' => 'foo'
-                },
-                'links' => { 'self' => 'forest/user/1' }
-              }
-            ],
+            'data' => {
+              'type' => 'user',
+              'id' => '1',
+              'attributes' => {
+                'id' => 1,
+                'first_name' => 'foo',
+                'last_name' => 'foo'
+              },
+              'links' => { 'self' => 'forest/user/1' }
+            },
             'included' => []
           )
-        end
-
-        it 'adds the route forest_list' do
-          list.setup_routes
-          expect(list.routes.include?('forest_list')).to be true
-          expect(list.routes.length).to eq 1
         end
       end
     end
