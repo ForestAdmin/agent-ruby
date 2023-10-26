@@ -44,7 +44,7 @@ module ForestAdminDatasourceToolkit
           PREVIOUS_X_DAYS = 'Previous_X_Days'.freeze
           PREVIOUS_X_DAYS_TO_DATE = 'Previous_X_Days_To_Date'.freeze
 
-          def self.all
+          def self.all_operators
             constants
           end
 
