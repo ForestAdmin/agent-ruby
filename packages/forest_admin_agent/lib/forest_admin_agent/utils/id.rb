@@ -2,6 +2,7 @@ module ForestAdminAgent
   module Utils
     class Id
       include ForestAdminDatasourceToolkit::Utils
+      include ForestAdminDatasourceToolkit
       def self.unpack_id(collection, packed_id, with_key: false)
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         primary_key_values = packed_id.to_s.split('|')
