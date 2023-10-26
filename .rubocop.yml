@@ -59,6 +59,7 @@ Metrics/AbcSize:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter_factory.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/nodes/condition_tree_leaf.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/transforms/time.rb'
     - 'packages/forest_admin_rails/app/controllers/forest_admin_rails/forest_controller.rb'
 
 Metrics/CyclomaticComplexity:
