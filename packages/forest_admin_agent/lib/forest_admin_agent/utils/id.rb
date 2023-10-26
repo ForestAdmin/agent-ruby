@@ -7,7 +7,7 @@ module ForestAdminAgent
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         primary_key_values = packed_id.to_s.split('|')
         if (nb_pks = primary_keys.size) != (nb_values = primary_key_values.size)
-          raise Exceptions::ForestException, "Expected $primaryKeyNames a size of #{nb_pks} values, found #{nb_values}"
+          raise Exceptions::ForestException, "Expected #{nb_pks} primary keys, found #{nb_values}"
         end
 
         result = primary_keys.map.with_index do |pk_name, index|
