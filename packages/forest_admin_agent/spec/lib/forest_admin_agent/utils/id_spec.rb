@@ -51,7 +51,7 @@ module ForestAdminAgent
             collection = datasource.collection('person')
 
             expect do
-              expect(described_class.unpack_id(collection, '1|foo'))
+              described_class.unpack_id(collection, '1|foo')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
               '🌳🌳🌳 Expected 1 primary keys, found 2'
@@ -69,7 +69,7 @@ module ForestAdminAgent
             collection = datasource.collection('pks')
 
             expect do
-              expect(described_class.unpack_id(collection, '1'))
+              described_class.unpack_id(collection, '1')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
               '🌳🌳🌳 Expected 2 primary keys, found 1'
