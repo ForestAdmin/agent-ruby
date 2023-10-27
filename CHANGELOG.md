@@ -1,3 +1,10 @@
+# [1.0.0-beta.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.6...v1.0.0-beta.7) (2023-10-27)
+
+
+### Features
+
+* add all writing operations ([#9](https://github.com/ForestAdmin/agent-ruby/issues/9)) ([3fd6a7a](https://github.com/ForestAdmin/agent-ruby/commit/3fd6a7a9d1dbe21e8689f2d54ae9b9abf13c17a5))
+
 # [1.0.0-beta.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.5...v1.0.0-beta.6) (2023-10-23)
 
 
