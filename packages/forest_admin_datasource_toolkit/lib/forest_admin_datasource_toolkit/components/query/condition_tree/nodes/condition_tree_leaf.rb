@@ -58,8 +58,7 @@ module ForestAdminDatasourceToolkit
 
             def match(record, collection, timezone)
               field_value = Record.field_value(record, @field)
-              column_type = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection,
-                                                                                             @field).column_type
+              column_type = Utils::Collection.get_field_schema(collection, @field).column_type
 
               supported = [
                 Operators::IN,
@@ -87,7 +86,7 @@ module ForestAdminDatasourceToolkit
               when Operators::GREATER_THAN
                 field_value > @value
               when Operators::MATCH
-                field_value.is_a?(String) && field_value.match(@value)
+                field_value.is_a?(String) && @value.match(field_value)
               when Operators::STARTS_WITH
                 field_value.is_a?(String) && field_value.start_with?(@value)
               when Operators::ENDS_WITH
