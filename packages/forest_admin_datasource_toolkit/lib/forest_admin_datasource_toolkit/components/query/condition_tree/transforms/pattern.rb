@@ -20,10 +20,10 @@ module ForestAdminDatasourceToolkit
                 forTypes: ['String'],
                 replacer: lambda { |leaf|
                   regex = leaf.value.gsub(/([\.\\\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:\-])/, '\\\\\1')
-                  regex.tr!(/%/, '.*')
+                  regex.gsub!('%', '.*')
                   regex.tr!('_', '.')
 
-                  leaf.override(operator: Operators::MATCH, value: /^#{regex}$/ + (case_sensitive ? '' : 'i'))
+                  leaf.override(operator: Operators::MATCH, value: "/^#{regex}$/#{case_sensitive ? "" : "i"}")
                 }
               }
             end
