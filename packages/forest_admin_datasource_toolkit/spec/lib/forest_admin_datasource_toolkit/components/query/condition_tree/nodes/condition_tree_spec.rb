@@ -54,6 +54,87 @@ module ForestAdminDatasourceToolkit
               )
             end
 
+            context 'when calling match' do
+              it 'works with many fields' do
+                collection = Collection.new(Datasource.new, 'myCollection')
+                collection.add_fields(
+                  {
+                    'column1' => ColumnSchema.new(
+                      column_type: PrimitiveType::BOOLEAN,
+                      filter_operators: [Operators::EQUAL]
+                    ),
+                    'column2' => ColumnSchema.new(
+                      column_type: PrimitiveType::BOOLEAN,
+                      filter_operators: [Operators::EQUAL]
+                    )
+                  }
+                )
+                expect(@condition_tree_branch.match({ 'column1' => true, 'column2' => true }, collection,
+                                                    'Europe/Paris')).to be_truthy
+                expect(@condition_tree_branch.match({ 'column1' => true, 'column2' => false }, collection,
+                                                    'Europe/Paris')).to be_falsey
+                expect(@condition_tree_branch.inverse.match({ 'column1' => true, 'column2' => true }, collection,
+                                                            'Europe/Paris')).to be_falsey
+                expect(@condition_tree_branch.inverse.match({ 'column1' => true, 'column2' => false }, collection,
+                                                            'Europe/Paris')).to be_truthy
+              end
+
+              it 'works with many operators' do
+                collection = Collection.new(Datasource.new, 'myCollection')
+                collection.add_fields(
+                  {
+                    'string' => ColumnSchema.new(
+                      column_type: PrimitiveType::STRING,
+                      filter_operators: [Operators::EQUAL]
+                    ),
+                    'array' => ColumnSchema.new(
+                      column_type: [PrimitiveType::STRING],
+                      filter_operators: [Operators::EQUAL]
+                    )
+                  }
+                )
+
+                all_conditions = ConditionTreeBranch.new('And', [
+                                                           ConditionTreeLeaf.new('string', Operators::PRESENT),
+                                                           ConditionTreeLeaf.new('string', Operators::MATCH,
+                                                                                 '/value/'),
+                                                           ConditionTreeLeaf.new('string', Operators::LESS_THAN,
+                                                                                 'valuf'),
+                                                           ConditionTreeLeaf.new('string', Operators::EQUAL, 'value'),
+                                                           ConditionTreeLeaf.new('string', Operators::GREATER_THAN,
+                                                                                 'valud'),
+                                                           ConditionTreeLeaf.new('string', Operators::IN, ['value']),
+                                                           ConditionTreeLeaf.new('array', Operators::INCLUDES_ALL,
+                                                                                 ['value']),
+                                                           ConditionTreeLeaf.new('string', Operators::LONGER_THAN, 0),
+                                                           ConditionTreeLeaf.new('string', Operators::SHORTER_THAN,
+                                                                                 999),
+                                                           ConditionTreeLeaf.new('string', Operators::STARTS_WITH,
+                                                                                 'val'),
+                                                           ConditionTreeLeaf.new('string', Operators::ENDS_WITH,
+                                                                                 'lue')
+                                                         ])
+
+                expect(all_conditions.match({ 'string' => 'value', 'array' => ['value'] }, collection,
+                                            'Europe/Paris')).to be_truthy
+              end
+
+              it 'works with null value' do
+                collection = Collection.new(Datasource.new, 'myCollection')
+                collection.add_fields(
+                  {
+                    'string' => ColumnSchema.new(
+                      column_type: PrimitiveType::STRING,
+                      filter_operators: [Operators::EQUAL]
+                    )
+                  }
+                )
+                leaf = ConditionTreeLeaf.new('string', Operators::MATCH, '%value%')
+
+                expect(leaf.match({ 'string' => nil }, collection, 'Europe/Paris')).to be_falsey
+              end
+            end
+
             it 'when calling for_each_leaf should work' do
               expect(@condition_tree_branch.for_each_leaf { |leaf| leaf.override(field: 'field') }).eql?(
                 ConditionTreeBranch.new('And', [
@@ -78,11 +159,11 @@ module ForestAdminDatasourceToolkit
               collection.add_fields(
                 {
                   'column1' => ColumnSchema.new(
-                    column_type: 'Boolean',
+                    column_type: PrimitiveType::BOOLEAN,
                     filter_operators: [Operators::EQUAL]
                   ),
                   'column2' => ColumnSchema.new(
-                    column_type: 'Boolean',
+                    column_type: PrimitiveType::BOOLEAN,
                     filter_operators: [Operators::EQUAL]
                   )
                 }
