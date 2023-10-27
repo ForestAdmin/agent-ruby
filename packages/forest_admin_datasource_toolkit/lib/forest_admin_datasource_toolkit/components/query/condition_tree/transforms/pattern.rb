@@ -5,7 +5,7 @@ module ForestAdminDatasourceToolkit
         module Transforms
           class Pattern
             def self.likes(get_pattern, case_sensitive)
-              operator = case_sensitive ? Operators::LIKE : Operators::ILIKE
+              operator = case_sensitive ? Operators::LIKE : Operators::I_LIKE
 
               {
                 dependsOn: [operator],
@@ -28,7 +28,7 @@ module ForestAdminDatasourceToolkit
               }
             end
 
-            def self.pattern_transforms
+            def self.transforms
               {
                 Operators::CONTAINS => [likes(->(value) { "%#{value}%" }, true)],
                 Operators::STARTS_WITH => [likes(->(value) { "#{value}%" }, true)],

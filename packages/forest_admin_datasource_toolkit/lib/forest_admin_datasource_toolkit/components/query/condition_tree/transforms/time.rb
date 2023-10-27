@@ -52,7 +52,7 @@ module ForestAdminDatasourceToolkit
               )
             end
 
-            def self.time_transforms
+            def self.transforms
               {
                 Operators::BEFORE => [compare(Operators::LESS_THAN) { |_now, value| Time.parse(value) }],
                 Operators::AFTER => [compare(Operators::GREATER_THAN) { |_now, value| Time.parse(value) }],
