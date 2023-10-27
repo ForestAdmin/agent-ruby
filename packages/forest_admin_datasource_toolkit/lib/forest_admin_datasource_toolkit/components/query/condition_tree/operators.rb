@@ -9,10 +9,10 @@ module ForestAdminDatasourceToolkit
           GREATER_THAN = 'Greater_Than'.freeze
           MATCH = 'Match'.freeze
           LIKE = 'Like'.freeze
-          ILIKE = 'ILike'.freeze
+          I_LIKE = 'ILike'.freeze
           NOT_CONTAINS = 'Not_Contains'.freeze
           CONTAINS = 'Contains'.freeze
-          ICONTAINS = 'IContains'.freeze
+          I_CONTAINS = 'IContains'.freeze
           LONGER_THAN = 'Longer_Than'.freeze
           SHORTER_THAN = 'Shorter_Than'.freeze
           INCLUDES_ALL = 'Includes_All'.freeze
@@ -21,9 +21,9 @@ module ForestAdminDatasourceToolkit
           IN = 'In'.freeze
           NOT_IN = 'Not_In'.freeze
           STARTS_WITH = 'Starts_With'.freeze
-          ISTARTS_WITH = 'IStarts_With'.freeze
+          I_STARTS_WITH = 'IStarts_With'.freeze
           ENDS_WITH = 'Ends_With'.freeze
-          IENDS_WITH = 'IEnds_With'.freeze
+          I_ENDS_WITH = 'IEnds_With'.freeze
           MISSING = 'Missing'.freeze
           BEFORE = 'Before'.freeze
           AFTER = 'After'.freeze

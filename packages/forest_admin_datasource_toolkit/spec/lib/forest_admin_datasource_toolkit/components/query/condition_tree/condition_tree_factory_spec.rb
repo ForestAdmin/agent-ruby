@@ -17,7 +17,7 @@ module ForestAdminDatasourceToolkit
           context 'when testing match_records / match_ids' do
             it 'raises an error when the collection has no primary key' do
               collection = Collection.new(datasource, 'cars')
-              collection.add_fields({ 'column' => ColumnSchema.new(column_type: 'String') })
+              collection.add_fields({ 'column' => ColumnSchema.new(column_type: PrimitiveType::STRING) })
 
               expect do
                 condition_tree_factory.match_ids(collection, [[]])
@@ -26,7 +26,7 @@ module ForestAdminDatasourceToolkit
 
             it 'raises an error when the collection does not support equal and in' do
               collection = Collection.new(datasource, 'cars')
-              collection.add_fields({ 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true) })
+              collection.add_fields({ 'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true) })
 
               expect do
                 condition_tree_factory.match_ids(collection, [[]])
@@ -36,7 +36,7 @@ module ForestAdminDatasourceToolkit
             it 'generates matchNone with simple PK' do
               collection = Collection.new(datasource, 'cars')
               collection.add_fields({ 'id' => ColumnSchema.new(
-                column_type: 'Number',
+                column_type: PrimitiveType::NUMBER,
                 filter_operators: [Operators::EQUAL, Operators::IN],
                 is_primary_key: true
               ) })
@@ -47,7 +47,7 @@ module ForestAdminDatasourceToolkit
             it 'generates equal with simple PK' do
               collection = Collection.new(datasource, 'cars')
               collection.add_fields({ 'id' => ColumnSchema.new(
-                column_type: 'Number',
+                column_type: PrimitiveType::NUMBER,
                 filter_operators: [Operators::EQUAL, Operators::IN],
                 is_primary_key: true
               ) })
@@ -58,7 +58,7 @@ module ForestAdminDatasourceToolkit
             it 'generates "In" with simple PK' do
               collection = Collection.new(datasource, 'cars')
               collection.add_fields({ 'id' => ColumnSchema.new(
-                column_type: 'Number',
+                column_type: PrimitiveType::NUMBER,
                 filter_operators: [Operators::EQUAL, Operators::IN],
                 is_primary_key: true
               ) })
@@ -71,12 +71,12 @@ module ForestAdminDatasourceToolkit
               collection.add_fields(
                 {
                   'col1' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   ),
                   'col2' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   )
@@ -96,12 +96,12 @@ module ForestAdminDatasourceToolkit
               collection.add_fields(
                 {
                   'col1' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   ),
                   'col2' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   )
@@ -121,12 +121,12 @@ module ForestAdminDatasourceToolkit
               collection.add_fields(
                 {
                   'col1' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   ),
                   'col2' => ColumnSchema.new(
-                    column_type: 'Number',
+                    column_type: PrimitiveType::NUMBER,
                     filter_operators: [Operators::EQUAL, Operators::IN],
                     is_primary_key: true
                   )
