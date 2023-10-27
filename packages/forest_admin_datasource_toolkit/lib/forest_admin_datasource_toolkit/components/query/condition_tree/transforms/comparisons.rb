@@ -4,6 +4,8 @@ module ForestAdminDatasourceToolkit
       module ConditionTree
         module Transforms
           class Comparisons
+            include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+
             def self.transforms
               {
                 Operators::BLANK => [
@@ -50,16 +52,15 @@ module ForestAdminDatasourceToolkit
 
                       [nil, ''].each do |value|
                         if values.include?(value)
-                          conditions.push(ConditionTreeLeaf.new(field: leaf.field, operator: Operators::EQUAL,
-                                                                value: value))
+                          conditions.push(ConditionTreeLeaf.new(leaf.field, Operators::EQUAL, value))
                         end
                       end
 
                       if values.any? { |value| !value.nil? && value != '' }
                         escaped = values.filter { |value| !value.nil? && value != '' }
 
-                        conditions.push(ConditionTreeLeaf.new(field: leaf.field, operator: Operators::MATCH,
-                                                              value: "/(#{escaped.join("|")})/g"))
+                        conditions.push(ConditionTreeLeaf.new(leaf.field, Operators::MATCH,
+                                                              "/(#{escaped.join("|")})/g"))
                       end
 
                       ConditionTreeFactory.union(conditions)
@@ -90,15 +91,14 @@ module ForestAdminDatasourceToolkit
 
                       [nil, ''].each do |value|
                         if values.include?(value)
-                          conditions.push(ConditionTreeLeaf.new(field: leaf.field, operator: Operators::NOT_EQUAL,
-                                                                value: value))
+                          conditions.push(ConditionTreeLeaf.new(leaf.field, Operators::NOT_EQUAL, value))
                         end
                       end
 
                       if values.any? { |value| !value.nil? && value != '' }
                         escaped = values.filter { |value| !value.nil? && value != '' }
-                        conditions.push(ConditionTreeLeaf.new(field: leaf.field, operator: Operators::MATCH,
-                                                              value: "/(?!(#{escaped.join("|")}))/g"))
+                        conditions.push(ConditionTreeLeaf.new(leaf.field, Operators::MATCH,
+                                                              "/(?!(#{escaped.join("|")}))/g"))
                       end
 
                       ConditionTreeFactory.intersect(conditions)
