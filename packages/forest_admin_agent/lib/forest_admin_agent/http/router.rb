@@ -9,8 +9,12 @@ module ForestAdminAgent
           # api_charts_routes,
           System::HealthCheck.new.routes,
           Security::Authentication.new.routes,
+          Resources::Count.new.routes,
+          Resources::Delete.new.routes,
           Resources::List.new.routes,
-          Resources::Count.new.routes
+          Resources::Show.new.routes,
+          Resources::Store.new.routes,
+          Resources::Update.new.routes
         ].inject(&:merge)
       end
 
