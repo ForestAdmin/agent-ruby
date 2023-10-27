@@ -26,13 +26,13 @@ module ForestAdminDatasourceToolkit
             end
 
             def valid_operator(value)
-              return if Operators.all.include?(value.upcase.to_sym)
+              return if Operators.exist?(value)
 
               raise ForestException, "Invalid operators, the #{value} operator does not exist."
             end
 
             def inverse
-              return override(operator: "Not_#{@operator}") if Operators.all.include?("Not_#{@operator}".upcase.to_sym)
+              return override(operator: "Not_#{@operator}") if Operators.exist?("Not_#{@operator}")
               return override(operator: @operator[4..]) if @operator.start_with?('Not')
 
               case @operator
