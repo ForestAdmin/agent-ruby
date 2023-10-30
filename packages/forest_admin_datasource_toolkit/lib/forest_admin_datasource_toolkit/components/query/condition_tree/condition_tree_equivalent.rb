@@ -26,7 +26,7 @@ module ForestAdminDatasourceToolkit
               @alternatives ||= {}
               comparisons = Transforms::Comparisons.transforms[operator] || []
               pattern = Transforms::Pattern.transforms[operator] || []
-              time = Transforms::Time.transforms[operator] || []
+              time = Transforms::Times.transforms[operator] || []
 
               @alternatives[operator] ||= comparisons.concat(pattern).concat(time)
 
