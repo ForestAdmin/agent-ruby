@@ -1,6 +1,8 @@
 module ForestAdminDatasourceActiveRecord
   module Parser
     module Column
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       TYPES = {
         boolean: 'Boolean',
         datetime: 'Date',
@@ -43,6 +45,32 @@ module ForestAdminDatasourceActiveRecord
 
       def sti_column?(model, column)
         model.inheritance_column && column.name == model.inheritance_column
+      end
+
+      def operators_for_column_type(type)
+        result = [Operators::PRESENT, Operators::MISSING]
+        equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
+
+        if (type.is_a? String)
+          orderables = [Operators::LESS_THAN, Operators::GREATER_THAN]
+          strings = [Operators::LIKE, Operators::I_LIKE, Operators::NOT_CONTAINS]
+
+          if (%w[Boolean Binary Enum Uuid].include?(type))
+            result + equality
+          end
+
+          if (%w[Date Dateonly Number].include?(type))
+            result + equality + orderables
+          end
+
+          if (%w[String].include?(type))
+            result + equality + orderables + strings
+          end
+        end
+
+        result + equality + ['Includes_All'] if (type.is_a? Array)
+
+        result
       end
     end
   end

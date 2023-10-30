@@ -51,7 +51,7 @@ module ForestAdminDatasourceActiveRecord
         # TODO: check is not sti column
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(@model, column),
-          filter_operators: %w[In Equal], # TODO
+          filter_operators: operators_for_column_type(get_column_type(@model, column)),
           is_primary_key: column_name == @model.primary_key,
           is_read_only: false,
           is_sortable: true,

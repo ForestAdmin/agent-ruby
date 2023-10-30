@@ -14,7 +14,9 @@ module ForestAdminAgent
         def handle_request(args = {})
           build(args)
           caller = ForestAdminAgent::Utils::QueryStringParser.parse_caller(args)
+
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+            condition_tree: ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@collection, args),
             page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
           )
           projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)
