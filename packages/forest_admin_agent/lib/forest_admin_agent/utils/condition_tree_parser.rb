@@ -9,44 +9,37 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
 
-
       def self.from_plain_object(collection, filters)
         if leaf?(filters)
-          operator = filters['operator'].titleize.gsub(' ', '_')
+          operator = filters['operator'].titleize.tr(' ', '_')
           value = parse_value(collection, filters)
 
           return ConditionTreeLeaf.new(filters['field'], operator, value)
         end
 
-        if (branch?(filters))
+        if branch?(filters)
           aggregator = filters['aggregator'].capitalize
           conditions = []
-          filters['conditions'].each do | sub_tree |
+          filters['conditions'].each do |sub_tree|
             conditions << from_plain_object(collection, sub_tree)
           end
 
-          return conditions.size != 1 ? ConditionTreeBranch.new(aggregator, conditions) : conditions[0]
+          return conditions.size == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
         end
 
-        raise ForestException.new('Failed to instantiate condition tree')
+        raise ForestException, 'Failed to instantiate condition tree'
       end
-
-      private
 
       def self.parse_value(collection, leaf)
         schema = Collection.get_field_schema(collection, leaf['field'])
-        operator = leaf['operator'].titleize.gsub(' ', '_')
+        operator = leaf['operator'].titleize.tr(' ', '_')
 
-        if (operator == Operators::IN && leaf['field'].is_a?(String))
-          values = leaf['value'].split(',').map { |item| item.strip }
+        if operator == Operators::IN && leaf['field'].is_a?(String)
+          values = leaf['value'].split(',').map(&:strip)
 
-          if schema.column_type == 'Boolean'
-            return values.map { |item| ! %w[false 0 no].include?(item) }
-          end
+          return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
 
-          if schema.column_type == 'Number'
-            return values.map { |item| item.to_f }.select { |item| item.is_a? Numeric }
-          end
+          return values.map(&:to_f).select { |item| item.is_a? Numeric } if schema.column_type == 'Number'
         end
 
         leaf['value']
