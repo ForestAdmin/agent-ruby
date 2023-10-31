@@ -13,15 +13,13 @@ module ForestAdminAgent
 
       def self.parse_condition_tree(collection, args)
         filters = args.dig(:params, :data, :attributes, :all_records_subset_query, :filters) ||
-          args.dig(:params, :filters) || args.dig(:params, :filter)
+                  args.dig(:params, :filters) || args.dig(:params, :filter)
 
-        return unless !filters.nil?
+        return if filters.nil?
 
-        filters = JSON::parse(filters) if filters.is_a? String
-        condition_tree = ConditionTreeParser::from_plain_object(collection, filters)
+        filters = JSON.parse(filters) if filters.is_a? String
+        ConditionTreeParser.from_plain_object(collection, filters)
         # TODO: ConditionTreeValidator::validate($conditionTree, $collection);
-
-        condition_tree
       end
 
       def self.parse_caller(args)
