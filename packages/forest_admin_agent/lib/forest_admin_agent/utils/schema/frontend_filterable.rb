@@ -61,7 +61,7 @@ module ForestAdminAgent
         end
 
         def self.get_required_operators(type)
-          return OPERATOR_BY_TYPE[type] if type.is_a?(String) && OPERATOR_BY_TYPE.include?(type)
+          return OPERATOR_BY_TYPE[type] if type.is_a?(String) && OPERATOR_BY_TYPE.key?(type)
 
           return ['Includes_All'] if type.is_a? Array
 
