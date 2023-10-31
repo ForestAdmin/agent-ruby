@@ -161,6 +161,8 @@ Metrics/ParameterLists:
 
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
+  Exclude:
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/query_string_parser_spec.rb'
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']

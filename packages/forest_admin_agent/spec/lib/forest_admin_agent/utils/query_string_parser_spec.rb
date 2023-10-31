@@ -6,6 +6,8 @@ module ForestAdminAgent
     include ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Components::Query
+    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
 
     describe QueryStringParser do
       include_context 'with caller'
@@ -248,6 +250,111 @@ module ForestAdminAgent
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
             '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
+          )
+        end
+      end
+
+      describe 'parse_condition_tree' do
+        let(:collection_category) do
+          datasource = Datasource.new
+          collection_category = Collection.new(datasource, 'Category')
+          collection_category.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                       filter_operators: [Operators::EQUAL]),
+              'label' => ColumnSchema.new(column_type: 'String')
+            }
+          )
+
+          datasource.add_collection(collection_category)
+
+          return collection_category
+        end
+
+        it 'return null when not provided' do
+          expect(described_class.parse_condition_tree(collection_category, {})).to be_nil
+        end
+
+        it 'work when passed in the querystring for list' do
+          args = {
+            params: {
+              filters: {
+                'aggregator' => 'And',
+                'conditions' => [
+                  { 'field' => 'id', 'operator' => 'Equal', 'value' => '123e4567-e89b-12d3-a456-426614174000' }
+                ]
+              }
+            }
+          }
+
+          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
+          )
+        end
+
+        it 'works when passed in the body for charts' do
+          args = {
+            params: {
+              data: {
+                attributes: {
+                  all_records_subset_query: {
+                    filters: {
+                      'field' => 'id',
+                      'operator' => 'Equal',
+                      'value' => '123e4567-e89b-12d3-a456-426614174001'
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174001')
+          )
+        end
+
+        it 'works when passed in the body for actions' do
+          args = {
+            params: {
+              data: {
+                attributes: {
+                  all_records_subset_query: {
+                    filters: {
+                      'field' => 'id',
+                      'operator' => 'Equal',
+                      'value' => '123e4567-e89b-12d3-a456-426614174000'
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
+          )
+        end
+
+        # TODO
+        it 'throw when the collection does not supports the requested operators',
+           pending: 'when condition tree validator is implemented' do
+          args = {
+            params: {
+              filters: {
+                'aggregator' => 'And',
+                'conditions' => [
+                  { 'field' => 'id', 'operator' => 'Greater_Than', 'value' => '123e4567-e89b-12d3-a456-426614174000' }
+                ]
+              }
+            }
+          }
+
+          expect do
+            described_class.parse_condition_tree(collection_category, args)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 The allowed operators are: Equal'
           )
         end
       end
