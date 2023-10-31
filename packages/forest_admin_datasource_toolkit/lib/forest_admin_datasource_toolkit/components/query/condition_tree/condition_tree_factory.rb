@@ -23,8 +23,7 @@ module ForestAdminDatasourceToolkit
 
             primary_key_names.each do |name|
               operators = collection.fields[name].filter_operators
-
-              unless operators.include?('Equal') || operators.include?('In')
+              unless operators.include?(Operators::EQUAL) || operators.include?(Operators::IN)
                 raise ForestException, "Field '#{name}' must support operators: ['Equal', 'In']"
               end
             end

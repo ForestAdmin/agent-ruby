@@ -22,15 +22,19 @@ module ForestAdminAgent
         with_key ? result : result.values
       end
 
-      def self.unpack_ids(collection, packed_ids)
-        packed_ids.map { |item| unpack_id(collection, item) }
+      def self.unpack_ids(collection, packed_ids, with_key: false)
+        packed_ids.map { |item| unpack_id(collection, item, with_key: with_key) }
       end
 
-      def self.parse_selection_ids(collection, params)
+      def self.parse_selection_ids(collection, params, with_key: false)
         attributes = params.dig('data', 'attributes')
         are_excluded = attributes&.key?('all_records') ? attributes['all_records'] : false
         input_ids = attributes&.key?('ids') ? attributes['ids'] : params['data'].map { |item| item['id'] }
-        ids = unpack_ids(collection, are_excluded ? attributes['all_records_ids_excluded'] : input_ids)
+        ids = unpack_ids(
+          collection,
+          are_excluded ? attributes['all_records_ids_excluded'] : input_ids,
+          with_key: with_key
+        )
 
         { are_excluded: are_excluded, ids: ids }
       end

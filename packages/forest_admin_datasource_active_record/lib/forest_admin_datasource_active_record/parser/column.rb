@@ -55,14 +55,14 @@ module ForestAdminDatasourceActiveRecord
           orderables = [Operators::LESS_THAN, Operators::GREATER_THAN]
           strings = [Operators::LIKE, Operators::I_LIKE, Operators::NOT_CONTAINS]
 
-          result + equality if %w[Boolean Binary Enum Uuid].include?(type)
+          result += equality if %w[Boolean Binary Enum Uuid].include?(type)
 
-          result + equality + orderables if %w[Date Dateonly Number].include?(type)
+          result = result + equality + orderables if %w[Date Dateonly Number].include?(type)
 
-          result + equality + orderables + strings if %w[String].include?(type)
+          result = result + equality + orderables + strings if %w[String].include?(type)
         end
 
-        result + equality + ['Includes_All'] if type.is_a? Array
+        result = result + equality + ['Includes_All'] if type.is_a? Array
 
         result
       end
