@@ -1,11 +1,14 @@
 module ForestAdminDatasourceActiveRecord
   module Utils
     class Query
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       def initialize(collection, projection, filter)
         @collection = collection
         @query = @collection.model
         @projection = projection
         @filter = filter
+        @arel_table = @collection.model.arel_table
       end
 
       def build
@@ -32,9 +35,22 @@ module ForestAdminDatasourceActiveRecord
       def compute_main_operator(condition_tree, aggregator)
         field = condition_tree.field
         value = condition_tree.value
+
         case condition_tree.operator
-        when 'EQUAL', 'IN'
+        when Operators::EQUAL, Operators::IN
           @query = @query.send(aggregator, @query.where({ field => value }))
+        when Operators::NOT_EQUAL, Operators::NOT_IN
+          @query = @query.send(aggregator, @query.where.not({ field => value }))
+        when Operators::GREATER_THAN
+          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].gt(value)))
+        when Operators::LESS_THAN
+          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].lt(value)))
+        when Operators::NOT_CONTAINS
+          @query = @query.send(aggregator, @query.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::CONTAINS
+          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::INCLUDES_ALL
+          # TODO: to implement
         end
 
         @query
