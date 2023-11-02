@@ -32,10 +32,8 @@ module ForestAdminAgent
         end
 
         def delete_records(args, selection_ids)
-          # TODO: replace by ConditionTreeFactory.matchIds(this.collection.schema, selectionIds.ids)
-          # condition_tree = OpenStruct.new(field: 'id', operator: 'IN', value: selection_ids[:ids][0])
           condition_tree_ids = ConditionTree::ConditionTreeFactory.match_records(@collection, selection_ids[:ids])
-          condition_tree.inverse if selection_ids[:are_excluded]
+          condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
               [
