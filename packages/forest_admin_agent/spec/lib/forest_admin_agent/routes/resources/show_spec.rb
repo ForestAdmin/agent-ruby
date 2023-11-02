@@ -91,11 +91,9 @@ module ForestAdminAgent
             show.handle_request(args)
 
             expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
-              caller.is_a?(Components::Caller) &&
-                filter.is_a?(Components::Query::Filter) &&
-                !filter.condition_tree.nil? &&
-                filter.condition_tree.to_h == { field: 'id', operator: Operators::EQUAL, value: 1 } &&
-                projection == %w[id first_name last_name]
+              expect(caller).to be_instance_of(Components::Caller)
+              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
+              expect(projection).to eq(%w[id first_name last_name])
             end
           end
         end
