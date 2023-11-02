@@ -7,6 +7,7 @@ module ForestAdminAgent
   module Routes
     module Resources
       include ForestAdminDatasourceToolkit
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
       describe Update do
         include_context 'with caller'
@@ -37,26 +38,31 @@ module ForestAdminAgent
               end
             end
             stub_const('Book', book_class)
-          end
-
-          it 'call update and return an serialized content' do
-            datasource = Datasource.new
-            collection = Collection.new(datasource, 'book')
-            collection.add_fields(
-              {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            @datasource = Datasource.new
+            collection = instance_double(
+              Collection,
+              name: 'book',
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number',
+                  is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                ),
                 'title' => ColumnSchema.new(column_type: 'String')
               }
             )
-            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-            datasource.add_collection(collection)
-            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
-            ForestAdminAgent::Builder::AgentFactory.instance.build
 
+            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+            @datasource.add_collection(collection)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+          end
+
+          it 'call update and return an serialized content' do
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
             book = Book.new(1, 'Harry potter and the goblet of fire')
-            allow(collection).to receive_messages(list: [book], update: true)
+            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
             result = update.handle_request(args)
             expect(result[:name]).to eq('book')
             expect(result[:content]).to eq(
@@ -71,6 +77,20 @@ module ForestAdminAgent
                   'links' => { 'self' => 'forest/book/1' }
                 }
             )
+          end
+
+          it 'call update with the expected args' do
+            args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
+            args[:params]['id'] = '1'
+            book = Book.new(1, 'Harry potter and the goblet of fire')
+            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
+            update.handle_request(args)
+
+            expect(@datasource.collection('book')).to have_received(:update) do |caller, filter, data|
+              expect(caller).to be_instance_of(Components::Caller)
+              expect(data).to eq({ 'title' => 'Harry potter and the goblet of fire' })
+              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
+            end
           end
         end
       end
