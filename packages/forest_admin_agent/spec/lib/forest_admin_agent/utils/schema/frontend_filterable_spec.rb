@@ -26,8 +26,15 @@ module ForestAdminAgent
                                                        ])
         end
 
-        it 'returns true with all operators' do
-          expect(frontend_filterable).filterable?('String', Operators.all)
+        it 'returns true with the supported operators' do
+          supported_operators = described_class::BASE_OPERATORS + [
+            Operators::IN,
+            Operators::STARTS_WITH,
+            Operators::ENDS_WITH,
+            Operators::CONTAINS,
+            Operators::NOT_CONTAINS
+          ]
+          expect(frontend_filterable.filterable?('String', supported_operators)).to be(true)
         end
 
         it 'returns false with array and no operators' do
