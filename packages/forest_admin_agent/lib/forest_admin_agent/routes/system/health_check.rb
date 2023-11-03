@@ -14,8 +14,6 @@ module ForestAdminAgent
             AgentFactory.instance.send_schema(force: true)
           end
 
-          AgentFactory.instance.send_schema(force: true)
-
           { content: nil, status: 204 }
         end
       end
