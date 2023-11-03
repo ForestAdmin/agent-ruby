@@ -12,6 +12,13 @@ module ForestAdminDatasourceToolkit
               super()
             end
 
+            def to_h
+              {
+                aggregator: @aggregator,
+                conditions: @conditions.map(&:to_h)
+              }
+            end
+
             def inverse
               aggregator = @aggregator == 'Or' ? 'And' : 'Or'
               ConditionTreeBranch.new(

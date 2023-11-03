@@ -25,11 +25,15 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def apply_condition_tree(condition_tree, aggregator = nil)
-        # if condition_tree.is_a ConditionTreeBranch
-        # TODO: add for ConditionTreeBranch
-        # else
-        compute_main_operator(condition_tree, aggregator || 'and')
-        # end
+        if condition_tree.is_a? Nodes::ConditionTreeBranch
+          aggregator = condition_tree.aggregator.downcase
+          condition_tree.conditions.each do |condition|
+            @query = @query.send(aggregator, apply_condition_tree(condition, aggregator))
+          end
+          @query
+        else
+          compute_main_operator(condition_tree, aggregator || 'and')
+        end
       end
 
       def compute_main_operator(condition_tree, aggregator)
