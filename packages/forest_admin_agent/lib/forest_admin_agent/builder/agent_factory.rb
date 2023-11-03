@@ -30,8 +30,6 @@ module ForestAdminAgent
         send_schema
       end
 
-      private
-
       def send_schema(force: false)
         return unless @has_env_secret
 
@@ -53,6 +51,8 @@ module ForestAdminAgent
           # TODO:  Logger::log('Info', 'Schema was not updated since last run');
         end
       end
+
+      private
 
       def build_container
         @container = Dry::Container.new
