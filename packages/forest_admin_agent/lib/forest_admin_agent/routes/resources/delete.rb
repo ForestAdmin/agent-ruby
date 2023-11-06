@@ -17,7 +17,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
-          id = Utils::Id.unpack_id(@collection, args[:params]['id'])
+          id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
           delete_records(args, { ids: [id], are_excluded: false })
 
           { content: nil, status: 204 }
@@ -25,17 +25,23 @@ module ForestAdminAgent
 
         def handle_request_bulk(args = {})
           build(args)
-          selection_ids = Utils::Id.parse_selection_ids(@collection, args[:params].to_unsafe_h)
+          selection_ids = Utils::Id.parse_selection_ids(@collection, args[:params], with_key: true)
           delete_records(args, selection_ids)
 
           { content: nil, status: 204 }
         end
 
-        def delete_records(_args, selection_ids)
-          # TODO: replace by ConditionTreeFactory.matchIds(this.collection.schema, selectionIds.ids)
-          condition_tree = OpenStruct.new(field: 'id', operator: 'IN', value: selection_ids[:ids][0])
-          condition_tree.inverse if selection_ids[:are_excluded]
-          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree)
+        def delete_records(args, selection_ids)
+          condition_tree_ids = ConditionTree::ConditionTreeFactory.match_records(@collection, selection_ids[:ids])
+          condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
+          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+              [
+                Utils::QueryStringParser.parse_condition_tree(@collection, args),
+                condition_tree_ids
+              ]
+            )
+          )
 
           @collection.delete(@caller, filter)
         end

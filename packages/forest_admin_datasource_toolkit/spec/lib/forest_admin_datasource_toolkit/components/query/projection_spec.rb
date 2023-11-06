@@ -9,8 +9,8 @@ module ForestAdminDatasourceToolkit
           collection = Collection.new(Datasource.new, '__collection__')
           collection.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'name' => ColumnSchema.new(column_type: 'String')
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+              'name' => ColumnSchema.new(column_type: PrimitiveType::STRING)
             }
           )
 
@@ -32,9 +32,9 @@ module ForestAdminDatasourceToolkit
             collection = Collection.new(Datasource.new, '__collection__')
             collection.add_fields(
               {
-                'key1' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'key2' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'name' => ColumnSchema.new(column_type: 'String')
+                'key1' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                'key2' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                'name' => ColumnSchema.new(column_type: PrimitiveType::STRING)
               }
             )
             projection = described_class.new(['name']).with_pks(collection)

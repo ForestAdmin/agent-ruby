@@ -11,7 +11,7 @@ module ForestAdminAgent
 
         def handle_request(_args = {})
           if AgentFactory.instance.container.resolve(:cache).get('config')[:is_production]
-            AgentFactory.send_schema(true)
+            AgentFactory.instance.send_schema(force: true)
           end
 
           { content: nil, status: 204 }

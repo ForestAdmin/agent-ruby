@@ -7,6 +7,7 @@ module ForestAdminAgent
   module Routes
     module Resources
       include ForestAdminDatasourceToolkit
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
       describe Store do
         include_context 'with caller'
@@ -30,10 +31,6 @@ module ForestAdminAgent
         describe 'simple case' do
           before do
             book_class = Struct.new(:id, :title, :published_at, :price) do
-              # def name
-              #   'book'
-              # end
-
               def respond_to?(arg)
                 return false if arg == :each
 
@@ -41,6 +38,7 @@ module ForestAdminAgent
               end
             end
             stub_const('Book', book_class)
+            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
           end
 
           it 'call create and return an serialized content' do
@@ -49,26 +47,35 @@ module ForestAdminAgent
               'published_at' => '2000-07-07T21:00:00.000Z',
               'price' => 6.75
             }
+            book = Book.new(1, attributes['title'], attributes['published_at'], attributes['price'])
 
             datasource = Datasource.new
-            collection = Collection.new(datasource, 'book')
-            collection.add_fields(
-              {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            collection = instance_double(
+              Collection,
+              name: 'book',
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number',
+                  is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                ),
                 'title' => ColumnSchema.new(column_type: 'String'),
                 'published_at' => ColumnSchema.new(column_type: 'Date'),
                 'price' => ColumnSchema.new(column_type: 'Number')
-              }
+              },
+              create: book
             )
-            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+
             datasource.add_collection(collection)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
             args[:params][:data] = { attributes: attributes, type: 'books' }
-            book = Book.new(1, attributes['title'], attributes['published_at'], attributes['price'])
 
-            allow(collection).to receive(:create).and_return(book)
             result = store.handle_request(args)
+            expect(collection).to have_received(:create) do |caller, data|
+              expect(caller).to be_instance_of(Components::Caller)
+              expect(data).to eq(attributes)
+            end
             expect(result[:name]).to eq('book')
             expect(result[:content]).to eq(
               'data' =>
@@ -108,10 +115,15 @@ module ForestAdminAgent
             stub_const('Passport', passport_class)
 
             @datasource = Datasource.new
-            collection_person = Collection.new(@datasource, 'person')
-            collection_person.add_fields(
-              {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            collection_person = instance_double(
+              Collection,
+              name: 'person',
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number',
+                  is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                ),
                 'name' => ColumnSchema.new(column_type: 'String'),
                 'passport' => Relations::OneToOneSchema.new(
                   origin_key: 'person_id',
@@ -121,10 +133,15 @@ module ForestAdminAgent
               }
             )
 
-            collection_passport = Collection.new(@datasource, 'passport')
-            collection_passport.add_fields(
-              {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            collection_passport = instance_double(
+              Collection,
+              name: 'passport',
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number',
+                  is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                ),
                 'person_id' => ColumnSchema.new(column_type: 'Number'),
                 'person' => Relations::ManyToOneSchema.new(
                   foreign_key: 'person_id',
@@ -148,10 +165,19 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'person'
-
               allow(@datasource.collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
               allow(@datasource.collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
+
               result = store.handle_request(args)
+              expect(@datasource.collection('person')).to have_received(:create) do |caller, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(data).to eq({ 'name' => 'john' })
+              end
+              expect(@datasource.collection('passport')).to have_received(:update) do |caller, filter, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(data).to eq({ 'person_id' => 1 })
+                expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
+              end
               expect(result[:name]).to eq('person')
               expect(result[:content]).to eq(
                 'data' =>
@@ -179,9 +205,13 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'passport'
-
               allow(@datasource.collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
+
               result = store.handle_request(args)
+              expect(@datasource.collection('passport')).to have_received(:create) do |caller, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(data).to eq({ 'person_id' => 1 })
+              end
               expect(result[:name]).to eq('passport')
               expect(result[:content]).to eq(
                 'data' =>

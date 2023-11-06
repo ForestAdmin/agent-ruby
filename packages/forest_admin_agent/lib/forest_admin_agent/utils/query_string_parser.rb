@@ -11,6 +11,17 @@ module ForestAdminAgent
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
 
+      def self.parse_condition_tree(collection, args)
+        filters = args.dig(:params, :data, :attributes, :all_records_subset_query, :filters) ||
+                  args.dig(:params, :filters) || args.dig(:params, :filter)
+
+        return if filters.nil?
+
+        filters = JSON.parse(filters) if filters.is_a? String
+        ConditionTreeParser.from_plain_object(collection, filters)
+        # TODO: ConditionTreeValidator::validate($conditionTree, $collection);
+      end
+
       def self.parse_caller(args)
         unless args.dig(:headers, 'HTTP_AUTHORIZATION')
           # TODO: replace by http exception
