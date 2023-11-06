@@ -1,3 +1,10 @@
+# [1.0.0-beta.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.7...v1.0.0-beta.8) (2023-11-06)
+
+
+### Features
+
+* added filters feature ([#10](https://github.com/ForestAdmin/agent-ruby/issues/10)) ([9210563](https://github.com/ForestAdmin/agent-ruby/commit/92105633205c61679749f805bff23da6c88dd912))
+
 # [1.0.0-beta.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.6...v1.0.0-beta.7) (2023-10-27)
 
 
