@@ -13,12 +13,25 @@ module ForestAdminDatasourceToolkit
           @page = page
         end
 
+        def to_h
+          {
+            condition_tree: @condition_tree,
+            search: @search,
+            search_extended: @search_extended,
+            segment: @segment,
+            sort: @sort,
+            page: @page
+          }
+        end
+
         def nestable?
           !@search && !@segment
         end
 
-        def override(*args)
-          Filter.new(*to_h.merge(args))
+        def override(args)
+          args = to_h.merge(args)
+
+          Filter.new(**args)
         end
 
         def nest(prefix)

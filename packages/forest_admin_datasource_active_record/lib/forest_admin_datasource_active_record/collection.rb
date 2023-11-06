@@ -16,7 +16,8 @@ module ForestAdminDatasourceActiveRecord
 
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter).build
-      query.offset(filter.page.offset).limit(filter.page.limit).all
+
+      query.all
     end
 
     def aggregate(_caller, _filter, aggregation)
@@ -92,8 +93,8 @@ module ForestAdminDatasourceActiveRecord
               association.name.to_s,
               ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
                 foreign_collection: association.class_name.demodulize.underscore,
-                origin_key: association.through_reflection.join_foreign_key,
-                origin_key_target: association.through_reflection.foreign_key,
+                origin_key: association.through_reflection.foreign_key,
+                origin_key_target: association.through_reflection.join_foreign_key,
                 foreign_key: association.join_foreign_key,
                 foreign_key_target: association.association_primary_key,
                 through_collection: association.through_reflection.class_name.demodulize.underscore

@@ -14,7 +14,8 @@ module ForestAdminAgent
           Resources::List.new.routes,
           Resources::Show.new.routes,
           Resources::Store.new.routes,
-          Resources::Update.new.routes
+          Resources::Update.new.routes,
+          Resources::Related::ListRelated.new.routes
         ].inject(&:merge)
       end
 

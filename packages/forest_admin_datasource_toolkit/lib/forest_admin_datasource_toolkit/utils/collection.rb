@@ -1,7 +1,9 @@
 module ForestAdminDatasourceToolkit
   module Utils
     class Collection
+      include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Schema::Relations
       include ForestAdminDatasourceToolkit::Exceptions
 
       def self.get_inverse_relation(collection, relation_name)
@@ -72,14 +74,17 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.get_value(collection, caller, id, field)
-        index = Schema.primary_keys(collection).index(field)
-        return id[index] if index
+        if id.is_a? Array
+          index = Schema.primary_keys(collection).index(field)
+
+          return id[index] if index
+        elsif Schema.primary_keys(collection).include?(field)
+          return id[field]
+        end
 
         record = collection.list(
           caller,
-          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTreeFactory.match_ids(
-            collection, [id]
-          )),
+          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_ids(collection, [id])),
           Projection.new([field])
         )
 
@@ -111,14 +116,13 @@ module ForestAdminDatasourceToolkit
 
           if foreign_relation
             through_collection = collection.datasource.collection(relation.through_collection)
-
             records = through_collection.list(
               caller,
               FilterFactory.make_through_filter(collection, id, relation_name, caller, foreign_filter),
-              projection.nest(foreign_relation)
+              projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |record| record[foreign_relation] }
+            return records.map { |record| record.try(foreign_relation) }
           end
         end
 

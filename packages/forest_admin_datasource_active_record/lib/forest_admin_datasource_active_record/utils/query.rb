@@ -20,6 +20,13 @@ module ForestAdminDatasourceActiveRecord
 
       def apply_filter
         @query = apply_condition_tree(@filter.condition_tree) unless @filter.condition_tree.nil?
+        @query = apply_pagination(@filter.page) unless @filter.page.nil?
+
+        @query
+      end
+
+      def apply_pagination(page)
+        @query.offset(page.offset).limit(page.limit)
 
         @query
       end
@@ -41,6 +48,8 @@ module ForestAdminDatasourceActiveRecord
         value = condition_tree.value
 
         case condition_tree.operator
+        when Operators::PRESENT
+          @query = @query.send(aggregator, @query.where.not({ field => nil }))
         when Operators::EQUAL, Operators::IN
           @query = @query.send(aggregator, @query.where({ field => value }))
         when Operators::NOT_EQUAL, Operators::NOT_IN
@@ -62,18 +71,17 @@ module ForestAdminDatasourceActiveRecord
 
       def select
         unless @projection.nil?
-          query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }.join(', ')
-
+          query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
           @projection.relations.each do |relation, _fields|
             relation_schema = @collection.fields[relation]
-            query_select += if relation_schema.type == 'OneToOne'
-                              ", #{@collection.model.table_name}.#{relation_schema.origin_key_target}"
-                            else
-                              ", #{@collection.model.table_name}.#{relation_schema.foreign_key}"
-                            end
+            if relation_schema.type == 'OneToOne'
+              query_select.push("#{@collection.model.table_name}.#{relation_schema.origin_key_target}")
+            else
+              query_select.push("#{@collection.model.table_name}.#{relation_schema.foreign_key}")
+            end
           end
 
-          @query = @query.select(query_select)
+          @query = @query.select(query_select.join(', '))
           @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
           # TODO: replace eager_load by joins because eager_load select ALL columns of relation
           # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
