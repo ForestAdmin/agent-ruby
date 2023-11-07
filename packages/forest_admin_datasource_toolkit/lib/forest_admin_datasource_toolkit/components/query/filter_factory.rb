@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
     module Query
       class FilterFactory
         include ForestAdminDatasourceToolkit::Schema
+        include ForestAdminDatasourceToolkit::Schema::Relations
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def self.get_previous_period_filter(filter, timezone)
@@ -58,12 +59,12 @@ module ForestAdminDatasourceToolkit
           origin_value = ForestAdminDatasourceToolkit::Utils::Collection.get_value(collection, caller, id,
                                                                                    relation.origin_key_target)
           if relation.is_a?(OneToManySchema)
-            origin_tree = ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
+            origin_tree = Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
           else
             through_collection = ForestAdminAgent::Facades::Container.datasource.collection(relation.through_collection)
             through_tree = ConditionTreeFactory.intersect([
-                                                            ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
-                                                            ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
+                                                            Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+                                                            Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
                                                           ])
             records = through_collection.list(
               caller,
@@ -71,7 +72,7 @@ module ForestAdminDatasourceToolkit
               Projection.new([relation.foreign_key])
             )
 
-            origin_tree = ConditionTreeLeaf.new(
+            origin_tree = Nodes::ConditionTreeLeaf.new(
               relation.foreign_key_target,
               Operators::IN,
               records.map { |record| record[relation.foreign_key] }
