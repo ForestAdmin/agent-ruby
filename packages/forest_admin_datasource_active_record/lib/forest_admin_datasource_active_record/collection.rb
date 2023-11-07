@@ -20,7 +20,7 @@ module ForestAdminDatasourceActiveRecord
       query.all
     end
 
-    def aggregate(_caller, _filter, aggregation)
+    def aggregate(_caller, _filter, aggregation, _limit = nil)
       field = aggregation.field || '*'
 
       [
