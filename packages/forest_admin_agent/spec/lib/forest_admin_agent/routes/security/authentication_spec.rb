@@ -69,8 +69,8 @@ module ForestAdminAgent
           end
 
           it 'returns a token on the handle_authentication_callback method' do
-            result = authentication.handle_authentication_callback 'code' => 'abc',
-                                                                   'state' => "{'renderingId': #{rendering_id}}"
+            args = { params: { 'code' => 'abc', 'state' => "{'renderingId': #{rendering_id}}" } }
+            result = authentication.handle_authentication_callback args
             expect(result[:content][:token]).to eq token
             expect(result[:content][:tokenData]).to eq JWT.decode(
               token,
