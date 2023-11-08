@@ -35,8 +35,10 @@ module ForestAdminDatasourceActiveRecord
         if condition_tree.is_a? Nodes::ConditionTreeBranch
           aggregator = condition_tree.aggregator.downcase
           condition_tree.conditions.each do |condition|
-            @query = @query.send(aggregator, apply_condition_tree(condition, aggregator))
+            query = apply_condition_tree(condition, aggregator)
+            @query = @query.send(aggregator, query)
           end
+
           @query
         else
           compute_main_operator(condition_tree, aggregator || 'and')
@@ -44,7 +46,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def compute_main_operator(condition_tree, aggregator)
-        field = condition_tree.field
+        field = format_field(condition_tree.field)
         value = condition_tree.value
 
         case condition_tree.operator
@@ -88,6 +90,28 @@ module ForestAdminDatasourceActiveRecord
         end
 
         @query
+      end
+
+      def add_join_relation(relation, relation_name)
+        if relation.type == 'ManyToMany'
+          # TODO: to implement
+        else
+          @query = @query.joins(relation_name.to_sym)
+        end
+
+        @query
+      end
+
+      def format_field(field)
+        if field.include?(':')
+          relation_name, field = field.split(':')
+          relation = @collection.fields[relation_name]
+          table_name = @collection.datasource.collection(relation.foreign_collection).model.table_name
+          add_join_relation(relation, relation_name)
+          return "#{table_name}.#{field}"
+        end
+
+        field
       end
     end
   end

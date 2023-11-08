@@ -102,7 +102,7 @@ module ForestAdminAgent
 
       def relationships
         forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'HasMany' || field.type == 'ManyToMany' }
+        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
         relations_to_one = forest_collection.fields.select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
         relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
@@ -111,11 +111,10 @@ module ForestAdminAgent
         has_one_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
           data[formatted_attribute_name] = {}
-          foreign_collection_name = relations_to_one[attribute_name.to_s].foreign_collection
 
           if attr_data[:options][:include_links]
-            links_self = relationship_self_link(foreign_collection_name)
-            links_related = relationship_related_link(foreign_collection_name)
+            links_self = relationship_self_link(attribute_name)
+            links_related = relationship_related_link(attribute_name)
             data[formatted_attribute_name]['links'] = {} if links_self || links_related
             data[formatted_attribute_name]['links']['related'] = {} if links_self
             data[formatted_attribute_name]['links']['related']['href'] = links_self if links_self
@@ -138,11 +137,10 @@ module ForestAdminAgent
         has_many_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
           data[formatted_attribute_name] = {}
-          foreign_collection_name = relations_to_many[attribute_name.to_s].foreign_collection
 
           if attr_data[:options][:include_links]
-            links_self = relationship_self_link(foreign_collection_name)
-            links_related = relationship_related_link(foreign_collection_name)
+            links_self = relationship_self_link(attribute_name)
+            links_related = relationship_related_link(attribute_name)
             data[formatted_attribute_name]['links'] = {} if links_self || links_related
             data[formatted_attribute_name]['links']['related'] = {} if links_self
             data[formatted_attribute_name]['links']['related']['href'] = links_self if links_self
