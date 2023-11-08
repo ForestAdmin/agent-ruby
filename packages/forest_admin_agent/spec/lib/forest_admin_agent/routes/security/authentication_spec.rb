@@ -81,6 +81,22 @@ module ForestAdminAgent
           end
         end
 
+        context 'when callback is called with error argument in the query' do
+          it 'raises an error' do
+            args = {
+              params: {
+                error: 'TrialBlockedError',
+                error_description: 'Your free trial has ended...',
+                state: '{"renderingId"=>128}'
+              }
+            }
+
+            expect do
+              authentication.handle_authentication_callback args
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient)
+          end
+        end
+
         context 'when handle the logout route' do
           it 'returns a 204 status code' do
             result = authentication.handle_authentication_logout
