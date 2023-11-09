@@ -121,7 +121,7 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            return records.filter_map { |r| r[foreign_relation] }
+            return records.map { |r| r.try(foreign_relation) }
           end
         end
 

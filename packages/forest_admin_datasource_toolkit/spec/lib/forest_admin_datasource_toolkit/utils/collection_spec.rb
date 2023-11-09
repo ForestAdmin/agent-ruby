@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'shared/caller'
+require 'ostruct'
 
 module ForestAdminDatasourceToolkit
   module Utils
@@ -248,9 +249,14 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'list_relation should work with many to many relation' do
+          book_person_class = Struct.new(:bookId, :personId, :myPerson, :myBook)
+          stub_const('BookPerson', book_person_class)
           allow(collection_person).to receive(:list).and_return([{ 'id' => 1, 'name' => 'foo' }])
-          allow(collection_book_person).to receive(:list).and_return([{ 'bookId' => 1, 'personId' => 1,
-                                                                        'myPerson' => 1, 'myBook' => 1 }])
+          allow(collection_book_person).to receive(:list).and_return(
+            [
+              BookPerson.new(1, 1, 1, 1)
+            ]
+          )
 
           expect(described_class.list_relation(collection_book, [1], 'myPersons', caller, Filter.new,
                                                Projection.new)).to eq([1])
