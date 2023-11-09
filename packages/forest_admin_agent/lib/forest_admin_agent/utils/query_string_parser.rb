@@ -13,13 +13,10 @@ module ForestAdminAgent
 
       def self.parse_condition_tree(collection, args)
         filters = begin
-          args.dig(:params, :data, :attributes, :all_records_subset_query, :filters)
+          args.dig(:params, :data, :attributes, :all_records_subset_query, :filters) ||
+            args.dig(:params, :filters) || args.dig(:params, :filter)
         rescue StandardError
-          nil ||
-            args.dig(:params,
-                     :filters) || args.dig(
-                       :params, :filter
-                     )
+          nil
         end
 
         return if filters.nil?
