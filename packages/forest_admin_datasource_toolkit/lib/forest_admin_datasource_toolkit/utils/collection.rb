@@ -8,11 +8,9 @@ module ForestAdminDatasourceToolkit
 
       def self.get_inverse_relation(collection, relation_name)
         relation_field = collection.fields[relation_name]
-        foreign_collection = ForestAdminAgent::Facades::Container.datasource.collections.find do |item|
-          item.name == relation_field.foreign_collection
-        end
+        foreign_collection = collection.datasource.collection(relation_field.foreign_collection)
 
-        inverse = foreign_collection.fields.select do |field|
+        inverse = foreign_collection.fields.select do |_name, field|
           field.is_a?(RelationSchema) &&
             field.foreign_collection == collection.name &&
             (
@@ -34,7 +32,8 @@ module ForestAdminDatasourceToolkit
         field.is_a?(ManyToManySchema) &&
           relation_field.is_a?(ManyToManySchema) &&
           field.origin_key == relation_field.foreign_key &&
-          field.through_collection == relation_field.through_collection
+          field.through_collection == relation_field.through_collection &&
+          field.foreign_key == relation_field.origin_key
       end
 
       def self.many_to_one_inverse?(field, relation_field)
@@ -45,9 +44,8 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.other_inverse?(field, relation_field)
-        field.is_a?(ManyToOneSchema) &&
-          (field.is_a?(OneToOneSchema) ||
-            field.is_a?(OneToManySchema)) &&
+        (field.is_a?(OneToManySchema) || field.is_a?(OneToOneSchema)) &&
+          relation_field.is_a?(ManyToOneSchema) &&
           field.origin_key == relation_field.foreign_key
       end
 
@@ -69,7 +67,7 @@ module ForestAdminDatasourceToolkit
         end
 
         get_field_schema(
-          ForestAdminAgent::Facades::Container.datasource.collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
+          collection.datasource.collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
         )
       end
 
@@ -111,6 +109,7 @@ module ForestAdminDatasourceToolkit
       def self.list_relation(collection, id, relation_name, caller, foreign_filter, projection)
         relation = collection.fields[relation_name]
         foreign_collection = collection.datasource.collection(relation.foreign_collection)
+
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
 
@@ -122,7 +121,7 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |record| record.try(foreign_relation) }
+            return records.filter_map { |r| r[foreign_relation] }
           end
         end
 
