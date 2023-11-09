@@ -17,8 +17,8 @@ module ForestAdminDatasourceToolkit
           collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Book')
           collection.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'author_id' => ColumnSchema.new(column_type: 'UUID'),
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+              'author_id' => ColumnSchema.new(column_type: PrimitiveType::UUID),
               'author' => Relations::ManyToOneSchema.new(
                 foreign_key: 'author_id',
                 foreign_key_target: 'id',
@@ -34,7 +34,7 @@ module ForestAdminDatasourceToolkit
           collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Person')
           collection.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true)
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true)
             }
           )
 
@@ -57,9 +57,9 @@ module ForestAdminDatasourceToolkit
           collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Book')
           collection.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'reference' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'title' => ColumnSchema.new(column_type: 'String'),
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+              'reference' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+              'title' => ColumnSchema.new(column_type: PrimitiveType::STRING),
               'myPersons' => Relations::ManyToManySchema.new(
                 origin_key: 'bookId',
                 origin_key_target: 'id',
@@ -83,8 +83,8 @@ module ForestAdminDatasourceToolkit
           collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'BookPerson')
           collection.add_fields(
             {
-              'bookId' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'personId' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+              'bookId' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+              'personId' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
               'myBook' => Relations::ManyToOneSchema.new(
                 foreign_key: 'bookId',
                 foreign_key_target: 'id',
@@ -105,9 +105,9 @@ module ForestAdminDatasourceToolkit
           collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Person')
           collection.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true,
                                        filter_operators: [Operators::IN, Operators::EQUAL]),
-              'name' => ColumnSchema.new(column_type: 'String'),
+              'name' => ColumnSchema.new(column_type: PrimitiveType::STRING),
               'myBooks' => Relations::ManyToManySchema.new(
                 origin_key: 'personId',
                 origin_key_target: 'id',
@@ -194,8 +194,8 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'get_field_schema should work with simple column' do
-          expect(described_class.get_field_schema(collection_person,
-                                                  'name')).eql?(ColumnSchema.new(column_type: 'String'))
+          expect(described_class.get_field_schema(collection_person, 'name'))
+            .eql?(ColumnSchema.new(column_type: PrimitiveType::STRING))
         end
 
         it 'get_field_schema should throw with unknown relation:column' do
@@ -213,8 +213,8 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'get_field_schema should work with relation column' do
-          expect(described_class.get_field_schema(collection_book_person,
-                                                  'myPerson:name')).eql?(ColumnSchema.new(column_type: 'String'))
+          expect(described_class.get_field_schema(collection_book_person, 'myPerson:name'))
+            .eql?(ColumnSchema.new(column_type: PrimitiveType::STRING))
         end
 
         it 'get_through_target should throw with invalid relation type' do
