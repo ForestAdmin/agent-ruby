@@ -44,7 +44,6 @@ module ForestAdminAgent
         forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
         fields = forest_collection.fields.select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
-
         return {} if attributes_map.nil?
         attributes = {}
 
@@ -62,7 +61,11 @@ module ForestAdminAgent
           instance_eval(&attr_or_block)
         else
           # Default behavior, call a method by the name of the attribute.
-          object.try(attr_or_block)
+          begin
+            object.try(attr_or_block)
+          rescue
+            nil
+          end
         end
       end
 
