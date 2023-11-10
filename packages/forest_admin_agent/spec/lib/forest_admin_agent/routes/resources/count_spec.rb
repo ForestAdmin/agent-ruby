@@ -22,8 +22,8 @@ module ForestAdminAgent
         end
 
         before do
-          datasource = Datasource.new
-          collection = Collection.new(datasource, 'user')
+          @datasource = Datasource.new
+          collection = Collection.new(@datasource, 'user')
           allow(collection).to receive(:aggregate).and_return(
             [
               { value: 1, group: [] }
@@ -31,22 +31,34 @@ module ForestAdminAgent
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
 
-          datasource.add_collection(collection)
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+          @datasource.add_collection(collection)
+          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
-        end
-
-        it 'return an serialized content' do
-          result = count.handle_request(args)
-
-          expect(result[:name]).to eq('user')
-          expect(result[:content]).to eq({ count: 1 })
         end
 
         it 'adds the route forest_count' do
           count.setup_routes
           expect(count.routes.include?('forest_count')).to be true
           expect(count.routes.length).to eq 1
+        end
+
+        context 'when collection is countable' do
+          it 'return an serialized content' do
+            result = count.handle_request(args)
+
+            expect(result[:name]).to eq('user')
+            expect(result[:content]).to eq({ count: 1 })
+          end
+        end
+
+        context 'when collection is not countable' do
+          it 'return an deactivated response' do
+            allow(@datasource.collection('user')).to receive(:is_countable?).and_return(false)
+            result = count.handle_request(args)
+
+            expect(result[:name]).to eq('user')
+            expect(result[:content]).to eq({ count: 'deactivated' })
+          end
         end
       end
     end

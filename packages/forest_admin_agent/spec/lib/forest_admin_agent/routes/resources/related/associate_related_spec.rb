@@ -101,7 +101,7 @@ module ForestAdminAgent
               args[:params]['id'] = 1
               allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.collection('address_user')).to receive(:update).and_return(true)
-              associate.handle_request(args)
+              result = associate.handle_request(args)
 
               expect(@datasource.collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
@@ -115,6 +115,8 @@ module ForestAdminAgent
                 )
                 expect(data).to eq({ 'user_id' => 1 })
               end
+              expect(result[:content]).to be_nil
+              expect(result[:status]).to eq 204
             end
           end
 
@@ -126,12 +128,14 @@ module ForestAdminAgent
               allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.collection('address')).to receive(:list).and_return([Address.new(1, 'foo location')])
               allow(@datasource.collection('address_user')).to receive(:create).and_return(true)
-              associate.handle_request(args)
+              result = associate.handle_request(args)
 
               expect(@datasource.collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
               end
+              expect(result[:content]).to be_nil
+              expect(result[:status]).to eq 204
             end
           end
         end
