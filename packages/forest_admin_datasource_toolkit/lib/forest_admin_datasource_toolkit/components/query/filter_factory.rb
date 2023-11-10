@@ -44,10 +44,10 @@ module ForestAdminDatasourceToolkit
 
         def self.get_previous_condition_tree(field, start_period, end_period)
           ConditionTreeFactory.intersect([
-                                           ConditionTreeLeaf.new(field, Operators::GREATER_THAN,
-                                                                 start_period.strftime('%Y-%m-%d %H:%M:%S')),
-                                           ConditionTreeLeaf.new(field, Operators::LESS_THAN,
-                                                                 end_period.strftime('%Y-%m-%d %H:%M:%S'))
+                                           Nodes::ConditionTreeLeaf.new(field, Operators::GREATER_THAN,
+                                                                        start_period.strftime('%Y-%m-%d %H:%M:%S')),
+                                           Nodes::ConditionTreeLeaf.new(field, Operators::LESS_THAN,
+                                                                        end_period.strftime('%Y-%m-%d %H:%M:%S'))
                                          ])
         end
 
@@ -61,7 +61,7 @@ module ForestAdminDatasourceToolkit
           if relation.is_a?(OneToManySchema)
             origin_tree = Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
           else
-            through_collection = ForestAdminAgent::Facades::Container.datasource.collection(relation.through_collection)
+            through_collection = collection.datasource.collection(relation.through_collection)
             through_tree = ConditionTreeFactory.intersect([
                                                             Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
                                                             Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
@@ -83,11 +83,11 @@ module ForestAdminDatasourceToolkit
         end
 
         def self.get_previous_period_by_unit(field, unit, timezone)
-          sub = unit.pluralize
+          unit = unit.downcase
           start = "beginning_of_#{unit}"
           end_ = "end_of_#{unit}"
-          start_period = Time.now.in_time_zone(timezone).send(:-, 2.send(sub)).send(start)
-          end_period = Time.now.in_time_zone(timezone).send(:-, 2.send(sub)).send(end_)
+          start_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(start)
+          end_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(end_)
 
           get_previous_condition_tree(field, start_period.to_datetime, end_period.to_datetime)
         end
@@ -133,11 +133,11 @@ module ForestAdminDatasourceToolkit
           records = target.list(
             caller,
             make_foreign_filter(collection, id, relation_name, caller, base_foreign_filter),
-            Projection.new(relation.foreign_key_target)
+            Projection.new([relation.foreign_key_target])
           )
 
           Filter.new(
-            condition_tree: condition_tree.intersect(
+            condition_tree: ConditionTreeFactory.intersect(
               [
                 # only children of parent
                 Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
@@ -145,7 +145,7 @@ module ForestAdminDatasourceToolkit
                 # only the children which match the conditions in baseForeignFilter
                 Nodes::ConditionTreeLeaf.new(
                   relation.foreign_key,
-                  Operators::In,
+                  Operators::IN,
                   records.map { |r| r[relation.foreign_key_target] }
                 )
               ]
