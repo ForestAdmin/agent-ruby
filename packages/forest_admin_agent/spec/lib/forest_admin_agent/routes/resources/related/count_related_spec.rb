@@ -11,9 +11,9 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-        describe ListRelated do
+        describe CountRelated do
           include_context 'with caller'
-          subject(:list) { described_class.new }
+          subject(:count) { described_class.new }
           let(:args) do
             {
               headers: { 'HTTP_AUTHORIZATION' => bearer },
@@ -41,12 +41,12 @@ module ForestAdminAgent
                   foreign_collection: 'category',
                   foreign_key_target: 'id'
                 )
-              },
-              list: [User.new(1, 'foo', 'foo')]
+              }
             )
             collection_category = instance_double(
               Collection,
               name: 'category',
+              is_countable?: true,
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                 'label' => ColumnSchema.new(column_type: 'String')
@@ -59,62 +59,51 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
           end
 
-          it 'adds the route forest_related_list' do
-            list.setup_routes
-            expect(list.routes.include?('forest_related_list')).to be true
-            expect(list.routes.length).to eq 1
+          it 'adds the route forest_related_count' do
+            count.setup_routes
+            expect(count.routes.include?('forest_related_count')).to be true
+            expect(count.routes.length).to eq 1
           end
 
-          context 'when call without filters' do
-            it 'call list_relation with expected args' do
+          context 'when collection is countable' do
+            it 'call aggregate_relation with expected args' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
-              list.handle_request(args)
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation)
+                .and_return([{ value: 1 }])
+              count.handle_request(args)
 
-              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
-              |collection, id, relation_name, caller, foreign_filter, projection|
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:aggregate_relation) do
+              |collection, id, relation_name, caller, foreign_filter, aggregation|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(collection.name).to eq('user')
                 expect(id).to eq({ 'id' => 1 })
                 expect(relation_name).to eq('category')
                 expect(foreign_filter).to have_attributes(
                   condition_tree: nil,
-                  page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
+                  page: nil,
                   search: nil,
                   search_extended: nil,
                   segment: nil,
                   sort: nil
                 )
-                expect(projection).to eq(%w[id label])
+                expect(aggregation).to be_instance_of(Components::Query::Aggregation)
+                expect(aggregation).to have_attributes(operation: 'Count')
               end
             end
           end
 
-          context 'when call with filters' do
-            it 'call list_relation with expected args' do
+          context 'when collection is not countable' do
+            it 'return response without call aggregate_relation' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
               args[:params][:filters] = JSON.generate({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
-              list.handle_request(args)
+              allow(@datasource.collection('category')).to receive(:is_countable?).and_return(false)
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation).and_return([])
+              result = count.handle_request(args)
 
-              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
-              |collection, id, relation_name, caller, foreign_filter, projection|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(collection.name).to eq('user')
-                expect(id).to eq({ 'id' => 1 })
-                expect(relation_name).to eq('category')
-                expect(foreign_filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::GREATER_THAN, value: 7),
-                  page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
-                  search: nil,
-                  search_extended: nil,
-                  segment: nil,
-                  sort: nil
-                )
-                expect(projection).to eq(%w[id label])
-              end
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).not_to have_received(:aggregate_relation)
+              expect(result[:content]).to eq({ count: 'deactivated' })
             end
           end
         end
