@@ -38,11 +38,11 @@ module ForestAdminAgent
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                 'name' => ColumnSchema.new(column_type: 'String'),
                 'addresses' => Relations::ManyToManySchema.new(
-                  foreign_key: 'user_id',
-                  foreign_collection: 'user',
+                  foreign_key: 'address_id',
+                  foreign_collection: 'address',
                   foreign_key_target: 'id',
                   through_collection: 'address_user',
-                  origin_key: 'address_id',
+                  origin_key: 'user_id',
                   origin_key_target: 'id'
                 ),
                 'address_users' => Relations::OneToManySchema.new(
@@ -59,13 +59,13 @@ module ForestAdminAgent
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                 'address' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'category_id',
-                  foreign_collection: 'category',
+                  foreign_key: 'address_id',
+                  foreign_collection: 'address',
                   foreign_key_target: 'id'
                 ),
                 'user' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'category_id',
-                  foreign_collection: 'category',
+                  foreign_key: 'user_id',
+                  foreign_collection: 'user',
                   foreign_key_target: 'id'
                 )
               }
