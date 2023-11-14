@@ -164,9 +164,10 @@ Metrics/ParameterLists:
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
   Exclude:
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/query_string_parser_spec.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/store_spec.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/utils/collection_spec.rb'
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']
