@@ -107,81 +107,45 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
-              # expect(datasource.collection('book')).to have_received(:update).exactly(2).times
+              parameters = [
+                [
+                  Components::Caller,
+                  {
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'author_id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
+                      ]
+                    ),
+                    page: nil,
+                    search: nil,
+                    search_extended: nil,
+                    segment: nil,
+                    sort: nil
+                  },
+                  { 'author_id' => nil }
+                ],
+                [
+                  Components::Caller,
+                  {
+                    condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                    page: nil,
+                    search: nil,
+                    search_extended: nil,
+                    segment: nil,
+                    sort: nil
+                  },
+                  { 'author_id' => 1 }
+                ]
+              ]
 
-              # parameters = [
-              #   [
-              #     Components::Caller,
-              #     {
-              #       condition_tree: have_attributes(
-              #         aggregator: 'And',
-              #         conditions: [
-              #           have_attributes(field: 'author_id', operator: Operators::EQUAL, value: 1),
-              #           have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
-              #         ]
-              #       ),
-              #       page: nil,
-              #       search: nil,
-              #       search_extended: nil,
-              #       segment: nil,
-              #       sort: nil
-              #     },
-              #     { 'author_id' => nil }
-              #   ],
-              #   [
-              #     Components::Caller,
-              #     {
-              #       condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
-              #       page: nil,
-              #       search: nil,
-              #       search_extended: nil,
-              #       segment: nil,
-              #       sort: nil
-              #     },
-              #     { 'author_id' => 1 }
-              #   ],
-              # ]
-              #
-              # parameters.each do |parameter|
-              #   expect(datasource.collection('book')).to have_received(:update) do |caller, filter, data|
-              #     expect(caller).to be_instance_of(parameter[0])
-              #     expect(filter).to have_attributes(parameter[1])
-              #     expect(data).to eq(parameter[2])
-              #   end.ordered
-              # end
-
-              expect(datasource.collection('book')).to have_received(:update) do |caller, filter, data|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(filter).to have_attributes(
-                  condition_tree: have_attributes(
-                    aggregator: 'And',
-                    conditions: [
-                      have_attributes(field: 'author_id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
-                    ]
-                  ),
-                  page: nil,
-                  search: nil,
-                  search_extended: nil,
-                  segment: nil,
-                  sort: nil
-                )
-                expect(data).to eq({ 'author_id' => nil })
+              expect(datasource.collection('book')).to have_received(:update).exactly(2).times do |caller, filter, data|
+                parameter = parameters.shift
+                expect(caller).to be_instance_of(parameter[0])
+                expect(filter).to have_attributes(parameter[1])
+                expect(data).to eq(parameter[2])
               end
-
-              expect(datasource.collection('book')).to have_received(:update) do |caller, filter, data|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
-                  page: nil,
-                  search: nil,
-                  search_extended: nil,
-                  segment: nil,
-                  sort: nil
-                )
-                expect(data).to eq({ 'author_id' => 1 })
-              end
-
               expect(result).to eq({ content: nil, status: 204 })
             end
           end
