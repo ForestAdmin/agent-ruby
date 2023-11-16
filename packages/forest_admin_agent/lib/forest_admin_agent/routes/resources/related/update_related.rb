@@ -24,6 +24,7 @@ module ForestAdminAgent
 
             relation = @collection.fields[args[:params]['relation_name']]
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'])
+
             linked_id = if (id = args.dig(:params, :data, :id))
                           Utils::Id.unpack_id(@child_collection, id)
                         end
@@ -44,7 +45,6 @@ module ForestAdminAgent
                               Collection.get_value(@child_collection, @caller, linked_id, relation.foreign_key_target)
                             end
             fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@collection, [parent_id])
-
             @collection.update(@caller, Filter.new(condition_tree: fk_owner), { relation.foreign_key => foreign_value })
           end
 
@@ -57,6 +57,7 @@ module ForestAdminAgent
 
           def break_old_one_to_one_relationship(_scope, relation, origin_value, linked_id)
             linked_id ||= []
+
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
@@ -87,6 +88,7 @@ module ForestAdminAgent
             return unless linked_id
 
             new_fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@child_collection, [linked_id])
+
             @child_collection.update(
               @caller,
               Filter.new(condition_tree: new_fk_owner),
