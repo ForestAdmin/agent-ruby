@@ -158,12 +158,16 @@ Metrics/ParameterLists:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/caller.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/related/list_related_spec.rb'
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/related/count_related_spec.rb'
 
 Metrics/ModuleLength:
   CountAsOne: [ 'array', 'hash', 'method_call' ]
   Exclude:
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/query_string_parser_spec.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/store_spec.rb'
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']

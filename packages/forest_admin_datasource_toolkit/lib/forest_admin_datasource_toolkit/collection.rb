@@ -24,7 +24,7 @@ module ForestAdminDatasourceToolkit
       @segments = {}
       @charts = {}
       @searchable = false
-      @countable = false
+      @countable = true
     end
 
     def is_countable?

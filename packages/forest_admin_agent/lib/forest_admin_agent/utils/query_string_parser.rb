@@ -12,8 +12,12 @@ module ForestAdminAgent
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
 
       def self.parse_condition_tree(collection, args)
-        filters = args.dig(:params, :data, :attributes, :all_records_subset_query, :filters) ||
-                  args.dig(:params, :filters) || args.dig(:params, :filter)
+        filters = begin
+          args.dig(:params, :data, :attributes, :all_records_subset_query, :filters) ||
+            args.dig(:params, :filters) || args.dig(:params, :filter)
+        rescue StandardError
+          nil
+        end
 
         return if filters.nil?
 

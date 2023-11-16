@@ -22,6 +22,21 @@ module ForestAdminDatasourceToolkit
           field.type == 'Column' && field.is_primary_key
         end
       end
+
+      def self.get_to_many_relation(collection, relation_name)
+        unless collection.fields.key?(relation_name)
+          raise Exceptions::ForestException, "Relation #{relation_name} not found"
+        end
+
+        relation = collection.fields[relation_name]
+
+        if relation.type != 'OneToMany' && relation.type != 'ManyToMany'
+          raise Exceptions::ForestException,
+                "Relation #{relation_name} has invalid type should be one of OneToMany or ManyToMany."
+        end
+
+        relation
+      end
     end
   end
 end

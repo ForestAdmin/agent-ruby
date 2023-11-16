@@ -27,7 +27,12 @@ module ForestAdminAgent
       end
 
       def self.parse_selection_ids(collection, params, with_key: false)
-        attributes = params.dig('data', 'attributes')
+        attributes = begin
+          params.dig('data', 'attributes')
+        rescue StandardError
+          nil
+        end
+
         are_excluded = attributes&.key?('all_records') ? attributes['all_records'] : false
         input_ids = attributes&.key?('ids') ? attributes['ids'] : params['data'].map { |item| item['id'] }
         ids = unpack_ids(

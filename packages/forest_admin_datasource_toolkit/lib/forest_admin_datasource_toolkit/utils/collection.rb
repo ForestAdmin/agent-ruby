@@ -1,16 +1,16 @@
 module ForestAdminDatasourceToolkit
   module Utils
     class Collection
+      include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Schema::Relations
       include ForestAdminDatasourceToolkit::Exceptions
 
       def self.get_inverse_relation(collection, relation_name)
         relation_field = collection.fields[relation_name]
-        foreign_collection = ForestAdminAgent::Facades::Container.datasource.collections.find do |item|
-          item.name == relation_field.foreign_collection
-        end
+        foreign_collection = collection.datasource.collection(relation_field.foreign_collection)
 
-        inverse = foreign_collection.fields.select do |field|
+        inverse = foreign_collection.fields.select do |_name, field|
           field.is_a?(RelationSchema) &&
             field.foreign_collection == collection.name &&
             (
@@ -32,7 +32,8 @@ module ForestAdminDatasourceToolkit
         field.is_a?(ManyToManySchema) &&
           relation_field.is_a?(ManyToManySchema) &&
           field.origin_key == relation_field.foreign_key &&
-          field.through_collection == relation_field.through_collection
+          field.through_collection == relation_field.through_collection &&
+          field.foreign_key == relation_field.origin_key
       end
 
       def self.many_to_one_inverse?(field, relation_field)
@@ -43,9 +44,8 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.other_inverse?(field, relation_field)
-        field.is_a?(ManyToOneSchema) &&
-          (field.is_a?(OneToOneSchema) ||
-            field.is_a?(OneToManySchema)) &&
+        (field.is_a?(OneToManySchema) || field.is_a?(OneToOneSchema)) &&
+          relation_field.is_a?(ManyToOneSchema) &&
           field.origin_key == relation_field.foreign_key
       end
 
@@ -67,19 +67,22 @@ module ForestAdminDatasourceToolkit
         end
 
         get_field_schema(
-          ForestAdminAgent::Facades::Container.datasource.collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
+          collection.datasource.collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
         )
       end
 
       def self.get_value(collection, caller, id, field)
-        index = Schema.primary_keys(collection).index(field)
-        return id[index] if index
+        if id.is_a? Array
+          index = Schema.primary_keys(collection).index(field)
+
+          return id[index] if index
+        elsif Schema.primary_keys(collection).include?(field)
+          return id[field]
+        end
 
         record = collection.list(
           caller,
-          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTreeFactory.match_ids(
-            collection, [id]
-          )),
+          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_ids(collection, [id])),
           Projection.new([field])
         )
 
@@ -106,19 +109,19 @@ module ForestAdminDatasourceToolkit
       def self.list_relation(collection, id, relation_name, caller, foreign_filter, projection)
         relation = collection.fields[relation_name]
         foreign_collection = collection.datasource.collection(relation.foreign_collection)
+
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
 
           if foreign_relation
             through_collection = collection.datasource.collection(relation.through_collection)
-
             records = through_collection.list(
               caller,
               FilterFactory.make_through_filter(collection, id, relation_name, caller, foreign_filter),
-              projection.nest(foreign_relation)
+              projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |record| record[foreign_relation] }
+            return records.map { |r| r.try(foreign_relation) }
           end
         end
 

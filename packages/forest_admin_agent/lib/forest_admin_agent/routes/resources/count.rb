@@ -13,15 +13,25 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
-          caller = ForestAdminAgent::Utils::QueryStringParser.parse_caller(args)
-          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new
-          aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
-          result = @collection.aggregate(caller, filter, aggregation)
+
+          if @collection.is_countable?
+            caller = ForestAdminAgent::Utils::QueryStringParser.parse_caller(args)
+            filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new
+            aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+            result = @collection.aggregate(caller, filter, aggregation)
+
+            return {
+              name: args[:params]['collection_name'],
+              content: {
+                count: result[0][:value]
+              }
+            }
+          end
 
           {
             name: args[:params]['collection_name'],
             content: {
-              count: result[0][:value]
+              count: 'deactivated'
             }
           }
         end

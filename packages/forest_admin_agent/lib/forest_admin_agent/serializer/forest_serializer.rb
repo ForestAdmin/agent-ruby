@@ -44,7 +44,6 @@ module ForestAdminAgent
         forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
         fields = forest_collection.fields.select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
-
         return {} if attributes_map.nil?
         attributes = {}
 
@@ -62,7 +61,11 @@ module ForestAdminAgent
           instance_eval(&attr_or_block)
         else
           # Default behavior, call a method by the name of the attribute.
-          object.try(attr_or_block)
+          begin
+            object.try(attr_or_block)
+          rescue
+            nil
+          end
         end
       end
 
@@ -102,7 +105,7 @@ module ForestAdminAgent
 
       def relationships
         forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'HasMany' || field.type == 'ManyToMany' }
+        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
         relations_to_one = forest_collection.fields.select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
         relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
@@ -136,7 +139,6 @@ module ForestAdminAgent
 
         has_many_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
-
           data[formatted_attribute_name] = {}
 
           if attr_data[:options][:include_links]
@@ -160,6 +162,14 @@ module ForestAdminAgent
           end
         end
         data
+      end
+
+      def relationship_self_link(attribute_name)
+        "/#{self_link}/relationships/#{format_name(attribute_name)}"
+      end
+
+      def relationship_related_link(attribute_name)
+        "/#{self_link}/#{format_name(attribute_name)}"
       end
     end
   end

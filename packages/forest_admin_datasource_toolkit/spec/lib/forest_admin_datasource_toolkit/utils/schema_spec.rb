@@ -5,7 +5,7 @@ module ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema
     describe Schema do
       let(:collection) do
-        collection = Collection.new(Datasource.new, '__collection__')
+        collection = ForestAdminDatasourceToolkit::Collection.new(Datasource.new, '__collection__')
         collection.add_fields(
           {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),

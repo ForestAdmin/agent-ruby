@@ -8,12 +8,12 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.field_value(record, field)
-        if field.include?(':')
-          record = record.flatten
-          field = field.tr(':', '.')
-        end
+        path = field.split(':')
+        current = record
 
-        record[field]
+        current = current[path.shift] while path.length.positive? && current
+
+        path.empty? ? current : nil
       end
     end
   end
