@@ -1,3 +1,10 @@
+# [1.0.0-beta.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.8...v1.0.0-beta.9) (2023-11-16)
+
+
+### Bug Fixes
+
+* **authentication:** return errors detail instead of generic error 500 ([#11](https://github.com/ForestAdmin/agent-ruby/issues/11)) ([19f84e5](https://github.com/ForestAdmin/agent-ruby/commit/19f84e54422ec6b0d2899621832023550e5d81a3))
+
 # [1.0.0-beta.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.7...v1.0.0-beta.8) (2023-11-06)
 
 
