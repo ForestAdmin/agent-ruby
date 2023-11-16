@@ -69,8 +69,8 @@ module ForestAdminAgent
           end
 
           it 'returns a token on the handle_authentication_callback method' do
-            result = authentication.handle_authentication_callback 'code' => 'abc',
-                                                                   'state' => "{'renderingId': #{rendering_id}}"
+            args = { params: { 'code' => 'abc', 'state' => "{'renderingId': #{rendering_id}}" } }
+            result = authentication.handle_authentication_callback args
             expect(result[:content][:token]).to eq token
             expect(result[:content][:tokenData]).to eq JWT.decode(
               token,
@@ -78,6 +78,22 @@ module ForestAdminAgent
               true,
               { algorithm: 'HS256' }
             )[0]
+          end
+        end
+
+        context 'when callback is called with error argument in the query' do
+          it 'raises an error' do
+            args = {
+              params: {
+                error: 'TrialBlockedError',
+                error_description: 'Your free trial has ended...',
+                state: '{"renderingId"=>128}'
+              }
+            }
+
+            expect do
+              authentication.handle_authentication_callback args
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient)
           end
         end
 

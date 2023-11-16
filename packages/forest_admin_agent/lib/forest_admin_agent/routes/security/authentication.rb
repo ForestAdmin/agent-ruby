@@ -5,6 +5,8 @@ module ForestAdminAgent
     module Security
       class Authentication < AbstractRoute
         include ForestAdminAgent::Builder
+        include ForestAdminAgent::Http::Exceptions
+
         def setup_routes
           add_route(
             'forest_authentication',
@@ -39,6 +41,11 @@ module ForestAdminAgent
         end
 
         def handle_authentication_callback(args = {})
+          if args[:params].key?(:error)
+            raise AuthenticationOpenIdClient.new(args[:params][:error], args[:params][:error_description],
+                                                 args[:params][:state])
+          end
+
           if args.dig(:headers, 'action_dispatch.remote_ip')
             Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
           end
