@@ -1,3 +1,10 @@
+# [1.0.0-beta.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.9...v1.0.0-beta.10) (2023-11-16)
+
+
+### Features
+
+* add related routes ([#12](https://github.com/ForestAdmin/agent-ruby/issues/12)) ([78e5a04](https://github.com/ForestAdmin/agent-ruby/commit/78e5a0404a1e11f4ee16a9e69226c4b1c0028759))
+
 # [1.0.0-beta.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.8...v1.0.0-beta.9) (2023-11-16)
 
 
