@@ -1,7 +1,7 @@
 module ForestAdminDatasourceToolkit
   module Components
     module Charts
-      class SmartChart
+      class ValueChart
         attr_reader :value, :previous_value
 
         def initialize(value, previous_value = nil)
@@ -11,7 +11,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def serialize
-          { countCurrent: value, countPrevious: nil }
+          { countCurrent: value, countPrevious: previous_value }
         end
       end
     end
