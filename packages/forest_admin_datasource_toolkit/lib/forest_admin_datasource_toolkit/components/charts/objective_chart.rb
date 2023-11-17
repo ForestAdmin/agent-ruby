@@ -11,7 +11,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def serialize
-          result = { value: value, objective: nil }
+          result = { value: value }
           result[:objective] = objective if objective
 
           result
