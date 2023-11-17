@@ -13,7 +13,7 @@ module ForestAdminDatasourceToolkit
 
         def serialize
           data.each do |item|
-            ChartValidator.validate(!item.key?(:label) || !item.key?(:values), item, "'label', 'values'")
+            ChartValidator.validate?(!item.key?(:label) || !item.key?(:values), item, "'label', 'values'")
           end
 
           data
