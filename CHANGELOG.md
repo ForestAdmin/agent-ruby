@@ -1,3 +1,10 @@
+# [1.0.0-beta.12](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.11...v1.0.0-beta.12) (2023-11-20)
+
+
+### Bug Fixes
+
+* ci remove rubygems_mfa_required ([#14](https://github.com/ForestAdmin/agent-ruby/issues/14)) ([848cdf9](https://github.com/ForestAdmin/agent-ruby/commit/848cdf9a590981b7b67adac93f6e51d87c6440f3))
+
 # [1.0.0-beta.11](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.10...v1.0.0-beta.11) (2023-11-20)
 
 
