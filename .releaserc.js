@@ -16,13 +16,18 @@ module.exports = {
       '@semantic-release/exec',
       {
         prepareCmd:
-          'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' lib/agent_ruby/version.rb; ' +
-          'sed -i \'s/"version": ".*"/"version": "${nextRelease.version}"/g\' package.json; ' +
-          'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/version.rb; ' +
-          'sed -i \'s/LIANA_VERSION = ".*"/LIANA_VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb; ' +
-          'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb; '+
-          'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
-          'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' lib/agent_ruby/version.rb; ' +
+            'sed -i \'s/"version": ".*"/"version": "${nextRelease.version}"/g\' package.json; ' +
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/version.rb; ' +
+            'sed -i \'s/LIANA_VERSION = ".*"/LIANA_VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb; ' +
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
+        successCmd:
+            '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-*.gem );' +
+            '( cd packages/forest_admin_datasource_active_record && gem build && gem push forest_admin_datasource_active_record-*.gem );' +
+            '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-*.gem );' +
+            '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-*.gem );' ,
       },
     ],
     [
@@ -41,22 +46,7 @@ module.exports = {
       },
     ],
     '@semantic-release/github',
-    'semantic-release-rubygem',
-    {
-      gemFileDir: 'packages/forest_admin_agent',
-    },
-    'semantic-release-rubygem',
-    {
-      gemFileDir: 'packages/forest_admin_datasource_active_record',
-    },
-    'semantic-release-rubygem',
-    {
-      gemFileDir: 'packages/forest_admin_datasource_toolkit',
-    },
-    'semantic-release-rubygem',
-    {
-      gemFileDir: 'packages/forest_admin_rails',
-    }
+    // 'semantic-release-rubygem',
     // [
     //   'semantic-release-slack-bot',
     //   {
