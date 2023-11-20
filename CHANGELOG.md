@@ -1,3 +1,10 @@
+# [1.0.0-beta.19](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.18...v1.0.0-beta.19) (2023-11-20)
+
+
+### Bug Fixes
+
+* ci deploy packages ([9541ba0](https://github.com/ForestAdmin/agent-ruby/commit/9541ba0bb83842adfb13b43d74b1f2ad58d363ff))
+
 # [1.0.0-beta.18](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.17...v1.0.0-beta.18) (2023-11-20)
 
 
