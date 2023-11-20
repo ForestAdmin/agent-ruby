@@ -29,7 +29,7 @@ module.exports = {
             'chmod 0600 $HOME/.gem/credentials '+
             'printf -- "---\n:rubygems_api_key: ${env.GEM_HOST_API_KEY}\n" > $HOME/.gem/credentials '+
             '( cd packages/forest_admin_agent && gem build && touch .trigger-rubygem-release )' +
-            '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
+            '( cd packages/forest_admin_datasource_active_record && gem build && touch .trigger-rubygem-release )' +
             '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
             '( cd packages/forest_admin_rails && gem build && touch .trigger-rubygem-release )' ,
       },
