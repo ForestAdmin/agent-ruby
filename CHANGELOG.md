@@ -1,3 +1,10 @@
+# [1.0.0-beta.21](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.20...v1.0.0-beta.21) (2023-11-20)
+
+
+### Bug Fixes
+
+* ci deploy packages to rubygems ([75b32f5](https://github.com/ForestAdmin/agent-ruby/commit/75b32f5caa82216e8fe9d50d2f00c24ce7de841c))
+
 # [1.0.0-beta.20](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.19...v1.0.0-beta.20) (2023-11-20)
 
 
