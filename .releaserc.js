@@ -24,10 +24,10 @@ module.exports = {
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
         successCmd:
-            '( cd packages/forest_admin_agent && gem build && touch .trigger-rubygem-release )' +
-            '( cd packages/forest_admin_datasource_active_record && gem build && touch .trigger-rubygem-release )' +
-            '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
-            '( cd packages/forest_admin_rails && gem build && touch .trigger-rubygem-release )' ,
+            'cd packages/forest_admin_agent && gem build && touch .trigger-rubygem-release' +
+            'cd packages/forest_admin_datasource_active_record && gem build && touch .trigger-rubygem-release' +
+            'cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release' +
+            'cd packages/forest_admin_rails && gem build && touch .trigger-rubygem-release' ,
       },
     ],
     [
