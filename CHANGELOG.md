@@ -1,3 +1,10 @@
+# [1.0.0-beta.15](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.14...v1.0.0-beta.15) (2023-11-20)
+
+
+### Bug Fixes
+
+* ci setup credentials ([5a33f54](https://github.com/ForestAdmin/agent-ruby/commit/5a33f5436611470dcce01ab9f67a23ab28029c66))
+
 # [1.0.0-beta.14](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.13...v1.0.0-beta.14) (2023-11-20)
 
 
