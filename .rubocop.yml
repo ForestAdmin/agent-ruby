@@ -20,6 +20,7 @@ Gemspec/OrderedDependencies:
 
 Gemspec/RequireMFA:
   Exclude:
+    - 'agent_ruby.gemspec'
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
