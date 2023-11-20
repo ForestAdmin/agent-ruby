@@ -18,6 +18,13 @@ Gemspec/OrderedDependencies:
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
+Gemspec/RequireMFA:
+  Exclude:
+    - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
+    - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
+    - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
+
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
 Lint/PercentStringArray:
