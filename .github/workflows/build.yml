@@ -127,6 +127,13 @@ jobs:
       - name: Install semantic release dependencies
         run: yarn
 
+      - name: Setup credentials
+        run: |
+          mkdir -p $HOME/.gem
+          touch $HOME/.gem/credentials
+          chmod 0600 $HOME/.gem/credentials
+          printf -- "---\n:rubygems_api_key: ${{secrets.GEM_HOST_API_KEY}}\n" > $HOME/.gem/credentials
+
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v2
         id: semantic

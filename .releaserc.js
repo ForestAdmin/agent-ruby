@@ -24,10 +24,6 @@ module.exports = {
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
         successCmd:
-            'mkdir -p $HOME/.gem '+
-            'touch $HOME/.gem/credentials '+
-            'chmod 0600 $HOME/.gem/credentials '+
-            'printf -- "---\n:rubygems_api_key: ${env.GEM_HOST_API_KEY}\n" > $HOME/.gem/credentials '+
             '( cd packages/forest_admin_agent && gem build && touch .trigger-rubygem-release )' +
             '( cd packages/forest_admin_datasource_active_record && gem build && touch .trigger-rubygem-release )' +
             '( cd packages/forest_admin_datasource_toolkit && gem build && touch .trigger-rubygem-release )' +
