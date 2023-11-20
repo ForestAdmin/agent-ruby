@@ -1,3 +1,10 @@
+# [1.0.0-beta.14](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.13...v1.0.0-beta.14) (2023-11-20)
+
+
+### Bug Fixes
+
+* comment out slack release ([9854f43](https://github.com/ForestAdmin/agent-ruby/commit/9854f430d46ef943c293ef1193c2c3e03a99c978))
+
 # [1.0.0-beta.13](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.12...v1.0.0-beta.13) (2023-11-20)
 
 
