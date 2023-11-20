@@ -1,3 +1,10 @@
+# [1.0.0-beta.18](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.17...v1.0.0-beta.18) (2023-11-20)
+
+
+### Bug Fixes
+
+* ci ([0358208](https://github.com/ForestAdmin/agent-ruby/commit/0358208ae2631e9aec3874090e2ac1813d4ef60f))
+
 # [1.0.0-beta.17](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.16...v1.0.0-beta.17) (2023-11-20)
 
 
