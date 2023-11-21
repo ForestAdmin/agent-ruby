@@ -20,15 +20,8 @@ module ForestAdminDatasourceActiveRecord
       query.all
     end
 
-    def aggregate(_caller, _filter, aggregation, _limit = nil)
-      field = aggregation.field || '*'
-
-      [
-        {
-          value: @model.send(aggregation.operation.downcase, field),
-          group: []
-        }
-      ]
+    def aggregate(_caller, filter, aggregation, limit = nil)
+      Utils::QueryAggregate.new(self, aggregation, filter, limit).get
     end
 
     def create(_caller, data)

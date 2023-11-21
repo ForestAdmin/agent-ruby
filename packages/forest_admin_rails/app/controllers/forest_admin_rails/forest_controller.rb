@@ -33,19 +33,19 @@ module ForestAdminRails
             {
               name: exception.name,
               detail: exception.message,
-              status: exception.status
+              status: exception.try(:status)
             }
           ]
         }
 
-        data[:errors][0][:data] = exception.data if exception.defined? :data
+        data[:errors][0][:data] = exception.try(:data)
 
         # TODO: IMPLEMENT LOGGING
         # if Facades::Container.cache(:is_production)
         # end
       end
 
-      render json: data, status: exception.status
+      render json: data, status: exception.try(:status)
     end
   end
 end
