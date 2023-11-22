@@ -29,21 +29,21 @@ module ForestAdminAgent
       def self.handle_response_error(error)
         raise error if error.is_a?(ForestException)
 
-        if error.message.include?('certificate')
+        if error.response[:message]&.include?('certificate')
           raise ForestException,
                 'ForestAdmin server TLS certificate cannot be verified. Please check that your system time is set properly.'
         end
 
-        if error.code.zero? || error.code == 502
+        if error.response[:status].zero? || error.response[:status] == 502
           raise ForestException, 'Failed to reach ForestAdmin server. Are you online?'
         end
 
-        if error.code == 404
+        if error.response[:status] == 404
           raise ForestException,
                 'ForestAdmin server failed to find the project related to the envSecret you configured. Can you check that you copied it properly in the Forest initialization?'
         end
 
-        if error.code == 503
+        if error.response[:status] == 503
           raise ForestException,
                 'Forest is in maintenance for a few minutes. We are upgrading your experience in the forest. We just need a few more minutes to get it right.'
         end
