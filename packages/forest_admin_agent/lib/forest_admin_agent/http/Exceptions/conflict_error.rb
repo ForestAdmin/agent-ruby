@@ -1,12 +1,12 @@
 module ForestAdminAgent
   module Http
     module Exceptions
-      class ForbiddenError < HttpException
+      class RequireApproval < HttpException
         attr_reader :name
 
-        def initialize(message, name = 'ForbiddenError')
+        def initialize(message, name = 'ConflictError')
           @name = name
-          super 403, 'Forbidden', message
+          super 429, 'Conflict', message
         end
       end
     end
