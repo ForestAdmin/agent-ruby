@@ -66,7 +66,6 @@ module ForestAdminAgent
       def match_conditions(condition_name)
         pk = Schema.primary_keys(collection)[0]
         condition_filter = if attributes[:all_records]
-                             puts 1
                              Nodes::ConditionTreeLeaf.new(pk, 'NOT_EQUAL', attributes[:all_records_ids_excluded])
                            else
                              Nodes::ConditionTreeLeaf.new(pk, 'IN', attributes[:ids])
