@@ -1,7 +1,7 @@
 module ForestAdminAgent
   module Http
     module Exceptions
-      class RequireApproval < HttpException
+      class ConflictError < HttpException
         attr_reader :name
 
         def initialize(message, name = 'ConflictError')
