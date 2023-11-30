@@ -40,7 +40,7 @@ module ForestAdminAgent
         if !schema_is_know || force
           #   Logger::log('Info', 'schema was updated, sending new version');
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-          client.post('/forest/apimaps', schema)
+          client.post('/forest/apimaps', schema.to_json)
           schema_file_hash_cache = Lightly.new(life: TTL_SCHEMA, dir: @options[:cache_dir].to_s)
           schema_file_hash_cache.get 'value' do
             schema[:meta][:schemaFileHash]

@@ -18,15 +18,15 @@ module ForestAdminAgent
         )
       end
 
-      def get(url, params)
-        @client.get(url, params.to_json)
+      def get(url, params = nil)
+        @client.get(url, params)
       end
 
-      def post(url, params)
-        @client.post(url, params.to_json)
+      def post(url, params = nil)
+        @client.post(url, params)
       end
 
-      def self.handle_response_error(error)
+      def handle_response_error(error)
         raise error if error.is_a?(ForestException)
 
         if error.response[:message]&.include?('certificate')
