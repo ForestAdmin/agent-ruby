@@ -11,7 +11,7 @@ module ForestAdminAgent
 
         FORMAT = {
           Day: '%d/%m/%Y',
-          Week: '%W-%Y',
+          Week: 'W%W-%Y',
           Month: '%b %y',
           Year: '%Y'
         }.freeze
@@ -29,9 +29,7 @@ module ForestAdminAgent
             condition_tree: ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@collection, args)
           )
 
-          {
-            content: Serializer::ForestChartSerializer.serialize(send("make_#{@type}".to_sym))
-          }
+          { content: Serializer::ForestChartSerializer.serialize(send("make_#{@type}".to_sym)) }
         end
 
         private
@@ -39,7 +37,7 @@ module ForestAdminAgent
         def type=(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Invalid Chart type $type'
+            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Invalid Chart type #{type}"
           end
 
           @type = type.downcase
@@ -120,7 +118,7 @@ module ForestAdminAgent
         def make_leaderboard
           field = @collection.fields[@args[:params][:relationshipFieldName]]
 
-          if field.type == 'OneToMany'
+          if field && field.type == 'OneToMany'
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(
               @collection,
               @args[:params][:relationshipFieldName]
@@ -136,7 +134,7 @@ module ForestAdminAgent
             end
           end
 
-          if field.type == 'ManyToMany'
+          if field && field.type == 'ManyToMany'
             origin = ForestAdminDatasourceToolkit::Utils::Collection.get_through_origin(
               @collection,
               @args[:params][:relationshipFieldName]
@@ -174,13 +172,13 @@ module ForestAdminAgent
             return LeaderboardChart.new(result)
           end
 
-          raise ForestAdminDatasourceToolkit::Exception::ForestException,
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                 'Failed to generate leaderboard chart: parameters do not match pre-requisites'
         end
 
         def compute_value(filter)
-          aggregation = Aggregation.new(operation: @args[:params]['aggregator'],
-                                        field: @args[:params]['aggregateFieldName'])
+          aggregation = Aggregation.new(operation: @args[:params][:aggregator],
+                                        field: @args[:params][:aggregateFieldName])
           result = @collection.aggregate(@caller, filter, aggregation)
 
           result[0][:value] || 0
