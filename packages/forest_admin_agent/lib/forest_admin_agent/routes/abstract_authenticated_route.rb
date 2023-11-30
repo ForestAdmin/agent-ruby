@@ -6,6 +6,7 @@ module ForestAdminAgent
           Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
         end
         @caller = Utils::QueryStringParser.parse_caller(args)
+        @permissions = ForestAdminAgent::Services::Permissions.new(@caller)
         super
       end
 
