@@ -36,9 +36,9 @@ module ForestAdminAgent
       private
 
       def can_approve?
-        if smart_action['userApprovalEnabled'].include?(role_id) &&
-           (smart_action['userApprovalConditions'].empty? || match_conditions('userApprovalConditions')) &&
-           (attributes[:requester_id] != caller.id || smart_action['selfApprovalEnabled'].include?(role_id))
+        if smart_action[:userApprovalEnabled].include?(role_id) &&
+           (smart_action[:userApprovalConditions].empty? || match_conditions(:userApprovalConditions)) &&
+           (attributes[:requester_id] != caller.id || smart_action[:selfApprovalEnabled].include?(role_id))
           return true
         end
 
@@ -46,16 +46,16 @@ module ForestAdminAgent
       end
 
       def can_trigger?
-        if smart_action['triggerEnabled'].include?(role_id) && !smart_action['approvalRequired'].include?(role_id)
-          return true if smart_action['triggerConditions'].empty? || match_conditions('triggerConditions')
-        elsif smart_action['approvalRequired'].include?(role_id) && smart_action['triggerEnabled'].include?(role_id)
-          if smart_action['approvalRequiredConditions'].empty? || match_conditions('approvalRequiredConditions')
+        if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
+          return true if smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
+        elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
+          if smart_action[:approvalRequiredConditions].empty? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
               'This action requires to be approved.',
               REQUIRE_APPROVAL_ERROR,
-              smart_action['userApprovalEnabled']
+              smart_action[:userApprovalEnabled]
             )
-          elsif smart_action['triggerConditions'].empty? || match_conditions('triggerConditions')
+          elsif smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
             return true
           end
         end

@@ -52,13 +52,13 @@ module ForestAdminAgent
 
       let :smart_action do
         {
-          'triggerEnabled' => [],
-          'triggerConditions' => [],
-          'approvalRequired' => [],
-          'approvalRequiredConditions' => [],
-          'userApprovalEnabled' => [],
-          'userApprovalConditions' => [],
-          'selfApprovalEnabled' => []
+          triggerEnabled: [],
+          triggerConditions: [],
+          approvalRequired: [],
+          approvalRequiredConditions: [],
+          userApprovalEnabled: [],
+          userApprovalConditions: [],
+          selfApprovalEnabled: []
         }
       end
 
@@ -80,7 +80,7 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can trigger the action' do
-        smart_action['triggerEnabled'] = [1]
+        smart_action[:triggerEnabled] = [1]
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -88,8 +88,8 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can trigger the action with trigger conditions' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['triggerConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:triggerConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -115,8 +115,8 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can trigger the action with trigger conditions with all_records_ids_excluded not empty' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['triggerConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:triggerConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -144,9 +144,9 @@ module ForestAdminAgent
       end
 
       it 'throws when the user try to trigger the action with approvalRequired and without approvalRequiredConditions' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['approvalRequired'] = [1]
-        smart_action['approvalRequiredConditions'] = []
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -156,9 +156,9 @@ module ForestAdminAgent
       end
 
       it 'throws when the user try to trigger the action with approvalRequired and match approvalRequiredConditions' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['approvalRequired'] = [1]
-        smart_action['approvalRequiredConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -186,9 +186,9 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user try to trigger the action with approvalRequired and triggerConditions and correct role into approvalRequired' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['approvalRequired'] = [1]
-        smart_action['approvalRequiredConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -214,8 +214,8 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user try to trigger the action with approvalRequired with triggerConditions and correct role into approvalRequired' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['triggerConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:triggerConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -231,8 +231,8 @@ module ForestAdminAgent
             'roleId' => 1
           }
         ]
-        smart_action['approvalRequired'] = [1]
-        smart_action['approvalRequiredConditions'] = [
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -261,10 +261,10 @@ module ForestAdminAgent
       end
 
       it 'throws when the user roleId is not into triggerEnabled & approvalRequired' do
-        smart_action['triggerEnabled'] = [1000]
-        smart_action['triggerConditions'] = []
-        smart_action['approvalRequired'] = [1000]
-        smart_action['approvalRequiredConditions'] = []
+        smart_action[:triggerEnabled] = [1000]
+        smart_action[:triggerConditions] = []
+        smart_action[:approvalRequired] = [1000]
+        smart_action[:approvalRequiredConditions] = []
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -275,8 +275,8 @@ module ForestAdminAgent
       end
 
       it "throws when smart action doesn't match with triggerConditions & approvalRequiredConditions" do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['triggerConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:triggerConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -292,8 +292,8 @@ module ForestAdminAgent
             'roleId' => 1
           }
         ]
-        smart_action['approvalRequired'] = [1]
-        smart_action['approvalRequiredConditions'] = [
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -327,7 +327,7 @@ module ForestAdminAgent
       it 'returns true when the user can approve and there is no userApprovalConditions and requesterId is not the callerId' do
         parameters[:data][:attributes][:requester_id] = 20
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalEnabled'] = [1]
+        smart_action[:userApprovalEnabled] = [1]
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -337,8 +337,8 @@ module ForestAdminAgent
       it 'returns true when the user can approve and there is no userApprovalConditions and user roleId is present into selfApprovalEnabled' do
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalEnabled'] = [1]
-        smart_action['selfApprovalEnabled'] = [1]
+        smart_action[:userApprovalEnabled] = [1]
+        smart_action[:selfApprovalEnabled] = [1]
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -348,8 +348,8 @@ module ForestAdminAgent
       it 'returns true when the user can approve and the condition match with userApprovalConditions and requesterId is the callerId' do
         parameters[:data][:attributes][:requester_id] = 20
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalEnabled'] = [1]
-        smart_action['userApprovalConditions'] = [
+        smart_action[:userApprovalEnabled] = [1]
+        smart_action[:userApprovalConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -379,8 +379,8 @@ module ForestAdminAgent
       it 'returns true when the user can approve and the condition match with userApprovalConditions and user roleId is present into selfApprovalEnabled' do
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalEnabled'] = [1]
-        smart_action['userApprovalConditions'] = [
+        smart_action[:userApprovalEnabled] = [1]
+        smart_action[:userApprovalConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -396,7 +396,7 @@ module ForestAdminAgent
             'roleId' => 1
           }
         ]
-        smart_action['selfApprovalEnabled'] = [1]
+        smart_action[:selfApprovalEnabled] = [1]
 
         collection = @datasource.collection('Book')
         allow(collection).to receive(:aggregate).and_return(
@@ -423,7 +423,7 @@ module ForestAdminAgent
       it 'throws when the user try to approve and there is no userApprovalConditions and user roleId is not present into selfApprovalEnabled' do
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['selfApprovalEnabled'] = [1000]
+        smart_action[:selfApprovalEnabled] = [1000]
 
         smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
@@ -436,7 +436,7 @@ module ForestAdminAgent
       it "throws when the user try to approve and the condition don't match with userApprovalConditions and requesterId is the callerId" do
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalConditions'] = [
+        smart_action[:userApprovalConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -469,7 +469,7 @@ module ForestAdminAgent
       it "throws when the user try to approve and the condition don't match with userApprovalConditions and requesterId is not the callerId" do
         parameters[:data][:attributes][:requester_id] = 20
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalConditions'] = [
+        smart_action[:userApprovalConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -501,7 +501,7 @@ module ForestAdminAgent
       it "throws when the user try to approve and the condition don't match with userApprovalConditions and user roleId is not present into selfApprovalEnabled" do
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
-        smart_action['userApprovalConditions'] = [
+        smart_action[:userApprovalConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
@@ -517,7 +517,7 @@ module ForestAdminAgent
             'roleId' => 1
           }
         ]
-        smart_action['selfApprovalEnabled'] = [1000]
+        smart_action[:selfApprovalEnabled] = [1000]
 
         collection = @datasource.collection('Book')
         allow(collection).to receive(:aggregate).and_return(
@@ -533,8 +533,8 @@ module ForestAdminAgent
       end
 
       it 'throws with an unknown operators' do
-        smart_action['triggerEnabled'] = [1]
-        smart_action['triggerConditions'] = [
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:triggerConditions] = [
           {
             'filter' => {
               'aggregator' => 'and',
