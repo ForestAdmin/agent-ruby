@@ -16,8 +16,12 @@ module ForestAdminAgent
         )
       end
 
-      def invalidate_cache(id_cache)
-        # TODO: HANDLE CACHE
+      def self.invalidate_cache(id_cache)
+        cache = Lightly.new(
+          life: Facades::Container.config_from_cache[:permission_expiration],
+          dir: "#{Facades::Container.config_from_cache[:cache_dir]}/permissions"
+        )
+        cache.clear id_cache
         # ...
         # TODO: HANDLE LOGGER
         # logger.debug("Invalidating #{id_cache} cache..")
