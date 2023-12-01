@@ -16,6 +16,7 @@ Gemspec/OrderedDependencies:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
 Gemspec/RequireMFA:
@@ -24,6 +25,7 @@ Gemspec/RequireMFA:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
 # Offense count: 1
@@ -33,6 +35,7 @@ Lint/PercentStringArray:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
 # Offense count: 1
@@ -55,6 +58,7 @@ Style/BlockComments:
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_customizer/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
 
 # Offense count: 3
@@ -80,6 +84,7 @@ Style/MutableConstant:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
 
 # Offense count: 38
@@ -119,6 +124,13 @@ Style/StringLiterals:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
     - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
+    - 'packages/forest_admin_datasource_customizer/Gemfile'
+    - 'packages/forest_admin_datasource_customizer/Rakefile'
+    - 'packages/forest_admin_datasource_customizer/bin/console'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb'
+    - 'packages/forest_admin_datasource_customizer/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
     - 'packages/forest_admin_datasource_active_record/Gemfile'
     - 'packages/forest_admin_datasource_active_record/Rakefile'
@@ -180,6 +192,7 @@ Metrics/ModuleLength:
     - 'packages/forest_admin_agent/spec/**/*'
     - 'packages/forest_admin_datasource_active_record/spec/**/*'
     - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_customizer/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
 
 Metrics/MethodLength:
