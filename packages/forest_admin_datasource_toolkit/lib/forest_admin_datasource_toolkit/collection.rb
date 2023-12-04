@@ -46,5 +46,11 @@ module ForestAdminDatasourceToolkit
         add_field(name, field)
       end
     end
+
+    def add_action(name, action)
+      raise Exceptions::ForestException, "Action #{name} already defined in collection" if @actions[key]
+
+      @actions[name] = action
+    end
   end
 end
