@@ -74,12 +74,9 @@ module ForestAdminAgent
 
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
-        action = find_action_from_endpoint(collection.name.to_sym, request.path_info, request.method)
-
-        raise ForestException, "The collection #{collection.name.to_sym} does not have this smart action" if action.nil?
-
+        action = find_action_from_endpoint(collection.name, request[:headers]['REQUEST_PATH'], request[:headers]['REQUEST_METHOD'])
         smart_action_approval = SmartActionChecker.new(
-          request,
+          request[:params],
           collection,
           collections_data[collection.name.to_sym][:actions][action[:name]],
           caller,
@@ -207,11 +204,16 @@ module ForestAdminAgent
       end
 
       def find_action_from_endpoint(collection_name, endpoint, http_method)
-        actions = ForestSchema.get_smart_actions(collection_name)
+        schema_file = JSON.parse(File.read(Facades::Container.config_from_cache[:schema_path]))
+        actions = schema_file['collections']&.select { |collection| collection['name'] == collection_name }&.first&.dig('actions')
 
-        return nil if actions.empty?
+        return nil if actions.nil? || actions.empty?
 
-        actions.find { |action| action['endpoint'] == endpoint && action['httpMethod'] == http_method }
+        action = actions.find { |a| a['endpoint'] == endpoint && a['http_method'].casecmp(http_method).zero? }
+
+        raise ForestException, "The collection #{collection.name} does not have this smart action" if action.nil?
+
+        action
       end
 
       def decode_crud_permissions(collection)
