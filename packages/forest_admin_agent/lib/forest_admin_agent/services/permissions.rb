@@ -211,7 +211,7 @@ module ForestAdminAgent
 
         action = actions.find { |a| a['endpoint'] == endpoint && a['http_method'].casecmp(http_method).zero? }
 
-        raise ForestException, "The collection #{collection.name} does not have this smart action" if action.nil?
+        raise ForestException, "The collection #{collection_name} does not have this smart action" if action.nil?
 
         action
       end
