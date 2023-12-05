@@ -1,3 +1,5 @@
+require 'filecache'
+
 module ForestAdminAgent
   module Services
     class Permissions
@@ -11,19 +13,24 @@ module ForestAdminAgent
       def initialize(caller)
         @caller = caller
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        @cache = Lightly.new(
-          life: Facades::Container.config_from_cache[:permission_expiration],
-          dir: "#{Facades::Container.config_from_cache[:cache_dir]}/permissions"
+        @cache = FileCache.new(
+          'permissions',
+          Facades::Container.config_from_cache[:cache_dir].to_s,
+          Facades::Container.config_from_cache[:permission_expiration]
         )
       end
 
-      def self.invalidate_cache(id_cache)
-        cache = Lightly.new(
-          life: Facades::Container.config_from_cache[:permission_expiration],
-          dir: "#{Facades::Container.config_from_cache[:cache_dir]}/permissions"
+      def self.invalidate_cache(id_cache = nil)
+        cache = FileCache.new(
+          'permissions',
+          Facades::Container.config_from_cache[:cache_dir].to_s,
+          Facades::Container.config_from_cache[:permission_expiration]
         )
-        cache.clear id_cache
-        # ...
+
+        cache.clear if id_cache.nil?
+
+        cache.delete(id_cache) unless cache.get(id_cache).nil?
+
         # TODO: HANDLE LOGGER
         # logger.debug("Invalidating #{id_cache} cache..")
       end
@@ -103,7 +110,7 @@ module ForestAdminAgent
       end
 
       def get_user_data(user_id)
-        cache.get('forest.users') do
+        cache.get_or_set('forest.users') do
           response = fetch('/liana/v4/permissions/users')
           users = {}
 
@@ -129,7 +136,7 @@ module ForestAdminAgent
       def get_collections_permissions_data(force_fetch: false)
         self.class.invalidate_cache('forest.collections') if force_fetch == true
 
-        cache.get('forest.collections') do
+        cache.get_or_set('forest.collections') do
           response = fetch('/liana/v4/permissions/environment')
           collections = {}
 
@@ -147,7 +154,7 @@ module ForestAdminAgent
       def get_chart_data(rendering_id, force_fetch: false)
         self.class.invalidate_cache('forest.stats') if force_fetch == true
 
-        cache.get('forest.stats') do
+        cache.get_or_set('forest.stats') do
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
           stat_hash = []
           response[:stats].each do |stat|
@@ -185,7 +192,7 @@ module ForestAdminAgent
       end
 
       def get_scope_and_team_data(rendering_id)
-        cache.get('forest.scopes') do
+        cache.get_or_set('forest.scopes') do
           data = {}
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
 
@@ -197,10 +204,10 @@ module ForestAdminAgent
       end
 
       def permission_system?
-        cache.get('forest.has_permission') do
+        cache.get_or_set('forest.has_permission') do
           response = fetch('/liana/v4/permissions/environment')
-          !response.nil?
-        end
+          { enable: !response.nil? }
+        end[:enable]
       end
 
       def find_action_from_endpoint(collection_name, endpoint, http_method)

@@ -1,6 +1,7 @@
 require 'spec_helper'
 require 'shared/caller'
 require 'faraday'
+require 'filecache'
 
 module ForestAdminAgent
   module Services
@@ -30,18 +31,12 @@ module ForestAdminAgent
       let(:user_role_id) { 1 }
 
       before do
-        # clear cache
+        # clear main cache
         cache = Lightly.new(
           life: Facades::Container.config_from_cache[:permission_expiration],
           dir: Facades::Container.config_from_cache[:cache_dir].to_s
         )
         cache.clear 'config'
-
-        # described_class::invalidate_cache('forest.users')
-        # described_class::invalidate_cache('forest.collections')
-        # described_class::invalidate_cache('forest.stats')
-        # described_class::invalidate_cache('forest.scopes')
-        # described_class::invalidate_cache('forest.has_permission')
 
         @datasource = Datasource.new
         collection_book = instance_double(
@@ -70,7 +65,8 @@ module ForestAdminAgent
             schema_path: "#{__dir__}/../../../shared/.forestadmin-schema.json",
             forest_server_url: 'https://api.development.forestadmin.com',
             debug: true,
-            prefix: 'forest'
+            prefix: 'forest',
+            permission_expiration: 100
           }
         )
 
@@ -197,21 +193,22 @@ module ForestAdminAgent
                           }.to_json)
         )
 
-        # a
-
         @permissions = described_class.new(QueryStringParser.parse_caller(args))
         allow(@permissions).to receive(:forest_api).and_return(forest_api_requester)
+
+        # clear permissions cache
+        described_class.invalidate_cache
       end
 
       context 'when invalidate_cache is called' do
         it 'invalidates the cache' do
-          @permissions.cache.get('foo') do
+          @permissions.cache.get_or_set('foo') do
             'bar'
           end
 
           described_class.invalidate_cache('foo')
 
-          expect(@permissions.cache.cached?('has_permission')).to be false
+          expect(@permissions.cache.get('foo')).to be_nil
         end
       end
 
@@ -549,84 +546,39 @@ module ForestAdminAgent
       end
 
       context 'when can_smart_action? is called' do
-        # test('canSmartAction() should return true when the permissions system is deactivate', function () {
-        #   $post = [
-        #     'data' => [
-        #       'attributes' => [
-        #         'values'                   => [],
-        #         'ids'                      => [1],
-        #         'collection_name'          => 'Booking',
-        #         'parent_collection_name'   => null,
-        #         'parent_collection_id'     => null,
-        #         'parent_association_name'  => null,
-        #         'all_records'              => false,
-        #         'all_records_subset_query' => [
-        #           'fields[Booking]'   => 'id,title',
-        #           'page[number]'      => 1,
-        #           'page[size]'        => 15,
-        #           'sort'              => '-id',
-        #           'timezone'          => 'Europe/Paris',
-        #         ],
-        #         'all_records_ids_excluded' => [],
-        #         'smart_action_id'          => 'Booking-Mark@@@as@@@live',
-        #         'signed_approval_request'  => null
-        #       ],
-        #       'type'       => 'custom-action-requests',
-        #     ],
-        #   ];
-        #   permissionsFactory($this, $post);
-        #   $permissions = $this->bucket['permissions'];
-        #   $collection = $this->bucket['collection'];
-        #   Cache::put('forest.has_permission', false, config('permissionExpiration'));
-        #
-        #   $request = Request::createFromGlobals();
-        #   $mockRequest = mock($request)
-        #   ->makePartial()
-        #   ->shouldAllowMockingProtectedMethods()
-        #   ->shouldReceive('getPathInfo')
-        #   ->andReturn('/forest/_actions/Booking/0/mark-as-live')
-        #   ->shouldReceive('getMethod')
-        #   ->andReturn('POST')
-        #   ->getMock();
-        #
-        #   expect($permissions->canSmartAction($mockRequest, $collection, new Filter()))->toBeTrue();
-        # });
+        it 'returns true when the permissions system is deactivate' do
+          args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
+          args[:headers]['REQUEST_METHOD'] = 'POST'
+          args[:params] = {
+            data: {
+              attributes: {
+                'values' => [],
+                'ids' => [1],
+                'collection_name' => 'Book',
+                'parent_collection_name' => nil,
+                'parent_collection_id' => nil,
+                'parent_association_name' => nil,
+                'all_records' => false,
+                'all_records_subset_query' => {
+                  'fields[Book]' => 'id,title',
+                  'page[number]' => 1,
+                  'page[size]' => 15,
+                  'sort' => '-id',
+                  'timezone' => 'Europe/Paris'
+                },
+                'all_records_ids_excluded' => [],
+                'smart_action_id' => 'make-photocopy',
+                'signed_approval_request' => nil
+              },
+              'type' => 'custom-action-requests'
+            }
+          }
 
-        # it 'should return true when the permissions system is deactivate' do
-        #   args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
-        #   args[:headers]['REQUEST_METHOD'] = 'POST'
-        #   args[:params] = {
-        #     data: {
-        #       attributes: {
-        #         'values' => [],
-        #         'ids' => [1],
-        #         'collection_name' => 'Book',
-        #         'parent_collection_name' => nil,
-        #         'parent_collection_id' => nil,
-        #         'parent_association_name' => nil,
-        #         'all_records' => false,
-        #         'all_records_subset_query' => {
-        #           'fields[Book]' => 'id,title',
-        #           'page[number]' => 1,
-        #           'page[size]' => 15,
-        #           'sort' => '-id',
-        #           'timezone' => 'Europe/Paris',
-        #         },
-        #         'all_records_ids_excluded' => [],
-        #         'smart_action_id' => 'make-photocopy',
-        #         'signed_approval_request' => nil,
-        #       },
-        #       'type' => 'custom-action-requests',
-        #     },
-        #   }
-        #
-        #   @permissions.cache.get 'forest.has_permission' do
-        #     'fff'
-        #   end
-        #   puts @permissions.cache.inspect
-        #
-        #   expect(@permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)).to be true
-        # end
+          @permissions.cache.set('forest.has_permission', { enable: false })
+          # puts @permissions.cache.get('forest.has_permission').inspect
+
+          expect(@permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)).to be true
+        end
 
         it 'throws when the action is unknown' do
           args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/fake-smart-action'
@@ -657,8 +609,7 @@ module ForestAdminAgent
           }
 
           expect do
-            @permissions.can_smart_action?(args, @datasource.collections['Book'],
-                                           Filter.new)
+            @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
           end.to raise_error(ForestException, '🌳🌳🌳 The collection Book does not have this smart action')
         end
 
@@ -691,8 +642,7 @@ module ForestAdminAgent
           }
 
           expect do
-            @permissions.can_smart_action?(args, @datasource.collections['Book'],
-                                           Filter.new)
+            @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
           end.to raise_error(ForestException, '🌳🌳🌳 The collection Book does not have this smart action')
         end
       end
