@@ -26,9 +26,9 @@ module ForestAdminAgent
         begin
           SSE::Client.new(uri, headers: headers) do |client|
             client.on_event do |event|
-              next if event.type == 'heartbeat'
+              next if event.type == :heartbeat
 
-              MESSAGE_CACHE_KEYS[event.type.to_sym]&.each do |cache_key|
+              MESSAGE_CACHE_KEYS[event.type]&.each do |cache_key|
                 @permission_service.invalidate_cache(cache_key)
                 # TODO: HANDLE LOGGER
                 # "info","invalidate cache {MESSAGE_CACHE_KEYS[event.type]} for event {event.type}"
