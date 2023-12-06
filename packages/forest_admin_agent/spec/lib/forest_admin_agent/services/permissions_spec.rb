@@ -575,7 +575,6 @@ module ForestAdminAgent
           }
 
           @permissions.cache.set('forest.has_permission', { enable: false })
-          # puts @permissions.cache.get('forest.has_permission').inspect
 
           expect(@permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)).to be true
         end
