@@ -24,7 +24,7 @@ module ForestAdminRails
   setting :project_dir, default: Dir.pwd
   setting :loggerLevel, default: 'info'
   setting :logger, default: nil
-  setting :instant_cache_refresh, default: true # Rails.env.production?
+  setting :instant_cache_refresh, default: Rails.env.production?
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine
