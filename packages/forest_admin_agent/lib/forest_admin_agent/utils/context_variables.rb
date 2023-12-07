@@ -32,7 +32,7 @@ module ForestAdminAgent
           return user[:tags][context_variable_key[USER_VALUE_TAG_PREFIX.length..]]
         end
 
-        user[context_variable_key[USER_VALUE_PREFIX.length..].to_sym]
+        user[context_variable_key[USER_VALUE_PREFIX.length..]]
       end
     end
   end

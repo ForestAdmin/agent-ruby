@@ -11,7 +11,7 @@ module ForestAdminAgent
           'firstName' => 'John',
           'lastName' => 'Doe',
           'fullName' => 'John Doe',
-          'email' => 'John Doe',
+          'email' => 'john.doe@domain.com',
           'tags' => { 'planet' => 'Death Star' },
           'roleId' => 1,
           'permissionLevel' => 'admin'
