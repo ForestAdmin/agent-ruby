@@ -8,7 +8,7 @@ module ForestAdminAgent
         attr_reader :rendering_id
 
         def initialize(rendering_id, attributes = {})
-          super attributes
+          super(attributes)
           @rendering_id = rendering_id
           @authorization_endpoint = '/oidc/auth'
           @token_endpoint = '/oidc/token'

@@ -5,7 +5,7 @@ module ForestAdminAgent
         attr_reader :error, :error_description, :state
 
         def initialize(error, error_description, state)
-          super error, 401, error_description
+          super(error, 401, error_description)
           @error = error
           @error_description = error_description
           @state = state

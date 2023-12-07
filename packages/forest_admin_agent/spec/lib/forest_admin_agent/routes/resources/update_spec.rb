@@ -40,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super arg
+                super(arg)
               end
             end
             stub_const('Book', book_class)

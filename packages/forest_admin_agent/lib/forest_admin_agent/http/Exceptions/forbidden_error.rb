@@ -6,7 +6,7 @@ module ForestAdminAgent
 
         def initialize(message, name = 'ForbiddenError')
           @name = name
-          super 403, 'Forbidden', message
+          super(403, 'Forbidden', message)
         end
       end
     end

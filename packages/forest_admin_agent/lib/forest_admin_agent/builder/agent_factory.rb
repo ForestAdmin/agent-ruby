@@ -21,7 +21,7 @@ module ForestAdminAgent
       end
 
       def add_datasource(datasource)
-        datasource.collections.each { |_name, collection| @customizer.add_collection(collection) }
+        datasource.collections.each_value { |collection| @customizer.add_collection(collection) }
         self
       end
 

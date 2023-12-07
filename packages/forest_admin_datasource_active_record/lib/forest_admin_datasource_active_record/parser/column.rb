@@ -27,7 +27,7 @@ module ForestAdminDatasourceActiveRecord
           return 'Enum'
         end
 
-        is_array = (column.respond_to?(:array) && column.array == true)
+        is_array = column.respond_to?(:array) && column.array == true
         is_array ? "[#{TYPES[column.type]}]" : TYPES[column.type]
       end
 
@@ -37,7 +37,7 @@ module ForestAdminDatasourceActiveRecord
           if sti_column?(model, column)
             model.descendants.each { |sti_model| enum_values << sti_model.name }
           else
-            model.defined_enums[column.name].each { |name, _value| enum_values << name }
+            model.defined_enums[column.name].each_key { |name| enum_values << name }
           end
         end
         enum_values

@@ -6,7 +6,7 @@ module ForestAdminAgent
 
         def initialize(message, name = 'ConflictError')
           @name = name
-          super 429, 'Conflict', message
+          super(429, 'Conflict', message)
         end
       end
     end
