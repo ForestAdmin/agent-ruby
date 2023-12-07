@@ -36,8 +36,8 @@ module ForestAdminAgent
 
       it 'returns the corresponding value from the key provided of the user data' do
         context_variables = described_class.new(team, user, request_context_variables)
-        # expect(context_variables.get_value('currentUser.firstName')).to eq('John')
-        # expect(context_variables.get_value('currentUser.tags.foo')).to eq('bar')
+        expect(context_variables.get_value('currentUser.firstName')).to eq('John')
+        expect(context_variables.get_value('currentUser.tags.foo')).to eq('bar')
         expect(context_variables.get_value('currentUser.team.id')).to eq(1)
       end
     end

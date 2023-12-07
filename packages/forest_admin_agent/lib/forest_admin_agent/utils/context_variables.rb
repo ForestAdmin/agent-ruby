@@ -10,8 +10,8 @@ module ForestAdminAgent
       USER_VALUE_TEAM_PREFIX = 'currentUser.team.'.freeze
 
       def initialize(team, user, request_context_variables = nil)
-        @team = team
-        @user = user
+        @team = team.transform_keys(&:to_sym)
+        @user = user.transform_keys(&:to_sym)
         @request_context_variables = request_context_variables
       end
 
@@ -32,7 +32,7 @@ module ForestAdminAgent
           return user[:tags][context_variable_key[USER_VALUE_TAG_PREFIX.length..]]
         end
 
-        user[context_variable_key[USER_VALUE_PREFIX.length..]]
+        user[context_variable_key[USER_VALUE_PREFIX.length..].to_sym]
       end
     end
   end
