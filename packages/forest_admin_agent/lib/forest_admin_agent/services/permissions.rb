@@ -178,16 +178,7 @@ module ForestAdminAgent
         parameters.select { |_, value| !value.nil? && value != '' }
       end
 
-      # protected function arrayHash(array $data): string
-      # {
-      #   ArrayHelper::ksortRecursive($data);
-      #
-      # return sha1(json_encode($data, JSON_THROW_ON_ERROR));
-      # stat_hash << "#{stat['type']}:#{Digest::SHA1.hexdigest(stat.sort.to_h.to_s)}"
-      # }
       def array_hash(data)
-        # data.deep_sort.to_s
-
         Digest::SHA1.hexdigest(data.sort.to_h.to_s)
       end
 
