@@ -12,11 +12,7 @@ module ForestAdminAgent
         # TODO: add one for ip whitelist when server implement it
       }.freeze
 
-      def initialize
-        @permission_service = Permissions
-      end
-
-      def run
+      def self.run
         uri = "#{Facades::Container.config_from_cache[:forest_server_url]}/liana/v4/subscribe-to-events"
         headers = {
           'forest-secret-key' => Facades::Container.config_from_cache[:env_secret],
@@ -29,7 +25,7 @@ module ForestAdminAgent
               next if event.type == :heartbeat
 
               MESSAGE_CACHE_KEYS[event.type]&.each do |cache_key|
-                @permission_service.invalidate_cache(cache_key)
+                Permissions.invalidate_cache(cache_key)
                 # TODO: HANDLE LOGGER
                 # "info","invalidate cache {MESSAGE_CACHE_KEYS[event.type]} for event {event.type}"
               end

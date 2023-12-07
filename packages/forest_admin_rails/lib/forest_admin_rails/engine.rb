@@ -40,7 +40,7 @@ module ForestAdminRails
       ForestAdminRails::CreateAgent.setup!
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
-      sse.new.run if ForestAdminRails.config[:instant_cache_refresh]
+      sse.run if ForestAdminRails.config[:instant_cache_refresh]
     end
 
     def load_cors
