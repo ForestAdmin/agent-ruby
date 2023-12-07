@@ -23,6 +23,7 @@ module ForestAdminAgent
               }
             }
           end
+          let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
             user_class = Struct.new(:id, :name)
@@ -86,6 +87,9 @@ module ForestAdminAgent
             @datasource.add_collection(collection_address)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+
+            allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
           end
 
           it 'adds the route forest_related_associate' do
@@ -106,7 +110,13 @@ module ForestAdminAgent
               expect(@datasource.collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(aggregator: 'Or', conditions: [])
+                    ]
+                  ),
                   page: nil,
                   search: nil,
                   search_extended: nil,

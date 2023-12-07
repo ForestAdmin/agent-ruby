@@ -15,6 +15,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          @permissions.can?(:add, @collection)
           data = format_attributes(args)
           record = @collection.create(@caller, data)
           link_one_to_one_relations(args, record)

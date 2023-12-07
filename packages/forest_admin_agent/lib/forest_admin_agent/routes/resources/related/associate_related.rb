@@ -8,6 +8,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query
+
           def setup_routes
             add_route(
               'forest_related_associate',
@@ -21,6 +22,7 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             build(args)
+            @permissions.can?(:edit, @collection)
 
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
             target_relation_id = Utils::Id.unpack_id(@child_collection, args[:params]['data'][0]['id'], with_key: true)
@@ -40,7 +42,14 @@ module ForestAdminAgent
           def associate_one_to_many(relation, parent_id, target_relation_id)
             id = Schema.primary_keys(@child_collection)[0]
             value = Collection.get_value(@child_collection, @caller, target_relation_id, id)
-            filter = Filter.new(condition_tree: ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value))
+            filter = Filter.new(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value),
+                  @permissions.get_scope(@collection)
+                ]
+              )
+            )
             value = Collection.get_value(@collection, @caller, parent_id, relation.origin_key_target)
 
             @child_collection.update(@caller, filter, { relation.origin_key => value })

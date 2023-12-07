@@ -8,6 +8,7 @@ module ForestAdminAgent
     module Resources
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
       describe Count do
         include_context 'with caller'
         subject(:count) { described_class.new }
@@ -20,6 +21,7 @@ module ForestAdminAgent
             }
           }
         end
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
         before do
           @datasource = Datasource.new
@@ -34,6 +36,9 @@ module ForestAdminAgent
           @datasource.add_collection(collection)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive_messages(can?: true, get_scope: ConditionTreeBranch.new('Or', []))
         end
 
         it 'adds the route forest_count' do

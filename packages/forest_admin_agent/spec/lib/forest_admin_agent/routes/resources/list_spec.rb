@@ -22,6 +22,7 @@ module ForestAdminAgent
             }
           }
         end
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
         before do
           user_class = Struct.new(:id, :first_name, :last_name)
@@ -42,6 +43,9 @@ module ForestAdminAgent
           @datasource.add_collection(collection)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
         end
 
         it 'adds the route forest_list' do
@@ -78,7 +82,10 @@ module ForestAdminAgent
 
             expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
-              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
+              expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
+                                                       conditions: [{ aggregator: 'Or', conditions: [] },
+                                                                    { field: 'id', operator: Operators::GREATER_THAN,
+                                                                      value: 7 }])
               expect(projection).to eq(%w[id first_name last_name])
             end
           end
@@ -103,6 +110,7 @@ module ForestAdminAgent
                 {
                   aggregator: 'And',
                   conditions: [
+                    { aggregator: 'Or', conditions: [] },
                     { field: 'id', operator: 'Greater_Than', value: 7 },
                     { field: 'first_name', operator: 'Contains', value: 'foo' }
                   ]

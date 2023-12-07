@@ -226,6 +226,7 @@ Layout/LineLength:
     - 'packages/forest_admin_agent/spec/shared/caller.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/http/forest_admin_api_requester.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/http/forest_admin_api_requester_spec.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/list.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/permissions.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/context_variables_injector_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/services/smart_action_checker_spec.rb'

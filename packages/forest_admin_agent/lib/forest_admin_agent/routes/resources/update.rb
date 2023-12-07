@@ -16,10 +16,12 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          @permissions.can?(:edit, @collection)
+          scope = @permissions.get_scope(@collection)
           id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
           condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [id])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-            condition_tree: condition_tree,
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope]),
             page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
           )
           data = format_attributes(args)

@@ -23,6 +23,7 @@ module ForestAdminAgent
               }
             }
           end
+          let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
             user_class = Struct.new(:id, :first_name, :last_name)
@@ -57,6 +58,9 @@ module ForestAdminAgent
             @datasource.add_collection(collection_category)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+
+            allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
           end
 
           it 'adds the route forest_related_count' do
@@ -80,7 +84,7 @@ module ForestAdminAgent
                 expect(id).to eq({ 'id' => 1 })
                 expect(relation_name).to eq('category')
                 expect(foreign_filter).to have_attributes(
-                  condition_tree: nil,
+                  condition_tree: have_attributes(aggregator: 'Or', conditions: []),
                   page: nil,
                   search: nil,
                   search_extended: nil,
