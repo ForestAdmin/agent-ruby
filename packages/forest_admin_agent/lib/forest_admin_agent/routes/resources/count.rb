@@ -18,7 +18,7 @@ module ForestAdminAgent
 
           if @collection.is_countable?
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-              condition_tree: ConditionTreeFactory.intersect([@permissions.get_scope(@collection)])
+              condition_tree: @permissions.get_scope(@collection)
             )
             aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
             result = @collection.aggregate(@caller, filter, aggregation)
