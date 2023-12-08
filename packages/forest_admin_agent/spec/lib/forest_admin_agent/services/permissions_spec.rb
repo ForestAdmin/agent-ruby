@@ -32,11 +32,8 @@ module ForestAdminAgent
 
       before do
         # clear main cache
-        cache = Lightly.new(
-          life: Facades::Container.config_from_cache[:permission_expiration],
-          dir: Facades::Container.config_from_cache[:cache_dir].to_s
-        )
-        cache.clear 'config'
+        cache = FileCache.new('app', 'tmp/cache/forest_admin')
+        cache.clear
 
         @datasource = Datasource.new
         collection_book = instance_double(

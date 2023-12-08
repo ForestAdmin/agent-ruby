@@ -1,4 +1,4 @@
-require 'lightly'
+require 'filecache'
 require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
@@ -31,8 +31,8 @@ end
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
   config.before do
-    lightly = Lightly.new(dir: 'tmp/cache/forest_admin')
-    lightly.flush
+    cache = FileCache.new('app', 'tmp/cache/forest_admin')
+    cache.clear
 
     agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
     agent_factory.setup(
