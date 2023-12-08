@@ -8,7 +8,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :caller, :forest_api, :cache
+      attr_reader :caller, :forest_api, :cache, :team, :user
 
       def initialize(caller)
         @caller = caller
@@ -99,8 +99,8 @@ module ForestAdminAgent
       def get_scope(collection)
         permissions = get_scope_and_team_data(caller.rendering_id)
         scope = permissions[:scopes][collection.name.to_sym]
-        team = permissions[:team]
-        user = get_user_data(caller.id)
+        @team = permissions[:team]
+        @user = get_user_data(caller.id)
 
         return nil if scope.nil?
 
@@ -197,7 +197,7 @@ module ForestAdminAgent
       def permission_system?
         cache.get_or_set('forest.has_permission') do
           response = fetch('/liana/v4/permissions/environment')
-          { enable: !response.nil? }
+          { enable: response != true }
         end[:enable]
       end
 
