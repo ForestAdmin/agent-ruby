@@ -7,6 +7,7 @@ module ForestAdminAgent
       class Charts < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query
+        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceToolkit::Components::Charts
 
         FORMAT = {
@@ -23,13 +24,22 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          @permissions.can_chart?(args[:params])
           @args = args
           self.type = args[:params][:type]
           @filter = Filter.new(
-            condition_tree: ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@collection, args)
+            condition_tree: ConditionTreeFactory.intersect(
+              [
+                @permissions.get_scope(@collection),
+                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+                  @collection, args
+                )
+              ]
+            )
           )
+          # inject_context_variables
 
-          { content: Serializer::ForestChartSerializer.serialize(send("make_#{@type}".to_sym)) }
+          { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}")) }
         end
 
         private
@@ -44,7 +54,17 @@ module ForestAdminAgent
         end
 
         def inject_context_variables
-          # TODO: to implement
+          context_variable = Utils::ContextVariables.new(@permissions.team, @permissions.user)
+
+          if @args[:params][:data].key?(:aggregator)
+            @args[:params][:data][:aggregator] = Utils::ContextVariablesInjector.inject_context_in_value(
+              @args[:params][:data][:aggregator], context_variable
+            )
+          end
+
+          @filter = @filter.override(condition_tree: Utils::ContextVariablesInjector.inject_context_in_filter(
+            @filter.condition_tree, context_variable
+          ))
         end
 
         def make_value

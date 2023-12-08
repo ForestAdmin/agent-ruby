@@ -10,6 +10,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
       describe Charts do
         include_context 'with caller'
         subject(:chart) { described_class.new }
@@ -22,6 +23,7 @@ module ForestAdminAgent
             }
           }
         end
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
         before do
           book_class = Struct.new(:id, :title, :price, :date, :year)
@@ -92,6 +94,9 @@ module ForestAdminAgent
           @datasource.add_collection(collection_book_review)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive_messages(can_chart?: true, get_scope: nil)
         end
 
         it 'adds the route forest_chart' do

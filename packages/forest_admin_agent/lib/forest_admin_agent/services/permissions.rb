@@ -56,7 +56,7 @@ module ForestAdminAgent
       end
 
       def can_chart?(parameters)
-        attributes = sanitize_chart_parameters(parameters)
+        attributes = sanitize_chart_parameters(parameters.deep_symbolize_keys)
         hash_request = "#{attributes[:type]}:#{array_hash(attributes)}"
         is_allowed = get_chart_data(caller.rendering_id).include?(hash_request)
 
@@ -174,6 +174,12 @@ module ForestAdminAgent
         parameters.delete(:timezone)
         parameters.delete(:collection)
         parameters.delete(:contextVariables)
+        # rails
+        parameters.delete(:route_alias)
+        parameters.delete(:controller)
+        parameters.delete(:action)
+        parameters.delete(:collection_name)
+        parameters.delete(:forest)
 
         parameters.select { |_, value| !value.nil? && value != '' }
       end
