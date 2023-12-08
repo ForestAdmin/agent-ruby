@@ -1,3 +1,10 @@
+# [1.0.0-beta.22](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.21...v1.0.0-beta.22) (2023-12-08)
+
+
+### Features
+
+* add permissions support ([#17](https://github.com/ForestAdmin/agent-ruby/issues/17)) ([d7b14ca](https://github.com/ForestAdmin/agent-ruby/commit/d7b14ca8a32a049b8aabf47b0cbf1b165f3b7ad0))
+
 # [1.0.0-beta.21](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.20...v1.0.0-beta.21) (2023-11-20)
 
 
