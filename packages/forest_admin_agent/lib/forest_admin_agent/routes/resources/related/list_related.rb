@@ -7,6 +7,8 @@ module ForestAdminAgent
         class ListRelated < AbstractRelatedRoute
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
+          include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
           def setup_routes
             add_route(
               'forest_related_list',
@@ -20,10 +22,16 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             build(args)
+            @permissions.can?(:browse, @collection)
             # TODO: add csv behaviour
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-              condition_tree: ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args),
+              condition_tree: ConditionTreeFactory.intersect(
+                [
+                  @permissions.get_scope(@collection),
+                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
+                ]
+              ),
               page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)

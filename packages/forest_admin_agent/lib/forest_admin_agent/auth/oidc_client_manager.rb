@@ -1,3 +1,4 @@
+require 'filecache'
 require 'openid_connect'
 require_relative 'oauth2/oidc_config'
 require_relative 'oauth2/forest_provider'
@@ -18,8 +19,8 @@ module ForestAdminAgent
       private
 
       def setup_cache(env_secret, config_agent)
-        lightly = Lightly.new(life: TTL, dir: "#{config_agent[:cache_dir]}/issuer")
-        lightly.get env_secret do
+        cache = FileCache.new('auth_issuer', (config_agent[:cache_dir]).to_s, TTL)
+        cache.get_or_set env_secret do
           oidc_config = retrieve_config(config_agent[:forest_server_url])
           credentials = register(
             config_agent[:env_secret],

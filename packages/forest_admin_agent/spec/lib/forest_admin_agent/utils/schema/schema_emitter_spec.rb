@@ -43,9 +43,9 @@ module ForestAdminAgent
           before do
             cache = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache)
             config = cache.get('config')
-            cache.clear 'config'
+            cache.clear
             config[:is_production] = false
-            cache.get 'config' do
+            cache.get_or_set 'config' do
               config
             end
           end
@@ -76,9 +76,9 @@ module ForestAdminAgent
           before do
             cache = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache)
             config = cache.get('config')
-            cache.clear 'config'
+            cache.clear
             config[:is_production] = true
-            cache.get 'config' do
+            cache.get_or_set 'config' do
               config
             end
           end

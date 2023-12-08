@@ -21,6 +21,7 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             build(args)
+            @permissions.can?(:delete, @collection)
 
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
             is_delete_mode = !args.dig(:params, :delete).nil?
@@ -84,6 +85,7 @@ module ForestAdminAgent
             Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
+                  @permissions.get_scope(@child_collection),
                   Utils::QueryStringParser.parse_condition_tree(@child_collection, args),
                   selected_ids
                 ]

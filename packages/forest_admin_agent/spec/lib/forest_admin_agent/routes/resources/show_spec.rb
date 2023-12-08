@@ -21,6 +21,12 @@ module ForestAdminAgent
             }
           }
         end
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+
+        before do
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+        end
 
         it 'adds the route forest_list' do
           show.setup_routes
@@ -34,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super arg
+                super(arg)
               end
             end
             stub_const('User', user_class)
@@ -92,7 +98,13 @@ module ForestAdminAgent
 
             expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
-              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
+              expect(filter.condition_tree.to_h).to eq({
+                                                         aggregator: 'And',
+                                                         conditions: [
+                                                           { field: 'id', operator: Operators::EQUAL, value: 1 },
+                                                           { aggregator: 'Or', conditions: [] }
+                                                         ]
+                                                       })
               expect(projection).to eq(%w[id first_name last_name])
             end
           end

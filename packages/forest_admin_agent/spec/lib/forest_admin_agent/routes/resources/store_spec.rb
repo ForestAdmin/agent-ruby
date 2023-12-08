@@ -21,6 +21,12 @@ module ForestAdminAgent
             }
           }
         end
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+
+        before do
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive(:can?).and_return(true)
+        end
 
         it 'adds the route forest_store' do
           store.setup_routes
@@ -34,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super arg
+                super(arg)
               end
             end
             stub_const('Book', book_class)
@@ -100,7 +106,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super arg
+                super(arg)
               end
             end
 
@@ -108,7 +114,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super arg
+                super(arg)
               end
             end
             stub_const('Person', person_class)

@@ -13,6 +13,7 @@ module ForestAdminAgent
           subject(:dissociate) { described_class.new }
 
           let(:datasource) { Datasource.new }
+          let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
             collection_user = Collection.new(datasource, 'user')
@@ -70,6 +71,9 @@ module ForestAdminAgent
             datasource.add_collection(collection_address)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+
+            allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
           end
 
           it 'adds the route forest_related_dissociate' do
@@ -113,6 +117,7 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
@@ -146,6 +151,7 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
@@ -183,6 +189,7 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 2),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
@@ -229,6 +236,7 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
@@ -262,6 +270,7 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
@@ -279,6 +288,7 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
+                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'id', operator: Operators::IN, value: [1])
                     ]

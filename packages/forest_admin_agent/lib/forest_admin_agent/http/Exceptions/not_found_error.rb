@@ -5,7 +5,7 @@ module ForestAdminAgent
         attr_reader :name, :status
 
         def initialize(msg, name = 'NotFoundError')
-          super msg
+          super(msg)
           @name = name
           @status = 404
         end

@@ -21,6 +21,7 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             build(args)
+            @permissions.can?(:edit, @collection)
 
             relation = @collection.fields[args[:params]['relation_name']]
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'])
@@ -61,6 +62,7 @@ module ForestAdminAgent
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
+                  @permissions.get_scope(@collection),
                   ConditionTree::Nodes::ConditionTreeLeaf.new(
                     relation.origin_key,
                     ConditionTree::Operators::EQUAL,
@@ -91,7 +93,12 @@ module ForestAdminAgent
 
             @child_collection.update(
               @caller,
-              Filter.new(condition_tree: new_fk_owner),
+              Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  @permissions.get_scope(@collection),
+                  new_fk_owner
+                ]
+              )),
               { relation.origin_key => origin_value }
             )
           end

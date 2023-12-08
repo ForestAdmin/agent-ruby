@@ -3,7 +3,7 @@ module ForestAdminDatasourceToolkit
     class ForestException < RuntimeError
       def initialize(msg = '')
         msg = "🌳🌳🌳 #{msg}"
-        super msg
+        super(msg)
       end
     end
   end

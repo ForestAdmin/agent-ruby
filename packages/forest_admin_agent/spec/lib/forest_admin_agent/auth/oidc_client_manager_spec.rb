@@ -11,8 +11,8 @@ module ForestAdminAgent
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
-        lightly = Lightly.new(dir: "#{Facades::Container.cache(:cache_dir)}/issuer")
-        lightly.flush
+        cache = FileCache.new('auth_issuer', Facades::Container.cache(:cache_dir).to_s)
+        cache.clear
       end
 
       context 'when then oidc is called and forest api is down' do

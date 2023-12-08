@@ -7,6 +7,7 @@ module ForestAdminAgent
       class Delete < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query
+        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def setup_routes
           add_route('forest_delete_bulk', 'delete', '/:collection_name', ->(args) { handle_request_bulk(args) })
@@ -17,6 +18,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          @permissions.can?(:delete, @collection)
           id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
           delete_records(args, { ids: [id], are_excluded: false })
 
@@ -25,6 +27,7 @@ module ForestAdminAgent
 
         def handle_request_bulk(args = {})
           build(args)
+          @permissions.can?(:delete, @collection)
           selection_ids = Utils::Id.parse_selection_ids(@collection, args[:params], with_key: true)
           delete_records(args, selection_ids)
 
@@ -38,7 +41,8 @@ module ForestAdminAgent
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
               [
                 Utils::QueryStringParser.parse_condition_tree(@collection, args),
-                condition_tree_ids
+                condition_tree_ids,
+                @permissions.get_scope(@collection)
               ]
             )
           )

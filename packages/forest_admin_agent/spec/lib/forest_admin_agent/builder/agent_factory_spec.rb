@@ -17,7 +17,7 @@ module ForestAdminAgent
 
           it 'build the cache' do
             expect(described_class.instance.container.resolve(:cache)).not_to be_nil
-            expect(described_class.instance.container.resolve(:cache)).to be_instance_of Lightly
+            expect(described_class.instance.container.resolve(:cache)).to be_instance_of FileCache
           end
 
           it 'build the logger' do

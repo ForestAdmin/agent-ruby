@@ -1,5 +1,5 @@
 require 'dry-container'
-require 'lightly'
+require 'filecache'
 
 module ForestAdminAgent
   module Builder
@@ -21,7 +21,7 @@ module ForestAdminAgent
       end
 
       def add_datasource(datasource)
-        datasource.collections.each { |_name, collection| @customizer.add_collection(collection) }
+        datasource.collections.each_value { |collection| @customizer.add_collection(collection) }
         self
       end
 
@@ -40,9 +40,9 @@ module ForestAdminAgent
         if !schema_is_know || force
           #   Logger::log('Info', 'schema was updated, sending new version');
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-          client.post('/forest/apimaps', schema)
-          schema_file_hash_cache = Lightly.new(life: TTL_SCHEMA, dir: @options[:cache_dir].to_s)
-          schema_file_hash_cache.get 'value' do
+          client.post('/forest/apimaps', schema.to_json)
+          schema_file_hash_cache = FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA)
+          schema_file_hash_cache.get_or_set 'value' do
             schema[:meta][:schemaFileHash]
           end
           @container.register(:schema_file_hash, schema_file_hash_cache)
@@ -59,11 +59,11 @@ module ForestAdminAgent
       end
 
       def build_cache
-        @container.register(:cache, Lightly.new(life: TTL_CONFIG, dir: @options[:cache_dir].to_s))
+        @container.register(:cache, FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA))
         return unless @has_env_secret
 
         cache = @container.resolve(:cache)
-        cache.get 'config' do
+        cache.get_or_set 'config' do
           @options.to_h
         end
       end

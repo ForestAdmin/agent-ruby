@@ -38,6 +38,9 @@ module ForestAdminRails
       # setup agent
       require Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
       ForestAdminRails::CreateAgent.setup!
+
+      sse = ForestAdminAgent::Services::SSECacheInvalidation
+      sse.run if ForestAdminRails.config[:instant_cache_refresh]
     end
 
     def load_cors
