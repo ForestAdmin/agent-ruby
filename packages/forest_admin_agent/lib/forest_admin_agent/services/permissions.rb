@@ -1,4 +1,5 @@
 require 'filecache'
+require 'deepsort'
 
 module ForestAdminAgent
   module Services
@@ -185,7 +186,7 @@ module ForestAdminAgent
       end
 
       def array_hash(data)
-        Digest::SHA1.hexdigest(data.sort.to_h.to_s)
+        Digest::SHA1.hexdigest(data.deep_sort.to_h.to_s)
       end
 
       def get_scope_and_team_data(rendering_id)
