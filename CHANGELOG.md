@@ -1,3 +1,10 @@
+# [1.0.0-beta.23](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.22...v1.0.0-beta.23) (2023-12-13)
+
+
+### Features
+
+* add charts support ([#16](https://github.com/ForestAdmin/agent-ruby/issues/16)) ([a8d609f](https://github.com/ForestAdmin/agent-ruby/commit/a8d609fb4e1e963722debb7e36bd2f9f3e6c42de))
+
 # [1.0.0-beta.22](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.21...v1.0.0-beta.22) (2023-12-08)
 
 
