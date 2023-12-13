@@ -9,7 +9,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :caller, :forest_api, :cache, :team, :user
+      attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
         @caller = caller
