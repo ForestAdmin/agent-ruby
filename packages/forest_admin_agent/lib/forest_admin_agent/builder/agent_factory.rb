@@ -14,7 +14,7 @@ module ForestAdminAgent
       def setup(options)
         @options = options
         @has_env_secret = options.to_h.key?(:env_secret)
-        @customizer = ForestAdminDatasourceToolkit::Datasource.new
+        @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
         build_cache
         build_logger
@@ -23,6 +23,10 @@ module ForestAdminAgent
       def add_datasource(datasource)
         datasource.collections.each_value { |collection| @customizer.add_collection(collection) }
         self
+      end
+
+      def customize_collection(name, handle)
+        @customizer.customize_collection(name, handle)
       end
 
       def build
