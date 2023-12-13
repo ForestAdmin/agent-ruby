@@ -229,6 +229,17 @@ module ForestAdminDatasourceToolkit
           expect(described_class.get_through_target(collection_book, 'myPersons')).to eq('myPerson')
         end
 
+        it 'get_through_origin should throw with invalid relation type' do
+          expect do
+            described_class.get_through_origin(collection_book,
+                                               'myBookPersons')
+          end.to raise_error(ForestException, '🌳🌳🌳 Relation must be many to many')
+        end
+
+        it 'get_through_origin should work' do
+          expect(described_class.get_through_origin(collection_book, 'myPersons')).to eq('myBook')
+        end
+
         it 'get_value should work' do
           allow(collection_person).to receive(:list).and_return({ 'id' => 1, 'name' => 'foo' })
 

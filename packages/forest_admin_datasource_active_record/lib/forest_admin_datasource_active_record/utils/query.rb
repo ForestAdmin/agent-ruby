@@ -9,13 +9,13 @@ module ForestAdminDatasourceActiveRecord
         @projection = projection
         @filter = filter
         @arel_table = @collection.model.arel_table
+        @select = []
       end
 
       def build
-        @query = select
-        @query = apply_filter
-
-        @query
+        build_select
+        apply_filter
+        apply_select
       end
 
       def apply_filter
@@ -71,19 +71,30 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
-      def select
+      def build_select
         unless @projection.nil?
-          query_select = @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
+          @select += @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
           @projection.relations.each_key do |relation|
             relation_schema = @collection.fields[relation]
-            if relation_schema.type == 'OneToOne'
-              query_select.push("#{@collection.model.table_name}.#{relation_schema.origin_key_target}")
-            else
-              query_select.push("#{@collection.model.table_name}.#{relation_schema.foreign_key}")
-            end
+            @select << if relation_schema.type == 'OneToOne'
+                         "#{@collection.model.table_name}.#{relation_schema.origin_key_target}"
+                       else
+                         "#{@collection.model.table_name}.#{relation_schema.foreign_key}"
+                       end
           end
 
-          @query = @query.select(query_select.join(', '))
+          # @query = @query.select(query_select.join(', '))
+          # @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
+          # # TODO: replace eager_load by joins because eager_load select ALL columns of relation
+          # # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
+        end
+
+        @query
+      end
+
+      def apply_select
+        unless @projection.nil?
+          @query = @query.select(@select.join(', '))
           @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
           # TODO: replace eager_load by joins because eager_load select ALL columns of relation
           # @query = @query.joins(@projection.relations.keys.map(&:to_sym))

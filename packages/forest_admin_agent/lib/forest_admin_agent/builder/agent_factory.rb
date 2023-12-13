@@ -63,9 +63,7 @@ module ForestAdminAgent
         return unless @has_env_secret
 
         cache = @container.resolve(:cache)
-        cache.get_or_set 'config' do
-          @options.to_h
-        end
+        cache.set('config', @options.to_h)
       end
 
       def build_logger

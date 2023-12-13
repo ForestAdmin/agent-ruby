@@ -1,4 +1,5 @@
 require 'filecache'
+require 'deepsort'
 
 module ForestAdminAgent
   module Services
@@ -56,7 +57,7 @@ module ForestAdminAgent
       end
 
       def can_chart?(parameters)
-        attributes = sanitize_chart_parameters(parameters)
+        attributes = sanitize_chart_parameters(parameters.deep_symbolize_keys)
         hash_request = "#{attributes[:type]}:#{array_hash(attributes)}"
         is_allowed = get_chart_data(caller.rendering_id).include?(hash_request)
 
@@ -99,8 +100,6 @@ module ForestAdminAgent
       def get_scope(collection)
         permissions = get_scope_and_team_data(caller.rendering_id)
         scope = permissions[:scopes][collection.name.to_sym]
-        team = permissions[:team]
-        user = get_user_data(caller.id)
 
         return nil if scope.nil?
 
@@ -170,16 +169,21 @@ module ForestAdminAgent
       end
 
       def sanitize_chart_parameters(parameters)
-        # parameters = parameters.to_h
         parameters.delete(:timezone)
         parameters.delete(:collection)
         parameters.delete(:contextVariables)
+        # rails
+        parameters.delete(:route_alias)
+        parameters.delete(:controller)
+        parameters.delete(:action)
+        parameters.delete(:collection_name)
+        parameters.delete(:forest)
 
         parameters.select { |_, value| !value.nil? && value != '' }
       end
 
       def array_hash(data)
-        Digest::SHA1.hexdigest(data.sort.to_h.to_s)
+        Digest::SHA1.hexdigest(data.deep_sort.to_h.to_s)
       end
 
       def get_scope_and_team_data(rendering_id)
@@ -197,7 +201,7 @@ module ForestAdminAgent
       def permission_system?
         cache.get_or_set('forest.has_permission') do
           response = fetch('/liana/v4/permissions/environment')
-          { enable: !response.nil? }
+          { enable: response != true }
         end[:enable]
       end
 

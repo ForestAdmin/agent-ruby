@@ -41,18 +41,18 @@ module ForestAdminDatasourceToolkit
                 depends_on = alt[:depends_on]
                 valid = alt[:for_types].nil? || alt[:for_types].include?(column_type)
 
-                if valid && !visited.include?(alt)
-                  depends_replacers = depends_on.map do |replacement|
-                    get_replacer(replacement, filter_operators, column_type, visited + [alt])
-                  end
+                next unless valid && !visited.include?(alt)
 
-                  if depends_replacers.all? { |r| !r.nil? }
-                    return lambda { |leaf, timezone|
-                      replacer.call(leaf).replace_leafs do |sub_leaf|
-                        depends_replacers[depends_on.index(sub_leaf.operator)].call(sub_leaf, timezone)
-                      end
-                    }
-                  end
+                depends_replacers = depends_on.map do |replacement|
+                  get_replacer(replacement, filter_operators, column_type, visited + [alt])
+                end
+
+                if depends_replacers.all? { |r| !r.nil? }
+                  return lambda { |leaf, timezone|
+                    replacer.call(leaf).replace_leafs do |sub_leaf|
+                      depends_replacers[depends_on.index(sub_leaf.operator)].call(sub_leaf, timezone)
+                    end
+                  }
                 end
               end
 

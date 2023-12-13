@@ -1,4 +1,5 @@
 require 'jwt'
+require 'active_support'
 require 'active_support/time'
 
 module ForestAdminAgent

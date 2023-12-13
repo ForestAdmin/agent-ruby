@@ -106,6 +106,23 @@ module ForestAdminDatasourceToolkit
         nil
       end
 
+      def self.get_through_origin(collection, relation_name)
+        relation = collection.fields[relation_name]
+        raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
+
+        through_collection = collection.datasource.collection(relation.through_collection)
+        through_collection.fields.select do |field_name, field|
+          if field.is_a?(ManyToOneSchema) &&
+             field.foreign_collection == collection.name &&
+             field.foreign_key == relation.origin_key &&
+             field.foreign_key_target == relation.origin_key_target
+            return field_name
+          end
+        end
+
+        nil
+      end
+
       def self.list_relation(collection, id, relation_name, caller, foreign_filter, projection)
         relation = collection.fields[relation_name]
         foreign_collection = collection.datasource.collection(relation.foreign_collection)
