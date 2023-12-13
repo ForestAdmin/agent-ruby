@@ -100,8 +100,6 @@ module ForestAdminAgent
       def get_scope(collection)
         permissions = get_scope_and_team_data(caller.rendering_id)
         scope = permissions[:scopes][collection.name.to_sym]
-        @team = permissions[:team]
-        @user = get_user_data(caller.id)
 
         return nil if scope.nil?
 
@@ -171,7 +169,6 @@ module ForestAdminAgent
       end
 
       def sanitize_chart_parameters(parameters)
-        # parameters = parameters.to_h
         parameters.delete(:timezone)
         parameters.delete(:collection)
         parameters.delete(:contextVariables)
