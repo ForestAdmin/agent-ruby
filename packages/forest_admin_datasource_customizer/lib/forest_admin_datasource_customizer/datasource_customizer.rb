@@ -9,8 +9,29 @@ module ForestAdminDatasourceCustomizer
       @stack = Decorators::DecoratorsStack.new(@composite_datasource)
     end
 
-    def add_datasource(datasource, options)
-      # TODO: to implement
+    def schema
+      @stack.datasource.schema
+    end
+
+    def get_collection(name)
+      CollectionCustomizer.new(self, @stack, name)
+    end
+
+    def collections
+      @stack.datasource.collections.map { |collection| get_collection(collection.name) }
+    end
+
+    def datasource
+      # TODO: call @stack.apply_queued_customizations(logger);
+
+      @stack.datasource
+    end
+
+    def add_datasource(datasource, _options)
+      # TODO: add include/exclude behavior
+      # TODO: add rename behavior
+
+      datasource.collections.each { |collection| @composite_datasource.add_collection(collection) }
     end
 
     def add_chart(name, definition)
@@ -26,18 +47,6 @@ module ForestAdminDatasourceCustomizer
     end
 
     def remove_collection(names)
-      # TODO: to implement
-    end
-
-    def collection(name)
-      # TODO: to implement
-    end
-
-    def collections
-      # TODO: to implement
-    end
-
-    def datasource
       # TODO: to implement
     end
   end
