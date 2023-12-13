@@ -9,8 +9,10 @@ module ForestAdminAgent
     module Charts
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+
       describe Charts do
         include_context 'with caller'
         subject(:chart) { described_class.new }
@@ -96,7 +98,21 @@ module ForestAdminAgent
           ForestAdminAgent::Builder::AgentFactory.instance.build
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can_chart?: true, get_scope: nil)
+          allow(permissions).to receive_messages(
+            can_chart?: true,
+            get_scope: nil,
+            get_user_data: {
+              id: 1,
+              firstName: 'John',
+              lastName: 'Doe',
+              fullName: 'John Doe',
+              email: 'johndoe@forestadmin.com',
+              tags: { 'foo' => 'bar' },
+              roleId: 1,
+              permissionLevel: 'admin'
+            },
+            get_team: { id: 100, name: 'Operations' }
+          )
         end
 
         it 'adds the route forest_chart' do
@@ -443,6 +459,44 @@ module ForestAdminAgent
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
               '🌳🌳🌳 Failed to generate leaderboard chart: parameters do not match pre-requisites'
             )
+          end
+        end
+
+        describe 'inject_context_variables' do
+          it 'overrides the filter with the context variables' do
+            args[:params] = args[:params].merge({
+                                                  type: 'Value',
+                                                  sourceCollectionName: 'book',
+                                                  aggregateFieldName: nil,
+                                                  aggregator: 'Count',
+                                                  filter: { 'aggregator' => 'and',
+                                                            'conditions' => [{ 'operator' => 'equal',
+                                                                               'value' => '{{dropdown1.selectedValue}}', 'field' => 'title' }] },
+                                                  contextVariables: { 'dropdown1.selectedValue' => 'FOO' },
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            chart.handle_request(args)
+
+            expect(chart.filter).eql?(Filter.new(
+                                        condition_tree: { field: 'title', operator: Operators::EQUAL,
+                                                          value: 'FOO' }, search: nil, search_extended: nil, segment: nil, sort: nil, page: nil
+                                      ))
+          end
+
+          it 'doeses not override the filter when there is no filter with a context variable' do
+            args[:params] = args[:params].merge({
+                                                  type: 'Value',
+                                                  sourceCollectionName: 'book',
+                                                  aggregateFieldName: nil,
+                                                  aggregator: 'Count',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            chart.handle_request(args)
+
+            expect(chart.filter).eql?(Filter.new(condition_tree: nil, search: nil, search_extended: nil, segment: nil,
+                                                 sort: nil, page: nil))
           end
         end
       end

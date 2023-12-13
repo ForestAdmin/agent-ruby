@@ -6,9 +6,12 @@ module ForestAdminAgent
     module Charts
       class Charts < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
+        include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceToolkit::Components::Charts
+
+        attr_reader :filter
 
         FORMAT = {
           Day: '%d/%m/%Y',
@@ -18,7 +21,9 @@ module ForestAdminAgent
         }.freeze
 
         def setup_routes
-          add_route('forest_chart', 'post', '/stats/:collection_name', ->(args) { handle_request(args) })
+          add_route('forest_chart', 'post', '/stats/:collection_name', lambda { |args|
+                                                                         handle_request(args)
+                                                                       })
           self
         end
 
@@ -37,7 +42,8 @@ module ForestAdminAgent
               ]
             )
           )
-          # inject_context_variables
+
+          inject_context_variables
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}")) }
         end
@@ -54,16 +60,15 @@ module ForestAdminAgent
         end
 
         def inject_context_variables
-          context_variable = Utils::ContextVariables.new(@permissions.team, @permissions.user)
+          user = @permissions.get_user_data(@caller.id)
+          team = @permissions.get_team(@caller.rendering_id)
 
-          if @args[:params][:data].key?(:aggregator)
-            @args[:params][:data][:aggregator] = Utils::ContextVariablesInjector.inject_context_in_value(
-              @args[:params][:data][:aggregator], context_variable
-            )
-          end
+          context_variables = ForestAdminAgent::Utils::ContextVariables.new(team, user,
+                                                                            @args[:params][:contextVariables])
+          return unless @args[:params][:filter]
 
-          @filter = @filter.override(condition_tree: Utils::ContextVariablesInjector.inject_context_in_filter(
-            @filter.condition_tree, context_variable
+          @filter = @filter.override(condition_tree: ContextVariablesInjector.inject_context_in_filter(
+            @filter.condition_tree, context_variables
           ))
         end
 
