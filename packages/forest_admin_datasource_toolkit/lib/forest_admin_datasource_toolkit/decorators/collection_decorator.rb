@@ -96,6 +96,14 @@ module ForestAdminDatasourceToolkit
       def refine_schema(sub_schema)
         sub_schema
       end
+
+      private
+
+      def push_customization(customization)
+        @stack.queue_customization(customization)
+
+        self
+      end
     end
   end
 end
