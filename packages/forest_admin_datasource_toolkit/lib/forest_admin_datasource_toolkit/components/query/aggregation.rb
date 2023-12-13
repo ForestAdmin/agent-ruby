@@ -34,7 +34,6 @@ module ForestAdminDatasourceToolkit
 
         def replace_fields(handler)
           result = clone
-          # result = Aggregation.new(operation: operation, field: field, groups: groups)
           result.field = handler.call(result.field) if result.field
           result.groups = result.groups.map do |group|
             {
