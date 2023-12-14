@@ -32,7 +32,7 @@ module ForestAdminAgent
 
         def link_one_to_one_relations(args, record)
           args[:params][:data][:relationships]&.map do |field, value|
-            schema = @collection.fields[field]
+            schema = @collection.schema[:fields][field]
             next unless schema.type == 'OneToOne'
 
             id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)

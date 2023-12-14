@@ -104,13 +104,13 @@ module ForestAdminDatasourceToolkit
         end
 
         def self.make_through_filter(collection, id, relation_name, caller, base_foreign_filter)
-          relation = collection.fields[relation_name]
+          relation = collection.schema[:fields][relation_name]
           origin_value = Utils::Collection.get_value(collection, caller, id, relation.origin_key_target)
           foreign_relation = Utils::Collection.get_through_target(collection, relation_name)
 
           # Optimization for many to many when there is not search/segment (saves one query)
           if foreign_relation && base_foreign_filter.nestable?
-            foreign_key = collection.datasource.collection(relation.through_collection).fields[relation.foreign_key]
+            foreign_key = collection.datasource.collection(relation.through_collection).schema[:fields][relation.foreign_key]
             base_through_filter = base_foreign_filter.nest(foreign_relation)
             condition_tree = ConditionTreeFactory.intersect(
               [

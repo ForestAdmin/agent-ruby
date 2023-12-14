@@ -31,7 +31,7 @@ module ForestAdminDatasourceCustomizer
       # TODO: add include/exclude behavior
       # TODO: add rename behavior
 
-      datasource.collections.each { |collection| @composite_datasource.add_collection(collection) }
+      datasource.collections.each { |_key, collection| @composite_datasource.add_collection(collection) }
     end
 
     def add_chart(name, definition)

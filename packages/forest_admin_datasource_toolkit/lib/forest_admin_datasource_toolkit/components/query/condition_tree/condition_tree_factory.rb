@@ -22,7 +22,7 @@ module ForestAdminDatasourceToolkit
             raise ForestException, 'Collection must have at least one primary key' if primary_key_names.empty?
 
             primary_key_names.each do |name|
-              operators = collection.fields[name].filter_operators
+              operators = collection.schema[:fields][name].filter_operators
               unless operators.include?(Operators::EQUAL) || operators.include?(Operators::IN)
                 raise ForestException, "Field '#{name}' must support operators: ['Equal', 'In']"
               end

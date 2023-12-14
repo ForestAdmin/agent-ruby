@@ -20,8 +20,9 @@ module ForestAdminAgent
         build_logger
       end
 
-      def add_datasource(datasource)
-        datasource.collections.each_value { |collection| @customizer.add_collection(collection) }
+      def add_datasource(datasource, options = {})
+        @customizer.add_datasource(datasource, options)
+
         self
       end
 
@@ -37,7 +38,7 @@ module ForestAdminAgent
       def send_schema(force: false)
         return unless @has_env_secret
 
-        schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@customizer)
+        schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@customizer.datasource)
         schema_is_know = @container.key?(:schema_file_hash) &&
                          @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
 

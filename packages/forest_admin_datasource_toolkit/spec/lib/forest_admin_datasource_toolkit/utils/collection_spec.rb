@@ -158,33 +158,33 @@ module ForestAdminDatasourceToolkit
             through_collection: 'BookFoo'
           )
 
-          expect(described_class.many_to_one_inverse?(collection_book.fields['myPersons'],
+          expect(described_class.many_to_one_inverse?(collection_book.schema[:fields]['myPersons'],
                                                       many_to_many_relation)).to be false
         end
 
         it 'is_many_to_one_inverse? should return true on a bidirectional relation' do
-          expect(described_class.many_to_many_inverse?(collection_book.fields['myPersons'],
-                                                       collection_person.fields['myBooks'])).to be true
+          expect(described_class.many_to_many_inverse?(collection_book.schema[:fields]['myPersons'],
+                                                       collection_person.schema[:fields]['myBooks'])).to be true
         end
 
         it 'is_many_to_one_inverse? should return false' do
-          expect(described_class.many_to_one_inverse?(collection_book_person.fields['myBook'],
-                                                      collection_person.fields['myBookPerson'])).to be false
+          expect(described_class.many_to_one_inverse?(collection_book_person.schema[:fields]['myBook'],
+                                                      collection_person.schema[:fields]['myBookPerson'])).to be false
         end
 
         it 'is_many_to_one_inverse? should return true' do
-          expect(described_class.many_to_one_inverse?(collection_book_person.fields['myBook'],
-                                                      collection_book.fields['myBookPersons'])).to be true
+          expect(described_class.many_to_one_inverse?(collection_book_person.schema[:fields]['myBook'],
+                                                      collection_book.schema[:fields]['myBookPersons'])).to be true
         end
 
         it 'is_other_inverse? should return false' do
-          expect(described_class.other_inverse?(collection_person.fields['myBookPerson'],
-                                                collection_book_person.fields['myBook'])).to be false
+          expect(described_class.other_inverse?(collection_person.schema[:fields]['myBookPerson'],
+                                                collection_book_person.schema[:fields]['myBook'])).to be false
         end
 
         it 'is_other_inverse? should return true' do
-          expect(described_class.other_inverse?(collection_person.fields['myBookPerson'],
-                                                collection_book_person.fields['myPerson'])).to be true
+          expect(described_class.other_inverse?(collection_person.schema[:fields]['myBookPerson'],
+                                                collection_book_person.schema[:fields]['myPerson'])).to be true
         end
 
         it 'get_field_schema should throw with unknown column' do

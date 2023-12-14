@@ -141,7 +141,7 @@ module ForestAdminAgent
         end
 
         def make_leaderboard
-          field = @collection.fields[@args[:params][:relationshipFieldName]]
+          field = @collection.schema[:fields][@args[:params][:relationshipFieldName]]
 
           if field && field.type == 'OneToMany'
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(

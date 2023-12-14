@@ -1,6 +1,6 @@
 module ForestAdminDatasourceToolkit
   class Collection < Components::Contracts::CollectionContract
-    attr_accessor :fields, :segments
+    attr_accessor :segments
 
     attr_reader :actions,
                 :charts,
@@ -17,9 +17,9 @@ module ForestAdminDatasourceToolkit
       @datasource = datasource
       @name = name
       @native_driver = native_driver
-      @fields = {}
-      @schema = {}
-      @fields = {}
+      @schema = {
+        fields: {}
+      }
       @actions = {}
       @segments = {}
       @charts = {}
@@ -35,10 +35,14 @@ module ForestAdminDatasourceToolkit
       @searchable
     end
 
-    def add_field(name, field)
-      raise Exceptions::ForestException, "Field #{name} already defined in collection" if @fields.key?(name)
+    def fields
+      @schema[:fields]
+    end
 
-      @fields[name] = field
+    def add_field(name, field)
+      raise Exceptions::ForestException, "Field #{name} already defined in collection" if @schema[:fields].key?(name)
+
+      @schema[:fields][name] = field
     end
 
     def add_fields(fields)

@@ -9,7 +9,7 @@ module ForestAdminDatasourceActiveRecord
 
     describe 'fetch_fields' do
       it 'add all fields of model to the collection' do
-        expect(collection.fields.keys).to include(
+        expect(collection.schema[:fields].keys).to include(
           'id',
           'category_id',
           'reference',
@@ -27,7 +27,7 @@ module ForestAdminDatasourceActiveRecord
 
     describe 'fetch_associations' do
       it 'add all relation of model to the collection' do
-        expect(collection.fields.keys).to include('category', 'user', 'car_checks', 'checks')
+        expect(collection.schema[:fields].keys).to include('category', 'user', 'car_checks', 'checks')
       end
     end
   end

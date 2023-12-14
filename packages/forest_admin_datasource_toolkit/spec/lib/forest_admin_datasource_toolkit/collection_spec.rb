@@ -44,7 +44,7 @@ module ForestAdminDatasourceToolkit
       it 'add field with unique name' do
         @collection.add_field('__field__', @field)
 
-        expect(@collection.fields).to eq({ '__field__' => @field })
+        expect(@collection.schema[:fields]).to eq({ '__field__' => @field })
       end
     end
 
@@ -57,7 +57,7 @@ module ForestAdminDatasourceToolkit
           }
         )
 
-        expect(@collection.fields).to eq(
+        expect(@collection.schema[:fields]).to eq(
           {
             __first__: @field,
             __second__: @field
