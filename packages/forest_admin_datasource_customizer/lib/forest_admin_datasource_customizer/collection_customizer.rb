@@ -15,5 +15,11 @@ module ForestAdminDatasourceCustomizer
     def collection
       @stack.datasource.collection(@name)
     end
+
+    def use(plugin, options = [])
+      push_customization(
+        -> { plugin.run(@datasource_customizer, self, options) }
+      )
+    end
   end
 end
