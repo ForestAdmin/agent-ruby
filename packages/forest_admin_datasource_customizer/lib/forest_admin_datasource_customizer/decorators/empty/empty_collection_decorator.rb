@@ -4,6 +4,26 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Decorators
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       class EmptyCollectionDecorator < CollectionDecorator
+        def list(caller, filter, projection)
+          return super unless return_empty_set(filter.condition_tree)
+
+          []
+        end
+
+        def update(caller, filter, patch)
+          super unless return_empty_set(filter.condition_tree)
+        end
+
+        def delete(caller, filter)
+          super unless return_empty_set(filter.condition_tree)
+        end
+
+        def aggregate(caller, filter, aggregation, limit)
+          return super unless return_empty_set(filter.condition_tree)
+
+          []
+        end
+
         private
 
         def return_empty_set(tree); end
