@@ -1,0 +1,49 @@
+module ForestAdminDatasourceCustomizer
+  module Decorators
+    module Empty
+      include ForestAdminDatasourceToolkit::Decorators
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+      class EmptyCollectionDecorator < CollectionDecorator
+        private
+
+        def return_empty_set(tree); end
+
+        def leaf_return_empty_set(leaf)
+          # Empty 'in` always return zero records.
+          leaf.operator == Operators::IN && leaf.value.blank?
+        end
+
+        def or_return_empty_set(conditions)
+          # Or return no records when
+          # - they have no conditions
+          # - they have only conditions which return zero records.
+          conditions.empty? || conditions.all? { |condition| return_empty_set(condition) }
+        end
+
+        def and_return_empty_set(conditions)
+          # There is a leaf which returns zero records
+          true if conditions.one? { |condition| return_empty_set(condition) }
+
+          # Scans for mutually exclusive conditions
+          # (this a naive implementation, it will miss many occurrences)
+          values_by_field = []
+          leafs = conditions.select { |condition| condition.is_a? Nodes::ConditionTreeLeaf }
+          leafs.each do |leaf|
+            field, operator, value = leaf.values_at(:field, :operator, :value)
+            if !values_by_field.key?(field) && operator == Operators::EQUAL
+              values_by_field[field] = [value]
+            elsif !values_by_field.key?(field) && operator == Operators::IN
+              values_by_field[field] = value
+            elsif values_by_field.key?(field) && operator == Operators::EQUAL
+              values_by_field[field] = values_by_field[field].include?(value) ? [value] : []
+            elsif values_by_field.key?(field) && operator == Operators::IN
+              values_by_field[field] = values_by_field[field].select { |v| value.include?(v) }
+            end
+          end
+
+          values_by_field.values.one?(&:empty?)
+        end
+      end
+    end
+  end
+end
