@@ -39,7 +39,7 @@ module ForestAdminAgent
           end
 
           it 'generate relation' do
-            schema = described_class.build_schema(@datasource.collection('Book'), 'author')
+            schema = described_class.build_schema(@datasource.get_collection('Book'), 'author')
 
             expect(schema).to match(
               {
@@ -63,7 +63,7 @@ module ForestAdminAgent
           end
 
           it 'generate inverse relation' do
-            schema = described_class.build_schema(@datasource.collection('Person'), 'written_books')
+            schema = described_class.build_schema(@datasource.get_collection('Person'), 'written_books')
 
             expect(schema).to match(
               {

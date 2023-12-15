@@ -8,7 +8,7 @@ module ForestAdminDatasourceToolkit
       @collections = {}
     end
 
-    def collection(name)
+    def get_collection(name)
       raise Exceptions::ForestException, "Collection #{name} not found." unless @collections.key? name
 
       @collections[name]

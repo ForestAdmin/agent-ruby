@@ -171,15 +171,15 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'person'
-              allow(@datasource.collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
-              allow(@datasource.collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
+              allow(@datasource.get_collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
 
               result = store.handle_request(args)
-              expect(@datasource.collection('person')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('person')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'name' => 'john' })
               end
-              expect(@datasource.collection('passport')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('passport')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'person_id' => 1 })
                 expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
@@ -211,10 +211,10 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'passport'
-              allow(@datasource.collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
 
               result = store.handle_request(args)
-              expect(@datasource.collection('passport')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('passport')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'person_id' => 1 })
               end

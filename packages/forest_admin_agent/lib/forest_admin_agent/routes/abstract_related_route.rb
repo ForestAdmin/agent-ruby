@@ -5,7 +5,7 @@ module ForestAdminAgent
         super
 
         relation = @collection.schema[:fields][args[:params]['relation_name']]
-        @child_collection = @datasource.collection(relation.foreign_collection)
+        @child_collection = @datasource.get_collection(relation.foreign_collection)
       end
     end
   end

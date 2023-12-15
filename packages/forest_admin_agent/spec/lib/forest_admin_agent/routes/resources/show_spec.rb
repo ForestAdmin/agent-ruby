@@ -96,7 +96,7 @@ module ForestAdminAgent
             args[:params]['id'] = 1
             show.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
               expect(filter.condition_tree.to_h).to eq({
                                                          aggregator: 'And',

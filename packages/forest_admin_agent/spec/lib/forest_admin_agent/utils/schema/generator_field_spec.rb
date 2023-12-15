@@ -38,7 +38,7 @@ module ForestAdminAgent
         end
 
         it 'generate the proper schema for the isbn field' do
-          schema = described_class.build_schema(@datasource.collection('Book'), 'isbn')
+          schema = described_class.build_schema(@datasource.get_collection('Book'), 'isbn')
 
           expect(schema).to match(
             {
@@ -61,7 +61,7 @@ module ForestAdminAgent
         end
 
         it 'generate the proper schema for the other field' do
-          schema = described_class.build_schema(@datasource.collection('Book'), 'origin_key')
+          schema = described_class.build_schema(@datasource.get_collection('Book'), 'origin_key')
 
           expect(schema).to match(
             {
@@ -84,7 +84,7 @@ module ForestAdminAgent
         end
 
         it 'generate the proper schema for composite types' do
-          schema = described_class.build_schema(@datasource.collection('Book'), 'composite')
+          schema = described_class.build_schema(@datasource.get_collection('Book'), 'composite')
 
           expect(schema[:type]).to match(
             {
@@ -97,7 +97,7 @@ module ForestAdminAgent
         end
 
         it 'generate the proper schema for array of composites types' do
-          schema = described_class.build_schema(@datasource.collection('Book'), 'array_of_composite')
+          schema = described_class.build_schema(@datasource.get_collection('Book'), 'array_of_composite')
 
           expect(schema[:type]).to match(
             [

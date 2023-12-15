@@ -52,7 +52,7 @@ module ForestAdminAgent
           end
 
           def dissociate_or_delete_many_to_many(relation, relation_name, parent_id, is_delete_mode, filter)
-            through_collection = @datasource.collection(relation.through_collection)
+            through_collection = @datasource.get_collection(relation.through_collection)
 
             if is_delete_mode
               # Generate filters _BEFORE_ deleting stuff, otherwise things break.

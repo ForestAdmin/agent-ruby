@@ -102,7 +102,7 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
               args[:params][:filters] = JSON.generate({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
-              allow(@datasource.collection('category')).to receive(:is_countable?).and_return(false)
+              allow(@datasource.get_collection('category')).to receive(:is_countable?).and_return(false)
               allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation).and_return([])
               result = count.handle_request(args)
 

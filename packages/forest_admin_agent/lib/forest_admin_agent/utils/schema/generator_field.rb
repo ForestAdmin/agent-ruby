@@ -75,7 +75,7 @@ module ForestAdminAgent
           def build_many_to_many_schema(relation, collection, foreign_collection, base_schema)
             target_name = relation.foreign_key_target
             target_field = foreign_collection.schema[:fields][target_name]
-            through_schema = collection.datasource.collection(relation.through_collection)
+            through_schema = collection.datasource.get_collection(relation.through_collection)
             foreign_schema = through_schema.schema[:fields][relation.foreign_key]
             origin_key = through_schema.schema[:fields][relation.origin_key]
 
@@ -153,7 +153,7 @@ module ForestAdminAgent
 
           def build_relation_schema(collection, name)
             relation = collection.schema[:fields][name]
-            foreign_collection = collection.datasource.collection(relation.foreign_collection)
+            foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
             relation_schema = {
               field: name,

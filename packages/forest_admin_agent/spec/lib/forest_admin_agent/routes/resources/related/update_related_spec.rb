@@ -77,7 +77,7 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a many_to_one relation' do
-              allow(datasource.collection('book')).to receive(:update).and_return(true)
+              allow(datasource.get_collection('book')).to receive(:update).and_return(true)
 
               args[:params]['collection_name'] = 'book'
               args[:params]['relation_name'] = 'author'
@@ -86,7 +86,7 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
-              expect(datasource.collection('book')).to have_received(:update) do |caller, filter, data|
+              expect(datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
@@ -102,7 +102,7 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a one_to_one relation' do
-              allow(datasource.collection('book')).to receive_messages(aggregate: [{ value: 1 }], update: true)
+              allow(datasource.get_collection('book')).to receive_messages(aggregate: [{ value: 1 }], update: true)
 
               args[:params]['collection_name'] = 'user'
               args[:params]['relation_name'] = 'book'
@@ -151,7 +151,8 @@ module ForestAdminAgent
                 ]
               ]
 
-              expect(datasource.collection('book')).to have_received(:update).exactly(2).times do |caller, filter, data|
+              expect(datasource.get_collection('book')).to have_received(:update)
+                .exactly(2).times do |caller, filter, data|
                 parameter = parameters.shift
                 expect(caller).to be_instance_of(parameter[0])
                 expect(filter).to have_attributes(parameter[1])

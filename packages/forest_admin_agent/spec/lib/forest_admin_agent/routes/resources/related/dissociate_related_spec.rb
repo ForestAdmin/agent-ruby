@@ -103,7 +103,7 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many without deletion' do
-              allow(datasource.collection('address_user')).to receive(:update).and_return(true)
+              allow(datasource.get_collection('address_user')).to receive(:update).and_return(true)
 
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
@@ -111,7 +111,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.collection('address_user')).to have_received(:update) do |caller, filter, data|
+              expect(datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -135,8 +135,8 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many with deletion' do
-              allow(datasource.collection('address_user')).to receive(:delete).and_return(true)
-              allow(datasource.collection('address')).to receive(:delete).and_return(true)
+              allow(datasource.get_collection('address_user')).to receive(:delete).and_return(true)
+              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
@@ -145,7 +145,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -168,8 +168,8 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many with deletion on multiple records' do
-              allow(datasource.collection('address_user')).to receive(:delete).and_return(true)
-              allow(datasource.collection('address')).to receive(:delete).and_return(true)
+              allow(datasource.get_collection('address_user')).to receive(:delete).and_return(true)
+              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
@@ -183,7 +183,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -220,8 +220,8 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_many_to_many without deletion' do
-              allow(datasource.collection('address_user')).to receive_messages(list: [AddressUser.new(1, 1, 1)],
-                                                                               delete: true)
+              allow(datasource.get_collection('address_user'))
+                .to receive_messages(list: [AddressUser.new(1, 1, 1)], delete: true)
 
               args[:params]['relation_name'] = 'addresses'
               args[:params]['data'] = [{ 'id' => 1 }]
@@ -229,7 +229,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -252,9 +252,9 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_many_to_many with deletion' do
-              allow(datasource.collection('address_user')).to receive_messages(list: [AddressUser.new(1, 1, 1)],
-                                                                               delete: true)
-              allow(datasource.collection('address')).to receive(:delete).and_return(true)
+              allow(datasource.get_collection('address_user')).to receive_messages(list: [AddressUser.new(1, 1, 1)],
+                                                                                   delete: true)
+              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'addresses'
@@ -263,7 +263,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -282,7 +282,7 @@ module ForestAdminAgent
                 )
               end
 
-              expect(datasource.collection('address')).to have_received(:delete) do |caller, filter|
+              expect(datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(

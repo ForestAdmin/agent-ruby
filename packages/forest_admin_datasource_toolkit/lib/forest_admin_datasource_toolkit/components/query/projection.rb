@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
 
           relations.each do |relation, projection|
             schema = collection.schema[:fields][relation]
-            association = collection.datasource.collection(schema.foreign_collection)
+            association = collection.datasource.get_collection(schema.foreign_collection)
             projection_with_pks = projection.with_pks(association).nest(prefix: relation)
 
             projection_with_pks.each { |field| push(field) unless include?(field) }

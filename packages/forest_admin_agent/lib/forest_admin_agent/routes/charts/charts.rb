@@ -180,7 +180,7 @@ module ForestAdminAgent
           end
 
           if collection && filter && aggregation
-            rows = @datasource.collection(collection).aggregate(
+            rows = @datasource.get_collection(collection).aggregate(
               @caller,
               filter,
               aggregation,

@@ -103,11 +103,11 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
-              allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
-              allow(@datasource.collection('address_user')).to receive(:update).and_return(true)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
+              allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
               result = associate.handle_request(args)
 
-              expect(@datasource.collection('address_user')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -135,12 +135,13 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'addresses'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
-              allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
-              allow(@datasource.collection('address')).to receive(:list).and_return([Address.new(1, 'foo location')])
-              allow(@datasource.collection('address_user')).to receive(:create).and_return(true)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
+              allow(@datasource.get_collection('address')).to receive(:list)
+                .and_return([Address.new(1, 'foo location')])
+              allow(@datasource.get_collection('address_user')).to receive(:create).and_return(true)
               result = associate.handle_request(args)
 
-              expect(@datasource.collection('address_user')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
               end

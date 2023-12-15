@@ -80,7 +80,7 @@ module ForestAdminAgent
             args[:params][:filters] = JSON.generate({ field: 'id', operator: 'greater_than', value: 7 })
             list.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
               expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
                                                        conditions: [{ aggregator: 'Or', conditions: [] },
@@ -104,7 +104,7 @@ module ForestAdminAgent
             )
             list.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
               expect(filter.condition_tree.to_h).to eq(
                 {

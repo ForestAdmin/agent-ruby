@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
             memo += [column_name] if schema.type == 'Column'
 
             if schema.type == 'OneToOne' || schema.type == 'ManyToOne'
-              relation = collection.datasource.collection(schema.foreign_collection)
+              relation = collection.datasource.get_collection(schema.foreign_collection)
               relation_columns = relation.schema[:fields]
                                          .select { |_column_name, relation_column| relation_column.type == 'Column' }
                                          .keys

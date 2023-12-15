@@ -61,7 +61,7 @@ module ForestAdminDatasourceToolkit
           if relation.is_a?(OneToManySchema)
             origin_tree = Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
           else
-            through_collection = collection.datasource.collection(relation.through_collection)
+            through_collection = collection.datasource.get_collection(relation.through_collection)
             through_tree = ConditionTreeFactory.intersect([
                                                             Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
                                                             Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
@@ -110,7 +110,7 @@ module ForestAdminDatasourceToolkit
 
           # Optimization for many to many when there is not search/segment (saves one query)
           if foreign_relation && base_foreign_filter.nestable?
-            foreign_key = collection.datasource.collection(relation.through_collection).schema[:fields][relation.foreign_key]
+            foreign_key = collection.datasource.get_collection(relation.through_collection).schema[:fields][relation.foreign_key]
             base_through_filter = base_foreign_filter.nest(foreign_relation)
             condition_tree = ConditionTreeFactory.intersect(
               [
@@ -129,7 +129,7 @@ module ForestAdminDatasourceToolkit
 
           # Otherwise we have no choice but to call the target collection so that search and segment
           # are correctly apply, and then match ids in the though collection.
-          target = collection.datasource.collection(relation.foreign_collection)
+          target = collection.datasource.get_collection(relation.foreign_collection)
           records = target.list(
             caller,
             make_foreign_filter(collection, id, relation_name, caller, base_foreign_filter),

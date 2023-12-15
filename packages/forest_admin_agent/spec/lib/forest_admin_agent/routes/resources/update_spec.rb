@@ -68,7 +68,7 @@ module ForestAdminAgent
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
             book = Book.new(1, 'Harry potter and the goblet of fire')
-            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
+            allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             result = update.handle_request(args)
             expect(result[:name]).to eq('book')
             expect(result[:content]).to eq(
@@ -89,10 +89,10 @@ module ForestAdminAgent
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
             book = Book.new(1, 'Harry potter and the goblet of fire')
-            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
+            allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             update.handle_request(args)
 
-            expect(@datasource.collection('book')).to have_received(:update) do |caller, filter, data|
+            expect(@datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
               expect(caller).to be_instance_of(Components::Caller)
               expect(data).to eq({ 'title' => 'Harry potter and the goblet of fire' })
               expect(filter.condition_tree.to_h).to eq(

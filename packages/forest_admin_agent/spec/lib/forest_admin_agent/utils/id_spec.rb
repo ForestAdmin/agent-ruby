@@ -43,12 +43,12 @@ module ForestAdminAgent
       describe 'unpack_id' do
         context 'when collection has one pk' do
           it 'return the list of id value' do
-            collection = datasource.collection('person')
+            collection = datasource.get_collection('person')
             expect(described_class.unpack_id(collection, 1)).to eq([1])
           end
 
           it 'raise when not expected number of pks is unpack' do
-            collection = datasource.collection('person')
+            collection = datasource.get_collection('person')
 
             expect do
               described_class.unpack_id(collection, '1|foo')
@@ -61,12 +61,12 @@ module ForestAdminAgent
 
         context 'when collection has multiple pks' do
           it 'return the list of id value' do
-            collection = datasource.collection('pks')
+            collection = datasource.get_collection('pks')
             expect(described_class.unpack_id(collection, '1|1')).to eq([1, 1])
           end
 
           it 'raise when not expected number of pks is unpack' do
-            collection = datasource.collection('pks')
+            collection = datasource.get_collection('pks')
 
             expect do
               described_class.unpack_id(collection, '1')
@@ -80,14 +80,14 @@ module ForestAdminAgent
 
       describe 'unpack_ids' do
         it 'return an array of list id values' do
-          collection = datasource.collection('pks')
+          collection = datasource.get_collection('pks')
           expect(described_class.unpack_ids(collection, ['1|1'])).to eq([[1, 1]])
         end
       end
 
       describe 'parse_selection_ids' do
         it 'return a hash with excluded_ids' do
-          collection = datasource.collection('person')
+          collection = datasource.get_collection('person')
           args = {
             'data' => {
               'attributes' => {
@@ -112,7 +112,7 @@ module ForestAdminAgent
         end
 
         it 'return a hash with ids' do
-          collection = datasource.collection('person')
+          collection = datasource.get_collection('person')
           args = {
             'data' => {
               'attributes' => {

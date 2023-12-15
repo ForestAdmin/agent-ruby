@@ -82,7 +82,7 @@ module ForestAdminAgent
       it 'returns true when the user can trigger the action' do
         smart_action[:triggerEnabled] = [1]
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect(smart_action_checker).to be_can_execute
       end
@@ -106,7 +106,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return([{ 'value' => 1, 'group' => [] }])
 
         smart_action_checker = described_class.new(parameters, collection, smart_action,
@@ -135,7 +135,7 @@ module ForestAdminAgent
 
         parameters[:data][:attributes][:all_records_ids_excluded] = [1]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return([{ 'value' => 1, 'group' => [] }])
 
         smart_action_checker = described_class.new(parameters, collection, smart_action,
@@ -148,7 +148,7 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = []
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
@@ -175,7 +175,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return([{ 'value' => 1, 'group' => [] }])
 
         smart_action_checker = described_class.new(parameters, collection, smart_action,
@@ -205,7 +205,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return([{ 'value' => 0, 'group' => [] }])
 
         smart_action_checker = described_class.new(parameters, collection, smart_action,
@@ -249,7 +249,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 0, 'group' => [] }],
           [{ 'value' => 1, 'group' => [] }]
@@ -266,7 +266,7 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1000]
         smart_action[:approvalRequiredConditions] = []
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
@@ -310,7 +310,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 0, 'group' => [] }],
           [{ 'value' => 0, 'group' => [] }]
@@ -329,7 +329,7 @@ module ForestAdminAgent
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
         smart_action[:userApprovalEnabled] = [1]
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect(smart_action_checker).to be_can_execute
       end
@@ -340,7 +340,7 @@ module ForestAdminAgent
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:selfApprovalEnabled] = [1]
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect(smart_action_checker).to be_can_execute
       end
@@ -366,7 +366,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 1, 'group' => [] }]
         )
@@ -398,7 +398,7 @@ module ForestAdminAgent
         ]
         smart_action[:selfApprovalEnabled] = [1]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 1, 'group' => [] }]
         )
@@ -412,7 +412,7 @@ module ForestAdminAgent
         parameters[:data][:attributes][:requester_id] = 1
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
@@ -425,7 +425,7 @@ module ForestAdminAgent
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
         smart_action[:selfApprovalEnabled] = [1000]
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
@@ -453,7 +453,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 1, 'group' => [] }]
         )
@@ -486,7 +486,7 @@ module ForestAdminAgent
           }
         ]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 0, 'group' => [] }]
         )
@@ -519,7 +519,7 @@ module ForestAdminAgent
         ]
         smart_action[:selfApprovalEnabled] = [1000]
 
-        collection = @datasource.collection('Book')
+        collection = @datasource.get_collection('Book')
         allow(collection).to receive(:aggregate).and_return(
           [{ 'value' => 0, 'group' => [] }]
         )
@@ -551,7 +551,7 @@ module ForestAdminAgent
           }
         ]
 
-        smart_action_checker = described_class.new(parameters, @datasource.collection('Book'), smart_action,
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
 
         expect do

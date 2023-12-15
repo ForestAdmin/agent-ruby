@@ -87,7 +87,7 @@ module ForestAdminAgent
             it 'call delete function with expected args' do
               delete.handle_request(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
                                                          conditions: [
@@ -134,7 +134,7 @@ module ForestAdminAgent
             it 'call delete function with filters for only ids selected' do
               delete.handle_request_bulk(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
                                                          conditions: [
@@ -149,7 +149,7 @@ module ForestAdminAgent
               args[:params]['data']['attributes']['all_records_ids_excluded'] = %w[1 2 3]
               delete.handle_request_bulk(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
                                                          conditions: [

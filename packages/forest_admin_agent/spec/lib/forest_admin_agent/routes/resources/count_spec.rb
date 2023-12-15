@@ -58,7 +58,7 @@ module ForestAdminAgent
 
         context 'when collection is not countable' do
           it 'return an deactivated response' do
-            allow(@datasource.collection('user')).to receive(:is_countable?).and_return(false)
+            allow(@datasource.get_collection('user')).to receive(:is_countable?).and_return(false)
             result = count.handle_request(args)
 
             expect(result[:name]).to eq('user')

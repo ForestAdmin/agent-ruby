@@ -8,11 +8,11 @@ module ForestAdminDatasourceToolkit
       end
 
       def collections
-        @child_datasource.collections.transform_values { |c| collection(c.name) }
+        @child_datasource.collections.transform_values { |c| get_collection(c.name) }
       end
 
-      def collection(name)
-        collection = @child_datasource.collection(name)
+      def get_collection(name)
+        collection = @child_datasource.get_collection(name)
         unless @decorators.key?(collection.name)
           @decorators[collection.name] = @collection_decorator_class.new(collection, self)
         end

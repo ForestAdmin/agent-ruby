@@ -9,11 +9,11 @@ module ForestAdminDatasourceCustomizer
     end
 
     def schema
-      @stack.datasource.collection(@name).schema
+      @stack.datasource.get_collection(@name).schema
     end
 
     def collection
-      @stack.datasource.collection(@name)
+      @stack.datasource.get_collection(@name)
     end
 
     def use(plugin, options = [])
