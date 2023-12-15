@@ -59,15 +59,17 @@ module ForestAdminAgent
             collection = instance_double(
               Collection,
               name: 'book',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'title' => ColumnSchema.new(column_type: 'String'),
-                'published_at' => ColumnSchema.new(column_type: 'Date'),
-                'price' => ColumnSchema.new(column_type: 'Number')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'title' => ColumnSchema.new(column_type: 'String'),
+                  'published_at' => ColumnSchema.new(column_type: 'Date'),
+                  'price' => ColumnSchema.new(column_type: 'Number')
+                }
               },
               create: book
             )
@@ -124,36 +126,40 @@ module ForestAdminAgent
             collection_person = instance_double(
               Collection,
               name: 'person',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'name' => ColumnSchema.new(column_type: 'String'),
-                'passport' => Relations::OneToOneSchema.new(
-                  origin_key: 'person_id',
-                  origin_key_target: 'id',
-                  foreign_collection: 'passport'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'name' => ColumnSchema.new(column_type: 'String'),
+                  'passport' => Relations::OneToOneSchema.new(
+                    origin_key: 'person_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'passport'
+                  )
+                }
               }
             )
 
             collection_passport = instance_double(
               Collection,
               name: 'passport',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'person_id' => ColumnSchema.new(column_type: 'Number'),
-                'person' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'person_id',
-                  foreign_key_target: 'id',
-                  foreign_collection: 'passport'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'person_id' => ColumnSchema.new(column_type: 'Number'),
+                  'person' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'person_id',
+                    foreign_key_target: 'id',
+                    foreign_collection: 'passport'
+                  )
+                }
               }
             )
             @datasource.add_collection(collection_person)

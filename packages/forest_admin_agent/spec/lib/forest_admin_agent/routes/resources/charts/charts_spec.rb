@@ -39,55 +39,61 @@ module ForestAdminAgent
           collection_book = instance_double(
             Collection,
             name: 'book',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'title' => ColumnSchema.new(column_type: 'String'),
-              'price' => ColumnSchema.new(column_type: 'Number'),
-              'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
-              'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),
-              'reviews' => Relations::ManyToManySchema.new(
-                foreign_key: 'review_id',
-                foreign_key_target: 'id',
-                foreign_collection: 'review',
-                through_collection: 'book_review',
-                origin_key_target: 'id',
-                origin_key: 'book_id'
-              ),
-              'bookReviews' => Relations::OneToManySchema.new(
-                origin_key: 'book_id',
-                foreign_collection: 'review',
-                origin_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'title' => ColumnSchema.new(column_type: 'String'),
+                'price' => ColumnSchema.new(column_type: 'Number'),
+                'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
+                'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),
+                'reviews' => Relations::ManyToManySchema.new(
+                  foreign_key: 'review_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'review',
+                  through_collection: 'book_review',
+                  origin_key_target: 'id',
+                  origin_key: 'book_id'
+                ),
+                'bookReviews' => Relations::OneToManySchema.new(
+                  origin_key: 'book_id',
+                  foreign_collection: 'review',
+                  origin_key_target: 'id'
+                )
+              }
             }
           )
           collection_book_review = instance_double(
             Collection,
             name: 'book_review',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'book' => Relations::ManyToOneSchema.new(
-                foreign_key: 'book_id',
-                foreign_collection: 'book',
-                foreign_key_target: 'id'
-              ),
-              'review' => Relations::ManyToOneSchema.new(
-                foreign_key: 'review_id',
-                foreign_collection: 'review',
-                foreign_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'book' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'book_id',
+                  foreign_collection: 'book',
+                  foreign_key_target: 'id'
+                ),
+                'review' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'review_id',
+                  foreign_collection: 'review',
+                  foreign_key_target: 'id'
+                )
+              }
             }
           )
           collection_review = instance_double(
             Collection,
             name: 'review',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'author' => ColumnSchema.new(column_type: 'String'),
-              'book' => Relations::ManyToOneSchema.new(
-                foreign_key: 'book_id',
-                foreign_collection: 'book',
-                foreign_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'author' => ColumnSchema.new(column_type: 'String'),
+                'book' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'book_id',
+                  foreign_collection: 'book',
+                  foreign_key_target: 'id'
+                )
+              }
             }
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)

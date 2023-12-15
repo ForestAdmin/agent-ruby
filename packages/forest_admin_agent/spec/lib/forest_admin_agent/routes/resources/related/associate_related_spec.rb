@@ -35,49 +35,55 @@ module ForestAdminAgent
             collection_user = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'name' => ColumnSchema.new(column_type: 'String'),
-                'addresses' => Relations::ManyToManySchema.new(
-                  foreign_key: 'address_id',
-                  foreign_collection: 'address',
-                  foreign_key_target: 'id',
-                  through_collection: 'address_user',
-                  origin_key: 'user_id',
-                  origin_key_target: 'id'
-                ),
-                'address_users' => Relations::OneToManySchema.new(
-                  origin_key: 'user_id',
-                  origin_key_target: 'id',
-                  foreign_collection: 'address_user'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'name' => ColumnSchema.new(column_type: 'String'),
+                  'addresses' => Relations::ManyToManySchema.new(
+                    foreign_key: 'address_id',
+                    foreign_collection: 'address',
+                    foreign_key_target: 'id',
+                    through_collection: 'address_user',
+                    origin_key: 'user_id',
+                    origin_key_target: 'id'
+                  ),
+                  'address_users' => Relations::OneToManySchema.new(
+                    origin_key: 'user_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'address_user'
+                  )
+                }
               }
             )
 
             collection_address_user = instance_double(
               Collection,
               name: 'address_user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'address' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'address_id',
-                  foreign_collection: 'address',
-                  foreign_key_target: 'id'
-                ),
-                'user' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'user_id',
-                  foreign_collection: 'user',
-                  foreign_key_target: 'id'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'address' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'address_id',
+                    foreign_collection: 'address',
+                    foreign_key_target: 'id'
+                  ),
+                  'user' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'user_id',
+                    foreign_collection: 'user',
+                    foreign_key_target: 'id'
+                  )
+                }
               }
             )
 
             collection_address = instance_double(
               Collection,
               name: 'address',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'location' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'location' => ColumnSchema.new(column_type: 'String')
+                }
               }
             )
 

@@ -16,7 +16,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def collections
-      @stack.datasource.collections.map { |collection| get_collection(collection.name) }
+      @stack.datasource.collections.transform_values { |collection| get_collection(collection.name) }
     end
 
     def datasource

@@ -33,24 +33,28 @@ module ForestAdminAgent
             collection_user = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
-                'last_name' => ColumnSchema.new(column_type: 'String'),
-                'category' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'category_id',
-                  foreign_collection: 'category',
-                  foreign_key_target: 'id'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'first_name' => ColumnSchema.new(column_type: 'String'),
+                  'last_name' => ColumnSchema.new(column_type: 'String'),
+                  'category' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'category_id',
+                    foreign_collection: 'category',
+                    foreign_key_target: 'id'
+                  )
+                }
               }
             )
             collection_category = instance_double(
               Collection,
               name: 'category',
               is_countable?: true,
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'label' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'label' => ColumnSchema.new(column_type: 'String')
+                }
               }
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)

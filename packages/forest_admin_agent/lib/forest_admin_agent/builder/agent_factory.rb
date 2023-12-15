@@ -31,7 +31,7 @@ module ForestAdminAgent
       end
 
       def build
-        @container.register(:datasource, @customizer)
+        @container.register(:datasource, @customizer.datasource)
         send_schema
       end
 

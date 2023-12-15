@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
           super unless return_empty_set(filter.condition_tree)
         end
 
-        def aggregate(caller, filter, aggregation, limit)
+        def aggregate(caller, filter, aggregation, limit = nil)
           return super unless return_empty_set(filter.condition_tree)
 
           []

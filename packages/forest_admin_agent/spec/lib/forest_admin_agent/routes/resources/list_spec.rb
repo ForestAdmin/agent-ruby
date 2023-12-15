@@ -32,10 +32,12 @@ module ForestAdminAgent
           collection = instance_double(
             Collection,
             name: 'user',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'first_name' => ColumnSchema.new(column_type: 'String'),
-              'last_name' => ColumnSchema.new(column_type: 'String')
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'first_name' => ColumnSchema.new(column_type: 'String'),
+                'last_name' => ColumnSchema.new(column_type: 'String')
+              }
             },
             list: [User.new(1, 'foo', 'foo')]
           )
