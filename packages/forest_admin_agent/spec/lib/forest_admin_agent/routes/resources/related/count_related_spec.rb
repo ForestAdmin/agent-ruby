@@ -77,6 +77,7 @@ module ForestAdminAgent
             it 'call aggregate_relation with expected args' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
+              ForestAdminAgent::Facades::Container.datasource.get_collection('category').enable_count
               allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation)
                 .and_return([{ value: 1 }])
               count.handle_request(args)
@@ -106,7 +107,6 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
               args[:params][:filters] = JSON.generate({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
-              allow(@datasource.get_collection('category')).to receive(:is_countable?).and_return(false)
               allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation).and_return([])
               result = count.handle_request(args)
 

@@ -49,6 +49,7 @@ module ForestAdminAgent
 
         context 'when collection is countable' do
           it 'return an serialized content' do
+            ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
             result = count.handle_request(args)
 
             expect(result[:name]).to eq('user')
@@ -58,7 +59,6 @@ module ForestAdminAgent
 
         context 'when collection is not countable' do
           it 'return an deactivated response' do
-            allow(@datasource.get_collection('user')).to receive(:is_countable?).and_return(false)
             result = count.handle_request(args)
 
             expect(result[:name]).to eq('user')

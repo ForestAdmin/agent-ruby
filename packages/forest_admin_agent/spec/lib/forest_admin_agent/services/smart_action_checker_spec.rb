@@ -67,9 +67,11 @@ module ForestAdminAgent
         collection_book = instance_double(
           Collection,
           name: 'Book',
-          fields: {
-            'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-            'title' => ColumnSchema.new(column_type: 'String')
+          schema: {
+            fields: {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+              'title' => ColumnSchema.new(column_type: 'String')
+            }
           }
         )
 
