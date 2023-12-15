@@ -1,5 +1,3 @@
-require 'active_record'
-
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
     attr_reader :stack
