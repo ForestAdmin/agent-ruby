@@ -12,6 +12,7 @@ module ForestAdminDatasourceActiveRecord
       super(datasource, name)
       fetch_fields
       fetch_associations
+      enable_count
     end
 
     def list(_caller, filter, projection)
