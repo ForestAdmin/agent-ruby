@@ -24,6 +24,10 @@ module ForestAdminDatasourceToolkit
       @segments = {}
       @charts = {}
       @searchable = false
+      @countable = false
+    end
+
+    def enable_count
       @countable = true
     end
 
