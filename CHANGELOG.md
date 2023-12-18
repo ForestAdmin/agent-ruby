@@ -1,3 +1,10 @@
+# [1.0.0-beta.24](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.23...v1.0.0-beta.24) (2023-12-18)
+
+
+### Features
+
+*  add customizer with decorator stack and empty-decorator ([#18](https://github.com/ForestAdmin/agent-ruby/issues/18)) ([900effd](https://github.com/ForestAdmin/agent-ruby/commit/900effd6f30218a7411e6858e13d72331cee6c15))
+
 # [1.0.0-beta.23](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.22...v1.0.0-beta.23) (2023-12-13)
 
 
