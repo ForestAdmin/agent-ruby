@@ -187,7 +187,6 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 2),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
@@ -234,7 +233,6 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
@@ -268,7 +266,6 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
@@ -286,7 +283,6 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'id', operator: Operators::IN, value: [1])
                     ]
