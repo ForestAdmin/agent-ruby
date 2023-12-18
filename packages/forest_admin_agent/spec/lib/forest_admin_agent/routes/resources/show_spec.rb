@@ -25,7 +25,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_list' do
@@ -100,13 +100,7 @@ module ForestAdminAgent
 
             expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
-              expect(filter.condition_tree.to_h).to eq({
-                                                         aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::EQUAL, value: 1 },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ]
-                                                       })
+              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
               expect(projection).to eq(%w[id first_name last_name])
             end
           end

@@ -22,7 +22,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_store' do
@@ -91,11 +91,7 @@ module ForestAdminAgent
 
               expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::EQUAL, value: 1 },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 1)
               end
             end
           end
@@ -138,11 +134,7 @@ module ForestAdminAgent
 
               expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::IN, value: [1, 2, 3] },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::IN, value: [1, 2, 3])
               end
             end
 
@@ -153,12 +145,7 @@ module ForestAdminAgent
 
               expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::NOT_IN,
-                                                             value: [1, 2, 3] },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_IN, value: [1, 2, 3])
               end
             end
           end

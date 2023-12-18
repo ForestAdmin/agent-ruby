@@ -95,7 +95,7 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+            allow(permissions).to receive_messages(can?: true, get_scope: nil)
           end
 
           it 'adds the route forest_related_associate' do
@@ -116,13 +116,7 @@ module ForestAdminAgent
               expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(
-                    aggregator: 'And',
-                    conditions: [
-                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(aggregator: 'Or', conditions: [])
-                    ]
-                  ),
+                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                   page: nil,
                   search: nil,
                   search_extended: nil,

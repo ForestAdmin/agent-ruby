@@ -50,7 +50,7 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+            allow(permissions).to receive_messages(can?: true, get_scope: nil)
           end
 
           it 'adds the route forest_related_update' do
@@ -118,7 +118,6 @@ module ForestAdminAgent
                     condition_tree: have_attributes(
                       aggregator: 'And',
                       conditions: [
-                        have_attributes(aggregator: 'Or', conditions: []),
                         have_attributes(field: 'author_id', operator: Operators::EQUAL, value: 1),
                         have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
                       ]
@@ -134,13 +133,7 @@ module ForestAdminAgent
                 [
                   Components::Caller,
                   {
-                    condition_tree: have_attributes(
-                      aggregator: 'And',
-                      conditions: [
-                        have_attributes(aggregator: 'Or', conditions: []),
-                        have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
-                      ]
-                    ),
+                    condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                     page: nil,
                     search: nil,
                     search_extended: nil,

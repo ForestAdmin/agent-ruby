@@ -73,7 +73,7 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+            allow(permissions).to receive_messages(can?: true, get_scope: nil)
           end
 
           it 'adds the route forest_related_dissociate' do
@@ -117,7 +117,6 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
@@ -151,7 +150,6 @@ module ForestAdminAgent
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
-                      have_attributes(aggregator: 'Or', conditions: []),
                       have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1)
                     ]
