@@ -1,12 +1,11 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Empty
-      include ForestAdminDatasourceToolkit::Decorators
-      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-      class EmptyCollectionDecorator < CollectionDecorator
-        def list(caller, filter, projection)
-          return super unless return_empty_set(filter.condition_tree)
+      class EmptyCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
+        include ForestAdminDatasourceToolkit::Decorators
+        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        def list(_caller, _filter, _projection)
           []
         end
 
@@ -26,11 +25,23 @@ module ForestAdminDatasourceCustomizer
 
         private
 
-        def return_empty_set(tree); end
+        def return_empty_set(tree)
+          if tree.is_a? Nodes::ConditionTreeLeaf
+            leaf_return_empty_set(tree)
+          elsif tree.is_a? Nodes::ConditionTreeBranch
+            if tree.aggregator == 'Or'
+              or_return_empty_set(tree.conditions)
+            elsif tree.aggregator == 'And'
+              and_return_empty_set(tree.conditions)
+            end
+          else
+            false
+          end
+        end
 
         def leaf_return_empty_set(leaf)
           # Empty 'in` always return zero records.
-          leaf.operator == Operators::IN && leaf.value.blank?
+          leaf.operator == Operators::IN && leaf.value.empty?
         end
 
         def or_return_empty_set(conditions)
@@ -46,10 +57,10 @@ module ForestAdminDatasourceCustomizer
 
           # Scans for mutually exclusive conditions
           # (this a naive implementation, it will miss many occurrences)
-          values_by_field = []
+          values_by_field = {}
           leafs = conditions.select { |condition| condition.is_a? Nodes::ConditionTreeLeaf }
           leafs.each do |leaf|
-            field, operator, value = leaf.values_at(:field, :operator, :value)
+            field, operator, value = leaf.to_h.values_at(:field, :operator, :value)
             if !values_by_field.key?(field) && operator == Operators::EQUAL
               values_by_field[field] = [value]
             elsif !values_by_field.key?(field) && operator == Operators::IN
