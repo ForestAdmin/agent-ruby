@@ -33,24 +33,28 @@ module ForestAdminAgent
             collection_user = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
-                'last_name' => ColumnSchema.new(column_type: 'String'),
-                'category' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'category_id',
-                  foreign_collection: 'category',
-                  foreign_key_target: 'id'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'first_name' => ColumnSchema.new(column_type: 'String'),
+                  'last_name' => ColumnSchema.new(column_type: 'String'),
+                  'category' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'category_id',
+                    foreign_collection: 'category',
+                    foreign_key_target: 'id'
+                  )
+                }
               }
             )
             collection_category = instance_double(
               Collection,
               name: 'category',
               is_countable?: true,
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'label' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'label' => ColumnSchema.new(column_type: 'String')
+                }
               }
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
@@ -73,6 +77,7 @@ module ForestAdminAgent
             it 'call aggregate_relation with expected args' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
+              ForestAdminAgent::Facades::Container.datasource.get_collection('category').enable_count
               allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation)
                 .and_return([{ value: 1 }])
               count.handle_request(args)
@@ -102,7 +107,6 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
               args[:params][:filters] = JSON.generate({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
-              allow(@datasource.collection('category')).to receive(:is_countable?).and_return(false)
               allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation).and_return([])
               result = count.handle_request(args)
 

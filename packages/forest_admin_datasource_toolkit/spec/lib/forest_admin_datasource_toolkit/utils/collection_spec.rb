@@ -6,8 +6,6 @@ module ForestAdminDatasourceToolkit
   module Utils
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Exceptions
-    include ForestAdminDatasourceToolkit::Components::Query
-    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
     describe Collection do
       include_context 'with caller'
@@ -107,7 +105,7 @@ module ForestAdminDatasourceToolkit
           collection.add_fields(
             {
               'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true,
-                                       filter_operators: [Operators::IN, Operators::EQUAL]),
+                                       filter_operators: [ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::IN, ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL]),
               'name' => ColumnSchema.new(column_type: PrimitiveType::STRING),
               'myBooks' => Relations::ManyToManySchema.new(
                 origin_key: 'personId',
@@ -158,33 +156,33 @@ module ForestAdminDatasourceToolkit
             through_collection: 'BookFoo'
           )
 
-          expect(described_class.many_to_one_inverse?(collection_book.fields['myPersons'],
+          expect(described_class.many_to_one_inverse?(collection_book.schema[:fields]['myPersons'],
                                                       many_to_many_relation)).to be false
         end
 
         it 'is_many_to_one_inverse? should return true on a bidirectional relation' do
-          expect(described_class.many_to_many_inverse?(collection_book.fields['myPersons'],
-                                                       collection_person.fields['myBooks'])).to be true
+          expect(described_class.many_to_many_inverse?(collection_book.schema[:fields]['myPersons'],
+                                                       collection_person.schema[:fields]['myBooks'])).to be true
         end
 
         it 'is_many_to_one_inverse? should return false' do
-          expect(described_class.many_to_one_inverse?(collection_book_person.fields['myBook'],
-                                                      collection_person.fields['myBookPerson'])).to be false
+          expect(described_class.many_to_one_inverse?(collection_book_person.schema[:fields]['myBook'],
+                                                      collection_person.schema[:fields]['myBookPerson'])).to be false
         end
 
         it 'is_many_to_one_inverse? should return true' do
-          expect(described_class.many_to_one_inverse?(collection_book_person.fields['myBook'],
-                                                      collection_book.fields['myBookPersons'])).to be true
+          expect(described_class.many_to_one_inverse?(collection_book_person.schema[:fields]['myBook'],
+                                                      collection_book.schema[:fields]['myBookPersons'])).to be true
         end
 
         it 'is_other_inverse? should return false' do
-          expect(described_class.other_inverse?(collection_person.fields['myBookPerson'],
-                                                collection_book_person.fields['myBook'])).to be false
+          expect(described_class.other_inverse?(collection_person.schema[:fields]['myBookPerson'],
+                                                collection_book_person.schema[:fields]['myBook'])).to be false
         end
 
         it 'is_other_inverse? should return true' do
-          expect(described_class.other_inverse?(collection_person.fields['myBookPerson'],
-                                                collection_book_person.fields['myPerson'])).to be true
+          expect(described_class.other_inverse?(collection_person.schema[:fields]['myBookPerson'],
+                                                collection_book_person.schema[:fields]['myPerson'])).to be true
         end
 
         it 'get_field_schema should throw with unknown column' do
@@ -255,8 +253,10 @@ module ForestAdminDatasourceToolkit
         it 'list_relation should work with one to many relation' do
           allow(collection_book_person).to receive(:list).and_return([{ 'bookId' => 1, 'personId' => 1 }])
 
-          expect(described_class.list_relation(collection_book, [1], 'myBookPersons', caller, Filter.new,
-                                               Projection.new)).to eq([{ 'bookId' => 1, 'personId' => 1 }])
+          expect(described_class.list_relation(collection_book, [1], 'myBookPersons', caller, ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                                               ForestAdminDatasourceToolkit::Components::Query::Projection.new)).to eq([{
+                                                                                                                         'bookId' => 1, 'personId' => 1
+                                                                                                                       }])
         end
 
         it 'list_relation should work with many to many relation' do
@@ -269,23 +269,23 @@ module ForestAdminDatasourceToolkit
             ]
           )
 
-          expect(described_class.list_relation(collection_book, [1], 'myPersons', caller, Filter.new,
-                                               Projection.new)).to eq([1])
+          expect(described_class.list_relation(collection_book, [1], 'myPersons', caller, ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                                               ForestAdminDatasourceToolkit::Components::Query::Projection.new)).to eq([1])
         end
 
         it 'aggregate_relation should work with one to many relation' do
           allow(collection_book_person).to receive(:aggregate).and_return(1)
 
-          expect(described_class.aggregate_relation(collection_book, [1], 'myBookPersons', caller, Filter.new,
-                                                    Aggregation.new(operation: 'Count'))).to eq(1)
+          expect(described_class.aggregate_relation(collection_book, [1], 'myBookPersons', caller, ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))).to eq(1)
         end
 
         it 'aggregate_relation should work with many to many relation' do
           allow(collection_person).to receive(:aggregate).and_return(1)
           allow(collection_book_person).to receive(:aggregate).and_return(1)
 
-          expect(described_class.aggregate_relation(collection_book, [1], 'myPersons', caller, Filter.new,
-                                                    Aggregation.new(operation: 'Count'))).to eq(1)
+          expect(described_class.aggregate_relation(collection_book, [1], 'myPersons', caller, ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))).to eq(1)
         end
       end
     end

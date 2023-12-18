@@ -11,7 +11,7 @@ module ForestAdminAgent
         end
 
         result = primary_keys.map.with_index do |pk_name, index|
-          field = collection.fields[pk_name]
+          field = collection.schema[:fields][pk_name]
           value = primary_key_values[index]
           casted_value = field.column_type == 'Number' ? value.to_i : value
           # TODO: call FieldValidator::validateValue($value, $field, $castedValue);

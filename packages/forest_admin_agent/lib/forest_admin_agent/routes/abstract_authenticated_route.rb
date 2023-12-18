@@ -14,7 +14,7 @@ module ForestAdminAgent
         record = args[:params][:data][:attributes]
 
         args[:params][:data][:relationships]&.map do |field, value|
-          schema = @collection.fields[field]
+          schema = @collection.schema[:fields][field]
 
           record[schema.foreign_key] = value['data'][schema.foreign_key_target] if schema.type == 'ManyToOne'
         end

@@ -10,7 +10,7 @@ module ForestAdminAgent
         }.freeze
 
         def self.build_schema(collection, name)
-          type = collection.fields[name].type
+          type = collection.schema[:fields][name].type
 
           case type
           when 'Column'
@@ -26,7 +26,7 @@ module ForestAdminAgent
           private
 
           def build_column_schema(collection, name)
-            column = collection.fields[name]
+            column = collection.schema[:fields][name]
             is_foreign_key = ForestAdminDatasourceToolkit::Utils::Schema.foreign_key?(collection, name)
 
             {
@@ -74,10 +74,10 @@ module ForestAdminAgent
 
           def build_many_to_many_schema(relation, collection, foreign_collection, base_schema)
             target_name = relation.foreign_key_target
-            target_field = foreign_collection.fields[target_name]
-            through_schema = collection.datasource.collection(relation.through_collection)
-            foreign_schema = through_schema.fields[relation.foreign_key]
-            origin_key = through_schema.fields[relation.origin_key]
+            target_field = foreign_collection.schema[:fields][target_name]
+            through_schema = collection.datasource.get_collection(relation.through_collection)
+            foreign_schema = through_schema.schema[:fields][relation.foreign_key]
+            origin_key = through_schema.schema[:fields][relation.origin_key]
 
             base_schema.merge(
               {
@@ -96,8 +96,8 @@ module ForestAdminAgent
 
           def build_one_to_many_schema(relation, collection, foreign_collection, base_schema)
             target_name = relation.origin_key_target
-            target_field = collection.fields[target_name]
-            origin_key = foreign_collection.fields[relation.origin_key]
+            target_field = collection.schema[:fields][target_name]
+            origin_key = foreign_collection.schema[:fields][relation.origin_key]
 
             base_schema.merge(
               {
@@ -115,8 +115,8 @@ module ForestAdminAgent
           end
 
           def build_one_to_one_schema(relation, collection, foreign_collection, base_schema)
-            target_field = collection.fields[relation.origin_key_target]
-            key_field = foreign_collection.fields[relation.origin_key]
+            target_field = collection.schema[:fields][relation.origin_key_target]
+            key_field = foreign_collection.schema[:fields][relation.origin_key]
 
             base_schema.merge(
               {
@@ -134,7 +134,7 @@ module ForestAdminAgent
           end
 
           def build_many_to_one_schema(relation, collection, foreign_collection, base_schema)
-            key_field = collection.fields[relation.foreign_key]
+            key_field = collection.schema[:fields][relation.foreign_key]
 
             base_schema.merge(
               {
@@ -152,8 +152,8 @@ module ForestAdminAgent
           end
 
           def build_relation_schema(collection, name)
-            relation = collection.fields[name]
-            foreign_collection = collection.datasource.collection(relation.foreign_collection)
+            relation = collection.schema[:fields][name]
+            foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
             relation_schema = {
               field: name,

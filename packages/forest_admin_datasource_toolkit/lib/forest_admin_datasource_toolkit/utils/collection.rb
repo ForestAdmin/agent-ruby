@@ -7,10 +7,10 @@ module ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Exceptions
 
       def self.get_inverse_relation(collection, relation_name)
-        relation_field = collection.fields[relation_name]
-        foreign_collection = collection.datasource.collection(relation_field.foreign_collection)
+        relation_field = collection.schema[:fields][relation_name]
+        foreign_collection = collection.datasource.get_collection(relation_field.foreign_collection)
 
-        inverse = foreign_collection.fields.select do |_name, field|
+        inverse = foreign_collection.schema[:fields].select do |_name, field|
           field.is_a?(RelationSchema) &&
             field.foreign_collection == collection.name &&
             (
@@ -50,7 +50,7 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.get_field_schema(collection, field_name)
-        fields = collection.fields
+        fields = collection.schema[:fields]
         unless field_name.include?(':')
           raise ForestException, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
 
@@ -67,7 +67,7 @@ module ForestAdminDatasourceToolkit
         end
 
         get_field_schema(
-          collection.datasource.collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
+          collection.datasource.get_collection(relation_schema.foreign_collection), field_name.split(':')[1..].join(':')
         )
       end
 
@@ -90,11 +90,11 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.get_through_target(collection, relation_name)
-        relation = collection.fields[relation_name]
+        relation = collection.schema[:fields][relation_name]
         raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
-        through_collection = collection.datasource.collection(relation.through_collection)
-        through_collection.fields.select do |field_name, field|
+        through_collection = collection.datasource.get_collection(relation.through_collection)
+        through_collection.schema[:fields].select do |field_name, field|
           if field.is_a?(ManyToOneSchema) &&
              field.foreign_collection == relation.foreign_collection &&
              field.foreign_key == relation.foreign_key &&
@@ -107,11 +107,11 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.get_through_origin(collection, relation_name)
-        relation = collection.fields[relation_name]
+        relation = collection.schema[:fields][relation_name]
         raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
-        through_collection = collection.datasource.collection(relation.through_collection)
-        through_collection.fields.select do |field_name, field|
+        through_collection = collection.datasource.get_collection(relation.through_collection)
+        through_collection.schema[:fields].select do |field_name, field|
           if field.is_a?(ManyToOneSchema) &&
              field.foreign_collection == collection.name &&
              field.foreign_key == relation.origin_key &&
@@ -124,14 +124,14 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.list_relation(collection, id, relation_name, caller, foreign_filter, projection)
-        relation = collection.fields[relation_name]
-        foreign_collection = collection.datasource.collection(relation.foreign_collection)
+        relation = collection.schema[:fields][relation_name]
+        foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
 
           if foreign_relation
-            through_collection = collection.datasource.collection(relation.through_collection)
+            through_collection = collection.datasource.get_collection(relation.through_collection)
             records = through_collection.list(
               caller,
               FilterFactory.make_through_filter(collection, id, relation_name, caller, foreign_filter),
@@ -150,13 +150,13 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.aggregate_relation(collection, id, relation_name, caller, foreign_filter, aggregation, limit = nil)
-        relation = collection.fields[relation_name]
-        foreign_collection = collection.datasource.collection(relation.foreign_collection)
+        relation = collection.schema[:fields][relation_name]
+        foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
           if foreign_relation
-            through_collection = collection.datasource.collection(relation.through_collection)
+            through_collection = collection.datasource.get_collection(relation.through_collection)
 
             return through_collection.aggregate(
               caller,

@@ -38,7 +38,7 @@ module ForestAdminAgent
         end
 
         it 'generate schema with readonly false and skipped foreign keys' do
-          schema = described_class.build_schema(@datasource.collection('Book'))
+          schema = described_class.build_schema(@datasource.get_collection('Book'))
 
           expect(schema[:isReadOnly]).to be false
           expect(schema[:fields].size).to eq 2
@@ -47,20 +47,20 @@ module ForestAdminAgent
         end
 
         it 'generate schema with readonly true' do
-          schema = described_class.build_schema(@datasource.collection('Person'))
+          schema = described_class.build_schema(@datasource.get_collection('Person'))
 
           expect(schema[:isReadOnly]).to be true
         end
 
         it 'have an id, regardless of the fact that it is also a fk on Person collection' do
-          schema = described_class.build_schema(@datasource.collection('Person'))
+          schema = described_class.build_schema(@datasource.get_collection('Person'))
 
           expect(schema[:fields][0][:field]).to eq 'id'
           expect(schema[:fields][0][:isPrimaryKey]).to be true
         end
 
         it 'have a one-to-one relationship' do
-          schema = described_class.build_schema(@datasource.collection('Person'))
+          schema = described_class.build_schema(@datasource.get_collection('Person'))
 
           expect(schema[:fields][1]).to include(
             field: 'my_self',

@@ -10,7 +10,7 @@ module ForestAdminAgent
             fields: build_fields(collection),
             icon: nil,
             integration: nil,
-            isReadOnly: collection.fields.all? { |_k, field| field.type != 'Column' || field.is_read_only },
+            isReadOnly: collection.schema[:fields].all? { |_k, field| field.type != 'Column' || field.is_read_only },
             isSearchable: true,
             isVirtual: false,
             name: collection.name,
@@ -21,7 +21,7 @@ module ForestAdminAgent
         end
 
         def self.build_fields(collection)
-          fields = collection.fields.select do |name, _field|
+          fields = collection.schema[:fields].select do |name, _field|
             !ForestAdminDatasourceToolkit::Utils::Schema.foreign_key?(collection, name) ||
               ForestAdminDatasourceToolkit::Utils::Schema.primary_key?(collection, name)
           end

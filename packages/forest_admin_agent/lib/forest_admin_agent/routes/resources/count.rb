@@ -26,7 +26,7 @@ module ForestAdminAgent
             return {
               name: args[:params]['collection_name'],
               content: {
-                count: result[0][:value]
+                count: result.empty? ? 0 : result[0][:value]
               }
             }
           end

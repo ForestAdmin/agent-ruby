@@ -59,15 +59,17 @@ module ForestAdminAgent
             collection = instance_double(
               Collection,
               name: 'book',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'title' => ColumnSchema.new(column_type: 'String'),
-                'published_at' => ColumnSchema.new(column_type: 'Date'),
-                'price' => ColumnSchema.new(column_type: 'Number')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'title' => ColumnSchema.new(column_type: 'String'),
+                  'published_at' => ColumnSchema.new(column_type: 'Date'),
+                  'price' => ColumnSchema.new(column_type: 'Number')
+                }
               },
               create: book
             )
@@ -124,36 +126,40 @@ module ForestAdminAgent
             collection_person = instance_double(
               Collection,
               name: 'person',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'name' => ColumnSchema.new(column_type: 'String'),
-                'passport' => Relations::OneToOneSchema.new(
-                  origin_key: 'person_id',
-                  origin_key_target: 'id',
-                  foreign_collection: 'passport'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'name' => ColumnSchema.new(column_type: 'String'),
+                  'passport' => Relations::OneToOneSchema.new(
+                    origin_key: 'person_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'passport'
+                  )
+                }
               }
             )
 
             collection_passport = instance_double(
               Collection,
               name: 'passport',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'person_id' => ColumnSchema.new(column_type: 'Number'),
-                'person' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'person_id',
-                  foreign_key_target: 'id',
-                  foreign_collection: 'passport'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'person_id' => ColumnSchema.new(column_type: 'Number'),
+                  'person' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'person_id',
+                    foreign_key_target: 'id',
+                    foreign_collection: 'passport'
+                  )
+                }
               }
             )
             @datasource.add_collection(collection_person)
@@ -171,15 +177,15 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'person'
-              allow(@datasource.collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
-              allow(@datasource.collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
+              allow(@datasource.get_collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
 
               result = store.handle_request(args)
-              expect(@datasource.collection('person')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('person')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'name' => 'john' })
               end
-              expect(@datasource.collection('passport')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('passport')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'person_id' => 1 })
                 expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
@@ -211,10 +217,10 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'passport'
-              allow(@datasource.collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
 
               result = store.handle_request(args)
-              expect(@datasource.collection('passport')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('passport')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'person_id' => 1 })
               end

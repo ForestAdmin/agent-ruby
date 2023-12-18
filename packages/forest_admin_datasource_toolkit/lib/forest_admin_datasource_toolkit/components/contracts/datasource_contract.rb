@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def collection(name)
+        def get_collection(name)
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 

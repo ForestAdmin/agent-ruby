@@ -62,7 +62,7 @@ module ForestAdminAgent
             origin_value = Collection.get_value(@collection, @caller, parent_id, id)
             record = { relation.origin_key => origin_value, relation.foreign_key => foreign_value }
 
-            through_collection = @datasource.collection(relation.through_collection)
+            through_collection = @datasource.get_collection(relation.through_collection)
             through_collection.create(@caller, record)
           end
         end

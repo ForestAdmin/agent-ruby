@@ -39,55 +39,61 @@ module ForestAdminAgent
           collection_book = instance_double(
             Collection,
             name: 'book',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'title' => ColumnSchema.new(column_type: 'String'),
-              'price' => ColumnSchema.new(column_type: 'Number'),
-              'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
-              'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),
-              'reviews' => Relations::ManyToManySchema.new(
-                foreign_key: 'review_id',
-                foreign_key_target: 'id',
-                foreign_collection: 'review',
-                through_collection: 'book_review',
-                origin_key_target: 'id',
-                origin_key: 'book_id'
-              ),
-              'bookReviews' => Relations::OneToManySchema.new(
-                origin_key: 'book_id',
-                foreign_collection: 'review',
-                origin_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'title' => ColumnSchema.new(column_type: 'String'),
+                'price' => ColumnSchema.new(column_type: 'Number'),
+                'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
+                'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),
+                'reviews' => Relations::ManyToManySchema.new(
+                  foreign_key: 'review_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'review',
+                  through_collection: 'book_review',
+                  origin_key_target: 'id',
+                  origin_key: 'book_id'
+                ),
+                'bookReviews' => Relations::OneToManySchema.new(
+                  origin_key: 'book_id',
+                  foreign_collection: 'review',
+                  origin_key_target: 'id'
+                )
+              }
             }
           )
           collection_book_review = instance_double(
             Collection,
             name: 'book_review',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'book' => Relations::ManyToOneSchema.new(
-                foreign_key: 'book_id',
-                foreign_collection: 'book',
-                foreign_key_target: 'id'
-              ),
-              'review' => Relations::ManyToOneSchema.new(
-                foreign_key: 'review_id',
-                foreign_collection: 'review',
-                foreign_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'book' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'book_id',
+                  foreign_collection: 'book',
+                  foreign_key_target: 'id'
+                ),
+                'review' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'review_id',
+                  foreign_collection: 'review',
+                  foreign_key_target: 'id'
+                )
+              }
             }
           )
           collection_review = instance_double(
             Collection,
             name: 'review',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'author' => ColumnSchema.new(column_type: 'String'),
-              'book' => Relations::ManyToOneSchema.new(
-                foreign_key: 'book_id',
-                foreign_collection: 'book',
-                foreign_key_target: 'id'
-              )
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'author' => ColumnSchema.new(column_type: 'String'),
+                'book' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'book_id',
+                  foreign_collection: 'book',
+                  foreign_key_target: 'id'
+                )
+              }
             }
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
@@ -140,7 +146,7 @@ module ForestAdminAgent
                                                   type: 'Value',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             result = chart.handle_request(args)
 
             expect(result).to match(
@@ -165,7 +171,7 @@ module ForestAdminAgent
                                                   type: 'Value',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [{ value: 10, group: [] }], # first call
               [{ value: 5, group: [] }] # second call
             )
@@ -194,7 +200,7 @@ module ForestAdminAgent
                                                   type: 'Objective',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             result = chart.handle_request(args)
 
             expect(result).to match(
@@ -220,7 +226,7 @@ module ForestAdminAgent
                                                   type: 'Pie',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
                 { value: 100, group: { 'year' => 2021 } },
                 { value: 150, group: { 'year' => 2022 } }
@@ -252,7 +258,7 @@ module ForestAdminAgent
                                                   type: 'Line',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'date' => Time.parse('2022-01-03 00:00:00') } },
                 { value: 15, group: { 'date' => Time.parse('2022-01-07 00:00:00') } }
@@ -288,7 +294,7 @@ module ForestAdminAgent
                                                   type: 'Line',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'date' => Time.parse('2022-01-03 00:00:00') } },
                 { value: 15, group: { 'date' => Time.parse('2022-01-10 00:00:00') } }
@@ -321,7 +327,7 @@ module ForestAdminAgent
                                                   type: 'Line',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'date' => Time.parse('2022-01-01 00:00:00') } },
                 { value: 15, group: { 'date' => Time.parse('2022-02-01 00:00:00') } }
@@ -354,7 +360,7 @@ module ForestAdminAgent
                                                   type: 'Line',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'date' => Time.parse('2022-01-01 00:00:00') } },
                 { value: 15, group: { 'date' => Time.parse('2023-01-01 00:00:00') } }
@@ -390,8 +396,8 @@ module ForestAdminAgent
                                                   type: 'Leaderboard',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:datasource).and_return(@datasource)
-            allow(@datasource.collection('review')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            allow(@datasource.get_collection('review')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'author' => 'Isaac Asimov' } },
                 { value: 15, group: { 'author' => 'Jules Verne' } }
@@ -422,8 +428,8 @@ module ForestAdminAgent
                                                   type: 'Leaderboard',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:datasource).and_return(@datasource)
-            allow(@datasource.collection('book_review')).to receive(:aggregate).and_return(
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            allow(@datasource.get_collection('book_review')).to receive(:aggregate).and_return(
               [
                 { value: 10, group: { 'book:year' => 2022 } },
                 { value: 15, group: { 'book:year' => 2023 } }
@@ -475,7 +481,7 @@ module ForestAdminAgent
                                                   contextVariables: { 'dropdown1.selectedValue' => 'FOO' },
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             chart.handle_request(args)
 
             expect(chart.filter).eql?(Filter.new(
@@ -492,7 +498,7 @@ module ForestAdminAgent
                                                   aggregator: 'Count',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             chart.handle_request(args)
 
             expect(chart.filter).eql?(Filter.new(condition_tree: nil, search: nil, search_extended: nil, segment: nil,

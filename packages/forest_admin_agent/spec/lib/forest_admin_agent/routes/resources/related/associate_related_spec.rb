@@ -35,49 +35,55 @@ module ForestAdminAgent
             collection_user = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'name' => ColumnSchema.new(column_type: 'String'),
-                'addresses' => Relations::ManyToManySchema.new(
-                  foreign_key: 'address_id',
-                  foreign_collection: 'address',
-                  foreign_key_target: 'id',
-                  through_collection: 'address_user',
-                  origin_key: 'user_id',
-                  origin_key_target: 'id'
-                ),
-                'address_users' => Relations::OneToManySchema.new(
-                  origin_key: 'user_id',
-                  origin_key_target: 'id',
-                  foreign_collection: 'address_user'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'name' => ColumnSchema.new(column_type: 'String'),
+                  'addresses' => Relations::ManyToManySchema.new(
+                    foreign_key: 'address_id',
+                    foreign_collection: 'address',
+                    foreign_key_target: 'id',
+                    through_collection: 'address_user',
+                    origin_key: 'user_id',
+                    origin_key_target: 'id'
+                  ),
+                  'address_users' => Relations::OneToManySchema.new(
+                    origin_key: 'user_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'address_user'
+                  )
+                }
               }
             )
 
             collection_address_user = instance_double(
               Collection,
               name: 'address_user',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'address' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'address_id',
-                  foreign_collection: 'address',
-                  foreign_key_target: 'id'
-                ),
-                'user' => Relations::ManyToOneSchema.new(
-                  foreign_key: 'user_id',
-                  foreign_collection: 'user',
-                  foreign_key_target: 'id'
-                )
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'address' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'address_id',
+                    foreign_collection: 'address',
+                    foreign_key_target: 'id'
+                  ),
+                  'user' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'user_id',
+                    foreign_collection: 'user',
+                    foreign_key_target: 'id'
+                  )
+                }
               }
             )
 
             collection_address = instance_double(
               Collection,
               name: 'address',
-              fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'location' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'location' => ColumnSchema.new(column_type: 'String')
+                }
               }
             )
 
@@ -89,7 +95,7 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+            allow(permissions).to receive_messages(can?: true, get_scope: nil)
           end
 
           it 'adds the route forest_related_associate' do
@@ -103,20 +109,14 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
-              allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
-              allow(@datasource.collection('address_user')).to receive(:update).and_return(true)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
+              allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
               result = associate.handle_request(args)
 
-              expect(@datasource.collection('address_user')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(
-                    aggregator: 'And',
-                    conditions: [
-                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(aggregator: 'Or', conditions: [])
-                    ]
-                  ),
+                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
                   page: nil,
                   search: nil,
                   search_extended: nil,
@@ -135,12 +135,13 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'addresses'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
-              allow(@datasource.collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
-              allow(@datasource.collection('address')).to receive(:list).and_return([Address.new(1, 'foo location')])
-              allow(@datasource.collection('address_user')).to receive(:create).and_return(true)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
+              allow(@datasource.get_collection('address')).to receive(:list)
+                .and_return([Address.new(1, 'foo location')])
+              allow(@datasource.get_collection('address_user')).to receive(:create).and_return(true)
               result = associate.handle_request(args)
 
-              expect(@datasource.collection('address_user')).to have_received(:create) do |caller, data|
+              expect(@datasource.get_collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
               end

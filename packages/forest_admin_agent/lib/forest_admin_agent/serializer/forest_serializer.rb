@@ -41,8 +41,8 @@ module ForestAdminAgent
       end
 
       def attributes
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        fields = forest_collection.fields.select { |_field_name, field| field.type == 'Column' }
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        fields = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
         return {} if attributes_map.nil?
         attributes = {}
@@ -104,9 +104,9 @@ module ForestAdminAgent
       end
 
       def relationships
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.collection(object.class.name.demodulize.underscore)
-        relations_to_many = forest_collection.fields.select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
-        relations_to_one = forest_collection.fields.select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
+        relations_to_one = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
         relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
 

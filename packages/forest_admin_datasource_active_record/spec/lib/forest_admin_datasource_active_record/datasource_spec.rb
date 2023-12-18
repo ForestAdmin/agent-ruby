@@ -4,7 +4,7 @@ module ForestAdminDatasourceActiveRecord
   describe Datasource do
     it 'fetch all models' do
       datasource = described_class.new(adapter: 'sqlite3', database: 'db/database.db')
-      expected = %w[InternalMetadata SchemaMigration User Order Check Category CarCheck Car Address]
+      expected = %w[user order check category car_check car address]
 
       expect(datasource.collections.keys).to match_array(expected)
     end

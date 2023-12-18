@@ -57,7 +57,7 @@ module ForestAdminAgent
         return ProjectionFactory.all(collection) unless fields != '' && !fields.nil?
 
         fields = fields.split(',').map do |field_name|
-          column = collection.fields[field_name.strip]
+          column = collection.schema[:fields][field_name.strip]
           column.type == 'Column' ? field_name.strip : "#{field_name.strip}:#{args[:params][:fields][field_name.strip]}"
         end
 

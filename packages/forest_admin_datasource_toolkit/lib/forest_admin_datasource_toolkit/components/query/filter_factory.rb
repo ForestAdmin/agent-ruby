@@ -61,7 +61,7 @@ module ForestAdminDatasourceToolkit
           if relation.is_a?(OneToManySchema)
             origin_tree = Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
           else
-            through_collection = collection.datasource.collection(relation.through_collection)
+            through_collection = collection.datasource.get_collection(relation.through_collection)
             through_tree = ConditionTreeFactory.intersect([
                                                             Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
                                                             Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
@@ -86,8 +86,8 @@ module ForestAdminDatasourceToolkit
           unit = unit.downcase
           start = "beginning_of_#{unit}"
           end_ = "end_of_#{unit}"
-          start_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(start)
-          end_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(end_)
+          start_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(start)
+          end_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(end_)
 
           get_previous_condition_tree(field, start_period.to_datetime, end_period.to_datetime)
         end
@@ -104,13 +104,13 @@ module ForestAdminDatasourceToolkit
         end
 
         def self.make_through_filter(collection, id, relation_name, caller, base_foreign_filter)
-          relation = collection.fields[relation_name]
+          relation = collection.schema[:fields][relation_name]
           origin_value = Utils::Collection.get_value(collection, caller, id, relation.origin_key_target)
           foreign_relation = Utils::Collection.get_through_target(collection, relation_name)
 
           # Optimization for many to many when there is not search/segment (saves one query)
           if foreign_relation && base_foreign_filter.nestable?
-            foreign_key = collection.datasource.collection(relation.through_collection).fields[relation.foreign_key]
+            foreign_key = collection.datasource.get_collection(relation.through_collection).schema[:fields][relation.foreign_key]
             base_through_filter = base_foreign_filter.nest(foreign_relation)
             condition_tree = ConditionTreeFactory.intersect(
               [
@@ -129,7 +129,7 @@ module ForestAdminDatasourceToolkit
 
           # Otherwise we have no choice but to call the target collection so that search and segment
           # are correctly apply, and then match ids in the though collection.
-          target = collection.datasource.collection(relation.foreign_collection)
+          target = collection.datasource.get_collection(relation.foreign_collection)
           records = target.list(
             caller,
             make_foreign_filter(collection, id, relation_name, caller, base_foreign_filter),

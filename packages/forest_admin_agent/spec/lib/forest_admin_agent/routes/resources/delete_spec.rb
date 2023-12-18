@@ -22,7 +22,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_store' do
@@ -48,14 +48,16 @@ module ForestAdminAgent
             collection = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
-                'last_name' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'first_name' => ColumnSchema.new(column_type: 'String'),
+                  'last_name' => ColumnSchema.new(column_type: 'String')
+                }
               },
               delete: true
             )
@@ -87,13 +89,9 @@ module ForestAdminAgent
             it 'call delete function with expected args' do
               delete.handle_request(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::EQUAL, value: 1 },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 1)
               end
             end
           end
@@ -134,13 +132,9 @@ module ForestAdminAgent
             it 'call delete function with filters for only ids selected' do
               delete.handle_request_bulk(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::IN, value: [1, 2, 3] },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::IN, value: [1, 2, 3])
               end
             end
 
@@ -149,14 +143,9 @@ module ForestAdminAgent
               args[:params]['data']['attributes']['all_records_ids_excluded'] = %w[1 2 3]
               delete.handle_request_bulk(args)
 
-              expect(@datasource.collection('user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
-                expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::NOT_IN,
-                                                             value: [1, 2, 3] },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ])
+                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_IN, value: [1, 2, 3])
               end
             end
           end

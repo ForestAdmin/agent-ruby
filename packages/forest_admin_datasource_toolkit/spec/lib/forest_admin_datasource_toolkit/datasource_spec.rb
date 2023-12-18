@@ -18,12 +18,12 @@ module ForestAdminDatasourceToolkit
     end
 
     it 'get collection from datasource' do
-      expect(@datasource.collection('__collection__')).to eq(@collection)
+      expect(@datasource.get_collection('__collection__')).to eq(@collection)
     end
 
     it 'raise an error when collection does not exist' do
       expect do
-        @datasource.collection('__no_such_collection__')
+        @datasource.get_collection('__no_such_collection__')
       end.to raise_error(
         ForestAdminDatasourceToolkit::Exceptions::ForestException,
         '🌳🌳🌳 Collection __no_such_collection__ not found.'

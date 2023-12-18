@@ -25,7 +25,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_store' do
@@ -48,13 +48,15 @@ module ForestAdminAgent
             collection = instance_double(
               Collection,
               name: 'book',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'title' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'title' => ColumnSchema.new(column_type: 'String')
+                }
               }
             )
 
@@ -68,7 +70,7 @@ module ForestAdminAgent
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
             book = Book.new(1, 'Harry potter and the goblet of fire')
-            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
+            allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             result = update.handle_request(args)
             expect(result[:name]).to eq('book')
             expect(result[:content]).to eq(
@@ -89,19 +91,13 @@ module ForestAdminAgent
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
             book = Book.new(1, 'Harry potter and the goblet of fire')
-            allow(@datasource.collection('book')).to receive_messages(list: [book], update: true)
+            allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             update.handle_request(args)
 
-            expect(@datasource.collection('book')).to have_received(:update) do |caller, filter, data|
+            expect(@datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
               expect(caller).to be_instance_of(Components::Caller)
               expect(data).to eq({ 'title' => 'Harry potter and the goblet of fire' })
-              expect(filter.condition_tree.to_h).to eq(
-                aggregator: 'And',
-                conditions: [
-                  { field: 'id', operator: Operators::EQUAL, value: 1 },
-                  { aggregator: 'Or', conditions: [] }
-                ]
-              )
+              expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 1)
             end
           end
         end

@@ -23,7 +23,7 @@ module ForestAdminAgent
             build(args)
             @permissions.can?(:edit, @collection)
 
-            relation = @collection.fields[args[:params]['relation_name']]
+            relation = @collection.schema[:fields][args[:params]['relation_name']]
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'])
 
             linked_id = if (id = args.dig(:params, :data, :id))

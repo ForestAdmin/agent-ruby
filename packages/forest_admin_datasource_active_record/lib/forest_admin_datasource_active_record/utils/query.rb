@@ -75,7 +75,7 @@ module ForestAdminDatasourceActiveRecord
         unless @projection.nil?
           @select += @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
           @projection.relations.each_key do |relation|
-            relation_schema = @collection.fields[relation]
+            relation_schema = @collection.schema[:fields][relation]
             @select << if relation_schema.type == 'OneToOne'
                          "#{@collection.model.table_name}.#{relation_schema.origin_key_target}"
                        else
@@ -116,8 +116,8 @@ module ForestAdminDatasourceActiveRecord
       def format_field(field)
         if field.include?(':')
           relation_name, field = field.split(':')
-          relation = @collection.fields[relation_name]
-          table_name = @collection.datasource.collection(relation.foreign_collection).model.table_name
+          relation = @collection.schema[:fields][relation_name]
+          table_name = @collection.datasource.get_collection(relation.foreign_collection).model.table_name
           add_join_relation(relation, relation_name)
           return "#{table_name}.#{field}"
         end

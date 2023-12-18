@@ -63,7 +63,7 @@ module ForestAdminAgent
           end
 
           it 'generate relation' do
-            schema = described_class.build_schema(@datasource.collection('Book'), 'reviewers')
+            schema = described_class.build_schema(@datasource.get_collection('Book'), 'reviewers')
 
             expect(schema).to match(
               {
@@ -87,7 +87,7 @@ module ForestAdminAgent
           end
 
           it 'sort schema property' do
-            schema = described_class.build_schema(@datasource.collection('Book'), 'reviewers')
+            schema = described_class.build_schema(@datasource.get_collection('Book'), 'reviewers')
 
             expect(schema.keys).to eq(
               [
@@ -112,7 +112,7 @@ module ForestAdminAgent
 
           context 'when the field reference is the primary key' do
             it 'the many to one relation should not be a primary key' do
-              schema = described_class.build_schema(@datasource.collection('BookPerson'), 'book')
+              schema = described_class.build_schema(@datasource.get_collection('BookPerson'), 'book')
               expect(schema).to match(
                 {
                   field: 'book',

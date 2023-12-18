@@ -32,10 +32,12 @@ module ForestAdminAgent
           collection = instance_double(
             Collection,
             name: 'user',
-            fields: {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'first_name' => ColumnSchema.new(column_type: 'String'),
-              'last_name' => ColumnSchema.new(column_type: 'String')
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'first_name' => ColumnSchema.new(column_type: 'String'),
+                'last_name' => ColumnSchema.new(column_type: 'String')
+              }
             },
             list: [User.new(1, 'foo', 'foo')]
           )
@@ -45,7 +47,7 @@ module ForestAdminAgent
           ForestAdminAgent::Builder::AgentFactory.instance.build
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_list' do
@@ -80,12 +82,9 @@ module ForestAdminAgent
             args[:params][:filters] = JSON.generate({ field: 'id', operator: 'greater_than', value: 7 })
             list.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
-              expect(filter.condition_tree.to_h).to eq(aggregator: 'And',
-                                                       conditions: [{ aggregator: 'Or', conditions: [] },
-                                                                    { field: 'id', operator: Operators::GREATER_THAN,
-                                                                      value: 7 }])
+              expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::GREATER_THAN, value: 7)
               expect(projection).to eq(%w[id first_name last_name])
             end
           end
@@ -104,13 +103,12 @@ module ForestAdminAgent
             )
             list.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
               expect(filter.condition_tree.to_h).to eq(
                 {
                   aggregator: 'And',
                   conditions: [
-                    { aggregator: 'Or', conditions: [] },
                     { field: 'id', operator: 'Greater_Than', value: 7 },
                     { field: 'first_name', operator: 'Contains', value: 'foo' }
                   ]

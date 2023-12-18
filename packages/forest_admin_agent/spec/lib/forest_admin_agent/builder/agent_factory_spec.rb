@@ -34,17 +34,17 @@ module ForestAdminAgent
             described_class.instance.add_datasource(datasource)
 
             expect(described_class.instance.customizer.collections.size).to eq(1)
-            expect(described_class.instance.customizer.collection('Book')).to eq(collection_book)
-            expect(described_class.instance.customizer.collection('Book').datasource).to eq(datasource)
+            expect(described_class.instance.customizer.get_collection('Book').name).to eq('Book')
           end
         end
 
         describe 'build' do
-          it 'add customizer to the container' do
+          it 'add datasource to the container' do
             allow(described_class.instance).to receive(:send_schema)
             described_class.instance.build
 
-            expect(described_class.instance.container.resolve(:datasource)).to eq(described_class.instance.customizer)
+            expect(described_class.instance.container.resolve(:datasource))
+              .to eq(described_class.instance.customizer.datasource)
           end
         end
 

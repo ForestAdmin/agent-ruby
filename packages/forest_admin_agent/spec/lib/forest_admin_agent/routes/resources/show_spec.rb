@@ -25,7 +25,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_list' do
@@ -50,14 +50,16 @@ module ForestAdminAgent
             collection = instance_double(
               Collection,
               name: 'user',
-              fields: {
-                'id' => ColumnSchema.new(
-                  column_type: 'Number',
-                  is_primary_key: true,
-                  filter_operators: [Operators::IN, Operators::EQUAL]
-                ),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
-                'last_name' => ColumnSchema.new(column_type: 'String')
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'first_name' => ColumnSchema.new(column_type: 'String'),
+                  'last_name' => ColumnSchema.new(column_type: 'String')
+                }
               },
               list: [
                 User.new(1, 'foo', 'foo')
@@ -96,15 +98,9 @@ module ForestAdminAgent
             args[:params]['id'] = 1
             show.handle_request(args)
 
-            expect(@datasource.collection('user')).to have_received(:list) do |caller, filter, projection|
+            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
               expect(caller).to be_instance_of(Components::Caller)
-              expect(filter.condition_tree.to_h).to eq({
-                                                         aggregator: 'And',
-                                                         conditions: [
-                                                           { field: 'id', operator: Operators::EQUAL, value: 1 },
-                                                           { aggregator: 'Or', conditions: [] }
-                                                         ]
-                                                       })
+              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: 1 })
               expect(projection).to eq(%w[id first_name last_name])
             end
           end
