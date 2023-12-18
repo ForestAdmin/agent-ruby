@@ -28,17 +28,17 @@ module ForestAdminDatasourceCustomizer
         private
 
         def return_empty_set(tree)
-          if tree.is_a? Nodes::ConditionTreeLeaf
-            leaf_return_empty_set(tree)
-          elsif tree.is_a? Nodes::ConditionTreeBranch
-            if tree.aggregator == 'Or'
-              or_return_empty_set(tree.conditions)
-            elsif tree.aggregator == 'And'
-              and_return_empty_set(tree.conditions)
-            end
-          else
-            false
+          return leaf_return_empty_set(tree) if tree.is_a? Nodes::ConditionTreeLeaf
+
+          if tree.is_a?(Nodes::ConditionTreeBranch) && tree.aggregator == 'Or'
+            return or_return_empty_set(tree.conditions)
           end
+
+          if tree.is_a?(Nodes::ConditionTreeBranch) && tree.aggregator == 'And'
+            return and_return_empty_set(tree.conditions)
+          end
+
+          false
         end
 
         def leaf_return_empty_set(leaf)
@@ -55,7 +55,7 @@ module ForestAdminDatasourceCustomizer
 
         def and_return_empty_set(conditions)
           # There is a leaf which returns zero records
-          true if conditions.one? { |condition| return_empty_set(condition) }
+          return true if conditions.one? { |condition| return_empty_set(condition) }
 
           # Scans for mutually exclusive conditions
           # (this a naive implementation, it will miss many occurrences)
