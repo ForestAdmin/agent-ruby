@@ -86,8 +86,8 @@ module ForestAdminDatasourceToolkit
           unit = unit.downcase
           start = "beginning_of_#{unit}"
           end_ = "end_of_#{unit}"
-          start_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(start)
-          end_period = Time.now.in_time_zone(timezone).send("prev_#{unit}").send(end_)
+          start_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(start)
+          end_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(end_)
 
           get_previous_condition_tree(field, start_period.to_datetime, end_period.to_datetime)
         end

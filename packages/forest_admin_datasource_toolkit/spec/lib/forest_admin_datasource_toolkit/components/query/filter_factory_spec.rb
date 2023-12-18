@@ -52,8 +52,8 @@ module ForestAdminDatasourceToolkit
               filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', operator[:base], 'someValue'))
               start = "beginning_of_#{operator[:unit].downcase}"
               end_ = "end_of_#{operator[:unit].downcase}"
-              start_period = Time.now.in_time_zone(timezone).send("prev_#{operator[:unit].downcase}").send(start)
-              end_period = Time.now.in_time_zone(timezone).send("prev_#{operator[:unit].downcase}").send(end_)
+              start_period = Time.now.in_time_zone(timezone).send(:"prev_#{operator[:unit].downcase}").send(start)
+              end_period = Time.now.in_time_zone(timezone).send(:"prev_#{operator[:unit].downcase}").send(end_)
 
               expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
                 .eql?(ConditionTreeBranch.new(
