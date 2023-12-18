@@ -21,5 +21,11 @@ module ForestAdminDatasourceCustomizer
         -> { plugin.run(@datasource_customizer, self, options) }
       )
     end
+
+    def disable_count
+      push_customization(
+        -> { @stack.schema.get_collection(@name).override_schema(countable: false) }
+      )
+    end
   end
 end
