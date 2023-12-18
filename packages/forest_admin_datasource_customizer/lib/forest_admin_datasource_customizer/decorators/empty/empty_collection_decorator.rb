@@ -5,7 +5,9 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Decorators
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-        def list(_caller, _filter, _projection)
+        def list(_caller, filter, _projection)
+          return super unless return_empty_set(filter.condition_tree)
+
           []
         end
 

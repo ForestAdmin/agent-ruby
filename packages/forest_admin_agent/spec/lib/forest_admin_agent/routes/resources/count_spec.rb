@@ -38,7 +38,7 @@ module ForestAdminAgent
           ForestAdminAgent::Builder::AgentFactory.instance.build
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: ConditionTreeBranch.new('Or', []))
+          allow(permissions).to receive_messages(can?: true, get_scope: nil)
         end
 
         it 'adds the route forest_count' do
