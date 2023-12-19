@@ -8,16 +8,16 @@ module ForestAdminDatasourceToolkit
               operator = case_sensitive ? Operators::LIKE : Operators::I_LIKE
 
               {
-                dependsOn: [operator],
-                forTypes: ['String'],
+                depends_on: [operator],
+                for_types: ['String'],
                 replacer: ->(leaf) { leaf.override(operator: operator, value: get_pattern.call(leaf.value)) }
               }
             end
 
             def self.match(case_sensitive)
               {
-                dependsOn: [Operators::MATCH],
-                forTypes: ['String'],
+                depends_on: [Operators::MATCH],
+                for_types: ['String'],
                 replacer: lambda { |leaf|
                   regex = leaf.value.gsub(/([\.\\\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:\-])/, '\\\\\1')
                   regex.gsub!('%', '.*')

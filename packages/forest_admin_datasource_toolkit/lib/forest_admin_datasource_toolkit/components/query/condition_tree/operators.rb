@@ -45,7 +45,7 @@ module ForestAdminDatasourceToolkit
           PREVIOUS_X_DAYS_TO_DATE = 'Previous_X_Days_To_Date'.freeze
 
           def self.all
-            constants
+            constants.map { |constant| const_get(constant) }
           end
 
           def self.exist?(operator_value)
@@ -60,7 +60,7 @@ module ForestAdminDatasourceToolkit
               operator_value = 'I_ENDS_WITH'
             end
 
-            all.include?(operator_value.upcase.to_sym)
+            all.include?(operator_value)
           end
 
           def self.interval_operators
