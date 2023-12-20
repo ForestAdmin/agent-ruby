@@ -1,7 +1,7 @@
-module ForestAdminDatasourceToolkit
+module ForestAdminDatasourceCustomizer
   module Decorators
     module Schema
-      class SchemaCollectionDecorator < CollectionDecorator
+      class SchemaCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         def initialize(child_collection, datasource)
           super
           @schema_override = {}

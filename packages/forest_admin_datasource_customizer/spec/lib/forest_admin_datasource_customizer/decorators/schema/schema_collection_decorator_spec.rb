@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-module ForestAdminDatasourceToolkit
+module ForestAdminDatasourceCustomizer
   module Decorators
     module Schema
       describe SchemaCollectionDecorator do
