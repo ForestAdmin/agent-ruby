@@ -14,7 +14,7 @@ module ForestAdminDatasourceToolkit
       end
 
       it 'return true when value is override' do
-        @collection.countable = true
+        @collection.schema[:countable] = true
         expect(@collection.is_countable?).to be true
       end
     end
