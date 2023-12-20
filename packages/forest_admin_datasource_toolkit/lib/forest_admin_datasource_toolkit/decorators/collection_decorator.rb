@@ -13,14 +13,13 @@ module ForestAdminDatasourceToolkit
         # a reference to parent collections from children.
         return unless child_collection.is_a?(CollectionDecorator)
 
-        original_child_mark_schema_as_dirty = child_collection.mark_schema_as_dirty
-        child_collection.mark_schema_as_dirty = lambda {
+        child_collection.define_singleton_method(:mark_schema_as_dirty) do
           # Call the original method (the child)
           original_child_mark_schema_as_dirty.call(child_collection)
 
           # Invalidate our schema (the parent)
           mark_schema_as_dirty
-        }
+        end
       end
 
       def native_driver
