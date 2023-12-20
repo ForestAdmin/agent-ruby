@@ -3,13 +3,13 @@ module ForestAdminDatasourceCustomizer
     class DecoratorsStack
       include ForestAdminDatasourceToolkit::Decorators
 
-      attr_reader :datasource, :empty, :schema
+      attr_reader :datasource, :schema
 
       def initialize(datasource)
         last = datasource
-        last = @empty = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
-        last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
+        last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
+        last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
       end
 

@@ -62,8 +62,8 @@ module ForestAdminDatasourceActiveRecord
           @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].lt(value)))
         when Operators::NOT_CONTAINS
           @query = @query.send(aggregator, @query.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
-        when Operators::CONTAINS
-          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::LIKE
+          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches(value)))
         when Operators::INCLUDES_ALL
           # TODO: to implement
         end

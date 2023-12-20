@@ -40,6 +40,8 @@ module ForestAdminAgent
           return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
 
           return values.map(&:to_f).select { |item| item.is_a? Numeric } if schema.column_type == 'Number'
+
+          return values
         end
 
         leaf['value']

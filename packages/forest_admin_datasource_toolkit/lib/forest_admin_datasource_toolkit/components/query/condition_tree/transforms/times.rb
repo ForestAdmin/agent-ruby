@@ -54,7 +54,11 @@ module ForestAdminDatasourceToolkit
             def self.previous_interval(duration)
               interval(
                 lambda { |now|
-                  duration == 'quarter' ? now.prev_quarter : (now - 1.send(duration)).send(:"beginning_of_#{duration}")
+                  if duration == 'quarter'
+                    now.prev_quarter.send(:"beginning_of_#{duration}")
+                  else
+                    (now - 1.send(duration)).send(:"beginning_of_#{duration}")
+                  end
                 },
                 ->(now) { now.send(:"beginning_of_#{duration}") }
               )

@@ -22,6 +22,24 @@ module ForestAdminDatasourceCustomizer
 
           sub_schema
         end
+
+        def refine_filter(caller, filter = nil)
+          filter&.override(
+            condition_tree: filter.condition_tree&.replace_leafs do |leaf|
+              schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(
+                @child_collection,
+                leaf.field
+              )
+
+              ConditionTreeEquivalent.get_equivalent_tree(
+                leaf,
+                schema.filter_operators,
+                schema.column_type,
+                caller.timezone
+              )
+            end
+          )
+        end
       end
     end
   end
