@@ -18,7 +18,8 @@ module ForestAdminDatasourceToolkit
       @name = name
       @native_driver = native_driver
       @schema = {
-        fields: {}
+        fields: {},
+        countable: false
       }
       @actions = {}
       @segments = {}
@@ -28,11 +29,11 @@ module ForestAdminDatasourceToolkit
     end
 
     def enable_count
-      @countable = true
+      @schema[:countable] = true
     end
 
     def is_countable?
-      @countable
+      @schema[:countable]
     end
 
     def is_searchable?
