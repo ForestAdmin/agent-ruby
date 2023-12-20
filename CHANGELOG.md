@@ -1,3 +1,10 @@
+# [1.0.0-beta.25](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.24...v1.0.0-beta.25) (2023-12-20)
+
+
+### Features
+
+* add schema decorator support ([#19](https://github.com/ForestAdmin/agent-ruby/issues/19)) ([3548290](https://github.com/ForestAdmin/agent-ruby/commit/354829022257d11aeb106ad760360adfe22bceff))
+
 # [1.0.0-beta.24](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.23...v1.0.0-beta.24) (2023-12-18)
 
 
