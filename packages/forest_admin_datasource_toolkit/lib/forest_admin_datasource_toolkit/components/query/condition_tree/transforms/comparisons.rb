@@ -12,41 +12,41 @@ module ForestAdminDatasourceToolkit
                   {
                     depends_on: [Operators::IN],
                     for_types: ['String'],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::IN, value: [nil, ''] }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::IN, value: [nil, ''] }) }
                   },
                   {
                     depends_on: [Operators::MISSING],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::MISSING }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::MISSING }) }
                   }
                 ],
                 Operators::MISSING => [
                   {
                     depends_on: [Operators::EQUAL],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::EQUAL, value: nil }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::EQUAL, value: nil }) }
                   }
                 ],
                 Operators::PRESENT => [
                   {
                     depends_on: [Operators::NOT_IN],
                     for_types: ['String'],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::NOT_IN, value: [nil, ''] }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::NOT_IN, value: [nil, ''] }) }
                   },
                   {
                     depends_on: [Operators::NOT_EQUAL],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::NOT_EQUAL, value: nil }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::NOT_EQUAL, value: nil }) }
                   }
                 ],
                 Operators::EQUAL => [
                   {
                     depends_on: [Operators::IN],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::IN, value: [leaf.value] }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::IN, value: [leaf.value] }) }
                   }
                 ],
                 Operators::IN => [
                   {
                     depends_on: [Operators::EQUAL, Operators::MATCH],
                     for_types: ['String'],
-                    replacer: lambda { |leaf|
+                    replacer: proc { |leaf|
                       values = leaf.value
                       conditions = []
 
@@ -68,7 +68,7 @@ module ForestAdminDatasourceToolkit
                   },
                   {
                     depends_on: [Operators::EQUAL],
-                    replacer: lambda { |leaf|
+                    replacer: proc { |leaf|
                       ConditionTreeFactory.union(
                         leaf.value.map { |item| leaf.override({ operator: Operators::EQUAL, value: item }) }
                       )
@@ -78,14 +78,14 @@ module ForestAdminDatasourceToolkit
                 Operators::NOT_EQUAL => [
                   {
                     depends_on: [Operators::NOT_IN],
-                    replacer: ->(leaf) { leaf.override({ operator: Operators::NOT_IN, value: [leaf.value] }) }
+                    replacer: proc { |leaf| leaf.override({ operator: Operators::NOT_IN, value: [leaf.value] }) }
                   }
                 ],
                 Operators::NOT_IN => [
                   {
                     depends_on: [Operators::NOT_EQUAL, Operators::MATCH],
                     for_types: ['String'],
-                    replacer: lambda { |leaf|
+                    replacer: proc { |leaf|
                       values = leaf.value
                       conditions = []
 
@@ -106,7 +106,7 @@ module ForestAdminDatasourceToolkit
                   },
                   {
                     depends_on: [Operators::NOT_EQUAL],
-                    replacer: lambda { |leaf|
+                    replacer: proc { |leaf|
                       ConditionTreeFactory.intersect(
                         leaf.value.map { |item| leaf.override({ operator: Operators::NOT_EQUAL, value: item }) }
                       )

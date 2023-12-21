@@ -49,17 +49,6 @@ module ForestAdminDatasourceToolkit
           end
 
           def self.exist?(operator_value)
-            case operator_value
-            when 'ILike'
-              operator_value = 'I_LIKE'
-            when 'IContains'
-              operator_value = 'I_CONTAINS'
-            when 'IStarts_With'
-              operator_value = 'I_STARTS_WITH'
-            when 'IEnds_With'
-              operator_value = 'I_ENDS_WITH'
-            end
-
             all.include?(operator_value)
           end
 

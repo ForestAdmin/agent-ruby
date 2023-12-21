@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
               {
                 depends_on: [operator],
                 for_types: ['String'],
-                replacer: ->(leaf) { leaf.override(operator: operator, value: get_pattern.call(leaf.value)) }
+                replacer: proc { |leaf| leaf.override(operator: operator, value: get_pattern.call(leaf.value)) }
               }
             end
 
@@ -18,7 +18,7 @@ module ForestAdminDatasourceToolkit
               {
                 depends_on: [Operators::MATCH],
                 for_types: ['String'],
-                replacer: lambda { |leaf|
+                replacer: proc { |leaf|
                   regex = leaf.value.gsub(/([\.\\\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:\-])/, '\\\\\1')
                   regex.gsub!('%', '.*')
                   regex.tr!('_', '.')
@@ -30,12 +30,12 @@ module ForestAdminDatasourceToolkit
 
             def self.transforms
               {
-                Operators::CONTAINS => [likes(->(value) { "%#{value}%" }, true)],
-                Operators::STARTS_WITH => [likes(->(value) { "#{value}%" }, true)],
-                Operators::ENDS_WITH => [likes(->(value) { "%#{value}" }, true)],
-                Operators::I_CONTAINS => [likes(->(value) { "%#{value}%" }, false)],
-                Operators::I_STARTS_WITH => [likes(->(value) { "#{value}%" }, false)],
-                Operators::I_ENDS_WITH => [likes(->(value) { "%#{value}" }, false)],
+                Operators::CONTAINS => [likes(proc { |value| "%#{value}%" }, true)],
+                Operators::STARTS_WITH => [likes(proc { |value| "#{value}%" }, true)],
+                Operators::ENDS_WITH => [likes(proc { |value| "%#{value}" }, true)],
+                Operators::I_CONTAINS => [likes(proc { |value| "%#{value}%" }, false)],
+                Operators::I_STARTS_WITH => [likes(proc { |value| "#{value}%" }, false)],
+                Operators::I_ENDS_WITH => [likes(proc { |value| "%#{value}" }, false)],
                 Operators::I_LIKE => [match(false)],
                 Operators::LIKE => [match(true)]
               }

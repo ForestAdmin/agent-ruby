@@ -15,7 +15,7 @@ module ForestAdminDatasourceToolkit
               {
                 depends_on: [operator],
                 for_types: ['Date', 'Dateonly'],
-                replacer: lambda { |leaf, tz|
+                replacer: proc { |leaf, tz|
                   leaf.override(operator: operator, value: format(yield(Time.now.in_time_zone(tz), leaf.value)))
                 }
               }
@@ -25,7 +25,7 @@ module ForestAdminDatasourceToolkit
               {
                 depends_on: [Operators::LESS_THAN, Operators::GREATER_THAN],
                 for_types: ['Date', 'Dateonly'],
-                replacer: lambda do |leaf, tz|
+                replacer: proc do |leaf, tz|
                   value_greater_than = if leaf.value.nil?
                                          format(start_fn.call(Time.now.in_time_zone(tz)))
                                        else
@@ -53,21 +53,21 @@ module ForestAdminDatasourceToolkit
 
             def self.previous_interval(duration)
               interval(
-                lambda { |now|
+                proc { |now|
                   if duration == 'quarter'
                     now.prev_quarter.send(:"beginning_of_#{duration}")
                   else
                     (now - 1.send(duration)).send(:"beginning_of_#{duration}")
                   end
                 },
-                ->(now) { now.send(:"beginning_of_#{duration}") }
+                proc { |now| now.send(:"beginning_of_#{duration}") }
               )
             end
 
             def self.previous_interval_to_date(duration)
               interval(
-                ->(now) { now.send(:"beginning_of_#{duration}") },
-                ->(now) { now }
+                proc { |now| now.send(:"beginning_of_#{duration}") },
+                proc { |now| now }
               )
             end
 
@@ -90,20 +90,20 @@ module ForestAdminDatasourceToolkit
                 Operators::PREVIOUS_YEAR => [previous_interval('year')],
                 Operators::PREVIOUS_X_DAYS_TO_DATE => [
                   interval(
-                    ->(now, value) { (now - value.days).beginning_of_day },
-                    ->(now, _value) { now }
+                    proc { |now, value| (now - value.days).beginning_of_day },
+                    proc { |now, _value| now }
                   )
                 ],
                 Operators::PREVIOUS_X_DAYS => [
                   interval(
-                    ->(now, value) { (now - value.days).beginning_of_day },
-                    ->(now, _value) { now.beginning_of_day }
+                    proc { |now, value| (now - value.days).beginning_of_day },
+                    proc { |now, _value| now.beginning_of_day }
                   )
                 ],
                 Operators::TODAY => [
                   interval(
-                    ->(now) { now.beginning_of_day },
-                    ->(now) { (now + 1.day).beginning_of_day }
+                    proc { |now| now.beginning_of_day },
+                    proc { |now| (now + 1.day).beginning_of_day }
                   )
                 ]
               }
