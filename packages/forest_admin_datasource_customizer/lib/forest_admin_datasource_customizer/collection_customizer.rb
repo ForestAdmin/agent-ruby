@@ -27,5 +27,11 @@ module ForestAdminDatasourceCustomizer
         -> { @stack.schema.get_collection(@name).override_schema(countable: false) }
       )
     end
+
+    def replace_search(definition)
+      push_customization(
+        -> { @stack.search.get_collection(@name).replace_search(definition) }
+      )
+    end
   end
 end

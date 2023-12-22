@@ -9,9 +9,6 @@ module ForestAdminDatasourceToolkit
                 :schema,
                 :native_driver
 
-    attr_writer :searchable,
-                :countable
-
     def initialize(datasource, name, native_driver: nil)
       super()
       @datasource = datasource
@@ -19,13 +16,12 @@ module ForestAdminDatasourceToolkit
       @native_driver = native_driver
       @schema = {
         fields: {},
-        countable: false
+        countable: false,
+        searchable: false
       }
       @actions = {}
       @segments = {}
       @charts = {}
-      @searchable = false
-      @countable = false
     end
 
     def enable_count
@@ -37,7 +33,7 @@ module ForestAdminDatasourceToolkit
     end
 
     def is_searchable?
-      @searchable
+      @searchable[:searchable]
     end
 
     def fields
