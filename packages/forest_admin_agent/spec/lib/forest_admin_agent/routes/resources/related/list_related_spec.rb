@@ -29,7 +29,7 @@ module ForestAdminAgent
             user_class = Struct.new(:id, :first_name, :last_name)
             stub_const('User', user_class)
 
-            @datasource = Datasource.new
+            datasource = Datasource.new
             collection_user = instance_double(
               Collection,
               name: 'user',
@@ -58,10 +58,12 @@ module ForestAdminAgent
               }
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-            @datasource.add_collection(collection_user)
-            @datasource.add_collection(collection_category)
-            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+            datasource.add_collection(collection_user)
+            datasource.add_collection(collection_category)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+
+            @datasource = ForestAdminAgent::Facades::Container.datasource
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
             allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
