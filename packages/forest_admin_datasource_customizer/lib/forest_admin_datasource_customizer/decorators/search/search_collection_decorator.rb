@@ -48,18 +48,16 @@ module ForestAdminDatasourceCustomizer
         private
 
         def default_replacer(search, extended)
-          searchable_fields = self.class.get_fields(@child_collection, extended)
+          searchable_fields = get_fields(@child_collection, extended)
 
           conditions = searchable_fields.map do |field, schema|
-            self.class.build_condition(field, schema, search)
+            build_condition(field, schema, search)
           end
 
           ConditionTreeFactory.union(conditions)
         end
 
-        # class << self
-        #   private
-        def self.build_condition(field, schema, search_string)
+        def build_condition(field, schema, search_string)
           column_type = schema.column_type
           enum_values = schema.enum_values
           filter_operators = schema.filter_operators
@@ -101,7 +99,7 @@ module ForestAdminDatasourceCustomizer
           nil
         end
 
-        def self.get_fields(collection, extended)
+        def get_fields(collection, extended)
           fields = []
           collection.schema[:fields].each do |name, field|
             fields.push([name, field]) if field.type == 'Column'
@@ -118,14 +116,13 @@ module ForestAdminDatasourceCustomizer
           fields
         end
 
-        def self.lenient_find(haystack, needle)
+        def lenient_find(haystack, needle)
           haystack&.find { |v| v == needle.strip } || haystack&.find { |v| v.downcase == needle.downcase.strip }
         end
 
-        def self.uuid?(value)
+        def uuid?(value)
           value.to_s.downcase.match?(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
         end
-        # end
       end
     end
   end
