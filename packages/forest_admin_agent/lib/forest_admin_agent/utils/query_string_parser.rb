@@ -85,6 +85,21 @@ module ForestAdminAgent
 
         Page.new(offset: offset, limit: items_per_pages.to_i)
       end
+
+      def self.parse_search(collection, args)
+        search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
+
+        raise ForestException, 'Collection is not searchable' if search && !collection.is_searchable?
+
+        search
+      end
+
+      def self.parse_search_extended(args)
+        extended = args.dig(:params, :data, :attributes, :all_records_subset_query,
+                            :searchExtended) || args.dig(:params, :searchExtended)
+
+        extended != '0'
+      end
     end
   end
 end

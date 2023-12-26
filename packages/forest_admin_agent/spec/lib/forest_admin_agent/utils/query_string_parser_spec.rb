@@ -358,6 +358,100 @@ module ForestAdminAgent
           )
         end
       end
+
+      describe 'when parse_search' do
+        let(:collection_category) do
+          datasource = Datasource.new
+          collection_category = Collection.new(datasource, 'Category')
+          collection_category.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                       filter_operators: [Operators::EQUAL]),
+              'label' => ColumnSchema.new(column_type: 'String')
+            }
+          )
+
+          datasource.add_collection(collection_category)
+
+          return collection_category
+        end
+
+        let(:collection_user) do
+          datasource = Datasource.new
+          collection_user = Collection.new(datasource, 'User')
+          collection_user.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                       filter_operators: [Operators::EQUAL]),
+              'name' => ColumnSchema.new(column_type: 'String')
+            }
+          )
+          collection_user.schema[:searchable] = true
+
+          datasource.add_collection(collection_user)
+
+          return collection_user
+        end
+
+        it 'returns null when not provided' do
+          args = { params: {} }
+
+          expect(described_class.parse_search(collection_category, args)).to be_nil
+        end
+
+        it 'hrows an error when the collection is not searchable' do
+          args = { params: { search: 'searched argument' } }
+
+          expect do
+            described_class.parse_search(collection_category, args)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Collection is not searchable'
+          )
+        end
+
+        it 'returns the query search parameter' do
+          args = { params: { search: 'searched argument' } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'converts the query search parameter as string' do
+          args = { params: { search: 1234 } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq(1234)
+        end
+
+        it 'works when passed in the body (actions)' do
+          args = {
+            params: {
+              data: {
+                attributes: {
+                  all_records_subset_query: {
+                    search: 'searched argument'
+                  }
+                }
+              }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+      end
+
+      describe 'when parse_search_extended' do
+        it 'returns the query searchExtended parameter' do
+          args = { params: { searchExtended: true } }
+
+          expect(described_class.parse_search_extended(args)).to be(true)
+        end
+
+        it 'returns false for falsy "0" string' do
+          args = { params: { searchExtended: '0' } }
+
+          expect(described_class.parse_search_extended(args)).to be(false)
+        end
+      end
     end
   end
 end
