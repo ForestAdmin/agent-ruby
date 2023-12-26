@@ -25,25 +25,25 @@ module ForestAdminDatasourceToolkit
     end
 
     def enable_count
-      @schema[:countable] = true
+      schema[:countable] = true
     end
 
     def is_countable?
-      @schema[:countable]
+      schema[:countable]
     end
 
     def is_searchable?
-      @searchable[:searchable]
+      schema[:searchable]
     end
 
     def fields
-      @schema[:fields]
+      schema[:fields]
     end
 
     def add_field(name, field)
       raise Exceptions::ForestException, "Field #{name} already defined in collection" if @schema[:fields].key?(name)
 
-      @schema[:fields][name] = field
+      schema[:fields][name] = field
     end
 
     def add_fields(fields)
