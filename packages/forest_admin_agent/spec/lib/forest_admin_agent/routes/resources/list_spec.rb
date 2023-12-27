@@ -39,8 +39,9 @@ module ForestAdminAgent
                 'last_name' => ColumnSchema.new(column_type: 'String')
               }
             },
-            list: [User.new(1, 'foo', 'foo')]
+            list: [User.new(1, 'foo', 'foo'), User.new(2, 'bar', 'bar')]
           )
+
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
           datasource.add_collection(collection)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
@@ -73,9 +74,20 @@ module ForestAdminAgent
                   'last_name' => 'foo'
                 },
                 'links' => { 'self' => 'forest/user/1' }
+              },
+              {
+                'type' => 'user',
+                'id' => '2',
+                'attributes' => {
+                  'id' => 2,
+                  'first_name' => 'bar',
+                  'last_name' => 'bar'
+                },
+                'links' => { 'self' => 'forest/user/2' }
               }
             ],
-            'included' => []
+            'included' => [],
+            'meta' => { decorators: [] }
           )
         end
 

@@ -98,6 +98,8 @@ module ForestAdminAgent
         extended = args.dig(:params, :data, :attributes, :all_records_subset_query,
                             :searchExtended) || args.dig(:params, :searchExtended)
 
+        return false if extended.nil?
+
         extended != '0'
       end
     end

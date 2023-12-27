@@ -26,6 +26,7 @@ module ForestAdminAgent
             search: ForestAdminAgent::Utils::QueryStringParser.parse_search(@collection, args),
             search_extended: ForestAdminAgent::Utils::QueryStringParser.parse_search_extended(args)
           )
+
           projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)
           records = @collection.list(@caller, filter, projection)
 
@@ -44,9 +45,12 @@ module ForestAdminAgent
         def handle_search_decorator(search_value, records)
           decorator = { decorators: [] }
           unless search_value.nil?
-            records.each_with_index do |record, index|
-              decorator[:decorators][index] = { id: Utils::Id.pack_id(@collection, record), search: [] }
-              record.attributes.each do |field_key, field_value|
+            records.each_with_index do |entry, index|
+              decorator[:decorators][index] = { id: Utils::Id.pack_id(@collection, entry), search: [] }
+              # attributes method is defined on ActiveRecord::Base model
+              attributes = entry.respond_to?(:attributes) ? entry.attributes : entry
+
+              attributes.each do |field_key, field_value|
                 if !field_value.is_a?(Array) && field_value.to_s.downcase.include?(search_value.downcase)
                   decorator[:decorators][index][:search] << field_key
                 end
