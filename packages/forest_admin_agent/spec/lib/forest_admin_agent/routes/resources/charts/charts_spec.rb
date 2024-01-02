@@ -35,7 +35,7 @@ module ForestAdminAgent
           review_class = Struct.new(:id, :book_id, :author)
           stub_const('Review', review_class)
 
-          @datasource = Datasource.new
+          datasource = Datasource.new
           collection_book = instance_double(
             Collection,
             name: 'book',
@@ -97,11 +97,13 @@ module ForestAdminAgent
             }
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-          @datasource.add_collection(collection_book)
-          @datasource.add_collection(collection_review)
-          @datasource.add_collection(collection_book_review)
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+          datasource.add_collection(collection_book)
+          datasource.add_collection(collection_review)
+          datasource.add_collection(collection_book_review)
+          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+
+          @datasource = ForestAdminAgent::Facades::Container.datasource
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
           allow(permissions).to receive_messages(
@@ -171,6 +173,7 @@ module ForestAdminAgent
                                                   type: 'Value',
                                                   timezone: 'Europe/Paris'
                                                 })
+            @datasource.get_collection('book')
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [{ value: 10, group: [] }], # first call
               [{ value: 5, group: [] }] # second call

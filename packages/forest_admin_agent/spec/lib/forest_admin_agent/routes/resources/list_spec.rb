@@ -28,7 +28,7 @@ module ForestAdminAgent
           user_class = Struct.new(:id, :first_name, :last_name)
           stub_const('User', user_class)
 
-          @datasource = Datasource.new
+          datasource = Datasource.new
           collection = instance_double(
             Collection,
             name: 'user',
@@ -42,9 +42,11 @@ module ForestAdminAgent
             list: [User.new(1, 'foo', 'foo')]
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-          @datasource.add_collection(collection)
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+          datasource.add_collection(collection)
+          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+          @datasource = ForestAdminAgent::Facades::Container.datasource
+          allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo', 'foo')])
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
           allow(permissions).to receive_messages(can?: true, get_scope: nil)
@@ -109,8 +111,8 @@ module ForestAdminAgent
                 {
                   aggregator: 'And',
                   conditions: [
-                    { field: 'id', operator: 'Greater_Than', value: 7 },
-                    { field: 'first_name', operator: 'Contains', value: 'foo' }
+                    { field: 'id', operator: 'greater_than', value: 7 },
+                    { field: 'first_name', operator: 'contains', value: 'foo' }
                   ]
                 }
               )

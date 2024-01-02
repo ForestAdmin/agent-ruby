@@ -1,3 +1,6 @@
+require 'active_support'
+require 'active_support/core_ext/string'
+
 module ForestAdminDatasourceToolkit
   module Components
     module Query
@@ -11,7 +14,7 @@ module ForestAdminDatasourceToolkit
 
             def initialize(field, operator, value = nil)
               @field = field
-              @operator = operator
+              @operator = operator.underscore
               @value = value
               valid_operator(@operator) if @operator
               super()
@@ -32,14 +35,14 @@ module ForestAdminDatasourceToolkit
             end
 
             def inverse
-              return override(operator: "Not_#{@operator}") if Operators.exist?("Not_#{@operator}")
-              return override(operator: @operator[4..]) if @operator.start_with?('Not')
+              return override(operator: "not_#{@operator}") if Operators.exist?("not_#{@operator}")
+              return override(operator: @operator[4..]) if @operator.start_with?('not')
 
               case @operator
-              when 'Blank'
-                override(operator: 'Present')
-              when 'Present'
-                override(operator: 'Blank')
+              when Operators::BLANK
+                override(operator: Operators::BLANK)
+              when Operators::PRESENT
+                override(operator: Operators::PRESENT)
               else
                 raise ForestException, "Operator: #{@operator} cannot be inverted."
               end

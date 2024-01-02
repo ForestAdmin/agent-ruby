@@ -49,7 +49,7 @@ module ForestAdminDatasourceToolkit
 
                 if depends_replacers.all? { |r| !r.nil? }
                   return lambda { |leaf, timezone|
-                    replacer.call(leaf).replace_leafs do |sub_leaf|
+                    replacer.call(leaf, timezone).replace_leafs do |sub_leaf|
                       depends_replacers[depends_on.index(sub_leaf.operator)].call(sub_leaf, timezone)
                     end
                   }

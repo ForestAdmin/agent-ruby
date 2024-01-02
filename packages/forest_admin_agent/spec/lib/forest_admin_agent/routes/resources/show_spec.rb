@@ -45,7 +45,7 @@ module ForestAdminAgent
             end
             stub_const('User', user_class)
 
-            @datasource = Datasource.new
+            datasource = Datasource.new
 
             collection = instance_double(
               Collection,
@@ -67,11 +67,11 @@ module ForestAdminAgent
             )
 
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-            @datasource.add_collection(collection)
-            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+            datasource.add_collection(collection)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
-
-            @datasource
+            @datasource = ForestAdminAgent::Facades::Container.datasource
+            allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo', 'foo')])
           end
 
           it 'return an serialized content' do

@@ -12,10 +12,10 @@ module ForestAdminAgent
           include_context 'with caller'
           subject(:dissociate) { described_class.new }
 
-          let(:datasource) { Datasource.new }
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
+            datasource = Datasource.new
             collection_user = Collection.new(datasource, 'user')
             collection_user.add_fields(
               {
@@ -72,6 +72,8 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
+            @datasource = ForestAdminAgent::Facades::Container.datasource
+
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
             allow(permissions).to receive_messages(can?: true, get_scope: nil)
           end
@@ -103,7 +105,7 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many without deletion' do
-              allow(datasource.get_collection('address_user')).to receive(:update).and_return(true)
+              allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
 
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
@@ -111,7 +113,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -134,8 +136,8 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many with deletion' do
-              allow(datasource.get_collection('address_user')).to receive(:delete).and_return(true)
-              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
+              allow(@datasource.get_collection('address_user')).to receive(:delete).and_return(true)
+              allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
@@ -144,7 +146,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -166,8 +168,8 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_one_to_many with deletion on multiple records' do
-              allow(datasource.get_collection('address_user')).to receive(:delete).and_return(true)
-              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
+              allow(@datasource.get_collection('address_user')).to receive(:delete).and_return(true)
+              allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
@@ -181,7 +183,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -217,7 +219,7 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_many_to_many without deletion' do
-              allow(datasource.get_collection('address_user'))
+              allow(@datasource.get_collection('address_user'))
                 .to receive_messages(list: [AddressUser.new(1, 1, 1)], delete: true)
 
               args[:params]['relation_name'] = 'addresses'
@@ -226,7 +228,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -248,9 +250,9 @@ module ForestAdminAgent
             end
 
             it 'call dissociate_or_delete_many_to_many with deletion' do
-              allow(datasource.get_collection('address_user')).to receive_messages(list: [AddressUser.new(1, 1, 1)],
-                                                                                   delete: true)
-              allow(datasource.get_collection('address')).to receive(:delete).and_return(true)
+              allow(@datasource.get_collection('address_user')).to receive_messages(list: [AddressUser.new(1, 1, 1)],
+                                                                                    delete: true)
+              allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'addresses'
@@ -259,7 +261,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
-              expect(datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(
@@ -277,7 +279,7 @@ module ForestAdminAgent
                 )
               end
 
-              expect(datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
+              expect(@datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(

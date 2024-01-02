@@ -12,10 +12,10 @@ module ForestAdminAgent
           include_context 'with caller'
           subject(:update) { described_class.new }
 
-          let(:datasource) { Datasource.new }
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
+            datasource = Datasource.new
             collection_user = Collection.new(datasource, 'user')
             collection_user.add_fields(
               {
@@ -48,6 +48,7 @@ module ForestAdminAgent
             datasource.add_collection(collection_book)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+            @datasource = ForestAdminAgent::Facades::Container.datasource
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
             allow(permissions).to receive_messages(can?: true, get_scope: nil)
@@ -77,7 +78,7 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a many_to_one relation' do
-              allow(datasource.get_collection('book')).to receive(:update).and_return(true)
+              allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
 
               args[:params]['collection_name'] = 'book'
               args[:params]['relation_name'] = 'author'
@@ -86,7 +87,7 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
-              expect(datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
+              expect(@datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
                   condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
@@ -102,7 +103,7 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a one_to_one relation' do
-              allow(datasource.get_collection('book')).to receive_messages(aggregate: [{ value: 1 }], update: true)
+              allow(@datasource.get_collection('book')).to receive_messages(aggregate: [{ value: 1 }], update: true)
 
               args[:params]['collection_name'] = 'user'
               args[:params]['relation_name'] = 'book'
@@ -144,7 +145,7 @@ module ForestAdminAgent
                 ]
               ]
 
-              expect(datasource.get_collection('book')).to have_received(:update)
+              expect(@datasource.get_collection('book')).to have_received(:update)
                 .exactly(2).times do |caller, filter, data|
                 parameter = parameters.shift
                 expect(caller).to be_instance_of(parameter[0])

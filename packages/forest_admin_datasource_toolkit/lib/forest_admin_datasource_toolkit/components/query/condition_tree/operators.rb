@@ -3,64 +3,53 @@ module ForestAdminDatasourceToolkit
     module Query
       module ConditionTree
         class Operators
-          EQUAL = 'Equal'.freeze
-          NOT_EQUAL = 'Not_Equal'.freeze
-          LESS_THAN = 'Less_Than'.freeze
-          GREATER_THAN = 'Greater_Than'.freeze
-          MATCH = 'Match'.freeze
-          LIKE = 'Like'.freeze
-          I_LIKE = 'ILike'.freeze
-          NOT_CONTAINS = 'Not_Contains'.freeze
-          CONTAINS = 'Contains'.freeze
-          I_CONTAINS = 'IContains'.freeze
-          LONGER_THAN = 'Longer_Than'.freeze
-          SHORTER_THAN = 'Shorter_Than'.freeze
-          INCLUDES_ALL = 'Includes_All'.freeze
-          PRESENT = 'Present'.freeze
-          BLANK = 'Blank'.freeze
-          IN = 'In'.freeze
-          NOT_IN = 'Not_In'.freeze
-          STARTS_WITH = 'Starts_With'.freeze
-          I_STARTS_WITH = 'IStarts_With'.freeze
-          ENDS_WITH = 'Ends_With'.freeze
-          I_ENDS_WITH = 'IEnds_With'.freeze
-          MISSING = 'Missing'.freeze
-          BEFORE = 'Before'.freeze
-          AFTER = 'After'.freeze
-          AFTER_X_HOURS_AGO = 'After_X_Hours_Ago'.freeze
-          BEFORE_X_HOURS_AGO = 'Before_X_Hours_Ago'.freeze
-          FUTURE = 'Future'.freeze
-          PAST = 'Past'.freeze
-          TODAY = 'Today'.freeze
-          YESTERDAY = 'Yesterday'.freeze
-          PREVIOUS_WEEK = 'Previous_Week'.freeze
-          PREVIOUS_MONTH = 'Previous_Month'.freeze
-          PREVIOUS_QUARTER = 'Previous_Quarter'.freeze
-          PREVIOUS_YEAR = 'Previous_Year'.freeze
-          PREVIOUS_WEEK_TO_DATE = 'Previous_Week_To_Date'.freeze
-          PREVIOUS_MONTH_TO_DATE = 'Previous_Month_To_Date'.freeze
-          PREVIOUS_QUARTER_TO_DATE = 'Previous_Quarter_To_Date'.freeze
-          PREVIOUS_YEAR_TO_DATE = 'Previous_Year_To_Date'.freeze
-          PREVIOUS_X_DAYS = 'Previous_X_Days'.freeze
-          PREVIOUS_X_DAYS_TO_DATE = 'Previous_X_Days_To_Date'.freeze
+          EQUAL = 'equal'.freeze
+          NOT_EQUAL = 'not_equal'.freeze
+          LESS_THAN = 'less_than'.freeze
+          GREATER_THAN = 'greater_than'.freeze
+          MATCH = 'match'.freeze
+          LIKE = 'like'.freeze
+          I_LIKE = 'i_like'.freeze
+          NOT_CONTAINS = 'not_contains'.freeze
+          CONTAINS = 'contains'.freeze
+          I_CONTAINS = 'i_contains'.freeze
+          LONGER_THAN = 'longer_than'.freeze
+          SHORTER_THAN = 'shorter_than'.freeze
+          INCLUDES_ALL = 'includes_all'.freeze
+          PRESENT = 'present'.freeze
+          BLANK = 'blank'.freeze
+          IN = 'in'.freeze
+          NOT_IN = 'not_in'.freeze
+          STARTS_WITH = 'starts_with'.freeze
+          I_STARTS_WITH = 'i_starts_with'.freeze
+          ENDS_WITH = 'ends_with'.freeze
+          I_ENDS_WITH = 'i_ends_with'.freeze
+          MISSING = 'missing'.freeze
+          BEFORE = 'before'.freeze
+          AFTER = 'after'.freeze
+          AFTER_X_HOURS_AGO = 'after_x_hours_ago'.freeze
+          BEFORE_X_HOURS_AGO = 'before_x_hours_ago'.freeze
+          FUTURE = 'future'.freeze
+          PAST = 'past'.freeze
+          TODAY = 'today'.freeze
+          YESTERDAY = 'yesterday'.freeze
+          PREVIOUS_WEEK = 'previous_week'.freeze
+          PREVIOUS_MONTH = 'previous_month'.freeze
+          PREVIOUS_QUARTER = 'previous_quarter'.freeze
+          PREVIOUS_YEAR = 'previous_year'.freeze
+          PREVIOUS_WEEK_TO_DATE = 'previous_week_to_date'.freeze
+          PREVIOUS_MONTH_TO_DATE = 'previous_month_to_date'.freeze
+          PREVIOUS_QUARTER_TO_DATE = 'previous_quarter_to_date'.freeze
+          PREVIOUS_YEAR_TO_DATE = 'previous_year_to_date'.freeze
+          PREVIOUS_X_DAYS = 'previous_x_days'.freeze
+          PREVIOUS_X_DAYS_TO_DATE = 'previous_x_days_to_date'.freeze
 
           def self.all
-            constants
+            constants.map { |constant| const_get(constant) }
           end
 
           def self.exist?(operator_value)
-            case operator_value
-            when 'ILike'
-              operator_value = 'I_LIKE'
-            when 'IContains'
-              operator_value = 'I_CONTAINS'
-            when 'IStarts_With'
-              operator_value = 'I_STARTS_WITH'
-            when 'IEnds_With'
-              operator_value = 'I_ENDS_WITH'
-            end
-
-            all.include?(operator_value.upcase.to_sym)
+            all.include?(operator_value)
           end
 
           def self.interval_operators

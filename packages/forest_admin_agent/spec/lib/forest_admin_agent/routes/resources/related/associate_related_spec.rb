@@ -31,7 +31,7 @@ module ForestAdminAgent
             address_class = Struct.new(:id, :location)
             stub_const('Address', address_class)
 
-            @datasource = Datasource.new
+            datasource = Datasource.new
             collection_user = instance_double(
               Collection,
               name: 'user',
@@ -88,11 +88,13 @@ module ForestAdminAgent
             )
 
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
-            @datasource.add_collection(collection_user)
-            @datasource.add_collection(collection_address_user)
-            @datasource.add_collection(collection_address)
-            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+            datasource.add_collection(collection_user)
+            datasource.add_collection(collection_address_user)
+            datasource.add_collection(collection_address)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
+
+            @datasource = ForestAdminAgent::Facades::Container.datasource
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
             allow(permissions).to receive_messages(can?: true, get_scope: nil)

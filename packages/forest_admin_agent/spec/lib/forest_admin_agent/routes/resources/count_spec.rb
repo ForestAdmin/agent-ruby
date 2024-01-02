@@ -24,8 +24,8 @@ module ForestAdminAgent
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
         before do
-          @datasource = Datasource.new
-          collection = Collection.new(@datasource, 'user')
+          datasource = Datasource.new
+          collection = Collection.new(datasource, 'user')
           allow(collection).to receive(:aggregate).and_return(
             [
               { value: 1, group: [] }
@@ -33,9 +33,10 @@ module ForestAdminAgent
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
 
-          @datasource.add_collection(collection)
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource)
+          datasource.add_collection(collection)
+          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
           ForestAdminAgent::Builder::AgentFactory.instance.build
+          @datasource = ForestAdminAgent::Facades::Container.datasource
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
           allow(permissions).to receive_messages(can?: true, get_scope: nil)
