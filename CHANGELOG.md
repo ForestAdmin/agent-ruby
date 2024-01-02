@@ -1,3 +1,10 @@
+# [1.0.0-beta.26](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.25...v1.0.0-beta.26) (2024-01-02)
+
+
+### Features
+
+* **decorator:** add operators equivalence support  ([#20](https://github.com/ForestAdmin/agent-ruby/issues/20)) ([006c49a](https://github.com/ForestAdmin/agent-ruby/commit/006c49a1f1ac4c936b7a0ab9555ae81a884a0e5d))
+
 # [1.0.0-beta.25](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.24...v1.0.0-beta.25) (2023-12-20)
 
 
