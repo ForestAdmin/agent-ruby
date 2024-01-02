@@ -9,9 +9,6 @@ module ForestAdminDatasourceToolkit
                 :schema,
                 :native_driver
 
-    attr_writer :searchable,
-                :countable
-
     def initialize(datasource, name, native_driver: nil)
       super()
       @datasource = datasource
@@ -19,35 +16,34 @@ module ForestAdminDatasourceToolkit
       @native_driver = native_driver
       @schema = {
         fields: {},
-        countable: false
+        countable: false,
+        searchable: false
       }
       @actions = {}
       @segments = {}
       @charts = {}
-      @searchable = false
-      @countable = false
     end
 
     def enable_count
-      @schema[:countable] = true
+      schema[:countable] = true
     end
 
     def is_countable?
-      @schema[:countable]
+      schema[:countable]
     end
 
     def is_searchable?
-      @searchable
+      schema[:searchable]
     end
 
     def fields
-      @schema[:fields]
+      schema[:fields]
     end
 
     def add_field(name, field)
       raise Exceptions::ForestException, "Field #{name} already defined in collection" if @schema[:fields].key?(name)
 
-      @schema[:fields][name] = field
+      schema[:fields][name] = field
     end
 
     def add_fields(fields)

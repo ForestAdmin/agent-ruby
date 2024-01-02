@@ -41,6 +41,7 @@ module ForestAdminAgent
             },
             list: [User.new(1, 'foo', 'foo')]
           )
+
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
           datasource.add_collection(collection)
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
@@ -75,7 +76,8 @@ module ForestAdminAgent
                 'links' => { 'self' => 'forest/user/1' }
               }
             ],
-            'included' => []
+            'included' => [],
+            'meta' => { decorators: [] }
           )
         end
 

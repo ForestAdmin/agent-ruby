@@ -25,7 +25,7 @@ module ForestAdminDatasourceToolkit
       end
 
       it 'return true when value is override' do
-        @collection.searchable = true
+        @collection.schema[:searchable] = true
         expect(@collection.is_searchable?).to be true
       end
     end

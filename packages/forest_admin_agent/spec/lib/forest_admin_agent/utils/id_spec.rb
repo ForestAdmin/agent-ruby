@@ -141,6 +141,38 @@ module ForestAdminAgent
           )
         end
       end
+
+      describe 'when pack_id is called' do
+        it 'return the id value' do
+          collection = datasource.get_collection('person')
+          expect(described_class.pack_id(collection, { 'id' => 1, 'foo' => 'bar' })).to eq('1')
+        end
+
+        it 'return the ids value' do
+          collection = datasource.get_collection('pks')
+          expect(described_class.pack_id(collection, { 'key1' => 1, 'key2' => 2 })).to eq('1|2')
+        end
+
+        it 'throws when collection does not have any primary keys' do
+          collection_foo = datasource.get_collection('foo')
+          expect do
+            described_class.pack_id(collection_foo, { 'id' => 1, 'foo' => 'bar' })
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 This collection has no primary key'
+          )
+        end
+      end
+
+      describe 'when pack_ids is called' do
+        it 'return an array of ids' do
+          collection = datasource.get_collection('person')
+          expect(described_class.pack_ids(collection, [
+                                            { 'id' => 1, 'foo' => 'bar' },
+                                            { 'id' => 2, 'foo' => 'foo' }
+                                          ])).to eq(['1', '2'])
+        end
+      end
     end
   end
 end

@@ -3,6 +3,19 @@ module ForestAdminAgent
     class Id
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit
+
+      def self.pack_ids(schema, records)
+        records.map { |packed_id| pack_id(schema, packed_id) }
+      end
+
+      def self.pack_id(schema, record)
+        pk_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(schema)
+
+        raise Exceptions::ForestException, 'This collection has no primary key' if pk_names.empty?
+
+        pk_names.map { |pk| record[pk].to_s }.join('|')
+      end
+
       def self.unpack_id(collection, packed_id, with_key: false)
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         primary_key_values = packed_id.to_s.split('|')
