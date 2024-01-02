@@ -148,6 +148,11 @@ module ForestAdminAgent
           expect(described_class.pack_id(collection, { 'id' => 1, 'foo' => 'bar' })).to eq('1')
         end
 
+        it 'return the ids value' do
+          collection = datasource.get_collection('pks')
+          expect(described_class.pack_id(collection, { 'key1' => 1, 'key2' => 2 })).to eq('1|2')
+        end
+
         it 'throws when collection does not have any primary keys' do
           collection_foo = datasource.get_collection('foo')
           expect do
