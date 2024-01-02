@@ -121,12 +121,15 @@ module ForestAdminDatasourceCustomizer
               )
               filter = Filter.new(search: 'something')
               decorator = described_class.new(collection, nil)
-              decorator.replace_search(proc { |value| { field: 'id', operator: 'Equal', value: value } })
+              decorator.replace_search(proc { |value|
+                                         { field: 'id', operator: ConditionTree::Operators::EQUAL, value: value }
+                                       })
 
               refined_filter = decorator.refine_filter(caller, filter)
 
               expect(refined_filter).to have_attributes(
-                condition_tree: have_attributes(field: 'id', operator: 'Equal', value: 'something'),
+                condition_tree: have_attributes(field: 'id', operator: ConditionTree::Operators::EQUAL,
+                                                value: 'something'),
                 search: nil
               )
             end
