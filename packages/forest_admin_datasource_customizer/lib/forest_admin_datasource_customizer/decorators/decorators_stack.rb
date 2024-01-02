@@ -9,7 +9,7 @@ module ForestAdminDatasourceCustomizer
         last = datasource
         last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
-        last = DatasourceDecorator.new(last, Schema::SearchCollectionDecorator)
+        last = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
       end
