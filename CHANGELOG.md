@@ -1,3 +1,10 @@
+# [1.0.0-beta.27](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.26...v1.0.0-beta.27) (2024-01-02)
+
+
+### Features
+
+* **decorator:** add search support ([#21](https://github.com/ForestAdmin/agent-ruby/issues/21)) ([a71acc6](https://github.com/ForestAdmin/agent-ruby/commit/a71acc6391fe14d38fc7204c8942de4c95fcbd1f))
+
 # [1.0.0-beta.26](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.25...v1.0.0-beta.26) (2024-01-02)
 
 
