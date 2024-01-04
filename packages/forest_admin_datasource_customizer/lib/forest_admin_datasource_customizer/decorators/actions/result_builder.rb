@@ -1,7 +1,7 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Actions
-      module ResultBuilder
+      class ResultBuilder
         def success(message: 'Success', options: [])
           {
             type: 'Success',
