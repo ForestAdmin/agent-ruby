@@ -37,7 +37,7 @@ module ForestAdminDatasourceToolkit
         def get_type_from_string(value, type_context)
           return type_context if [PrimitiveTypes::ENUM, PrimitiveTypes::STRING].include?(type_context)
 
-          return PrimitiveTypes::UUID if uuid_validate(value)
+          return PrimitiveTypes::UUID if uuid?(value)
 
           return get_date_type(value) if valid_date?(value) && [PrimitiveTypes::DATE, PrimitiveTypes::DATE_ONLY,
                                                                 PrimitiveTypes::TIME_ONLY].include?(type_context)
@@ -52,15 +52,19 @@ module ForestAdminDatasourceToolkit
         end
 
         def date?(value)
-          Date.parse(value)
-          true
+          true if Date.parse(value)
         rescue ArgumentError
           false
         end
 
         def time?(value)
-          Time.parse(value)
-          true
+          true if Time.parse(value)
+        rescue ArgumentError
+          false
+        end
+
+        def number?(value)
+          true if Float(value)
         rescue ArgumentError
           false
         end
@@ -69,11 +73,11 @@ module ForestAdminDatasourceToolkit
           potential_point = value.split(',')
 
           potential_point.length == 2 && type_context == PrimitiveTypes::POINT && potential_point.all? do |point|
-            get(point, PrimitiveTypes::NUMBER) == PrimitiveTypes::NUMBER
+            number?(point) && get(point.to_i, PrimitiveTypes::NUMBER) == PrimitiveTypes::NUMBER
           end
         end
 
-        def uuid_validate(uuid)
+        def uuid?(uuid)
           format = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
           true if format.match?(uuid.to_s.downcase)
