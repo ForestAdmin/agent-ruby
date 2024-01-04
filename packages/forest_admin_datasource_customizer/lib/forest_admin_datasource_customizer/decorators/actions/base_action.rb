@@ -4,7 +4,7 @@ module ForestAdminDatasourceCustomizer
       class BaseAction
         attr_reader :scope, :form, :is_generate_file, :execute
 
-        def initialize(scope:, form: [], is_generate_file: false)
+        def initialize(scope:, form: nil, is_generate_file: false)
           @scope = scope
           @form = form
           @is_generate_file = is_generate_file
