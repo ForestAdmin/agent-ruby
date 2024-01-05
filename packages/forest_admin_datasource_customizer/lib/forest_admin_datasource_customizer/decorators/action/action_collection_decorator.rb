@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
-    module Actions
+    module Action
       class ActionCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Components
 

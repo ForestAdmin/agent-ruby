@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
-    module Actions
+    module Action
       class DynamicField
         attr_accessor :type, :label, :description, :is_required, :is_read_only, :if_condition, :value, :default_value,
                       :collection_name, :enum_values

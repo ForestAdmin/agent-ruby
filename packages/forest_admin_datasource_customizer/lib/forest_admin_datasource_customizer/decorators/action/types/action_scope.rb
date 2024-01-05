@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
-    module Actions
+    module Action
       module Types
         module ActionScope
           SINGLE = 'single'.freeze
