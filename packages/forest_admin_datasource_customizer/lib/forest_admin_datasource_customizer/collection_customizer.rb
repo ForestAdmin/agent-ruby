@@ -33,5 +33,23 @@ module ForestAdminDatasourceCustomizer
         -> { @stack.search.get_collection(@name).replace_search(definition) }
       )
     end
+
+    def add_field(name, definition)
+      push_customization(
+        lambda {
+          collection_before_relations = @stack.early_computed.get_collection(@name)
+          collection_after_relations = @stack.late_computed.get_collection(@name)
+          can_be_computed_before_relations = definition.dependencies.all? do |field|
+            !ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection_before_relations, field).nil?
+          rescue StandardError
+            false
+          end
+
+          collection = can_be_computed_before_relations ? collection_before_relations : collection_after_relations
+
+          collection.register_computed(name, definition)
+        }
+      )
+    end
   end
 end
