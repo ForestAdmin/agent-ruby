@@ -3,13 +3,16 @@ module ForestAdminDatasourceCustomizer
     class DecoratorsStack
       include ForestAdminDatasourceToolkit::Decorators
 
-      attr_reader :datasource, :schema
+      attr_reader :datasource, :schema, :action
 
       def initialize(datasource)
+        @customizations = []
+
         last = datasource
         last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
         last = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
+        last = @action = DatasourceDecorator.new(last, Action::ActionCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
       end
@@ -24,7 +27,7 @@ module ForestAdminDatasourceCustomizer
       # This method will be called recursively and clears the queue at each recursion to ensure
       # that all customizations are applied in the right order.
       def apply_queued_customizations(logger)
-        queued_customizations = @customizations.pop
+        queued_customizations = @customizations.clone
         @customizations = []
 
         while queued_customizations.length.positive?

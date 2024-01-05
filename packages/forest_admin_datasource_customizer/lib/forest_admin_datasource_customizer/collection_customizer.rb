@@ -8,6 +8,12 @@ module ForestAdminDatasourceCustomizer
       @name = name
     end
 
+    def add_action(name, definition)
+      push_customization(
+        proc { @stack.action.get_collection(@name).add_action(name, definition) }
+      )
+    end
+
     def schema
       @stack.datasource.get_collection(@name).schema
     end
@@ -18,7 +24,7 @@ module ForestAdminDatasourceCustomizer
 
     def use(plugin, options = [])
       push_customization(
-        -> { plugin.run(@datasource_customizer, self, options) }
+        proc { plugin.run(@datasource_customizer, self, options) }
       )
     end
 
@@ -30,8 +36,12 @@ module ForestAdminDatasourceCustomizer
 
     def replace_search(definition)
       push_customization(
-        -> { @stack.search.get_collection(@name).replace_search(definition) }
+        proc { @stack.search.get_collection(@name).replace_search(definition) }
       )
+    end
+
+    def push_customization(customization)
+      @stack.queue_customization(customization)
     end
   end
 end
