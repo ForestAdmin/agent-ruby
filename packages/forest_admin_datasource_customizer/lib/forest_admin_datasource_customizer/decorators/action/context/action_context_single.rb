@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
-    module Actions
+    module Action
       module Context
         class ActionContextSingle < ActionContext
           include ForestAdminDatasourceToolkit

@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
-    module Actions
+    module Action
       class BaseAction
         attr_reader :scope, :form, :is_generate_file, :execute
 
