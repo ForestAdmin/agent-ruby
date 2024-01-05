@@ -83,7 +83,7 @@ module ForestAdminAgent
 
             {
               data: data,
-              included: included.reject!(&:empty?),
+              included: included.reject!(&:empty?).flatten,
               meta: schema[:meta]
             }
           end
@@ -95,6 +95,8 @@ module ForestAdminAgent
               smart_feature[:attributes] = value if with_attributes
               smart_features << smart_feature
             end
+
+            smart_features
           end
         end
       end
