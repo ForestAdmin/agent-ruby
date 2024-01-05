@@ -245,24 +245,18 @@ RSpec/MultipleExpectations:
 Layout/LineLength:
   Max: 120
   Exclude:
-    - 'packages/forest_admin_agent/spec/shared/caller.rb'
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_customizer/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/http/forest_admin_api_requester.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/http/forest_admin_api_requester_spec.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/list.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/permissions.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/charts/charts_spec.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/services/smart_action_checker_spec.rb'
-    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/utils/context_variables_injector_spec.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter_factory.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory_spec.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/transforms/comparisons_spec.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/transforms/pattern_spec.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/components/query/condition_tree/transforms/times_spec.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/validations/field_validator.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/utils/collection_spec.rb'
-    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/validations/field_validator_spec.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
