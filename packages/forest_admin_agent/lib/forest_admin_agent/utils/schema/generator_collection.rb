@@ -6,7 +6,7 @@ module ForestAdminAgent
 
         def self.build_schema(collection)
           {
-            actions: {},
+            actions: build_actions(collection),
             fields: build_fields(collection),
             icon: nil,
             integration: nil,
@@ -28,6 +28,10 @@ module ForestAdminAgent
 
           fields.map { |name, _field| GeneratorField.build_schema(collection, name) }
                 .sort_by { |v| v[:field] }
+        end
+
+        def self.build_actions(collection)
+          collection.schema[:actions].keys.sort.map { |name| GeneratorAction.build_schema(collection, name) }
         end
       end
     end
