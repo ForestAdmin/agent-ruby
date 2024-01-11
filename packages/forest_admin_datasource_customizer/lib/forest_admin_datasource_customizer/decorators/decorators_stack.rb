@@ -6,11 +6,13 @@ module ForestAdminDatasourceCustomizer
       attr_reader :datasource, :schema, :early_computed, :late_computed
 
       def initialize(datasource)
+        @customizations = []
+
         last = datasource
-        last = @early_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
-        last = @late_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
+        last = @early_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
+        last = @late_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
@@ -26,7 +28,7 @@ module ForestAdminDatasourceCustomizer
       # This method will be called recursively and clears the queue at each recursion to ensure
       # that all customizations are applied in the right order.
       def apply_queued_customizations(logger)
-        queued_customizations = @customizations.pop
+        queued_customizations = @customizations.clone
         @customizations = []
 
         while queued_customizations.length.positive?
