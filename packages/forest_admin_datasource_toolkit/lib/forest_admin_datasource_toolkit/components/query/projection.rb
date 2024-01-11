@@ -36,6 +36,28 @@ module ForestAdminDatasourceToolkit
         def nest(prefix: nil)
           prefix ? Projection.new(map { |path| "#{prefix}:#{path}" }) : self
         end
+
+        def unnest
+          prefix = first.split(':')[0]
+          raise 'Cannot unnest projection.' unless all? { |path| path.start_with?(prefix) }
+
+          Projection.new(map { |path| path[prefix.length + 1, path.length - prefix.length - 1] })
+        end
+
+        def replace(&block)
+          Projection.new(
+            map(&block)
+            .reduce(Projection.new) do |memo, path|
+              return memo.union([path]) if path.is_a?(String)
+
+              memo.union(path)
+            end
+          )
+        end
+
+        def equals(other)
+          length == other.length && all? { |field| other.include?(field) }
+        end
       end
     end
   end
