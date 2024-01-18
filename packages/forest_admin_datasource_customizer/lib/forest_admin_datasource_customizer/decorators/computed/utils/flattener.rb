@@ -10,30 +10,37 @@ module ForestAdminDatasourceCustomizer
           end
 
           def self.un_flatten(flatten, projection)
-            num_records = flatten[0].length || 0
-            records = Array.new(num_records) { [] }
-            projection.columns.each_with_index do |field, index|
-              flatten[index].each_with_index do |value, key|
-                records[key] = {} if records[key].empty?
-                records[key][field] = value || nil
+            num_records = flatten[0]&.length || 0
+            records = []
+
+            (0...num_records).each do |record_index|
+              records[record_index] = {}
+
+              projection.each_with_index do |path, path_index|
+                parts = path.split(':').reject { |part| part.nil? || part.empty? }
+                value = flatten[path_index][record_index]
+
+                # Ignore undefined values.
+                next if value.nil?
+
+                # Set all others (including null)
+                record = records[record_index]
+
+                (0...parts.length).each do |part_index|
+                  part = parts[part_index]
+
+                  if part_index == parts.length - 1
+                    record[part] = value
+                  elsif record[part].nil?
+                    record[part] = {}
+                  end
+
+                  record = record[part]
+                end
               end
             end
 
-            projection.relations.each do |relation, paths|
-              sub_flatten = []
-              paths.each do |path|
-                sub_flatten << flatten[projection.search("#{relation}:#{path}")]
-              end
-
-              sub_records = un_flatten(sub_flatten, paths)
-              records.each_key do |key|
-                records[key][relation] = sub_records[key]
-              end
-            end
-
-            records.map do |record|
-              record.any? { |value| !value.nil? } ? record : nil
-            end
+            records
           end
         end
       end
