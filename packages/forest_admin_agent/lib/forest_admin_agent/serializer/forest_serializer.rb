@@ -20,8 +20,12 @@ module ForestAdminAgent
       end
 
       def type
-        class_name = object.class.name
-        @@class_names[class_name] ||= class_name.demodulize.underscore.freeze
+        class_name = @options[:class_name]
+        @@class_names[class_name] ||= class_name
+      end
+
+      def id
+        @object['id'].to_s # TODO: change id by primary
       end
 
       def format_name(attribute_name)
@@ -41,7 +45,7 @@ module ForestAdminAgent
       end
 
       def attributes
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
         fields = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
         return {} if attributes_map.nil?
@@ -61,11 +65,12 @@ module ForestAdminAgent
           instance_eval(&attr_or_block)
         else
           # Default behavior, call a method by the name of the attribute.
-          begin
-            object.try(attr_or_block)
-          rescue
-            nil
-          end
+          object[attr_or_block]
+          # begin
+          #   object.try(attr_or_block)
+          # rescue
+          #   nil
+          # end
         end
       end
 
@@ -104,7 +109,7 @@ module ForestAdminAgent
       end
 
       def relationships
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
         relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
         relations_to_one = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 

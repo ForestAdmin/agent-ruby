@@ -18,7 +18,7 @@ module ForestAdminDatasourceActiveRecord
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter).build
 
-      query.all
+      query.all.map(&:attributes)
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
@@ -26,7 +26,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def create(_caller, data)
-      @model.create(data)
+      @model.create(data).attributes
     end
 
     def update(_caller, filter, data)
