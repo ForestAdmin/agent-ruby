@@ -40,21 +40,6 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
-          # test('flatten() should work', function () {
-          #     $records = [
-          #         ['id' => 1, 'book' => ['author' => ['firstname' => 'romain']]],
-          #         ['id' => 2, 'book' => null],
-          #         ['id' => 3, 'book' => ['author' => ['firstname' => 'ana']]],
-          #     ];
-          #     $projection = new Projection(['id', 'book:author:firstname']);
-          #
-          #     expect(Flattener::flatten($records, $projection))->toEqual(
-          #         [
-          #             [1, 2, 3],
-          #             ['romain', null, 'ana'],
-          #         ]
-          #     );
-          # });
           it 'flatten() should work' do
             records = [
               { 'id' => 1, 'book' => { 'author' => { 'firstname' => 'romain' } } },
