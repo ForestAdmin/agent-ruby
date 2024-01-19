@@ -1,3 +1,10 @@
+# [1.0.0-beta.28](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.27...v1.0.0-beta.28) (2024-01-19)
+
+
+### Features
+
+* **serializer:** serialize hash instead of an active record object ([#22](https://github.com/ForestAdmin/agent-ruby/issues/22)) ([70dea37](https://github.com/ForestAdmin/agent-ruby/commit/70dea37982c201c3a547638f7b21cd0500b37014))
+
 # [1.0.0-beta.27](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.26...v1.0.0-beta.27) (2024-01-02)
 
 
