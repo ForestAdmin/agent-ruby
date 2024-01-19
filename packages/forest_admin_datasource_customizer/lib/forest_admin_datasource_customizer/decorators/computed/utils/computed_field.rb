@@ -7,7 +7,10 @@ module ForestAdminDatasourceCustomizer
 
           def self.compute_field(ctx, computed, computed_dependencies, flatten)
             transform_unique_values(
-              Flattener.un_flatten(flatten, Projection.new(computed_dependencies)),
+              Flattener.un_flatten(
+                flatten,
+                Projection.new(computed_dependencies)
+              ),
               ->(unique_partials) { computed.get_values(unique_partials, ctx) }
             )
           end
@@ -47,7 +50,7 @@ module ForestAdminDatasourceCustomizer
 
             inputs.each do |input|
               if input
-                hash = Digest::SHA1.hexdigest(input.to_h.to_s)
+                hash = Digest::SHA1.hexdigest(input.to_s)
 
                 if indexes[hash].nil?
                   indexes[hash] = unique_inputs.length
@@ -58,11 +61,11 @@ module ForestAdminDatasourceCustomizer
               else
                 mapping.push(-1)
               end
-
-              unique_outputs = callback.call(unique_inputs)
-
-              mapping.map { |index| index == -1 ? nil : unique_outputs[index] }
             end
+
+            unique_outputs = callback.call(unique_inputs)
+
+            mapping.map { |index| index == -1 ? nil : unique_outputs[index] }
           end
         end
       end
