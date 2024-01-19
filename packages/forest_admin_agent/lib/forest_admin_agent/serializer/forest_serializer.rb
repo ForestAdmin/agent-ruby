@@ -25,7 +25,12 @@ module ForestAdminAgent
       end
 
       def id
-        @object['id'].to_s # TODO: change id by primary
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
+        primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(forest_collection)
+        id = []
+        primary_keys.each { |key| id << @object[key] }
+
+        id.join('|')
       end
 
       def format_name(attribute_name)
