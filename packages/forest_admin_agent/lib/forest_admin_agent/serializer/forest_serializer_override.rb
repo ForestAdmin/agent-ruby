@@ -48,7 +48,7 @@ module ForestAdminAgent
               end
 
               # We're finding relationships for compound documents, so skip anything that doesn't exist.
-              next if object.nil?
+              next if object.nil? || object.empty?
 
               # Full linkage: a request for comments.author MUST automatically include comments
               # in the response.
@@ -58,6 +58,8 @@ module ForestAdminAgent
                 # If it is not set, that indicates that this is an inner path and not a leaf and will
                 # be followed by the recursion below.
                 objects.each do |obj|
+                  relation = ForestAdminAgent::Facades::Container.datasource.get_collection(options[:class_name]).schema[:fields][attribute_name]
+                  relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
                   obj_serializer = JSONAPI::Serializer.find_serializer(obj, options)
                   # Use keys of ['posts', '1'] for the results to enforce uniqueness.
                   # Spec: A compound document MUST NOT include more than one resource object for each
@@ -82,7 +84,8 @@ module ForestAdminAgent
                   # so merge the include_linkages each time we see it to load all the relevant linkages.
                   current_child_includes += (results[key] && results[key][:include_linkages]) || []
                   current_child_includes.uniq!
-                  results[key] = { object: obj, include_linkages: current_child_includes }
+
+                  results[key] = { object: obj, include_linkages: current_child_includes, class_name: relation_class_name }
                 end
               end
 
@@ -169,7 +172,7 @@ module ForestAdminAgent
               # Duck-typing check for a collection being passed without is_collection true.
               # We always must be told if serializing a collection because the JSON:API spec distinguishes
               # how to serialize null single resources vs. empty collections.
-              if !options[:skip_collection_check] && objects.respond_to?(:each)
+              if !options[:skip_collection_check] && objects.is_a?(Array)
                 raise JSONAPI::Serializer::AmbiguousCollectionError.new(
                   'Must provide `is_collection: true` to `serialize` when serializing collections.')
               end
@@ -206,6 +209,8 @@ module ForestAdminAgent
                 included_passthrough_options[:serializer] = find_serializer_class(data[:object], options)
                 included_passthrough_options[:namespace] = passthrough_options[:namespace]
                 included_passthrough_options[:include_linkages] = data[:include_linkages]
+                included_passthrough_options[:class_name] = data[:class_name]
+
                 serialize_primary(data[:object], included_passthrough_options)
               end
             end

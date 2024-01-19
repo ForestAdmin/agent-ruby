@@ -66,11 +66,6 @@ module ForestAdminAgent
         else
           # Default behavior, call a method by the name of the attribute.
           object[attr_or_block]
-          # begin
-          #   object.try(attr_or_block)
-          # rescue
-          #   nil
-          # end
         end
       end
 
@@ -109,7 +104,8 @@ module ForestAdminAgent
       end
 
       def relationships
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
+        datasource = ForestAdminAgent::Facades::Container.datasource
+        forest_collection = datasource.get_collection(@options[:class_name])
         relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
         relations_to_one = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
@@ -129,10 +125,13 @@ module ForestAdminAgent
           end
 
           object = has_one_relationship(attribute_name, attr_data)
-          if object.nil?
+          if object.nil? || object.empty?
             data[formatted_attribute_name]['data'] = nil
           else
-            related_object_serializer = ForestSerializer.new(object, @options)
+            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            options = @options.clone
+            options[:class_name] = datasource.get_collection(relation.foreign_collection).name
+            related_object_serializer = ForestSerializer.new(object, options)
             data[formatted_attribute_name]['data'] = {
               'type' => related_object_serializer.type.to_s,
               'id' => related_object_serializer.id.to_s,
@@ -157,6 +156,9 @@ module ForestAdminAgent
           if @_include_linkages.include?(formatted_attribute_name) || attr_data[:options][:include_data]
             data[formatted_attribute_name]['data'] = []
             objects = has_many_relationship(attribute_name, attr_data) || []
+            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            options = @options.clone
+            options[:class_name] = datasource.get_collection(relation.foreign_collection).name
             objects.each do |obj|
               related_object_serializer = JSONAPI::Serializer.find_serializer(obj, @options)
               data[formatted_attribute_name]['data'] << {
