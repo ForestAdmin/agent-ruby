@@ -18,7 +18,7 @@ module ForestAdminDatasourceActiveRecord
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter).build
 
-      query.all.map(&:attributes)
+      query.all.map { |record| Utils::ActiveRecordSerializer.new(record).to_hash }
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
@@ -26,7 +26,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def create(_caller, data)
-      @model.create(data).attributes
+      Utils::ActiveRecordSerializer.new(@model.create(data)).to_hash
     end
 
     def update(_caller, filter, data)
