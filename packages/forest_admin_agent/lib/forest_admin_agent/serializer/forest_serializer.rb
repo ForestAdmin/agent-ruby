@@ -20,8 +20,17 @@ module ForestAdminAgent
       end
 
       def type
-        class_name = object.class.name
-        @@class_names[class_name] ||= class_name.demodulize.underscore.freeze
+        class_name = @options[:class_name]
+        @@class_names[class_name] ||= class_name
+      end
+
+      def id
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
+        primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(forest_collection)
+        id = []
+        primary_keys.each { |key| id << @object[key] }
+
+        id.join('|')
       end
 
       def format_name(attribute_name)
@@ -41,7 +50,7 @@ module ForestAdminAgent
       end
 
       def attributes
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
         fields = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
         return {} if attributes_map.nil?
@@ -61,11 +70,7 @@ module ForestAdminAgent
           instance_eval(&attr_or_block)
         else
           # Default behavior, call a method by the name of the attribute.
-          begin
-            object.try(attr_or_block)
-          rescue
-            nil
-          end
+          object[attr_or_block]
         end
       end
 
@@ -104,7 +109,8 @@ module ForestAdminAgent
       end
 
       def relationships
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(object.class.name.demodulize.underscore)
+        datasource = ForestAdminAgent::Facades::Container.datasource
+        forest_collection = datasource.get_collection(@options[:class_name])
         relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
         relations_to_one = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
 
@@ -124,10 +130,13 @@ module ForestAdminAgent
           end
 
           object = has_one_relationship(attribute_name, attr_data)
-          if object.nil?
+          if object.nil? || object.empty?
             data[formatted_attribute_name]['data'] = nil
           else
-            related_object_serializer = ForestSerializer.new(object, @options)
+            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            options = @options.clone
+            options[:class_name] = datasource.get_collection(relation.foreign_collection).name
+            related_object_serializer = ForestSerializer.new(object, options)
             data[formatted_attribute_name]['data'] = {
               'type' => related_object_serializer.type.to_s,
               'id' => related_object_serializer.id.to_s,
@@ -152,6 +161,9 @@ module ForestAdminAgent
           if @_include_linkages.include?(formatted_attribute_name) || attr_data[:options][:include_data]
             data[formatted_attribute_name]['data'] = []
             objects = has_many_relationship(attribute_name, attr_data) || []
+            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            options = @options.clone
+            options[:class_name] = datasource.get_collection(relation.foreign_collection).name
             objects.each do |obj|
               related_object_serializer = JSONAPI::Serializer.find_serializer(obj, @options)
               data[formatted_attribute_name]['data'] << {

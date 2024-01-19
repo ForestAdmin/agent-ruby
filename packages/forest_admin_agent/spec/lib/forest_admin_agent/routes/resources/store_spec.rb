@@ -104,24 +104,6 @@ module ForestAdminAgent
 
         describe 'with relation' do
           before do
-            person_class = Struct.new(:id, :name) do
-              def respond_to?(arg)
-                return false if arg == :each
-
-                super(arg)
-              end
-            end
-
-            passport_class = Struct.new(:id, :person_id) do
-              def respond_to?(arg)
-                return false if arg == :each
-
-                super(arg)
-              end
-            end
-            stub_const('Person', person_class)
-            stub_const('Passport', passport_class)
-
             @datasource = Datasource.new
             collection_person = instance_double(
               Collection,
@@ -177,8 +159,12 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'person'
-              allow(@datasource.get_collection('person')).to receive(:create).and_return(Person.new(1, 'john'))
-              allow(@datasource.get_collection('passport')).to receive(:update).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('person')).to receive(:create).and_return(
+                { 'id' => 1, 'name' => 'john' }
+              )
+              allow(@datasource.get_collection('passport')).to receive(:update).and_return(
+                { 'id' => 1, 'person_id' => 1 }
+              )
 
               result = store.handle_request(args)
               expect(@datasource.get_collection('person')).to have_received(:create) do |caller, data|
@@ -217,7 +203,9 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'passport'
-              allow(@datasource.get_collection('passport')).to receive(:create).and_return(Passport.new(1, 1))
+              allow(@datasource.get_collection('passport')).to receive(:create).and_return(
+                { 'id' => 1, 'person_id' => 1 }
+              )
 
               result = store.handle_request(args)
               expect(@datasource.get_collection('passport')).to have_received(:create) do |caller, data|

@@ -50,6 +50,7 @@ module ForestAdminAgent
               content: JSONAPI::Serializer.serialize(
                 records,
                 is_collection: true,
+                class_name: @child_collection.name,
                 serializer: Serializer::ForestSerializer,
                 include: projection.relations.keys
               )

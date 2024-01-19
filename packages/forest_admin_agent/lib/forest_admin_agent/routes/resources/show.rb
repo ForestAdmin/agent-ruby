@@ -34,6 +34,7 @@ module ForestAdminAgent
             name: args[:params]['collection_name'],
             content: JSONAPI::Serializer.serialize(
               records[0],
+              class_name: @collection.name,
               is_collection: false,
               serializer: Serializer::ForestSerializer,
               include: projection.relations.keys

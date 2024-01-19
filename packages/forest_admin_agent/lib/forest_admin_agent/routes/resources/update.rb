@@ -33,6 +33,7 @@ module ForestAdminAgent
             content: JSONAPI::Serializer.serialize(
               records[0],
               is_collection: false,
+              class_name: @collection.name,
               serializer: Serializer::ForestSerializer
             )
           }
