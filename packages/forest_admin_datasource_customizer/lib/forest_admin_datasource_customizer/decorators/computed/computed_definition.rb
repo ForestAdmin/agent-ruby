@@ -4,7 +4,7 @@ module ForestAdminDatasourceCustomizer
       class ComputedDefinition
         attr_reader :column_type, :dependencies, :default_value, :enum_values
 
-        def initialize(column_type, dependencies, values, default_value = nil, enum_values = nil)
+        def initialize(column_type:, dependencies:, values:, default_value: nil, enum_values: nil)
           @column_type = column_type
           @dependencies = dependencies
           @values = values
