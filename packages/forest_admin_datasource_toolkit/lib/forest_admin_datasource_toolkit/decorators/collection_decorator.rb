@@ -2,24 +2,14 @@ module ForestAdminDatasourceToolkit
   module Decorators
     class CollectionDecorator < Collection
       attr_reader :datasource, :child_collection, :last_schema
+      attr_writer :parent
 
       def initialize(child_collection, datasource)
         super
         @child_collection = child_collection
         @datasource = datasource
 
-        # When the child collection invalidates its schema, we also invalidate ours.
-        # This is done like this, and not in the markSchemaAsDirty method, because we don't have
-        # a reference to parent collections from children.
-        return unless child_collection.is_a?(CollectionDecorator)
-
-        child_collection.define_singleton_method(:mark_schema_as_dirty) do
-          # Call the original method (the child)
-          original_child_mark_schema_as_dirty.call(child_collection)
-
-          # Invalidate our schema (the parent)
-          mark_schema_as_dirty
-        end
+        child_collection.parent = self if child_collection.is_a?(CollectionDecorator)
       end
 
       def native_driver
@@ -87,6 +77,7 @@ module ForestAdminDatasourceToolkit
 
       def mark_schema_as_dirty
         @last_schema = nil
+        @parent&.mark_schema_as_dirty
       end
 
       def refine_filter(_caller, filter = nil)
@@ -95,14 +86,6 @@ module ForestAdminDatasourceToolkit
 
       def refine_schema(sub_schema)
         sub_schema
-      end
-
-      private
-
-      def push_customization(customization)
-        @stack.queue_customization(customization)
-
-        self
       end
     end
   end
