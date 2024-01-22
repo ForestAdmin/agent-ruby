@@ -17,6 +17,10 @@ module ForestAdminRails
     end
 
     def forest_response(data = {})
+      if data.dig(:content, :type) == 'File'
+        send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type]
+      end
+
       render json: data[:content], status: data[:status] || 200
     end
 

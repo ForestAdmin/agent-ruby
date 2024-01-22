@@ -12,7 +12,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         def static_form?
-          form&.all?(&:static?)
+          return form&.all?(&:static?) if form
+
+          true
         end
       end
     end

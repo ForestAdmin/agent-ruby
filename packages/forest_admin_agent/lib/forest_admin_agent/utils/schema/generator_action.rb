@@ -46,39 +46,37 @@ module ForestAdminAgent
           }
         end
 
+        def self.build_field_schema(datasource, field)
+          output = {
+            description: field.description,
+            isRequired: field.is_required,
+            isReadOnly: field.is_read_only,
+            field: field.label,
+            value: ForestValueConverter.value_to_forest(field)
+          }
+
+          output[:hook] = 'changeHook' if field.watch_changes
+
+          if ActionFields.collection_field?(field)
+            collection = datasource.get_collection(field.collection_name)
+            pk = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
+            pk_schema = collection.schema[:fields][pk]
+
+            output[:type] = pk_schema.column_type
+            output[:reference] = "#{collection.name}.#{pk}"
+          elsif field.type.end_with?('List')
+            output[:type] = [field.type.delete_suffix('List')]
+          else
+            output[:type] = field.type
+          end
+
+          output[:enums] = field.enum_values if ActionFields.enum_field?(field) || ActionFields.enum_list_field?(field)
+
+          output
+        end
+
         class << self
           private
-
-          def build_field_schema(datasource, field)
-            output = {
-              description: field.description,
-              isRequired: field.is_required,
-              isReadOnly: field.is_read_only,
-              field: field.label,
-              value: ForestValueConverter.value_to_forest(field)
-            }
-
-            output[:hook] = 'changeHook' if field.watch_changes
-
-            if ActionFields.collection_field?(field)
-              collection = datasource.get_collection(field.collection_name)
-              pk = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
-              pk_schema = collection.schema[:fields][pk]
-
-              output[:type] = pk_schema.column_type
-              output[:reference] = "#{collection.name}.#{pk}"
-            elsif field.type.end_with?('List')
-              output[:type] = [field.type.delete_suffix('List')]
-            else
-              output[:type] = field.type
-            end
-
-            if ActionFields.enum_field?(field) || ActionFields.enum_list_field?(field)
-              output[:enums] = field.enum_values
-            end
-
-            output
-          end
 
           def build_fields(collection, name, action)
             return DEFAULT_FIELDS unless action.static_form?

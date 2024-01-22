@@ -5,7 +5,7 @@ module ForestAdminAgent
 
       def self.routes
         [
-          # actions_routes,
+          actions_routes,
           # api_charts_routes,
           System::HealthCheck.new.routes,
           Security::Authentication.new.routes,
@@ -25,14 +25,14 @@ module ForestAdminAgent
       end
 
       def self.actions_routes
-        routes = []
-        # TODO
-        # AgentFactory.get('datasource').collections.each do |collection|
-        #   collection.get_actions.each do |action_name, action|
-        #     routes << Actions.new(collection, action_name).routes
-        #   end
-        # end
-        routes.flatten
+        routes = {}
+        Facades::Container.datasource.collections.each_value do |collection|
+          collection.schema[:actions].each_key do |action_name|
+            routes.merge!(Action::Action.new(collection, action_name).routes)
+          end
+        end
+
+        routes
       end
 
       def self.api_charts_routes
