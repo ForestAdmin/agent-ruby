@@ -44,9 +44,9 @@ module ForestAdminDatasourceToolkit
           Projection.new(map { |path| path[prefix.length + 1, path.length - prefix.length - 1] })
         end
 
-        def replace(&block)
+        def replace(...)
           Projection.new(
-            map(&block)
+            map(...)
             .reduce(Projection.new) do |memo, path|
               return memo.union([path]) if path.is_a?(String)
 
