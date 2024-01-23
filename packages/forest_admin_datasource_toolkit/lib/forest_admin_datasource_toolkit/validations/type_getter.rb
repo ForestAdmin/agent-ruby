@@ -85,7 +85,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def buffer
-          IO::Buffer if Kernel.const_get 'IO::Buffer'
+          Object.const_get('IO::Buffer') if Kernel.const_get 'IO::Buffer'
         rescue ArgumentError
           OpenSSL::Buffering::Buffer
         end
