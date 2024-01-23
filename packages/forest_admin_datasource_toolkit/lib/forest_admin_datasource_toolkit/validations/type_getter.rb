@@ -17,7 +17,7 @@ module ForestAdminDatasourceToolkit
 
         return PrimitiveTypes::BOOLEAN if value.is_a?(TrueClass) || value.is_a?(FalseClass)
 
-        return PrimitiveTypes::BINARY if value.is_a?(buffer)
+        return PrimitiveTypes::BINARY if value.is_a?(OpenSSL::Buffering::Buffer)
 
         nil
       end
@@ -82,12 +82,6 @@ module ForestAdminDatasourceToolkit
           format = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
           true if format.match?(uuid.to_s.downcase)
-        end
-
-        def buffer
-          Object.const_get('IO::Buffer') if Kernel.const_get 'IO::Buffer'
-        rescue ArgumentError
-          OpenSSL::Buffering::Buffer
         end
       end
     end
