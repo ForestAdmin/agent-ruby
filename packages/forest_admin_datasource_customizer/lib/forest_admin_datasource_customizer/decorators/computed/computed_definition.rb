@@ -12,8 +12,8 @@ module ForestAdminDatasourceCustomizer
           @enum_values = enum_values
         end
 
-        def get_values(records, context)
-          @values.call(records, context)
+        def get_values(*args)
+          @values.call(*args)
         end
       end
     end
