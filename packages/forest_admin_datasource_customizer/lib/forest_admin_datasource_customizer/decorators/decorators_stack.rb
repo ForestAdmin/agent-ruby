@@ -3,7 +3,7 @@ module ForestAdminDatasourceCustomizer
     class DecoratorsStack
       include ForestAdminDatasourceToolkit::Decorators
 
-      attr_reader :datasource, :schema, :early_computed, :late_computed
+      attr_reader :datasource, :schema, :search, :early_computed, :late_computed
 
       def initialize(datasource)
         @customizations = []
@@ -13,7 +13,7 @@ module ForestAdminDatasourceCustomizer
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
         last = @early_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = @late_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
-        last = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
+        last = @search = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
       end
@@ -32,7 +32,7 @@ module ForestAdminDatasourceCustomizer
         @customizations = []
 
         while queued_customizations.length.positive?
-          queued_customizations.shift.call(logger)
+          queued_customizations.shift.call
           apply_queued_customizations(logger)
         end
       end
