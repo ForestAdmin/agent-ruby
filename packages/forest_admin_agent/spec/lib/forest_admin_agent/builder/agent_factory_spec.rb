@@ -44,7 +44,7 @@ module ForestAdminAgent
             described_class.instance.build
 
             expect(described_class.instance.container.resolve(:datasource))
-              .to eq(described_class.instance.customizer.datasource)
+              .to eq(described_class.instance.customizer.datasource({}))
           end
         end
 
