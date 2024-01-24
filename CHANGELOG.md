@@ -1,3 +1,10 @@
+# [1.0.0-beta.29](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.28...v1.0.0-beta.29) (2024-01-24)
+
+
+### Features
+
+* **decorator:** add compute support ([#23](https://github.com/ForestAdmin/agent-ruby/issues/23)) ([3345fb4](https://github.com/ForestAdmin/agent-ruby/commit/3345fb483c94296614a0f90251adba4845f1e90c))
+
 # [1.0.0-beta.28](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.27...v1.0.0-beta.28) (2024-01-19)
 
 
