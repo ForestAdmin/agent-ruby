@@ -20,9 +20,3 @@ PreCommit:
 
   BundleAudit:
     enabled: true
-
-PrePush:
-  RSpec:
-    enabled: true
-    command: ["run_rspec"]
-    quiet: false

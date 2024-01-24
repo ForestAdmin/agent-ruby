@@ -19,8 +19,8 @@ module ForestAdminDatasourceCustomizer
       @stack.datasource.collections.transform_values { |collection| get_collection(collection.name) }
     end
 
-    def datasource
-      # TODO: call @stack.apply_queued_customizations(logger);
+    def datasource(logger)
+      @stack.apply_queued_customizations(logger)
 
       @stack.datasource
     end
@@ -41,7 +41,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def customize_collection(name, handle)
-      # TODO: to implement
+      handle.call(get_collection(name))
     end
 
     def remove_collection(names)

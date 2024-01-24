@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
 
     def use(plugin, options = [])
       push_customization(
-        -> { plugin.run(@datasource_customizer, self, options) }
+        proc { plugin.run(@datasource_customizer, self, options) }
       )
     end
 
@@ -30,8 +30,32 @@ module ForestAdminDatasourceCustomizer
 
     def replace_search(definition)
       push_customization(
-        -> { @stack.search.get_collection(@name).replace_search(definition) }
+        proc { @stack.search.get_collection(@name).replace_search(definition) }
       )
+    end
+
+    def add_field(name, definition)
+      push_customization(
+        proc {
+          collection_before_relations = @stack.early_computed.get_collection(@name)
+          collection_after_relations = @stack.late_computed.get_collection(@name)
+          can_be_computed_before_relations = definition.dependencies.all? do |field|
+            !ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection_before_relations, field).nil?
+          rescue StandardError
+            false
+          end
+
+          collection = can_be_computed_before_relations ? collection_before_relations : collection_after_relations
+
+          collection.register_computed(name, definition)
+        }
+      )
+    end
+
+    private
+
+    def push_customization(customization)
+      @stack.queue_customization(customization)
     end
   end
 end
