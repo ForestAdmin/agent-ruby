@@ -104,6 +104,19 @@ module ForestAdminAgent
 
         extended != '0'
       end
+
+      def self.parse_sort(collection, context)
+        sort_string = context.request.params[:sort]
+
+        return Sort::SortFactory.by_primary_keys(collection) unless sort_string
+
+        sort = Sort.new(
+          field: sort_string.gsub(/^-/, '').tr('.', ':'),
+          ascending: !sort_string.start_with?('-')
+        )
+
+        SortValidator.validate(collection, sort)
+      end
     end
   end
 end
