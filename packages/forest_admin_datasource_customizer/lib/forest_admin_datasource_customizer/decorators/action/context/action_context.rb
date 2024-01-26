@@ -2,7 +2,7 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       module Context
-        class ActionContext < Context::CollectionCustomizationContext
+        class ActionContext < ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext
           include ForestAdminDatasourceToolkit
 
           attr_reader :filter, :used
@@ -30,7 +30,7 @@ module ForestAdminDatasourceCustomizer
           def records(_fields = [])
             # Validations::ProjectionValidator.validate?(@real_collection, fields)
 
-            @real_collection.list(@caller, @filter, @filter)
+            @real_collection.list(@caller, @filter, [])
           end
 
           def record_ids

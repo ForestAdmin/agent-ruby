@@ -18,10 +18,11 @@ module ForestAdminRails
 
     def forest_response(data = {})
       if data.dig(:content, :type) == 'File'
-        send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type]
+        return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
+                                                  disposition: 'attachment'
       end
 
-      render json: data[:content], status: data[:status] || 200
+      render json: data[:content], status: data[:status] || data[:content][:status] || 200
     end
 
     def exception_handler(exception)

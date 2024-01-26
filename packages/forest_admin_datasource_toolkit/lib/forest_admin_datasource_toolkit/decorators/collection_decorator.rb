@@ -35,7 +35,7 @@ module ForestAdminDatasourceToolkit
         @child_collection.execute(caller, name, data, refined_filter)
       end
 
-      def get_form(caller, name, data = nil, filter = nil, metas = nil)
+      def get_form(caller, name, data = nil, filter = nil, metas = {})
         refined_filter = refine_filter(caller, filter)
 
         @child_collection.get_form(caller, name, data, refined_filter, metas)

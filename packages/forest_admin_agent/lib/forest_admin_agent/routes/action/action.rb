@@ -51,7 +51,8 @@ module ForestAdminAgent
           # As forms are dynamic, we don't have any way to ensure that we're parsing the data correctly
           # better send invalid data to the getForm() customer handler than to the execute() one.
           unsafe_data = Schema::ForestValueConverter.make_form_data_unsafe(raw_data)
-          @collection.get_form(
+
+          fields = @collection.get_form(
             @caller,
             @action_name,
             unsafe_data,
@@ -61,6 +62,7 @@ module ForestAdminAgent
 
           # Now that we have the field list, we can parse the data again.
           data = Schema::ForestValueConverter.make_form_data(@datasource, raw_data, fields)
+
           { content: @collection.execute(@caller, @action_name, data, filter_for_caller) }
         end
 

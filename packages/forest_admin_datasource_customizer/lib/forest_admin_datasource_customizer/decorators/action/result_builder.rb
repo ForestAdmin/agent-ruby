@@ -2,7 +2,7 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class ResultBuilder
-        def success(message: 'Success', options: [])
+        def success(message: 'Success', options: {})
           {
             type: 'Success',
             message: message,
@@ -11,7 +11,7 @@ module ForestAdminDatasourceCustomizer
           }
         end
 
-        def error(message: 'Error', options: [])
+        def error(message: 'Error', options: {})
           {
             type: 'Error',
             status: 400,
@@ -20,7 +20,7 @@ module ForestAdminDatasourceCustomizer
           }
         end
 
-        def webhook(url:, method: 'POST', headers: [], body: [])
+        def webhook(url:, method: 'POST', headers: {}, body: {})
           {
             type: 'Webhook',
             webhook: {

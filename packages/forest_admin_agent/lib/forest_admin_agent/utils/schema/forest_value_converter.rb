@@ -13,7 +13,7 @@ module ForestAdminAgent
           data = {}
           raw_data.each do |key, value|
             # Skip fields from the default form
-            next unless Schema::GeneratorAction::DEFAULT_FIELDS.map(&:field).include?(key)
+            next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(key)
 
             data[key] = if value.is_a?(Array) && value.all? { |v| data_uri?(v) }
                           value.map { |uri| parse_data_uri(uri) }
@@ -30,7 +30,7 @@ module ForestAdminAgent
         def self.make_form_data_from_fields(datasource, fields)
           data = {}
           fields.each_value do |field|
-            next unless Schema::GeneratorAction::DEFAULT_FIELDS.map(&:field).include?(key)
+            next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(field.field)
 
             if field.reference && field.value
               collection_name = field.reference.split('.').first
@@ -53,10 +53,9 @@ module ForestAdminAgent
         def self.make_form_data(datasource, raw_data, fields)
           data = {}
           raw_data.each do |key, value|
-            field = fields.find { |f| f.field == key }
-
+            field = fields.find { |f| f.label == key }
             # Skip fields from the default form
-            next unless Schema::GeneratorAction::DEFAULT_FIELDS.map(&:field).include?(key)
+            next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(key)
 
             if ActionFields.collection_field?(field) && !value.nil?
               collection = datasource.get_collection(field.collection_name)

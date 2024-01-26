@@ -20,26 +20,27 @@ module ForestAdminDatasourceCustomizer
           return @child_collection.execute(caller, name, data, filter) if action.nil?
 
           context = get_context(caller, action, data, filter)
+
           result_builder = ResultBuilder.new
           result = action.execute.call(context, result_builder)
 
           result || result_builder.success
         end
 
-        def get_form(caller, name, data = nil, filter = nil, metas = nil)
+        def get_form(caller, name, data = nil, filter = nil, metas = {})
           action = @actions[name]
           return @child_collection.execute(caller, name, data, filter) if action.nil?
           return [] if action.form.nil?
 
           form_values = data || {}
           used = {}
-          get_context(caller, action, form_values, filter, used, metas[:change_field])
+          context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
           dynamic_fields = action.form
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields)
 
-          fields = drop_deferred(context, metas[:search_values], dynamic_fields)
+          fields = drop_deferred(context, dynamic_fields)
           fields.each do |field|
             if field.value.nil?
               # customer did not define a handler to rewrite the previous value => reuse current one.
@@ -63,38 +64,42 @@ module ForestAdminDatasourceCustomizer
 
         def drop_defaults(context, fields, data)
           unvalued_fields = fields.select { |field| data.key?(field.label) }
-          unvalued_fields.map { |field| evaluate(context, nil, field.default_value) }
+          defaults = unvalued_fields.map { |field| evaluate(context, field.default_value) }
+          unvalued_fields.each_with_index { |field, index| data[field.label] = defaults[index] }
 
-          unvalued_fields.each { |index, field| data[field.label] = defaults[index] }
-
-          fields.each_value { |field| field.default_value = nil }
+          fields.each { |field| field.default_value = nil }
 
           fields
         end
 
         def drop_ifs(context, fields)
-          if_values = fields.map { |field| evaluate(context, nil, field.if_condition) }
-          new_fields = fields.select { |index, _field| if_values[index] }
+          if_values = fields.map { |field| !field.if_condition || evaluate(context, field.if_condition) }
+          new_fields = fields.select.with_index { |_field, index| if_values[index] }
           new_fields.each { |field| field.if_condition = nil }
 
           new_fields
         end
 
-        def drop_deferred(context, search_values, fields)
+        def drop_deferred(context, fields)
           new_fields = []
           fields.each do |field|
             field.instance_variables.each do |key|
+              key = key.to_s.delete('@').to_sym
+
               # call getter corresponding to the key and then set the evaluated value
               value = field.send(key)
-              field.send(key, evaluate(context, search_values[field.label], value))
+              key = key.to_s.concat('=').to_sym
+
+              field.send(key, evaluate(context, value))
             end
-            new_fields << ActionField.new(*field)
+
+            new_fields << ActionField.new(**field.to_h)
           end
 
           new_fields
         end
 
-        def evaluate(context, _search_value, value)
+        def evaluate(context, value)
           return value.call(context) if value.respond_to?(:call)
 
           value
@@ -102,10 +107,10 @@ module ForestAdminDatasourceCustomizer
 
         def get_context(caller, action, form_values = [], filter = nil, used = [], change_field = nil)
           if action.scope == Types::ActionScope::SINGLE
-            return Context::ActionContextSingle.new(self, caller, filter, form_values, used, change_field)
+            return Context::ActionContextSingle.new(self, caller, form_values, filter, used, change_field)
           end
 
-          Context::ActionContext.new(self, caller, filter, form_values, used, change_field)
+          Context::ActionContext.new(self, caller, form_values, filter, used, change_field)
         end
       end
     end

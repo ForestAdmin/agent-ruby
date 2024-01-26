@@ -55,7 +55,7 @@ module ForestAdminAgent
             value: ForestValueConverter.value_to_forest(field)
           }
 
-          output[:hook] = 'changeHook' if field.watch_changes
+          output[:hook] = 'changeHook' if field.respond_to?(:watch_changes) && field.watch_changes
 
           if ActionFields.collection_field?(field)
             collection = datasource.get_collection(field.collection_name)

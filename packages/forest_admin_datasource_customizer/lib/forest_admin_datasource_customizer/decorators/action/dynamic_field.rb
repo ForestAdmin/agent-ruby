@@ -32,6 +32,19 @@ module ForestAdminDatasourceCustomizer
         def static?
           instance_variables.all? { |attribute| !attribute.respond_to?(:call) }
         end
+
+        def to_h
+          {
+            type: @type,
+            label: @label,
+            description: @description,
+            is_required: @is_required,
+            is_read_only: @is_read_only,
+            value: @value,
+            collection_name: @collection_name,
+            enum_values: @enum_values
+          }
+        end
       end
     end
   end
