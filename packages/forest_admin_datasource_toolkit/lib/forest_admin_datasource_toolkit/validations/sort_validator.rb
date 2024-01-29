@@ -6,7 +6,7 @@ module ForestAdminDatasourceToolkit
           FieldValidator.validate(collection, s[:field])
           unless s[:ascending].is_a?(TrueClass) || s[:ascending].is_a?(FalseClass)
             raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-                  "Invalid sort.ascending value: #{s[:ascending]}"
+                  "Invalid sort_utils.ascending value: #{s[:ascending]}"
           end
         end
       end
