@@ -113,9 +113,8 @@ module ForestAdminAgent
           # Restrict the filter to the selected records for single or bulk actions
           if @collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL
             selection_ids = Utils::Id.parse_selection_ids(@collection, args[:params])
-            selected_ids = ConditionTreeFactory.match_ids(@collection, selection_ids)
+            selected_ids = ConditionTreeFactory.match_ids(@collection, selection_ids[:ids])
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
-
             filter = filter.override(
               condition_tree: ConditionTreeFactory.intersect([filter.condition_tree, selected_ids])
             )

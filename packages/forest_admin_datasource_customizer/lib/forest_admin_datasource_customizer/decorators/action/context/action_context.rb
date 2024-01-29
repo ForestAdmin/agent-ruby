@@ -27,10 +27,10 @@ module ForestAdminDatasourceCustomizer
             @form_value[key]
           end
 
-          def records(_fields = [])
-            # Validations::ProjectionValidator.validate?(@real_collection, fields)
+          def records(fields = [])
+            Validations::ProjectionValidator.validate?(@real_collection, fields)
 
-            @real_collection.list(@caller, @filter, [])
+            @real_collection.list(@caller, @filter, Components::Query::Projection.new)
           end
 
           def record_ids

@@ -89,7 +89,7 @@ module ForestAdminAgent
           #
           # return value.map { |f| make_data_uri(f) } if ActionFields.file_list_field?(field)
 
-          value
+          field.value
         end
 
         def self.make_data_uri(file)
