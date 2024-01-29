@@ -439,6 +439,57 @@ module ForestAdminAgent
           expect(described_class.parse_search_extended(args)).to be(false)
         end
       end
+
+      describe 'parse_sort' do
+        let(:collection_user) do
+          datasource = Datasource.new
+          collection_user = Collection.new(datasource, 'User')
+          collection_user.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                       filter_operators: [Operators::EQUAL]),
+              'name' => ColumnSchema.new(column_type: 'String')
+            }
+          )
+
+          datasource.add_collection(collection_user)
+
+          return collection_user
+        end
+
+        it 'sorts by pk ascending when not sort is given' do
+          args = {
+            params: {}
+          }
+
+          expect(described_class.parse_sort(collection_user, args)).to eq([{ field: 'id', ascending: true }])
+        end
+
+        it 'sorts by the request field and order when given' do
+          args = {
+            params: {
+              sort: '-name'
+            }
+          }
+
+          expect(described_class.parse_sort(collection_user, args)).to eq([{ field: 'name', ascending: false }])
+        end
+
+        it 'throws a ValidationError when the requested sort is invalid' do
+          args = {
+            params: {
+              sort: '-fieldThatDoNotExist'
+            }
+          }
+
+          expect do
+            described_class.parse_sort(collection_user, args)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "🌳🌳🌳 Column not found: 'User.fieldThatDoNotExist'"
+          )
+        end
+      end
     end
   end
 end
