@@ -3,12 +3,12 @@ module ForestAdminDatasourceToolkit
     module Query
       class Sort < Array
         def projection
-          Projection.new(map(&:field))
+          Projection.new(map { |clause| clause[:field] })
         end
 
         def replace_clauses(...)
           self.class.new(
-            map(...)
+            map(&block)
             .reduce(self.class.new) do |memo, cb_result|
               return memo.union(cb_result) if cb_result.is_a?(self.class)
 
@@ -33,7 +33,7 @@ module ForestAdminDatasourceToolkit
 
         def unnest
           prefix = first[:field].split(':')[0]
-          raise 'Cannot unnest sort.' unless all? { |ob| ob[:field].start_with?(prefix) }
+          raise 'Cannot unnest sort_utils.' unless all? { |ob| ob[:field].start_with?(prefix) }
 
           self.class.new(map do |ob|
                            { field: ob[:field][prefix.length + 1, ob[:field].length - prefix.length - 1],
@@ -46,6 +46,7 @@ module ForestAdminDatasourceToolkit
             (0..length).each do |i|
               field = self[i][:field]
               ascending = self[i][:ascending]
+
               value_on_a = ForestAdminDatasourceToolkit::Utils::Record.field_value(a, field)
               value_on_b = ForestAdminDatasourceToolkit::Utils::Record.field_value(b, field)
 
