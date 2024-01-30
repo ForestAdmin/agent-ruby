@@ -43,18 +43,20 @@ module ForestAdminDatasourceToolkit
 
         def apply(records)
           records.sort do |a, b|
-            (0..length).each do |i|
+            comparison = 0
+            (0..length - 1).each do |i|
               field = self[i][:field]
               ascending = self[i][:ascending]
+              break unless comp.zero?
 
               value_on_a = ForestAdminDatasourceToolkit::Utils::Record.field_value(a, field)
               value_on_b = ForestAdminDatasourceToolkit::Utils::Record.field_value(b, field)
 
-              return ascending ? -1 : 1 if value_on_a < value_on_b
-              return ascending ? 1 : -1 if value_on_a > value_on_b
+              comparison = value_on_a <=> value_on_b
+              comparison *= -1 unless ascending
             end
 
-            0
+            comparison
           end
         end
       end
