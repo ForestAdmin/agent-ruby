@@ -47,7 +47,7 @@ module ForestAdminDatasourceToolkit
             (0..length - 1).each do |i|
               field = self[i][:field]
               ascending = self[i][:ascending]
-              break unless comp.zero?
+              break unless comparison.zero?
 
               value_on_a = ForestAdminDatasourceToolkit::Utils::Record.field_value(a, field)
               value_on_b = ForestAdminDatasourceToolkit::Utils::Record.field_value(b, field)
