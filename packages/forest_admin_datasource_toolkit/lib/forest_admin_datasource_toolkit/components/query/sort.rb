@@ -8,7 +8,7 @@ module ForestAdminDatasourceToolkit
 
         def replace_clauses(...)
           self.class.new(
-            map(&block)
+            map(...)
             .reduce(self.class.new) do |memo, cb_result|
               return memo.union(cb_result) if cb_result.is_a?(self.class)
 
