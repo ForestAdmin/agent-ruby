@@ -27,6 +27,10 @@ module ForestAdminDatasourceToolkit
         @collection_name = collection_name
         @watch_changes = watch_changes
       end
+
+      def watch_changes?
+        @watch_changes
+      end
     end
   end
 end

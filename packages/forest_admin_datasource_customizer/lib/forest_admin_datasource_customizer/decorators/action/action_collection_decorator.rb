@@ -33,7 +33,7 @@ module ForestAdminDatasourceCustomizer
           return [] if action.form.nil?
 
           form_values = data || {}
-          used = {}
+          used = []
           context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
           dynamic_fields = action.form
@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
             end
 
             # fields that were accessed through the context.formValues.X getter should be watched.
-            field.watch_changes = used.key?(field.label)
+            field.watch_changes = used.include?(field.label)
           end
 
           fields

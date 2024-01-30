@@ -21,13 +21,13 @@ module ForestAdminDatasourceCustomizer
             @change_field == field_name
           end
 
-          def form_value(key)
+          def get_form_value(key)
             @used << key
 
             @form_value[key]
           end
 
-          def records(fields = [])
+          def get_records(fields = [])
             Validations::ProjectionValidator.validate?(@real_collection, fields)
 
             @real_collection.list(@caller, @filter, Components::Query::Projection.new)
@@ -41,7 +41,7 @@ module ForestAdminDatasourceCustomizer
 
           def composite_record_ids
             projection = Components::Query::Projection.new.with_pks(@real_collection)
-            records = records(projection)
+            records = get_records(projection)
 
             records.map { |record| Utils::Record.primary_keys(@real_collection, record) }
           end
