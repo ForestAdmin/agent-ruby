@@ -268,7 +268,7 @@ module ForestAdminAgent
 
           datasource.add_collection(collection_category)
 
-          return collection_category
+          collection_category
         end
 
         it 'return null when not provided' do

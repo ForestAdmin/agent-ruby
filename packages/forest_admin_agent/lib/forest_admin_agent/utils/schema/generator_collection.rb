@@ -31,7 +31,11 @@ module ForestAdminAgent
         end
 
         def self.build_actions(collection)
-          collection.schema[:actions].keys.sort.map { |name| GeneratorAction.build_schema(collection, name) }
+          if collection.schema[:actions]
+            collection.schema[:actions].keys.sort.map { |name| GeneratorAction.build_schema(collection, name) }
+          else
+            {}
+          end
         end
       end
     end
