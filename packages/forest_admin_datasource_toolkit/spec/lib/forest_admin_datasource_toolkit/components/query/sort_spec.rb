@@ -13,23 +13,6 @@ module ForestAdminDatasourceToolkit
           expect(sort.projection).to eq(['column1', 'column2'])
         end
 
-        # test('apply should sort records', () => {
-        #     const records = [
-        #       { column1: 2, column2: 2 },
-        #       { column1: 1, column2: 1 },
-        #       { column1: 1, column2: 1 },
-        #       { column1: 1, column2: 2 },
-        #       { column1: 2, column2: 1 },
-        #     ];
-        #
-        #     expect(sort.apply(records)).toStrictEqual([
-        #       { column1: 1, column2: 2 },
-        #       { column1: 1, column2: 1 },
-        #       { column1: 1, column2: 1 },
-        #       { column1: 2, column2: 2 },
-        #       { column1: 2, column2: 1 },
-        #     ]);
-        #   });
         it('apply should sort records') do
           records = [
             { column1: 2, column2: 2 },
