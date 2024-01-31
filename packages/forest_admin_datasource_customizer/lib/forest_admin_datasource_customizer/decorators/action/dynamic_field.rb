@@ -30,7 +30,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def static?
-          instance_variables.all? { |attribute| !attribute.respond_to?(:call) }
+          instance_variables.all? { |attribute| !instance_variable_get(attribute).respond_to?(:call) }
         end
 
         def to_h

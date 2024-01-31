@@ -14,11 +14,11 @@ module ForestAdminDatasourceToolkit
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def execute
+        def execute(caller, name, data, filter = nil)
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 
-        def form
+        def get_form(caller, name, data = nil, filter = nil, metas = {})
           raise NotImplementedError, "#{self.class} has not implemented method '#{__method__}'"
         end
 

@@ -1,10 +1,8 @@
 module ForestAdminDatasourceToolkit
   module Components
     class ActionField
-      attr_accessor :value
+      attr_accessor :value, :watch_changes
       attr_reader :type, :label, :description, :is_required, :is_read_only, :enum_values, :collection_name
-
-      attr_writer :watch_changes
 
       def initialize(
         type:,

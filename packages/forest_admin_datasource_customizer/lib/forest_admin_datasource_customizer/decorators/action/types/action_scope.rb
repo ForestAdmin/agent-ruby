@@ -5,7 +5,7 @@ module ForestAdminDatasourceCustomizer
         module ActionScope
           SINGLE = 'single'.freeze
 
-          SCOPE = 'scope'.freeze
+          BULK = 'bulk'.freeze
 
           GLOBAL = 'global'.freeze
         end

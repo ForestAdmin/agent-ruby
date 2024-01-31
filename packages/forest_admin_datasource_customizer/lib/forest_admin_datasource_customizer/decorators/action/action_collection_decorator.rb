@@ -29,7 +29,7 @@ module ForestAdminDatasourceCustomizer
 
         def get_form(caller, name, data = nil, filter = nil, metas = {})
           action = @actions[name]
-          return @child_collection.execute(caller, name, data, filter) if action.nil?
+          return @child_collection.get_form(caller, name, data, filter, metas) if action.nil?
           return [] if action.form.nil?
 
           form_values = data || {}
@@ -38,7 +38,7 @@ module ForestAdminDatasourceCustomizer
 
           dynamic_fields = action.form
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
-          dynamic_fields = drop_ifs(context, dynamic_fields)
+          dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
           fields = drop_deferred(context, dynamic_fields)
           fields.each do |field|
@@ -63,7 +63,7 @@ module ForestAdminDatasourceCustomizer
         private
 
         def drop_defaults(context, fields, data)
-          unvalued_fields = fields.select { |field| data.key?(field.label) }
+          unvalued_fields = fields.reject { |field| data.key?(field.label) }
           defaults = unvalued_fields.map { |field| evaluate(context, field.default_value) }
           unvalued_fields.each_with_index { |field, index| data[field.label] = defaults[index] }
 
