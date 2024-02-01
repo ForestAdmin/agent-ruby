@@ -2,9 +2,12 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Relation
       class RelationCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
+        include ForestAdminDatasourceToolkit::Exceptions
         include ForestAdminDatasourceToolkit::Utils
         include ForestAdminDatasourceToolkit::Components::Query
+        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+        include ForestAdminDatasourceToolkit::Schema
 
         def initialize(child_collection, datasource)
           super
@@ -13,6 +16,7 @@ module ForestAdminDatasourceCustomizer
 
         def add_relation(name, partial_joint)
           relation = relation_with_optional_fields(partial_joint)
+          puts relation.inspect
           check_foreign_keys(relation)
           check_origin_keys(relation)
 
@@ -22,7 +26,8 @@ module ForestAdminDatasourceCustomizer
 
         def list(caller, filter, projection)
           new_filter = refine_filter(caller, filter)
-          new_projection = projection.replace(->(field) { rewrite_field(field) }, self).with_pks(self)
+          new_projection = projection.replace { |field| rewrite_field(field) }.with_pks(self)
+          # new_projection = projection.replace(->(field) { rewrite_field(field) }, self).with_pks(self)
           records = child_collection.list(caller, new_filter, new_projection)
           return records if new_projection.equals(projection)
 
@@ -45,36 +50,17 @@ module ForestAdminDatasourceCustomizer
 
         protected
 
-        def refine_schema(sub_schema)
-          sub_schema[:fields].merge!(@relations)
+        def refine_schema(child_schema)
+          @relations.each do |name, relation|
+            child_schema[:fields][name] = relation
+          end
+
+          child_schema
         end
 
-        #   protected override async refineFilter(
-        #     caller: Caller,
-        #     filter: PaginatedFilter,
-        #   ): Promise<PaginatedFilter> {
-        #     return filter?.override({
-        #       conditionTree: await filter.conditionTree?.replaceLeafsAsync(
-        #         leaf => this.rewriteLeaf(caller, leaf),
-        #         this,
-        #       ),
-        #
-        #       // Replace sort in emulated relations to
-        #       // - sorting by the fk of the relation for many to one
-        #       // - removing the sort altogether for one to one
-        #       //
-        #       // This is far from ideal, but the best that can be done without taking a major
-        #       // performance hit.
-        #       // Customers which want proper sorting should enable emulation in the associated
-        #       // middleware
-        #       sort: filter.sort?.replaceClauses(clause =>
-        #         this.rewriteField(clause.field).map(field => ({ ...clause, field })),
-        #       ),
-        #     });
-        #   }
         def refine_filter(caller, filter)
           filter.override({
-                            condition_tree: filter.condition_tree.replace_leafs do |leaf|
+                            condition_tree: filter.condition_tree&.replace_leafs do |leaf|
                                               rewrite_leaf(caller, leaf)
                                             end,
                             sort: filter.sort&.replace_clauses do |clause|
@@ -89,41 +75,82 @@ module ForestAdminDatasourceCustomizer
 
         def relation_with_optional_fields(partial_joint)
           relation = partial_joint.dup
-          target = datasource.get_collection(relation[:foreign_collection])
+          target = datasource.get_collection(partial_joint[:foreign_collection])
 
+          puts "partial_joint #{relation}"
           case relation[:type]
           when 'ManyToOne'
-            relation[:foreign_key_target] ||= Schema.primary_keys(target.schema).first
-          when 'OneToOne', 'OneToMany'
-            relation[:origin_key_target] ||= Schema.primary_keys(schema).first
+            relation = Relations::ManyToOneSchema.new(
+              foreign_key: relation[:foreign_key],
+              foreign_key_target: if relation[:foreign_key_target].nil?
+                                    ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(target).first
+                                  else
+                                    relation[:foreign_key_target]
+                                  end,
+              foreign_collection: relation[:foreign_collection]
+            )
+          when 'OneToOne'
+            relation = Relations::OneToOneSchema.new(
+              origin_key: relation[:origin_key],
+              origin_key_target: if relation[:origin_key_target].nil?
+                                   ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(self).first
+                                 else
+                                   relation[:origin_key_target]
+                                 end,
+              foreign_collection: relation[:foreign_collection]
+            )
+          when 'OneToMany'
+            relation = Relations::OneToManySchema.new(
+              origin_key: relation[:origin_key],
+              origin_key_target: if relation[:origin_key_target].nil?
+                                   ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(self).first
+                                 else
+                                   relation[:origin_key_target]
+                                 end,
+              foreign_collection: relation[:foreign_collection]
+            )
           when 'ManyToMany'
-            relation[:origin_key_target] ||= Schema.primary_keys(schema).first
-            relation[:foreign_key_target] ||= Schema.primary_keys(target.schema).first
+            relation = Relations::ManyToManySchema.new(
+              origin_key: relation[:origin_key],
+              origin_key_target: if relation[:origin_key_target].nil?
+                                   ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(self).first
+                                 else
+                                   relation[:origin_key_target]
+                                 end,
+              foreign_key: relation[:foreign_key],
+              foreign_key_target: if relation[:foreign_key_target].nil?
+                                    ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(target).first
+                                  else
+                                    relation[:foreign_key_target]
+                                  end,
+              foreign_collection: relation[:foreign_collection],
+              through_collection: relation[:through_collection]
+            )
           end
 
           relation
         end
 
         def check_foreign_keys(relation)
-          return unless relation[:type] == 'ManyToOne' || relation[:type] == 'ManyToMany'
+          return unless relation.type == 'ManyToOne' || relation.type == 'ManyToMany'
 
           check_keys(
-            relation[:type] == 'ManyToMany' ? datasource.get_collection(relation[:through_collection]) : self,
-            datasource.get_collection(relation[:foreign_collection]),
-            relation[:foreign_key],
-            relation[:foreign_key_target]
+            relation.type == 'ManyToMany' ? datasource.get_collection(relation.through_collection) : self,
+            datasource.get_collection(relation.foreign_collection),
+            relation.foreign_key,
+            relation.foreign_key_target
           )
         end
 
         def check_origin_keys(relation)
-          if relation[:type] == 'OneToMany' || relation[:type] == 'OneToOne' || relation[:type] == 'ManyToMany'
-            check_keys(
-              relation[:type] == 'ManyToMany' ? datasource.get_collection(relation[:through_collection]) : self,
-              datasource.get_collection(relation[:foreign_collection]),
-              relation[:origin_key],
-              relation[:origin_key_target]
-            )
-          end
+          return unless relation.type == 'OneToMany' || relation.type == 'OneToOne' || relation.type == 'ManyToMany'
+
+          check_keys(
+            relation.type == 'ManyToMany' ? datasource.get_collection(relation.through_collection) : datasource.get_collection(relation.foreign_collection),
+            self,
+            relation.origin_key,
+            relation.origin_key_target
+          )
         end
 
         def check_keys(owner, target_owner, key_name, target_name)
@@ -149,22 +176,52 @@ module ForestAdminDatasourceCustomizer
           raise ForestException, "Column does not support the In operator: '#{owner.name}.#{name}'"
         end
 
+        # private rewriteField(field: string): string[] {
+        #     const prefix = field.split(':').shift();
+        #     const schema = this.schema.fields[prefix];
+        #     if (schema.type === 'Column') return [field];
+        #
+        #     const relation = this.dataSource.getCollection(schema.foreignCollection);
+        #     let result = [] as string[];
+        #
+        #     if (!this.relations[prefix]) {
+        #       result = relation
+        #         .rewriteField(field.substring(prefix.length + 1))
+        #         .map(subField => `${prefix}:${subField}`);
+        #     } else if (schema.type === 'ManyToOne') {
+        #       result = [schema.foreignKey];
+        #     } else if (
+        #       schema.type === 'OneToOne' ||
+        #       schema.type === 'OneToMany' ||
+        #       schema.type === 'ManyToMany'
+        #     ) {
+        #       result = [schema.originKeyTarget];
+        #     }
+        #
+        #     return result;
+        #   }
         def rewrite_field(field)
           prefix = field.split(':').first
-          schema = schema[:fields][prefix]
-          return [field] if schema.type == 'Column'
+          field_schema = schema[:fields][prefix]
 
-          relation = datasource.get_collection(schema.foreign_collection)
+          puts "prefix #{prefix}"
+
+          return [field] if field_schema.type == 'Column'
+
+          relation = datasource.get_collection(field_schema.foreign_collection)
           result = []
 
           if !@relations.key?(prefix)
             result = relation.rewrite_field(field[prefix.length + 1..]).map { |sub_field| "#{prefix}:#{sub_field}" }
-          elsif schema.type == 'ManyToOne'
-            result = [schema.foreign_key]
-          elsif schema.type == 'OneToOne' || schema.type == 'OneToMany' || schema.type == 'ManyToMany'
-            result = [schema.origin_key_target]
+          elsif field_schema.is_a? Relations::ManyToOneSchema
+            result = [field_schema.foreign_key]
+          elsif field_schema.is_a?(Relations::OneToOneSchema) ||
+                field_schema.is_a?(Relations::OneToManySchema) ||
+                field_schema.is_a?(Relations::ManyToManySchema)
+            result = [field_schema.origin_key_target]
           end
 
+          puts "result #{result}"
           result
         end
 
