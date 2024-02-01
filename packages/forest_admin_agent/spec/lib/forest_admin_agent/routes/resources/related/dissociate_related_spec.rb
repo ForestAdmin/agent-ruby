@@ -108,7 +108,7 @@ module ForestAdminAgent
               allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
 
               args[:params]['relation_name'] = 'address_users'
-              args[:params]['data'] = [{ 'id' => 1 }]
+              args[:params][:data] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
 
               result = dissociate.handle_request(args)
@@ -141,7 +141,7 @@ module ForestAdminAgent
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
-              args[:params]['data'] = [{ 'id' => 1 }]
+              args[:params][:data] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
 
               result = dissociate.handle_request(args)
@@ -173,11 +173,12 @@ module ForestAdminAgent
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'address_users'
-              args[:params]['data'] = {
-                'attributes' =>
-                  { 'ids' => [{ 'id' => '1', 'type' => 'address_user' }],
-                    'all_records' => true,
-                    'all_records_ids_excluded' => ['2'] }
+              args[:params][:data] = {
+                attributes: {
+                  ids: [{ 'id' => '1', 'type' => 'address_user' }],
+                  all_records: true,
+                  all_records_ids_excluded: ['2']
+                }
               }
               args[:params]['id'] = 1
 
@@ -223,7 +224,7 @@ module ForestAdminAgent
                 .to receive_messages(list: [AddressUser.new(1, 1, 1)], delete: true)
 
               args[:params]['relation_name'] = 'addresses'
-              args[:params]['data'] = [{ 'id' => 1 }]
+              args[:params][:data] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
 
               result = dissociate.handle_request(args)
@@ -256,7 +257,7 @@ module ForestAdminAgent
 
               args[:params][:delete] = true
               args[:params]['relation_name'] = 'addresses'
-              args[:params]['data'] = [{ 'id' => 1 }]
+              args[:params][:data] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
 
               result = dissociate.handle_request(args)

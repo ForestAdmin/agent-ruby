@@ -87,7 +87,7 @@ module ForestAdminAgent
 
           {
             content: {
-              fields: fields.map { |field| Schema::GeneratorAction.build_field_schema(@datasource, field) }
+              fields: fields&.map { |field| Schema::GeneratorAction.build_field_schema(@datasource, field) } || {}
             }
           }
         end

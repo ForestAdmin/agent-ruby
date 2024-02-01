@@ -102,23 +102,23 @@ module ForestAdminAgent
               {
                 'collection_name' => 'user',
                 'timezone' => 'Europe/Paris',
-                'data' => {
-                  'attributes' => {
-                    'ids' => %w[1 2 3],
-                    'collection_name' => 'Car',
-                    'parent_collection_name' => nil,
-                    'parent_collection_id' => nil,
-                    'parent_association_name' => nil,
-                    'all_records' => false,
-                    'all_records_subset_query' => {
+                data: {
+                  attributes: {
+                    ids: %w[1 2 3],
+                    collection_name: 'Car',
+                    parent_collection_name: nil,
+                    parent_collection_id: nil,
+                    parent_association_name: nil,
+                    all_records: false,
+                    all_records_subset_query: {
                       'fields[Car]' => 'id,model,brand',
                       'page[number]' => 1,
                       'page[size]' => 15
                     },
-                    'all_records_ids_excluded' => [],
-                    'smart_action_id' => nil
+                    all_records_ids_excluded: [],
+                    smart_action_id: nil
                   },
-                  'type' => 'action-requests'
+                  type: 'action-requests'
                 }
               }
             end
@@ -140,8 +140,8 @@ module ForestAdminAgent
             end
 
             it 'call delete function with filters for only ids no selected' do
-              args[:params]['data']['attributes']['all_records'] = true
-              args[:params]['data']['attributes']['all_records_ids_excluded'] = %w[1 2 3]
+              args[:params][:data][:attributes][:all_records] = true
+              args[:params][:data][:attributes][:all_records_ids_excluded] = %w[1 2 3]
               delete.handle_request_bulk(args)
 
               expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
