@@ -25,8 +25,8 @@ module ForestAdminDatasourceToolkit
         it { expect { collection.datasource }.to raise_error(NotImplementedError) }
         it { expect { collection.schema }.to raise_error(NotImplementedError) }
         it { expect { collection.name }.to raise_error(NotImplementedError) }
-        it { expect { collection.execute }.to raise_error(NotImplementedError) }
-        it { expect { collection.form }.to raise_error(NotImplementedError) }
+        it { expect { collection.execute(caller, 'action_name', {}) }.to raise_error(NotImplementedError) }
+        it { expect { collection.get_form(caller, 'action_name') }.to raise_error(NotImplementedError) }
         it { expect { collection.create(caller, {}) }.to raise_error(NotImplementedError) }
         it { expect { collection.list(caller, Filter.new, Projection.new) }.to raise_error(NotImplementedError) }
         it { expect { collection.update(caller, Filter.new, {}) }.to raise_error(NotImplementedError) }
