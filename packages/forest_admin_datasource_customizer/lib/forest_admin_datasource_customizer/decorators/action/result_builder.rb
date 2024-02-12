@@ -2,8 +2,19 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class ResultBuilder
+        def initialize
+          @headers = {}
+        end
+
+        def set_header(key, value)
+          @headers[key] = value
+
+          self
+        end
+
         def success(message: 'Success', options: {})
           {
+            headers: @headers,
             type: 'Success',
             message: message,
             refresh: { relationships: options.key?(:invalidated) ? options[:invalidated] : [] },
@@ -13,6 +24,7 @@ module ForestAdminDatasourceCustomizer
 
         def error(message: 'Error', options: {})
           {
+            headers: @headers,
             type: 'Error',
             status: 400,
             message: message,
@@ -22,6 +34,7 @@ module ForestAdminDatasourceCustomizer
 
         def webhook(url:, method: 'POST', headers: {}, body: {})
           {
+            headers: @headers,
             type: 'Webhook',
             webhook: {
               body: body,
@@ -34,6 +47,7 @@ module ForestAdminDatasourceCustomizer
 
         def file(content:, name: 'file', mime_type: 'application/octet-stream')
           {
+            headers: @headers,
             type: 'File',
             name: name,
             mime_type: mime_type,
@@ -43,6 +57,7 @@ module ForestAdminDatasourceCustomizer
 
         def redirect_to(path:)
           {
+            headers: @headers,
             type: 'Redirect',
             redirect_to: path
           }

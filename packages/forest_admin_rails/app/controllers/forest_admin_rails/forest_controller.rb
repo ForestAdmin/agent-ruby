@@ -22,7 +22,10 @@ module ForestAdminRails
                                                   disposition: 'attachment'
       end
 
-      render json: data[:content], status: data[:status] || data[:content][:status] || 200
+      response.headers.merge!(data[:content][:headers] || {})
+      data[:content].delete(:headers)
+
+      render json: data[:content], head: headers, status: data[:status] || data[:content][:status] || 200
     end
 
     def exception_handler(exception)

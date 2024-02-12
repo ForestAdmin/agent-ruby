@@ -7,9 +7,9 @@ module ForestAdminDatasourceCustomizer
 
           attr_reader :filter, :used
 
-          def initialize(collection, caller, form_value, filter, used = [], change_field = nil)
+          def initialize(collection, caller, form_values, filter, used = [], change_field = nil)
             super(collection, caller)
-            @form_value = form_value
+            @form_values = form_values
             @filter = filter
             @used = used
             @change_field = change_field
@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
           def get_form_value(key)
             @used << key
 
-            @form_value[key]
+            @form_values[key]
           end
 
           def get_records(fields = [])
