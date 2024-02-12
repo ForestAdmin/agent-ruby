@@ -50,11 +50,6 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          # allow(collection_book).to receive(:list).and_return(records)
-          # allow(collection_book).to receive(:aggregate) do |caller, _filter, aggregation, limit|
-          #   aggregation.apply(records, caller.timezone, limit)
-          # end
-
           datasource.add_collection(@collection_book)
           datasource.add_collection(@collection_person)
 
@@ -96,7 +91,7 @@ module ForestAdminDatasourceCustomizer
 
           it 'execute and return default response' do
             result = @decorated_book.execute(caller, 'make photocopy', {}, Filter.new)
-            expect(result).to eq({ type: 'Success', message: 'Success', refresh: { relationships: [] }, html: nil })
+            expect(result).to eq({ headers: {}, type: 'Success', message: 'Success', refresh: { relationships: [] }, html: nil })
           end
 
           it 'generate empty form' do
