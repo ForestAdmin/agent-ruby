@@ -1,3 +1,10 @@
+# [1.0.0-beta.30](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.29...v1.0.0-beta.30) (2024-02-13)
+
+
+### Features
+
+* **decorator:** add action support ([#24](https://github.com/ForestAdmin/agent-ruby/issues/24)) ([e586476](https://github.com/ForestAdmin/agent-ruby/commit/e586476589c8f81fb741c5d11bd1f931c1d4e439))
+
 # [1.0.0-beta.29](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.28...v1.0.0-beta.29) (2024-01-24)
 
 
