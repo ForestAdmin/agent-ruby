@@ -17,7 +17,15 @@ module ForestAdminRails
     end
 
     def forest_response(data = {})
-      render json: data[:content], status: data[:status] || 200
+      if data.dig(:content, :type) == 'File'
+        return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
+                                                  disposition: 'attachment'
+      end
+
+      response.headers.merge!(data[:content][:headers] || {})
+      data[:content].delete(:headers)
+
+      render json: data[:content], head: headers, status: data[:status] || data[:content][:status] || 200
     end
 
     def exception_handler(exception)

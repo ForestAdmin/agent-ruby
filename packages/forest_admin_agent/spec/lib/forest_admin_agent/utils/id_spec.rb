@@ -89,21 +89,21 @@ module ForestAdminAgent
         it 'return a hash with excluded_ids' do
           collection = datasource.get_collection('person')
           args = {
-            'data' => {
-              'attributes' => {
-                'ids' => %w[1 2 3],
-                'collection_name' => 'User',
-                'parent_collection_name' => nil,
-                'parent_collection_id' => nil,
-                'parent_association_name' => nil,
-                'all_records' => true,
-                'all_records_subset_query' => [
+            data: {
+              attributes: {
+                ids: %w[1 2 3],
+                collection_name: 'User',
+                parent_collection_name: nil,
+                parent_collection_id: nil,
+                parent_association_name: nil,
+                all_records: true,
+                all_records_subset_query: [
                   'fields[Car]' => 'id,first_name,last_name',
                   'page[number]' => 1,
                   'page[size]' => 15
                 ],
-                'all_records_ids_excluded' => ['4'],
-                'smart_action_id' => nil
+                all_records_ids_excluded: ['4'],
+                smart_action_id: nil
               }
             }
           }
@@ -114,21 +114,21 @@ module ForestAdminAgent
         it 'return a hash with ids' do
           collection = datasource.get_collection('person')
           args = {
-            'data' => {
-              'attributes' => {
-                'ids' => %w[1 2 3],
-                'collection_name' => 'User',
-                'parent_collection_name' => nil,
-                'parent_collection_id' => nil,
-                'parent_association_name' => nil,
-                'all_records' => false,
-                'all_records_subset_query' => [
+            data: {
+              attributes: {
+                ids: %w[1 2 3],
+                collection_name: 'User',
+                parent_collection_name: nil,
+                parent_collection_id: nil,
+                parent_association_name: nil,
+                all_records: false,
+                all_records_subset_query: [
                   'fields[Car]' => 'id,first_name,last_name',
                   'page[number]' => 1,
                   'page[size]' => 15
                 ],
-                'all_records_ids_excluded' => ['4'],
-                'smart_action_id' => nil
+                all_records_ids_excluded: ['4'],
+                smart_action_id: nil
               }
             }
           }

@@ -28,7 +28,7 @@ module ForestAdminAgent
         return collection_category
       end
 
-      it 'faileds if provided something else' do
+      it 'failed if provided something else' do
         expect do
           condition_tree_parser.from_plain_object(collection_category,
                                                   {})

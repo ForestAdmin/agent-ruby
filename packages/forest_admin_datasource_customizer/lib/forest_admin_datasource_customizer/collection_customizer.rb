@@ -8,6 +8,12 @@ module ForestAdminDatasourceCustomizer
       @name = name
     end
 
+    def add_action(name, definition)
+      push_customization(
+        proc { @stack.action.get_collection(@name).add_action(name, definition) }
+      )
+    end
+
     def schema
       @stack.datasource.get_collection(@name).schema
     end

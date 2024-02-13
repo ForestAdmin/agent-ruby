@@ -3,7 +3,7 @@ module ForestAdminDatasourceCustomizer
     class DecoratorsStack
       include ForestAdminDatasourceToolkit::Decorators
 
-      attr_reader :datasource, :schema, :search, :early_computed, :late_computed
+      attr_reader :datasource, :schema, :search, :early_computed, :late_computed, :action
 
       def initialize(datasource)
         @customizations = []
@@ -14,6 +14,7 @@ module ForestAdminDatasourceCustomizer
         last = @early_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = @late_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = @search = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
+        last = @action = DatasourceDecorator.new(last, Action::ActionCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         @datasource = last
       end
