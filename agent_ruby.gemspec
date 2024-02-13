@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.summary     = "Ruby agent for Forest Admin."
   spec.description = "Forest is a modern admin interface that works on all major web frameworks. This gem is the main
 repository (monorepo) for the Ruby agent."
-  spec.license = "MIT"
+  spec.license = "GPL-3.0"
   spec.required_ruby_version = ">= 3.0.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
