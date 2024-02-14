@@ -58,6 +58,23 @@ module ForestAdminDatasourceToolkit
         def equals(other)
           length == other.length && all? { |field| other.include?(field) }
         end
+
+        def apply(records)
+          records.map { |record| re_project(record) }
+        end
+
+        def re_project(record)
+          result = nil
+
+          if record
+            record = HashHelper.convert_keys(record, :to_s)
+            result = {}
+            columns.each { |column| result[column.to_s] = record[column.to_s] }
+            relations.each { |relation, projection| result[relation] = projection.re_project(record[relation]) }
+          end
+
+          result
+        end
       end
     end
   end
