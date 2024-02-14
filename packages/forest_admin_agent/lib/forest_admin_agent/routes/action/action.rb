@@ -44,7 +44,7 @@ module ForestAdminAgent
           filter_for_caller = get_record_selection(args)
           get_record_selection(args, include_user_scope: false)
 
-          # TODO: permission
+          @permissions.can_smart_action?(args, @collection, filter_for_caller)
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
