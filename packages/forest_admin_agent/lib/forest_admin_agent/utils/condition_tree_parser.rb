@@ -11,16 +11,16 @@ module ForestAdminAgent
 
       def self.from_plain_object(collection, filters)
         if leaf?(filters)
-          operator = filters['operator'].titleize.tr(' ', '_')
+          operator = filters[:operator].titleize.tr(' ', '_')
           value = parse_value(collection, filters)
 
-          return ConditionTreeLeaf.new(filters['field'], operator, value)
+          return ConditionTreeLeaf.new(filters[:field], operator, value)
         end
 
         if branch?(filters)
-          aggregator = filters['aggregator'].capitalize
+          aggregator = filters[:aggregator].capitalize
           conditions = []
-          filters['conditions'].each do |sub_tree|
+          filters[:conditions].each do |sub_tree|
             conditions << from_plain_object(collection, sub_tree)
           end
 
@@ -31,11 +31,11 @@ module ForestAdminAgent
       end
 
       def self.parse_value(collection, leaf)
-        schema = Collection.get_field_schema(collection, leaf['field'])
-        operator = leaf['operator'].titleize.tr(' ', '_')
+        schema = Collection.get_field_schema(collection, leaf[:field])
+        operator = leaf[:operator].titleize.tr(' ', '_')
 
-        if operator == Operators::IN && leaf['field'].is_a?(String)
-          values = leaf['value'].split(',').map(&:strip)
+        if operator == Operators::IN && leaf[:field].is_a?(String)
+          values = leaf[:value].split(',').map(&:strip)
 
           return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
 
@@ -44,15 +44,15 @@ module ForestAdminAgent
           return values
         end
 
-        leaf['value']
+        leaf[:value]
       end
 
       def self.leaf?(filters)
-        filters.key?('field') && filters.key?('operator')
+        filters.key?(:field) && filters.key?(:operator)
       end
 
       def self.branch?(filters)
-        filters.key?('aggregator') && filters.key?('conditions')
+        filters.key?(:aggregator) && filters.key?(:conditions)
       end
     end
   end
