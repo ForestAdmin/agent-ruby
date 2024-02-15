@@ -11,7 +11,7 @@ module ForestAdminDatasourceToolkit
         path = field.split(':')
         current = record
 
-        current = current[path.shift.to_sym] while path.length.positive? && current
+        current = current[path.shift] while path.length.positive? && current
 
         path.empty? ? current : nil
       end
