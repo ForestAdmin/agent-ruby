@@ -81,7 +81,7 @@ module ForestAdminDatasourceToolkit
 
               case @operator
               when Operators::IN
-                Array(@value).include?(field_value)
+                @value.include?(field_value)
               when Operators::EQUAL
                 field_value == @value
               when Operators::LESS_THAN
