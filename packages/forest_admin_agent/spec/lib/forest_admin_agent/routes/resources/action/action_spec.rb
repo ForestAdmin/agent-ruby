@@ -62,7 +62,7 @@ module ForestAdminAgent
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
           allow(permissions).to receive_messages(
-            can_chart?: true,
+            can_smart_action?: true,
             get_scope: nil,
             get_user_data: {
               id: 1,
