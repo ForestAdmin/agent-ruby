@@ -93,14 +93,14 @@ module ForestAdminAgent
         smart_action[:triggerEnabled] = [1]
         smart_action[:triggerConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            filter: {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'title',
-                  'value' => nil,
-                  'source' => 'data',
-                  'operator' => 'present'
+                  field: 'title',
+                  value: nil,
+                  source: 'data',
+                  operator: 'present'
                 }
               ]
             },
@@ -120,14 +120,14 @@ module ForestAdminAgent
         smart_action[:triggerEnabled] = [1]
         smart_action[:triggerConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'title',
-                  'value' => nil,
-                  'source' => 'data',
-                  'operator' => 'present'
+                  field: 'title',
+                  value: nil,
+                  source: 'data',
+                  operator: 'present'
                 }
               ]
             },
@@ -142,7 +142,7 @@ module ForestAdminAgent
 
         smart_action_checker = described_class.new(parameters, collection, smart_action,
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
-        expect(smart_action_checker).to be_can_execute
+        expect(smart_action_checker.can_execute?).to be(true)
       end
 
       it 'throws when the user try to trigger the action with approvalRequired and without approvalRequiredConditions' do
@@ -162,14 +162,14 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -192,14 +192,14 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            filter: {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -219,14 +219,14 @@ module ForestAdminAgent
         smart_action[:triggerEnabled] = [1]
         smart_action[:triggerConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'title',
-                  'value' => nil,
-                  'source' => 'data',
-                  'operator' => 'present'
+                  field: 'title',
+                  value: nil,
+                  source: 'data',
+                  operator: 'present'
                 }
               ]
             },
@@ -236,14 +236,14 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -280,14 +280,14 @@ module ForestAdminAgent
         smart_action[:triggerEnabled] = [1]
         smart_action[:triggerConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'title',
-                  'value' => nil,
-                  'source' => 'data',
-                  'operator' => 'present'
+                  field: 'title',
+                  value: nil,
+                  source: 'data',
+                  operator: 'present'
                 }
               ]
             },
@@ -297,14 +297,14 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -353,14 +353,14 @@ module ForestAdminAgent
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:userApprovalConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -384,14 +384,14 @@ module ForestAdminAgent
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:userApprovalConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -440,14 +440,14 @@ module ForestAdminAgent
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
         smart_action[:userApprovalConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -473,14 +473,14 @@ module ForestAdminAgent
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
         smart_action[:userApprovalConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1000,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1000,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -505,14 +505,14 @@ module ForestAdminAgent
         parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
         smart_action[:userApprovalConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'id',
-                  'value' => 1000,
-                  'source' => 'data',
-                  'operator' => 'equal'
+                  field: 'id',
+                  value: 1000,
+                  source: 'data',
+                  operator: 'equal'
                 }
               ]
             },
@@ -538,14 +538,14 @@ module ForestAdminAgent
         smart_action[:triggerEnabled] = [1]
         smart_action[:triggerConditions] = [
           {
-            'filter' => {
-              'aggregator' => 'and',
-              'conditions' => [
+            :filter => {
+              aggregator: 'and',
+              conditions: [
                 {
-                  'field' => 'title',
-                  'value' => nil,
-                  'source' => 'data',
-                  'operator' => 'unknown'
+                  field: 'title',
+                  value: nil,
+                  source: 'data',
+                  operator: 'unknown'
                 }
               ]
             },

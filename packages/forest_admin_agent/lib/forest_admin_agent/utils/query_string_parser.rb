@@ -23,6 +23,8 @@ module ForestAdminAgent
         return if filters.nil?
 
         filters = JSON.parse(filters, symbolize_names: true) if filters.is_a? String
+        # TODO: add else for convert all keys to sym
+
         ConditionTreeParser.from_plain_object(collection, filters)
         # TODO: ConditionTreeValidator::validate($conditionTree, $collection);
       end
