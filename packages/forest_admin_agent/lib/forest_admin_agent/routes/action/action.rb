@@ -1,5 +1,6 @@
 require 'jsonapi-serializers'
 require 'active_support/inflector'
+require 'jwt'
 
 module ForestAdminAgent
   module Routes
@@ -41,6 +42,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          args = middleware_custom_action_approval_request_data(args)
           filter_for_caller = get_record_selection(args)
           get_record_selection(args, include_user_scope: false)
 
@@ -93,6 +95,23 @@ module ForestAdminAgent
         end
 
         private
+
+        def middleware_custom_action_approval_request_data(args)
+          if (signed_request = args.dig(:params, :data, :attributes, :signed_approval_request))
+            args[:params][:data][:attributes][:signed_approval_request] = decode_signed_approval_request(signed_request)
+          end
+
+          args
+        end
+
+        def decode_signed_approval_request(signed_request)
+          ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(JWT.decode(
+            signed_request,
+            Facades::Container.cache(:env_secret),
+            true,
+            { algorithm: 'HS256' }
+          )[0])
+        end
 
         def get_record_selection(args, include_user_scope: true)
           attributes = args.dig(:params, :data, :attributes)

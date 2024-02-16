@@ -38,7 +38,8 @@ module ForestAdminAgent
       def can_approve?
         if smart_action[:userApprovalEnabled].include?(role_id) &&
            (smart_action[:userApprovalConditions].empty? || match_conditions(:userApprovalConditions)) &&
-           (attributes[:requester_id] != caller.id || smart_action[:selfApprovalEnabled].include?(role_id))
+           (attributes[:signed_approval_request][:data][:attributes][:requester_id] != caller.id ||
+             smart_action[:selfApprovalEnabled].include?(role_id))
           return true
         end
 
