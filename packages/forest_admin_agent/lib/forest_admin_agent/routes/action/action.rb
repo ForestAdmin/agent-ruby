@@ -97,6 +97,8 @@ module ForestAdminAgent
         private
 
         def middleware_custom_action_approval_request_data(args)
+          raise Http::Exceptions::UnprocessableError if args.dig(:params, :data, :attributes, :requester_id)
+
           if (signed_request = args.dig(:params, :data, :attributes, :signed_approval_request))
             args[:params][:data][:attributes][:signed_approval_request] = decode_signed_approval_request(signed_request)
           end

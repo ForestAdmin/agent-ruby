@@ -88,6 +88,49 @@ module ForestAdminAgent
           )
         end
 
+        describe 'checking user authorization' do
+          before do
+            @action_collection.add_action(
+              'foo',
+              BaseAction.new(
+                scope: Types::ActionScope::GLOBAL,
+                form: [
+                  DynamicField.new(type: Types::FieldType::STRING, label: 'firstname')
+                ]
+              ) do |_context, result_builder|
+                result_builder.success
+              end
+            )
+          end
+
+          context 'when the request contains requester_id' do
+            it 'reject with UnprocessableError (prevent forged request)' do
+              args[:params][:data][:attributes][:requester_id] = 'requester_id'
+              allow(@action_collection).to receive(:execute)
+
+              expect { action.handle_request(args) }.to raise_error(Http::Exceptions::UnprocessableError)
+            end
+          end
+
+          context 'when the request is an approval' do
+            it 'get the signed parameters and change body' do
+              unsigned_request = { foo: 'value' }
+              signed_request = JWT.encode(
+                unsigned_request,
+                Facades::Container.cache(:env_secret),
+                'HS256'
+              )
+              args[:params][:data][:attributes][:signed_approval_request] = signed_request
+              allow(@action_collection).to receive(:execute)
+              action.handle_request(args)
+
+              expect(permissions).to have_received(:can_smart_action?) do |args, _collection, _filter_for_caller|
+                expect(args[:params][:data][:attributes][:signed_approval_request]).to eq(unsigned_request)
+              end
+            end
+          end
+        end
+
         context 'with a single action used from list-view, detail-view & summary' do
           before do
             @action_collection.add_action(
