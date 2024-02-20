@@ -327,8 +327,13 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can approve and there is no userApprovalConditions and requesterId is not the callerId' do
-        parameters[:data][:attributes][:requester_id] = 20
-        parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 20
+            }
+          }
+        }
         smart_action[:userApprovalEnabled] = [1]
 
         smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
@@ -337,8 +342,13 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can approve and there is no userApprovalConditions and user roleId is present into selfApprovalEnabled' do
-        parameters[:data][:attributes][:requester_id] = 1
-        parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 1
+            }
+          }
+        }
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:selfApprovalEnabled] = [1]
 
@@ -348,8 +358,13 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can approve and the condition match with userApprovalConditions and requesterId is the callerId' do
-        parameters[:data][:attributes][:requester_id] = 20
-        parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 20
+            }
+          }
+        }
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:userApprovalConditions] = [
           {
@@ -379,8 +394,13 @@ module ForestAdminAgent
       end
 
       it 'returns true when the user can approve and the condition match with userApprovalConditions and user roleId is present into selfApprovalEnabled' do
-        parameters[:data][:attributes][:requester_id] = 1
-        parameters[:data][:attributes][:signed_approval_request] = 'AAABBBCCC'
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 1
+            }
+          }
+        }
         smart_action[:userApprovalEnabled] = [1]
         smart_action[:userApprovalConditions] = [
           {
