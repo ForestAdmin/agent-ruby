@@ -1,3 +1,10 @@
+# [1.0.0-beta.31](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.30...v1.0.0-beta.31) (2024-02-22)
+
+
+### Bug Fixes
+
+* **security:** patch ip dependency vulnerabilities ([#28](https://github.com/ForestAdmin/agent-ruby/issues/28)) ([6988f97](https://github.com/ForestAdmin/agent-ruby/commit/6988f97f9eb549edde39277c3b9a1fbfe9364662))
+
 # [1.0.0-beta.30](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.29...v1.0.0-beta.30) (2024-02-13)
 
 
