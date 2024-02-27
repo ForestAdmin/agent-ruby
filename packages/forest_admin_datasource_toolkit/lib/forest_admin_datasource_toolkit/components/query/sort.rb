@@ -12,7 +12,7 @@ module ForestAdminDatasourceToolkit
             .reduce(self.class.new) do |memo, cb_result|
               return memo.union(cb_result) if cb_result.is_a?(self.class)
 
-              memo.union([cb_result])
+              memo.union(cb_result)
             end
           )
         end
@@ -53,6 +53,7 @@ module ForestAdminDatasourceToolkit
               value_on_b = ForestAdminDatasourceToolkit::Utils::Record.field_value(b, field)
 
               comparison = value_on_a <=> value_on_b
+              comparison = 1 if comparison.nil?
               comparison *= -1 unless ascending
             end
 

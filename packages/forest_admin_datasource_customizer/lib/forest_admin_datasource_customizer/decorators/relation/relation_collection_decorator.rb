@@ -16,7 +16,6 @@ module ForestAdminDatasourceCustomizer
 
         def add_relation(name, partial_joint)
           relation = relation_with_optional_fields(partial_joint)
-          puts relation.inspect
           check_foreign_keys(relation)
           check_origin_keys(relation)
 
@@ -26,17 +25,16 @@ module ForestAdminDatasourceCustomizer
 
         def list(caller, filter, projection)
           new_filter = refine_filter(caller, filter)
-          new_projection = projection.replace { |field| rewrite_field(field) }.with_pks(self)
-          # new_projection = projection.replace(->(field) { rewrite_field(field) }, self).with_pks(self)
+          new_projection = projection.replace { |field| rewrite_field(field) }
           records = child_collection.list(caller, new_filter, new_projection)
           return records if new_projection.equals(projection)
 
-          re_project_in_place(caller, records, projection)
+          records = re_project_in_place(caller, records, projection)
 
           projection.apply(records)
         end
 
-        def aggregate(caller, filter, aggregation, limit)
+        def aggregate(caller, filter, aggregation, limit = nil)
           new_filter = refine_filter(caller, filter)
 
           # No emulated relations are used in the aggregation
@@ -64,20 +62,17 @@ module ForestAdminDatasourceCustomizer
                                               rewrite_leaf(caller, leaf)
                                             end,
                             sort: filter.sort&.replace_clauses do |clause|
-                                    rewrite_field(clause.field).map do |field|
-                                      { **clause, field: field }
-                                    end
-                                  end
+                              rewrite_field(clause[:field]).map do |field|
+                                clause.merge(field: field)
+                              end
+                            end
                           })
         end
-
-        private
 
         def relation_with_optional_fields(partial_joint)
           relation = partial_joint.dup
           target = datasource.get_collection(partial_joint[:foreign_collection])
 
-          puts "partial_joint #{relation}"
           case relation[:type]
           when 'ManyToOne'
             relation = Relations::ManyToOneSchema.new(
@@ -176,35 +171,9 @@ module ForestAdminDatasourceCustomizer
           raise ForestException, "Column does not support the In operator: '#{owner.name}.#{name}'"
         end
 
-        # private rewriteField(field: string): string[] {
-        #     const prefix = field.split(':').shift();
-        #     const schema = this.schema.fields[prefix];
-        #     if (schema.type === 'Column') return [field];
-        #
-        #     const relation = this.dataSource.getCollection(schema.foreignCollection);
-        #     let result = [] as string[];
-        #
-        #     if (!this.relations[prefix]) {
-        #       result = relation
-        #         .rewriteField(field.substring(prefix.length + 1))
-        #         .map(subField => `${prefix}:${subField}`);
-        #     } else if (schema.type === 'ManyToOne') {
-        #       result = [schema.foreignKey];
-        #     } else if (
-        #       schema.type === 'OneToOne' ||
-        #       schema.type === 'OneToMany' ||
-        #       schema.type === 'ManyToMany'
-        #     ) {
-        #       result = [schema.originKeyTarget];
-        #     }
-        #
-        #     return result;
-        #   }
         def rewrite_field(field)
           prefix = field.split(':').first
           field_schema = schema[:fields][prefix]
-
-          puts "prefix #{prefix}"
 
           return [field] if field_schema.type == 'Column'
 
@@ -221,40 +190,39 @@ module ForestAdminDatasourceCustomizer
             result = [field_schema.origin_key_target]
           end
 
-          puts "result #{result}"
           result
         end
 
         def rewrite_leaf(caller, leaf)
           prefix = leaf.field.split(':').first
-          schema = schema[:fields][prefix]
-          return leaf if schema.type == 'Column'
+          field_schema = schema[:fields][prefix]
+          return leaf if field_schema.type == 'Column'
 
-          relation = datasource.get_collection(schema.foreign_collection)
+          relation = datasource.get_collection(field_schema.foreign_collection)
           result = leaf
 
           if !@relations.key?(prefix)
             result = relation.rewrite_leaf(caller, leaf.unnest).nest(prefix)
-          elsif schema.type == 'ManyToOne'
+          elsif field_schema.type == 'ManyToOne'
             records = relation.list(
               caller,
               Filter.new(condition_tree: leaf.unnest),
-              Projection.new(schema.foreign_key_target)
+              Projection.new([field_schema.foreign_key_target])
             )
 
-            result = ConditionTreeLeaf.new(schema.foreign_key, 'In', records.map do |record|
-                                                                       record[schema.foreign_key_target]
-                                                                     end.uniq)
-          elsif schema.type == 'OneToOne'
-            records = relation.list(
-              caller,
-              Filter.new(condition_tree: leaf.unnest),
-              Projection.new(schema.origin_key)
-            )
-
-            result = ConditionTreeLeaf.new(schema.origin_key_target, 'In', records.map do |record|
-                                                                             record[schema.origin_key]
+            result = ConditionTreeLeaf.new(field_schema.foreign_key, 'In', records.map do |record|
+                                                                             record[field_schema.foreign_key_target]
                                                                            end.uniq)
+          elsif field_schema.type == 'OneToOne'
+            records = relation.list(
+              caller,
+              Filter.new(condition_tree: leaf.unnest),
+              Projection.new([field_schema.origin_key])
+            )
+
+            result = ConditionTreeLeaf.new(field_schema.origin_key_target, 'In', records.map do |record|
+                                                                                   record[field_schema.origin_key]
+                                                                                 end.uniq)
           end
 
           result
@@ -264,29 +232,31 @@ module ForestAdminDatasourceCustomizer
           projection.relations.each do |prefix, sub_projection|
             re_project_relation_in_place(caller, records, prefix, sub_projection)
           end
+
+          records
         end
 
         def re_project_relation_in_place(caller, records, name, projection)
-          schema = schema[:fields][name]
-          association = datasource.get_collection(schema.foreign_collection)
+          field_schema = schema[:fields][name]
+          association = datasource.get_collection(field_schema.foreign_collection)
 
           if !@relations[name]
             association.re_project_in_place(caller, records.map { |r| r[name] }.filter { |fk| !fk.nil? }, projection)
-          elsif schema.type == 'ManyToOne'
-            ids = records.map { |record| record[schema.foreign_key] }.filter { |fk| !fk.nil? }.uniq
-            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(schema.foreign_key_target, 'In', ids))
-            sub_records = association.list(caller, sub_filter, projection.union([schema.foreign_key_target]))
+          elsif field_schema.type == 'ManyToOne'
+            ids = records.map { |record| record[field_schema.foreign_key] }.filter { |fk| !fk.nil? }.uniq
+            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.foreign_key_target, 'In', ids))
+            sub_records = association.list(caller, sub_filter, projection.union([field_schema.foreign_key_target]))
 
             records.each do |record|
-              record[name] = sub_records.find { |sr| sr[schema.foreign_key_target] == record[schema.foreign_key] }
+              record[name] = sub_records.find { |sr| sr[field_schema.foreign_key_target] == record[field_schema.foreign_key] }
             end
-          elsif schema.type == 'OneToOne' || schema.type == 'OneToMany'
-            ids = records.map { |record| record[schema.origin_key_target] }.filter { |okt| !okt.nil? }.uniq
-            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(schema.origin_key, 'In', ids))
-            sub_records = association.list(caller, sub_filter, projection.union([schema.origin_key]))
+          elsif field_schema.type == 'OneToOne' || field_schema.type == 'OneToMany'
+            ids = records.map { |record| record[field_schema.origin_key_target] }.filter { |okt| !okt.nil? }.uniq
+            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.origin_key, 'In', ids))
+            sub_records = association.list(caller, sub_filter, projection.union([field_schema.origin_key]))
 
             records.each do |record|
-              record[name] = sub_records.find { |sr| sr[schema.origin_key] == record[schema.origin_key_target] }
+              record[name] = sub_records.find { |sr| sr[field_schema.origin_key] == record[field_schema.origin_key_target] }
             end
           end
         end

@@ -27,9 +27,10 @@ module ForestAdminDatasourceToolkit
           each_with_object({}) do |path, memo|
             next unless path.include?(':')
 
-            split_path = path.split(':')
-            relation = split_path[0]
-            memo[relation] = Projection.new([split_path[1]].union(memo[relation] || []))
+            original_path = path.split(':')
+            relation = original_path.shift
+
+            memo[relation] = Projection.new([original_path.join(':')].union(memo[relation] || []))
           end
         end
 
@@ -47,7 +48,7 @@ module ForestAdminDatasourceToolkit
         def replace(...)
           Projection.new(
             map(...)
-            .reduce(Projection.new) do |memo, path|
+              .reduce(Projection.new) do |memo, path|
               return memo.union([path]) if path.is_a?(String)
 
               memo.union(path)

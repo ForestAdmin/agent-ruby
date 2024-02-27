@@ -23,10 +23,10 @@ module ForestAdminDatasourceToolkit
 
         def projection
           aggregate_fields = []
-          aggregate_fields << field if field
+          aggregate_fields << field.to_s if field
 
           groups.each do |group|
-            aggregate_fields << group[:field]
+            aggregate_fields << group[:field].to_s
           end
 
           Projection.new(aggregate_fields)
@@ -132,7 +132,7 @@ module ForestAdminDatasourceToolkit
           group = {}
 
           groups.each do |value|
-            group_value = record[value[:field]]
+            group_value = ForestAdminDatasourceToolkit::Utils::Record.field_value(record, value[:field])
             group[value[:field]] = apply_date_operation(group_value, value[:operation], timezone)
           end
 
