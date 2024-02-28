@@ -17,33 +17,33 @@ module ForestAdminDatasourceCustomizer
         let(:passport_records) do
           [
             {
-              id: 101,
-              issue_date: '2010-01-01',
-              owner_id: 202,
-              picture_id: 301,
-              picture: { picture_id: 301, filename: 'pic1.jpg' }
+              'id' => 101,
+              'issue_date' => '2010-01-01',
+              'owner_id' => 202,
+              'picture_id' => 301,
+              'picture' => { 'picture_id' => 301, 'filename' => 'pic1.jpg' }
             },
             {
-              id: 102,
-              issue_date: '2017-01-01',
-              owner_id: 201,
-              picture_id: 302,
-              picture: { picture_id: 302, filename: 'pic2.jpg' }
+              'id' => 102,
+              'issue_date' => '2017-01-01',
+              'owner_id' => 201,
+              'picture_id' => 302,
+              'picture' => { 'picture_id' => 302, 'filename' => 'pic2.jpg' }
             },
             {
-              id: 103,
-              issue_date: '2017-02-05',
-              owner_id: nil,
-              picture_id: 303,
-              picture: { picture_id: 303, filename: 'pic3.jpg' }
+              'id' => 103,
+              'issue_date' => '2017-02-05',
+              'owner_id' => nil,
+              'picture_id' => 303,
+              'picture' => { 'picture_id' => 303, 'filename' => 'pic3.jpg' }
             }
           ]
         end
         let(:person_records) do
           [
-            { id: 201, other_id: 201, name: 'Sharon J. Whalen' },
-            { id: 202, other_id: 202, name: 'Mae S. Waldron' },
-            { id: 203, other_id: 203, name: 'Joseph P. Rodriguez' }
+            { 'id' => 201, 'other_id' => 201, 'name' => 'Sharon J. Whalen' },
+            { 'id' => 202, 'other_id' => 202, 'name' => 'Mae S. Waldron' },
+            { 'id' => 203, 'other_id' => 203, 'name' => 'Joseph P. Rodriguez' }
           ]
         end
 
@@ -72,7 +72,8 @@ module ForestAdminDatasourceCustomizer
                 'picture_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
                 'picture' => Relations::ManyToOneSchema.new(foreign_key: 'picture_id', foreign_key_target: 'id', foreign_collection: 'picture')
               }
-            }
+            },
+            datasource: datasource
           )
 
           allow(collection_passport).to receive(:list) do |_caller, filter, projection|
@@ -81,6 +82,9 @@ module ForestAdminDatasourceCustomizer
             result = filter.sort.apply(result) if filter&.sort
 
             projection.apply(result)
+          end
+          allow(collection_passport).to receive(:aggregate) do |caller, _filter, aggregation, limit|
+            aggregation.apply(passport_records, caller.timezone, limit)
           end
 
           collection_person = instance_double(
@@ -92,7 +96,8 @@ module ForestAdminDatasourceCustomizer
                 'other_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::IN]),
                 'name' => ColumnSchema.new(column_type: PrimitiveType::STRING, filter_operators: [Operators::IN])
               }
-            }
+            },
+            datasource: datasource
           )
 
           allow(collection_person).to receive(:list) do |_caller, filter, projection|
@@ -101,6 +106,9 @@ module ForestAdminDatasourceCustomizer
             result = filter.sort.apply(result) if filter&.sort
 
             projection.apply(result)
+          end
+          allow(collection_person).to receive(:aggregate) do |caller, _filter, aggregation, limit|
+            aggregation.apply(person_records, caller.timezone, limit)
           end
 
           datasource.add_collection(collection_picture)
@@ -443,61 +451,165 @@ module ForestAdminDatasourceCustomizer
                                   ])
           end
 
-          # test('should fetch fields from a native behind an emulated one', async () => {
-          #       newPersons.addRelation('passport', {
-          #         type: 'OneToOne',
-          #         foreignCollection: 'passports',
-          #         originKey: 'ownerId',
-          #       });
-          #       newPassports.addRelation('owner', {
-          #         type: 'ManyToOne',
-          #         foreignCollection: 'persons',
-          #         foreignKey: 'ownerId',
-          #       });
-          #       const records = await newPersons.list(
-          #         factories.caller.build(),
-          #         new Filter({}),
-          #         new Projection('personId', 'name', 'passport:picture:filename'),
-          #       );
-          #
-          #       expect(records).toStrictEqual([
-          #         {
-          #           personId: 201,
-          #           name: 'Sharon J. Whalen',
-          #           passport: { picture: { filename: 'pic2.jpg' } },
-          #         },
-          #         { personId: 202, name: 'Mae S. Waldron', passport: { picture: { filename: 'pic1.jpg' } } },
-          #         { personId: 203, name: 'Joseph P. Rodriguez', passport: null },
-          #       ]);
-          #
-          #       // make sure that the emulator did not trigger on native relation
-          #       expect(pictures.list).not.toHaveBeenCalled();
-          #     });
+          it 'fetches fields from a native behind an emulated one' do
+            @datasource_decorator.get_collection('person').add_relation('passport', {
+                                                                          type: 'OneToOne',
+                                                                          foreign_collection: 'passport',
+                                                                          origin_key: 'owner_id'
+                                                                        })
+            @datasource_decorator.get_collection('passport').add_relation('owner', {
+                                                                            type: 'ManyToOne',
+                                                                            foreign_collection: 'person',
+                                                                            foreign_key: 'owner_id'
+                                                                          })
 
-          # it 'fetches fields from a native behind an emulated one' do
-          #   @datasource_decorator.get_collection('person').add_relation('passport', {
-          #                                                                 type: 'OneToOne',
-          #                                                                 foreign_collection: 'passport',
-          #                                                                 origin_key: 'owner_id'
-          #                                                               })
-          #   @datasource_decorator.get_collection('passport').add_relation('owner', {
-          #                                                                   type: 'ManyToOne',
-          #                                                                   foreign_collection: 'person',
-          #                                                                   foreign_key: 'owner_id'
-          #                                                                 })
-          #
-          #   records = @datasource_decorator.get_collection('person').list(
-          #     caller,
-          #     Filter.new,
-          #     Projection.new(%w[passport:picture:filename]) #  passport:picture:filename
-          #   )
-          #
-          #   expect(records).to eq([
-          #                           { 'id' => 201, 'name' => 'Sharon J. Whalen', 'passport' => { 'picture' => { 'filename' => 'pic2.jpg' } } },
-          #                           { 'id' => 202, 'name' => 'Mae S. Waldron', 'passport' => { 'picture' => { 'filename' => 'pic1.jpg' } } },
-          #                           { 'id' => 203, 'name' => 'Joseph P. Rodriguez', 'passport' => nil }
-          #                         ])
-          # end
+            records = @datasource_decorator.get_collection('person').list(
+              caller,
+              Filter.new,
+              Projection.new(%w[id name passport:picture:filename])
+            )
+
+            expect(records).to eq([
+                                    { 'id' => 201, 'name' => 'Sharon J. Whalen', 'passport' => { 'picture' => { 'filename' => 'pic2.jpg' } } },
+                                    { 'id' => 202, 'name' => 'Mae S. Waldron', 'passport' => { 'picture' => { 'filename' => 'pic1.jpg' } } },
+                                    { 'id' => 203, 'name' => 'Joseph P. Rodriguez', 'passport' => nil }
+                                  ])
+          end
+
+          it 'does not break with deep reprojection' do
+            @datasource_decorator.get_collection('person').add_relation('passport', {
+                                                                          type: 'OneToOne',
+                                                                          foreign_collection: 'passport',
+                                                                          origin_key: 'owner_id'
+                                                                        })
+            @datasource_decorator.get_collection('passport').add_relation('owner', {
+                                                                            type: 'ManyToOne',
+                                                                            foreign_collection: 'person',
+                                                                            foreign_key: 'owner_id'
+                                                                          })
+
+            records = @datasource_decorator.get_collection('person').list(
+              caller,
+              Filter.new,
+              Projection.new(%w[id name passport:owner:passport:issue_date])
+            )
+
+            expect(records).to eq([
+                                    { 'id' => 201, 'name' => 'Sharon J. Whalen', 'passport' => { 'owner' => { 'passport' => { 'issue_date' => '2017-01-01' } } } },
+                                    { 'id' => 202, 'name' => 'Mae S. Waldron', 'passport' => { 'owner' => { 'passport' => { 'issue_date' => '2010-01-01' } } } },
+                                    { 'id' => 203, 'name' => 'Joseph P. Rodriguez', 'passport' => nil }
+                                  ])
+          end
+
+          context 'with two emulated relations' do
+            before do
+              @datasource_decorator.get_collection('person').add_relation('passport', {
+                                                                            type: 'OneToOne',
+                                                                            foreign_collection: 'passport',
+                                                                            origin_key: 'owner_id'
+                                                                          })
+              @datasource_decorator.get_collection('passport').add_relation('owner', {
+                                                                              type: 'ManyToOne',
+                                                                              foreign_collection: 'person',
+                                                                              foreign_key: 'owner_id'
+                                                                            })
+            end
+
+            context 'when emulated filtering' do
+              it 'filters by a many to one relation' do
+                records = @datasource_decorator.get_collection('passport').list(
+                  caller,
+                  Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('owner:name', 'Equal', 'Mae S. Waldron')),
+                  Projection.new(%w[id issue_date])
+                )
+
+                expect(records).to eq([{ 'id' => 101, 'issue_date' => '2010-01-01' }])
+              end
+
+              it 'filters by a one to one relation' do
+                records = @datasource_decorator.get_collection('person').list(
+                  caller,
+                  Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('passport:issue_date', 'Equal', '2017-01-01')),
+                  Projection.new(%w[id name])
+                )
+
+                expect(records).to eq([{ 'id' => 201, 'name' => 'Sharon J. Whalen' }])
+              end
+
+              it 'filters by native relation behind an emulated one' do
+                records = @datasource_decorator.get_collection('person').list(
+                  caller,
+                  Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('passport:picture:filename', 'Equal', 'pic1.jpg')),
+                  Projection.new(%w[id name])
+                )
+
+                expect(records).to eq([{ 'id' => 202, 'name' => 'Mae S. Waldron' }])
+              end
+
+              it 'does not break with deep filters' do
+                records = @datasource_decorator.get_collection('person').list(
+                  caller,
+                  Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('passport:owner:passport:issue_date', 'Equal', '2017-01-01')),
+                  Projection.new(%w[id name])
+                )
+
+                expect(records).to eq([{ 'id' => 201, 'name' => 'Sharon J. Whalen' }])
+              end
+            end
+
+            context 'when emulated sorting' do
+              it 'replaces sorts in emulated many to one into sort by fk' do
+                ascending = @datasource_decorator.get_collection('passport').list(
+                  caller,
+                  Filter.new(sort: Sort.new([{ field: 'owner:name', ascending: true }])),
+                  Projection.new(%w[id owner_id owner:name])
+                )
+
+                descending = @datasource_decorator.get_collection('passport').list(
+                  caller,
+                  Filter.new(sort: Sort.new([{ field: 'owner:name', ascending: false }])),
+                  Projection.new(%w[id owner_id owner:name])
+                )
+
+                expect(ascending).to eq([
+                                          { 'id' => 103, 'owner_id' => nil, 'owner' => nil },
+                                          { 'id' => 102, 'owner_id' => 201, 'owner' => { 'name' => 'Sharon J. Whalen' } },
+                                          { 'id' => 101, 'owner_id' => 202, 'owner' => { 'name' => 'Mae S. Waldron' } }
+                                        ])
+
+                expect(descending).to eq([
+                                           { 'id' => 101, 'owner_id' => 202, 'owner' => { 'name' => 'Mae S. Waldron' } },
+                                           { 'id' => 102, 'owner_id' => 201, 'owner' => { 'name' => 'Sharon J. Whalen' } },
+                                           { 'id' => 103, 'owner_id' => nil, 'owner' => nil }
+                                         ])
+              end
+            end
+
+            context 'when emulated aggregation' do
+              it "does not emulate aggregation which don't need it" do
+                filter = Filter.new
+                aggregation = Aggregation.new(operation: 'Count', groups: [{ field: 'name' }])
+                groups = @datasource_decorator.get_collection('person').aggregate(caller, filter, aggregation)
+
+                expect(groups).to eq([
+                                       { value: 1, group: { 'name' => 'Sharon J. Whalen' } },
+                                       { value: 1, group: { 'name' => 'Mae S. Waldron' } },
+                                       { value: 1, group: { 'name' => 'Joseph P. Rodriguez' } }
+                                     ])
+              end
+
+              it 'gives valid results otherwise' do
+                filter = Filter.new
+                aggregation = Aggregation.new(operation: 'Count', groups: [{ field: 'passport:picture:filename' }])
+                groups = @datasource_decorator.get_collection('person').aggregate(caller, filter, aggregation, 2)
+
+                expect(groups).to eq([
+                                       { value: 1, group: { 'passport:picture:filename' => 'pic2.jpg' } },
+                                       { value: 1, group: { 'passport:picture:filename' => 'pic1.jpg' } }
+                                     ])
+              end
+            end
+          end
         end
       end
     end
