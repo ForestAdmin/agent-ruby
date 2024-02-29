@@ -22,12 +22,6 @@ module ForestAdminDatasourceCustomizer
       @stack.datasource.get_collection(@name)
     end
 
-    def use(plugin, options = [])
-      push_customization(
-        proc { plugin.run(@datasource_customizer, self, options) }
-      )
-    end
-
     def disable_count
       push_customization(
         -> { @stack.schema.get_collection(@name).override_schema(countable: false) }
@@ -123,6 +117,16 @@ module ForestAdminDatasourceCustomizer
                       foreign_key: options[:foreign_key],
                       foreign_key_target: options[:foreign_key_target]
                     })
+    end
+
+    def use(plugin, options = [])
+      push_customization(
+        proc { plugin.new.run(@datasource_customizer, self, options) }
+      )
+    end
+
+    def add_external_relation(name, definition)
+      use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
 
     private

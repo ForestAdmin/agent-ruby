@@ -9,6 +9,8 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
         include ForestAdminDatasourceToolkit::Schema
 
+        attr_reader :relations
+
         def initialize(child_collection, datasource)
           super
           @relations = {}
