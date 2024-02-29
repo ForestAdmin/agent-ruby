@@ -78,7 +78,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def union(other_arrays)
-          Projection.new(other_arrays.union(self))
+          Projection.new(other_arrays.to_a.union(self))
         end
       end
     end
