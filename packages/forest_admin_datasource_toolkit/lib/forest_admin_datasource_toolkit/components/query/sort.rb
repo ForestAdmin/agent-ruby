@@ -7,12 +7,14 @@ module ForestAdminDatasourceToolkit
         end
 
         def replace_clauses(...)
-          self.class.new(
+          Sort.new(
             map(...)
-            .reduce(self.class.new) do |memo, cb_result|
-              return memo.union(cb_result) if cb_result.is_a?(self.class) || cb_result.is_a?(Array)
-
-              memo.union([cb_result])
+            .reduce(Sort.new) do |memo, clause|
+              if clause.is_a?(Array) || clause.is_a?(self.class)
+                memo.union(clause)
+              else
+                memo.union([clause])
+              end
             end
           )
         end

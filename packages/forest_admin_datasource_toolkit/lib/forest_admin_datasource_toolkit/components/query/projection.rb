@@ -49,9 +49,11 @@ module ForestAdminDatasourceToolkit
           Projection.new(
             map(...)
               .reduce(Projection.new) do |memo, path|
-              return memo.union([path]) if path.is_a?(String)
-
-              memo.union(path)
+              if path.is_a?(String)
+                memo.union([path])
+              else
+                memo.union(path)
+              end
             end
           )
         end
