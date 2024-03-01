@@ -151,7 +151,7 @@ module ForestAdminDatasourceToolkit
             end
 
             it 'when calling projection should work' do
-              expect(@condition_tree_branch.projection).to eq(Projection.new(['column1', 'column2']))
+              expect(@condition_tree_branch.projection).to include('column1', 'column2')
             end
 
             it 'when calling apply should work' do

@@ -105,8 +105,8 @@ module ForestAdminDatasourceToolkit
 
         def self.make_through_filter(collection, id, relation_name, caller, base_foreign_filter)
           relation = collection.schema[:fields][relation_name]
-          origin_value = Utils::Collection.get_value(collection, caller, id, relation.origin_key_target)
-          foreign_relation = Utils::Collection.get_through_target(collection, relation_name)
+          origin_value = ForestAdminDatasourceToolkit::Utils::Collection.get_value(collection, caller, id, relation.origin_key_target)
+          foreign_relation =  ForestAdminDatasourceToolkit::Utils::Collection.get_through_target(collection, relation_name)
 
           # Optimization for many to many when there is not search/segment (saves one query)
           if foreign_relation && base_foreign_filter.nestable?

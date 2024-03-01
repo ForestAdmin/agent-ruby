@@ -15,18 +15,18 @@ module ForestAdminDatasourceToolkit
 
         it('apply should sort records') do
           records = [
-            { column1: 2, column2: 2 },
-            { column1: 1, column2: 1 },
-            { column1: 1, column2: 1 },
-            { column1: 1, column2: 2 },
-            { column1: 2, column2: 1 }
+            { 'column1' => 2, 'column2' => 2 },
+            { 'column1' => 1, 'column2' => 1 },
+            { 'column1' => 1, 'column2' => 1 },
+            { 'column1' => 1, 'column2' => 2 },
+            { 'column1' => 2, 'column2' => 1 }
           ]
           expect(sort.apply(records)).to eq([
-                                              { column1: 1, column2: 2 },
-                                              { column1: 1, column2: 1 },
-                                              { column1: 1, column2: 1 },
-                                              { column1: 2, column2: 2 },
-                                              { column1: 2, column2: 1 }
+                                              { 'column1' => 1, 'column2' => 2 },
+                                              { 'column1' => 1, 'column2' => 1 },
+                                              { 'column1' => 1, 'column2' => 1 },
+                                              { 'column1' => 2, 'column2' => 2 },
+                                              { 'column1' => 2, 'column2' => 1 }
                                             ])
         end
 

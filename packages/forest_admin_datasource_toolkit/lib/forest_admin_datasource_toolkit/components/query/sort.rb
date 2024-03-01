@@ -10,9 +10,9 @@ module ForestAdminDatasourceToolkit
           self.class.new(
             map(...)
             .reduce(self.class.new) do |memo, cb_result|
-              return memo.union(cb_result) if cb_result.is_a?(self.class)
+              return memo.union(cb_result) if cb_result.is_a?(self.class) || cb_result.is_a?(Array)
 
-              memo.union(cb_result)
+              memo.union([cb_result])
             end
           )
         end
@@ -33,7 +33,7 @@ module ForestAdminDatasourceToolkit
 
         def unnest
           prefix = first[:field].split(':')[0]
-          raise 'Cannot unnest sort_utils.' unless all? { |ob| ob[:field].start_with?(prefix) }
+          raise 'Cannot unnest sort.' unless all? { |ob| ob[:field].start_with?(prefix) }
 
           self.class.new(map do |ob|
                            { field: ob[:field][prefix.length + 1, ob[:field].length - prefix.length - 1],
