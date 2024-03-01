@@ -5,8 +5,7 @@ module ForestAdminAgent
         attr_reader :name
 
         def initialize(message, name = 'ConflictError')
-          @name = name
-          super(429, 'Conflict', message)
+          super(429, message, name)
         end
       end
     end

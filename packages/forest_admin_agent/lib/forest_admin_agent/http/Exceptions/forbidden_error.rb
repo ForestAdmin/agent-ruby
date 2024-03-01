@@ -5,8 +5,7 @@ module ForestAdminAgent
         attr_reader :name
 
         def initialize(message, name = 'ForbiddenError')
-          @name = name
-          super(403, 'Forbidden', message)
+          super(403, message, name)
         end
       end
     end

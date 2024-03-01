@@ -473,17 +473,22 @@ module ForestAdminAgent
 
         describe 'inject_context_variables' do
           it 'overrides the filter with the context variables' do
-            args[:params] = args[:params].merge({
-                                                  type: 'Value',
-                                                  sourceCollectionName: 'book',
-                                                  aggregateFieldName: nil,
-                                                  aggregator: 'Count',
-                                                  filter: { 'aggregator' => 'and',
-                                                            'conditions' => [{ 'operator' => 'equal',
-                                                                               'value' => '{{dropdown1.selectedValue}}', 'field' => 'title' }] },
-                                                  contextVariables: { 'dropdown1.selectedValue' => 'FOO' },
-                                                  timezone: 'Europe/Paris'
-                                                })
+            args[:params] = args[:params].merge(
+              {
+                type: 'Value',
+                sourceCollectionName: 'book',
+                aggregateFieldName: nil,
+                aggregator: 'Count',
+                filter: JSON.generate({
+                                        aggregator: 'and',
+                                        conditions: [
+                                          { operator: 'equal', value: '{{dropdown1.selectedValue}}', field: 'title' }
+                                        ]
+                                      }),
+                contextVariables: { 'dropdown1.selectedValue' => 'FOO' },
+                timezone: 'Europe/Paris'
+              }
+            )
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             chart.handle_request(args)
 

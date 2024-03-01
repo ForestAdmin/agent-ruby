@@ -38,7 +38,8 @@ module ForestAdminAgent
       def can_approve?
         if smart_action[:userApprovalEnabled].include?(role_id) &&
            (smart_action[:userApprovalConditions].empty? || match_conditions(:userApprovalConditions)) &&
-           (attributes[:requester_id] != caller.id || smart_action[:selfApprovalEnabled].include?(role_id))
+           (attributes[:signed_approval_request][:data][:attributes][:requester_id] != caller.id ||
+             smart_action[:selfApprovalEnabled].include?(role_id))
           return true
         end
 
@@ -70,8 +71,7 @@ module ForestAdminAgent
                            else
                              Nodes::ConditionTreeLeaf.new(pk, 'IN', attributes[:ids])
                            end
-
-        condition = smart_action[condition_name][0]['filter']
+        condition = smart_action[condition_name][0][:filter]
         conditional_filter = filter.override(
           condition_tree: ConditionTreeFactory.intersect(
             [
@@ -81,9 +81,9 @@ module ForestAdminAgent
             ]
           )
         )
-        rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
 
-        (rows[0]['value'] || 0) == attributes[:ids].count
+        rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
+        (rows.empty? ? 0 : rows[0]['value']) == attributes[:ids].count
       rescue StandardError
         raise ConflictError.new(
           'The conditions to trigger this action cannot be verified. Please contact an administrator.',

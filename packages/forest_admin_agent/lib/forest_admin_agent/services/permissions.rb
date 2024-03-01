@@ -86,7 +86,7 @@ module ForestAdminAgent
         smart_action_approval = SmartActionChecker.new(
           request[:params],
           collection,
-          collections_data[collection.name.to_sym][:actions][action[:name]],
+          collections_data[collection.name.to_sym][:actions][action['name'].to_sym],
           caller,
           user_data[:roleId],
           filter
@@ -211,7 +211,7 @@ module ForestAdminAgent
 
         return nil if actions.nil? || actions.empty?
 
-        action = actions.find { |a| a['endpoint'] == endpoint && a['http_method'].casecmp(http_method).zero? }
+        action = actions.find { |a| a['endpoint'] == endpoint && a['httpMethod'].casecmp(http_method).zero? }
 
         raise ForestException, "The collection #{collection_name} does not have this smart action" if action.nil?
 
