@@ -281,7 +281,6 @@ module ForestAdminAgent
               filters: '{"aggregator":"And","conditions": [{"field":"id","operator":"Equal","value":"123e4567-e89b-12d3-a456-426614174000"}]}'
             }
           }
-          # "{\"aggregator\":\"And\",\"conditions\": [{\"field\":\"id\",\"operator\":\"Equal\",\"value\":\"123e4567-e89b-12d3-a456-426614174000\"}]}"
 
           expect(described_class.parse_condition_tree(collection_category, args)).eql?(
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
@@ -387,7 +386,7 @@ module ForestAdminAgent
           expect(described_class.parse_search(collection_category, args)).to be_nil
         end
 
-        it 'hrows an error when the collection is not searchable' do
+        it 'throws an error when the collection is not searchable' do
           args = { params: { search: 'searched argument' } }
 
           expect do
