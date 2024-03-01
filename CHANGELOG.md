@@ -1,3 +1,10 @@
+# [1.0.0-beta.32](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.31...v1.0.0-beta.32) (2024-03-01)
+
+
+### Features
+
+* **action:** add permission on action routes ([#27](https://github.com/ForestAdmin/agent-ruby/issues/27)) ([c7361f7](https://github.com/ForestAdmin/agent-ruby/commit/c7361f753c40a8b4abfc4245aeb17f244c7fec02))
+
 # [1.0.0-beta.31](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.30...v1.0.0-beta.31) (2024-02-22)
 
 
