@@ -306,5 +306,21 @@ module ForestAdminDatasourceCustomizer
         expect { @datasource_customizer.datasource({}) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 The options parameter must contains the following keys: `name, schema, listRecords`')
       end
     end
+
+    context 'when adding a field validation' do
+      it 'adds a validation rule' do
+        stack = @datasource_customizer.stack
+        allow(stack.validation).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.validation.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.add_field_validation('title', Operators::LONGER_THAN, 5)
+        @datasource_customizer.datasource({})
+
+        validation_collection = @datasource_customizer.stack.validation.get_collection('book')
+
+        expect(validation_collection.validation).to have_key('title')
+        expect(validation_collection.validation['title']).to eq([{ operator: Operators::LONGER_THAN, value: 5 }])
+      end
+    end
   end
 end
