@@ -1,3 +1,10 @@
+# [1.0.0-beta.33](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.32...v1.0.0-beta.33) (2024-03-05)
+
+
+### Features
+
+* add relation decorator support  ([#29](https://github.com/ForestAdmin/agent-ruby/issues/29)) ([e181b5f](https://github.com/ForestAdmin/agent-ruby/commit/e181b5f82fb8a8b1fbf835545daa0145a219cea1))
+
 # [1.0.0-beta.32](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.31...v1.0.0-beta.32) (2024-03-01)
 
 
