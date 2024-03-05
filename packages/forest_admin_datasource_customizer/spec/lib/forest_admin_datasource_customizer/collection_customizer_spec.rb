@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceToolkit
@@ -6,7 +7,9 @@ module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
   include ForestAdminDatasourceCustomizer::Decorators::Computed
   include ForestAdminDatasourceCustomizer::Decorators::Action
+  include ForestAdminDatasourceCustomizer::Context
   describe CollectionCustomizer do
+    include_context 'with caller'
     before do
       datasource = Datasource.new
       collection_book = instance_double(
@@ -14,11 +17,11 @@ module ForestAdminDatasourceCustomizer
         name: 'book',
         schema: {
           fields: {
-            'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
             'reference' => ColumnSchema.new(column_type: 'String'),
             'child_id' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::IN]),
-            'author_id' => ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: true),
+            'author_id' => ColumnSchema.new(column_type: 'Number', is_read_only: true, is_sortable: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'author' => Relations::ManyToOneSchema.new(
               foreign_key: 'author_id',
               foreign_collection: 'person',
@@ -42,8 +45,8 @@ module ForestAdminDatasourceCustomizer
         schema: {
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
-            'person_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-            'book_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+            'person_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
+            'book_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'category' => Relations::ManyToOneSchema.new(
               foreign_key: 'category_id',
               foreign_key_target: 'id',
@@ -83,18 +86,6 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      #  $collectionCategory = new Collection($datasource, 'Category');
-      #         $collectionCategory->addFields(
-      #             [
-      #                 'id'    => new ColumnSchema(columnType: PrimitiveType::NUMBER, filterOperators: [Operators::EQUAL, Operators::IN], isPrimaryKey: true),
-      #                 'label' => new ColumnSchema(columnType: PrimitiveType::STRING),
-      #                 'books' => new OneToManySchema(
-      #                     originKey: 'categoryId',
-      #                     originKeyTarget: 'id',
-      #                     foreignCollection: 'Book',
-      #                 ),
-      #             ]
-      #         );
       collection_category = instance_double(
         Collection,
         name: 'category',
@@ -167,27 +158,26 @@ module ForestAdminDatasourceCustomizer
         expect(computed_collection.get_computed('test').get_values(data)).to eq(['Foundation-2022', 'Harry Potter-2022'])
       end
 
-      # TODO: uncomment this test when the relation decorator will be implemented
-      # it 'should add a field to late collection' do
-      #   stack = @datasource_customizer.stack
-      #   allow(stack.late_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.late_computed.get_collection('book'))
-      #
-      #   field_definition = ComputedDefinition.new(
-      #     column_type: PrimitiveType::STRING,
-      #     dependencies: ['id'],
-      #     values: proc { |records| records.map { |record| record['id'].to_s + '-Foo' } },
-      #   )
-      #
-      #   customizer = CollectionCustomizer.new(@datasource_customizer, @datasource_customizer.stack, 'book')
-      #   # $customizer->addManyToOneRelation('mySelf', 'Book', 'id', 'childId');
-      #   customizer.add_field('mySelf', field_definition)
-      #   @datasource_customizer.datasource({})
-      #
-      #   computed_collection = @datasource_customizer.stack.late_computed.get_collection('book')
-      #
-      #   expect(computed_collection.fields).to have_key('mySelf')
-      #   expect(computed_collection.get_computed('mySelf').get_values(data)).to eq(['1-Foo', '2-Foo'])
-      # end
+      it 'adds a field to late collection' do
+        stack = @datasource_customizer.stack
+        allow(stack.late_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_computed.get_collection('book'))
+
+        field_definition = ComputedDefinition.new(
+          column_type: PrimitiveType::STRING,
+          dependencies: ['id'],
+          values: proc { |records| records.map { |record| "#{record["id"]}-Foo" } }
+        )
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.add_many_to_one_relation('mySelf', 'book', { foreign_key: 'id', foreign_key_target: 'child_id' })
+        customizer.add_field('mySelf', field_definition)
+        @datasource_customizer.datasource({})
+
+        computed_collection = @datasource_customizer.stack.late_computed.get_collection('book')
+
+        expect(computed_collection.fields).to have_key('mySelf')
+        expect(computed_collection.get_computed('mySelf').get_values(data)).to eq(['1-Foo', '2-Foo'])
+      end
     end
 
     context 'when using replace_search' do
@@ -214,6 +204,106 @@ module ForestAdminDatasourceCustomizer
         @datasource_customizer.datasource([])
 
         expect(@datasource_customizer.stack.schema.get_collection('book').schema[:countable]).to be false
+      end
+    end
+
+    context 'when adding a relation' do
+      it 'adds a many to one' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.add_many_to_one_relation('myAuthor', 'person', { foreign_key: 'author_id' })
+        @datasource_customizer.datasource({})
+
+        relation_collection = @datasource_customizer.stack.relation.get_collection('book')
+
+        expect(relation_collection.relations).to have_key('myAuthor')
+        expect(relation_collection.relations['myAuthor']).to be_a(Relations::ManyToOneSchema)
+        expect(relation_collection.relations['myAuthor'].foreign_collection).to eq('person')
+        expect(relation_collection.relations['myAuthor'].foreign_key).to eq('author_id')
+        expect(relation_collection.relations['myAuthor'].foreign_key_target).to eq('id')
+      end
+
+      it 'adds a one to one' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.add_one_to_one_relation('myBookAuthor', 'book_person', { origin_key: 'person_id', origin_key_target: 'id' })
+        @datasource_customizer.datasource({})
+
+        relation_collection = @datasource_customizer.stack.relation.get_collection('person')
+
+        expect(relation_collection.relations).to have_key('myBookAuthor')
+        expect(relation_collection.relations['myBookAuthor']).to be_a(Relations::OneToOneSchema)
+        expect(relation_collection.relations['myBookAuthor'].foreign_collection).to eq('book_person')
+        expect(relation_collection.relations['myBookAuthor'].origin_key).to eq('person_id')
+        expect(relation_collection.relations['myBookAuthor'].origin_key_target).to eq('id')
+      end
+
+      it 'adds a one to many' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.add_one_to_many_relation('myBookAuthors', 'book_person', { origin_key: 'person_id', origin_key_target: 'id' })
+        @datasource_customizer.datasource({})
+
+        relation_collection = @datasource_customizer.stack.relation.get_collection('person')
+
+        expect(relation_collection.relations).to have_key('myBookAuthors')
+        expect(relation_collection.relations['myBookAuthors']).to be_a(Relations::OneToManySchema)
+        expect(relation_collection.relations['myBookAuthors'].foreign_collection).to eq('book_person')
+        expect(relation_collection.relations['myBookAuthors'].origin_key).to eq('person_id')
+        expect(relation_collection.relations['myBookAuthors'].origin_key_target).to eq('id')
+      end
+
+      it 'adds a many to many' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.add_many_to_many_relation('myBooks', 'book', 'book_person', { foreign_key: 'book_id', foreign_key_target: 'id', origin_key: 'person_id', origin_key_target: 'id' })
+        @datasource_customizer.datasource({})
+
+        relation_collection = @datasource_customizer.stack.relation.get_collection('person')
+
+        expect(relation_collection.relations).to have_key('myBooks')
+        expect(relation_collection.relations['myBooks']).to be_a(Relations::ManyToManySchema)
+        expect(relation_collection.relations['myBooks'].foreign_collection).to eq('book')
+        expect(relation_collection.relations['myBooks'].through_collection).to eq('book_person')
+        expect(relation_collection.relations['myBooks'].foreign_key).to eq('book_id')
+        expect(relation_collection.relations['myBooks'].foreign_key_target).to eq('id')
+        expect(relation_collection.relations['myBooks'].origin_key).to eq('person_id')
+        expect(relation_collection.relations['myBooks'].origin_key_target).to eq('id')
+      end
+    end
+
+    context 'when adding external relation' do
+      it 'calls addField' do
+        data = [{ 'id' => 1, 'title' => 'Dune' }]
+        stack = @datasource_customizer.stack
+        allow(stack.late_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_computed.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.add_external_relation(
+          'tags',
+          {
+            schema: ['etag' => 'String', 'selfLink' => 'String'],
+            listRecords: proc {
+              [
+                { 'etag' => 'OTD2tB19qn4', 'selfLink' => 'https://www.googleapis.com/books/v1/volumes/_ojXNuzgHRcC' },
+                { 'etag' => 'NsxMT6kCCVs', 'selfLink' => 'https://www.googleapis.com/books/v1/volumes/RJxWIQOvoZUC' }
+              ]
+            }
+          }
+        )
+        @datasource_customizer.datasource({})
+
+        computed_collection = @datasource_customizer.stack.late_computed.get_collection('book')
+
+        expect(computed_collection.fields).to have_key('tags')
+        expect(computed_collection.get_computed('tags').get_values(data, CollectionCustomizationContext.new(computed_collection, caller))).to eq([
+                                                                                                                                                   [
+                                                                                                                                                     { 'etag' => 'OTD2tB19qn4', 'selfLink' => 'https://www.googleapis.com/books/v1/volumes/_ojXNuzgHRcC' },
+                                                                                                                                                     { 'etag' => 'NsxMT6kCCVs', 'selfLink' => 'https://www.googleapis.com/books/v1/volumes/RJxWIQOvoZUC' }
+                                                                                                                                                   ]
+                                                                                                                                                 ])
+      end
+
+      it 'throwns an exception when the plugin have options keys missing' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.add_external_relation('tags', {})
+        expect { @datasource_customizer.datasource({}) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 The options parameter must contains the following keys: `name, schema, listRecords`')
       end
     end
   end

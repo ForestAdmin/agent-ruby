@@ -103,6 +103,9 @@ module ForestAdminAgent
 
         return nil if scope.nil?
 
+        team = get_team(caller.rendering_id)
+        user = get_user_data(caller.id)
+
         context_variables = ContextVariables.new(team, user)
 
         ContextVariablesInjector.inject_context_in_filter(scope, context_variables)

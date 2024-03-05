@@ -27,9 +27,10 @@ module ForestAdminDatasourceToolkit
           each_with_object({}) do |path, memo|
             next unless path.include?(':')
 
-            split_path = path.split(':')
-            relation = split_path[0]
-            memo[relation] = Projection.new([split_path[1]].union(memo[relation] || []))
+            original_path = path.split(':')
+            relation = original_path.shift
+
+            memo[relation] = Projection.new([original_path.join(':')].union(memo[relation] || []))
           end
         end
 
@@ -47,16 +48,39 @@ module ForestAdminDatasourceToolkit
         def replace(...)
           Projection.new(
             map(...)
-            .reduce(Projection.new) do |memo, path|
-              return memo.union([path]) if path.is_a?(String)
-
-              memo.union(path)
+              .reduce(Projection.new) do |memo, path|
+              if path.is_a?(String)
+                memo.union([path])
+              else
+                memo.union(path)
+              end
             end
           )
         end
 
         def equals(other)
           length == other.length && all? { |field| other.include?(field) }
+        end
+
+        def apply(records)
+          records.map { |record| re_project(record) }
+        end
+
+        def re_project(record)
+          result = nil
+
+          if record
+            record = HashHelper.convert_keys(record, :to_s)
+            result = {}
+            columns.each { |column| result[column.to_s] = record[column.to_s] }
+            relations.each { |relation, projection| result[relation] = projection.re_project(record[relation]) }
+          end
+
+          result
+        end
+
+        def union(other_arrays)
+          Projection.new(other_arrays.to_a.union(self))
         end
       end
     end

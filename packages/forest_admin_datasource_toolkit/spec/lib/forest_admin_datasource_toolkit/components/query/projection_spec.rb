@@ -71,6 +71,33 @@ module ForestAdminDatasourceToolkit
             expect(projection.relations).to eq({ 'category' => ['label'] })
           end
         end
+
+        describe 'apply' do
+          it 're_projects a list of records' do
+            projection = described_class.new(%w[id name author:name other:id])
+
+            expect(
+              projection.apply([
+                                 {
+                                   id: 1,
+                                   name: 'romain',
+                                   age: 12,
+                                   author: { name: 'ana', lastname: 'something' },
+                                   other: nil
+                                 }
+                               ])
+            ).to eq(
+              [
+                {
+                  'id' => 1,
+                  'name' => 'romain',
+                  'author' => { 'name' => 'ana' },
+                  'other' => nil
+                }
+              ]
+            )
+          end
+        end
       end
     end
   end
