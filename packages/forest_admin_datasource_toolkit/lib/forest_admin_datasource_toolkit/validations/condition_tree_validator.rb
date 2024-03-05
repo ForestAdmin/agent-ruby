@@ -13,9 +13,7 @@ module ForestAdminDatasourceToolkit
         end
       end
 
-      private
-
-      def validate_branch(branch, collection)
+      def self.validate_branch(branch, collection)
         unless %w[And Or].include?(branch.aggregator)
           raise Exceptions::ValidationError,
                 "The given aggregator '#{branch.aggregator}' is not supported. The supported values are: ['Or', 'And']"
@@ -27,9 +25,11 @@ module ForestAdminDatasourceToolkit
         end
 
         branch.conditions.each { |condition| validate(condition, collection) }
+
+        nil
       end
 
-      def validate_leaf(leaf, collection)
+      def self.validate_leaf(leaf, collection)
         field_schema = Utils::Collection.get_field_schema(collection, leaf.field)
 
         throw_if_operator_not_allowed_with_column(leaf, field_schema)
@@ -38,34 +38,32 @@ module ForestAdminDatasourceToolkit
         throw_if_value_not_allowed_with_column_type(leaf, field_schema)
       end
 
-      def throw_if_operator_not_allowed_with_column(leaf, column_schema)
+      def self.throw_if_operator_not_allowed_with_column(leaf, column_schema)
         operators = column_schema.filter_operators
-        unless leaf.operator.include?(operators)
-          raise Exceptions::ValidationError,
-                "The given operator '#{leaf.operator}'
+        return if operators.include?(leaf.operator)
+
+        raise Exceptions::ValidationError,
+              "The given operator '#{leaf.operator}'
             is not supported by the column: '#{leaf.field}'.\n
             #{operators.empty? ? "The allowed types are: #{operators.join(",")}" : "the column is not filterable"}"
-        end
-        validate_values(field, column_schema, value, allowed_types)
       end
 
-      def throw_if_value_not_allowed_with_operator(leaf, column_schema)
+      def self.throw_if_value_not_allowed_with_operator(leaf, column_schema)
         allowed_types = Rules.get_allowed_types_for_operator(leaf.operator)
-        validate_values(field, column_schema, value, allowed_types)
+        validate_values(leaf.field, column_schema, leaf.value, allowed_types)
       end
 
-      def throw_if_operator_not_allowed_with_column_type(leaf, column_schema)
+      def self.throw_if_operator_not_allowed_with_column_type(leaf, column_schema)
         allowed_operators = Rules.get_allowed_operators_for_column_type(column_schema.column_type)
 
         return if allowed_operators.include?(leaf.operator)
 
         raise Exceptions::ValidationError,
-              "The given operator '#{leaf.operator}'
-            is not allowed with the columnType schema: '#{column_schema.column_type}'.\n
-            The allowed types are: [#{allowed_operators.join(",")}]"
+              "The given operator '#{leaf.operator}' is not allowed with the columnType schema: " \
+              "'#{column_schema.column_type}'. The allowed types are: [#{allowed_operators.join(",")}]"
       end
 
-      def throw_if_value_not_allowed_with_column_type(leaf, column_schema)
+      def self.throw_if_value_not_allowed_with_column_type(leaf, column_schema)
         # exclude some cases where the value is not related to the columnType of the field
         excluded_cases = [
           Operators::SHORTER_THAN,
@@ -82,7 +80,7 @@ module ForestAdminDatasourceToolkit
         validate_values(leaf.field, column_schema, leaf.value, types)
       end
 
-      def validate_values(field, column_schema, value, allowed_types)
+      def self.validate_values(field, column_schema, value, allowed_types)
         if value.is_a?(Array)
           value.each do |item|
             FieldValidator.validate_value(field, column_schema, item, allowed_types)

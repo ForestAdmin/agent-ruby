@@ -95,7 +95,7 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.compute_allowed_types_for_operators
-        get_allowed_operators_for_column_type.keys.reduce do |result, type|
+        get_allowed_operators_for_column_type.keys.each_with_object({}) do |type, result|
           allowed_operators = get_allowed_operators_for_column_type(type)
           allowed_operators.each do |operator|
             if result[operator]
@@ -104,8 +104,6 @@ module ForestAdminDatasourceToolkit
               result[operator] = [type]
             end
           end
-
-          result
         end
       end
 
