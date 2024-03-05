@@ -13,7 +13,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_validation(name, validation)
-          FieldValidator.validate(child_collection, name)
+          FieldValidator.validate(self, name)
 
           field = @child_collection.schema[:fields][name]
           if field.nil? || field.type != 'Column'
@@ -29,19 +29,22 @@ module ForestAdminDatasourceCustomizer
 
         def create(caller, data)
           data.each { |record| validate(record, caller.timezone, true) }
-          super(caller, data)
+          child_collection.create(caller, data)
         end
 
         def update(caller, filter, patch)
           validate(patch, caller.timezone, false)
-          super(caller, filter, patch)
+          child_collection.update(caller, filter, patch)
         end
 
         def refine_schema(child_schema)
           @validation.each do |name, rules|
-            validation = child_schema[name].validation + rules
-            child_schema[name].validation = validation
+            field = child_schema[:fields][name]
+            field.validations = (field.validations || []).concat(rules)
+            child_schema[:fields][name] = field
           end
+
+          child_schema
         end
 
         private
@@ -55,18 +58,18 @@ module ForestAdminDatasourceCustomizer
 
             applicable_rules.each do |validator|
               raw_leaf = { field: name }.merge(validator)
-              tree = ConditionTreeFactory.from_array(raw_leaf)
+              tree = ConditionTreeFactory.from_plain_object(raw_leaf)
               next if tree.match(record, self, timezone)
 
               message = "#{name} failed validation rule :"
-              rule = if validator.key?('value')
-                       "#{validator["operator"]}(#{if validator["value"].is_a?(Array)
-                                                     validator["value"].join(",")
-                                                   else
-                                                     validator["value"]
-                                                   end})"
+              rule = if validator.key?(:value)
+                       "#{validator[:operator]}(#{if validator[:value].is_a?(Array)
+                                                    validator[:value].join(",")
+                                                  else
+                                                    validator[:value]
+                                                  end})"
                      else
-                       validator['operator']
+                       validator[:operator]
                      end
 
               raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, "#{message} #{rule}"
