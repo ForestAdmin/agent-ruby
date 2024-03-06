@@ -129,15 +129,6 @@ module ForestAdminDatasourceCustomizer
       use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
 
-    # public function addFieldValidation(string $name, string $operator, $value = null): self
-    # {
-    #   return $this->pushCustomization(
-    #   fn () => $this->stack
-    # ->validation
-    # ->getCollection($this->name)
-    # ->addValidation($name, ['operator' => $operator, 'value' => $value])
-    # );
-    # }
     def add_field_validation(name, operator, value = nil)
       push_customization(
         proc { @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value }) }
