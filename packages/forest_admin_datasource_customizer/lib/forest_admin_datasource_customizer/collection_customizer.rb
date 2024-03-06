@@ -129,6 +129,12 @@ module ForestAdminDatasourceCustomizer
       use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
 
+    # Add a new validator to the edition form of a given field
+    # @param name The name of the field
+    # @param operator The validator that you wish to add
+    # @param value A configuration value that the validator may need
+    # @example
+    # .add_field_validation('first_name', Operators::LONGER_THAN, 2)
     def add_field_validation(name, operator, value = nil)
       push_customization(
         proc { @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value }) }
