@@ -43,9 +43,8 @@ module ForestAdminDatasourceToolkit
         return if operators.include?(leaf.operator)
 
         raise Exceptions::ValidationError,
-              "The given operator '#{leaf.operator}'
-            is not supported by the column: '#{leaf.field}'.\n
-            #{operators.empty? ? "The allowed types are: #{operators.join(",")}" : "the column is not filterable"}"
+              "The given operator '#{leaf.operator}' is not supported by the column: '#{leaf.field}'." \
+              "#{operators.empty? ? " The allowed types are: #{operators.join(",")}" : " The column is not filterable"}"
       end
 
       def self.throw_if_value_not_allowed_with_operator(leaf, column_schema)

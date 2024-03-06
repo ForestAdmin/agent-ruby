@@ -7,7 +7,12 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-        @fields = {}
+        attr_accessor :fields
+
+        def initialize(child_collection, datasource)
+          super
+          @fields = {}
+        end
 
         def emulate_field_operator(name, operator)
           replace_field_operator(name, operator)
@@ -21,19 +26,21 @@ module ForestAdminDatasourceCustomizer
             operators = schema.filter_operators
 
             if !operators.include?(Operators::EQUAL) || !operators.include?(Operators::IN)
-              raise Exceptions::ForestException, "Cannot override operators on collection #{self.name}:
-                the primary key columns must support 'Equal' and 'In' operators."
+              raise Exceptions::ForestException, "Cannot override operators on collection #{self.name}: " \
+                                                 "the primary key columns must support 'Equal' and 'In' operators."
             end
           end
 
           # Check that targeted field is valid
           field = child_collection.schema[:fields][name]
           Validations::FieldValidator.validate(self, name)
-          raise Exceptions::ForestException, 'Cannot override operators on co' unless field.nil?
+          unless field.is_a?(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
+            raise Exceptions::ForestException, 'Cannot replace operator for relation'
+          end
 
           # Mark the field operator as replaced.
           fields[name] = {} unless fields.key?(name)
-          fields[name].merge({ operator => replace_by })
+          fields[name][operator] = replace_by
           mark_schema_as_dirty
         end
 
@@ -42,6 +49,8 @@ module ForestAdminDatasourceCustomizer
         def refine_schema(sub_schema)
           sub_schema[:fields].map do |name, schema|
             schema.filter_operators = schema.filter_operators.union(fields[name].keys) if fields.key?(name)
+
+            schema
           end
 
           sub_schema
@@ -59,8 +68,8 @@ module ForestAdminDatasourceCustomizer
           # ConditionTree is targeting a field on another collection => recurse.
           if leaf.field.include?(':')
             prefix = leaf.field.split(':').first
-            schema = schema[:fields][prefix]
-            association = datasource.get_collection(schema.foreign_collection)
+            relation_schema = schema[:fields][prefix]
+            association = datasource.get_collection(relation_schema.foreign_collection)
             association_leaf = leaf.unnest.replace_leafs do |sub_leaf|
               association.replace_leaf(caller, sub_leaf, replacements)
             end
@@ -75,7 +84,7 @@ module ForestAdminDatasourceCustomizer
           handler = fields.dig(leaf.field, leaf.operator)
           if handler
             replacement_id = "#{name}.#{leaf.field}[#{leaf.operator}]"
-            sub_replacements = [...replacements, replacement_id]
+            sub_replacements = replacements.union([replacement_id])
             if replacements.include?(replacement_id)
               raise Exceptions::ForestException, "Operator replacement cycle: #{sub_replacements.join(" -> ")}"
             end
@@ -88,15 +97,14 @@ module ForestAdminDatasourceCustomizer
                 replace_leaf(caller, sub_leaf, sub_replacements)
               end
 
-              # TODO : add ConditionTreeValidator
-              # ConditionTreeValidator.validate(equivalent, this);
+              Validations::ConditionTreeValidator.validate(equivalent, self)
 
               return equivalent
             end
           end
 
           ConditionTreeFactory.match_records(
-            schema,
+            self,
             leaf.apply(
               list(caller, Filter.new, leaf.projection.with_pks(self)),
               self,

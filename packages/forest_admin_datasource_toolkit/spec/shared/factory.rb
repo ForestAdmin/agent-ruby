@@ -13,10 +13,13 @@ module Factory
     instance_double(
       ForestAdminDatasourceToolkit::Collection,
       {
-        # nativeDriver: null,
         datasource: ForestAdminDatasourceToolkit::Datasource.new,
         name: 'collection',
-        schema: {}, # collectionSchemaFactory.build(),
+        schema: {
+          fields: {},
+          countable: false,
+          searchable: false
+        },
         execute: nil,
         get_form: nil,
         render_chart: nil,
