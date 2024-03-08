@@ -21,7 +21,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def use(plugin, options = [])
-      push_customization { plugin.run(@datasource_customizer, self, options) }
+      push_customization { plugin.new.run(@datasource_customizer, self, options) }
     end
 
     def disable_count
