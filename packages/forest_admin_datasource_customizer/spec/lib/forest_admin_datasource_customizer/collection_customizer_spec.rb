@@ -322,5 +322,36 @@ module ForestAdminDatasourceCustomizer
         expect(validation_collection.validation['title']).to eq([{ operator: Operators::LONGER_THAN, value: 5 }])
       end
     end
+
+    context 'when using emulate_field_operator' do
+      it 'emulate operator on field' do
+        stack = @datasource_customizer.stack
+        allow(stack.early_op_emulate).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_op_emulate.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.emulate_field_operator('title', Operators::PRESENT)
+        @datasource_customizer.datasource({})
+        op_emulate_collection = @datasource_customizer.stack.early_op_emulate.get_collection('book')
+
+        expect(op_emulate_collection.fields).to have_key('title')
+        expect(op_emulate_collection.fields['title']).to eq({ Operators::PRESENT => nil })
+      end
+    end
+
+    context 'when using replace_field_operator' do
+      it 'replace operator on field' do
+        stack = @datasource_customizer.stack
+        allow(stack.early_op_emulate).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_op_emulate.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        replacer = proc { { field: 'first_name', operator: Operators::NOT_EQUAL, value: nil } }
+        customizer.replace_field_operator('title', Operators::PRESENT, &replacer)
+        @datasource_customizer.datasource({})
+        op_emulate_collection = @datasource_customizer.stack.early_op_emulate.get_collection('book')
+
+        expect(op_emulate_collection.fields).to have_key('title')
+        expect(op_emulate_collection.fields['title']).to eq({ Operators::PRESENT => replacer })
+      end
+    end
   end
 end
