@@ -8,6 +8,11 @@ module ForestAdminDatasourceToolkit
           @offset = offset
           @limit = limit
         end
+
+        def apply(records)
+          end_index = @limit ? @offset + @limit : nil
+          records[@offset...end_index]
+        end
       end
     end
   end
