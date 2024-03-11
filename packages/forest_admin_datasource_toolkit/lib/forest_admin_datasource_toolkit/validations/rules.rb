@@ -62,15 +62,11 @@ module ForestAdminDatasourceToolkit
             Operators::LESS_THAN,
             Operators::GREATER_THAN
           ],
-          PrimitiveType::JSON => [
-            Operators::BLANK,
-            Operators::MISSING,
-            Operators::PRESENT
-          ],
+          PrimitiveType::JSON => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::DATEONLY => [*Rules::BASE_OPERATORS, *Rules::BASE_DATEONLY_OPERATORS],
           PrimitiveType::ENUM => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::UUID => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
-          PrimitiveType::BOOLEAN => Rules::BASE_OPERATORS,
+          PrimitiveType::BOOLEAN => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::POINT => Rules::BASE_OPERATORS
         }
 
@@ -132,7 +128,9 @@ module ForestAdminDatasourceToolkit
           Operators::PREVIOUS_X_DAYS_TO_DATE => ['Number'],
           Operators::PREVIOUS_X_DAYS => ['Number'],
           Operators::BEFORE_X_HOURS_AGO => ['Number'],
-          Operators::AFTER_X_HOURS_AGO => ['Number']
+          Operators::AFTER_X_HOURS_AGO => ['Number'],
+          Operators::LONGER_THAN => ['Number'],
+          Operators::SHORTER_THAN => ['Number']
         )
 
         operator ? merged[operator] : merged

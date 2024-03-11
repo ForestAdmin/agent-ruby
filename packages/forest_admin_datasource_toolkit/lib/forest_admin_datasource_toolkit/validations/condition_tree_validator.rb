@@ -36,6 +36,8 @@ module ForestAdminDatasourceToolkit
         throw_if_value_not_allowed_with_operator(leaf, field_schema)
         throw_if_operator_not_allowed_with_column_type(leaf, field_schema)
         throw_if_value_not_allowed_with_column_type(leaf, field_schema)
+
+        nil
       end
 
       def self.throw_if_operator_not_allowed_with_column(leaf, column_schema)
