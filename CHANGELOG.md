@@ -1,3 +1,10 @@
+# [1.0.0-beta.34](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.33...v1.0.0-beta.34) (2024-03-11)
+
+
+### Features
+
+* add validation support ([#30](https://github.com/ForestAdmin/agent-ruby/issues/30)) ([a0e8092](https://github.com/ForestAdmin/agent-ruby/commit/a0e80923ad1b75286d911ed96ef5e6baef0b022a))
+
 # [1.0.0-beta.33](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.32...v1.0.0-beta.33) (2024-03-05)
 
 
