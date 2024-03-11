@@ -150,9 +150,9 @@ module ForestAdminDatasourceCustomizer
     # @example
     # .add_field_validation('first_name', Operators::LONGER_THAN, 2)
     def add_field_validation(name, operator, value = nil)
-      push_customization(
-        proc { @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value }) }
-      )
+      push_customization do
+        @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value })
+      end
     end
 
     private
