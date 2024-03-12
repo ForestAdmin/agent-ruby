@@ -62,15 +62,11 @@ module ForestAdminDatasourceToolkit
             Operators::LESS_THAN,
             Operators::GREATER_THAN
           ],
-          PrimitiveType::JSON => [
-            Operators::BLANK,
-            Operators::MISSING,
-            Operators::PRESENT
-          ],
+          PrimitiveType::JSON => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::DATEONLY => [*Rules::BASE_OPERATORS, *Rules::BASE_DATEONLY_OPERATORS],
           PrimitiveType::ENUM => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::UUID => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
-          PrimitiveType::BOOLEAN => Rules::BASE_OPERATORS,
+          PrimitiveType::BOOLEAN => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::POINT => Rules::BASE_OPERATORS
         }
 
@@ -95,7 +91,7 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.compute_allowed_types_for_operators
-        get_allowed_operators_for_column_type.keys.reduce do |result, type|
+        get_allowed_operators_for_column_type.keys.each_with_object({}) do |type, result|
           allowed_operators = get_allowed_operators_for_column_type(type)
           allowed_operators.each do |operator|
             if result[operator]
@@ -104,8 +100,6 @@ module ForestAdminDatasourceToolkit
               result[operator] = [type]
             end
           end
-
-          result
         end
       end
 
@@ -134,7 +128,9 @@ module ForestAdminDatasourceToolkit
           Operators::PREVIOUS_X_DAYS_TO_DATE => ['Number'],
           Operators::PREVIOUS_X_DAYS => ['Number'],
           Operators::BEFORE_X_HOURS_AGO => ['Number'],
-          Operators::AFTER_X_HOURS_AGO => ['Number']
+          Operators::AFTER_X_HOURS_AGO => ['Number'],
+          Operators::LONGER_THAN => ['Number'],
+          Operators::SHORTER_THAN => ['Number']
         )
 
         operator ? merged[operator] : merged

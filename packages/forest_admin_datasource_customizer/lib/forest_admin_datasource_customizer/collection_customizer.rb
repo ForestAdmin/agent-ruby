@@ -9,9 +9,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def add_action(name, definition)
-      push_customization(
-        proc { @stack.action.get_collection(@name).add_action(name, definition) }
-      )
+      push_customization { @stack.action.get_collection(@name).add_action(name, definition) }
     end
 
     def schema
@@ -22,34 +20,56 @@ module ForestAdminDatasourceCustomizer
       @stack.validation.get_collection(@name)
     end
 
+    def use(plugin, options = [])
+      push_customization { plugin.new.run(@datasource_customizer, self, options) }
+    end
+
     def disable_count
-      push_customization(
-        -> { @stack.schema.get_collection(@name).override_schema(countable: false) }
-      )
+      push_customization { @stack.schema.get_collection(@name).override_schema(countable: false) }
     end
 
     def replace_search(definition)
-      push_customization(
-        proc { @stack.search.get_collection(@name).replace_search(definition) }
-      )
+      push_customization { @stack.search.get_collection(@name).replace_search(definition) }
     end
 
     def add_field(name, definition)
-      push_customization(
-        proc {
-          collection_before_relations = @stack.early_computed.get_collection(@name)
-          collection_after_relations = @stack.late_computed.get_collection(@name)
-          can_be_computed_before_relations = definition.dependencies.all? do |field|
-            !ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection_before_relations, field).nil?
-          rescue StandardError
-            false
-          end
+      push_customization do
+        collection_before_relations = @stack.early_computed.get_collection(@name)
+        collection_after_relations = @stack.late_computed.get_collection(@name)
+        can_be_computed_before_relations = definition.dependencies.all? do |field|
+          !ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(collection_before_relations, field).nil?
+        rescue StandardError
+          false
+        end
 
-          collection = can_be_computed_before_relations ? collection_before_relations : collection_after_relations
+        collection = can_be_computed_before_relations ? collection_before_relations : collection_after_relations
 
-          collection.register_computed(name, definition)
-        }
-      )
+        collection.register_computed(name, definition)
+      end
+    end
+
+    def emulate_field_operator(name, operator)
+      push_customization do
+        collection = if @stack.early_op_emulate.get_collection(@name).schema[:fields].key?(name)
+                       @stack.early_op_emulate.get_collection(@name)
+                     else
+                       @stack.late_op_emulate.get_collection(@name)
+                     end
+
+        collection.emulate_field_operator(name, operator)
+      end
+    end
+
+    def replace_field_operator(name, operator, &replacer)
+      push_customization do
+        collection = if @stack.early_op_emulate.get_collection(@name).schema[:fields].key?(name)
+                       @stack.early_op_emulate.get_collection(@name)
+                     else
+                       @stack.late_op_emulate.get_collection(@name)
+                     end
+
+        collection.replace_field_operator(name, operator, &replacer)
+      end
     end
 
     # Add a many to one relation to the collection
@@ -119,12 +139,6 @@ module ForestAdminDatasourceCustomizer
                     })
     end
 
-    def use(plugin, options = [])
-      push_customization(
-        proc { plugin.new.run(@datasource_customizer, self, options) }
-      )
-    end
-
     def add_external_relation(name, definition)
       use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
@@ -136,21 +150,19 @@ module ForestAdminDatasourceCustomizer
     # @example
     # .add_field_validation('first_name', Operators::LONGER_THAN, 2)
     def add_field_validation(name, operator, value = nil)
-      push_customization(
-        proc { @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value }) }
-      )
+      push_customization do
+        @stack.validation.get_collection(@name).add_validation(name, { operator: operator, value: value })
+      end
     end
 
     private
 
-    def push_customization(customization)
+    def push_customization(&customization)
       @stack.queue_customization(customization)
     end
 
     def push_relation(name, definition)
-      push_customization(
-        proc { @stack.relation.get_collection(@name).add_relation(name, definition) }
-      )
+      push_customization { @stack.relation.get_collection(@name).add_relation(name, definition) }
     end
   end
 end

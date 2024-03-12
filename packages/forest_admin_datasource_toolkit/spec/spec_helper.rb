@@ -2,6 +2,7 @@ require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_datasource_toolkit'
+require 'shared/factory'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -15,4 +16,6 @@ RSpec.configure do |config|
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end
+
+  config.include Factory
 end
