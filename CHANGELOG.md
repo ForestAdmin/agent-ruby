@@ -1,3 +1,10 @@
+# [1.0.0-beta.35](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.34...v1.0.0-beta.35) (2024-03-12)
+
+
+### Features
+
+* add operator emulate support ([#31](https://github.com/ForestAdmin/agent-ruby/issues/31)) ([fc6c7b5](https://github.com/ForestAdmin/agent-ruby/commit/fc6c7b5f3f31374936e89f84f69330433263904e))
+
 # [1.0.0-beta.34](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.33...v1.0.0-beta.34) (2024-03-11)
 
 
