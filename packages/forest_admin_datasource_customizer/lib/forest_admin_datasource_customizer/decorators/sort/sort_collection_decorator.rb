@@ -31,7 +31,7 @@ module ForestAdminDatasourceCustomizer
                                                  rewrite_plain_sort_clause(clause)
                                                end)
 
-          if child_filter.sort&.none? { |clause| emulated?(clause[:field]) }
+          if child_filter.sort.nil? || child_filter.sort.none? { |clause| emulated?(clause[:field]) }
             return child_collection.list(caller, child_filter, projection)
           end
 
