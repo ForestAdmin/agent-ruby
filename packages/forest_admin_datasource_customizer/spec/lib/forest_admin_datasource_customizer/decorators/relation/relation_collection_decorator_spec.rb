@@ -561,13 +561,13 @@ module ForestAdminDatasourceCustomizer
               it 'replaces sorts in emulated many to one into sort by fk' do
                 ascending = @datasource_decorator.get_collection('passport').list(
                   caller,
-                  Filter.new(sort: Sort.new([{ field: 'owner:name', ascending: true }])),
+                  Filter.new(sort: ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'owner:name', ascending: true }])),
                   Projection.new(%w[id owner_id owner:name])
                 )
 
                 descending = @datasource_decorator.get_collection('passport').list(
                   caller,
-                  Filter.new(sort: Sort.new([{ field: 'owner:name', ascending: false }])),
+                  Filter.new(sort: ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'owner:name', ascending: false }])),
                   Projection.new(%w[id owner_id owner:name])
                 )
 
