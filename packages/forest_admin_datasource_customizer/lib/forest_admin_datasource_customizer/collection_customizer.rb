@@ -157,7 +157,7 @@ module ForestAdminDatasourceCustomizer
 
     # emulateFieldSorting(name: TColumnName<S, N>): this {
     #     return this.pushCustomization(async () => {
-    #       this.stack.sortEmulate.getCollection(this.name).emulateFieldSorting(name);
+    #       this.stack.sort_emulate.get_collection(this.name).emulate_field_sorting(name);
     #     });
     #   }
     # Enable sorting on a specific field using emulation.
@@ -166,15 +166,13 @@ module ForestAdminDatasourceCustomizer
     # @example
     # .emulate_field_sorting('fullName')
     def emulate_field_sorting(name)
-      push_customization(
-        proc { @stack.sort.get_collection(@name).emulate_field_sorting(name) }
-      )
+      push_customization { @stack.sort.get_collection(@name).emulate_field_sorting(name) }
     end
 
     # Replace an implementation for the sorting.
     # The field sorting will be done by the datasource.
     # @param name the name of the field to enable sort
-    # @param equivalentSort the sort equivalent
+    # @param equivalent_sort the sort equivalent
     # @example
     # .replace_field_sorting(
     #   'fullName',
@@ -184,9 +182,7 @@ module ForestAdminDatasourceCustomizer
     #   ]
     # )
     def replace_field_sorting(name, equivalent_sort)
-      push_customization(
-        proc { @stack.sort.get_collection(@name).replace_field_sorting(name, equivalent_sort) }
-      )
+      push_customization { @stack.sort.get_collection(@name).replace_field_sorting(name, equivalent_sort) }
     end
 
     private
