@@ -27,6 +27,7 @@ module ForestAdminDatasourceCustomizer
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
         last = @validation = DatasourceDecorator.new(last, Validation::ValidationCollectionDecorator)
 
+        last = @publication = Publication::PublicationDatasourceDecorator.new(last)
         last = @rename_field = DatasourceDecorator.new(last, RenameField::RenameFieldCollectionDecorator)
         @datasource = last
       end
