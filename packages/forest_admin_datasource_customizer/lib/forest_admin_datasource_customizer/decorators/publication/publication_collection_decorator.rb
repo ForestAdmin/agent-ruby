@@ -2,7 +2,6 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Publication
       class PublicationCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
-        include ForestAdminDatasourceToolkit::Utils
         include ForestAdminDatasourceToolkit::Exceptions
         attr_reader :blacklist
 
@@ -14,7 +13,9 @@ module ForestAdminDatasourceCustomizer
         def change_field_visibility(name, visible)
           field = child_collection.schema[:fields][name]
           raise ForestException, "No such field '#{name}'" unless field
-          raise ForestException, 'Cannot hide primary key' if Schema.primary_key?(child_collection.schema, name)
+          raise ForestException, 'Cannot hide primary key' if ForestAdminDatasourceToolkit::Utils::Schema.primary_key?(
+            child_collection, name
+          )
 
           if visible
             @blacklist.delete(name)
@@ -36,18 +37,14 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(child_schema)
-          child_schema[:fields].each do |name, schema|
-            child_schema[:fields][name] = schema unless @blacklist.include?(name)
+          schema = { fields: {} }
+
+          child_schema[:fields].each do |name, field|
+            schema[:fields][name] = field if published?(name)
           end
 
-          child_schema
+          schema
         end
-
-        # public override markSchemaAsDirty(): void {
-        #     return super.markSchemaAsDirty();
-        #   }
-
-        private
 
         def published?(name)
           # Explicitly hidden
@@ -72,14 +69,18 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
-          return false unless field.type == 'ManyToMany'
+          if field.type == 'ManyToMany'
+            return (
+              datasource.published?(field.through_collection) &&
+              datasource.published?(field.foreign_collection) &&
+              datasource.get_collection(field.through_collection).published?(field.foreign_key) &&
+              datasource.get_collection(field.through_collection).published?(field.origin_key) &&
+              published?(field.origin_key_target) &&
+              datasource.get_collection(field.foreign_collection).published?(field.foreign_key_target)
+            )
+          end
 
-          datasource.published?(field.through_collection) &&
-            datasource.published?(field.foreign_collection) &&
-            datasource.get_collection(field.through_collection).published?(field.foreign_key) &&
-            datasource.get_collection(field.through_collection).published?(field.origin_key) &&
-            published?(field.origin_key_target) &&
-            datasource.get_collection(field.foreign_collection).published?(field.foreign_key_target)
+          true
         end
       end
     end

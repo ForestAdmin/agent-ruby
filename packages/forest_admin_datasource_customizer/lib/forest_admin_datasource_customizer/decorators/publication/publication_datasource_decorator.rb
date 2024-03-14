@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
         def get_collection(name)
           raise ForestException, "Collection '#{name}' was removed." if @blacklist.include?(name)
 
-          super.get_collection(name)
+          super(name)
         end
 
         def keep_collections_matching(include, exclude)
