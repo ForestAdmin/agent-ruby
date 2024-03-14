@@ -22,21 +22,21 @@ module ForestAdminDatasourceCustomizer
 
           ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_name(name, new_name)
 
-          # Revert previous renaming (avoids conflicts and need to recurse on this.toSubCollection)
-          if @to_child_collection.key?(current_name)
-            child_name = @to_child_collection[current_name]
-            @to_child_collection.delete(current_name)
-            @from_child_collection.delete(child_name)
-            initial_name = child_name
-            mark_schema_as_dirty
-          end
+          # # Revert previous renaming (avoids conflicts and need to recurse on this.toSubCollection)
+          # if to_child_collection.key?(current_name)
+          #   child_name = to_child_collection[current_name]
+          #   to_child_collection.delete(current_name)
+          #   from_child_collection.delete(child_name)
+          #   initial_name = child_name
+          #   mark_all_schema_as_dirty
+          # end
 
           # Do not update arrays if renaming is a no-op (ie: customer is cancelling a previous rename)
           return unless initial_name != new_name
 
-          @from_child_collection[initial_name] = new_name
-          @to_child_collection[new_name] = initial_name
-          mark_schema_as_dirty
+          from_child_collection[initial_name] = new_name
+          to_child_collection[new_name] = initial_name
+          mark_all_schema_as_dirty
         end
 
         def refine_schema(sub_schema)
@@ -45,17 +45,17 @@ module ForestAdminDatasourceCustomizer
           sub_schema[:fields].each do |old_name, schema|
             case schema.type
             when 'ManyToOne'
-              schema.foreign_key = from_child_collection[schema.foreign_key] ||= schema.foreign_key
+              schema.foreign_key = from_child_collection[schema.foreign_key] || schema.foreign_key
             when 'OneToMany', 'OneToOne'
               relation = datasource.get_collection(schema.foreign_collection)
-              schema.origin_key = relation.from_child_collection[schema.origin_key] ||= schema.origin_key
+              schema.origin_key = relation.from_child_collection[schema.origin_key] || schema.origin_key
             when 'ManyToMany'
               through = datasource.get_collection(schema.through_collection)
-              schema.foreign_key = through.from_child_collection[schema.foreign_key] ||= schema.foreign_key
-              schema.origin_key = through.from_child_collection[schema.origin_key] ||= schema.origin_key
+              schema.foreign_key = through.from_child_collection[schema.foreign_key] || schema.foreign_key
+              schema.origin_key = through.from_child_collection[schema.origin_key] || schema.origin_key
             end
 
-            fields[from_child_collection[old_name] ||= old_name] = schema
+            fields[from_child_collection[old_name] || old_name] = schema
           end
 
           sub_schema[:fields] = fields
@@ -108,15 +108,14 @@ module ForestAdminDatasourceCustomizer
 
           rows.map do |row|
             {
-              value: row[:value],
-              group: row[:group].reduce({}) do |memo, path, value|
+              'value' => row['value'],
+              'group' => row['group']&.reduce({}) do |memo, group|
+                path, value = group
                 memo.merge({ path_from_child_collection(path) => value })
               end
             }
           end
         end
-
-        private
 
         def mark_all_schema_as_dirty
           datasource.collections.each_value(&:mark_schema_as_dirty)
@@ -127,7 +126,7 @@ module ForestAdminDatasourceCustomizer
           if path.include?(':')
             paths = path.split(':')
             child_field = paths[0]
-            relation_name = from_child_collection[child_field] ||= child_field
+            relation_name = from_child_collection[child_field] || child_field
             relation_schema = schema[:fields][relation_name]
             relation = datasource.get_collection(relation_schema.foreign_collection)
 
@@ -144,7 +143,7 @@ module ForestAdminDatasourceCustomizer
             relation_name = paths[0]
             relation_schema = schema[:fields][relation_name]
             relation = datasource.get_collection(relation_schema.foreign_collection)
-            child_field = to_child_collection[relation_name] ||= relation_name
+            child_field = to_child_collection[relation_name] || relation_name
 
             return "#{child_field}:#{relation.path_to_child_collection(paths[1])}"
           end
@@ -156,7 +155,7 @@ module ForestAdminDatasourceCustomizer
         def record_to_child_collection(record)
           child_record = {}
           record.each do |field, value|
-            child_record[to_child_collection[field] ||= field] = value
+            child_record[to_child_collection[field] || field] = value
           end
 
           child_record
@@ -165,7 +164,7 @@ module ForestAdminDatasourceCustomizer
         def record_from_child_collection(child_record)
           record = {}
           child_record.each do |child_field, value|
-            field = from_child_collection[child_field] ||= child_field
+            field = from_child_collection[child_field] || child_field
             field_schema = schema[:fields][field]
 
             # Perform the mapping, recurse for relations
