@@ -67,7 +67,7 @@ module ForestAdminDatasourceCustomizer
         schema: {
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
-            'name' => ColumnSchema.new(column_type: 'String'),
+            'name' => ColumnSchema.new(column_type: 'String', is_sortable: true),
             'name_in_read_only' => ColumnSchema.new(column_type: 'String', is_read_only: true),
             'book' => Relations::OneToOneSchema.new(
               origin_key: 'author_id',
@@ -266,6 +266,14 @@ module ForestAdminDatasourceCustomizer
         expect(relation_collection.relations['myBooks'].origin_key).to eq('person_id')
         expect(relation_collection.relations['myBooks'].origin_key_target).to eq('id')
       end
+
+      it 'does not allow replaceFieldSorting' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.add_one_to_one_relation('myBookAuthor', 'book_person', { origin_key: 'person_id', origin_key_target: 'id' })
+        customizer.replace_field_sorting('myBookAuthor', [])
+
+        expect { @datasource_customizer.datasource({}) }.to raise_error(Exceptions::ValidationError, "🌳🌳🌳 Unexpected field type: 'person.myBookAuthor' (found 'OneToOne' expected 'Column')")
+      end
     end
 
     context 'when adding external relation' do
@@ -351,6 +359,39 @@ module ForestAdminDatasourceCustomizer
 
         expect(op_emulate_collection.fields).to have_key('title')
         expect(op_emulate_collection.fields['title']).to eq({ Operators::PRESENT => replacer })
+      end
+    end
+
+    context 'when using emulate_field_sorting' do
+      it 'emulate sort on field' do
+        stack = @datasource_customizer.stack
+        allow(stack.sort).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.sort.get_collection('person'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.emulate_field_sorting('name')
+        @datasource_customizer.datasource({})
+
+        sort_collection = @datasource_customizer.stack.sort.get_collection('person')
+
+        expect(sort_collection.sorts).to have_key('name')
+        expect(sort_collection.emulated?('name')).to be_nil
+      end
+    end
+
+    context 'when using replace_field_sorting' do
+      it 'replace sort on field' do
+        stack = @datasource_customizer.stack
+        allow(stack.sort).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.sort.get_collection('person'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        sort_clauses = [{ field: 'name', ascending: true }]
+        customizer.replace_field_sorting('name', sort_clauses)
+        @datasource_customizer.datasource({})
+
+        sort_collection = @datasource_customizer.stack.sort.get_collection('person')
+
+        expect(sort_collection.sorts).to have_key('name')
+        expect(sort_collection.sorts['name']).to eq(ForestAdminDatasourceToolkit::Components::Query::Sort.new(sort_clauses))
       end
     end
   end
