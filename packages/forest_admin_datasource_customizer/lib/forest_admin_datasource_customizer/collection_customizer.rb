@@ -155,11 +155,6 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
-    # emulateFieldSorting(name: TColumnName<S, N>): this {
-    #     return this.pushCustomization(async () => {
-    #       this.stack.sort_emulate.get_collection(this.name).emulate_field_sorting(name);
-    #     });
-    #   }
     # Enable sorting on a specific field using emulation.
     # As for all the emulation method, the field sorting will be done in-memory.
     # @param name the name of the field to enable emulation on
