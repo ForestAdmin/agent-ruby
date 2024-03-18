@@ -1,3 +1,10 @@
+# [1.0.0-beta.36](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.35...v1.0.0-beta.36) (2024-03-18)
+
+
+### Features
+
+* add sort decorator support ([#32](https://github.com/ForestAdmin/agent-ruby/issues/32)) ([a5320fc](https://github.com/ForestAdmin/agent-ruby/commit/a5320fca5a6b30d49ad1471fd9068ac7d65ed3e1))
+
 # [1.0.0-beta.35](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.34...v1.0.0-beta.35) (2024-03-12)
 
 
