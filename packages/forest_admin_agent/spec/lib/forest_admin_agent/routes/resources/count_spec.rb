@@ -28,7 +28,7 @@ module ForestAdminAgent
           collection = Collection.new(datasource, 'user')
           allow(collection).to receive(:aggregate).and_return(
             [
-              { value: 1, group: [] }
+              { 'value' => 1, 'group' => [] }
             ]
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)

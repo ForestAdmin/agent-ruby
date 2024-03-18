@@ -6,7 +6,8 @@ module ForestAdminDatasourceToolkit
     module Query
       class Aggregation
         include ForestAdminDatasourceToolkit::Exceptions
-        attr_reader :operation, :field, :groups
+        attr_reader :operation
+        attr_accessor :groups, :field
 
         def initialize(operation:, field: nil, groups: [])
           validate(operation)
@@ -32,12 +33,12 @@ module ForestAdminDatasourceToolkit
           Projection.new(aggregate_fields)
         end
 
-        def replace_fields(handler)
+        def replace_fields
           result = clone
-          result.field = handler.call(result.field) if result.field
+          result.field = yield(result.field) if result.field
           result.groups = result.groups.map do |group|
             {
-              field: handler.call(group[:field]),
+              field: yield(group[:field]),
               operation: group[:operation] || nil
             }
           end

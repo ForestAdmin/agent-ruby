@@ -53,7 +53,7 @@ module ForestAdminAgent
               'published_at' => '2000-07-07T21:00:00.000Z',
               'price' => 6.75
             }
-            book = Book.new(1, attributes['title'], attributes['published_at'], attributes['price'])
+            book = { 'id' => 1 }.merge(attributes)
 
             datasource = Datasource.new
             collection = instance_double(
