@@ -1,3 +1,10 @@
+# [1.0.0-beta.37](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.36...v1.0.0-beta.37) (2024-03-18)
+
+
+### Features
+
+* add rename field decorator support ([#33](https://github.com/ForestAdmin/agent-ruby/issues/33)) ([1bcfd42](https://github.com/ForestAdmin/agent-ruby/commit/1bcfd4294cc0df1e0cca29f7419e30dcc82d9d75))
+
 # [1.0.0-beta.36](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.35...v1.0.0-beta.36) (2024-03-18)
 
 
