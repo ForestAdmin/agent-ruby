@@ -10,15 +10,8 @@ module ForestAdminDatasourceCustomizer
           @blacklist = []
         end
 
-        # override get collections(): PublicationCollectionDecorator[] {
-        #     return this.childDataSource.collections
-        #       .filter(({ name }) => !this.blacklist.has(name))
-        #       .map(({ name }) => this.getCollection(name));
-        #   }
-
         def collections
-          # @child_datasource.collections.transform_values { |c| get_collection(c.name) }
-          @child_datasource.collections.reject { |c| @blacklist.include?(c.name) }.map { |c| get_collection(c.name) }
+          @child_datasource.collections.keys.reject { |name| @blacklist.include?(name) }.map { |name| get_collection(name) }
         end
 
         def get_collection(name)
@@ -27,14 +20,12 @@ module ForestAdminDatasourceCustomizer
           super(name)
         end
 
-        def keep_collections_matching(include, exclude)
+        def keep_collections_matching(include = [], exclude = [])
           validate_collection_names(include.to_a + exclude.to_a)
 
           # List collection we're keeping from the white/black list.
-          @child_datasource.collections.each do |collection|
-            if (include && !include.include?(collection.name)) || exclude&.include?(collection.name)
-              remove_collection(collection.name)
-            end
+          @child_datasource.collections.each_key do |collection|
+            remove_collection(collection) if (include && !include.include?(collection)) || exclude&.include?(collection)
           end
         end
 

@@ -82,6 +82,12 @@ module ForestAdminDatasourceCustomizer
 
           true
         end
+
+        # rubocop:disable Lint/UselessMethodDefinition
+        def mark_schema_as_dirty
+          super
+        end
+        # rubocop:enable Lint/UselessMethodDefinition
       end
     end
   end
