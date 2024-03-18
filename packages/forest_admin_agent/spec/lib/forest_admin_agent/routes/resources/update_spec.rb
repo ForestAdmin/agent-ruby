@@ -69,7 +69,8 @@ module ForestAdminAgent
           it 'call update and return an serialized content' do
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
-            book = Book.new(1, 'Harry potter and the goblet of fire')
+            book = { 'id' => 1, 'title' => 'Harry potter and the goblet of fire' }
+
             allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             result = update.handle_request(args)
             expect(result[:name]).to eq('book')
@@ -90,7 +91,7 @@ module ForestAdminAgent
           it 'call update with the expected args' do
             args[:params][:data] = { attributes: { 'title' => 'Harry potter and the goblet of fire' } }
             args[:params]['id'] = '1'
-            book = Book.new(1, 'Harry potter and the goblet of fire')
+            book = { 'id' => 1, 'title' => 'Harry potter and the goblet of fire' }
             allow(@datasource.get_collection('book')).to receive_messages(list: [book], update: true)
             update.handle_request(args)
 
