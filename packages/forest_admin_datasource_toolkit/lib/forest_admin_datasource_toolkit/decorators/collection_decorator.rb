@@ -73,12 +73,12 @@ module ForestAdminDatasourceToolkit
         @child_collection.render_chart(caller, name, record_id)
       end
 
+      protected
+
       def mark_schema_as_dirty
         @last_schema = nil
         @parent&.mark_schema_as_dirty
       end
-
-      protected
 
       def refine_filter(_caller, filter = nil)
         filter
