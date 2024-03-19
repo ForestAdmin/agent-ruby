@@ -37,7 +37,7 @@ module ForestAdminDatasourceCustomizer
 
           # Tell all collections that their schema is dirty: if we removed a collection, all
           # relations to this collection are now invalid and should be unpublished.
-          collections.each(&:mark_schema_as_dirty)
+          collections.each_values(&:mark_schema_as_dirty)
         end
 
         def published?(collection_name)

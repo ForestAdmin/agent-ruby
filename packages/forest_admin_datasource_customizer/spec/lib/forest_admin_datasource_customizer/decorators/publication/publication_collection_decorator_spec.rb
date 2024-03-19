@@ -110,6 +110,9 @@ module ForestAdminDatasourceCustomizer
         context 'when hiding normal fields' do
           before do
             @decorated_book_person.change_field_visibility('date', false)
+            allow(@decorated_book).to receive(:mark_schema_as_dirty).and_return(nil)
+            allow(@decorated_book_person).to receive(:mark_schema_as_dirty).and_return(nil)
+            allow(@decorated_person).to receive(:mark_schema_as_dirty).and_return(nil)
           end
 
           it 'the field should be removed from the schema of the collection' do
@@ -130,10 +133,10 @@ module ForestAdminDatasourceCustomizer
 
           it 'create should proxies return value (removing extra columns)' do
             created = { 'id' => 1, 'book_id' => 2, 'person_id' => 3, 'date' => '1985-10-26' }
-            allow(@collection_book_person).to receive(:create).and_return([created])
+            allow(@collection_book_person).to receive(:create).and_return(created)
 
-            result = @decorated_book_person.create(caller, [{ 'something' => true }])
-            expect(result).to eq([{ 'id' => 1, 'book_id' => 2, 'person_id' => 3 }])
+            result = @decorated_book_person.create(caller, { 'something' => true })
+            expect(result).to eq({ 'id' => 1, 'book_id' => 2, 'person_id' => 3 })
           end
         end
 
