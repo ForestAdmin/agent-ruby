@@ -191,6 +191,15 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    # Rename fields from the exported schema.
+    # @param current_name the current name of the field or the relation in a given collection
+    # @param new_name the new name of the field or the relation
+    # @example
+    # rename_field('currentFieldOrRelationName', 'newFieldOrRelationName')
+    def rename_field(current_name, new_name)
+      push_customization { @stack.rename_field.get_collection(@name).rename_field(current_name, new_name) }
+    end
+
     private
 
     def push_customization(&customization)
