@@ -141,6 +141,7 @@ module ForestAdminDatasourceCustomizer
 
       it 'adds a field to early collection' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.early_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_computed.get_collection('book'))
 
         field_definition = ComputedDefinition.new(
@@ -151,7 +152,7 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.add_field('test', field_definition)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         computed_collection = @datasource_customizer.stack.early_computed.get_collection('book')
 
@@ -161,6 +162,7 @@ module ForestAdminDatasourceCustomizer
 
       it 'adds a field to late collection' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.late_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_computed.get_collection('book'))
 
         field_definition = ComputedDefinition.new(
@@ -172,7 +174,7 @@ module ForestAdminDatasourceCustomizer
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.add_many_to_one_relation('mySelf', 'book', { foreign_key: 'id', foreign_key_target: 'child_id' })
         customizer.add_field('mySelf', field_definition)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         computed_collection = @datasource_customizer.stack.late_computed.get_collection('book')
 
@@ -184,13 +186,14 @@ module ForestAdminDatasourceCustomizer
     context 'when using replace_search' do
       it 'calls the search decorator' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.search).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.search.get_collection('book'))
 
         condition = proc { |search| [{ field: 'title', operator: Operators::EQUAL, value: search }] }
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.replace_search(condition)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         search_collection = @datasource_customizer.stack.search.get_collection('book')
 
@@ -281,6 +284,7 @@ module ForestAdminDatasourceCustomizer
       it 'calls addField' do
         data = [{ 'id' => 1, 'title' => 'Dune' }]
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.late_computed).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_computed.get_collection('book'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
@@ -296,7 +300,7 @@ module ForestAdminDatasourceCustomizer
             }
           }
         )
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         computed_collection = @datasource_customizer.stack.late_computed.get_collection('book')
 
@@ -319,11 +323,12 @@ module ForestAdminDatasourceCustomizer
     context 'when adding a field validation' do
       it 'adds a validation rule' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.validation).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.validation.get_collection('book'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.add_field_validation('title', Operators::LONGER_THAN, 5)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         validation_collection = @datasource_customizer.stack.validation.get_collection('book')
 
@@ -335,11 +340,12 @@ module ForestAdminDatasourceCustomizer
     context 'when using emulate_field_operator' do
       it 'emulate operator on field' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.early_op_emulate).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_op_emulate.get_collection('book'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.emulate_field_operator('title', Operators::PRESENT)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
         op_emulate_collection = @datasource_customizer.stack.early_op_emulate.get_collection('book')
 
         expect(op_emulate_collection.fields).to have_key('title')
@@ -350,12 +356,13 @@ module ForestAdminDatasourceCustomizer
     context 'when using replace_field_operator' do
       it 'replace operator on field' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.early_op_emulate).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.early_op_emulate.get_collection('book'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         replacer = proc { { field: 'first_name', operator: Operators::NOT_EQUAL, value: nil } }
         customizer.replace_field_operator('title', Operators::PRESENT, &replacer)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
         op_emulate_collection = @datasource_customizer.stack.early_op_emulate.get_collection('book')
 
         expect(op_emulate_collection.fields).to have_key('title')
@@ -366,11 +373,12 @@ module ForestAdminDatasourceCustomizer
     context 'when using emulate_field_sorting' do
       it 'emulate sort on field' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.sort).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.sort.get_collection('person'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
         customizer.emulate_field_sorting('name')
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         sort_collection = @datasource_customizer.stack.sort.get_collection('person')
 
@@ -382,12 +390,13 @@ module ForestAdminDatasourceCustomizer
     context 'when using replace_field_sorting' do
       it 'replace sort on field' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.sort).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.sort.get_collection('person'))
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
         sort_clauses = [{ field: 'name', ascending: true }]
         customizer.replace_field_sorting('name', sort_clauses)
-        @datasource_customizer.datasource({})
+        stack.apply_queued_customizations({})
 
         sort_collection = @datasource_customizer.stack.sort.get_collection('person')
 
