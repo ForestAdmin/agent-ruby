@@ -43,12 +43,14 @@ module ForestAdminAgent
               {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
                                          filter_operators: [Operators::IN, Operators::EQUAL]),
-                'address_id' => Relations::ManyToOneSchema.new(
+                'address_id' => ColumnSchema.new(column_type: 'Number'),
+                'user_id' => ColumnSchema.new(column_type: 'Number'),
+                'address' => Relations::ManyToOneSchema.new(
                   foreign_key: 'address_id',
                   foreign_collection: 'address',
                   foreign_key_target: 'id'
                 ),
-                'user_id' => Relations::ManyToOneSchema.new(
+                'user' => Relations::ManyToOneSchema.new(
                   foreign_key: 'user_id',
                   foreign_collection: 'user',
                   foreign_key_target: 'id'
@@ -236,7 +238,7 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
+                      have_attributes(field: 'address:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
                   page: nil,
@@ -269,7 +271,7 @@ module ForestAdminAgent
                     aggregator: 'And',
                     conditions: [
                       have_attributes(field: 'user_id', operator: Operators::EQUAL, value: 1),
-                      have_attributes(field: 'address_id:id', operator: Operators::EQUAL, value: 1)
+                      have_attributes(field: 'address:id', operator: Operators::EQUAL, value: 1)
                     ]
                   ),
                   page: nil,

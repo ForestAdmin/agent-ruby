@@ -38,6 +38,7 @@ module ForestAdminAgent
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                   'first_name' => ColumnSchema.new(column_type: 'String'),
                   'last_name' => ColumnSchema.new(column_type: 'String'),
+                  'category_id' => ColumnSchema.new(column_type: 'Number'),
                   'category' => Relations::ManyToOneSchema.new(
                     foreign_key: 'category_id',
                     foreign_collection: 'category',
