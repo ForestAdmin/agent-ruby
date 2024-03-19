@@ -37,7 +37,9 @@ module ForestAdminDatasourceCustomizer
 
         # TODO: add rename behavior
 
-        @composite_datasource.add_datasource(datasource)
+        datasource.collections.each_value do |collection|
+          @composite_datasource.add_collection(collection)
+        end
       })
 
       self

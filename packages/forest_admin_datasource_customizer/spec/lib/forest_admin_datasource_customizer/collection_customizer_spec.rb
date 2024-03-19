@@ -114,6 +114,7 @@ module ForestAdminDatasourceCustomizer
     context 'when using add_action' do
       it 'adds an action to early collection' do
         stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
         allow(stack.action).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.action.get_collection('book'))
 
         action = BaseAction.new(scope: Types::ActionScope::SINGLE) do |_context, result_builder|
@@ -122,8 +123,8 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.add_action('my_action', action)
-        @datasource_customizer.datasource({})
         action_collection = @datasource_customizer.stack.action.get_collection('book')
+        stack.apply_queued_customizations({})
 
         expect(action_collection.actions).to have_key('my_action')
         expect(action_collection.actions['my_action']).to eq(action)

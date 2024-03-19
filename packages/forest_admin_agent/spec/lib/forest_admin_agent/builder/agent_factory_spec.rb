@@ -32,6 +32,7 @@ module ForestAdminAgent
             collection_book = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Book')
             datasource.add_collection(collection_book)
             described_class.instance.add_datasource(datasource)
+            described_class.instance.customizer.datasource({})
 
             expect(described_class.instance.customizer.collections.size).to eq(1)
             expect(described_class.instance.customizer.get_collection('Book').name).to eq('Book')
