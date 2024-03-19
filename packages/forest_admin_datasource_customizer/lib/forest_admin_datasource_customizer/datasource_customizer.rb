@@ -57,14 +57,6 @@ module ForestAdminDatasourceCustomizer
       handle.call(get_collection(name))
     end
 
-    # removeCollection(...names: TCollectionName<S>[]): this {
-    #     this.stack.queueCustomization(async () => {
-    #       this.stack.publication.keepCollectionsMatching(undefined, names);
-    #     });
-    #
-    #     return this;
-    #   }
-
     def remove_collection(*names)
       @stack.queue_customization(-> { @stack.publication.keep_collections_matching(nil, names) })
 
