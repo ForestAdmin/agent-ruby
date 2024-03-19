@@ -180,6 +180,17 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.sort.get_collection(@name).replace_field_sorting(name, equivalent_sort) }
     end
 
+    # Remove fields from the exported schema (they will still be usable within the agent).
+    # @param names the names of the field or the relation
+    # @example
+    # .remove_field('fieldNameToRemove', 'relationNameToRemove')
+    def remove_field(*names)
+      push_customization do
+        collection = @stack.publication.get_collection(@name)
+        names.each { |name| collection.change_field_visibility(name, false) }
+      end
+    end
+
     private
 
     def push_customization(&customization)

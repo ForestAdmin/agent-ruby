@@ -68,6 +68,8 @@ module ForestAdminAgent
             schema: {
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'book_id' => ColumnSchema.new(column_type: 'Number'),
+                'review_id' => ColumnSchema.new(column_type: 'Number'),
                 'book' => Relations::ManyToOneSchema.new(
                   foreign_key: 'book_id',
                   foreign_collection: 'book',
@@ -88,6 +90,7 @@ module ForestAdminAgent
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                 'author' => ColumnSchema.new(column_type: 'String'),
+                'book_id' => ColumnSchema.new(column_type: 'Number'),
                 'book' => Relations::ManyToOneSchema.new(
                   foreign_key: 'book_id',
                   foreign_collection: 'book',

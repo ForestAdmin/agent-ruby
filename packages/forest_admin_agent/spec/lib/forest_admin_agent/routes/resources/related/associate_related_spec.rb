@@ -62,6 +62,8 @@ module ForestAdminAgent
               schema: {
                 fields: {
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'address_id' => ColumnSchema.new(column_type: 'Number'),
+                  'user_id' => ColumnSchema.new(column_type: 'Number'),
                   'address' => Relations::ManyToOneSchema.new(
                     foreign_key: 'address_id',
                     foreign_collection: 'address',
