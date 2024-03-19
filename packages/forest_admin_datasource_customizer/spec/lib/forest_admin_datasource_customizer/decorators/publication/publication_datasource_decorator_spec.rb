@@ -9,11 +9,10 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Exceptions
 
       describe PublicationDatasourceDecorator do
-        let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
-
         before do
+          datasource = ForestAdminDatasourceToolkit::Datasource.new
           @collection_library = instance_double(
-            ForestAdminDatasourceToolkit::Collection,
+            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
             name: 'library',
             schema: {
               fields: {
@@ -27,11 +26,12 @@ module ForestAdminDatasourceCustomizer
                   through_collection: 'library_book'
                 )
               }
-            }
+            },
+            mark_schema_as_dirty: nil
           )
 
           @collection_library_book = instance_double(
-            ForestAdminDatasourceToolkit::Collection,
+            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
             name: 'library_book',
             schema: {
               fields: {
@@ -49,11 +49,12 @@ module ForestAdminDatasourceCustomizer
                   foreign_key_target: 'id'
                 )
               }
-            }
+            },
+            mark_schema_as_dirty: nil
           )
 
           @collection_book = instance_double(
-            ForestAdminDatasourceToolkit::Collection,
+            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
             name: 'book',
             schema: {
               fields: {
@@ -67,13 +68,15 @@ module ForestAdminDatasourceCustomizer
                   through_collection: 'library_book'
                 )
               }
-            }
+            },
+            mark_schema_as_dirty: nil
           )
 
           datasource.add_collection(@collection_library)
           datasource.add_collection(@collection_library_book)
           datasource.add_collection(@collection_book)
 
+          datasource = ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator.new(datasource, Empty::EmptyCollectionDecorator)
           @datasource_decorator = described_class.new(datasource)
 
           @decorated_library = @datasource_decorator.get_collection('library')

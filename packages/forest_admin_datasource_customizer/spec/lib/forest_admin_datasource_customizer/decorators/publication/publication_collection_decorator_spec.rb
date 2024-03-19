@@ -110,9 +110,6 @@ module ForestAdminDatasourceCustomizer
         context 'when hiding normal fields' do
           before do
             @decorated_book_person.change_field_visibility('date', false)
-            allow(@decorated_book).to receive(:mark_schema_as_dirty).and_return(nil)
-            allow(@decorated_book_person).to receive(:mark_schema_as_dirty).and_return(nil)
-            allow(@decorated_person).to receive(:mark_schema_as_dirty).and_return(nil)
           end
 
           it 'the field should be removed from the schema of the collection' do
