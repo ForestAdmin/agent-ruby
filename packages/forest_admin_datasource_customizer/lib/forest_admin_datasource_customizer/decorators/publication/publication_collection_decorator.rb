@@ -27,23 +27,24 @@ module ForestAdminDatasourceCustomizer
         end
 
         def create(caller, data)
-          super.map do |child_record|
-            record = {}
-            child_record.each do |key, value|
-              record[key] = value unless @blacklist.include?(key)
-            end
-            record
+          record = {}
+          child_collection.create(caller, data).each do |key, value|
+            record[key] = value unless @blacklist.include?(key)
           end
+
+          record
         end
 
         def refine_schema(child_schema)
-          schema = { fields: {} }
+          fields = {}
 
           child_schema[:fields].each do |name, field|
-            schema[:fields][name] = field if published?(name)
+            fields[name] = field if published?(name)
           end
 
-          schema
+          child_schema[:fields] = fields
+
+          child_schema
         end
 
         def published?(name)

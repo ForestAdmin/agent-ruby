@@ -11,7 +11,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def collections
-          @child_datasource.collections.keys.reject { |name| @blacklist.include?(name) }.map { |name| get_collection(name) }
+          @child_datasource.collections.except(*@blacklist)
         end
 
         def get_collection(name)
