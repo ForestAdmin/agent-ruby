@@ -394,5 +394,18 @@ module ForestAdminDatasourceCustomizer
         expect(sort_collection.sorts['name']).to eq(ForestAdminDatasourceToolkit::Components::Query::Sort.new(sort_clauses))
       end
     end
+
+    context 'when using removeField' do
+      it 'removes the given fields' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.remove_field('name', 'name_in_read_only')
+        @datasource_customizer.datasource({})
+
+        publication_collection = @datasource_customizer.stack.publication.get_collection('person')
+
+        expect(publication_collection.fields).not_to have_key('name')
+        expect(publication_collection.fields).not_to have_key('name_in_read_only')
+      end
+    end
   end
 end
