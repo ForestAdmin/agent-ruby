@@ -25,11 +25,22 @@ module ForestAdminDatasourceCustomizer
       @stack.datasource
     end
 
-    def add_datasource(datasource, _options)
-      # TODO: add include/exclude behavior
-      # TODO: add rename behavior
+    def add_datasource(datasource, options)
+      @stack.queue_customization(lambda {
+        # TODO: add call logger
 
-      datasource.collections.each_value { |collection| @composite_datasource.add_collection(collection) }
+        if options[:include] || options[:exclude]
+          publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(datasource)
+          publication_decorator.keep_collections_matching(options[:include], options[:exclude])
+          datasource = publication_decorator
+        end
+
+        # TODO: add rename behavior
+
+        @composite_datasource.add_datasource(datasource)
+      })
+
+      self
     end
 
     def add_chart(name, definition)
@@ -44,8 +55,18 @@ module ForestAdminDatasourceCustomizer
       handle.call(get_collection(name))
     end
 
-    def remove_collection(names)
-      # TODO: to implement
+    # removeCollection(...names: TCollectionName<S>[]): this {
+    #     this.stack.queueCustomization(async () => {
+    #       this.stack.publication.keepCollectionsMatching(undefined, names);
+    #     });
+    #
+    #     return this;
+    #   }
+
+    def remove_collection(*names)
+      @stack.queue_customization(-> { @stack.publication.keep_collections_matching(nil, names) })
+
+      self
     end
   end
 end
