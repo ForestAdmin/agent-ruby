@@ -11,7 +11,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         def collections
-          @child_datasource.collections.except(*@blacklist)
+          @child_datasource.collections.except(*@blacklist).to_h do |name, _collection|
+            [name, get_collection(name)]
+          end
         end
 
         def get_collection(name)
@@ -37,7 +39,7 @@ module ForestAdminDatasourceCustomizer
 
           # Tell all collections that their schema is dirty: if we removed a collection, all
           # relations to this collection are now invalid and should be unpublished.
-          collections.each_values(&:mark_schema_as_dirty)
+          collections.each_value(&:mark_schema_as_dirty)
         end
 
         def published?(collection_name)
