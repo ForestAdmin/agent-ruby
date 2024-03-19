@@ -1,3 +1,10 @@
+# [1.0.0-beta.38](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.37...v1.0.0-beta.38) (2024-03-19)
+
+
+### Features
+
+* add publication decorator support ([#34](https://github.com/ForestAdmin/agent-ruby/issues/34)) ([7550e10](https://github.com/ForestAdmin/agent-ruby/commit/7550e10a50e99934776522e8650523413202f9b0))
+
 # [1.0.0-beta.37](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.36...v1.0.0-beta.37) (2024-03-18)
 
 
