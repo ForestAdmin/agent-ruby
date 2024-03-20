@@ -4,7 +4,7 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Decorators
 
       attr_reader :datasource, :schema, :search, :early_computed, :late_computed, :action, :relation, :late_op_emulate,
-                  :early_op_emulate, :validation, :sort, :rename_field, :publication
+                  :early_op_emulate, :validation, :sort, :rename_field, :publication, :write
 
       def initialize(datasource)
         @customizations = []
@@ -25,6 +25,7 @@ module ForestAdminDatasourceCustomizer
         last = @sort = DatasourceDecorator.new(last, Sort::SortCollectionDecorator)
         last = @action = DatasourceDecorator.new(last, Action::ActionCollectionDecorator)
         last = @schema = DatasourceDecorator.new(last, Schema::SchemaCollectionDecorator)
+        last = @write = Write::WriteDatasourceDecorator.new(last)
         last = @validation = DatasourceDecorator.new(last, Validation::ValidationCollectionDecorator)
 
         last = @publication = Publication::PublicationDatasourceDecorator.new(last)
