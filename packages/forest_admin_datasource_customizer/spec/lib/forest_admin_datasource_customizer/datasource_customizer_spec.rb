@@ -25,8 +25,24 @@ module ForestAdminDatasourceCustomizer
         customized = described_class.new
                                     .add_datasource(datasource, {})
                                     .remove_collection('collection')
+        customized.stack.apply_queued_customizations({})
 
         expect(customized.collections).to be_empty
+      end
+    end
+
+    context 'when rename a collection' do
+      it 'rename the collection into the datasource' do
+        customized = described_class.new
+                                    .add_datasource(
+                                      datasource,
+                                      {
+                                        rename: { 'collection' => 'renamed_collection' }
+                                      }
+                                    )
+        customized.stack.apply_queued_customizations({})
+
+        expect(customized.collections.key?('renamed_collection')).to be(true)
       end
     end
   end
