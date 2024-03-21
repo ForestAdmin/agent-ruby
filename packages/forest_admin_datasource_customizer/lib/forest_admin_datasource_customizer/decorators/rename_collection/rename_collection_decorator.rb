@@ -6,16 +6,18 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def name
-          datasource.get_collection(@child_collection.name)
+          datasource.get_collection_name(super)
         end
 
         def refine_schema(sub_schema)
           fields = {}
 
           sub_schema[:fields].each do |name, old_schema|
-            if old_schema.type == 'ManyToMany'
+            if old_schema.type != 'Column'
               old_schema.foreign_collection = datasource.get_collection_name(old_schema.foreign_collection)
-              old_schema.through_collection = datasource.get_collection_name(old_schema.through_collection)
+              if old_schema.type == 'ManyToMany'
+                old_schema.through_collection = datasource.get_collection_name(old_schema.through_collection)
+              end
             end
 
             fields[name] = old_schema

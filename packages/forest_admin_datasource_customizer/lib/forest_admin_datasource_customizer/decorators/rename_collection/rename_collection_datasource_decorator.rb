@@ -2,6 +2,7 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module RenameCollection
       class RenameCollectionDatasourceDecorator < ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator
+        include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Decorators
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
@@ -13,13 +14,13 @@ module ForestAdminDatasourceCustomizer
 
         def collections
           @child_datasource.collections.to_h do |name, _collection|
-            [name, get_collection(name)]
+            [name, method(:get_collection).super_method.call(name)]
           end
         end
 
         def get_collection(name)
           # Collection has been renamed, user is using the new name
-          super(@to_child_name[name]) if @to_child_name.key?(name)
+          return super(@to_child_name[name]) if @to_child_name.key?(name)
 
           # Collection has been renamed, user is using the old name
           if @from_child_name.key?(name)
@@ -30,7 +31,7 @@ module ForestAdminDatasourceCustomizer
           super(name)
         end
 
-        def rename_collections(renames)
+        def rename_collections(renames = [])
           renames.each do |current_name, new_name|
             rename_collection(current_name, new_name)
           end

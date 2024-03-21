@@ -3,6 +3,8 @@ require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_datasource_toolkit'
 require 'forest_admin_datasource_customizer'
+require 'shared/factory'
+require 'shared/column_schema_factory'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -55,4 +57,7 @@ RSpec.configure do |config|
   # inherited by the metadata hash of host groups and examples, rather than
   # triggering implicit auto-inclusion in groups with matching metadata.
   config.shared_context_metadata_behavior = :apply_to_host_groups
+
+  config.include Factory
+  config.include ColumnSchemaFactory
 end
