@@ -35,7 +35,13 @@ module ForestAdminDatasourceCustomizer
           datasource = publication_decorator
         end
 
-        # TODO: add rename behavior
+        if options[:rename]
+          rename_collection_decorator = Decorators::RenameCollection::RenameCollectionDatasourceDecorator.new(
+            datasource
+          )
+          rename_collection_decorator.rename_collections(options[:rename])
+          datasource = rename_collection_decorator
+        end
 
         datasource.collections.each_value do |collection|
           @composite_datasource.add_collection(collection)
