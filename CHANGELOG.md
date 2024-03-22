@@ -1,3 +1,10 @@
+# [1.0.0-beta.39](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.38...v1.0.0-beta.39) (2024-03-22)
+
+
+### Features
+
+* add rename collection decorator support ([#35](https://github.com/ForestAdmin/agent-ruby/issues/35)) ([e0cad85](https://github.com/ForestAdmin/agent-ruby/commit/e0cad85b00e9b9335c8ff9c4bc062b77408bd42e))
+
 # [1.0.0-beta.38](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.37...v1.0.0-beta.38) (2024-03-19)
 
 
