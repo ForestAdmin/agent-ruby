@@ -26,7 +26,7 @@ module ForestAdminDatasourceCustomizer
             schema[:fields] = child_schema[:fields].dup
 
             @handlers.each do |field_name, handler|
-              schema[:fields][field_name] = schema[:fields][field_name].merge(isReadOnly: handler.nil?)
+              schema[:fields][field_name].is_read_only = handler.nil?
             end
 
             schema
