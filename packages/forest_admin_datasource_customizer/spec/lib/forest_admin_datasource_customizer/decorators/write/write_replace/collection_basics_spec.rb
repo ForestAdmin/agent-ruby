@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'name' => ColumnSchema.new(column_type: 'String', is_read_only: true)
+                  'name' => column_build(is_read_only: true)
                 }
               }
             )
