@@ -417,5 +417,17 @@ module ForestAdminDatasourceCustomizer
         expect(publication_collection.fields).not_to have_key('name_in_read_only')
       end
     end
+
+    context 'when using rename_field' do
+      it 'replace rename a field' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.rename_field('name', 'renamed_name')
+        @datasource_customizer.datasource({})
+
+        rename_collection = @datasource_customizer.stack.rename_field.get_collection('person')
+
+        expect(rename_collection.schema[:fields]).to have_key('renamed_name')
+      end
+    end
   end
 end

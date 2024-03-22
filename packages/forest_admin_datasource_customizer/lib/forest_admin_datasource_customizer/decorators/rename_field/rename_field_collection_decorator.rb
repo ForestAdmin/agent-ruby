@@ -33,20 +33,20 @@ module ForestAdminDatasourceCustomizer
         def refine_schema(sub_schema)
           fields = {}
 
-          sub_schema[:fields].each do |old_name, schema|
-            case schema.type
+          sub_schema[:fields].each do |old_name, old_schema|
+            case old_schema.type
             when 'ManyToOne'
-              schema.foreign_key = from_child_collection[schema.foreign_key] || schema.foreign_key
+              old_schema.foreign_key = from_child_collection[old_schema.foreign_key] || old_schema.foreign_key
             when 'OneToMany', 'OneToOne'
-              relation = datasource.get_collection(schema.foreign_collection)
-              schema.origin_key = relation.from_child_collection[schema.origin_key] || schema.origin_key
+              relation = datasource.get_collection(old_schema.foreign_collection)
+              old_schema.origin_key = relation.from_child_collection[old_schema.origin_key] || old_schema.origin_key
             when 'ManyToMany'
-              through = datasource.get_collection(schema.through_collection)
-              schema.foreign_key = through.from_child_collection[schema.foreign_key] || schema.foreign_key
-              schema.origin_key = through.from_child_collection[schema.origin_key] || schema.origin_key
+              through = datasource.get_collection(old_schema.through_collection)
+              old_schema.foreign_key = through.from_child_collection[old_schema.foreign_key] || old_schema.foreign_key
+              old_schema.origin_key = through.from_child_collection[old_schema.origin_key] || old_schema.origin_key
             end
 
-            fields[from_child_collection[old_name] || old_name] = schema
+            fields[from_child_collection[old_name] || old_name] = old_schema
           end
 
           sub_schema[:fields] = fields
@@ -69,7 +69,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def create(caller, data)
-          record = super(
+          record = @child_collection.create(
             caller,
             record_to_child_collection(data)
           )
@@ -79,18 +79,18 @@ module ForestAdminDatasourceCustomizer
 
         def list(caller, filter, projection)
           child_projection = projection.replace { |field| path_to_child_collection(field) }
-          records = super(caller, filter, child_projection)
+          records = @child_collection.list(caller, filter, child_projection)
           return records if child_projection == projection
 
           records.map { |record| record_from_child_collection(record) }
         end
 
         def update(caller, filter, patch)
-          super(caller, filter, record_to_child_collection(patch))
+          @child_collection.update(caller, filter, record_to_child_collection(patch))
         end
 
         def aggregate(caller, filter, aggregation, limit = nil)
-          rows = super(
+          rows = @child_collection.aggregate(
             caller,
             filter,
             aggregation.replace_fields { |field| path_to_child_collection(field) },
