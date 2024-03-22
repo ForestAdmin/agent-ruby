@@ -60,6 +60,61 @@ module ForestAdminDatasourceCustomizer
 
             new_patch
           end
+
+          private
+
+          def rewrite_key(context, key, used)
+            if used.include?(key)
+              raise ForestException,
+                    "Conflict value on the field #{key}. It received several values."
+            end
+
+            record = context.record
+            action = context.action
+            caller = context.caller
+            schema = schema.nil? ? nil : schema[:fields][key]
+
+            if schema&.type == 'Column'
+              # We either call the customer handler or a default one that does nothing.
+              handler = @handlers[key] || ->(v) { { key => v } }
+              field_patch = handler.call(record[key], context) || {}
+
+              # Isolate change to our own value (which should not recurse) and the rest which should
+              # trigger the other handlers.
+              value = field_patch[key] || nil
+              new_patch = rewrite_patch(caller, action, field_patch.except(key), used + [key])
+
+              value ? deep_merge({ key => value }, new_patch) : new_patch
+            elsif schema&.type == 'ManyToOne' || schema&.type == 'OneToOne'
+              # Delegate relations to the appropriate collection.
+              relation = datasource.get_collection(schema.foreign_collection)
+
+              { key => relation.rewrite_patch(caller, action, record[key]) }
+            else
+              raise ForestException, "Unknown field: '#{key}'"
+            end
+          end
+
+          # Recursively merge patches into a single one ensuring that there is no conflict.
+          def deep_merge(*patches)
+            acc = {}
+
+            patches.each do |patch|
+              patch = { patch => patch } unless patch.is_a?(Hash)
+
+              patch.each do |sub_key, sub_value|
+                if !acc.key?(sub_key)
+                  acc[sub_key] = sub_value
+                elsif sub_value.is_a?(Hash)
+                  acc[sub_key] = deep_merge(acc[sub_key], sub_value)
+                else
+                  raise ForestException, "Conflict value on the field #{sub_key}. It received several values."
+                end
+              end
+            end
+
+            acc
+          end
         end
       end
     end
