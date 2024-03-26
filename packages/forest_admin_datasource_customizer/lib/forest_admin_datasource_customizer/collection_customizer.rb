@@ -204,10 +204,10 @@ module ForestAdminDatasourceCustomizer
     # @param name the name of the field
     # @param definition the function or a value to represent the write behavior
     # @example
-    # .replace_field_writing('fullName', full_name => {
-    #  first_name, last_name = full_name.split(' ')
-    # { first_name: first_name, last_name: last_name }
-    def replace_field_writing(name, definition)
+    # .replace_field_writing('author_last_name') do |value|
+    #   { 'author' => { 'last_name' => value } }
+    # end
+    def replace_field_writing(name, &definition)
       push_customization { @stack.write.get_collection(@name).replace_field_writing(name, definition) }
     end
 
