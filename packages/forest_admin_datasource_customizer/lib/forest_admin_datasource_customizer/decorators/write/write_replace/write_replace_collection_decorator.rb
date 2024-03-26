@@ -13,9 +13,8 @@ module ForestAdminDatasourceCustomizer
           end
 
           def replace_field_writing(field_name, &definition)
-            # unless schema[:fields].keys.include?(field_name)
-            #   raise ForestException, "The given field '#{field_name}' does not exist on the #{name} collection."
-            # end
+            raise ForestException, 'A new writing method should be provided to replace field writing' unless definition
+
             ForestAdminDatasourceToolkit::Validations::FieldValidator.validate(self, field_name)
 
             @handlers[field_name] = definition
@@ -49,6 +48,7 @@ module ForestAdminDatasourceCustomizer
           def rewrite_patch(caller, action, patch, used_handlers = [], filter = nil)
             # We rewrite the patch by applying all handlers on each field.
             context = WriteCustomizationContext.new(self, caller, action, patch, filter)
+
             patches = patch.map { |key, _| rewrite_key(context, key, used_handlers) }
 
             # We now have a list of patches (one per field) that we can merge.
@@ -67,27 +67,34 @@ module ForestAdminDatasourceCustomizer
               raise ForestException, "Conflict value on the field #{key}. It received several values."
             end
 
-            record = context.record
-            action = context.action
-            caller = context.caller
             field_schema = schema.nil? ? nil : schema[:fields][key]
 
             if field_schema&.type == 'Column'
               # We either call the customer handler or a default one that does nothing.
               handler = @handlers[key] || proc { |v| { key => v } }
-              field_patch = record[key] && handler.call(record[key], context) ? handler.call(record[key], context) : []
+              field_patch = if context.record[key] && handler.call(context.record[key], context)
+                              handler.call(context.record[key], context)
+                            else
+                              []
+                            end
+
+              #  if (fieldPatch && !this.isObject(fieldPatch))
+              #         throw new Error(`The write handler of ${key} should return an object or nothing.`)
+              if field_patch && !field_patch.is_a?(Hash)
+                raise ForestException, "The write handler of #{key} should return an object or nothing."
+              end
 
               # Isolate change to our own value (which should not recurse) and the rest which should
               # trigger the other handlers.
               value = field_patch[key] || nil
-              new_patch = rewrite_patch(caller, action, field_patch.except(key), used + [key])
+              new_patch = rewrite_patch(context.caller, context.action, field_patch.except(key), used + [key])
 
               value ? deep_merge({ key => value }, new_patch) : new_patch
             elsif field_schema&.type == 'ManyToOne' || field_schema&.type == 'OneToOne'
               # Delegate relations to the appropriate collection.
               relation = datasource.get_collection(field_schema.foreign_collection)
 
-              { key => relation.rewrite_patch(caller, action, record[key]) }
+              { key => relation.rewrite_patch(context.caller, context.action, context.record[key]) }
             else
               raise ForestException, "Unknown field: '#{key}'"
             end
