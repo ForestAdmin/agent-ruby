@@ -12,12 +12,13 @@ module ForestAdminDatasourceCustomizer
             @handlers = {}
           end
 
-          def replace_field_writing(field_name, definition)
-            raise ForestException, 'A new writing method should be provided to replace field writing' unless definition
-
+          def replace_field_writing(field_name, &definition)
+            # unless schema[:fields].keys.include?(field_name)
+            #   raise ForestException, "The given field '#{field_name}' does not exist on the #{name} collection."
+            # end
             ForestAdminDatasourceToolkit::Validations::FieldValidator.validate(self, field_name)
-            @handlers[field_name] = definition
 
+            @handlers[field_name] = definition
             mark_schema_as_dirty
           end
 
@@ -32,12 +33,10 @@ module ForestAdminDatasourceCustomizer
             schema
           end
 
-          def create(caller, records)
-            new_records = records.map do |record|
-              rewrite_patch(caller, 'create', record)
-            end
+          def create(caller, record)
+            new_record = rewrite_patch(caller, 'create', record)
 
-            child_collection.create(caller, new_records)
+            child_collection.create(caller, new_record)
           end
 
           def update(caller, filter, patch)
@@ -50,7 +49,7 @@ module ForestAdminDatasourceCustomizer
           def rewrite_patch(caller, action, patch, used_handlers = [], filter = nil)
             # We rewrite the patch by applying all handlers on each field.
             context = WriteCustomizationContext.new(self, caller, action, patch, filter)
-            patches = patch.map { |key| rewrite_key(context, key, used_handlers) }
+            patches = patch.map { |key, _| rewrite_key(context, key, used_handlers) }
 
             # We now have a list of patches (one per field) that we can merge.
             new_patch = deep_merge(*patches)
@@ -65,19 +64,18 @@ module ForestAdminDatasourceCustomizer
 
           def rewrite_key(context, key, used)
             if used.include?(key)
-              raise ForestException,
-                    "Conflict value on the field #{key}. It received several values."
+              raise ForestException, "Conflict value on the field #{key}. It received several values."
             end
 
             record = context.record
             action = context.action
             caller = context.caller
-            schema = schema.nil? ? nil : schema[:fields][key]
+            field_schema = schema.nil? ? nil : schema[:fields][key]
 
-            if schema&.type == 'Column'
+            if field_schema&.type == 'Column'
               # We either call the customer handler or a default one that does nothing.
-              handler = @handlers[key] || ->(v) { { key => v } }
-              field_patch = handler.call(record[key], context) || {}
+              handler = @handlers[key] || proc { |v| { key => v } }
+              field_patch = record[key] && handler.call(record[key], context) ? handler.call(record[key], context) : []
 
               # Isolate change to our own value (which should not recurse) and the rest which should
               # trigger the other handlers.
@@ -85,9 +83,9 @@ module ForestAdminDatasourceCustomizer
               new_patch = rewrite_patch(caller, action, field_patch.except(key), used + [key])
 
               value ? deep_merge({ key => value }, new_patch) : new_patch
-            elsif schema&.type == 'ManyToOne' || schema&.type == 'OneToOne'
+            elsif field_schema&.type == 'ManyToOne' || field_schema&.type == 'OneToOne'
               # Delegate relations to the appropriate collection.
-              relation = datasource.get_collection(schema.foreign_collection)
+              relation = datasource.get_collection(field_schema.foreign_collection)
 
               { key => relation.rewrite_patch(caller, action, record[key]) }
             else

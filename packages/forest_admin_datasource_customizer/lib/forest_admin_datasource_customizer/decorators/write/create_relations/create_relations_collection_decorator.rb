@@ -22,8 +22,7 @@ module ForestAdminDatasourceCustomizer
             # Note: the create_one_to_one_relation method modifies the records_with_pk array in place!
             records_by_relation.each do |key, entries|
               if schema[:fields][key].type == 'OneToOne'
-                create_one_to_one_relation(caller, records_with_pk, key,
-                                           entries)
+                create_one_to_one_relation(caller, records_with_pk, key, entries)
               end
             end
 
