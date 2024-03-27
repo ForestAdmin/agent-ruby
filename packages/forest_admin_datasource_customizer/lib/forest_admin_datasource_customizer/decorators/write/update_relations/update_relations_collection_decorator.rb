@@ -8,8 +8,8 @@ module ForestAdminDatasourceCustomizer
           def update(caller, filter, patch)
             # Step 1: Perform the normal update
             if patch.keys.any? { |key| schema[:fields][key].type == 'Column' }
-              patch_without_relations = patch.keys.reduce do |memo, key|
-                schema[:fields][key].type == 'Column' ? memo.merge(key => patch[key]) : memo
+              patch_without_relations = patch.reduce({}) do |carry, (key, value)|
+                schema[:fields][key].type == 'Column' ? carry.merge(key => value) : carry
               end
 
               child_collection.update(caller, filter, patch_without_relations)
