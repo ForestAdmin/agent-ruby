@@ -31,22 +31,6 @@ module ForestAdminDatasourceCustomizer
 
           private
 
-          # private function extractRelations(array &$records): array
-          #     {
-          #         $recordsByRelation = [];
-          #
-          #         foreach ($records as $index => $record) {
-          #             if ($this->getFields()[$index]->getType() !== 'Column') {
-          #                 foreach ($record as $key => $subRecord) {
-          #                     $recordsByRelation[$index] ??= [];
-          #                     $recordsByRelation[$index][$key] = $subRecord;
-          #                 }
-          #                 unset($records[$index]);
-          #             }
-          #         }
-          #
-          #         return $recordsByRelation;
-          #     }
           def extract_relations(record)
             records_by_relation = {}
 
