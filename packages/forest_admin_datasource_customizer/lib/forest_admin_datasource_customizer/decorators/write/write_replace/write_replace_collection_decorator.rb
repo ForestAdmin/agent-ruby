@@ -78,10 +78,8 @@ module ForestAdminDatasourceCustomizer
                               []
                             end
 
-              #  if (fieldPatch && !this.isObject(fieldPatch))
-              #         throw new Error(`The write handler of ${key} should return an object or nothing.`)
               if field_patch && !field_patch.is_a?(Hash)
-                raise ForestException, "The write handler of #{key} should return an object or nothing."
+                raise ForestException, "The write handler of #{key} should return an Hash or nothing."
               end
 
               # Isolate change to our own value (which should not recurse) and the rest which should
