@@ -22,8 +22,9 @@ module ForestAdminDatasourceCustomizer
                 fields: {
                   'id' => column_build(column_type: 'Uuid'),
                   'title' => column_build,
-                  'my_author' => one_to_one_build(foreign_collection: 'author', origin_key: 'book_id'),
-                  'format_id' => column_build(column_type: 'Uuid'),
+                  'author_id' => column_build(column_type: 'Number'),
+                  'my_author' => many_to_one_build(foreign_collection: 'author', foreign_key: 'author_id'),
+                  'format_id' => column_build(column_type: 'Number'),
                   'my_format' => many_to_one_build(foreign_collection: 'format', foreign_key: 'format_id')
                 }
               }
@@ -36,7 +37,7 @@ module ForestAdminDatasourceCustomizer
                 fields: {
                   'id' => column_build(column_type: 'Uuid'),
                   'name' => column_build,
-                  'book_id' => column_build(column_type: 'Uuid')
+                  'price_id' => column_build(column_type: 'Number')
                 }
               }
             )
@@ -46,7 +47,7 @@ module ForestAdminDatasourceCustomizer
               name: 'format',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
+                  'id' => column_build(column_type: 'Number'),
                   'name' => column_build
                 }
               }
@@ -63,23 +64,23 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'creates the relations and attaches to the new collection' do
+            allow(@collection_book).to receive(:create).and_return({ 'id' => '1', 'title' => 'name' })
+            allow(@collection_author).to receive(:create).and_return({ 'id' => '1', 'name' => 'Orius' })
+            allow(@collection_format).to receive(:create).and_return({ 'id' => '1', 'name' => 'XXL' })
+
             @decorated_book.replace_field_writing('title') do
               {
                 'my_author' => { 'name' => 'Orius' },
                 'my_format' => { 'name' => 'XXL' },
-                'title' => 'a name'
+                'title' => 'name'
               }
             end
 
-            allow(@collection_book).to receive(:create).and_return({ 'id' => '123e4567-e89b-12d3-a456-426614174087', 'title' => 'a name' })
-            allow(@collection_author).to receive(:create).and_return({ 'id' => '123e4567-e89b-12d3-a456-111111111111', 'name' => 'Orius' })
-            allow(@collection_format).to receive(:create).and_return({ 'id' => '123e4567-e89b-12d3-a456-222222222222', 'name' => 'XXL' })
-
             @decorated_book.create(caller, { 'title' => 'a title' })
 
-            expect(@collection_book).to have_received(:create).with(caller, { 'format_id' => '123e4567-e89b-12d3-a456-222222222222', 'title' => 'a name' })
-            expect(@collection_author).to have_received(:create).with(caller, { 'book_id' => '123e4567-e89b-12d3-a456-426614174087', 'name' => 'Orius' })
+            expect(@collection_author).to have_received(:create).with(caller, { 'name' => 'Orius' })
             expect(@collection_format).to have_received(:create).with(caller, { 'name' => 'XXL' })
+            expect(@collection_book).to have_received(:create).with(caller, { 'title' => 'name', 'format_id' => '1', 'author_id' => '1' })
           end
         end
       end
