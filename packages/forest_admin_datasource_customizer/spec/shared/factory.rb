@@ -1,4 +1,18 @@
 module Factory
+  def datasource_build(args = {})
+    instance_double(
+      ForestAdminDatasourceToolkit::Datasource,
+      {
+        schema: { charts: [] },
+        collections: [],
+        get_collection: nil,
+        add_collection: nil,
+        render_chart: nil,
+        **args
+      }
+    )
+  end
+
   def datasource_with_collections_build(collections)
     datasource = ForestAdminDatasourceToolkit::Datasource.new
     collections.each do |collection|
