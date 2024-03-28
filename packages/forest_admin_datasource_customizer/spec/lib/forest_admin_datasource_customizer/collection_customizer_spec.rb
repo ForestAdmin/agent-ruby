@@ -16,6 +16,7 @@ module ForestAdminDatasourceCustomizer
         Collection,
         name: 'book',
         schema: {
+          charts: [],
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
@@ -405,7 +406,7 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
-    context 'when using removeField' do
+    context 'when using remove_field' do
       it 'removes the given fields' do
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
         customizer.remove_field('name', 'name_in_read_only')
@@ -447,6 +448,24 @@ module ForestAdminDatasourceCustomizer
         write_collection.handlers
         expect(write_collection.fields).to have_key('name')
         expect(write_collection.handlers).to have_key('name')
+
+      end
+    end
+
+    context 'when using add_chart' do
+      it 'add a chart' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.chart).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.chart.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        definition = proc { |_context, result_builder| result_builder.value(10) }
+        customizer.add_chart('my_chart', &definition)
+        stack.apply_queued_customizations({})
+        chart_collection = @datasource_customizer.stack.chart.get_collection('book')
+
+        expect(chart_collection.charts).to have_key('my_chart')
+        expect(chart_collection.charts['my_chart']).to eq(definition)
       end
     end
   end

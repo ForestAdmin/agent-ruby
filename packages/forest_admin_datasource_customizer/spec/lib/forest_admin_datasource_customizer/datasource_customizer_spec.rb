@@ -45,5 +45,17 @@ module ForestAdminDatasourceCustomizer
         expect(customized.collections.key?('renamed_collection')).to be(true)
       end
     end
+
+    context 'when using add_chart' do
+      it 'add a chart' do
+        customizer = described_class.new
+        definition = proc { |_context, result_builder| result_builder.value(10) }
+        customizer.add_chart('my_chart', &definition)
+        datasource = customizer.datasource({})
+
+        expect(datasource.schema[:charts]).to include('my_chart')
+        expect(datasource.render_chart(caller, 'my_chart')).to eq({ countCurrent: 10, countPrevious: nil })
+      end
+    end
   end
 end
