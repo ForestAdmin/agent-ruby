@@ -65,7 +65,7 @@ module ForestAdminDatasourceCustomizer
             field_schema = schema[:fields][key]
             relation = datasource.get_collection(field_schema.foreign_collection)
 
-            relation.create(caller, entries.merge(field_schema.origin_key_target => records[field_schema.origin_key]))
+            relation.create(caller, entries.merge(field_schema.origin_key => records[field_schema.origin_key_target]))
           end
         end
       end
