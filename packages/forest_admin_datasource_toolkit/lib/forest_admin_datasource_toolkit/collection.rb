@@ -3,7 +3,6 @@ module ForestAdminDatasourceToolkit
     attr_accessor :segments
 
     attr_reader :actions,
-                :charts,
                 :datasource,
                 :name,
                 :schema,
@@ -17,11 +16,11 @@ module ForestAdminDatasourceToolkit
       @schema = {
         fields: {},
         countable: false,
-        searchable: false
+        searchable: false,
+        charts: []
       }
       @actions = {}
       @segments = {}
-      @charts = {}
     end
 
     def enable_count
