@@ -61,13 +61,13 @@ module ForestAdminDatasourceCustomizer
               record = { 'name' => 'another name' }
               allow(@collection_book).to receive(:create).and_return(record)
 
-              @decorated_book.replace_field_writing('name') do |value|
-                { 'name' => value }
+              @decorated_book.replace_field_writing('name') do
+                record
               end
               result = @decorated_book.create(caller, { 'name' => 'a name' })
 
               expect(result).to eq(record)
-              expect(@collection_book).to have_received(:create).with(caller, { 'name' => 'a name' })
+              expect(@collection_book).to have_received(:create).with(caller, { 'name' => 'another name' })
             end
 
             it 'when writing on another field in the handler' do
