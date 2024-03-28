@@ -204,7 +204,7 @@ module ForestAdminDatasourceCustomizer
     # @param name the name of the field
     # @param definition the function or a value to represent the write behavior
     # @example
-    # .replace_field_writing('author_last_name') do |value|
+    # .replace_field_writing('author_last_name') do
     #   { 'author' => { 'last_name' => value } }
     # end
     def replace_field_writing(name, &definition)
