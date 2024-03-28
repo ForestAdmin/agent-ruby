@@ -51,8 +51,13 @@ module ForestAdminDatasourceCustomizer
       self
     end
 
-    def add_chart(name, definition)
-      # TODO: to implement
+    # Create a new API chart
+    # @param name name of the chart
+    # @param definition definition of the chart
+    # @example
+    # .addChart('num_customers') { |context, result_builder| result_builder.value(123) }
+    def add_chart(name, &definition)
+      push_customization { @stack.chart.add_chart(name, &definition) }
     end
 
     def use(plugin, options)
@@ -67,6 +72,12 @@ module ForestAdminDatasourceCustomizer
       @stack.queue_customization(-> { @stack.publication.keep_collections_matching(nil, names) })
 
       self
+    end
+
+    private
+
+    def push_customization(&customization)
+      @stack.queue_customization(customization)
     end
   end
 end

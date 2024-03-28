@@ -5,6 +5,8 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Decorators
 
+        attr_reader :charts
+
         def initialize(child_collection, datasource)
           @charts = {}
           super
