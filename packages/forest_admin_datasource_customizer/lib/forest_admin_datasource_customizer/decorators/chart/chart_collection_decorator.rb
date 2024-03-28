@@ -2,8 +2,8 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Chart
       class ChartCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
+        include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Decorators
-        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def initialize(child_collection, datasource)
           @charts = {}

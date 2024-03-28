@@ -56,5 +56,9 @@ module ForestAdminDatasourceToolkit
 
       @actions[name] = action
     end
+
+    def render_chart(_caller, name, _record_id)
+      raise Exceptions::ForestException, "Chart #{name} is not implemented."
+    end
   end
 end

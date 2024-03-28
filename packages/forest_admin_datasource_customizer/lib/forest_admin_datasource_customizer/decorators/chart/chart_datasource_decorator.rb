@@ -4,7 +4,6 @@ module ForestAdminDatasourceCustomizer
       class ChartDatasourceDecorator < ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Decorators
-        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def initialize(child_datasource)
           @charts = {}
