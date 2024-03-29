@@ -6,7 +6,7 @@ module ForestAdminAgent
       def self.routes
         [
           actions_routes,
-          # api_charts_routes,
+          api_charts_routes,
           System::HealthCheck.new.routes,
           Security::Authentication.new.routes,
           Charts::Charts.new.routes,
@@ -36,17 +36,18 @@ module ForestAdminAgent
       end
 
       def self.api_charts_routes
-        routes = []
-        # TODO
-        # AgentFactory.get('datasource').charts.each do |chart|
-        #   routes << ApiChartDatasource.new(chart).routes
-        # end
-        # AgentFactory.get('datasource').collections.each do |collection|
-        #   collection.charts.each do |chart|
-        #     routes << ApiChartCollection.new(collection, chart).routes
-        #   end
-        # end
-        routes.flatten
+        routes = {}
+        Facades::Container.datasource.collections.each_value do |collection|
+          collection.schema[:charts].each_key do |chart_name|
+            routes.merge!(Charts::ApiChartCollection.new(chart_name).routes)
+          end
+        end
+
+        Facades::Container.datasource.schema[:charts].each_key do |chart_name|
+          routes.merge!(Charts::ApiChartDatasource.new(chart_name).routes)
+        end
+
+        routes
       end
     end
   end
