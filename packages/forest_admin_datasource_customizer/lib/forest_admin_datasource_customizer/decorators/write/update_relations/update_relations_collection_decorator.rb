@@ -38,18 +38,18 @@ module ForestAdminDatasourceCustomizer
             projection = Projection.new.with_pks(self)
 
             patch.each_key do |key|
-              schema = schema[:fields][key]
+              field_schema = schema[:fields][key]
 
-              next unless schema.type != 'Column'
+              next unless field_schema.type != 'Column'
 
-              relation = datasource.get_collection(schema.foreign_collection)
+              relation = datasource.get_collection(field_schema.foreign_collection)
 
               projection = projection.union(Projection.new.with_pks(relation).nest(prefix: key))
-              if schema.type == 'ManyToOne'
-                projection = projection.union(Projection.new(schema.foreign_key_target).nest(prefix: key))
+              if field_schema.type == 'ManyToOne'
+                projection = projection.union(Projection.new([field_schema.foreign_key_target]).nest(prefix: key))
               end
-              if schema.type == 'OneToOne'
-                projection = projection.union(Projection.new(schema.origin_key_target).nest(prefix: key))
+              if field_schema.type == 'OneToOne'
+                projection = projection.union(Projection.new([field_schema.origin_key_target]).nest(prefix: key))
               end
             end
 
@@ -57,33 +57,37 @@ module ForestAdminDatasourceCustomizer
           end
 
           def create_or_update_relation(caller, records, key, patch)
-            schema = schema[:fields][key]
-            relation = datasource.get_collection(schema.foreign_collection)
+            field_schema = schema[:fields][key]
+            relation = datasource.get_collection(field_schema.foreign_collection)
             creates = records.filter { |r| !r[key] || r[key].nil? }
             updates = records.filter { |r| r[key] && !r[key].nil? }
 
-            if creates.empty?
-              # Create the one-to-one relations that don't already exist
-              relation.create(
-                caller,
-                creates.map { |record| patch.merge(schema.origin_key => record[schema.origin_key_target]) }
-              )
-            else
-              # Create many-to-one relations
-              sub_record = relation.create(caller, [patch])
+            unless creates.empty?
+              if field_schema.type == 'ManyToOne'
+                # Create many-to-one relations
+                sub_record = relation.create(caller, [patch])
 
-              # Set foreign key on the parent records
-              condition_tree = ConditionTree::ConditionTreeFactory.match_records(self.schema, creates)
-              parent_patch = { schema.foreign_key => sub_record[schema.foreign_key_target] }
+                # Set foreign key on the parent records
+                condition_tree = ConditionTree::ConditionTreeFactory.match_records(schema, creates)
+                parent_patch = { field_schema.foreign_key => sub_record[field_schema.foreign_key_target] }
 
-              update(caller, Filter.new(condition_tree: condition_tree), parent_patch)
+                update(caller, Filter.new(condition_tree: condition_tree), parent_patch)
+              else
+                # Create the one-to-one relations that don't already exist
+                relation.create(
+                  caller,
+                  creates.map do |record|
+                    patch.merge(field_schema.origin_key => record[field_schema.origin_key_target])
+                  end
+                )
+              end
             end
 
             # Update the relations that already exist
             return if updates.empty?
 
             sub_records = updates.map { |record| record[key] }
-            condition_tree = ConditionTree::ConditionTreeFactory.match_records(relation.schema, sub_records)
+            condition_tree = ConditionTree::ConditionTreeFactory.match_records(relation, sub_records)
 
             relation.update(caller, Filter.new(condition_tree: condition_tree), patch)
           end
