@@ -6,6 +6,8 @@ require 'forest_admin_agent'
 require 'forest_admin_datasource_toolkit'
 require 'forest_admin_datasource_customizer'
 require 'singleton'
+require 'shared/factory'
+require 'shared/column_schema_factory'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -31,6 +33,9 @@ end
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
+  config.include Factory
+  config.include ColumnSchemaFactory
+
   config.before do
     cache = FileCache.new('app', 'tmp/cache/forest_admin')
     cache.clear

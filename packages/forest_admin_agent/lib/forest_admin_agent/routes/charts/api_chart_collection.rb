@@ -7,8 +7,9 @@ module ForestAdminAgent
       class ApiChartCollection < AbstractAuthenticatedRoute
         include ForestAdminAgent::Utils
 
-        def initialize(chart_name)
+        def initialize(collection, chart_name)
           @chart_name = chart_name
+          @collection = collection
 
           super()
         end

@@ -39,7 +39,7 @@ module ForestAdminAgent
         routes = {}
         Facades::Container.datasource.collections.each_value do |collection|
           collection.schema[:charts].each_key do |chart_name|
-            routes.merge!(Charts::ApiChartCollection.new(chart_name).routes)
+            routes.merge!(Charts::ApiChartCollection.new(collection, chart_name).routes)
           end
         end
 
