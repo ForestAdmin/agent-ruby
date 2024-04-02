@@ -429,5 +429,25 @@ module ForestAdminDatasourceCustomizer
         expect(rename_collection.schema[:fields]).to have_key('renamed_name')
       end
     end
+
+    context 'when using replace_field_writing' do
+      it 'replaces write on field' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.write).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.write.get_collection('person'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.replace_field_writing('name') do
+          { 'name' => 'value' }
+        end
+        stack.apply_queued_customizations({})
+
+        write_collection = @datasource_customizer.stack.write.get_collection('person')
+        allow(write_collection).to receive(:replace_field_writing).with('name').and_return({ 'name' => 'value' })
+        write_collection.handlers
+        expect(write_collection.fields).to have_key('name')
+        expect(write_collection.handlers).to have_key('name')
+      end
+    end
   end
 end
