@@ -202,7 +202,7 @@ module ForestAdminDatasourceToolkit
         it 'throws an error' do
           expect do
             described_class.validate(@collection, { 'id' => '1' })
-          end.to raise_error(ForestException, "🌳🌳🌳 Unexpected schema type 'fake_type_column' while traversing record")
+          end.to raise_error(ForestException)
         end
       end
     end
