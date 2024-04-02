@@ -65,10 +65,10 @@ module ForestAdminDatasourceCustomizer
             unless creates.empty?
               if field_schema.type == 'ManyToOne'
                 # Create many-to-one relations
-                sub_record = relation.create(caller, [patch])
+                sub_record = relation.create(caller, patch)
 
                 # Set foreign key on the parent records
-                condition_tree = ConditionTree::ConditionTreeFactory.match_records(schema, creates)
+                condition_tree = ConditionTree::ConditionTreeFactory.match_records(self, creates)
                 parent_patch = { field_schema.foreign_key => sub_record[field_schema.foreign_key_target] }
 
                 update(caller, Filter.new(condition_tree: condition_tree), parent_patch)
