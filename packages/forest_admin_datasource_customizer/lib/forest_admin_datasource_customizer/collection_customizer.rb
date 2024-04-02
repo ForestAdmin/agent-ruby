@@ -208,7 +208,7 @@ module ForestAdminDatasourceCustomizer
     #   { 'author' => { 'last_name' => value } }
     # end
     def replace_field_writing(name, &definition)
-      push_customization { @stack.write.get_collection(@name).replace_field_writing(name, definition) }
+      push_customization { @stack.write.get_collection(@name).replace_field_writing(name, &definition) }
     end
 
     private

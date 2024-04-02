@@ -76,9 +76,7 @@ module ForestAdminDatasourceCustomizer
                 # Create the one-to-one relations that don't already exist
                 relation.create(
                   caller,
-                  creates.map do |record|
-                    patch.merge(field_schema.origin_key => record[field_schema.origin_key_target])
-                  end
+                  patch.merge(field_schema.origin_key => creates.first[field_schema.origin_key_target])
                 )
               end
             end
