@@ -81,7 +81,7 @@ module ForestAdminDatasourceToolkit
 
         it 'does not throw an error when the record data match the collection schema' do
           expect do
-            described_class.validate(datasource.get_collection('book'), { 'owner' => { 'name' => 'this field is in collection' } })
+            described_class.validate(datasource.get_collection('book'), { 'relation' => { 'name' => 'this field is in collection' } })
           end.not_to raise_error
         end
 
