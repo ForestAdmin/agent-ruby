@@ -8,7 +8,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def schema
-      @stack.datasource.schema
+      @stack.validation.schema
     end
 
     def get_collection(name)

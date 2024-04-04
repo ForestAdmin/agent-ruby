@@ -11,12 +11,13 @@ module ForestAdminDatasourceCustomizer
         end
 
         def schema
-          child_schema = @child_datasource.schema
+          child_schema = @child_datasource.schema.dup
 
           duplicate = @charts.keys.find { |name| child_schema[:charts].include?(name) }
+
           raise(Exceptions::ForestException, "Chart #{duplicate} is defined twice.") if duplicate
 
-          child_schema[:charts] = child_schema[:charts] + @charts.keys
+          child_schema[:charts] = child_schema[:charts].union(@charts.keys)
 
           child_schema
         end

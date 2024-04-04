@@ -38,12 +38,12 @@ module ForestAdminAgent
       def self.api_charts_routes
         routes = {}
         Facades::Container.datasource.collections.each_value do |collection|
-          collection.schema[:charts].each_key do |chart_name|
+          collection.schema[:charts].each do |chart_name|
             routes.merge!(Charts::ApiChartCollection.new(collection, chart_name).routes)
           end
         end
 
-        Facades::Container.datasource.schema[:charts].each_key do |chart_name|
+        Facades::Container.datasource.schema[:charts].each do |chart_name|
           routes.merge!(Charts::ApiChartDatasource.new(chart_name).routes)
         end
 
