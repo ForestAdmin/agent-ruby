@@ -47,8 +47,7 @@ module ForestAdminAgent
 
             datasource = Datasource.new
 
-            collection = instance_double(
-              Collection,
+            collection = collection_build(
               name: 'user',
               schema: {
                 fields: {

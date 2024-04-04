@@ -31,7 +31,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(sub_schema)
-          sub_schema[:charts] = sub_schema[:charts] + @charts.keys
+          sub_schema[:charts] = sub_schema[:charts].union(@charts.keys)
 
           sub_schema
         end

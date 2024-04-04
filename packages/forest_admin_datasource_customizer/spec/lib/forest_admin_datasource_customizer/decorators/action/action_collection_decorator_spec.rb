@@ -14,8 +14,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_book = instance_double(
-            Collection,
+          @collection_book = collection_build(
             name: 'book',
             schema: {
               fields: {
@@ -33,8 +32,7 @@ module ForestAdminDatasourceCustomizer
             get_form: nil
           )
 
-          @collection_person = instance_double(
-            Collection,
+          @collection_person = collection_build(
             name: 'person',
             schema: {
               fields: {

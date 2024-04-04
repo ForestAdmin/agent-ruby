@@ -15,8 +15,7 @@ module ForestAdminDatasourceCustomizer
         context 'when the collection pk does not supports EQUAL or IN operators' do
           before do
             datasource = Datasource.new
-            @child_collection_book = instance_double(
-              Collection,
+            @child_collection_book = collection_build(
               name: 'book',
               schema: {
                 fields: {
@@ -51,8 +50,7 @@ module ForestAdminDatasourceCustomizer
         context 'when the collection pk supports EQUAL or IN operators' do
           before do
             datasource = Datasource.new
-            @child_collection_book = instance_double(
-              Collection,
+            @child_collection_book = collection_build(
               name: 'book',
               schema: {
                 fields: {
@@ -71,8 +69,7 @@ module ForestAdminDatasourceCustomizer
                 }
               }
             )
-            @child_collection_person = instance_double(
-              Collection,
+            @child_collection_person = collection_build(
               name: 'person',
               schema: {
                 fields: {

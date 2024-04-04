@@ -29,8 +29,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_person = instance_double(
-            Collection,
+          @collection_person = collection_build(
             name: 'person',
             schema: {
               fields: {
@@ -45,8 +44,7 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_book_person = instance_double(
-            Collection,
+          @collection_book_person = collection_build(
             name: 'book_person',
             schema: {
               fields: {
@@ -69,8 +67,7 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_book = instance_double(
-            Collection,
+          @collection_book = collection_build(
             name: 'book',
             schema: {
               fields: {

@@ -45,8 +45,7 @@ module ForestAdminAgent
             end
             stub_const('Book', book_class)
             @datasource = Datasource.new
-            collection = instance_double(
-              Collection,
+            collection = collection_build(
               name: 'book',
               schema: {
                 fields: {

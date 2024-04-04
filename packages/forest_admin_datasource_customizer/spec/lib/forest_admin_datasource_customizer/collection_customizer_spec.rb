@@ -44,6 +44,7 @@ module ForestAdminDatasourceCustomizer
         Collection,
         name: 'book_person',
         schema: {
+          charts: [],
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'person_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
@@ -66,6 +67,7 @@ module ForestAdminDatasourceCustomizer
         Collection,
         name: 'person',
         schema: {
+          charts: [],
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'name' => ColumnSchema.new(column_type: 'String', is_sortable: true),
@@ -91,6 +93,7 @@ module ForestAdminDatasourceCustomizer
         Collection,
         name: 'category',
         schema: {
+          charts: [],
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'label' => ColumnSchema.new(column_type: 'String'),
