@@ -3,7 +3,7 @@ source "https://rubygems.org"
 # Specify your gem's dependencies in forest_admin_datasource_active_record.gemspec
 gemspec
 
-gem 'forest_admin_datasource_toolkit'
+gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
 
 gem 'rake', '~> 13.0'
 
