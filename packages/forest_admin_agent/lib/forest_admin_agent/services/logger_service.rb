@@ -5,15 +5,31 @@ module ForestAdminAgent
     class LoggerService
       attr_reader :default_logger
 
+      LEVELS = {
+        'Info' => Logger::INFO,
+        'Debug' => Logger::DEBUG,
+        'Warn' => Logger::WARN,
+        'Error' => Logger::ERROR
+      }.freeze
+
       def initialize(logger_level = 'Info', logger = nil)
         @logger_level = logger_level
         @logger = logger
-        @default_logger = MonoLogger.new('forest_admin')
+        @default_logger = MonoLogger.new($stdout)
         # TODO: HANDLE FORMATTER
       end
 
-      def levels
-        %w[Debug Info Warn Error]
+      def log(level, message)
+        if @logger
+          @logger.call(get_level(level), message)
+        else
+          @default_logger.add(get_level(level), message)
+        end
+        @logger || @default_logger
+      end
+
+      def get_level(level)
+        LEVELS[level]
       end
     end
   end

@@ -30,6 +30,10 @@ module ForestAdminAgent
             proc { handle_api_chart }
           )
 
+          unless Facades::Container.cache(:is_production)
+            Facades::Container.logger.log('Info', "/forest/_charts/#{slug}")
+          end
+
           self
         end
 
