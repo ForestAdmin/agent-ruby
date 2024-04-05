@@ -451,7 +451,6 @@ module ForestAdminDatasourceCustomizer
         write_collection.handlers
         expect(write_collection.fields).to have_key('name')
         expect(write_collection.handlers).to have_key('name')
-
       end
     end
 
