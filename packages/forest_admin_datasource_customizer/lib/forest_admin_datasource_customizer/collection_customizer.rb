@@ -200,6 +200,17 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.rename_field.get_collection(@name).rename_field(current_name, new_name) }
     end
 
+    # Replace the write behavior of a field.
+    # @param name the name of the field
+    # @param definition the function or a value to represent the write behavior
+    # @example
+    # .replace_field_writing('author_last_name') do
+    #   { 'author' => { 'last_name' => value } }
+    # end
+    def replace_field_writing(name, &definition)
+      push_customization { @stack.write.get_collection(@name).replace_field_writing(name, &definition) }
+    end
+
     private
 
     def push_customization(&customization)

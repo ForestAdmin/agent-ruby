@@ -16,8 +16,10 @@ module ForestAdminDatasourceToolkit
                   "Unexpected field type: '#{collection.name}.#{field}' (found '#{schema.type}' expected 'Column')"
           end
 
-          values&.each do |value|
-            validate_value(field, schema, value)
+          if values.is_a?(Array)
+            values.each do |value|
+              validate_value(field, schema, value)
+            end
           end
         else
           prefix = field[0, dot_index]
