@@ -1,3 +1,10 @@
+# [1.0.0-beta.40](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.39...v1.0.0-beta.40) (2024-04-05)
+
+
+### Features
+
+*  add write decorator support ([#36](https://github.com/ForestAdmin/agent-ruby/issues/36)) ([f052601](https://github.com/ForestAdmin/agent-ruby/commit/f0526015db0ddc83aa3ddf972628790fd0825575))
+
 # [1.0.0-beta.39](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.38...v1.0.0-beta.39) (2024-03-22)
 
 
