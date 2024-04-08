@@ -9,7 +9,7 @@ module ForestAdminAgent
             id: SecureRandom.uuid,
             type: 'stats',
             attributes: {
-              value: chart.serialize
+              value: chart
             }
           }
         }

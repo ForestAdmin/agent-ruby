@@ -3,7 +3,6 @@ module ForestAdminDatasourceToolkit
     attr_accessor :segments
 
     attr_reader :actions,
-                :charts,
                 :datasource,
                 :name,
                 :schema,
@@ -17,11 +16,11 @@ module ForestAdminDatasourceToolkit
       @schema = {
         fields: {},
         countable: false,
-        searchable: false
+        searchable: false,
+        charts: []
       }
       @actions = {}
       @segments = {}
-      @charts = {}
     end
 
     def enable_count
@@ -56,6 +55,10 @@ module ForestAdminDatasourceToolkit
       raise Exceptions::ForestException, "Action #{name} already defined in collection" if @actions[key]
 
       @actions[name] = action
+    end
+
+    def render_chart(_caller, name, _record_id)
+      raise Exceptions::ForestException, "Chart #{name} is not implemented."
     end
   end
 end

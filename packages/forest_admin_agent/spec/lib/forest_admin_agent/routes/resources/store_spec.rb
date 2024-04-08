@@ -56,8 +56,7 @@ module ForestAdminAgent
             book = { 'id' => 1 }.merge(attributes)
 
             datasource = Datasource.new
-            collection = instance_double(
-              Collection,
+            collection = collection_build(
               name: 'book',
               schema: {
                 fields: {
@@ -105,8 +104,7 @@ module ForestAdminAgent
         describe 'with relation' do
           before do
             @datasource = Datasource.new
-            collection_person = instance_double(
-              Collection,
+            collection_person = collection_build(
               name: 'person',
               schema: {
                 fields: {
@@ -125,8 +123,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_passport = instance_double(
-              Collection,
+            collection_passport = collection_build(
               name: 'passport',
               schema: {
                 fields: {

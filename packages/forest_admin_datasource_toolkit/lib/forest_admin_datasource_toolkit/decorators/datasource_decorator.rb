@@ -7,6 +7,10 @@ module ForestAdminDatasourceToolkit
         @decorators = {}
       end
 
+      def schema
+        @child_datasource.schema
+      end
+
       def collections
         @child_datasource.collections.transform_values { |c| get_collection(c.name) }
       end

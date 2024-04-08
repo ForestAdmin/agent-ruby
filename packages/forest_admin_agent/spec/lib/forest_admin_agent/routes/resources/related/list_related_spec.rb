@@ -30,8 +30,7 @@ module ForestAdminAgent
             stub_const('User', user_class)
 
             datasource = Datasource.new
-            collection_user = instance_double(
-              Collection,
+            collection_user = collection_build(
               name: 'user',
               schema: {
                 fields: {
@@ -48,8 +47,7 @@ module ForestAdminAgent
               },
               list: [User.new(1, 'foo', 'foo')]
             )
-            collection_category = instance_double(
-              Collection,
+            collection_category = collection_build(
               name: 'category',
               schema: {
                 fields: {

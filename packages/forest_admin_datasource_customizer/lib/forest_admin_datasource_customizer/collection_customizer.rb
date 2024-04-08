@@ -211,6 +211,22 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.write.get_collection(@name).replace_field_writing(name, &definition) }
     end
 
+    # Create a new API chart
+    # @param name name of the chart
+    # @param definition definition of the chart
+    # @example
+    # .addChart('num_customers') do |context, result_builder|
+    #   return result_builder.distribution({
+    #     tomatoes: 10,
+    #     potatoes: 20,
+    #     carrots: 30,
+    #   });
+    #  end
+    # )
+    def add_chart(name, &definition)
+      push_customization { @stack.chart.get_collection(@name).add_chart(name, &definition) }
+    end
+
     private
 
     def push_customization(&customization)

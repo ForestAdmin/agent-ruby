@@ -82,11 +82,11 @@ module ForestAdminAgent
             previous_value = compute_value(FilterFactory.get_previous_period_filter(@filter, @caller.timezone))
           end
 
-          ValueChart.new(value, previous_value)
+          ValueChart.new(value, previous_value).serialize
         end
 
         def make_objective
-          ObjectiveChart.new(compute_value(@filter))
+          ObjectiveChart.new(compute_value(@filter)).serialize
         end
 
         def make_pie
@@ -99,7 +99,7 @@ module ForestAdminAgent
 
           result = @collection.aggregate(@caller, @filter, aggregation)
 
-          PieChart.new(result.map { |row| { key: row[:group][group_field], value: row[:value] } })
+          PieChart.new(result.map { |row| { key: row[:group][group_field], value: row[:value] } }).serialize
         end
 
         def make_line
@@ -137,7 +137,7 @@ module ForestAdminAgent
             current += 1.send(time_range.downcase.pluralize.to_sym)
           end
 
-          LineChart.new(result)
+          LineChart.new(result).serialize
         end
 
         def make_leaderboard
@@ -194,7 +194,7 @@ module ForestAdminAgent
               }
             end
 
-            return LeaderboardChart.new(result)
+            return LeaderboardChart.new(result).serialize
           end
 
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,

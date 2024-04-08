@@ -9,6 +9,10 @@ module ForestAdminAgent
         instance.resolve(:datasource)
       end
 
+      def self.logger
+        instance.resolve(:logger)
+      end
+
       def self.config_from_cache
         instance.resolve(:cache).get('config')
       end

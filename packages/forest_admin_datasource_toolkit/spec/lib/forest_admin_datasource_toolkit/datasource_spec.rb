@@ -12,11 +12,6 @@ module ForestAdminDatasourceToolkit
       expect(@datasource.collections).to be_a Hash
     end
 
-    it 'return an empty hash for charts' do
-      expect(@datasource.charts).to be_a Hash
-      expect(@datasource.charts).to eq({})
-    end
-
     it 'get collection from datasource' do
       expect(@datasource.get_collection('__collection__')).to eq(@collection)
     end

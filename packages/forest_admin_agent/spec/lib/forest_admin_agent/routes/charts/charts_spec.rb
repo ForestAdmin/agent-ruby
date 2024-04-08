@@ -36,8 +36,7 @@ module ForestAdminAgent
           stub_const('Review', review_class)
 
           datasource = Datasource.new
-          collection_book = instance_double(
-            Collection,
+          collection_book = collection_build(
             name: 'book',
             schema: {
               fields: {
@@ -62,8 +61,7 @@ module ForestAdminAgent
               }
             }
           )
-          collection_book_review = instance_double(
-            Collection,
+          collection_book_review = collection_build(
             name: 'book_review',
             schema: {
               fields: {
@@ -83,8 +81,7 @@ module ForestAdminAgent
               }
             }
           )
-          collection_review = instance_double(
-            Collection,
+          collection_review = collection_build(
             name: 'review',
             schema: {
               fields: {
