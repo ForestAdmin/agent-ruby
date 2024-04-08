@@ -1,3 +1,15 @@
+# [1.0.0-beta.41](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.40...v1.0.0-beta.41) (2024-04-08)
+
+
+### Bug Fixes
+
+* rubocop lint ([#38](https://github.com/ForestAdmin/agent-ruby/issues/38)) ([48b658f](https://github.com/ForestAdmin/agent-ruby/commit/48b658f02949a29ed9a8f35beaa5d83ced6a8dfb))
+
+
+### Features
+
+* add chart decorator support ([#37](https://github.com/ForestAdmin/agent-ruby/issues/37)) ([c1fc0ac](https://github.com/ForestAdmin/agent-ruby/commit/c1fc0acb6109c396e500bf202d0e8eb20bc28943))
+
 # [1.0.0-beta.40](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.39...v1.0.0-beta.40) (2024-04-05)
 
 
