@@ -19,9 +19,8 @@ module ForestAdminAgent
 
         if branch?(filters)
           aggregator = filters[:aggregator].capitalize
-          conditions = []
-          filters[:conditions].each do |sub_tree|
-            conditions << from_plain_object(collection, sub_tree)
+          conditions = filters[:conditions].map do |sub_tree|
+            from_plain_object(collection, sub_tree)
           end
 
           return conditions.size == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
