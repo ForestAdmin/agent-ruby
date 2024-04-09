@@ -15,7 +15,7 @@ module ForestAdminDatasourceCustomizer
           @after.each { |hook| hook.call(context) }
         end
 
-        def add_hook(position, hook)
+        def add_handler(position, hook)
           position == 'After' ? @after << hook : @before << hook
         end
       end
