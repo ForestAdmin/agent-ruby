@@ -5,6 +5,8 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Components
         include Context
 
+        attr_reader :hooks
+
         def initialize(child_collection, datasource)
           super
           @hooks = {

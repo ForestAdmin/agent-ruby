@@ -2,6 +2,8 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Hook
       class Hooks
+        attr_reader :before, :after
+
         def initialize
           @before = []
           @after = []
