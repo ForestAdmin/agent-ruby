@@ -215,16 +215,27 @@ module ForestAdminDatasourceCustomizer
     # @param name name of the chart
     # @param definition definition of the chart
     # @example
-    # .addChart('num_customers') do |context, result_builder|
+    # .add_chart('num_customers') do |context, result_builder|
     #   return result_builder.distribution({
     #     tomatoes: 10,
     #     potatoes: 20,
     #     carrots: 30,
     #   });
-    #  end
-    # )
+    # end
     def add_chart(name, &definition)
       push_customization { @stack.chart.get_collection(@name).add_chart(name, &definition) }
+    end
+
+    # Add a new hook handler to an action
+    # @param position Either if the hook is executed before or after the action
+    # @param type Type of action which should be hooked
+    # @param handler Callback that should be executed when the hook is triggered
+    # @example
+    # .add_hook('before', 'list') do |context|
+    #   # Do something before the list action
+    # end
+    def add_hook(position, type, &handler)
+      push_customization { @stack.hook.get_collection(@name).add_hook(position, type, handler) }
     end
 
     private

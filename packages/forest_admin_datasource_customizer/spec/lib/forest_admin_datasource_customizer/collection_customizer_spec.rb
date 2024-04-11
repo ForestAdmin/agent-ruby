@@ -470,5 +470,21 @@ module ForestAdminDatasourceCustomizer
         expect(chart_collection.charts['my_chart']).to eq(definition)
       end
     end
+
+    context 'when using add_hook' do
+      it 'add a hook' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.hook).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.hook.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        handler = proc {}
+        customizer.add_hook('before', 'list', &handler)
+        stack.apply_queued_customizations({})
+        hook_collection = @datasource_customizer.stack.hook.get_collection('book')
+
+        expect(hook_collection.hooks['list'].before.first).to eq(handler)
+      end
+    end
   end
 end
