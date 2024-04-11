@@ -1,3 +1,10 @@
+# [1.0.0-beta.42](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.41...v1.0.0-beta.42) (2024-04-11)
+
+
+### Features
+
+* add hook decorator support ([#39](https://github.com/ForestAdmin/agent-ruby/issues/39)) ([1514aed](https://github.com/ForestAdmin/agent-ruby/commit/1514aed9a615fce2385fceea9099852e06f9e301))
+
 # [1.0.0-beta.41](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.40...v1.0.0-beta.41) (2024-04-08)
 
 
