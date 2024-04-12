@@ -30,10 +30,12 @@ module Factory
         datasource: ForestAdminDatasourceToolkit::Datasource.new,
         name: 'collection',
         schema: {
+          charts: [],
           fields: {},
           countable: false,
-          searchable: false
-        },
+          searchable: false,
+          segments: {}
+        }.merge(args[:schema]),
         execute: nil,
         get_form: nil,
         render_chart: nil,
@@ -42,7 +44,7 @@ module Factory
         update: nil,
         delete: nil,
         aggregate: nil,
-        **args
+        **args.except(:schema)
       }
     )
   end

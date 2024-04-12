@@ -33,7 +33,8 @@ module Factory
           charts: [],
           fields: {},
           countable: false,
-          searchable: false
+          searchable: false,
+          segments: {}
         }.merge(args[:schema]),
         execute: nil,
         get_form: nil,

@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Segment
       class SegmentCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Decorators
+        include ForestAdminDatasourceToolkit::Validations
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def initialize(child_collection, datasource)
@@ -43,7 +44,7 @@ module ForestAdminDatasourceCustomizer
                                        ConditionTreeFactory.from_plain_object(result)
                                      end
 
-            Validation::ConditionTreeValidator.validate(condition_tree_segment, self)
+            ConditionTreeValidator.validate(condition_tree_segment, self)
 
             condition_tree = ConditionTreeFactory.intersect([condition_tree_segment, filter.condition_tree])
             segment = nil
