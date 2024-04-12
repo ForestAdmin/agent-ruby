@@ -1,3 +1,10 @@
+# [1.0.0-beta.43](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.42...v1.0.0-beta.43) (2024-04-12)
+
+
+### Bug Fixes
+
+* **security:** patch tar dependency vulnerabilities ([#40](https://github.com/ForestAdmin/agent-ruby/issues/40)) ([86be2a7](https://github.com/ForestAdmin/agent-ruby/commit/86be2a752011f469649cec0f09b55aa5939936d0))
+
 # [1.0.0-beta.42](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.41...v1.0.0-beta.42) (2024-04-11)
 
 
