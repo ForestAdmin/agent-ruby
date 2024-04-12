@@ -35,7 +35,7 @@ module Factory
           countable: false,
           searchable: false,
           segments: {}
-        }.merge(args[:schema]),
+        }.merge(args[:schema] || {}),
         execute: nil,
         get_form: nil,
         render_chart: nil,

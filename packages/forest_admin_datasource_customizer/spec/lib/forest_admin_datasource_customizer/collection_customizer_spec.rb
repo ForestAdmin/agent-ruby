@@ -12,8 +12,7 @@ module ForestAdminDatasourceCustomizer
     include_context 'with caller'
     before do
       datasource = Datasource.new
-      collection_book = instance_double(
-        Collection,
+      collection_book = collection_build(
         name: 'book',
         schema: {
           charts: [],
@@ -40,8 +39,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_book_person = instance_double(
-        Collection,
+      collection_book_person = collection_build(
         name: 'book_person',
         schema: {
           charts: [],
@@ -63,8 +61,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_person = instance_double(
-        Collection,
+      collection_person = collection_build(
         name: 'person',
         schema: {
           charts: [],
@@ -89,8 +86,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_category = instance_double(
-        Collection,
+      collection_category = collection_build(
         name: 'category',
         schema: {
           charts: [],
