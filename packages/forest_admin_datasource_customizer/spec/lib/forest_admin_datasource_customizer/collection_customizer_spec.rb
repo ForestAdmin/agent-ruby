@@ -486,5 +486,22 @@ module ForestAdminDatasourceCustomizer
         expect(hook_collection.hooks['list'].before.first).to eq(handler)
       end
     end
+
+    context 'when using add_segment' do
+      it 'add a segment' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.segment).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.segment.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        definition = proc { Nodes::ConditionTreeLeaf.new('title', Operators::EQUAL, 'foo') }
+        customizer.add_segment('foo_segment', definition)
+        stack.apply_queued_customizations({})
+        segment_collection = @datasource_customizer.stack.segment.get_collection('book')
+
+        expect(segment_collection.segments).to have_key('foo_segment')
+        expect(segment_collection.segments['foo_segment']).to eq(definition)
+      end
+    end
   end
 end
