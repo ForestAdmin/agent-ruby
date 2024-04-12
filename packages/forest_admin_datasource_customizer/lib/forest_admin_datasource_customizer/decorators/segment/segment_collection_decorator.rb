@@ -6,6 +6,8 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Validations
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        attr_reader :segments
+
         def initialize(child_collection, datasource)
           super
           @segments = {}
