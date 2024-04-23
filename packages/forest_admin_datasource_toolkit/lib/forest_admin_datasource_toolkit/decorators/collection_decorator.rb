@@ -19,7 +19,7 @@ module ForestAdminDatasourceToolkit
       def schema
         unless @last_schema
           sub_schema = @child_collection.schema
-          @last_schema = refine_schema(sub_schema)
+          @last_schema = refine_schema(sub_schema.dup)
         end
 
         @last_schema
