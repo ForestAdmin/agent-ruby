@@ -43,6 +43,7 @@ module ForestAdminDatasourceToolkit
           PREVIOUS_YEAR_TO_DATE = 'previous_year_to_date'.freeze
           PREVIOUS_X_DAYS = 'previous_x_days'.freeze
           PREVIOUS_X_DAYS_TO_DATE = 'previous_x_days_to_date'.freeze
+          MATCH = 'match'.freeze
 
           def self.all
             constants.map { |constant| const_get(constant) }

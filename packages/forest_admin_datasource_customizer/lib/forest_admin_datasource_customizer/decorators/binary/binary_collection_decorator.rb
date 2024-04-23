@@ -8,6 +8,12 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Decorators
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        OPERATORS_WITH_REPLACEMENT = [Operators::AFTER, Operators::BEFORE, Operators::CONTAINS,
+                                      Operators::ENDS_WITH, Operators::EQUAL, Operators::GREATER_THAN,
+                                      Operators::ICONTAINS, Operators::NOT_IN, Operators::IENDS_WITH,
+                                      Operators::ISTARTS_WITH, Operators::LESS_THAN, Operators::NOT_CONTAINS,
+                                      Operators::NOT_EQUAL, Operators::STARTS_WITH, Operators::IN].freeze
+
         def initialize(child_collection, datasource)
           super
           @use_hex_conversion = {}
@@ -44,6 +50,14 @@ module ForestAdminDatasourceCustomizer
           sub_schema
         end
 
+        def refine_filter(_caller, filter = nil)
+          filter&.override(
+            condition_tree: filter&.condition_tree&.replace_leafs do |leaf|
+              convert_condition_tree_leaf(leaf)
+            end
+          )
+        end
+
         def create(caller, data)
           data_with_binary = convert_record(true, data)
           record = super(caller, data_with_binary)
@@ -73,6 +87,33 @@ module ForestAdminDatasourceCustomizer
         end
 
         private
+
+        def convert_condition_tree_leaf(leaf)
+          prefix, suffix = leaf.field.split(':')
+          schema = @child_collection.schema[:fields][prefix]
+
+          if schema.type != 'Column'
+            condition_tree = @datasource.get_collection(schema.foreign_collection).convert_condition_tree_leaf(
+              leaf.override(field: suffix)
+            )
+
+            return condition_tree.nest(suffix)
+          end
+
+          if OPERATORS_WITH_REPLACEMENT.include?(leaf.operator)
+            column_type = if [Operators::IN, Operators::NOT_IN].include?(leaf.operator)
+                            [schema.column_type]
+                          else
+                            schema.column_type
+                          end
+
+            return leaf.override(
+              value: convert_value_helper(true, column_type, should_use_hex(prefix), leaf.value)
+            )
+          end
+
+          leaf
+        end
 
         def should_use_hex(name)
           @use_hex_conversion[name] if @use_hex_conversion.key?(name)
@@ -146,7 +187,27 @@ module ForestAdminDatasourceCustomizer
           column_type.transform_values { |type| replace_column_type(type) }
         end
 
-        def replace_validation(_name, column_schema)
+        def replace_validation(name, column_schema)
+          if column_schema.column_type == 'Binary'
+            validations = column_schema.validations
+            min_length = column_schema.validations.find { |v| v[:operator] == Operators::LONGER_THAN }&.value
+            max_length = column_schema.validations.find { |v| v[:operator] == Operators::SHORTER_THAN }&.value
+
+            if should_use_hex(name)
+              validations << { operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }
+              validations << { operator: Operators::LONGER_THAN, value: (min_length * 2) + 1 } if min_length
+              validations << { operator: Operators::SHORTER_THAN, value: (max_length * 2) - 1 } if max_length
+            else
+              validations << { operator: Operators::MATCH, value: '/^data:.*;base64,.*/' }
+            end
+
+            if column_schema.validations.find { |v| v[:operator] == Operators::PRESENT }
+              validations << { operator: Operators::PRESENT }
+            end
+
+            return validations
+          end
+
           column_schema.validations
         end
 
