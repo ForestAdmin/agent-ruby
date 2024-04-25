@@ -10,8 +10,8 @@ module ForestAdminDatasourceCustomizer
 
         OPERATORS_WITH_REPLACEMENT = [Operators::AFTER, Operators::BEFORE, Operators::CONTAINS,
                                       Operators::ENDS_WITH, Operators::EQUAL, Operators::GREATER_THAN,
-                                      Operators::ICONTAINS, Operators::NOT_IN, Operators::IENDS_WITH,
-                                      Operators::ISTARTS_WITH, Operators::LESS_THAN, Operators::NOT_CONTAINS,
+                                      Operators::I_CONTAINS, Operators::NOT_IN, Operators::I_ENDS_WITH,
+                                      Operators::I_STARTS_WITH, Operators::LESS_THAN, Operators::NOT_CONTAINS,
                                       Operators::NOT_EQUAL, Operators::STARTS_WITH, Operators::IN].freeze
 
         def initialize(child_collection, datasource)
@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
 
           raise Exceptions::ForestException, 'Invalid binary mode' unless %w[datauri hex].include?(type)
 
-          unless field.type == 'Column' && field.column_type == 'Binary'
+          unless field&.type == 'Column' && field&.column_type == 'Binary'
             raise Exceptions::ForestException, 'Expected a binary field'
           end
 
@@ -79,14 +79,12 @@ module ForestAdminDatasourceCustomizer
         def aggregate(caller, filter, aggregation, limit = nil)
           rows = super
           rows.map! do |row|
-            [
+            {
               value: row[:value],
-              group: row[:group].map! { |path, value| convert_value(false, path, value) }
-            ]
+              group: row[:group].to_h { |path, value| [path, convert_value(false, path, value)] }
+            }
           end
         end
-
-        private
 
         def convert_condition_tree_leaf(leaf)
           prefix, suffix = leaf.field.split(':')
@@ -97,7 +95,7 @@ module ForestAdminDatasourceCustomizer
               leaf.override(field: suffix)
             )
 
-            return condition_tree.nest(suffix)
+            return condition_tree.nest(prefix)
           end
 
           if OPERATORS_WITH_REPLACEMENT.include?(leaf.operator)
@@ -116,7 +114,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def should_use_hex(name)
-          @use_hex_conversion[name] if @use_hex_conversion.key?(name)
+          return @use_hex_conversion[name] if @use_hex_conversion.key?(name)
 
           Utils::Schema.primary_key?(@child_collection, name) || Utils::Schema.foreign_key?(@child_collection, name)
         end
@@ -166,13 +164,13 @@ module ForestAdminDatasourceCustomizer
 
         def convert_scalar(to_backend, use_hex, value)
           if to_backend
-            return use_hex ? hex_to_bin(value) : Base64.decode64(value.partition(',')[1])
+            return use_hex ? BinaryHelper.hex_to_bin(value) : Base64.strict_decode64(value.partition(',')[2])
           end
 
-          return bin_to_hex(value) if use_hex
+          return BinaryHelper.bin_to_hex(value) if use_hex
 
-          data = Base64.encode64(value)
-          mime = detect_mime_type(data)
+          data = Base64.strict_encode64(value)
+          mime = BinaryHelper.detect_mime_type(data)
 
           "data:#{mime};base64,#{data}"
         end
@@ -189,9 +187,9 @@ module ForestAdminDatasourceCustomizer
 
         def replace_validation(name, column_schema)
           if column_schema.column_type == 'Binary'
-            validations = column_schema.validations
-            min_length = column_schema.validations.find { |v| v[:operator] == Operators::LONGER_THAN }&.value
-            max_length = column_schema.validations.find { |v| v[:operator] == Operators::SHORTER_THAN }&.value
+            validations = []
+            min_length = (column_schema.validations.find { |v| v[:operator] == Operators::LONGER_THAN } || {})[:value]
+            max_length = (column_schema.validations.find { |v| v[:operator] == Operators::SHORTER_THAN } || {})[:value]
 
             if should_use_hex(name)
               validations << { operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }
@@ -209,33 +207,6 @@ module ForestAdminDatasourceCustomizer
           end
 
           column_schema.validations
-        end
-
-        def bin_to_hex(data)
-          data.unpack1('H*')
-        end
-
-        def hex_to_bin(data)
-          data.scan(/../).map(&:hex).pack('c*')
-        end
-
-        def detect_mime_type(base_64_value)
-          signatures = {
-            'JVBERi0' => 'application/pdf',
-            'R0lGODdh' => 'image/gif',
-            'R0lGODlh' => 'image/gif',
-            'iVBORw0KGgo' => 'image/png',
-            'TU0AK' => 'image/tiff',
-            '/9j/' => 'image/jpg',
-            'UEs' => 'application/vnd.openxmlformats-officedocument.',
-            'PK' => 'application/zip'
-          }
-
-          signatures.each do |key, value|
-            return value if base_64_value.index(key)&.zero?
-          end
-
-          'application/octet-stream'
         end
       end
     end

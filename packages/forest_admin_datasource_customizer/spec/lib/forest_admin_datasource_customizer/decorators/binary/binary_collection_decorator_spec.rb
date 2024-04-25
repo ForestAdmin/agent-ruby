@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -10,223 +11,315 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Schema
 
       describe BinaryCollectionDecorator do
-        subject(:empty_collection_decorator) { described_class }
+        include_context 'with caller'
 
-        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
-        let(:category) { @datasource_decorator.get_collection('category') }
-        let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
+        subject(:binary_collection_decorator) { described_class }
+
+        let(:book_record) do
+          {
+            'id' => BinaryHelper.hex_to_bin('30303030'),
+            # 1x1 transparent png (we use it to test that the datauri can guess mime types)
+            'cover' => Base64.strict_decode64('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='),
+            'author' => {
+              'name' => 'John Doe',
+              # Invalid image file (the datauri should not be able to guess the mime type)
+              'picture' => BinaryHelper.hex_to_bin('30303030'),
+              'tags' => %w[tag1 tag2]
+            }
+          }
+        end
+
+        let(:favorite_record) { { 'id' => 1, 'book' => book_record } }
 
         before do
           datasource = Datasource.new
-          @collection_category = collection_build(
-            name: 'category',
+          @collection_favorite = collection_build(
+            name: 'favorite',
             schema: {
               fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
-                                         filter_operators: [Operators::EQUAL, Operators::IN]),
-                'label' => ColumnSchema.new(column_type: 'String')
+                'id' => numeric_primary_key_build,
+                'book' => many_to_one_build(foreign_key: 'book_id', foreign_collection: 'book')
               }
             }
           )
-          datasource.add_collection(@collection_category)
+          @collection_book = collection_build(
+            name: 'book',
+            schema: {
+              fields: {
+                'id' => column_build(
+                  is_primary_key: true,
+                  column_type: 'Binary',
+                  validations: [
+                    { operator: Operators::LONGER_THAN, value: 15 },
+                    { operator: Operators::SHORTER_THAN, value: 17 },
+                    { operator: Operators::PRESENT },
+                    { operator: Operators::NOT_EQUAL, value: BinaryHelper.hex_to_bin('1234') }
+                  ]
+                ),
+                'title' => column_build,
+                'cover' => column_build(column_type: 'Binary'),
+                'author' => column_build(column_type: { 'name' => 'String', 'picture' => 'Binary', 'tags' => ['String'] })
+              }
+            }
+          )
+          datasource.add_collection(@collection_favorite)
+          datasource.add_collection(@collection_book)
 
-          @datasource_decorator = DatasourceDecorator.new(datasource, empty_collection_decorator)
+          @datasource_decorator = DatasourceDecorator.new(datasource, binary_collection_decorator)
+          @decorated_favorite = @datasource_decorator.get_collection('favorite')
+          @decorated_book = @datasource_decorator.get_collection('book')
         end
 
-        it 'schema should not be changed' do
-          expect(@datasource_decorator.get_collection('category').schema).to eq(@collection_category.schema)
-        end
-
-        context 'with valid query on crud' do
-          it 'list() should be called with overlapping Ins' do
-            allow(category).to receive(:list).and_return([{ id: 2 }])
-
-            records = category.list(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'In', [1, 2]),
-                    Nodes::ConditionTreeLeaf.new('id', 'In', [2, 3])
-                  ]
-                )
-              ),
-              Projection.new
-            )
-
-            expect(records).to eq([{ id: 2 }])
-            expect(category).to have_received(:list)
+        describe 'set_binary_mode' do
+          it 'raise an error when an invalid mode is provided' do
+            expect { @decorated_book.set_binary_mode('name', 'invalid') }.to raise_error(Exceptions::ForestException)
           end
 
-          it 'list() should be called with empty And' do
-            allow(category).to receive(:list).and_return([{ id: 2 }])
-            records = category.list(
-              caller,
-              Filter.new(condition_tree: Nodes::ConditionTreeBranch.new('And', [])),
-              Projection.new
-            )
-
-            expect(records).to eq([{ id: 2 }])
-            expect(category).to have_received(:list)
+          it 'raise an error when the field does not exist' do
+            expect { @decorated_book.set_binary_mode('invalid', 'hex') }.to raise_error(Exceptions::ForestException)
           end
 
-          it 'list() should be called with only non Equal/In leafs' do
-            allow(category).to receive(:list).and_return([{ id: 2 }])
-            records = category.list(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'Today', nil)
-                  ]
-                )
-              ),
-              Projection.new
-            )
-
-            expect(records).to eq([{ id: 2 }])
-            expect(category).to have_received(:list)
-          end
-
-          it 'update() should be called with overlapping incompatible equals' do
-            allow(category).to receive(:update).and_return(nil)
-
-            category.update(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'Or',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'Equal', 4),
-                    Nodes::ConditionTreeLeaf.new('id', 'Equal', 5)
-                  ]
-                )
-              ),
-              { label: 'new label' }
-            )
-
-            expect(category).to have_received(:update)
-          end
-
-          it 'delete() should be called with null condition Tree' do
-            allow(category).to receive(:delete).and_return(nil)
-            category.delete(caller, Filter.new(condition_tree: nil))
-
-            expect(category).to have_received(:delete)
-          end
-
-          it 'aggregate() should be called with simple query' do
-            allow(category).to receive(:aggregate).and_return([{ value: 2, group: {} }])
-            records = category.aggregate(
-              caller,
-              Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('id', 'Equal', nil)),
-              aggregation
-            )
-
-            expect(records).to eq([{ value: 2, group: {} }])
-            expect(category).to have_received(:aggregate)
+          it 'raise an error when the field is not a binary field' do
+            expect { @decorated_book.set_binary_mode('title', 'hex') }.to raise_error(Exceptions::ForestException)
           end
         end
 
-        context 'with queries which target an impossible filter' do
-          it 'list() should not be called with empty In' do
-            allow(@collection_category).to receive(:list).and_return([])
-            records = category.list(
-              caller,
-              Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('id', 'In', [])),
-              Projection.new
-            )
-
-            expect(records).to eq([])
-            expect(@collection_category).not_to have_received(:list)
+        describe 'schema' do
+          it 'do not modified the favorite collection schema' do
+            expect(@collection_favorite.schema[:fields]['id'].column_type).to eq(@decorated_favorite.schema[:fields]['id'].column_type)
+            expect(@collection_favorite.schema[:fields]['id'].validations).to eq(@decorated_favorite.schema[:fields]['id'].validations)
           end
 
-          it 'list() should not be called with nested empty In' do
-            allow(@collection_category).to receive(:list).and_return([])
-            records = category.list(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeBranch.new(
-                      'And',
-                      [
-                        Nodes::ConditionTreeBranch.new(
-                          'Or',
-                          [
-                            Nodes::ConditionTreeLeaf.new('id', 'In', [])
-                          ]
-                        )
-                      ]
-                    )
-                  ]
-                )
-              ),
-              Projection.new
+          it 'rewrite book primary key as an hex string' do
+            expect(@decorated_book.schema[:fields]['id']).to have_attributes(
+              is_primary_key: true,
+              column_type: 'String',
+              validations: [
+                { operator: Operators::MATCH, value: '/^[0-9a-f]+$/' },
+                { operator: Operators::LONGER_THAN, value: 31 },
+                { operator: Operators::SHORTER_THAN, value: 33 },
+                { operator: Operators::PRESENT }
+              ]
             )
-
-            expect(records).to eq([])
-            expect(@collection_category).not_to have_received(:list)
           end
 
-          it 'delete() should not be called with incompatible Equals' do
-            allow(@collection_category).to receive(:delete).and_return(nil)
-            category.delete(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'Equal', 12),
-                    Nodes::ConditionTreeLeaf.new('id', 'Equal', 13)
-                  ]
-                )
+          it 'rewrite book cover as datauri' do
+            expect(@decorated_book.schema[:fields]['cover']).to have_attributes(
+              column_type: 'String',
+              validations: [{ operator: Operators::MATCH, value: '/^data:.*;base64,.*/' }]
+            )
+          end
+
+          it 'rewrite book author picture but validation left alone' do
+            expect(@decorated_book.schema[:fields]['author']).to have_attributes(
+              column_type: { 'name' => 'String', 'picture' => 'String', 'tags' => ['String'] }
+            )
+          end
+
+          it 'rewrite book cover as hex string if requested' do
+            @decorated_book.set_binary_mode('cover', 'hex')
+
+            expect(@decorated_book.schema[:fields]['cover']).to have_attributes(
+              column_type: 'String',
+              validations: [{ operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }]
+            )
+          end
+        end
+
+        describe 'list with a simple filter' do
+          #  Build params (30303030 is the hex representation of 0000)
+          let(:condition_tree) { Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, '30303030') }
+          let(:filter) { Filter.new(condition_tree: condition_tree) }
+          let(:projection) { Projection.new(%w[id cover author:picture]) }
+
+          before do
+            allow(@collection_book).to receive(:list).and_return([book_record])
+          end
+
+          it 'refine filter when call list' do
+            @decorated_book.list(caller, filter, projection)
+
+            expect(@collection_book).to have_received(:list) do |_caller, filter, _projection|
+              expect(filter.condition_tree.to_h).to eq(
+                { field: 'id', operator: Operators::EQUAL, value: '0000' }
               )
-            )
-
-            expect(@collection_category).not_to have_received(:delete)
+            end
           end
 
-          it 'update() should not be called with incompatible Equal/In' do
-            allow(@collection_category).to receive(:update).and_return(nil)
-            category.update(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'Equal', 12),
-                    Nodes::ConditionTreeLeaf.new('id', 'In', [13])
-                  ]
-                )
-              ),
-              { label: 'new label' }
-            )
+          it 'transformed records when call list' do
+            records = @decorated_book.list(caller, filter, projection)
 
-            expect(@collection_category).not_to have_received(:update)
+            expect(records).to eq(
+              [
+                {
+                  'id' => '30303030',
+                  'cover' => 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
+                  'author' => {
+                    'name' => 'John Doe',
+                    'picture' => 'data:application/octet-stream;base64,MDAwMA==',
+                    'tags' => %w[tag1 tag2]
+                  }
+                }
+              ]
+            )
+          end
+        end
+
+        describe 'list with a more complex filter' do
+          #  Build params (30303030 is the hex representation of 0000)
+          let(:condition_tree) do
+            Nodes::ConditionTreeBranch.new(
+              'Or',
+              [
+                Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, '30303030'),
+                Nodes::ConditionTreeLeaf.new('id', Operators::IN, ['30303030']),
+                Nodes::ConditionTreeLeaf.new('title', Operators::EQUAL, 'Foundation'),
+                Nodes::ConditionTreeLeaf.new('title', Operators::LIKE, 'Found%'),
+                Nodes::ConditionTreeLeaf.new('cover', Operators::EQUAL, 'data:image/gif;base64,1234')
+              ]
+            )
+          end
+          let(:filter) { Filter.new(condition_tree: condition_tree) }
+          let(:projection) { Projection.new(%w[id cover author:picture]) }
+
+          before do
+            allow(@collection_book).to receive(:list).and_return([book_record])
           end
 
-          it 'aggregate() should not be called with incompatible Ins' do
-            allow(@collection_category).to receive(:aggregate).and_return([])
-            records = category.aggregate(
-              caller,
-              Filter.new(
-                condition_tree: Nodes::ConditionTreeBranch.new(
-                  'And',
-                  [
-                    Nodes::ConditionTreeLeaf.new('id', 'In', [34, 32]),
-                    Nodes::ConditionTreeLeaf.new('id', 'In', [13])
-                  ]
-                )
-              ),
-              aggregation
-            )
+          it 'refine filter when call list' do
+            @decorated_book.list(caller, filter, projection)
 
-            expect(records).to eq([])
-            expect(@collection_category).not_to have_received(:aggregate)
+            expect(@collection_book).to have_received(:list) do |_caller, filter, _projection|
+              expect(filter.condition_tree.to_h).to eq(
+                {
+                  aggregator: 'Or',
+                  conditions: [
+                    { field: 'id', operator: Operators::EQUAL, value: BinaryHelper.hex_to_bin('30303030') },
+                    { field: 'id', operator: Operators::IN, value: [BinaryHelper.hex_to_bin('30303030')] },
+                    { field: 'title', operator: Operators::EQUAL, value: 'Foundation' },
+                    { field: 'title', operator: Operators::LIKE, value: 'Found%' },
+                    { field: 'cover', operator: Operators::EQUAL, value: Base64.strict_decode64('1234') }
+                  ]
+                }
+              )
+            end
+          end
+        end
+
+        describe 'list from relations' do
+          #  Build params (30303030 is the hex representation of 0000)
+          let(:condition_tree) { Nodes::ConditionTreeLeaf.new('book:id', Operators::EQUAL, '30303030') }
+          let(:filter) { Filter.new(condition_tree: condition_tree) }
+          let(:projection) { Projection.new(%w[id book:id book:cover book:author:picture]) }
+
+          before do
+            allow(@collection_favorite).to receive(:list).and_return([favorite_record, { 'id' => 2, 'book' => nil }])
+          end
+
+          it 'refine filter when call list' do
+            @decorated_favorite.list(caller, filter, projection)
+
+            expect(@collection_favorite).to have_received(:list) do |_caller, filter, _projection|
+              expect(filter.condition_tree.to_h).to eq(
+                { field: 'book:id', operator: Operators::EQUAL, value: BinaryHelper.hex_to_bin('30303030') }
+              )
+            end
+          end
+
+          it 'transformed records when call list' do
+            records = @decorated_favorite.list(caller, filter, projection)
+
+            expect(records).to eq(
+              [
+                {
+                  'id' => 1,
+                  'book' => {
+                    'id' => '30303030',
+                    'cover' => 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==',
+                    'author' => {
+                      'name' => 'John Doe',
+                      'picture' => 'data:application/octet-stream;base64,MDAwMA==',
+                      'tags' => %w[tag1 tag2]
+                    }
+                  }
+                },
+                {
+                  'id' => 2,
+                  'book' => nil
+                }
+              ]
+            )
+          end
+        end
+
+        describe 'simple creation' do
+          let(:record) { { 'id' => '3030', 'cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
+
+          before do
+            allow(@collection_book).to receive(:create)
+              .and_return(
+                { 'id' => BinaryHelper.hex_to_bin('3030'), 'cover' => Base64.strict_decode64('aGVsbG8=') }
+              )
+          end
+
+          it 'transformed record when going to database' do
+            @decorated_book.create(caller, record)
+
+            expect(@collection_book).to have_received(:create) do |_caller, data|
+              expect(data).to eq(
+                { 'id' => BinaryHelper.hex_to_bin('3030'), 'cover' => Base64.strict_decode64('aGVsbG8=') }
+              )
+            end
+          end
+
+          it 'transformed record return for frontend' do
+            data = @decorated_book.create(caller, record)
+
+            expect(data).to eq(record)
+          end
+        end
+
+        describe 'simple update' do
+          let(:patch) { { 'cover' => 'data:image/gif;base64,aGVsbG8=' } }
+
+          it 'transformed patch when going to database' do
+            @decorated_book.update(caller, Filter.new, { 'cover' => 'data:image/gif;base64,aGVsbG8=' })
+
+            expect(@collection_book).to have_received(:update) do |_caller, _filter, data|
+              expect(data).to eq(
+                { 'cover' => Base64.strict_decode64('aGVsbG8=') }
+              )
+            end
+          end
+        end
+
+        describe 'aggregation with binary groups' do
+          it 'transformed groups in result' do
+            aggregation = Aggregation.new(operation: 'Count', field: 'title', groups: [{ field: 'cover' }])
+            allow(@collection_book).to receive(:aggregate)
+              .and_return([{ value: 1, group: { 'cover' => Base64.strict_decode64('aGVsbG8=') } }])
+            result = @decorated_book.aggregate(caller, Filter.new, aggregation)
+
+            expect(result).to eq(
+              [
+                { value: 1, group: { 'cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
+              ]
+            )
+          end
+        end
+
+        describe 'aggregation from a relation' do
+          it 'transformed groups in result' do
+            aggregation = Aggregation.new(operation: 'Count', field: 'title', groups: [{ field: 'book:cover' }])
+            allow(@collection_favorite).to receive(:aggregate)
+              .and_return([{ value: 1, group: { 'book:cover' => Base64.strict_decode64('aGVsbG8=') } }])
+            result = @decorated_favorite.aggregate(caller, Filter.new, aggregation)
+
+            expect(result).to eq(
+              [
+                { value: 1, group: { 'book:cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
+              ]
+            )
           end
         end
       end
