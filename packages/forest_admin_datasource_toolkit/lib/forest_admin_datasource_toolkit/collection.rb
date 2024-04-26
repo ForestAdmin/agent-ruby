@@ -1,7 +1,5 @@
 module ForestAdminDatasourceToolkit
   class Collection < Components::Contracts::CollectionContract
-    attr_accessor :segments
-
     attr_reader :actions,
                 :datasource,
                 :name,
@@ -17,10 +15,10 @@ module ForestAdminDatasourceToolkit
         fields: {},
         countable: false,
         searchable: false,
-        charts: []
+        charts: [],
+        segments: {}
       }
       @actions = {}
-      @segments = {}
     end
 
     def enable_count

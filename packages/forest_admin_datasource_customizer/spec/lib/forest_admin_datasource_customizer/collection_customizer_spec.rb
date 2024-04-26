@@ -12,8 +12,7 @@ module ForestAdminDatasourceCustomizer
     include_context 'with caller'
     before do
       datasource = Datasource.new
-      collection_book = instance_double(
-        Collection,
+      collection_book = collection_build(
         name: 'book',
         schema: {
           charts: [],
@@ -40,8 +39,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_book_person = instance_double(
-        Collection,
+      collection_book_person = collection_build(
         name: 'book_person',
         schema: {
           charts: [],
@@ -63,8 +61,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_person = instance_double(
-        Collection,
+      collection_person = collection_build(
         name: 'person',
         schema: {
           charts: [],
@@ -89,8 +86,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_category = instance_double(
-        Collection,
+      collection_category = collection_build(
         name: 'category',
         schema: {
           charts: [],
@@ -484,6 +480,23 @@ module ForestAdminDatasourceCustomizer
         hook_collection = @datasource_customizer.stack.hook.get_collection('book')
 
         expect(hook_collection.hooks['list'].before.first).to eq(handler)
+      end
+    end
+
+    context 'when using add_segment' do
+      it 'add a segment' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.segment).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.segment.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        definition = proc { Nodes::ConditionTreeLeaf.new('title', Operators::EQUAL, 'foo') }
+        customizer.add_segment('foo_segment', definition)
+        stack.apply_queued_customizations({})
+        segment_collection = @datasource_customizer.stack.segment.get_collection('book')
+
+        expect(segment_collection.segments).to have_key('foo_segment')
+        expect(segment_collection.segments['foo_segment']).to eq(definition)
       end
     end
   end

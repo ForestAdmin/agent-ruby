@@ -238,6 +238,18 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.hook.get_collection(@name).add_hook(position, type, handler) }
     end
 
+    # Add a new segment on the collection.
+    # @param name the name of the segment
+    # @param definition a function used to generate a condition tree or a condition tree
+    # @example
+    # .add_segment(
+    #    'Wrote more than 2 books',
+    #   { field: 'booksCount', operator: 'GreaterThan', value: 2 }
+    # );
+    def add_segment(name, definition)
+      push_customization { @stack.segment.get_collection(@name).add_segment(name, definition) }
+    end
+
     private
 
     def push_customization(&customization)
