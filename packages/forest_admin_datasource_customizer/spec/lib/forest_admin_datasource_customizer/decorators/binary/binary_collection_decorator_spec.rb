@@ -297,12 +297,12 @@ module ForestAdminDatasourceCustomizer
           it 'transformed groups in result' do
             aggregation = Aggregation.new(operation: 'Count', field: 'title', groups: [{ field: 'cover' }])
             allow(@collection_book).to receive(:aggregate)
-              .and_return([{ value: 1, group: { 'cover' => Base64.strict_decode64('aGVsbG8=') } }])
+              .and_return([{ 'value' => 1, 'group' => { 'cover' => Base64.strict_decode64('aGVsbG8=') } }])
             result = @decorated_book.aggregate(caller, Filter.new, aggregation)
 
             expect(result).to eq(
               [
-                { value: 1, group: { 'cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
+                { 'value' => 1, 'group' => { 'cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
               ]
             )
           end
@@ -312,12 +312,12 @@ module ForestAdminDatasourceCustomizer
           it 'transformed groups in result' do
             aggregation = Aggregation.new(operation: 'Count', field: 'title', groups: [{ field: 'book:cover' }])
             allow(@collection_favorite).to receive(:aggregate)
-              .and_return([{ value: 1, group: { 'book:cover' => Base64.strict_decode64('aGVsbG8=') } }])
+              .and_return([{ 'value' => 1, 'group' => { 'book:cover' => Base64.strict_decode64('aGVsbG8=') } }])
             result = @decorated_favorite.aggregate(caller, Filter.new, aggregation)
 
             expect(result).to eq(
               [
-                { value: 1, group: { 'book:cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
+                { 'value' => 1, 'group' => { 'book:cover' => 'data:application/octet-stream;base64,aGVsbG8=' } }
               ]
             )
           end

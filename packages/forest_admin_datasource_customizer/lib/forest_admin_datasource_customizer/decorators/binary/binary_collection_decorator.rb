@@ -80,8 +80,8 @@ module ForestAdminDatasourceCustomizer
           rows = super
           rows.map! do |row|
             {
-              value: row[:value],
-              group: row[:group].to_h { |path, value| [path, convert_value(false, path, value)] }
+              'value' => row['value'],
+              'group' => row['group'].to_h { |path, value| [path, convert_value(false, path, value)] }
             }
           end
         end
