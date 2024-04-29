@@ -1,4 +1,5 @@
 require 'base64'
+require 'marcel'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -170,7 +171,7 @@ module ForestAdminDatasourceCustomizer
           return BinaryHelper.bin_to_hex(value) if use_hex
 
           data = Base64.strict_encode64(value)
-          mime = BinaryHelper.detect_mime_type(data)
+          mime = Marcel::MimeType.for StringIO.new(value)
 
           "data:#{mime};base64,#{data}"
         end
