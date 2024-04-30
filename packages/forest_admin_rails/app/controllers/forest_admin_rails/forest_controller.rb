@@ -47,10 +47,10 @@ module ForestAdminRails
         }
 
         data[:errors][0][:data] = exception.try(:data)
+      end
 
-        # TODO: IMPLEMENT LOGGING
-        # if Facades::Container.cache(:is_production)
-        # end
+      unless Facades::Container.cache(:is_production)
+        ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
       end
 
       render json: data, status: exception.try(:status)

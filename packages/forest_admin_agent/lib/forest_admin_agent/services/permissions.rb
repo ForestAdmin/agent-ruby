@@ -32,8 +32,7 @@ module ForestAdminAgent
 
         cache.delete(id_cache) unless cache.get(id_cache).nil?
 
-        # TODO: HANDLE LOGGER
-        # logger.debug("Invalidating #{id_cache} cache..")
+        ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
       end
 
       def can?(action, collection, allow_fetch: false)
@@ -66,13 +65,17 @@ module ForestAdminAgent
 
         # still not allowed - throw forbidden message
         unless is_allowed
-          # TODO: HANDLE LOGGER
-          # logger.debug("User #{caller.id} cannot retrieve chart on rendering #{caller.rendering_id}")
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "User #{caller.id} cannot retrieve chart on rendering #{caller.rendering_id}"
+          )
           raise ForbiddenError, "You don't have permission to access this collection."
         end
 
-        # TODO: HANDLE LOGGER
-        # logger.debug("User #{caller.id} can retrieve chart on rendering #{caller.rendering_id}")
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Debug',
+          "User #{caller.id} can retrieve chart on rendering #{caller.rendering_id}"
+        )
 
         is_allowed
       end
@@ -93,8 +96,10 @@ module ForestAdminAgent
         )
 
         smart_action_approval.can_execute?
-        # TODO: HANDLE LOGGER
-        # logger.debug("User #{user_data[:roleId]} is #{is_allowed ? '' : 'not'} allowed to perform #{action['name']}")
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Debug',
+          "User #{user_data[:roleId]} is #{is_allowed ? "" : "not"} allowed to perform #{action["name"]}"
+        )
       end
 
       def get_scope(collection)
@@ -120,8 +125,7 @@ module ForestAdminAgent
             users[user[:id].to_s] = user
           end
 
-          # TODO: HANDLE LOGGER
-          # logger.debug('Refreshing user permissions cache')
+          ForestAdminAgent::Facades::Container.logger.log('Debug', 'Refreshing user permissions cache')
 
           users
         end[user_id.to_s]
@@ -146,8 +150,7 @@ module ForestAdminAgent
             collections[name] = decode_crud_permissions(collection).merge(decode_action_permissions(collection))
           end
 
-          # TODO: HANDLE LOGGER
-          # logger.debug('Fetching environment permissions')
+          ForestAdminAgent::Facades::Container.logger.log('Debug', 'Fetching environment permissions')
 
           collections
         end
@@ -164,8 +167,10 @@ module ForestAdminAgent
             stat_hash << "#{stat[:type]}:#{array_hash(stat)}"
           end
 
-          # TODO: HANDLE LOGGER
-          # logger.debug("Loading rendering permissions for rendering #{rendering_id}")
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "Loading rendering permissions for rendering #{rendering_id}"
+          )
 
           stat_hash
         end

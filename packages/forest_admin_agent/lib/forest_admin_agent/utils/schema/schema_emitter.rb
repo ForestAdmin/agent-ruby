@@ -15,7 +15,11 @@ module ForestAdminAgent
             schema = if schema_path && File.exist?(schema_path)
                        JSON.parse(File.read(schema_path), { symbolize_names: true })
                      else
-                       # TODO: Logger::log('Warn', 'The .forestadmin-schema.json file doesn\'t exist')
+                       ForestAdminAgent::Facades::Container.logger.log(
+                         'Warn',
+                         'The .forestadmin-schema.json file doesn\'t exist'
+                       )
+
                        {
                          meta: meta(Digest::SHA1.hexdigest('')),
                          collections: {}
