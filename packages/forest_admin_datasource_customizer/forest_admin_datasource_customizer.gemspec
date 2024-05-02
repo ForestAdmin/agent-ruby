@@ -34,5 +34,6 @@ admin work on any Ruby application."
   spec.require_paths = ["lib"]
 
   spec.add_dependency "activesupport", ">= 6.1"
+  spec.add_dependency 'marcel', '~> 1.0', '>= 1.0.4'
   spec.add_dependency "zeitwerk", "~> 2.3"
 end

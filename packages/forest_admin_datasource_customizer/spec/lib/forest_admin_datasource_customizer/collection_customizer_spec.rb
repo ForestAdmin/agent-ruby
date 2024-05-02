@@ -19,6 +19,7 @@ module ForestAdminDatasourceCustomizer
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
             'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
+            'picture' => ColumnSchema.new(column_type: 'Binary'),
             'reference' => ColumnSchema.new(column_type: 'String'),
             'child_id' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::IN]),
             'author_id' => ColumnSchema.new(column_type: 'Number', is_read_only: true, is_sortable: true, filter_operators: [Operators::EQUAL, Operators::IN]),
@@ -497,6 +498,21 @@ module ForestAdminDatasourceCustomizer
 
         expect(segment_collection.segments).to have_key('foo_segment')
         expect(segment_collection.segments['foo_segment']).to eq(definition)
+      end
+    end
+
+    context 'when using replace_field_binary_mode' do
+      it 'replace binary mode on field' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(@datasource_customizer.stack.binary.get_collection('book')).to receive(:set_binary_mode)
+        allow(stack.binary).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.binary.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.replace_field_binary_mode('picture', 'datauri')
+        stack.apply_queued_customizations({})
+
+        expect(@datasource_customizer.stack.binary.get_collection('book')).to have_received(:set_binary_mode)
       end
     end
   end

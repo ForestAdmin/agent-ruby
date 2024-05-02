@@ -22,6 +22,15 @@ module ForestAdminDatasourceCustomizer
 
           ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_name(name, new_name)
 
+          # Revert previous renaming (avoids conflicts and need to recurse on @to_child_collection).
+          if to_child_collection[current_name]
+            child_name = to_child_collection[current_name]
+            to_child_collection.delete(current_name)
+            from_child_collection.delete(child_name)
+            initial_name = child_name
+            mark_all_schema_as_dirty
+          end
+
           # Do not update arrays if renaming is a no-op (ie: customer is cancelling a previous rename)
           return unless initial_name != new_name
 

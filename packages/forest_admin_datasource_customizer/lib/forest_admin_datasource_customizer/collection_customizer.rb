@@ -250,6 +250,21 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.segment.get_collection(@name).add_segment(name, definition) }
     end
 
+    # Choose how binary data should be transported to the GUI.
+    # By default, all fields are transported as 'datauri', with the exception of primary and foreign
+    # keys.
+    #
+    # Using 'datauri' allows to use the FilePicker widget, while 'hex' is more suitable for
+    # short binary data (for instance binary uuids).
+    #
+    # @param name the name of the field
+    # @param binary_mode either 'datauri' or 'hex'
+    # @example
+    # .replace_field_binary_mode('avatar', 'datauri');
+    def replace_field_binary_mode(name, binary_mode)
+      push_customization { @stack.binary.get_collection(@name).set_binary_mode(name, binary_mode) }
+    end
+
     private
 
     def push_customization(&customization)

@@ -36,7 +36,7 @@ module ForestAdminRails
       Rails.application.eager_load!
 
       # setup agent
-      Dir[Rails.root.join('lib', 'forest_admin_rails', '*.rb')].each { |file| require file }
+      Dir[Rails.root.join('lib', 'forest_admin_rails', '**', '*.rb')].each { |file| require file }
 
       ForestAdminRails::CreateAgent.setup!
 
