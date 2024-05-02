@@ -1,3 +1,11 @@
+# [1.0.0-beta.44](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.43...v1.0.0-beta.44) (2024-05-02)
+
+
+### Features
+
+* add binary decorator support ([#42](https://github.com/ForestAdmin/agent-ruby/issues/42)) ([0e03047](https://github.com/ForestAdmin/agent-ruby/commit/0e0304753337fb8034ed2250d2c3d0a7b537b52e))
+* add segment decorator support ([#41](https://github.com/ForestAdmin/agent-ruby/issues/41)) ([3b4e437](https://github.com/ForestAdmin/agent-ruby/commit/3b4e437460d7ac7d0c2eda291ddde241cff0fce9))
+
 # [1.0.0-beta.43](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.42...v1.0.0-beta.43) (2024-04-12)
 
 
