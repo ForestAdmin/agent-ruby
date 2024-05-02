@@ -22,11 +22,19 @@ module ForestAdminRails
   class Engine < ::Rails::Engine
     isolate_namespace ForestAdminRails
 
+    extend ActiveSupport::Concern
+
+    initializer 'forest_admin_rails.error_subscribe' do
+      Rails.error.subscribe(ForestAdminErrorSubscriber.new)
+    end
+
     config.after_initialize do
-      agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
-      agent_factory.setup(ForestAdminRails.config)
-      load_configuration
-      load_cors
+      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
+        agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+        agent_factory.setup(ForestAdminRails.config)
+        load_configuration
+        load_cors
+      end
     end
 
     def load_configuration
