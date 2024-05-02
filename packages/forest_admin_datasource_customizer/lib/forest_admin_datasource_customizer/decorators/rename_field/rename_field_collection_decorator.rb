@@ -22,7 +22,7 @@ module ForestAdminDatasourceCustomizer
 
           ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_name(name, new_name)
 
-          # Revert previous renaming (avoids conflicts and need to recurse on this.toSubCollection).
+          # Revert previous renaming (avoids conflicts and need to recurse on @to_child_collection).
           if to_child_collection[current_name]
             child_name = to_child_collection[current_name]
             to_child_collection.delete(current_name)

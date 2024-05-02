@@ -260,7 +260,7 @@ module ForestAdminDatasourceCustomizer
     # @param name the name of the field
     # @param binary_mode either 'datauri' or 'hex'
     # @example
-    # .replaceFieldBinaryMode('avatar', 'datauri');
+    # .replace_field_binary_mode('avatar', 'datauri');
     def replace_field_binary_mode(name, binary_mode)
       push_customization { @stack.binary.get_collection(@name).set_binary_mode(name, binary_mode) }
     end
