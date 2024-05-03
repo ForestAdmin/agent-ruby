@@ -1,3 +1,10 @@
+# [1.0.0-beta.45](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.44...v1.0.0-beta.45) (2024-05-03)
+
+
+### Features
+
+* add logs in dev mode ([#43](https://github.com/ForestAdmin/agent-ruby/issues/43)) ([da941af](https://github.com/ForestAdmin/agent-ruby/commit/da941af365b1ca48832eaa32c7cf29880a5a66b7))
+
 # [1.0.0-beta.44](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.43...v1.0.0-beta.44) (2024-05-02)
 
 
