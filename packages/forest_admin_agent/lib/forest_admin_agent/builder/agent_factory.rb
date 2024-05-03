@@ -49,7 +49,6 @@ module ForestAdminAgent
                          @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
 
         if !schema_is_know || force
-          #   Logger::log('Info', 'schema was updated, sending new version');
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
           client.post('/forest/apimaps', schema.to_json)
           schema_file_hash_cache = FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA)
@@ -57,9 +56,10 @@ module ForestAdminAgent
             schema[:meta][:schemaFileHash]
           end
           @container.register(:schema_file_hash, schema_file_hash_cache)
+          ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
         else
           @container.resolve(:logger)
-          # TODO:  Logger::log('Info', 'Schema was not updated since last run');
+          ForestAdminAgent::Facades::Container.logger.log('Info', 'Schema was not updated since last run')
         end
       end
 
