@@ -1,5 +1,7 @@
 module ForestAdminRails
   class ForestController < ActionController::Base
+    include ForestAdminAgent::Http::ErrorHandling
+
     skip_forgery_protection
 
     def index
@@ -43,7 +45,7 @@ module ForestAdminRails
           errors: [
             {
               name: exception.name,
-              detail: exception.message,
+              detail: get_error_message(exception),
               status: exception.try(:status)
             }
           ]
