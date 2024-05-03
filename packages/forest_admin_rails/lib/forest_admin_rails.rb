@@ -24,6 +24,7 @@ module ForestAdminRails
   setting :project_dir, default: Dir.pwd
   setting :loggerLevel, default: 'info'
   setting :logger, default: nil
+  setting :customize_error_message, default: nil
   setting :instant_cache_refresh, default: Rails.env.production?
 
   if defined?(Rails::Railtie)
