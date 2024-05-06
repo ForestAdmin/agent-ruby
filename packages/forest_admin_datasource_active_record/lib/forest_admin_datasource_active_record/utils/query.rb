@@ -21,6 +21,16 @@ module ForestAdminDatasourceActiveRecord
       def apply_filter
         @query = apply_condition_tree(@filter.condition_tree) unless @filter.condition_tree.nil?
         @query = apply_pagination(@filter.page) unless @filter.page.nil?
+        @query = apply_sort(@filter.sort) unless @filter.sort.nil?
+
+        @query
+      end
+
+      def apply_sort(sort)
+        sort.each do |sort_clause|
+          field = format_field(sort_clause[:field])
+          @query = @query.order(field => sort_clause[:ascending] ? :asc : :desc)
+        end
 
         @query
       end

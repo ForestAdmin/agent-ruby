@@ -489,6 +489,33 @@ module ForestAdminAgent
             "🌳🌳🌳 Column not found: 'User.fieldThatDoNotExist'"
           )
         end
+
+        describe 'when sending multiple sort' do
+          it 'returns the sort clauses' do
+            args = {
+              params: {
+                sort: 'name,-id'
+              }
+            }
+
+            expect(described_class.parse_sort(collection_user, args)).to eq([{ field: 'name', ascending: true }, { field: 'id', ascending: false }])
+          end
+
+          it 'throws a ValidationError when one of the sorting field is invalid' do
+            args = {
+              params: {
+                sort: 'name,-fieldThatDoesNotExist'
+              }
+            }
+
+            expect do
+              described_class.parse_sort(collection_user, args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Column not found: \'User.fieldThatDoesNotExist\''
+            )
+          end
+        end
       end
     end
   end
