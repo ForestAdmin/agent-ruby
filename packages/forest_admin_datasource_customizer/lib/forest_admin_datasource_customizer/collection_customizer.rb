@@ -285,6 +285,18 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.binary.get_collection(@name).set_binary_mode(name, binary_mode) }
     end
 
+    def override_create(handler)
+      push_customization { @stack.override.get_collection(@name).add_create_handler(handler) }
+    end
+
+    def override_update(handler)
+      push_customization { @stack.override.get_collection(@name).add_update_handler(handler) }
+    end
+
+    def override_delete(handler)
+      push_customization { @stack.override.get_collection(@name).add_delete_handler(handler) }
+    end
+
     private
 
     def push_customization(&customization)
