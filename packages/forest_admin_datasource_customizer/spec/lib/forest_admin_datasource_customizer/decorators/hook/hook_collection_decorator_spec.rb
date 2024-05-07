@@ -13,7 +13,6 @@ module ForestAdminDatasourceCustomizer
         subject(:hook_collection_decorator) { described_class }
 
         let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
-        let(:category) { @datasource_decorator.get_collection('category') }
         let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
 
         before do
