@@ -68,43 +68,18 @@ module ForestAdminDatasourceCustomizer
         end
 
         context 'when setting up override' do
-          # describe('on create', () => {
-          #       test('it should call the handler', async () => {
-          #         const spy = jest.spyOn(transactions, 'create');
-          #         const handler = jest.fn();
-          #
-          #         const currentCaller = factories.caller.build();
-          #         const currentData = [factories.recordData.build()];
-          #         const context = new CreateOverrideCustomizationContext(
-          #           transactions,
-          #           currentCaller,
-          #           currentData,
-          #         );
-          #
-          #         decoratedTransactions.addCreateHandler(handler);
-          #         await decoratedTransactions.create(currentCaller, currentData);
-          #
-          #         expect(spy).not.toHaveBeenCalled();
-          #         expect(handler).toHaveBeenCalledTimes(1);
-          #
-          #         const handlerArguments = handler.mock.calls[0][0];
-          #         expect(handlerArguments.caller).toEqual(context.caller);
-          #         expect(handlerArguments.data).toEqual(context.data);
-          #       });
-          #     });
-
           context 'when create' do
             it 'calls the handler' do
               handler = instance_double(Proc, call: nil)
               Context::CreateOverrideCustomizationContext.new(@decorated_transaction, caller, [])
-              # handler = Proc.new do |context|
-              #   expect(context.caller).to eq(caller)
-              # end
 
               @decorated_transaction.add_create_handler(handler)
               @decorated_transaction.create(caller, [])
 
-              expect(handler).to have_received(:call).once
+              expect(handler).to have_received(:call).once do |context|
+                expect(context.caller).to eq(caller)
+                expect(context.data).to eq([])
+              end
             end
           end
 
@@ -115,7 +90,11 @@ module ForestAdminDatasourceCustomizer
               @decorated_transaction.add_update_handler(handler)
               @decorated_transaction.update(caller, Filter.new, [])
 
-              expect(handler).to have_received(:call).once
+              expect(handler).to have_received(:call).once do |context|
+                expect(context.caller).to eq(caller)
+                expect(context.filter).to be_a(Filter)
+                expect(context.patch).to eq([])
+              end
             end
           end
 
@@ -126,7 +105,10 @@ module ForestAdminDatasourceCustomizer
               @decorated_transaction.add_delete_handler(handler)
               @decorated_transaction.delete(caller, Filter.new)
 
-              expect(handler).to have_received(:call).once
+              expect(handler).to have_received(:call).once do |context|
+                expect(context.caller).to eq(caller)
+                expect(context.filter).to be_a(Filter)
+              end
             end
           end
         end
