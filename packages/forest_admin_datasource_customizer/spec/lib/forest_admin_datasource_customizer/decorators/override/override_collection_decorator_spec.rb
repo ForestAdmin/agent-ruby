@@ -71,7 +71,6 @@ module ForestAdminDatasourceCustomizer
           context 'when create' do
             it 'calls the handler' do
               handler = instance_double(Proc, call: nil)
-              Context::CreateOverrideCustomizationContext.new(@decorated_transaction, caller, [])
 
               @decorated_transaction.add_create_handler(handler)
               @decorated_transaction.create(caller, [])
