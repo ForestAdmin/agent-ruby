@@ -1,5 +1,4 @@
 require 'ipaddress'
-require 'net/http'
 
 module ForestAdminAgent
   module Services
@@ -8,15 +7,19 @@ module ForestAdminAgent
       RULE_MATCH_RANGE = 1
       RULE_MATCH_SUBNET = 2
 
+      attr_reader :forest_api
+
       def initialize
-        fetch_rules
+        @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
       end
 
       def use_ip_whitelist
+        fetch_rules if @use_ip_whitelist.nil?
         @use_ip_whitelist ||= false
       end
 
       def rules
+        fetch_rules if @rules.nil?
         @rules ||= []
       end
 
@@ -82,18 +85,23 @@ module ForestAdminAgent
       private
 
       def fetch_rules
-        response = Net::HTTP.get_response(
-          URI("#{Facades::Container.cache(:forest_server_url)}/liana/v1/ip-whitelist-rules"),
-          { 'Content-Type' => 'application/json', 'forest-secret-key' => Facades::Container.cache(:env_secret) }
-        )
+        # response = Net::HTTP.get_response(
+        #   URI("#{Facades::Container.cache(:forest_server_url)}/liana/v1/ip-whitelist-rules"),
+        #   { 'Content-Type' => 'application/json', 'forest-secret-key' => Facades::Container.cache(:env_secret) }
+        # )
+        #
+        # raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED unless response.is_a?(Net::HTTPSuccess)
 
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED unless response.is_a?(Net::HTTPSuccess)
+        # client = ForestAdminAgent::Http::ForestAdminApiRequester.new
+        response = forest_api.get('/liana/v1/ip-whitelist-rules')
 
         body = JSON.parse(response.body)
         ip_whitelist_data = body['data']['attributes']
 
         @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
         @rules = ip_whitelist_data['rules']
+      rescue StandardError
+        raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
       end
     end
   end
