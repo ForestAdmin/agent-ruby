@@ -9,7 +9,7 @@ module ForestAdminRails
         @env_secret = env_secret
         template 'initializers/config.rb', 'config/initializers/forest_admin_rails.rb'
         template 'create_agent.rb', 'lib/forest_admin_rails/create_agent.rb'
-        route "mount ForestAdminRails::Engine => '/#{ForestAdminRails.config[:prefix]}'"
+        route %(mount ForestAdminRails::Engine => "#{ForestAdminRails.config[:prefix]}")
       end
     end
   end
