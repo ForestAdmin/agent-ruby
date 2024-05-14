@@ -2,10 +2,12 @@ module ForestAdminAgent
   module Http
     module ErrorHandling
       def get_error_message(error)
-        return error.message if error.ancestors.include? ForestAdminAgent::Http::Exceptions::HttpException
+        if error.respond_to?(:ancestors) && error.ancestors.include?(ForestAdminAgent::Http::Exceptions::HttpException)
+          return error.message
+        end
 
         if (customizer = ForestAdminAgent::Facades::Container.cache(:customize_error_message))
-          message = customizer.call(error)
+          message = eval(customizer).call(error)
           return message if message
         end
 

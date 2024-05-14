@@ -74,6 +74,14 @@ module ForestAdminAgent
         return unless @has_env_secret
 
         cache = @container.resolve(:cache)
+        @options.customize_error_message = @options.customize_error_message
+                                                   &.source
+                                                   &.strip
+                                                   &.delete_prefix('config.customize_error_message =')
+                                                   &.strip
+
+        @options.logger = @options.logger&.source&.strip&.delete_prefix('config.logger =')&.strip
+
         cache.set('config', @options.to_h)
       end
 

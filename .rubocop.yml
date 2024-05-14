@@ -279,3 +279,7 @@ Layout/LineLength:
 RSpec/MultipleMemoizedHelpers:
   Max: 10
 
+Security/Eval:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/http/error_handling.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/services/logger_service.rb'

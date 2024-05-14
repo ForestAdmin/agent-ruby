@@ -21,7 +21,7 @@ module ForestAdminAgent
 
       def log(level, message)
         if @logger
-          @logger.call(get_level(level), message)
+          eval(@logger).call(get_level(level), message)
         else
           @default_logger.add(get_level(level), message)
         end
