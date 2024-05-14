@@ -13,7 +13,8 @@ module ForestAdminAgent
         @client = Faraday.new(
           Facades::Container.cache(:forest_server_url),
           {
-            headers: @headers
+            headers: @headers,
+            ssl: { verify: !Facades::Container.cache(:debug) }
           }
         )
       end
