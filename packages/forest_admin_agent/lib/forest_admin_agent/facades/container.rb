@@ -6,7 +6,9 @@ module ForestAdminAgent
       end
 
       def self.datasource
-        instance.resolve(:datasource)
+        instance.resolve(:datasource) do
+          ForestAdminDatasourceToolkit::Datasource.new
+        end
       end
 
       def self.logger

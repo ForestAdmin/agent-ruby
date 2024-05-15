@@ -8,8 +8,8 @@ module ForestAdminRails
         @auth_secret = SecureRandom.hex(20)
         @env_secret = env_secret
         template 'initializers/config.rb', 'config/initializers/forest_admin_rails.rb'
-        template 'create_agent.rb', 'lib/forest_admin_rails/create_agent.rb'
-        route %(mount ForestAdminRails::Engine => "#{ForestAdminRails.config[:prefix]}")
+        template 'create_agent.rb', 'app/lib/forest_admin_rails/create_agent.rb'
+        route 'mount ForestAdminRails::Engine => "#{ForestAdminRails.config[:prefix]}"'
       end
     end
   end
