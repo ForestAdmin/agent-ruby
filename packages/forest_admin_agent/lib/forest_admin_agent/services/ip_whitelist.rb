@@ -85,14 +85,6 @@ module ForestAdminAgent
       private
 
       def fetch_rules
-        # response = Net::HTTP.get_response(
-        #   URI("#{Facades::Container.cache(:forest_server_url)}/liana/v1/ip-whitelist-rules"),
-        #   { 'Content-Type' => 'application/json', 'forest-secret-key' => Facades::Container.cache(:env_secret) }
-        # )
-        #
-        # raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED unless response.is_a?(Net::HTTPSuccess)
-
-        # client = ForestAdminAgent::Http::ForestAdminApiRequester.new
         response = forest_api.get('/liana/v1/ip-whitelist-rules')
 
         body = JSON.parse(response.body)
