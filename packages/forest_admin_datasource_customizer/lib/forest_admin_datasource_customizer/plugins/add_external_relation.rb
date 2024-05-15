@@ -4,7 +4,7 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceCustomizer::Decorators::Computed
 
-      def run(_datasource_customizer, collection_customizer = nil, options = [])
+      def run(_datasource_customizer, collection_customizer = nil, options = {})
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection_customizer.collection)
 
         unless options.key?(:name) && options.key?(:schema) && options.key?(:listRecords)
