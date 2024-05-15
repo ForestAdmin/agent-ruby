@@ -106,15 +106,24 @@ module ForestAdminAgent
       end
 
       def self.parse_sort(collection, args)
-        sort_string = args.dig(:params, :sort)
+        raw_sort_string = args.dig(:params, :sort)
 
-        return SortUtils::SortFactory.by_primary_keys(collection) unless sort_string
+        return SortUtils::SortFactory.by_primary_keys(collection) unless raw_sort_string
 
-        sort = Sort.new([
-                          { field: sort_string.gsub(/^-/, '').tr('.', ':'), ascending: !sort_string.start_with?('-') }
-                        ])
+        sort_list = []
+        raw_sort_string.split(',').map do |sort_string|
+          field = sort_string.tr('.', ':')
+          ascending = !sort_string.start_with?('-')
+          field = field[1..] unless ascending
+
+          sort_list.push({ field: field, ascending: ascending })
+        end
+
+        sort = Sort.new(sort_list)
 
         ForestAdminDatasourceToolkit::Validations::SortValidator.validate(collection, sort)
+
+        sort
       end
     end
   end
