@@ -1,3 +1,10 @@
+# [1.0.0-beta.46](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.45...v1.0.0-beta.46) (2024-05-15)
+
+
+### Features
+
+* support multi field sorting from frontend ([#44](https://github.com/ForestAdmin/agent-ruby/issues/44)) ([eadde5d](https://github.com/ForestAdmin/agent-ruby/commit/eadde5d9d53ca56bbaf3f139780041e114f7c8a6))
+
 # [1.0.0-beta.45](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.44...v1.0.0-beta.45) (2024-05-03)
 
 
