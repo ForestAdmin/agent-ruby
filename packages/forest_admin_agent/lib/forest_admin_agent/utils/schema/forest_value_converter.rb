@@ -29,19 +29,20 @@ module ForestAdminAgent
 
         def self.make_form_data_from_fields(datasource, fields)
           data = {}
-          fields.each_value do |field|
-            next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(field.field)
 
-            if field.reference && field.value
-              collection_name = field.reference.split('.').first
+          fields.each do |field|
+            next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(field['field'])
+
+            if field['reference'] && field['value']
+              collection_name = field['reference'].split('.').first
               collection = datasource.get_collection(collection_name)
-              data[field.field] = Utils::Id.unpack_id(collection, field.value)
-            elsif field.type == 'File'
-              data[field.field] = parse_data_uri(field.value)
-            elsif field.type.is_a?(Array) && field.type[0] == 'File'
-              data[field.field] = field.value.map { |v| parse_data_uri(v) }
+              data[field['field']] = Utils::Id.unpack_id(collection, field['value'])
+            elsif field['type'] == 'File'
+              data[field['field']] = parse_data_uri(field['value'])
+            elsif field['type'].is_a?(Array) && field['type'][0] == 'File'
+              data[field['field']] = field['value'].map { |v| parse_data_uri(v) }
             else
-              data[field.field] = field.value
+              data[field['field']] = field['value']
             end
           end
 
@@ -83,7 +84,7 @@ module ForestAdminAgent
 
           return field.value.select { |v| field.enum_values.include?(v) } if ActionFields.enum_list_field?(field)
 
-          return field.value.join('|') if ActionFields.collection_field?(field)
+          return field.value&.join('|') if ActionFields.collection_field?(field)
 
           # return make_data_uri(field.value) if ActionFields.file_field?(field)
           #

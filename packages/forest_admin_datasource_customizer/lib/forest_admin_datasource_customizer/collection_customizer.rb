@@ -285,6 +285,8 @@ module ForestAdminDatasourceCustomizer
 
     def push_customization(&customization)
       @stack.queue_customization(customization)
+
+      self
     end
 
     def push_relation(name, definition)

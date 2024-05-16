@@ -80,7 +80,7 @@ module ForestAdminAgent
             data,
             filter,
             {
-              change_field: nil,
+              change_field: args.dig(:params, :data, :attributes, :changed_field),
               search_field: nil,
               search_values: {},
               includeHiddenFields: false

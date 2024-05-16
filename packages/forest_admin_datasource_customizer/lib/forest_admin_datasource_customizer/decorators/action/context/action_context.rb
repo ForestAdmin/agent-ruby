@@ -5,7 +5,7 @@ module ForestAdminDatasourceCustomizer
         class ActionContext < ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext
           include ForestAdminDatasourceToolkit
 
-          attr_reader :filter, :used
+          attr_reader :filter, :used, :form_values
 
           def initialize(collection, caller, form_values, filter, used = [], change_field = nil)
             super(collection, caller)
@@ -45,6 +45,10 @@ module ForestAdminDatasourceCustomizer
 
             records.map { |record| Utils::Record.primary_keys(@real_collection, record) }
           end
+
+          alias get_record_ids record_ids
+          alias get_composite_record_ids composite_record_ids
+          alias has_field_changed field_changed?
         end
       end
     end

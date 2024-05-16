@@ -59,7 +59,7 @@ module ForestAdminAgent
 
           if ActionFields.collection_field?(field)
             collection = datasource.get_collection(field.collection_name)
-            pk = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
+            pk = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)[0]
             pk_schema = collection.schema[:fields][pk]
 
             output[:type] = pk_schema.column_type
@@ -82,6 +82,7 @@ module ForestAdminAgent
             return DEFAULT_FIELDS unless action.static_form?
 
             fields = collection.get_form(nil, name)
+
             if fields
               return fields.map do |field|
                 new_field = build_field_schema(collection.datasource, field)
