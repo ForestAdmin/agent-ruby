@@ -72,7 +72,7 @@ module ForestAdminDatasourceCustomizer
                        validator[:operator]
                      end
 
-              raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, "#{message} #{rule}"
+              raise ForestAdminAgent::Http::Exceptions::ValidationError, "#{message} #{rule}"
             end
           end
         end

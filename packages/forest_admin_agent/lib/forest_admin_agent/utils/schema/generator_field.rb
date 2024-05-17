@@ -48,7 +48,7 @@ module ForestAdminAgent
               isVirtual: false,
               reference: nil,
               type: convert_column_type(column.column_type),
-              validations: [] # TODO: FrontendValidationUtils.convertValidationList(column),
+              validations: FrontendValidationUtils.convert_validation_list(column)
             }
           end
 
@@ -67,9 +67,10 @@ module ForestAdminAgent
             }
           end
 
-          def foreign_collection_filterable?
-            # TODO: implement FrontendFilterable before
-            true
+          def foreign_collection_filterable?(foreign_collection)
+            foreign_collection.schema[:fields].values.any? do |field|
+              field.type == 'Column' && FrontendFilterable.filterable?(field.column_type, field.filter_operators)
+            end
           end
 
           def build_many_to_many_schema(relation, collection, foreign_collection, base_schema)
@@ -122,7 +123,7 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: nil,
-                isFilterable: foreign_collection_filterable?,
+                isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
                 isRequired: false,
                 isReadOnly: key_field.is_read_only,
@@ -140,7 +141,7 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: key_field.default_value,
-                isFilterable: foreign_collection_filterable?,
+                isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
                 isRequired: false, # TODO: check with validations
                 isReadOnly: key_field.is_read_only,
