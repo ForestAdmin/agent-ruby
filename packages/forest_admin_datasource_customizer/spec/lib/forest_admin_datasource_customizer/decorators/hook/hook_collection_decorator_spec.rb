@@ -46,7 +46,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a list' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('before', 'list', spy)
+              @decorated_transaction.add_hook('Before', 'List', spy)
               @decorated_transaction.list(caller, Filter.new, Projection.new)
 
               expect(spy).to have_received(:call).once
@@ -56,7 +56,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a create' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('before', 'create', spy)
+              @decorated_transaction.add_hook('Before', 'Create', spy)
               @decorated_transaction.create(caller, [])
 
               expect(spy).to have_received(:call).once
@@ -66,7 +66,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a update' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('before', 'update', spy)
+              @decorated_transaction.add_hook('Before', 'Update', spy)
               @decorated_transaction.update(caller, Filter.new, [])
 
               expect(spy).to have_received(:call).once
@@ -76,7 +76,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a delete' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('before', 'delete', spy)
+              @decorated_transaction.add_hook('Before', 'Delete', spy)
               @decorated_transaction.delete(caller, Filter.new)
 
               expect(spy).to have_received(:call).once
@@ -86,7 +86,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a aggregate' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('before', 'aggregate', spy)
+              @decorated_transaction.add_hook('Before', 'Aggregate', spy)
               @decorated_transaction.aggregate(caller, Filter.new, Aggregation.new(operation: 'Count'))
 
               expect(spy).to have_received(:call).once
@@ -98,7 +98,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a list' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('after', 'list', spy)
+              @decorated_transaction.add_hook('After', 'List', spy)
               @decorated_transaction.list(caller, Filter.new, Projection.new)
 
               expect(spy).to have_received(:call).once
@@ -108,7 +108,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a create' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('after', 'create', spy)
+              @decorated_transaction.add_hook('After', 'Create', spy)
               @decorated_transaction.create(caller, [])
 
               expect(spy).to have_received(:call).once
@@ -118,7 +118,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a update' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('after', 'update', spy)
+              @decorated_transaction.add_hook('After', 'Update', spy)
               @decorated_transaction.update(caller, Filter.new, [])
 
               expect(spy).to have_received(:call).once
@@ -128,7 +128,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a delete' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('after', 'delete', spy)
+              @decorated_transaction.add_hook('After', 'Delete', spy)
               @decorated_transaction.delete(caller, Filter.new)
 
               expect(spy).to have_received(:call).once
@@ -138,7 +138,7 @@ module ForestAdminDatasourceCustomizer
           describe 'on a aggregate' do
             it 'call the hook with valid parameters' do
               spy = instance_double(Proc, call: nil)
-              @decorated_transaction.add_hook('after', 'aggregate', spy)
+              @decorated_transaction.add_hook('After', 'Aggregate', spy)
               @decorated_transaction.aggregate(caller, Filter.new, Aggregation.new(operation: 'Count'))
 
               expect(spy).to have_received(:call).once
