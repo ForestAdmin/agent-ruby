@@ -24,7 +24,8 @@ module ForestAdminAgent
             page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
             search: ForestAdminAgent::Utils::QueryStringParser.parse_search(@collection, args),
             search_extended: ForestAdminAgent::Utils::QueryStringParser.parse_search_extended(args),
-            sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@collection, args)
+            sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@collection, args),
+            segment: ForestAdminAgent::Utils::QueryStringParser.parse_segment(@collection, args)
           )
 
           projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)

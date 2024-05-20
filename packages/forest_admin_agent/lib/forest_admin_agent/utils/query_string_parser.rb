@@ -125,6 +125,17 @@ module ForestAdminAgent
 
         sort
       end
+
+      def self.parse_segment(collection, args)
+        segment = args.dig(:params, :data, :attributes, :all_records_subset_query,
+                           :segment) || args.dig(:params, :segment)
+
+        return unless segment
+
+        raise ForestException, "Invalid segment: #{segment}" unless collection.schema[:segments].include?(segment)
+
+        segment
+      end
     end
   end
 end

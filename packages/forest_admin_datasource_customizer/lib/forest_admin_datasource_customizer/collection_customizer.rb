@@ -262,7 +262,7 @@ module ForestAdminDatasourceCustomizer
     #    'Wrote more than 2 books',
     #   { field: 'booksCount', operator: 'GreaterThan', value: 2 }
     # );
-    def add_segment(name, definition)
+    def add_segment(name, &definition)
       push_customization { @stack.segment.get_collection(@name).add_segment(name, definition) }
     end
 
