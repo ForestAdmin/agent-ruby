@@ -15,8 +15,8 @@ module ForestAdminAgent
         @routes ||= {}
       end
 
-      def add_route(name, method, uri, closure)
-        @routes[name] = { method: method, uri: uri, closure: closure }
+      def add_route(name, method, uri, closure, format = 'json')
+        @routes[name] = { method: method, uri: uri, closure: closure, format: format }
       end
 
       def setup_routes
