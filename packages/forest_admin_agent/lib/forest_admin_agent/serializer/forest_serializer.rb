@@ -16,7 +16,7 @@ module ForestAdminAgent
       end
 
       def base_url
-        Facades::Container.cache(:prefix)
+        '/forest'
       end
 
       def type
@@ -177,11 +177,11 @@ module ForestAdminAgent
       end
 
       def relationship_self_link(attribute_name)
-        "/#{self_link}/relationships/#{format_name(attribute_name)}"
+        "#{self_link}/relationships/#{format_name(attribute_name)}"
       end
 
       def relationship_related_link(attribute_name)
-        "/#{self_link}/#{format_name(attribute_name)}"
+        "#{self_link}/#{format_name(attribute_name)}"
       end
     end
   end
