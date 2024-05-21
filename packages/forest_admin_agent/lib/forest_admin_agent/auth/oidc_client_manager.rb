@@ -9,6 +9,12 @@ module ForestAdminAgent
       TTL = 60 * 60 * 24
 
       def make_forest_provider(rendering_id)
+        if Facades::Container.cache(:debug)
+          OpenIDConnect.http_config do |options|
+            options.ssl.verify = false
+          end
+        end
+
         config_agent = Facades::Container.config_from_cache
         cache_key = "#{config_agent[:env_secret]}-client-data"
         cache = setup_cache(cache_key, config_agent)
