@@ -1,20 +1,21 @@
-require 'jsonapi-serializers'
+require 'csv'
 
 module ForestAdminAgent
   module Routes
     module Resources
       module Related
-        class ListRelated < AbstractRelatedRoute
-          include ForestAdminAgent::Builder
+        class CsvRelated < AbstractRelatedRoute
+          include ForestAdminAgent::Utils
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
           def setup_routes
             add_route(
-              'forest_related_list',
+              'forest_related_list_csv',
               'get',
-              '/:collection_name/:id/relationships/:relation_name',
-              ->(args) { handle_request(args) }
+              '/:collection_name/:id/relationships/:relation_name.:format',
+              ->(args) { handle_request(args) },
+              'csv'
             )
 
             self
@@ -23,6 +24,7 @@ module ForestAdminAgent
           def handle_request(args = {})
             build(args)
             @permissions.can?(:browse, @collection)
+            @permissions.can?(:export, @collection)
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
@@ -30,8 +32,7 @@ module ForestAdminAgent
                   @permissions.get_scope(@collection),
                   ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
                 ]
-              ),
-              page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
+              )
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
             id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
@@ -44,15 +45,14 @@ module ForestAdminAgent
               projection
             )
 
+            filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
+            filename += '.csv' unless /\.csv$/i.match?(filename)
+
             {
-              name: @child_collection.name,
-              content: JSONAPI::Serializer.serialize(
-                records,
-                is_collection: true,
-                class_name: @child_collection.name,
-                serializer: Serializer::ForestSerializer,
-                include: projection.relations.keys
-              )
+              content: {
+                export: CsvGenerator.generate(records, projection)
+              },
+              filename: filename
             }
           end
         end
