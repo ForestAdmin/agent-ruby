@@ -34,6 +34,8 @@ module ForestAdminAgent
 
       def customize_collection(name, &handle)
         @customizer.customize_collection(name, handle)
+
+        self
       end
 
       def build
