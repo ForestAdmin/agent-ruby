@@ -1,3 +1,10 @@
+# [1.0.0-beta.47](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.46...v1.0.0-beta.47) (2024-05-22)
+
+
+### Bug Fixes
+
+* add emulate_field_filtering missing method on customizer ([#49](https://github.com/ForestAdmin/agent-ruby/issues/49)) ([41dfb0e](https://github.com/ForestAdmin/agent-ruby/commit/41dfb0eb8a27e7797057eeeed9ecd349dacda8f3))
+
 # [1.0.0-beta.46](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.45...v1.0.0-beta.46) (2024-05-15)
 
 
