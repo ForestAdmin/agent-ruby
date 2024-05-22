@@ -1,5 +1,3 @@
-require 'csv'
-
 module ForestAdminAgent
   module Routes
     module Resources
@@ -45,7 +43,7 @@ module ForestAdminAgent
               projection
             )
 
-            filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
+            filename = args[:params][:filename] || "#{args[:params]["relation_name"]}.csv"
             filename += '.csv' unless /\.csv$/i.match?(filename)
 
             {
