@@ -1,5 +1,6 @@
 module ForestAdminDatasourceCustomizer
   class CollectionCustomizer
+    include ForestAdminDatasourceToolkit::Validations
     attr_reader :datasource_customizer, :stack, :name
 
     def initialize(datasource_customizer, stack, name)
@@ -57,6 +58,21 @@ module ForestAdminDatasourceCustomizer
                      end
 
         collection.emulate_field_operator(name, operator)
+      end
+    end
+
+    def emulate_field_filtering(name)
+      push_customization do
+        collection = @stack.late_op_emulate.get_collection(@name)
+        field = collection.schema[:fields][name]
+
+        if field.column_type.is_a?(String)
+          operators = Rules.get_allowed_operators_for_column_type[field.column_type]
+
+          operators.each do |operator|
+            emulate_field_operator(name, operator) unless field.filter_operators&.include?(operator)
+          end
+        end
       end
     end
 

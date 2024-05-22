@@ -388,6 +388,23 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    context 'when using emulate_field_filtering' do
+      it 'emulate filtering on field' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.early_op_emulate).to receive(:get_collection).with('person').and_return(@datasource_customizer.stack.early_op_emulate.get_collection('person'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person')
+        customizer.emulate_field_filtering('name')
+        stack.apply_queued_customizations({})
+
+        expected_operators = ForestAdminDatasourceToolkit::Validations::Rules.get_allowed_operators_for_column_type['String']
+        op_emulate_collection = @datasource_customizer.stack.early_op_emulate.get_collection('person')
+
+        expect(op_emulate_collection.schema[:fields]['name'].filter_operators).to include(*expected_operators)
+      end
+    end
+
     context 'when using replace_field_sorting' do
       it 'replace sort on field' do
         stack = @datasource_customizer.stack
