@@ -13,8 +13,8 @@ admin work on any Rails application (Rails >= 6.1)."
   spec.required_ruby_version = ">= 3.0.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/ForestAdmin/rails-forest_admin"
-  spec.metadata["changelog_uri"] = "https://github.com/ForestAdmin/rails-forest_admin/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = "https://github.com/ForestAdmin/agent-ruby"
+  spec.metadata["changelog_uri"] = "https://github.com/ForestAdmin/agent-ruby/blob/main/CHANGELOG.md"
   spec.metadata['rubygems_mfa_required'] = 'false'
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
