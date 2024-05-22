@@ -493,11 +493,11 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         handler = proc {}
-        customizer.add_hook('before', 'list', &handler)
+        customizer.add_hook('Before', 'List', &handler)
         stack.apply_queued_customizations({})
         hook_collection = @datasource_customizer.stack.hook.get_collection('book')
 
-        expect(hook_collection.hooks['list'].before.first).to eq(handler)
+        expect(hook_collection.hooks['List'].before.first).to eq(handler)
       end
     end
 
@@ -509,7 +509,7 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         definition = proc { Nodes::ConditionTreeLeaf.new('title', Operators::EQUAL, 'foo') }
-        customizer.add_segment('foo_segment', definition)
+        customizer.add_segment('foo_segment', &definition)
         stack.apply_queued_customizations({})
         segment_collection = @datasource_customizer.stack.segment.get_collection('book')
 

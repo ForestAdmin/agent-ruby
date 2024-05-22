@@ -82,7 +82,7 @@ module ForestAdminAgent
                     'id' => 1,
                     'title' => 'Harry potter and the goblet of fire'
                   },
-                  'links' => { 'self' => 'forest/book/1' }
+                  'links' => { 'self' => '/forest/book/1' }
                 }
             )
           end

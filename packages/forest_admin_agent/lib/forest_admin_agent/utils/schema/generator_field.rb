@@ -35,8 +35,7 @@ module ForestAdminAgent
               field: name,
               integration: nil,
               inverseOf: nil,
-              # isFilterable: FrontendFilterable.filterable?(column.column_type, column.filter_operators),
-              isFilterable: true, # TODO: remove when implementing operators decorators
+              isFilterable: FrontendFilterable.filterable?(column.column_type, column.filter_operators),
               isPrimaryKey: column.is_primary_key,
 
               # When a column is a foreign key, it is readonly.

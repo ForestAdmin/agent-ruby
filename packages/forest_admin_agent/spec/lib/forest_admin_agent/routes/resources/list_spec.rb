@@ -72,7 +72,7 @@ module ForestAdminAgent
                   'first_name' => 'foo',
                   'last_name' => 'foo'
                 },
-                'links' => { 'self' => 'forest/user/1' }
+                'links' => { 'self' => '/forest/user/1' }
               }
             ],
             'included' => [],
