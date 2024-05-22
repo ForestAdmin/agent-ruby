@@ -20,24 +20,26 @@ module ForestAdminAgent
             "forest_chart_get_#{slug}",
             'get',
             "/_charts/#{slug}",
-            proc { handle_smart_chart }
+            proc { |args| handle_smart_chart(args) }
           )
 
           add_route(
             "forest_chart_post_#{slug}",
             'post',
             "/_charts/#{slug}",
-            proc { handle_api_chart }
+            proc { |args| handle_api_chart(args) }
           )
 
           unless Facades::Container.cache(:is_production)
-            Facades::Container.logger.log('Info', "/forest/_charts/#{slug}")
+            Facades::Container.logger.log('Info', "Chart #{@chart_name} was mounted at /forest/_charts/#{slug}")
           end
 
           self
         end
 
-        def handle_api_chart
+        def handle_api_chart(args = {})
+          @caller = Utils::QueryStringParser.parse_caller(args)
+
           {
             content: Serializer::ForestChartSerializer.serialize(
               @datasource.render_chart(
@@ -48,7 +50,9 @@ module ForestAdminAgent
           }
         end
 
-        def handle_smart_chart
+        def handle_smart_chart(args = {})
+          @caller = Utils::QueryStringParser.parse_caller(args)
+
           {
             content: @datasource.render_chart(
               @caller,
