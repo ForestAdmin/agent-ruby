@@ -23,16 +23,16 @@ module ForestAdminAgent
         return if filters.nil?
 
         filters = JSON.parse(filters, symbolize_names: true) if filters.is_a? String
-        # TODO: add else for convert all keys to sym
 
         ConditionTreeParser.from_plain_object(collection, filters)
-        # TODO: ConditionTreeValidator::validate($conditionTree, $collection);
       end
 
       def self.parse_caller(args)
         unless args.dig(:headers, 'HTTP_AUTHORIZATION')
-          # TODO: replace by http exception
-          raise ForestException, 'You must be logged in to access at this resource.'
+          raise Http::Exceptions::HttpException.new(
+            401,
+            'You must be logged in to access at this resource.'
+          )
         end
 
         timezone = args[:params]['timezone']

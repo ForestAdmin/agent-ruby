@@ -322,28 +322,6 @@ module ForestAdminAgent
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
           )
         end
-
-        # TODO
-        it 'throw when the collection does not supports the requested operators',
-           pending: 'when condition tree validator is implemented' do
-          args = {
-            params: {
-              filters: {
-                'aggregator' => 'And',
-                'conditions' => [
-                  { 'field' => 'id', 'operator' => 'Greater_Than', 'value' => '123e4567-e89b-12d3-a456-426614174000' }
-                ]
-              }
-            }
-          }
-
-          expect do
-            described_class.parse_condition_tree(collection_category, args)
-          end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 The allowed operators are: Equal'
-          )
-        end
       end
 
       describe 'when parse_search' do
