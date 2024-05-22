@@ -44,12 +44,10 @@ module ForestAdminAgent
             expect(schema).to match(
               {
                 field: 'book',
-                inverseOf: nil,
-
+                inverseOf: 'author',
                 reference: 'Book.id',
                 relationship: 'HasOne',
                 type: 'String',
-
                 defaultValue: nil,
                 enums: nil,
                 integration: nil,
@@ -70,12 +68,11 @@ module ForestAdminAgent
             expect(schema).to match(
               {
                 field: 'author',
-                inverseOf: nil,
+                inverseOf: 'book',
                 reference: 'Person.id',
                 relationship: 'BelongsTo',
                 type: 'String',
                 isSortable: true,
-
                 defaultValue: nil,
                 enums: nil,
                 integration: nil,

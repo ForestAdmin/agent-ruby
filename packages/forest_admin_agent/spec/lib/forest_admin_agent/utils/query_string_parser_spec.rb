@@ -68,8 +68,8 @@ module ForestAdminAgent
           expect do
             described_class.parse_caller(args)
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 You must be logged in to access at this resource.'
+            Http::Exceptions::HttpException,
+            'You must be logged in to access at this resource.'
           )
         end
       end

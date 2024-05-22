@@ -46,7 +46,7 @@ module ForestAdminAgent
           describe 'with the route mounted' do
             it 'return the chart in a JSON-API response when call handle_api_chart' do
               chart = described_class.new('my_chart')
-              result = chart.handle_api_chart
+              result = chart.handle_api_chart(args)
               {
                 data: {
                   id: SecureRandom.uuid,
@@ -65,7 +65,7 @@ module ForestAdminAgent
 
             it 'return the chart in a simple response when call handle_smart_chart' do
               chart = described_class.new('my_chart')
-              result = chart.handle_smart_chart
+              result = chart.handle_smart_chart(args)
               {
                 data: {
                   id: SecureRandom.uuid,

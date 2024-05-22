@@ -68,7 +68,7 @@ module ForestAdminAgent
             expect(schema).to match(
               {
                 field: 'reviewers',
-                inverseOf: nil,
+                inverseOf: 'books',
                 reference: 'Person.id',
                 relationship: 'BelongsToMany',
                 type: ['Number'],
