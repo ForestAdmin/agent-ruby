@@ -1,5 +1,3 @@
-require 'csv'
-
 module ForestAdminAgent
   module Routes
     module Resources

@@ -1,3 +1,5 @@
+require 'csv'
+
 module ForestAdminAgent
   module Utils
     class CsvGenerator
