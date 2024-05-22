@@ -142,10 +142,10 @@ module ForestAdminAgent
                 defaultValue: key_field.default_value,
                 isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
-                isRequired: false, # TODO: check with validations
+                isRequired: key_field.validations.any? { |v| v[:operator] == 'Present' },
                 isReadOnly: key_field.is_read_only,
                 isSortable: key_field.is_sortable,
-                validations: [], # TODO: FrontendValidation::convertValidationList(foreignTargetColumn)
+                validations: FrontendValidationUtils.convert_validation_list(key_field),
                 reference: "#{foreign_collection.name}.#{relation.foreign_key_target}"
               }
             )
@@ -161,7 +161,7 @@ module ForestAdminAgent
               integration: nil,
               isReadOnly: nil,
               isVirtual: false,
-              inverseOf: nil, # TODO: CollectionUtils::getInverseRelation(collection, name)
+              inverseOf: ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, name),
               relationship: RELATION_MAP[relation.type]
             }
 
