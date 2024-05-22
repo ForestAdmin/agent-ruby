@@ -26,18 +26,30 @@ module ForestAdminAgent
 
               MESSAGE_CACHE_KEYS[event.type]&.each do |cache_key|
                 Permissions.invalidate_cache(cache_key)
-                # TODO: HANDLE LOGGER
-                # "info","invalidate cache {MESSAGE_CACHE_KEYS[event.type]} for event {event.type}"
+                ForestAdminAgent::Facades::Container.logger.log(
+                  'Info',
+                  "invalidate cache #{MESSAGE_CACHE_KEYS[event.type]} for event #{event.type}"
+                )
               end
-              # TODO: HANDLE LOGGER add else
-              # "info", "SSECacheInvalidation: unhandled message from server: {event.type}"
+
+              ForestAdminAgent::Facades::Container.logger.log(
+                'Info',
+                "SSECacheInvalidation: unhandled message from server: #{event.type}"
+              )
             end
           end
         rescue StandardError
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            'SSE connection to forestadmin server'
+          )
+
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warning',
+            'SSE connection to forestadmin server closed unexpectedly, retrying.'
+          )
+
           raise ForestException, 'Failed to reach SSE data from ForestAdmin server.'
-          # TODO: HANDLE LOGGER
-          # "debug", "SSE connection to forestadmin server due to ..."
-          # "warning", "SSE connection to forestadmin server closed unexpectedly, retrying."
         end
       end
     end

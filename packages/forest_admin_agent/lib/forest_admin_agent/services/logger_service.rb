@@ -16,7 +16,6 @@ module ForestAdminAgent
         @logger_level = logger_level
         @logger = logger
         @default_logger = MonoLogger.new($stdout)
-        # TODO: HANDLE FORMATTER
       end
 
       def log(level, message)
