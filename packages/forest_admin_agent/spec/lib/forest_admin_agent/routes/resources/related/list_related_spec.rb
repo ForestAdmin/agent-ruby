@@ -26,7 +26,7 @@ module ForestAdminAgent
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
           before do
-            user_class = Struct.new(:id, :first_name, :last_name)
+            user_class = Struct.new(:id, :first_name, :last_name, :category_id)
             stub_const('User', user_class)
 
             datasource = Datasource.new
@@ -45,7 +45,7 @@ module ForestAdminAgent
                   )
                 }
               },
-              list: [User.new(1, 'foo', 'foo')]
+              list: [User.new(1, 'foo', 'foo', 1)]
             )
             collection_category = collection_build(
               name: 'category',
