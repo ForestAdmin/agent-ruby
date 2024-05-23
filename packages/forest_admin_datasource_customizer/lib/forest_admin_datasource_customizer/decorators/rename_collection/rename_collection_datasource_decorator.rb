@@ -28,7 +28,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           # Collection has not been renamed
-          super(name)
+          super
         end
 
         def rename_collections(renames = [])
