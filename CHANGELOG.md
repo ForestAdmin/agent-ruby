@@ -1,3 +1,10 @@
+# [1.0.0-beta.49](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.48...v1.0.0-beta.49) (2024-05-23)
+
+
+### Bug Fixes
+
+* polished after doc review ([#51](https://github.com/ForestAdmin/agent-ruby/issues/51)) ([055a153](https://github.com/ForestAdmin/agent-ruby/commit/055a1531d313b889fc9f2cc45755bc9555348c65))
+
 # [1.0.0-beta.48](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.47...v1.0.0-beta.48) (2024-05-23)
 
 
