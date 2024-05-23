@@ -25,7 +25,10 @@ module ForestAdminRails
       response.headers.merge!(data[:content][:headers] || {})
       data[:content].delete(:headers)
 
-      render json: data[:content], head: headers, status: data[:status] || data[:content][:status] || 200
+      respond_to do |format|
+        format.json { render json: data[:content], status: data[:status] || data[:content][:status] || 200 }
+        format.csv { render plain: data[:content][:export], status: 200, filename: data[:filename] }
+      end
     end
 
     def exception_handler(exception)

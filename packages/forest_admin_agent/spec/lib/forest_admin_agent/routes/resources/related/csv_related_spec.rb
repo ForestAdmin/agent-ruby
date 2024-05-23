@@ -11,9 +11,9 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-        describe ListRelated do
+        describe CsvRelated do
           include_context 'with caller'
-          subject(:list) { described_class.new }
+          subject(:csv) { described_class.new }
           let(:args) do
             {
               headers: { 'HTTP_AUTHORIZATION' => bearer },
@@ -24,10 +24,13 @@ module ForestAdminAgent
             }
           end
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+          let(:csv_generator) { class_double(ForestAdminAgent::Utils::CsvGenerator).as_stubbed_const }
 
           before do
             user_class = Struct.new(:id, :first_name, :last_name, :category_id)
             stub_const('User', user_class)
+            category_class = Struct.new(:id, :label)
+            stub_const('Category', category_class)
 
             datasource = Datasource.new
             collection_user = collection_build(
@@ -54,7 +57,8 @@ module ForestAdminAgent
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                   'label' => ColumnSchema.new(column_type: 'String')
                 }
-              }
+              },
+              list: [Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')]
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
             datasource.add_collection(collection_user)
@@ -68,18 +72,21 @@ module ForestAdminAgent
             allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
           end
 
-          it 'adds the route forest_related_list' do
-            list.setup_routes
-            expect(list.routes.include?('forest_related_list')).to be true
-            expect(list.routes.length).to eq 1
+          it 'adds the route forest_related_list_csv' do
+            csv.setup_routes
+            expect(csv.routes.include?('forest_related_list_csv')).to be true
+            expect(csv.routes.length).to eq 1
           end
 
-          context 'when call without filters' do
-            it 'call list_relation with expected args' do
+          context 'when call csv' do
+            # rubocop:disable RSpec/MultipleExpectations
+            # rubocop:disable Metrics/ParameterLists
+            it 'returns an export csv of the related collection' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
-              list.handle_request(args)
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
+              allow(csv_generator).to receive(:generate).with([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')], %w[id label]).and_return("id,label\n1,bar\n2,baz\n3,qux\n")
+              result = csv.handle_request(args)
 
               expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
               |collection, id, relation_name, caller, foreign_filter, projection|
@@ -89,7 +96,7 @@ module ForestAdminAgent
                 expect(relation_name).to eq('category')
                 expect(foreign_filter).to have_attributes(
                   condition_tree: have_attributes(aggregator: 'Or', conditions: []),
-                  page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
+                  page: nil,
                   search: nil,
                   search_extended: nil,
                   segment: nil,
@@ -97,39 +104,27 @@ module ForestAdminAgent
                 )
                 expect(projection).to eq(%w[id label])
               end
-            end
-          end
 
-          context 'when call with filters' do
-            it 'call list_relation with expected args' do
+              expect(csv_generator).to have_received(:generate) do |records, projection|
+                expect(records).to eq([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
+                expect(projection).to eq(%w[id label])
+              end
+              expect(result[:filename]).to eq('category.csv')
+              expect(result[:content][:export]).to eq("id,label\n1,bar\n2,baz\n3,qux\n")
+            end
+            # rubocop:enable RSpec/MultipleExpectations
+            # rubocop:enable Metrics/ParameterLists
+
+            it 'with a filename should return an export csv with the filename provided' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
-              args[:params][:filters] = JSON.generate({ field: 'id', operator: Operators::GREATER_THAN, value: 7 })
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
-              list.handle_request(args)
+              args[:params][:filename] = 'filename'
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
+              allow(csv_generator).to receive(:generate).with([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')], %w[id label]).and_return("id,label\n1,bar\n2,baz\n3,qux\n")
+              result = csv.handle_request(args)
 
-              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
-              |collection, id, relation_name, caller, foreign_filter, projection|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(collection.name).to eq('user')
-                expect(id).to eq({ 'id' => 1 })
-                expect(relation_name).to eq('category')
-                expect(foreign_filter).to have_attributes(
-                  condition_tree: have_attributes(
-                    aggregator: 'And',
-                    conditions: [
-                      have_attributes(aggregator: 'Or', conditions: []),
-                      have_attributes(field: 'id', operator: Operators::GREATER_THAN, value: 7)
-                    ]
-                  ),
-                  page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
-                  search: nil,
-                  search_extended: nil,
-                  segment: nil,
-                  sort: nil
-                )
-                expect(projection).to eq(%w[id label])
-              end
+              expect(result[:filename]).to eq('filename.csv')
+              expect(result[:content][:export]).to eq("id,label\n1,bar\n2,baz\n3,qux\n")
             end
           end
         end
