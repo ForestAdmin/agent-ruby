@@ -40,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super(arg)
+                super
               end
             end
             stub_const('Book', book_class)
@@ -82,7 +82,7 @@ module ForestAdminAgent
                     'id' => 1,
                     'title' => 'Harry potter and the goblet of fire'
                   },
-                  'links' => { 'self' => 'forest/book/1' }
+                  'links' => { 'self' => '/forest/book/1' }
                 }
             )
           end

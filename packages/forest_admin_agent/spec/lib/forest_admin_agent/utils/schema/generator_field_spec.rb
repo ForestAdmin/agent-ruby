@@ -4,6 +4,7 @@ module ForestAdminAgent
   module Utils
     module Schema
       include ForestAdminDatasourceToolkit
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
       describe GeneratorField do
         before do
@@ -17,7 +18,7 @@ module ForestAdminAgent
                 filter_operators: %w[Equal NotEqual Present],
                 is_sortable: true,
                 is_read_only: true,
-                validations: [{ operator: 'Present' }]
+                validations: [{ operator: Operators::PRESENT }]
               ),
               'origin_key' => ColumnSchema.new(
                 column_type: 'Number',
@@ -49,13 +50,13 @@ module ForestAdminAgent
               defaultValue: nil,
               enums: [],
               integration: nil,
-              isFilterable: true,
+              isFilterable: false,
               isPrimaryKey: true,
               isReadOnly: true,
-              isRequired: true,
+              isRequired: false,
               isVirtual: false,
               reference: nil,
-              validations: []
+              validations: [{ message: 'Field is required', type: 'is present' }]
             }
           )
         end
@@ -72,7 +73,7 @@ module ForestAdminAgent
               defaultValue: nil,
               enums: [],
               integration: nil,
-              isFilterable: true,
+              isFilterable: false,
               isPrimaryKey: false,
               isReadOnly: false,
               isRequired: false,

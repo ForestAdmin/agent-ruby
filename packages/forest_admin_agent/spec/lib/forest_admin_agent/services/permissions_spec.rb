@@ -63,7 +63,8 @@ module ForestAdminAgent
             forest_server_url: 'https://api.development.forestadmin.com',
             debug: true,
             prefix: 'forest',
-            permission_expiration: 100
+            permission_expiration: 100,
+            customize_error_message: nil
           }
         )
 

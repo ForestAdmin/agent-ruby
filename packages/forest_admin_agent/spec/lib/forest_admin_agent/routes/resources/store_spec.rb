@@ -40,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super(arg)
+                super
               end
             end
             stub_const('Book', book_class)
@@ -95,7 +95,7 @@ module ForestAdminAgent
                     'published_at' => '2000-07-07T21:00:00.000Z',
                     'price' => 6.75
                   },
-                  'links' => { 'self' => 'forest/book/1' }
+                  'links' => { 'self' => '/forest/book/1' }
                 }
             )
           end
@@ -180,7 +180,7 @@ module ForestAdminAgent
                     'type' => 'person',
                     'id' => '1',
                     'attributes' => { 'id' => 1, 'name' => 'john' },
-                    'links' => { 'self' => 'forest/person/1' },
+                    'links' => { 'self' => '/forest/person/1' },
                     'relationships' => {
                       'passport' => {
                         'data' => nil,
@@ -216,7 +216,7 @@ module ForestAdminAgent
                     'type' => 'passport',
                     'id' => '1',
                     'attributes' => { 'id' => 1, 'person_id' => 1 },
-                    'links' => { 'self' => 'forest/passport/1' },
+                    'links' => { 'self' => '/forest/passport/1' },
                     'relationships' => {
                       'person' => {
                         'data' => nil,

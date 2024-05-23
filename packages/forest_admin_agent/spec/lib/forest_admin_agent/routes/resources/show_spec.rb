@@ -40,7 +40,7 @@ module ForestAdminAgent
               def respond_to?(arg)
                 return false if arg == :each
 
-                super(arg)
+                super
               end
             end
             stub_const('User', user_class)
@@ -87,7 +87,7 @@ module ForestAdminAgent
                   'first_name' => 'foo',
                   'last_name' => 'foo'
                 },
-                'links' => { 'self' => 'forest/user/1' }
+                'links' => { 'self' => '/forest/user/1' }
               },
               'included' => []
             )

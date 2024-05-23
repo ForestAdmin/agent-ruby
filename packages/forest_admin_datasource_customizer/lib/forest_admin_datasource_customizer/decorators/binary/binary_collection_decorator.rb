@@ -67,7 +67,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def list(caller, filter, projection)
-          records = super(caller, filter, projection)
+          records = super
           records.map! { |record| convert_record(false, record) }
 
           records

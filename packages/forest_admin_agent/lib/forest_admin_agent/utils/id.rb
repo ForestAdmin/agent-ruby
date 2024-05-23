@@ -27,7 +27,7 @@ module ForestAdminAgent
           field = collection.schema[:fields][pk_name]
           value = primary_key_values[index]
           casted_value = field.column_type == 'Number' ? value.to_i : value
-          # TODO: call FieldValidator::validateValue($value, $field, $castedValue);
+          ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_value(value, field, casted_value)
 
           [pk_name, casted_value]
         end.to_h

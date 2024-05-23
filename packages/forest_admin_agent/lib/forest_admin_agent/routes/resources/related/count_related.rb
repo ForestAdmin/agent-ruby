@@ -38,7 +38,7 @@ module ForestAdminAgent
               return {
                 name: @child_collection.name,
                 content: {
-                  count: result[0][:value]
+                  count: result.empty? ? 0 : result[0]['value']
                 }
               }
             end

@@ -102,7 +102,7 @@ module ForestAdminDatasourceToolkit
                 ],
                 Operators::TODAY => [
                   interval(
-                    proc { |now| now.beginning_of_day },
+                    proc(&:beginning_of_day),
                     proc { |now| (now + 1.day).beginning_of_day }
                   )
                 ]

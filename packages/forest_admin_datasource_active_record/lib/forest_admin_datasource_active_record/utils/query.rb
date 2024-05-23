@@ -18,9 +18,16 @@ module ForestAdminDatasourceActiveRecord
         apply_select
       end
 
+      def get
+        build
+
+        return @query.all if @filter.page.nil?
+
+        @query.offset(@filter.page.offset).limit(@filter.page.limit)
+      end
+
       def apply_filter
         @query = apply_condition_tree(@filter.condition_tree) unless @filter.condition_tree.nil?
-        @query = apply_pagination(@filter.page) unless @filter.page.nil?
         @query = apply_sort(@filter.sort) unless @filter.sort.nil?
 
         @query
@@ -92,11 +99,6 @@ module ForestAdminDatasourceActiveRecord
                          "#{@collection.model.table_name}.#{relation_schema.foreign_key}"
                        end
           end
-
-          # @query = @query.select(query_select.join(', '))
-          # @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
-          # # TODO: replace eager_load by joins because eager_load select ALL columns of relation
-          # # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
         end
 
         @query

@@ -1,5 +1,7 @@
 module ForestAdminRails
   class ForestController < ActionController::Base
+    include ForestAdminAgent::Http::ErrorHandling
+
     skip_forgery_protection
 
     def index
@@ -22,8 +24,10 @@ module ForestAdminRails
                                                   disposition: 'attachment'
       end
 
-      response.headers.merge!(data[:content][:headers] || {})
-      data[:content].delete(:headers)
+      if data.dig(:content, :headers)
+        response.headers.merge!(data[:content][:headers] || {})
+        data[:content].delete(:headers)
+      end
 
       respond_to do |format|
         format.json { render json: data[:content], status: data[:status] || data[:content][:status] || 200 }
@@ -43,7 +47,7 @@ module ForestAdminRails
           errors: [
             {
               name: exception.name,
-              detail: exception.message,
+              detail: get_error_message(exception),
               status: exception.try(:status)
             }
           ]
@@ -52,7 +56,7 @@ module ForestAdminRails
         data[:errors][0][:data] = exception.try(:data)
       end
 
-      unless Facades::Container.cache(:is_production)
+      unless ForestAdminAgent::Facades::Container.cache(:is_production)
         ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
       end
 

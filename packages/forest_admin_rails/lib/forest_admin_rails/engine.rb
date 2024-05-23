@@ -38,13 +38,10 @@ module ForestAdminRails
     end
 
     def load_configuration
-      return unless File.exist?(Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb'))
+      return unless File.exist?(Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb'))
 
       # force eager loading models
       Rails.application.eager_load!
-
-      # setup agent
-      Dir[Rails.root.join('lib', 'forest_admin_rails', '**', '*.rb')].each { |file| require file }
 
       ForestAdminRails::CreateAgent.setup!
 

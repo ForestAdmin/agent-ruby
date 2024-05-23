@@ -279,3 +279,19 @@ Layout/LineLength:
 RSpec/MultipleMemoizedHelpers:
   Max: 10
 
+Security/Eval:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/http/error_handling.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/services/logger_service.rb'
+
+Style/PercentLiteralDelimiters:
+  Exclude:
+    - 'packages/forest_admin_rails/lib/generators/forest_admin_rails/install_generator.rb'
+
+Lint/InterpolationCheck:
+  Exclude:
+    - 'packages/forest_admin_rails/lib/generators/forest_admin_rails/install_generator.rb'
+
+Lint/UnusedMethodArgument:
+  Exclude:
+    - 'packages/forest_admin_rails/config/initializers/forest_admin_error_subscriber.rb'

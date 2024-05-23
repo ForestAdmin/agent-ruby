@@ -37,8 +37,8 @@ module ForestAdminDatasourceActiveRecord
       def compute_result_aggregate(rows)
         rows.map do |row|
           {
-            value: row.send(@operation.to_sym),
-            group: @aggregation.groups.each_with_object({}) do |group, memo|
+            'value' => row.send(@operation.to_sym),
+            'group' => @aggregation.groups.each_with_object({}) do |group, memo|
               memo[group[:field]] = row.send(group[:field].to_sym)
             end
           }

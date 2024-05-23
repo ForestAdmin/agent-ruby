@@ -92,7 +92,7 @@ module ForestAdminDatasourceCustomizer
             result = handler.call(leaf.value, Context::CollectionCustomizationContext.new(self, caller))
 
             if result
-              equivalent = result.is_a?(ConditionTree) ? result : ConditionTreeFactory.from_plain_object(result)
+              equivalent = result.class < Nodes::ConditionTree ? result : ConditionTreeFactory.from_plain_object(result)
               equivalent.replace_leafs do |sub_leaf|
                 replace_leaf(caller, sub_leaf, sub_replacements)
               end

@@ -26,6 +26,5 @@ repository (monorepo) for the Ruby agent."
     end
   end
 
-  spec.executables = ["run_rspec"]
   spec.require_paths = ["lib"]
 end

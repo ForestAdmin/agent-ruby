@@ -95,7 +95,7 @@ module ForestAdminAgent
           filter
         )
 
-        smart_action_approval.can_execute?
+        is_allowed = smart_action_approval.can_execute?
         ForestAdminAgent::Facades::Container.logger.log(
           'Debug',
           "User #{user_data[:roleId]} is #{is_allowed ? "" : "not"} allowed to perform #{action["name"]}"
@@ -213,7 +213,8 @@ module ForestAdminAgent
         end[:enable]
       end
 
-      def find_action_from_endpoint(collection_name, endpoint, http_method)
+      def find_action_from_endpoint(collection_name, path, http_method)
+        endpoint = path.partition('/forest/')[1..].join
         schema_file = JSON.parse(File.read(Facades::Container.config_from_cache[:schema_path]))
         actions = schema_file['collections']&.select { |collection| collection['name'] == collection_name }&.first&.dig('actions')
 

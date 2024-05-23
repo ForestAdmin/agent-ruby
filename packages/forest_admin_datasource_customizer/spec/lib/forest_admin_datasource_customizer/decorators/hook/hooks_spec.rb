@@ -30,8 +30,8 @@ module ForestAdminDatasourceCustomizer
               second_hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('before', first_hook)
-              hooks.add_handler('before', second_hook)
+              hooks.add_handler('Before', first_hook)
+              hooks.add_handler('Before', second_hook)
               hooks.execute_before(fake_hook_context.new)
 
               expect(first_hook).to have_received(:call).once
@@ -43,8 +43,8 @@ module ForestAdminDatasourceCustomizer
               second_hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('before', first_hook)
-              hooks.add_handler('before', second_hook)
+              hooks.add_handler('Before', first_hook)
+              hooks.add_handler('Before', second_hook)
               hooks.execute_before(fake_hook_context.new)
 
               expect(second_hook).to have_received(:call) do |context|
@@ -58,8 +58,8 @@ module ForestAdminDatasourceCustomizer
                 second_hook = instance_double(Proc, call: nil)
 
                 hooks = described_class.new
-                hooks.add_handler('before', first_hook)
-                hooks.add_handler('before', second_hook)
+                hooks.add_handler('Before', first_hook)
+                hooks.add_handler('Before', second_hook)
 
                 expect { hooks.execute_before(fake_hook_context.new) }.to raise_error(RuntimeError)
                 expect(second_hook).not_to have_received(:call)
@@ -72,7 +72,7 @@ module ForestAdminDatasourceCustomizer
               hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('after', hook)
+              hooks.add_handler('After', hook)
               hooks.execute_before(fake_hook_context.new)
 
               expect(hook).not_to have_received(:call)
@@ -87,8 +87,8 @@ module ForestAdminDatasourceCustomizer
               second_hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('after', first_hook)
-              hooks.add_handler('after', second_hook)
+              hooks.add_handler('After', first_hook)
+              hooks.add_handler('After', second_hook)
               hooks.execute_after(fake_hook_context.new)
 
               expect(first_hook).to have_received(:call).once
@@ -100,8 +100,8 @@ module ForestAdminDatasourceCustomizer
               second_hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('after', first_hook)
-              hooks.add_handler('after', second_hook)
+              hooks.add_handler('After', first_hook)
+              hooks.add_handler('After', second_hook)
               hooks.execute_after(fake_hook_context.new)
 
               expect(second_hook).to have_received(:call) do |context|
@@ -115,8 +115,8 @@ module ForestAdminDatasourceCustomizer
                 second_hook = instance_double(Proc, call: nil)
 
                 hooks = described_class.new
-                hooks.add_handler('after', first_hook)
-                hooks.add_handler('after', second_hook)
+                hooks.add_handler('After', first_hook)
+                hooks.add_handler('After', second_hook)
 
                 expect { hooks.execute_after(fake_hook_context.new) }.to raise_error(RuntimeError)
                 expect(second_hook).not_to have_received(:call)
@@ -129,7 +129,7 @@ module ForestAdminDatasourceCustomizer
               hook = instance_double(Proc, call: nil)
 
               hooks = described_class.new
-              hooks.add_handler('before', hook)
+              hooks.add_handler('Before', hook)
               hooks.execute_after(fake_hook_context.new)
 
               expect(hook).not_to have_received(:call)

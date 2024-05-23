@@ -1,6 +1,8 @@
 module ForestAdminDatasourceCustomizer
   module Context
     class AgentCustomizationContext
+      include ForestAdminDatasourceCustomizer::Context::RelaxedWrappers
+
       attr_reader :caller
 
       def initialize(datasource, caller)

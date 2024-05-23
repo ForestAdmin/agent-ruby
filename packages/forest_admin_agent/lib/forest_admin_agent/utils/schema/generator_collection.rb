@@ -16,7 +16,7 @@ module ForestAdminAgent
             name: collection.name,
             onlyForRelationships: false,
             paginationType: 'page',
-            segments: {}
+            segments: build_segments(collection)
           }
         end
 
@@ -35,6 +35,14 @@ module ForestAdminAgent
             collection.schema[:actions].keys.sort.map { |name| GeneratorAction.build_schema(collection, name) }
           else
             {}
+          end
+        end
+
+        def self.build_segments(collection)
+          if collection.schema[:segments]
+            collection.schema[:segments].keys.sort.map { |name| { id: "#{collection.name}.#{name}", name: name } }
+          else
+            []
           end
         end
       end

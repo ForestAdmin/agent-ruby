@@ -1,7 +1,10 @@
 module ForestAdminDatasourceToolkit
   module Exceptions
     class ValidationError < ForestException
-      def initialize(msg = '')
+      attr_reader :name
+
+      def initialize(message)
+        @name = 'ValidationError'
         super
       end
     end

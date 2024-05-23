@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_handler(position, hook)
-          position == 'after' ? @after << hook : @before << hook
+          position == 'After' ? @after << hook : @before << hook
         end
       end
     end

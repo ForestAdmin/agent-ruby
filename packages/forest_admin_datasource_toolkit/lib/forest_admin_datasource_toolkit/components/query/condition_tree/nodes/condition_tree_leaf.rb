@@ -55,7 +55,7 @@ module ForestAdminDatasourceToolkit
               elsif result.is_a?(ConditionTree)
                 result
               else
-                ConditionTreeFactory.from_array(result)
+                ConditionTreeFactory.from_plain_object(result)
               end
             end
 

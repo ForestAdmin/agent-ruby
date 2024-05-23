@@ -58,8 +58,8 @@ module ForestAdminDatasourceCustomizer
         def time_based(time_range, values)
           return [] if values.nil?
 
-          values = HashHelper.convert_keys(values, :to_s)
-          values = values.map { |date, value| { date: DateTime.parse(date), value: value } } unless values.is_a? Array
+          values = HashHelper.convert_keys(values, :to_sym)
+          values = values.map { |date, value| { date: date, value: value } } unless values.is_a? Array
           data = build_time_based_chart_result(time_range, values)
 
           LineChart.new(data).serialize
@@ -120,8 +120,8 @@ module ForestAdminDatasourceCustomizer
 
           format = TIME_FORMAT[time_range.to_sym]
           formatted = {}
-
           points.each do |point|
+            point[:date] = DateTime.parse(point[:date].to_s) if point[:date].is_a?(String) || point[:date].is_a?(Symbol)
             label = point[:date].strftime(format)
             formatted[label] = (formatted[label] || 0) + point[:value] if point[:value].is_a? Numeric
           end

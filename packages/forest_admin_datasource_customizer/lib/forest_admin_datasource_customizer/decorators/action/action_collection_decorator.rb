@@ -24,7 +24,9 @@ module ForestAdminDatasourceCustomizer
           result_builder = ResultBuilder.new
           result = action.execute.call(context, result_builder)
 
-          result || result_builder.success
+          return result if result.is_a? Hash
+
+          result_builder.success
         end
 
         def get_form(caller, name, data = nil, filter = nil, metas = {})
@@ -41,13 +43,14 @@ module ForestAdminDatasourceCustomizer
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
           fields = drop_deferred(context, dynamic_fields)
+
           fields.each do |field|
             if field.value.nil?
               # customer did not define a handler to rewrite the previous value => reuse current one.
               field.value = form_values[field.label]
             end
 
-            # fields that were accessed through the context.formValues.X getter should be watched.
+            # fields that were accessed through the context.get_form_value(x) getter should be watched.
             field.watch_changes = used.include?(field.label)
           end
 
@@ -75,7 +78,10 @@ module ForestAdminDatasourceCustomizer
         def drop_ifs(context, fields)
           if_values = fields.map { |field| !field.if_condition || evaluate(context, field.if_condition) }
           new_fields = fields.select.with_index { |_field, index| if_values[index] }
-          new_fields.each { |field| field.if_condition = nil }
+          new_fields.each do |field|
+            field = field.dup
+            field.if_condition = nil
+          end
 
           new_fields
         end
@@ -83,6 +89,7 @@ module ForestAdminDatasourceCustomizer
         def drop_deferred(context, fields)
           new_fields = []
           fields.each do |field|
+            field = field.dup
             field.instance_variables.each do |key|
               key = key.to_s.delete('@').to_sym
 

@@ -35,8 +35,7 @@ module ForestAdminAgent
               field: name,
               integration: nil,
               inverseOf: nil,
-              # isFilterable: FrontendFilterable.filterable?(column.column_type, column.filter_operators),
-              isFilterable: true, # TODO: remove when implementing operators decorators
+              isFilterable: FrontendFilterable.filterable?(column.column_type, column.filter_operators),
               isPrimaryKey: column.is_primary_key,
 
               # When a column is a foreign key, it is readonly.
@@ -48,7 +47,7 @@ module ForestAdminAgent
               isVirtual: false,
               reference: nil,
               type: convert_column_type(column.column_type),
-              validations: [] # TODO: FrontendValidationUtils.convertValidationList(column),
+              validations: FrontendValidationUtils.convert_validation_list(column)
             }
           end
 
@@ -67,9 +66,10 @@ module ForestAdminAgent
             }
           end
 
-          def foreign_collection_filterable?
-            # TODO: implement FrontendFilterable before
-            true
+          def foreign_collection_filterable?(foreign_collection)
+            foreign_collection.schema[:fields].values.any? do |field|
+              field.type == 'Column' && FrontendFilterable.filterable?(field.column_type, field.filter_operators)
+            end
           end
 
           def build_many_to_many_schema(relation, collection, foreign_collection, base_schema)
@@ -122,7 +122,7 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: nil,
-                isFilterable: foreign_collection_filterable?,
+                isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
                 isRequired: false,
                 isReadOnly: key_field.is_read_only,
@@ -140,12 +140,12 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: key_field.default_value,
-                isFilterable: foreign_collection_filterable?,
+                isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
-                isRequired: false, # TODO: check with validations
+                isRequired: key_field.validations.any? { |v| v[:operator] == 'Present' },
                 isReadOnly: key_field.is_read_only,
                 isSortable: key_field.is_sortable,
-                validations: [], # TODO: FrontendValidation::convertValidationList(foreignTargetColumn)
+                validations: FrontendValidationUtils.convert_validation_list(key_field),
                 reference: "#{foreign_collection.name}.#{relation.foreign_key_target}"
               }
             )
@@ -161,7 +161,7 @@ module ForestAdminAgent
               integration: nil,
               isReadOnly: nil,
               isVirtual: false,
-              inverseOf: nil, # TODO: CollectionUtils::getInverseRelation(collection, name)
+              inverseOf: ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, name),
               relationship: RELATION_MAP[relation.type]
             }
 
