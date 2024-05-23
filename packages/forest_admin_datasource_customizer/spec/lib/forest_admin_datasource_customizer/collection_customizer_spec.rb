@@ -532,5 +532,50 @@ module ForestAdminDatasourceCustomizer
         expect(@datasource_customizer.stack.binary.get_collection('book')).to have_received(:set_binary_mode)
       end
     end
+
+    context 'when using override_create' do
+      it 'adds the handler to the stack' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.override).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.override.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        handler = proc { [] }
+        customizer.override_create(&handler)
+        stack.apply_queued_customizations({})
+
+        expect(@datasource_customizer.stack.override.get_collection('book').create_handler).to eq(handler)
+      end
+    end
+
+    context 'when using override_update' do
+      it 'adds the handler to the stack' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.override).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.override.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        handler = proc { [] }
+        customizer.override_update(&handler)
+        stack.apply_queued_customizations({})
+
+        expect(@datasource_customizer.stack.override.get_collection('book').update_handler).to eq(handler)
+      end
+    end
+
+    context 'when using override_delete' do
+      it 'adds the handler to the stack' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.override).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.override.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        handler = proc { [] }
+        customizer.override_delete(&handler)
+        stack.apply_queued_customizations({})
+
+        expect(@datasource_customizer.stack.override.get_collection('book').delete_handler).to eq(handler)
+      end
+    end
   end
 end

@@ -5,12 +5,13 @@ module ForestAdminDatasourceCustomizer
 
       attr_reader :datasource, :schema, :search, :early_computed, :late_computed, :action, :relation, :late_op_emulate,
                   :early_op_emulate, :validation, :sort, :rename_field, :publication, :write, :chart, :hook, :segment,
-                  :binary
+                  :binary, :override
 
       def initialize(datasource)
         @customizations = []
 
         last = datasource
+        last = @override = DatasourceDecorator.new(last, Override::OverrideCollectionDecorator)
         last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
 
