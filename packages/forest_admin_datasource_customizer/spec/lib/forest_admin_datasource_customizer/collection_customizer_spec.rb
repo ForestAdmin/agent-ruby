@@ -541,7 +541,7 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         handler = proc { [] }
-        customizer.override_create(handler)
+        customizer.override_create(&handler)
         stack.apply_queued_customizations({})
 
         expect(@datasource_customizer.stack.override.get_collection('book').create_handler).to eq(handler)
@@ -556,7 +556,7 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         handler = proc { [] }
-        customizer.override_update(handler)
+        customizer.override_update(&handler)
         stack.apply_queued_customizations({})
 
         expect(@datasource_customizer.stack.override.get_collection('book').update_handler).to eq(handler)
@@ -571,7 +571,7 @@ module ForestAdminDatasourceCustomizer
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         handler = proc { [] }
-        customizer.override_delete(handler)
+        customizer.override_delete(&handler)
         stack.apply_queued_customizations({})
 
         expect(@datasource_customizer.stack.override.get_collection('book').delete_handler).to eq(handler)
