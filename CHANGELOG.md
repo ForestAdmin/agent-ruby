@@ -1,3 +1,10 @@
+# [1.0.0-beta.48](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.47...v1.0.0-beta.48) (2024-05-23)
+
+
+### Features
+
+* add export routes support ([#50](https://github.com/ForestAdmin/agent-ruby/issues/50)) ([1377185](https://github.com/ForestAdmin/agent-ruby/commit/137718585056b38bfa29735e8075c13ab40c6230))
+
 # [1.0.0-beta.47](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.46...v1.0.0-beta.47) (2024-05-22)
 
 
