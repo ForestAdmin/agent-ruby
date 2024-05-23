@@ -1,3 +1,10 @@
+# [1.0.0-beta.51](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.50...v1.0.0-beta.51) (2024-05-23)
+
+
+### Features
+
+* add override decorator support ([#46](https://github.com/ForestAdmin/agent-ruby/issues/46)) ([a581678](https://github.com/ForestAdmin/agent-ruby/commit/a581678d487b7129c61b884d10bd8631a987a113))
+
 # [1.0.0-beta.50](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.49...v1.0.0-beta.50) (2024-05-23)
 
 
