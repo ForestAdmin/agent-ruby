@@ -159,6 +159,10 @@ module ForestAdminDatasourceCustomizer
       use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
 
+    def import_field(name, definition)
+      use(ForestAdminDatasourceCustomizer::Plugins::ImportField, { name: name }.merge(definition))
+    end
+
     # Add a new validator to the edition form of a given field
     # @param name The name of the field
     # @param operator The validator that you wish to add
