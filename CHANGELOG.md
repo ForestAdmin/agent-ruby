@@ -1,3 +1,10 @@
+# [1.0.0-beta.50](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.49...v1.0.0-beta.50) (2024-05-23)
+
+
+### Features
+
+* **plugin:** add new import field plugin ([#47](https://github.com/ForestAdmin/agent-ruby/issues/47)) ([be7b575](https://github.com/ForestAdmin/agent-ruby/commit/be7b575147fabc6c833a7339d2444be64e24e75f))
+
 # [1.0.0-beta.49](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.48...v1.0.0-beta.49) (2024-05-23)
 
 
