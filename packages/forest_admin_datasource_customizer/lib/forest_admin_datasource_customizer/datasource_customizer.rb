@@ -27,8 +27,6 @@ module ForestAdminDatasourceCustomizer
 
     def add_datasource(datasource, options)
       @stack.queue_customization(lambda {
-        # TODO: add call logger
-
         if options[:include] || options[:exclude]
           publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(datasource)
           publication_decorator.keep_collections_matching(options[:include], options[:exclude])
@@ -61,7 +59,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def use(plugin, options)
-      # TODO: to implement
+      push_customization { plugin.new.run(self, nil, options) }
     end
 
     def customize_collection(name, handle)
