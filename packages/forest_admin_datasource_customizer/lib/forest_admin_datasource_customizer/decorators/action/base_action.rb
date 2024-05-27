@@ -11,6 +11,12 @@ module ForestAdminDatasourceCustomizer
           @execute = execute
         end
 
+        def build_fields
+          @form = @form&.map do |field|
+            DynamicField.new(**field)
+          end
+        end
+
         def static_form?
           return form&.all?(&:static?) if form
 

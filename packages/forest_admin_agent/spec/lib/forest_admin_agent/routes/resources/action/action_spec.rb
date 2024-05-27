@@ -94,7 +94,7 @@ module ForestAdminAgent
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(type: Types::FieldType::STRING, label: 'firstname')
+                  { type: Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -137,7 +137,7 @@ module ForestAdminAgent
               BaseAction.new(
                 scope: Types::ActionScope::SINGLE,
                 form: [
-                  DynamicField.new(type: Types::FieldType::STRING, label: 'firstname')
+                  { type: Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -192,7 +192,7 @@ module ForestAdminAgent
               BaseAction.new(
                 scope: Types::ActionScope::BULK,
                 form: [
-                  DynamicField.new(type: Types::FieldType::STRING, label: 'firstname')
+                  { type: Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -225,7 +225,7 @@ module ForestAdminAgent
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(type: Types::FieldType::STRING, label: 'firstname')
+                  { type: Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success

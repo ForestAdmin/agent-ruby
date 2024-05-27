@@ -105,8 +105,8 @@ module ForestAdminDatasourceCustomizer
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(label: 'firstname', type: Types::FieldType::STRING),
-                  DynamicField.new(label: 'lastname', type: Types::FieldType::STRING)
+                  { label: 'firstname', type: Types::FieldType::STRING },
+                  { label: 'lastname', type: Types::FieldType::STRING }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
             )
@@ -133,17 +133,17 @@ module ForestAdminDatasourceCustomizer
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(label: 'noIf', type: Types::FieldType::STRING),
-                  DynamicField.new(
+                  { label: 'noIf', type: Types::FieldType::STRING },
+                  {
                     label: 'dynamicIfFalse',
                     type: Types::FieldType::STRING,
                     if_condition: proc { false }
-                  ),
-                  DynamicField.new(
+                  },
+                  {
                     label: 'dynamicIfTrue',
                     type: Types::FieldType::STRING,
                     if_condition: proc { true }
-                  )
+                  }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
             )
@@ -176,16 +176,16 @@ module ForestAdminDatasourceCustomizer
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(
+                  {
                     label: 'firstname',
                     type: Types::FieldType::STRING,
                     default_value: proc { 'DynamicDefault' }
-                  ),
-                  DynamicField.new(
+                  },
+                  {
                     label: 'lastname',
                     type: Types::FieldType::STRING,
                     is_read_only: proc { |context| !context.get_form_value('firstname').nil? }
-                  )
+                  }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
             )
@@ -239,19 +239,19 @@ module ForestAdminDatasourceCustomizer
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  DynamicField.new(
+                  {
                     label: 'change',
                     type: Types::FieldType::STRING,
                     default_value: proc { 'DynamicDefault' }
-                  ),
-                  DynamicField.new(
+                  },
+                  {
                     label: 'to change',
                     type: Types::FieldType::STRING,
                     is_read_only: true,
                     value: proc do |context|
                       context.get_form_value('change') if context.field_changed?('change')
                     end
-                  )
+                  }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
             )

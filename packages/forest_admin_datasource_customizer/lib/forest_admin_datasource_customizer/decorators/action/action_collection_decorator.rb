@@ -10,6 +10,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_action(name, action)
+          action.build_fields
           @actions[name] = action
 
           mark_schema_as_dirty
