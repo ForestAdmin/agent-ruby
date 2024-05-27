@@ -52,7 +52,8 @@ module ForestAdminAgent
             isRequired: field.is_required,
             isReadOnly: field.is_read_only,
             field: field.label,
-            value: ForestValueConverter.value_to_forest(field)
+            value: ForestValueConverter.value_to_forest(field),
+            widgetEdit: GeneratorActionFieldWidget.build_widget_options(field)
           }
 
           output[:hook] = 'changeHook' if field.respond_to?(:watch_changes) && field.watch_changes

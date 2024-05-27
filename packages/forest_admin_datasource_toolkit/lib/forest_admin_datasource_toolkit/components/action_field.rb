@@ -2,7 +2,7 @@ module ForestAdminDatasourceToolkit
   module Components
     class ActionField
       attr_accessor :value, :watch_changes
-      attr_reader :type, :label, :description, :is_required, :is_read_only, :enum_values, :collection_name
+      attr_reader :type, :label, :description, :is_required, :is_read_only, :enum_values, :collection_name, :widget
 
       def initialize(
         type:,
@@ -24,6 +24,7 @@ module ForestAdminDatasourceToolkit
         @enum_values = enum_values
         @collection_name = collection_name
         @watch_changes = watch_changes
+        @widget = nil
       end
 
       def watch_changes?
