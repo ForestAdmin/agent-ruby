@@ -16,9 +16,9 @@ module ForestAdminDatasourceToolkit
         countable: false,
         searchable: false,
         charts: [],
-        segments: {}
+        segments: {},
+        actions: {}
       }
-      @actions = {}
     end
 
     def enable_count
@@ -50,9 +50,9 @@ module ForestAdminDatasourceToolkit
     end
 
     def add_action(name, action)
-      raise Exceptions::ForestException, "Action #{name} already defined in collection" if @actions[key]
+      raise Exceptions::ForestException, "Action #{name} already defined in collection" if @schema[:actions].key?(name)
 
-      @actions[name] = action
+      schema[:actions][name] = action
     end
 
     def render_chart(_caller, name, _record_id)
