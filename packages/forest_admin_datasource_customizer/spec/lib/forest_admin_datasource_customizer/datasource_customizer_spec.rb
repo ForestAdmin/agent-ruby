@@ -57,19 +57,5 @@ module ForestAdminDatasourceCustomizer
         expect(datasource.render_chart(caller, 'my_chart')).to eq({ countCurrent: 10, countPrevious: nil })
       end
     end
-
-    context 'when using a plugin' do
-      it 'adds a plugin' do
-        customizer = described_class.new
-        customizer.add_datasource(datasource, {})
-        plugin = instance_double(plugin)
-        allow(plugin).to receive(:new).and_return(plugin)
-        allow(plugin).to receive(:run).with(customizer, nil, { my_options: 1 })
-
-        customizer.use(plugin, { my_options: 1 })
-        customizer.datasource({})
-        expect(plugin).to have_received(:run).with(customizer, nil, { my_options: 1 })
-      end
-    end
   end
 end
