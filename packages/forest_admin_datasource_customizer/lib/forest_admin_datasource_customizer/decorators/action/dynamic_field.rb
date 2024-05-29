@@ -3,7 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Action
       class DynamicField
         attr_accessor :type, :label, :description, :is_required, :is_read_only, :if_condition, :value, :default_value,
-                      :collection_name, :enum_values, :widget
+                      :collection_name, :enum_values
 
         def initialize(
           type:,
@@ -15,7 +15,8 @@ module ForestAdminDatasourceCustomizer
           value: nil,
           default_value: nil,
           collection_name: nil,
-          enum_values: nil
+          enum_values: nil,
+          placeholder: nil
         )
           @type = type
           @label = label
@@ -27,7 +28,7 @@ module ForestAdminDatasourceCustomizer
           @default_value = default_value
           @collection_name = collection_name
           @enum_values = enum_values
-          @widget = nil
+          @placeholder = placeholder
         end
 
         def static?
