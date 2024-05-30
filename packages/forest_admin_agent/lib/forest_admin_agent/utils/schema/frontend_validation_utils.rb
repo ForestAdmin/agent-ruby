@@ -115,7 +115,9 @@ module ForestAdminAgent
           elsif [Operators::LESS_THAN, Operators::BEFORE, Operators::SHORTER_THAN].include? rule[:operator]
             rule[:value] = [rule[:value], new_rule[:value]].min
           elsif rule[:operator] == Operators::MATCH
-            # TODO
+            regex = rule[:value].gsub(/\W/, '')
+            new_regex = new_rule[:value].gsub(/\W/, '')
+            rule[:value] = "/^(?=#{regex})(?=#{new_regex}).*$/i"
           end
           # else Ignore the rules that we can't deduplicate (we could log a warning here).
 
