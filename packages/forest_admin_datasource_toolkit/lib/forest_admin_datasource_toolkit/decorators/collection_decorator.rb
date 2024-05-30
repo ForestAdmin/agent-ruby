@@ -13,7 +13,7 @@ module ForestAdminDatasourceToolkit
       end
 
       def native_driver
-        # TODO
+        child_collection.native_driver
       end
 
       def schema

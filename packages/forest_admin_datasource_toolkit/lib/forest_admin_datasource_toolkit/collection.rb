@@ -6,7 +6,7 @@ module ForestAdminDatasourceToolkit
                 :schema,
                 :native_driver
 
-    def initialize(datasource, name, native_driver: nil)
+    def initialize(datasource, name, native_driver = nil)
       super()
       @datasource = datasource
       @name = name
