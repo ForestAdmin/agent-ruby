@@ -82,7 +82,7 @@ module ForestAdminDatasourceActiveRecord
         when Operators::LIKE
           @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches(value)))
         when Operators::INCLUDES_ALL
-          # TODO: to implement
+          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches_all(value)))
         end
 
         @query

@@ -210,6 +210,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/json_api_serializer.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/parser/validation.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/query.rb'
     - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/computed/utils/flattener.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/decorators_stack.rb'
