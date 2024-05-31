@@ -105,8 +105,8 @@ module ForestAdminAgent
               parameters: {
                 format: field.format || nil,
                 placeholder: field.placeholder || nil,
-                minDate: field.min.is_a?(Date) ? field.min.toISOString : nil,
-                maxDate: field.max.is_a?(Date) ? field.max.toISOString : nil
+                minDate: field.min.is_a?(Date) ? field.min.iso8601 : nil,
+                maxDate: field.max.is_a?(Date) ? field.max.iso8601 : nil
               }
             }
           end
@@ -159,8 +159,8 @@ module ForestAdminAgent
               name: 'color editor',
               parameters: {
                 placeholder: field.placeholder || nil,
-                enableOpacity: field.enableOpacity || false,
-                quickPalette: field.quick_palette?.length ? field.quick_palette : nil
+                enableOpacity: field.enable_opacity || false,
+                quickPalette: field.quick_palette&.length ? field.quick_palette : nil
               }
             }
           end
@@ -250,9 +250,9 @@ module ForestAdminAgent
           end
 
           def map_currency_base(base)
-            return 'Cents' if ['cents', 'cent'].include?(base)
+            return 'Cent' if %w[cents cent].include?(base)
 
-            'Units'
+            'Unit'
           end
         end
       end

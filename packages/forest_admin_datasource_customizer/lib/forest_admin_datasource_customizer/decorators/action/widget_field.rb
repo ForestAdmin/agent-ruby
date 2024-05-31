@@ -19,6 +19,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class TimePickerField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :type, { type: 'contains', value: ['Time'] })
@@ -27,27 +29,34 @@ module ForestAdminDatasourceCustomizer
         end
 
         class AddressAutocompleteField < DynamicField
-          attr_reader :placeolder
+          attr_accessor :widget
 
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :type, { type: 'contains', value: ['String'] })
 
-            @placeolder = options[:placeholder] || nil
             @widget = 'AddressAutocomplete'
           end
         end
 
         class CheckboxField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
-            WidgetField.validate_arg(options, :type, { type: 'contains', value: [FieldType::BOOLEAN] })
+            WidgetField.validate_arg(
+              options,
+              :type,
+              { type: 'contains', value: [Types::FieldType::BOOLEAN] }
+            )
 
             @widget = 'Checkbox'
           end
         end
 
         class CheckboxGroupField < DynamicField
+          attr_accessor :widget, :options
+
           def initialize(options)
             super(**options)
 
@@ -55,7 +64,7 @@ module ForestAdminDatasourceCustomizer
             WidgetField.validate_arg(
               options,
               :type,
-              { type: 'contains', value: [FieldType::STRING_LIST, FieldType::NUMBER_LIST] }
+              { type: 'contains', value: [Types::FieldType::STRING_LIST, Types::FieldType::NUMBER_LIST] }
             )
 
             @widget = 'CheckboxGroup'
@@ -64,10 +73,12 @@ module ForestAdminDatasourceCustomizer
         end
 
         class ColorPickerField < DynamicField
+          attr_accessor :widget, :enable_opacity, :quick_palette
+
           def initialize(options)
             super(**options)
 
-            WidgetField.validate_arg(enable_opac, :type, { type: 'contains', value: [FieldType::STRING] })
+            WidgetField.validate_arg(options, :enable_opacity, { type: 'contains', value: [Types::FieldType::STRING] })
 
             @widget = 'ColorPicker'
             @enable_opacity = options[:enable_opacity] || nil
@@ -76,10 +87,12 @@ module ForestAdminDatasourceCustomizer
         end
 
         class CurrencyInputField < DynamicField
+          attr_accessor :widget, :currency, :base, :min, :max, :step
+
           def initialize(options)
             super(**options)
 
-            WidgetField.validate_arg(options, :type, { type: 'contains', value: [FieldType::NUMBER] })
+            WidgetField.validate_arg(options, :type, { type: 'contains', value: [Types::FieldType::NUMBER] })
             WidgetField.validate_arg(options, :currency, { type: 'present' })
 
             @widget = 'CurrencyInput'
@@ -92,13 +105,16 @@ module ForestAdminDatasourceCustomizer
         end
 
         class DatePickerField < DynamicField
+          attr_accessor :widget, :min, :max, :format, :step
+
           def initialize(options)
             super(**options)
 
             WidgetField.validate_arg(
               options,
               'type',
-              { type: 'contains', value: [FieldType::DATE, FieldType::DATE_ONLY, FieldType::STRING] }
+              { type: 'contains',
+                value: [Types::FieldType::DATE, Types::FieldType::DATE_ONLY, Types::FieldType::STRING] }
             )
 
             @widget = 'DatePicker'
@@ -110,6 +126,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class DropdownField < DynamicField
+          attr_accessor :widget, :options, :search
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -118,7 +136,8 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::DATE, FieldType::DATE_ONLY, FieldType::STRING, FieldType::STRING_LIST]
+                value: [Types::FieldType::DATE, Types::FieldType::DATE_ONLY, Types::FieldType::STRING,
+                        Types::FieldType::STRING_LIST]
               }
             )
 
@@ -129,6 +148,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class FilePickerField < DynamicField
+          attr_accessor :widget, :extensions, :max_count, :max_size_mb
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -137,7 +158,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::FILE, FieldType::FILE_LIST]
+                value: [Types::FieldType::FILE, Types::FieldType::FILE_LIST]
               }
             )
 
@@ -149,6 +170,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class NumberInputField < DynamicField
+          attr_accessor :widget, :step, :min, :max
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -157,7 +180,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::NUMBER]
+                value: [Types::FieldType::NUMBER]
               }
             )
 
@@ -169,6 +192,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class JsonEditorField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(
@@ -176,7 +201,8 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::DATE, FieldType::DATE_ONLY, FieldType::STRING, FieldType::STRING_LIST]
+                value: [Types::FieldType::DATE, Types::FieldType::DATE_ONLY, Types::FieldType::STRING,
+                        Types::FieldType::STRING_LIST]
               }
             )
 
@@ -184,7 +210,9 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
-        class NumberListInputField < DynamicField
+        class NumberInputListField < DynamicField
+          attr_accessor :widget, :allow_duplicates, :allow_empty_values, :enable_reorder, :min, :max, :step
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -193,11 +221,11 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::NUMBER_LIST]
+                value: [Types::FieldType::NUMBER_LIST]
               }
             )
 
-            @widget = 'NumberList'
+            @widget = 'NumberInputList'
             @allow_duplicates = options[:allow_duplicates] || nil
             @allow_empty_values = options[:allow_empty_values] || nil
             @enable_reorder = options[:enable_reorder] || nil
@@ -208,6 +236,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class RadioGroupField < DynamicField
+          attr_accessor :widget, :options
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -216,7 +246,8 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::DATE, FieldType::DATEONLY, FieldType::NUMBER, FieldType::STRING]
+                value: [Types::FieldType::DATE, Types::FieldType::DATEONLY, Types::FieldType::NUMBER,
+                        Types::FieldType::STRING]
               }
             )
 
@@ -226,6 +257,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class RichTextField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -234,7 +267,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::STRING]
+                value: [Types::FieldType::STRING]
               }
             )
 
@@ -243,6 +276,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class TextAreaField < DynamicField
+          attr_accessor :widget, :rows
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(
@@ -250,7 +285,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::STRING]
+                value: [Types::FieldType::STRING]
               }
             )
 
@@ -260,6 +295,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class TextInputField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(
@@ -267,7 +304,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::STRING]
+                value: [Types::FieldType::STRING]
               }
             )
 
@@ -276,6 +313,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class TextInputListField < DynamicField
+          attr_accessor :widget, :allow_duplicates, :allow_empty_values, :enable_reorder
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(
@@ -283,7 +322,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::STRING_LIST]
+                value: [Types::FieldType::STRING_LIST]
               }
             )
 
@@ -295,6 +334,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class UserDropdownField < DynamicField
+          attr_accessor :widget
+
           def initialize(options)
             super(**options)
             WidgetField.validate_arg(options, :options, { type: 'present' })
@@ -303,7 +344,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [FieldType::STRING, FieldType::STRING_LIST]
+                value: [Types::FieldType::STRING, Types::FieldType::STRING_LIST]
               }
             )
 

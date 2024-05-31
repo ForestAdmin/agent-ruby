@@ -3,7 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Action
       class DynamicField
         attr_accessor :type, :label, :description, :is_required, :is_read_only, :if_condition, :value, :default_value,
-                      :collection_name, :enum_values
+                      :collection_name, :enum_values, :placeholder
 
         def initialize(
           type:,
@@ -16,7 +16,8 @@ module ForestAdminDatasourceCustomizer
           default_value: nil,
           collection_name: nil,
           enum_values: nil,
-          placeholder: nil
+          placeholder: nil,
+          **_kwargs
         )
           @type = type
           @label = label
@@ -36,16 +37,12 @@ module ForestAdminDatasourceCustomizer
         end
 
         def to_h
-          {
-            type: @type,
-            label: @label,
-            description: @description,
-            is_required: @is_required,
-            is_read_only: @is_read_only,
-            value: @value,
-            collection_name: @collection_name,
-            enum_values: @enum_values
-          }
+          result = {}
+          instance_variables.each do |attribute|
+            result[attribute.to_s.delete('@').to_sym] = instance_variable_get(attribute)
+          end
+
+          result
         end
       end
     end

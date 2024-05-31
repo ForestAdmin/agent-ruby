@@ -94,6 +94,8 @@ module ForestAdminDatasourceCustomizer
             field.instance_variables.each do |key|
               key = key.to_s.delete('@').to_sym
 
+              next unless field.respond_to?(key)
+
               # call getter corresponding to the key and then set the evaluated value
               value = field.send(key)
               key = key.to_s.concat('=').to_sym
@@ -101,7 +103,7 @@ module ForestAdminDatasourceCustomizer
               field.send(key, evaluate(context, value))
             end
 
-            new_fields << ActionField.new(**field.to_h)
+            new_fields << Actions::ActionFieldFactory.build(field.to_h)
           end
 
           new_fields
