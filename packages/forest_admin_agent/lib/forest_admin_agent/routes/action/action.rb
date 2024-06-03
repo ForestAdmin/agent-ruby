@@ -37,6 +37,12 @@ module ForestAdminAgent
             "#{path}/hooks/change",
             proc { |args| handle_hook_request(args) }
           )
+          add_route(
+            "#{route_name}_search",
+            'post',
+            "#{path}/hooks/search",
+            proc { |args| handle_hook_request(args) }
+          )
           self
         end
 
@@ -73,6 +79,8 @@ module ForestAdminAgent
           forest_fields = args.dig(:params, :data, :attributes, :fields)
           data = (Schema::ForestValueConverter.make_form_data_from_fields(@datasource, forest_fields) if forest_fields)
           filter = get_record_selection(args)
+          search_values = {}
+          forest_fields&.each { |field| search_values[field['field']] = field['searchValue'] }
 
           fields = @collection.get_form(
             @caller,
@@ -81,8 +89,8 @@ module ForestAdminAgent
             filter,
             {
               change_field: args.dig(:params, :data, :attributes, :changed_field),
-              search_field: nil,
-              search_values: {},
+              search_field: args.dig(:params, :data, :attributes, :search_field),
+              search_values: search_values,
               includeHiddenFields: false
             }
           )

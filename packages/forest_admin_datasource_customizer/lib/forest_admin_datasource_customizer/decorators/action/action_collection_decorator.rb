@@ -40,10 +40,15 @@ module ForestAdminDatasourceCustomizer
           context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
           dynamic_fields = action.form
+          if metas[:search_field]
+            # in the case of a search hook,
+            # we don't want to rebuild all the fields. only the one searched
+            dynamic_fields = dynamic_fields.select { |field| field.label == metas[:search_field] }
+          end
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
-          fields = drop_deferred(context, dynamic_fields)
+          fields = drop_deferred(context, metas[:search_values], dynamic_fields)
 
           fields.each do |field|
             if field.value.nil?
@@ -87,7 +92,7 @@ module ForestAdminDatasourceCustomizer
           new_fields
         end
 
-        def drop_deferred(context, fields)
+        def drop_deferred(context, search_values, fields)
           new_fields = []
           fields.each do |field|
             field = field.dup
@@ -100,7 +105,7 @@ module ForestAdminDatasourceCustomizer
               value = field.send(key)
               key = key.to_s.concat('=').to_sym
 
-              field.send(key, evaluate(context, value))
+              field.send(key, evaluate(context, value, search_values&.dig(field.label)))
             end
 
             new_fields << Actions::ActionFieldFactory.build(field.to_h)
@@ -109,8 +114,12 @@ module ForestAdminDatasourceCustomizer
           new_fields
         end
 
-        def evaluate(context, value)
-          return value.call(context) if value.respond_to?(:call)
+        def evaluate(context, value, search_value = nil)
+          if value.respond_to?(:call)
+            return value.call(context, search_value) if search_value
+
+            return value.call(context)
+          end
 
           value
         end

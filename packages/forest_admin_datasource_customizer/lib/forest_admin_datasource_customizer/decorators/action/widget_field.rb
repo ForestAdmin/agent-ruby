@@ -289,7 +289,7 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @widget = 'RichText'
+            @widget = 'TextArea'
             @rows = options[:rows] || nil
           end
         end
@@ -348,7 +348,7 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @widget = 'Dropdown'
+            @widget = 'UserDropdown'
           end
         end
       end

@@ -160,7 +160,7 @@ module ForestAdminDatasourceToolkit
 
           def initialize(options)
             super(**options)
-            @widget = 'RichText'
+            @widget = 'TextArea'
             @rows = options[:rows] || nil
           end
         end
@@ -191,7 +191,7 @@ module ForestAdminDatasourceToolkit
 
           def initialize(options)
             super(**options)
-            @widget = 'Dropdown'
+            @widget = 'UserDropdown'
           end
         end
       end
