@@ -239,6 +239,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/permissions.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/charts/charts.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/action/action.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/frontend_validation_utils.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/query.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/collection_customizer.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/binary/binary_collection_decorator.rb'
