@@ -30,6 +30,7 @@ module Factory
         datasource: ForestAdminDatasourceToolkit::Datasource.new,
         name: 'collection',
         schema: {
+          actions: {},
           charts: [],
           fields: {},
           countable: false,
@@ -44,7 +45,7 @@ module Factory
         update: nil,
         delete: nil,
         aggregate: nil,
-        **args.except!(:schema)
+        **args.except(:schema)
       }
     )
   end
