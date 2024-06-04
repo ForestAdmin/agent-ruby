@@ -179,7 +179,7 @@ module ForestAdminDatasourceToolkit
 
           def initialize(options)
             super(**options)
-            @widget = 'TextInput'
+            @widget = 'TextInputList'
             @allow_duplicates = options[:allow_duplicates] || nil
             @allow_empty_values = options[:allow_empty_values] || nil
             @enable_reorder = options[:enable_reorder] || nil

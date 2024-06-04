@@ -83,7 +83,7 @@ module ForestAdminAgent
           action.setup_routes
 
           expect(action.routes.keys).to eq(
-            %w[forest_action_book__foo forest_action_book__foo_load forest_action_book__foo_change]
+            %w[forest_action_book__foo forest_action_book__foo_load forest_action_book__foo_change forest_action_book__foo_search]
           )
         end
 
