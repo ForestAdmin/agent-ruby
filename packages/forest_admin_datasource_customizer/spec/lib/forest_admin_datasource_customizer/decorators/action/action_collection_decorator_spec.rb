@@ -266,6 +266,48 @@ module ForestAdminDatasourceCustomizer
             )
           end
         end
+
+        describe 'with single action with search hook' do
+          before do
+            @decorated_book.add_action(
+              'make photocopy',
+              BaseAction.new(
+                scope: Types::ActionScope::GLOBAL,
+                form: [
+                  { label: 'firstname', type: Types::FieldType::STRING, default_value: proc { 'DynamicDefault' } },
+                  {
+                    label: 'lastname',
+                    type: Types::FieldType::STRING,
+                    is_read_only: proc { |context| !context.form_value('firstname').nil? }
+                  }
+                ]
+              ) { |_context, result_builder| result_builder.error(message: 'meeh') }
+            )
+          end
+
+          it 'only return the field matching the searchField' do
+            fields = @decorated_book.get_form(
+              caller,
+              'make photocopy',
+              {},
+              Filter.new,
+              {
+                changed_field: 'toto',
+                search_field: 'firstname',
+                search_values: { firstname: 'first' }
+              }
+            )
+
+            expect(fields).to include(
+              have_attributes(
+                label: 'firstname',
+                type: 'String',
+                value: 'DynamicDefault',
+                watch_changes: false
+              )
+            )
+          end
+        end
       end
     end
   end
