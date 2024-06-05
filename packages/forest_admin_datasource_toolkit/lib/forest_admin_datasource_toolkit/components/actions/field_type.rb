@@ -6,6 +6,8 @@ module ForestAdminDatasourceToolkit
 
         DATE = 'Date'.freeze
 
+        TIME = 'Time'.freeze
+
         DATE_ONLY = 'Dateonly'.freeze
 
         COLLECTION = 'Collection'.freeze

@@ -55,7 +55,7 @@ module ForestAdminAgent
               parameters: {
                 searchType: field.search == 'dynamic' ? 'dynamic' : nil,
                 isSearchable: %w[static dynamic].include?(field.search),
-                placeholder: field.placeholder || nil,
+                placeholder: field.placeholder,
                 static: { options: field.options || [] }
               }
             }
@@ -94,7 +94,7 @@ module ForestAdminAgent
             {
               name: 'text editor',
               parameters: {
-                placeholder: field.placeholder || nil
+                placeholder: field.placeholder
               }
             }
           end
@@ -103,8 +103,8 @@ module ForestAdminAgent
             {
               name: 'date editor',
               parameters: {
-                format: field.format || nil,
-                placeholder: field.placeholder || nil,
+                format: field.format,
+                placeholder: field.placeholder,
                 minDate: field.min.is_a?(Date) ? field.min.iso8601 : nil,
                 maxDate: field.max.is_a?(Date) ? field.max.iso8601 : nil
               }
@@ -115,10 +115,10 @@ module ForestAdminAgent
             {
               name: 'input array',
               parameters: {
-                placeholder: field.placeholder || nil,
-                allowDuplicate: field.allow_duplicates || false,
-                allowEmptyValue: field.allow_empty_values || false,
-                enableReorder: field.enable_reorder || true
+                placeholder: field.placeholder,
+                allowDuplicate: field.allow_duplicates,
+                allowEmptyValue: field.allow_empty_values,
+                enableReorder: field.enable_reorder
               }
             }
           end
@@ -127,7 +127,7 @@ module ForestAdminAgent
             {
               name: 'text area editor',
               parameters: {
-                placeholder: field.placeholder || nil,
+                placeholder: field.placeholder,
                 rows: valid_number?(field.rows) && field.rows.positive? ? field.rows.round : nil
               }
             }
@@ -137,7 +137,7 @@ module ForestAdminAgent
             {
               name: 'rich text',
               parameters: {
-                placeholder: field.placeholder || nil
+                placeholder: field.placeholder
               }
             }
           end
@@ -146,7 +146,7 @@ module ForestAdminAgent
             {
               name: 'number input',
               parameters: {
-                placeholder: field.placeholder || nil,
+                placeholder: field.placeholder,
                 min: valid_number?(field.min) ? field.min : nil,
                 max: valid_number?(field.max) ? field.max : nil,
                 step: valid_number?(field.step) ? field.step : nil
@@ -158,9 +158,9 @@ module ForestAdminAgent
             {
               name: 'color editor',
               parameters: {
-                placeholder: field.placeholder || nil,
-                enableOpacity: field.enable_opacity || false,
-                quickPalette: field.quick_palette&.length ? field.quick_palette : nil
+                placeholder: field.placeholder,
+                enableOpacity: field.enable_opacity,
+                quickPalette: field.quick_palette
               }
             }
           end
@@ -169,9 +169,9 @@ module ForestAdminAgent
             {
               name: 'input array',
               parameters: {
-                placeholder: field.placeholder || nil,
-                allowDuplicate: field.allow_duplicates || false,
-                enableReorder: field.enable_reorder || true,
+                placeholder: field.placeholder,
+                allowDuplicate: field.allow_duplicates.nil? ? false : field.allow_duplicates,
+                enableReorder: field.enable_reorder.nil? ? true : field.enable_reorder,
                 min: valid_number?(field.min) ? field.min : nil,
                 max: valid_number?(field.max) ? field.max : nil,
                 step: valid_number?(field.step) ? field.step : nil
@@ -183,7 +183,7 @@ module ForestAdminAgent
             {
               name: 'price editor',
               parameters: {
-                placeholder: field.placeholder || nil,
+                placeholder: field.placeholder,
                 min: valid_number?(field.min) ? field.min : nil,
                 max: valid_number?(field.max) ? field.max : nil,
                 step: valid_number?(field.step) ? field.step : nil,
@@ -212,9 +212,9 @@ module ForestAdminAgent
               name: 'file picker',
               parameters: {
                 prefix: nil,
-                filesExtensions: field.extensions || nil,
-                filesSizeLimit: field.max_size_mb || nil,
-                filesCountLimit: field.max_count || nil
+                filesExtensions: field.extensions,
+                filesSizeLimit: field.max_size_mb,
+                filesCountLimit: field.max_count
               }
             }
           end
@@ -223,7 +223,7 @@ module ForestAdminAgent
             {
               name: 'address editor',
               parameters: {
-                placeholder: field.placeholder || nil
+                placeholder: field.placeholder
               }
             }
           end
@@ -232,7 +232,7 @@ module ForestAdminAgent
             {
               name: 'assignee editor',
               parameters: {
-                placeholder: field.placeholder || nil
+                placeholder: field.placeholder
               }
             }
           end
@@ -250,7 +250,7 @@ module ForestAdminAgent
           end
 
           def map_currency_base(base)
-            return 'Cent' if %w[cents cent].include?(base)
+            return 'Cent' if %w[cents cent].include?(base.downcase)
 
             'Unit'
           end

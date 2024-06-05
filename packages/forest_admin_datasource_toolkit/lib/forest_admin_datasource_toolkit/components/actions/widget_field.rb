@@ -45,7 +45,7 @@ module ForestAdminDatasourceToolkit
           def initialize(options)
             super(**options)
             @widget = 'ColorPicker'
-            @enable_opacity = options[:enable_opacity] || nil
+            @enable_opacity = options[:enable_opacity].nil? ? false : options[:enable_opacity]
             @quick_palette = options[:quick_palette] || nil
           end
         end
@@ -127,12 +127,12 @@ module ForestAdminDatasourceToolkit
           def initialize(options)
             super(**options)
             @widget = 'NumberInputList'
-            @allow_duplicates = options[:allow_duplicates] || nil
-            @allow_empty_values = options[:allow_empty_values] || nil
-            @enable_reorder = options[:enable_reorder] || nil
-            @min = options[:min] || nil
-            @max = options[:max] || nil
-            @step = options[:step] || nil
+            @allow_duplicates = options[:allow_duplicates]
+            @allow_empty_values = options[:allow_empty_values]
+            @enable_reorder = options[:enable_reorder]
+            @min = options[:min]
+            @max = options[:max]
+            @step = options[:step]
           end
         end
 
@@ -179,10 +179,11 @@ module ForestAdminDatasourceToolkit
 
           def initialize(options)
             super(**options)
+
             @widget = 'TextInputList'
-            @allow_duplicates = options[:allow_duplicates] || nil
-            @allow_empty_values = options[:allow_empty_values] || nil
-            @enable_reorder = options[:enable_reorder] || nil
+            @allow_duplicates = !options[:allow_duplicates].nil?
+            @allow_empty_values = !options[:allow_empty_values].nil?
+            @enable_reorder = options[:enable_reorder].nil?
           end
         end
 
