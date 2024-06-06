@@ -17,7 +17,7 @@ module ForestAdminDatasourceToolkit
           collection_name: nil,
           watch_changes: false,
           placeholder: nil,
-          **_kargs
+          **_kwargs
         )
           @type = type
           @label = label
