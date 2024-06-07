@@ -1,3 +1,5 @@
+require 'base64'
+
 module ForestAdminAgent
   module Utils
     module Schema
@@ -86,19 +88,36 @@ module ForestAdminAgent
 
           return field.value&.join('|') if ActionFields.collection_field?(field)
 
-          # return make_data_uri(field.value) if ActionFields.file_field?(field)
-          #
-          # return value.map { |f| make_data_uri(f) } if ActionFields.file_list_field?(field)
+          return make_data_uri(field.value) if ActionFields.file_field?(field)
+
+          return value.map { |f| make_data_uri(f) } if ActionFields.file_list_field?(field)
 
           field.value
         end
 
         def self.make_data_uri(file)
-          # TODO: to implement
+          return if file.nil?
+
+          mime_type = `file --b --mime-type #{file.path}`.strip
+          value = Base64.strict_encode64(File.read(file.path))
+
+          "data:#{mime_type};base64,#{value}"
         end
 
-        def self.parse_data_uri(file)
-          # TODO: to implement
+        def self.parse_data_uri(data_uri)
+          return if data_uri.nil?
+
+          header, data = data_uri[5, data_uri.size].split(',')
+          mime_type, *media_types = header.split(';')
+          result = { 'mime_type' => mime_type, 'buffer' => Base64.strict_decode64(data) }
+
+          media_types.each do |media_type|
+            if (index = media_type.index('='))
+              result[media_type[0, index]] = CGI.unescape(media_type[index + 1, media_type.size])
+            end
+          end
+
+          result
         end
       end
     end

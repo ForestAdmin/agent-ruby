@@ -70,15 +70,15 @@ module ForestAdminDatasourceCustomizer
                 BaseAction.new(
                   scope: Types::ActionScope::SINGLE,
                   form: [
-                    DynamicField.new(label: 'change', type: Types::FieldType::STRING),
-                    DynamicField.new(
+                    { label: 'change', type: Types::FieldType::STRING },
+                    {
                       label: 'to change',
                       type: Types::FieldType::STRING,
                       is_read_only: true,
                       value: proc do |context|
                         return context.get_form_value('change') if context.field_changed?('change')
                       end
-                    )
+                    }
                   ]
                 ) do |_context, result_builder|
                   result_builder.success(message: 'Foo!')
