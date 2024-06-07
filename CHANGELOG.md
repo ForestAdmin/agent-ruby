@@ -1,3 +1,10 @@
+# [1.0.0-beta.52](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.51...v1.0.0-beta.52) (2024-06-07)
+
+
+### Features
+
+* **action:** add action widgets support ([#53](https://github.com/ForestAdmin/agent-ruby/issues/53)) ([51605b2](https://github.com/ForestAdmin/agent-ruby/commit/51605b2b1136a4a9f44b5f442803415f717bbae9))
+
 # [1.0.0-beta.51](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.50...v1.0.0-beta.51) (2024-05-23)
 
 
