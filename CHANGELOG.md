@@ -1,3 +1,10 @@
+# [1.0.0-beta.54](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.53...v1.0.0-beta.54) (2024-06-10)
+
+
+### Features
+
+* expose plugin to datasource-customizer ([#52](https://github.com/ForestAdmin/agent-ruby/issues/52)) ([2d36337](https://github.com/ForestAdmin/agent-ruby/commit/2d36337d3f93df261f9ccc2c7db8df183d4d92f0))
+
 # [1.0.0-beta.53](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.52...v1.0.0-beta.53) (2024-06-10)
 
 

@@ -1,3 +1,3 @@
 module ForestAdminAgent
-  VERSION = "1.0.0-beta.53"
+  VERSION = "1.0.0-beta.54"
 end
