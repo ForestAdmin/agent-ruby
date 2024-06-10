@@ -47,11 +47,10 @@ module ForestAdminDatasourceActiveRecord
 
     def fetch_fields
       @model.columns_hash.each do |column_name, column|
-        # TODO: check is not sti column
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(@model, column),
           filter_operators: operators_for_column_type(get_column_type(@model, column)),
-          is_primary_key: column_name == @model.primary_key,
+          is_primary_key: column_name == @model.primary_key || @model.primary_key.include?(column_name),
           is_read_only: false,
           is_sortable: true,
           default_value: column.default,

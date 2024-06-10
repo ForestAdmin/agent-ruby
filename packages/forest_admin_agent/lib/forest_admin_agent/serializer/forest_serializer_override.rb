@@ -60,7 +60,10 @@ module ForestAdminAgent
                 objects.each do |obj|
                   relation = ForestAdminAgent::Facades::Container.datasource.get_collection(options[:class_name]).schema[:fields][attribute_name]
                   relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
-                  obj_serializer = JSONAPI::Serializer.find_serializer(obj, options)
+                  option_relation = options.clone
+                  option_relation[:class_name] = relation_class_name
+                  obj_serializer = JSONAPI::Serializer.find_serializer(obj, option_relation)
+
                   # Use keys of ['posts', '1'] for the results to enforce uniqueness.
                   # Spec: A compound document MUST NOT include more than one resource object for each
                   # type and id pair.
@@ -200,7 +203,6 @@ module ForestAdminAgent
                 # of the internal special merging logic.
                 find_recursive_relationships(obj, inclusion_tree, relationship_data, passthrough_options)
               end
-
               result['included'] = relationship_data.map do |_, data|
                 included_passthrough_options = {}
                 included_passthrough_options[:base_url] = passthrough_options[:base_url]

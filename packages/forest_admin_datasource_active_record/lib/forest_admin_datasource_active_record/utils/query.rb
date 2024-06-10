@@ -107,9 +107,7 @@ module ForestAdminDatasourceActiveRecord
       def apply_select
         unless @projection.nil?
           @query = @query.select(@select.join(', '))
-          @query = @query.eager_load(@projection.relations.keys.map(&:to_sym))
-          # TODO: replace eager_load by joins because eager_load select ALL columns of relation
-          # @query = @query.joins(@projection.relations.keys.map(&:to_sym))
+          @query = @query.joins(@projection.relations.keys.map(&:to_sym))
         end
 
         @query
