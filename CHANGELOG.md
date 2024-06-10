@@ -1,3 +1,10 @@
+# [1.0.0-beta.53](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.52...v1.0.0-beta.53) (2024-06-10)
+
+
+### Features
+
+* add native driver support ([#54](https://github.com/ForestAdmin/agent-ruby/issues/54)) ([aea9c32](https://github.com/ForestAdmin/agent-ruby/commit/aea9c3257538ec52c4acfd95ff443084e5daf385))
+
 # [1.0.0-beta.52](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.51...v1.0.0-beta.52) (2024-06-07)
 
 
