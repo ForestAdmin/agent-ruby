@@ -15,6 +15,10 @@ module ForestAdminDatasourceActiveRecord
       enable_count
     end
 
+    def native_driver
+      ActiveRecord::Base.connection
+    end
+
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter)
 

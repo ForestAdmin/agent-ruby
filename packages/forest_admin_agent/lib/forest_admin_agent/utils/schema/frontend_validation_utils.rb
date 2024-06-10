@@ -53,8 +53,11 @@ module ForestAdminAgent
         def self.convert_validation_list(column)
           return [] if column.validations.empty?
 
-          rules = column.validations.dup.map { |rule| simplify_rule(column.column_type, rule) }
-          remove_duplicates_in_place(rules).map { |rule| SUPPORTED[rule[:operator]].call(rule) }
+          rules = column.validations.map { |rule| simplify_rule(column.column_type, rule) }
+          remove_duplicates_in_place(rules)
+
+          rules.filter { |rule| rule.is_a?(Hash) && rule.key?(:operator) }
+               .map { |rule| SUPPORTED[rule[:operator]].call(rule) }
         end
 
         def self.simplify_rule(column_type, rule)
@@ -74,11 +77,16 @@ module ForestAdminAgent
             timezone = 'Europe/Paris' # we're sending the schema => use random tz
             tree = ConditionTreeEquivalent.get_equivalent_tree(leaf, operators, column_type, timezone)
 
-            if tree.is_a? Nodes::ConditionTreeLeaf
-              [tree]
-            else
-              tree.conditions
-            end
+            conditions = if tree.is_a? Nodes::ConditionTreeLeaf
+                           [tree]
+                         else
+                           tree.conditions
+                         end
+
+            return conditions.filter { |c| c.is_a?(Nodes::ConditionTreeLeaf) }
+                             .filter { |c| c.operator != Operators::EQUAL && c.operator != Operators::NOT_EQUAL }
+                             .map { |c| simplify_rule(column_type, operator: c.operator, value: c.value) }
+                             .first
           rescue StandardError
             # Just ignore errors, they mean that the operator is not supported by the frontend
             # and that we don't have an automatic conversion for it.
@@ -91,36 +99,44 @@ module ForestAdminAgent
           []
         end
 
-        # The frontend crashes when it receives multiple rules of the same type.
-        # This method merges the rules which can be merged and drops the others.
         def self.remove_duplicates_in_place(rules)
           used = {}
-          rules.each_with_index do |rule, key|
-            if used.key?(rule[:operator])
-              rule = rules[rule[:operator]]
-              new_rule = rule
-              rules.delete(key)
-              rules[used[rule[:operator]]] = merge_into(rule, new_rule)
-            else
-              used[rule[:operator]] = key
+
+          i = 0
+          while i < rules.length
+            rule = rules[i]
+            if rule.is_a?(Hash) && rule.key?(:operator)
+              if used.key?(rule[:operator])
+                existing_rule = rules[used[rule[:operator]]]
+                new_rule = rules.delete_at(i)
+
+                merge_into(existing_rule, new_rule)
+                # Adjust the index to account for the removed element
+                i -= 1
+              else
+                used[rule[:operator]] = i
+              end
             end
+            i += 1
           end
-
-          rules
         end
 
-        def merge_into(rule, new_rule)
-          if [Operators::GREATER_THAN, Operators::AFTER, Operators::LONGER_THAN].include? rule[:operator]
+        # rubocop:disable Style/EmptyElse
+        def self.merge_into(rule, new_rule)
+          case rule[:operator]
+          when Operators::GREATER_THAN, Operators::AFTER, Operators::LONGER_THAN
             rule[:value] = [rule[:value], new_rule[:value]].max
-          elsif [Operators::LESS_THAN, Operators::BEFORE, Operators::SHORTER_THAN].include? rule[:operator]
+          when Operators::LESS_THAN, Operators::BEFORE, Operators::SHORTER_THAN
             rule[:value] = [rule[:value], new_rule[:value]].min
-          elsif rule[:operator] == Operators::MATCH
-            # TODO
+          when Operators::MATCH
+            regex = rule[:value].gsub(/\W/, '')
+            new_regex = new_rule[:value].gsub(/\W/, '')
+            rule[:value] = "/^(?=#{regex})(?=#{new_regex}).*$/i"
+          else
+            # Ignore the rules that we can't deduplicate (we could log a warning here).
           end
-          # else Ignore the rules that we can't deduplicate (we could log a warning here).
-
-          rule
         end
+        # rubocop:enable Style/EmptyElse
       end
     end
   end
