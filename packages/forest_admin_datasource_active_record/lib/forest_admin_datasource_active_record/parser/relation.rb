@@ -3,7 +3,7 @@ module ForestAdminDatasourceActiveRecord
     module Relation
       def associations(model)
         model.reflect_on_all_associations.select do |association|
-          !polymorphic?(association) && !active_type?(association.klass)
+          polymorphic?(association) ? true : !active_type?(association.klass)
         end
       end
 
@@ -15,6 +15,17 @@ module ForestAdminDatasourceActiveRecord
       #         See the gem documentation: https://github.com/makandra/active_type
       def active_type?(model)
         Object.const_defined?('ActiveType::Object') && model < ActiveType::Object
+      end
+
+      def get_polymorphic_types(relation)
+        types = {}
+        @datasource.models.each do |model|
+          unless model.reflect_on_all_associations.none? { |assoc| assoc.options[:as] == relation.name.to_sym }
+            types[model.name] = model.primary_key
+          end
+        end
+
+        types
       end
     end
   end
