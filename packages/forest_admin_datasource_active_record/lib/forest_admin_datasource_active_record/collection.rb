@@ -99,14 +99,27 @@ module ForestAdminDatasourceActiveRecord
           end
         when :belongs_to
           if association_primary_key?(association)
-            add_field(
-              association.name.to_s,
-              ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-                foreign_collection: association.class_name.demodulize.underscore,
-                foreign_key: association.foreign_key,
-                foreign_key_target: association.association_primary_key
+            if polymorphic?(association)
+              foreign_collections = get_polymorphic_types(association)
+              add_field(
+                association.name.to_s,
+                ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(
+                  foreign_collections: foreign_collections.keys,
+                  foreign_key: association.foreign_key,
+                  foreign_key_type_field: association.foreign_type,
+                  foreign_key_targets: foreign_collections
+                )
               )
-            )
+            else
+              add_field(
+                association.name.to_s,
+                ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
+                  foreign_collection: association.class_name.demodulize.underscore,
+                  foreign_key: association.foreign_key,
+                  foreign_key_target: association.association_primary_key
+                )
+              )
+            end
           end
         when :has_many
           if association_primary_key?(association)
