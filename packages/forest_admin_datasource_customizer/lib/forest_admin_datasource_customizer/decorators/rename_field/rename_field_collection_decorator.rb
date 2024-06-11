@@ -134,9 +134,11 @@ module ForestAdminDatasourceCustomizer
             child_field = paths[0]
             relation_name = from_child_collection[child_field] || child_field
             relation_schema = schema[:fields][relation_name]
-            relation = datasource.get_collection(relation_schema.foreign_collection)
+            if relation_schema.type != 'PolymorphicManyToOne'
+              relation = datasource.get_collection(relation_schema.foreign_collection)
 
-            return "#{relation_name}:#{relation.path_from_child_collection(paths[1])}"
+              return "#{relation_name}:#{relation.path_from_child_collection(paths[1])}"
+            end
           end
 
           from_child_collection[path] ||= path
@@ -148,10 +150,12 @@ module ForestAdminDatasourceCustomizer
             paths = path.split(':')
             relation_name = paths[0]
             relation_schema = schema[:fields][relation_name]
-            relation = datasource.get_collection(relation_schema.foreign_collection)
-            child_field = to_child_collection[relation_name] || relation_name
+            if relation_schema.type != 'PolymorphicManyToOne'
+              relation = datasource.get_collection(relation_schema.foreign_collection)
+              child_field = to_child_collection[relation_name] || relation_name
 
-            return "#{child_field}:#{relation.path_to_child_collection(paths[1])}"
+              return "#{child_field}:#{relation.path_to_child_collection(paths[1])}"
+            end
           end
 
           to_child_collection[path] ||= path
@@ -174,7 +178,7 @@ module ForestAdminDatasourceCustomizer
             field_schema = schema[:fields][field]
 
             # Perform the mapping, recurse for relations
-            if field_schema.type == 'Column' || value.nil?
+            if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne' || value.nil?
               record[field] = value
             else
               relation = datasource.get_collection(field_schema.foreign_collection)
