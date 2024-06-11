@@ -4,6 +4,7 @@ module ForestAdminAgent
       class GeneratorField
         RELATION_MAP = {
           'ManyToMany' => 'BelongsToMany',
+          'PolymorphicManyToOne' => 'BelongsTo',
           'ManyToOne' => 'BelongsTo',
           'OneToMany' => 'HasMany',
           'OneToOne' => 'HasOne'
@@ -12,12 +13,11 @@ module ForestAdminAgent
         def self.build_schema(collection, name)
           type = collection.schema[:fields][name].type
 
-          case type
-          when 'Column'
-            schema = build_column_schema(collection, name)
-          when 'ManyToOne', 'OneToMany', 'ManyToMany', 'OneToOne'
-            schema = build_relation_schema(collection, name)
-          end
+          schema = if type == 'Column'
+                     build_column_schema(collection, name)
+                   else
+                     build_relation_schema(collection, name)
+                   end
 
           schema.sort_by { |k, _v| k }.to_h
         end
@@ -151,29 +151,51 @@ module ForestAdminAgent
             )
           end
 
+          def build_polymorphic_many_to_one_schema(relation, base_schema)
+            base_schema.merge(
+              {
+                type: 'Number', # default or take first foreign_key_targets ??,
+                defaultValue: nil, # key_field.default_value,
+                isFilterable: false, # foreign_collection_filterable?(foreign_collection),
+                isPrimaryKey: false,
+                isRequired: false, # key_field.validations.any? { |v| v[:operator] == 'Present' },
+                isReadOnly: false, # key_field.is_read_only,
+                isSortable: true, # key_field.is_sortable,
+                validations: [], # FrontendValidationUtils.convert_validation_list(key_field),
+                reference: "#{base_schema[:field]}.id", # to change
+                polymorphic_referenced_models: relation.foreign_collections
+              }
+            )
+          end
+
           def build_relation_schema(collection, name)
             relation = collection.schema[:fields][name]
-            foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
-
             relation_schema = {
               field: name,
               enums: nil,
               integration: nil,
               isReadOnly: nil,
               isVirtual: false,
-              inverseOf: ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, name),
               relationship: RELATION_MAP[relation.type]
             }
 
-            case relation.type
-            when 'ManyToMany'
-              build_many_to_many_schema(relation, collection, foreign_collection, relation_schema)
-            when 'OneToMany'
-              build_one_to_many_schema(relation, collection, foreign_collection, relation_schema)
-            when 'OneToOne'
-              build_one_to_one_schema(relation, collection, foreign_collection, relation_schema)
-            when 'ManyToOne'
-              build_many_to_one_schema(relation, collection, foreign_collection, relation_schema)
+            if relation.type == 'PolymorphicManyToOne'
+              relation_schema[:inverseOf] = collection.name
+              build_polymorphic_many_to_one_schema(relation, relation_schema)
+            else
+              relation_schema[:inverseOf] =
+                ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, name)
+              foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
+              case relation.type
+              when 'ManyToMany'
+                build_many_to_many_schema(relation, collection, foreign_collection, relation_schema)
+              when 'OneToMany'
+                build_one_to_many_schema(relation, collection, foreign_collection, relation_schema)
+              when 'OneToOne'
+                build_one_to_one_schema(relation, collection, foreign_collection, relation_schema)
+              when 'ManyToOne'
+                build_many_to_one_schema(relation, collection, foreign_collection, relation_schema)
+              end
             end
           end
         end
