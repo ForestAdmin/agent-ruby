@@ -189,9 +189,9 @@ module ForestAdminAgent
               case relation.type
               when 'ManyToMany'
                 build_many_to_many_schema(relation, collection, foreign_collection, relation_schema)
-              when 'OneToMany'
+              when 'OneToMany', 'PolymorphicOneToMany'
                 build_one_to_many_schema(relation, collection, foreign_collection, relation_schema)
-              when 'OneToOne'
+              when 'OneToOne', 'PolymorphicOneToOne'
                 build_one_to_one_schema(relation, collection, foreign_collection, relation_schema)
               when 'ManyToOne'
                 build_many_to_one_schema(relation, collection, foreign_collection, relation_schema)

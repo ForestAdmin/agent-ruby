@@ -111,9 +111,11 @@ module ForestAdminAgent
       def relationships
         datasource = ForestAdminAgent::Facades::Container.datasource
         forest_collection = datasource.get_collection(@options[:class_name])
-        relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
+        relations_to_many = forest_collection.schema[:fields].select do |_field_name, field|
+          %w[OneToMany ManyToMany PolymorphicOneToMany].include?(field.type)
+        end
         relations_to_one = forest_collection.schema[:fields].select do |_field_name, field|
-          field.type == 'OneToOne' || field.type == 'ManyToOne' || field.type == 'PolymorphicManyToOne'
+          %w[OneToOne ManyToOne PolymorphicManyToOne PolymorphicOneToOne].include?(field.type)
         end
 
         relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
