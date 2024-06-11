@@ -112,7 +112,9 @@ module ForestAdminAgent
         datasource = ForestAdminAgent::Facades::Container.datasource
         forest_collection = datasource.get_collection(@options[:class_name])
         relations_to_many = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToMany' || field.type == 'ManyToMany' }
-        relations_to_one = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'OneToOne' || field.type == 'ManyToOne' }
+        relations_to_one = forest_collection.schema[:fields].select do |_field_name, field|
+          field.type == 'OneToOne' || field.type == 'ManyToOne' || field.type == 'PolymorphicManyToOne'
+        end
 
         relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
 
@@ -135,12 +137,21 @@ module ForestAdminAgent
           else
             relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
             options = @options.clone
-            options[:class_name] = datasource.get_collection(relation.foreign_collection).name
-            related_object_serializer = ForestSerializer.new(object, options)
-            data[formatted_attribute_name]['data'] = {
-              'type' => related_object_serializer.type.to_s,
-              'id' => related_object_serializer.id.to_s,
-            }
+            if relation.type == 'PolymorphicManyToOne'
+              options[:class_name] = @object[relation.foreign_key_type_field].demodulize.underscore
+              related_object_serializer = ForestSerializer.new(object, options)
+              data[formatted_attribute_name]['data'] = {
+                'type' => related_object_serializer.type.to_s,
+                'id' => related_object_serializer.id.to_s,
+              }
+            else
+              options[:class_name] = datasource.get_collection(relation.foreign_collection).name
+              related_object_serializer = ForestSerializer.new(object, options)
+              data[formatted_attribute_name]['data'] = {
+                'type' => related_object_serializer.type.to_s,
+                'id' => related_object_serializer.id.to_s,
+              }
+            end
           end
         end
 
@@ -173,6 +184,7 @@ module ForestAdminAgent
             end
           end
         end
+
         data
       end
 

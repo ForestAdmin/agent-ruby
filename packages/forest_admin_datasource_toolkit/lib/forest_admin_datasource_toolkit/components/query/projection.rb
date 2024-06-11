@@ -25,17 +25,19 @@ module ForestAdminDatasourceToolkit
           reject { |field| field.include?(':') }
         end
 
-        def relations
-          each_with_object({}) do |path, memo|
+        def relations(only_keys: false)
+          relations = each_with_object({}) do |path, memo|
             next unless path.include?(':')
 
             original_path = path.split(':')
-            next if original_path.size == 1
+            next if original_path.size == 1 && !only_keys
 
             relation = original_path.shift
 
             memo[relation] = Projection.new([original_path.join(':')].union(memo[relation] || []))
           end
+
+          only_keys ? relations.keys : relations
         end
 
         def nest(prefix: nil)
