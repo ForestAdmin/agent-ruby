@@ -10,6 +10,8 @@ module ForestAdminDatasourceToolkit
 
           relations.each do |relation, projection|
             schema = collection.schema[:fields][relation]
+            next unless schema.type != 'PolymorphicManyToOne'
+
             association = collection.datasource.get_collection(schema.foreign_collection)
             projection_with_pks = projection.with_pks(association).nest(prefix: relation)
 
@@ -28,6 +30,8 @@ module ForestAdminDatasourceToolkit
             next unless path.include?(':')
 
             original_path = path.split(':')
+            next if original_path.size == 1
+
             relation = original_path.shift
 
             memo[relation] = Projection.new([original_path.join(':')].union(memo[relation] || []))
