@@ -67,14 +67,27 @@ module ForestAdminDatasourceActiveRecord
       associations(@model).each do |association|
         case association.macro
         when :has_one
-          add_field(
-            association.name.to_s,
-            ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-              foreign_collection: association.class_name.demodulize.underscore,
-              origin_key: association.foreign_key,
-              origin_key_target: association.association_primary_key
+          if association.inverse_of.polymorphic?
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
+                foreign_collection: association.class_name.demodulize.underscore,
+                origin_key: association.foreign_key,
+                origin_key_target: association.association_primary_key,
+                origin_type_field: association.inverse_of.foreign_type,
+                origin_type_value: @model.name
+              )
             )
-          )
+          else
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
+                foreign_collection: association.class_name.demodulize.underscore,
+                origin_key: association.foreign_key,
+                origin_key_target: association.association_primary_key
+              )
+            )
+          end
         when :belongs_to
           if polymorphic?(association)
             foreign_collections = get_polymorphic_types(association)
@@ -108,6 +121,17 @@ module ForestAdminDatasourceActiveRecord
                 foreign_key: association.join_foreign_key,
                 foreign_key_target: association.association_primary_key,
                 through_collection: association.through_reflection.class_name.demodulize.underscore
+              )
+            )
+          elsif association.inverse_of.polymorphic?
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
+                foreign_collection: association.class_name.demodulize.underscore,
+                origin_key: association.foreign_key,
+                origin_key_target: association.association_primary_key,
+                origin_type_field: association.inverse_of.foreign_type,
+                origin_type_value: @model.name
               )
             )
           else
