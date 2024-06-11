@@ -177,7 +177,7 @@ module ForestAdminDatasourceCustomizer
           prefix = field.split(':').first
           field_schema = schema[:fields][prefix]
 
-          return [field] if field_schema.type == 'Column'
+          return [field] if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne'
 
           relation = datasource.get_collection(field_schema.foreign_collection)
           result = []
