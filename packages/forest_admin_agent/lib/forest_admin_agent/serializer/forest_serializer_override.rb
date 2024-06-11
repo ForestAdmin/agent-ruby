@@ -59,7 +59,12 @@ module ForestAdminAgent
                 # be followed by the recursion below.
                 objects.each do |obj|
                   relation = ForestAdminAgent::Facades::Container.datasource.get_collection(options[:class_name]).schema[:fields][attribute_name]
-                  relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
+                  if relation.type == 'PolymorphicManyToOne'
+                    relation_class_name = root_object[relation.foreign_key_type_field].demodulize.underscore
+                  else
+                    relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
+                  end
+
                   option_relation = options.clone
                   option_relation[:class_name] = relation_class_name
                   obj_serializer = JSONAPI::Serializer.find_serializer(obj, option_relation)
