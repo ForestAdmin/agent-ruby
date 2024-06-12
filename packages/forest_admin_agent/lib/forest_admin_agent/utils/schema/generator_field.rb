@@ -183,8 +183,10 @@ module ForestAdminAgent
               relation_schema[:inverseOf] = collection.name
               build_polymorphic_many_to_one_schema(relation, relation_schema)
             else
-              relation_schema[:inverseOf] =
-                ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, name)
+              relation_schema[:inverseOf] = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(
+                collection,
+                name
+              )
               foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
               case relation.type
               when 'ManyToMany'
