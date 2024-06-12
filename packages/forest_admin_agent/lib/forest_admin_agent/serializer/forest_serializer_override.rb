@@ -25,6 +25,7 @@ module ForestAdminAgent
               object = nil
               is_collection = false
               is_valid_attr = false
+
               if serializer.has_one_relationships.key?(unformatted_attr_name)
                 is_valid_attr = true
                 attr_data = serializer.has_one_relationships[unformatted_attr_name]
@@ -208,6 +209,7 @@ module ForestAdminAgent
                 # of the internal special merging logic.
                 find_recursive_relationships(obj, inclusion_tree, relationship_data, passthrough_options)
               end
+
               result['included'] = relationship_data.map do |_, data|
                 included_passthrough_options = {}
                 included_passthrough_options[:base_url] = passthrough_options[:base_url]
@@ -221,6 +223,7 @@ module ForestAdminAgent
                 serialize_primary(data[:object], included_passthrough_options)
               end
             end
+
             result
           end
         end

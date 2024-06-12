@@ -19,6 +19,8 @@ module ForestAdminDatasourceToolkit
               memo += relation_columns
             end
 
+            memo += ["#{column_name}:"] if schema.type == 'PolymorphicManyToOne'
+
             memo
           end
 

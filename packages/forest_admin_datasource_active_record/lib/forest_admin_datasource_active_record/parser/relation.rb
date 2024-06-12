@@ -21,7 +21,7 @@ module ForestAdminDatasourceActiveRecord
         types = {}
         @datasource.models.each do |model|
           unless model.reflect_on_all_associations.none? { |assoc| assoc.options[:as] == relation.name.to_sym }
-            types[model.name] = model.primary_key
+            types[model.name.demodulize.underscore] = model.primary_key
           end
         end
 
