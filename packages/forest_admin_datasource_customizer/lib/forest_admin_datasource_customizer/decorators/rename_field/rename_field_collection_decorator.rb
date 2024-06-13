@@ -41,6 +41,7 @@ module ForestAdminDatasourceCustomizer
 
         def refine_schema(sub_schema)
           fields = {}
+          schema = sub_schema.dup
 
           sub_schema[:fields].each do |old_name, old_schema|
             case old_schema.type
@@ -58,9 +59,9 @@ module ForestAdminDatasourceCustomizer
             fields[from_child_collection[old_name] || old_name] = old_schema
           end
 
-          sub_schema[:fields] = fields
+          schema[:fields] = fields
 
-          sub_schema
+          schema
         end
 
         def refine_filter(_caller, filter = nil)
@@ -89,7 +90,7 @@ module ForestAdminDatasourceCustomizer
         def list(caller, filter, projection)
           child_projection = projection.replace { |field| path_to_child_collection(field) }
           records = @child_collection.list(caller, filter, child_projection)
-          return records if child_projection == projection
+          return records if child_projection.sort == projection.sort
 
           records.map { |record| record_from_child_collection(record) }
         end
@@ -177,7 +178,8 @@ module ForestAdminDatasourceCustomizer
             field = from_child_collection[child_field] || child_field
             field_schema = schema[:fields][field]
 
-            # Perform the mapping, recurse for relations
+            # Perform the mapping, recurse for relation
+            # debugger if field == 'user'
             if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne' || value.nil?
               record[field] = value
             else
