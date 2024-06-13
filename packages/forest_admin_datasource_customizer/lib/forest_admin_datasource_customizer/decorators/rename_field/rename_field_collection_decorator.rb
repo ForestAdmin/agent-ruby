@@ -179,7 +179,6 @@ module ForestAdminDatasourceCustomizer
             field_schema = schema[:fields][field]
 
             # Perform the mapping, recurse for relation
-            # debugger if field == 'user'
             if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne' || value.nil?
               record[field] = value
             else
