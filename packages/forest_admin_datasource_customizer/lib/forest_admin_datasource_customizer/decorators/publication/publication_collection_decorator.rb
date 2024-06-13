@@ -37,14 +37,15 @@ module ForestAdminDatasourceCustomizer
 
         def refine_schema(child_schema)
           fields = {}
+          schema = child_schema.dup
 
-          child_schema[:fields].each do |name, field|
+          schema[:fields].each do |name, field|
             fields[name] = field if published?(name)
           end
 
-          child_schema[:fields] = fields
+          schema[:fields] = fields
 
-          child_schema
+          schema
         end
 
         def published?(name)
