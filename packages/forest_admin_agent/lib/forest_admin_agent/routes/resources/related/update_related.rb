@@ -8,6 +8,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query
+
           def setup_routes
             add_route(
               'forest_related_update',
@@ -30,9 +31,13 @@ module ForestAdminAgent
                           Utils::Id.unpack_id(@child_collection, id)
                         end
 
-            if relation.type == 'ManyToOne'
+            case relation.type
+            when 'ManyToOne'
               update_many_to_one(relation, parent_id, linked_id)
-            elsif relation.type == 'OneToOne'
+            when 'PolymorphicManyToOne'
+              polymorphic_type = args[:params][:forest][:data][:type]
+              update_polymorphic_many_to_one(relation, parent_id, linked_id, polymorphic_type)
+            when 'OneToOne'
               update_one_to_one(relation, parent_id, linked_id)
             end
 
@@ -47,6 +52,28 @@ module ForestAdminAgent
                             end
             fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@collection, [parent_id])
             @collection.update(@caller, Filter.new(condition_tree: fk_owner), { relation.foreign_key => foreign_value })
+          end
+
+          def update_polymorphic_many_to_one(relation, parent_id, linked_id, polymorphic_type)
+            foreign_value = if linked_id
+                              Collection.get_value(
+                                @child_collection,
+                                @caller,
+                                linked_id,
+                                relation.foreign_key_targets[@child_collection.name]
+                              )
+                            end
+
+            polymorphic_type = polymorphic_type.gsub('__', '::')
+            fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@collection, [parent_id])
+            @collection.update(
+              @caller,
+              Filter.new(condition_tree: fk_owner),
+              {
+                relation.foreign_key => foreign_value,
+                relation.foreign_key_type_field => polymorphic_type
+              }
+            )
           end
 
           def update_one_to_one(relation, parent_id, linked_id)
