@@ -8,7 +8,7 @@ module ForestAdminDatasourceActiveRecord
 
     def initialize(datasource, model)
       @model = model
-      name = model.name.demodulize.underscore
+      name = format_model_name(@model.name)
       super(datasource, name)
       fetch_fields
       fetch_associations
@@ -44,6 +44,10 @@ module ForestAdminDatasourceActiveRecord
     end
 
     private
+
+    def format_model_name(class_name)
+      class_name.gsub('::', '__')
+    end
 
     def fetch_fields
       @model.columns_hash.each do |column_name, column|
@@ -101,7 +105,7 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-                  foreign_collection: association.class_name.demodulize.underscore,
+                  foreign_collection: format_model_name(association.class_name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key
                 )
