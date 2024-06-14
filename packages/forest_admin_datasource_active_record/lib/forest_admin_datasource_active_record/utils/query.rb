@@ -50,39 +50,41 @@ module ForestAdminDatasourceActiveRecord
 
       def apply_condition_tree(condition_tree, aggregator = nil)
         if condition_tree.is_a? Nodes::ConditionTreeBranch
-          aggregator = condition_tree.aggregator.downcase
+          aggregator = condition_tree.aggregator.downcase.to_sym
           condition_tree.conditions.each do |condition|
-            query = apply_condition_tree(condition, aggregator)
-            @query = @query.send(aggregator, query)
+            @query = apply_condition_tree(condition, aggregator)
+            @query = @query.send(aggregator, @query)
           end
 
           @query
         else
-          compute_main_operator(condition_tree, aggregator || 'and')
+          @query = compute_main_operator(condition_tree, aggregator || :and)
         end
       end
 
       def compute_main_operator(condition_tree, aggregator)
         field = format_field(condition_tree.field)
         value = condition_tree.value
+        aggregator = aggregator.to_sym
 
         case condition_tree.operator
         when Operators::PRESENT
-          @query = @query.send(aggregator, @query.where.not({ field => nil }))
+          @query = query_aggregator(aggregator, @collection.model.where.not({ field => nil }))
         when Operators::EQUAL, Operators::IN
-          @query = @query.send(aggregator, @query.where({ field => value }))
+          @query = query_aggregator(aggregator, @collection.model.where({ field => value }))
         when Operators::NOT_EQUAL, Operators::NOT_IN
-          @query = @query.send(aggregator, @query.where.not({ field => value }))
+          @query = query_aggregator(aggregator, @collection.model.where.not({ field => value }))
         when Operators::GREATER_THAN
-          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].gt(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].gt(value)))
         when Operators::LESS_THAN
-          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].lt(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].lt(value)))
         when Operators::NOT_CONTAINS
-          @query = @query.send(aggregator, @query.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
         when Operators::LIKE
-          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches(value)))
         when Operators::INCLUDES_ALL
-          @query = @query.send(aggregator, @query.where(@arel_table[field.to_sym].matches_all(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches_all(value)))
         end
 
         @query
@@ -93,7 +95,7 @@ module ForestAdminDatasourceActiveRecord
           @select += @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
           @projection.relations.each_key do |relation|
             relation_schema = @collection.schema[:fields][relation]
-            @select << if relation_schema.type == 'OneToOne'
+            @select << if relation_schema.type == 'OneToOne' || relation_schema.type == 'PolymorphicOneToOne'
                          "#{@collection.model.table_name}.#{relation_schema.origin_key_target}"
                        else
                          "#{@collection.model.table_name}.#{relation_schema.foreign_key}"
@@ -107,32 +109,40 @@ module ForestAdminDatasourceActiveRecord
       def apply_select
         unless @projection.nil?
           @query = @query.select(@select.join(', '))
-          @query = @query.joins(@projection.relations.keys.map(&:to_sym))
+          @query = @query.includes(@projection.relations.keys.map(&:to_sym))
         end
 
         @query
       end
 
-      def add_join_relation(relation, relation_name)
-        if relation.type == 'ManyToMany'
-          # TODO: to implement
-        else
-          @query = @query.joins(relation_name.to_sym)
-        end
+      def add_join_relation(relation_name)
+        @query = @query.includes(relation_name.to_sym)
 
         @query
       end
 
       def format_field(field)
+        @select << "#{@collection.model.table_name}.#{field}"
+
         if field.include?(':')
           relation_name, field = field.split(':')
           relation = @collection.schema[:fields][relation_name]
           table_name = @collection.datasource.get_collection(relation.foreign_collection).model.table_name
-          add_join_relation(relation, relation_name)
+          add_join_relation(relation_name)
+          @select << "#{table_name}.#{field}"
+
           return "#{table_name}.#{field}"
         end
 
         field
+      end
+
+      def query_aggregator(aggregator, query)
+        if !@query.respond_to?(:where_clause) || @query.where_clause.empty?
+          query
+        else
+          @query.send(aggregator, query)
+        end
       end
     end
   end
