@@ -61,11 +61,11 @@ module ForestAdminDatasourceCustomizer
           column_type = schema.column_type
           enum_values = schema.enum_values
           filter_operators = schema.filter_operators
-          is_number = search_string.to_i.to_s == search_string
+          is_number = number?(search_string)
           is_uuid = uuid?(search_string)
 
           if column_type == PrimitiveType::NUMBER && is_number && filter_operators&.include?(Operators::EQUAL)
-            return Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, search_string.to_i)
+            return Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, search_string.to_f)
           end
 
           if column_type == PrimitiveType::ENUM && filter_operators&.include?(Operators::EQUAL)
@@ -122,6 +122,12 @@ module ForestAdminDatasourceCustomizer
 
         def uuid?(value)
           value.to_s.downcase.match?(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i)
+        end
+
+        def number?(value)
+          true if Float(value)
+        rescue StandardError
+          false
         end
       end
     end

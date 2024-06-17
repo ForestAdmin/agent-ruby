@@ -8,19 +8,23 @@ module ForestAdminDatasourceCustomizer
         protected
 
         def refine_schema(sub_schema)
-          sub_schema[:fields].map do |_name, schema|
-            if schema.type == 'Column'
+          schema = sub_schema.dup
+          schema[:fields] = sub_schema[:fields].dup
+
+          schema[:fields].map do |_name, field_schema|
+            if field_schema.type == 'Column'
               new_operators = Operators.all.select do |operator|
-                ConditionTreeEquivalent.equivalent_tree?(operator, schema.filter_operators, schema.column_type)
+                ConditionTreeEquivalent.equivalent_tree?(operator, field_schema.filter_operators,
+                                                         field_schema.column_type)
               end
 
-              schema.filter_operators = new_operators
+              field_schema.filter_operators = new_operators
             else
-              schema
+              field_schema
             end
           end
 
-          sub_schema
+          schema
         end
 
         def refine_filter(caller, filter = nil)
