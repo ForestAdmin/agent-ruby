@@ -1,3 +1,10 @@
+# [1.0.0-beta.55](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.54...v1.0.0-beta.55) (2024-06-17)
+
+
+### Bug Fixes
+
+* search behaviour  ([#55](https://github.com/ForestAdmin/agent-ruby/issues/55)) ([e429c4c](https://github.com/ForestAdmin/agent-ruby/commit/e429c4cf373a15617d12b6623da6d96283d5d582))
+
 # [1.0.0-beta.54](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.53...v1.0.0-beta.54) (2024-06-10)
 
 
