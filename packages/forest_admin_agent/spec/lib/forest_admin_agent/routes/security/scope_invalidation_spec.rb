@@ -1,111 +1,48 @@
 require 'spec_helper'
-require 'singleton'
+require 'shared/caller'
 
 module ForestAdminAgent
   module Routes
     module Security
-      describe Authentication do
-        subject(:authentication) { described_class.new }
+      describe ScopeInvalidation do
+        include_context 'with caller'
+        subject(:scope_invalidation) { described_class.new }
 
         context 'when setup the routes' do
-          it 'adds the route forest_authentication' do
-            authentication.setup_routes
-            expect(authentication.routes.include?('forest_authentication')).to be true
-            expect(authentication.routes.include?('forest_authentication-callback')).to be true
-            expect(authentication.routes.include?('forest_logout')).to be true
-            expect(authentication.routes.length).to eq 3
+          it 'adds the route forest_scope_invalidation' do
+            scope_invalidation.setup_routes
+            expect(scope_invalidation.routes.include?('forest_scope_invalidation')).to be true
+            expect(scope_invalidation.routes.length).to eq 1
           end
         end
 
-        context 'when handle the authentication' do
-          let(:rendering_id) { '10' }
-          let(:user) do
+        context 'when handle the scope invalidation' do
+          let(:args) do
             {
-              'id' => '1',
-              'email' => 'john.doe@example.com',
-              'first_name' => 'John',
-              'last_name' => 'Doe',
-              'team' => 'Operations',
-              'tags' => [
-                {
-                  'key' => 'demo',
-                  'value' => '1234'
-                }
-              ],
-              'rendering_id' => rendering_id,
-              'exp' => (DateTime.now + (1 / 24.0)).to_time.to_i,
-              'permission_level' => 'admin'
-            }
-          end
-          let(:token) { JWT.encode :user, ForestAdminAgent::Facades::Container.cache(:auth_secret), 'HS256' }
-          let(:auth_manager) { instance_double(ForestAdminAgent::Auth::AuthManager) }
-
-          before do
-            allow(ForestAdminAgent::Auth::AuthManager).to receive(:new).and_return(auth_manager)
-            allow(auth_manager).to receive(:start).with(any_args).and_return('https://api.development.forestadmin.com/oidc/...')
-            allow(auth_manager).to receive(:verify_code_and_generate_token).with(any_args).and_return(token)
-          end
-
-          it 'returns an auth url on the handle_authentication method' do
-            args = { params: { 'renderingId' => rendering_id } }
-            result = authentication.handle_authentication args
-            expect(result[:content][:authorizationUrl]).to eq 'https://api.development.forestadmin.com/oidc/...'
-          end
-
-          it 'raises an error if renderingId is not present' do
-            args = { params: {} }
-            expect do
-              authentication.handle_authentication args
-            end.to raise_error(Error,
-                               ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID)
-          end
-
-          it 'raises an error if renderingId is not an integer' do
-            args = { params: { 'renderingId' => 'abc' } }
-            expect do
-              authentication.handle_authentication args
-            end.to raise_error(Error,
-                               ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID)
-          end
-
-          it 'returns a token on the handle_authentication_callback method' do
-            args = { params: { 'code' => 'abc', 'state' => "{'renderingId': #{rendering_id}}" } }
-            result = authentication.handle_authentication_callback args
-            expect(result[:content][:token]).to eq token
-            expect(result[:content][:tokenData]).to eq JWT.decode(
-              token,
-              Facades::Container.cache(:auth_secret),
-              true,
-              { algorithm: 'HS256' }
-            )[0]
-          end
-        end
-
-        context 'when callback is called with error argument in the query' do
-          it 'raises an error' do
-            args = {
+              headers: { 'HTTP_AUTHORIZATION' => bearer },
               params: {
-                error: 'TrialBlockedError',
-                error_description: 'Your free trial has ended...',
-                state: '{"renderingId"=>128}'
+                'collection_name' => 'user',
+                'timezone' => 'Europe/Paris'
               }
             }
-
-            expect do
-              authentication.handle_authentication_callback args
-            end.to raise_error(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient)
           end
-        end
+          let(:permissions) { class_double(ForestAdminAgent::Services::Permissions).as_stubbed_const }
 
-        context 'when handle the logout route' do
-          it 'returns a 204 status code' do
-            result = authentication.handle_authentication_logout
+          before do
+            allow(permissions).to receive(:invalidate_cache).with(any_args).and_return(nil)
+          end
+
+          it 'return 204 response' do
+            result = scope_invalidation.handle_request(args)
+            expect(result[:content]).to be_nil
             expect(result[:status]).to eq 204
           end
-        end
 
-        it 'when handle auth it should return an AuthManager instance' do
-          expect(authentication.auth).to be_an_instance_of(ForestAdminAgent::Auth::AuthManager)
+          it 'call the invalidate_cache method' do
+            scope_invalidation.handle_request(args)
+
+            expect(permissions).to have_received(:invalidate_cache).with('forest.scopes')
+          end
         end
       end
     end
