@@ -60,7 +60,13 @@ module ForestAdminAgent
 
         fields = fields.split(',').map do |field_name|
           column = collection.schema[:fields][field_name.strip]
-          column.type == 'Column' ? field_name.strip : "#{field_name.strip}:#{args[:params][:fields][field_name.strip]}"
+          if column.type == 'Column'
+            field_name.strip
+          elsif column.type == 'PolymorphicManyToOne'
+            "#{field_name.strip}:*"
+          else
+            "#{field_name.strip}:#{args[:params][:fields][field_name.strip]}"
+          end
         end
 
         Projection.new(fields)
