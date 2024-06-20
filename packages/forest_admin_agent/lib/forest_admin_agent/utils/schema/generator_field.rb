@@ -6,7 +6,9 @@ module ForestAdminAgent
           'ManyToMany' => 'BelongsToMany',
           'PolymorphicManyToOne' => 'BelongsTo',
           'ManyToOne' => 'BelongsTo',
+          'PolymorphicOneToMany' => 'HasMany',
           'OneToMany' => 'HasMany',
+          'PolymorphicOneToOne' => 'HasOne',
           'OneToOne' => 'HasOne'
         }.freeze
 
@@ -155,14 +157,14 @@ module ForestAdminAgent
             base_schema.merge(
               {
                 type: 'Number', # default or take first foreign_key_targets ??,
-                defaultValue: nil, # key_field.default_value,
-                isFilterable: false, # foreign_collection_filterable?(foreign_collection),
+                defaultValue: nil,
+                isFilterable: false,
                 isPrimaryKey: false,
-                isRequired: false, # key_field.validations.any? { |v| v[:operator] == 'Present' },
-                isReadOnly: false, # key_field.is_read_only,
-                isSortable: true, # key_field.is_sortable,
-                validations: [], # FrontendValidationUtils.convert_validation_list(key_field),
-                reference: "#{base_schema[:field]}.id", # to change
+                isRequired: false,
+                isReadOnly: false,
+                isSortable: false,
+                validations: [],
+                reference: "#{base_schema[:field]}.id",
                 polymorphic_referenced_models: relation.foreign_collections
               }
             )
