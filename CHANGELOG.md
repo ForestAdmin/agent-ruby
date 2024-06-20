@@ -1,3 +1,11 @@
+# [1.0.0-beta.56](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.55...v1.0.0-beta.56) (2024-06-20)
+
+
+### Bug Fixes
+
+* **security:** patch braces dependency vulnerabilities ([#56](https://github.com/ForestAdmin/agent-ruby/issues/56)) ([699446e](https://github.com/ForestAdmin/agent-ruby/commit/699446e7e7c4d42e0cb9a5b42578fdc4719a742e))
+* **security:** patch tar dependency vulnerabilities ([#57](https://github.com/ForestAdmin/agent-ruby/issues/57)) ([b86f396](https://github.com/ForestAdmin/agent-ruby/commit/b86f396d278902aba1ad1f569229dcb22e4ac2ef))
+
 # [1.0.0-beta.55](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.54...v1.0.0-beta.55) (2024-06-17)
 
 
