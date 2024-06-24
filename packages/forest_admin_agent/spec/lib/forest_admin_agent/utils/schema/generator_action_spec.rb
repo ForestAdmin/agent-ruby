@@ -4,7 +4,6 @@ module ForestAdminAgent
   module Utils
     module Schema
       include ForestAdminDatasourceToolkit::Components::Actions
-      include ForestAdminDatasourceCustomizer::Decorators::Action
 
       describe GeneratorAction do
         describe 'without form' do
@@ -12,7 +11,7 @@ module ForestAdminAgent
             @collection = collection_build(
               schema: {
                 actions: {
-                  'Send email' => BaseAction.new(scope: Types::ActionScope::SINGLE)
+                  'Send email' => ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(scope: Types::ActionScope::SINGLE)
                 }
               }
             )
@@ -43,13 +42,13 @@ module ForestAdminAgent
             @collection = collection_build(
               schema: {
                 actions: {
-                  'Send email' => BaseAction.new(
-                    scope: Types::ActionScope::SINGLE
+                  'Send email' => ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                    scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE
                   )
                 }
               },
               get_form: [
-                ActionField.new(
+                ForestAdminDatasourceCustomizer::Decorators::Action::ActionField.new(
                   label: 'label',
                   description: 'email',
                   type: 'String',
@@ -87,9 +86,9 @@ module ForestAdminAgent
               schema: {
                 actions: {
                   'Send email' => instance_double(
-                    BaseAction,
+                    ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction,
                     {
-                      scope: Types::ActionScope::SINGLE,
+                      scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE,
                       static_form?: true,
                       is_generate_file: false
                     }
@@ -97,7 +96,7 @@ module ForestAdminAgent
                 }
               },
               get_form: [
-                ActionField.new(
+                ForestAdminDatasourceCustomizer::Decorators::Action::ActionField.new(
                   label: 'label',
                   description: 'email',
                   type: 'String',
@@ -123,9 +122,9 @@ module ForestAdminAgent
               schema: {
                 actions: {
                   'Send email' => instance_double(
-                    BaseAction,
+                    ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction,
                     {
-                      scope: Types::ActionScope::SINGLE,
+                      scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE,
                       static_form?: true,
                       is_generate_file: false
                     }
@@ -133,7 +132,7 @@ module ForestAdminAgent
                 }
               },
               get_form: [
-                ActionField.new(
+                ForestAdminDatasourceCustomizer::Decorators::Action::ActionField.new(
                   label: 'label',
                   description: 'email',
                   type: 'String',
@@ -154,9 +153,9 @@ module ForestAdminAgent
               schema: {
                 actions: {
                   'Send email' => instance_double(
-                    BaseAction,
+                    ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction,
                     {
-                      scope: Types::ActionScope::SINGLE,
+                      scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE,
                       static_form?: true,
                       is_generate_file: false
                     }
