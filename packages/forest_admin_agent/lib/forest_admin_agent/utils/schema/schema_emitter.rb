@@ -5,7 +5,7 @@ module ForestAdminAgent
   module Utils
     module Schema
       class SchemaEmitter
-        LIANA_NAME = "forest-rails"
+        LIANA_NAME = "agent-ruby"
 
         LIANA_VERSION = "1.0.0-beta.56"
 
