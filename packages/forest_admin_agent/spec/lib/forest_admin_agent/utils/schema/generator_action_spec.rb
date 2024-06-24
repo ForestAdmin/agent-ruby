@@ -4,6 +4,8 @@ module ForestAdminAgent
   module Utils
     module Schema
       include ForestAdminDatasourceToolkit::Components::Actions
+      include ForestAdminDatasourceCustomizer::Decorators::Action
+
       describe GeneratorAction do
         describe 'without form' do
           before do

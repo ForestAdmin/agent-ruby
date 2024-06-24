@@ -12,8 +12,9 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+      include ForestAdminDatasourceCustomizer::Decorators::Action
 
-      describe Action do
+      describe Actions do
         include_context 'with caller'
         let(:args) do
           {
