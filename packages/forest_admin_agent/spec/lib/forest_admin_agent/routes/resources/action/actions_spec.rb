@@ -12,7 +12,6 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
-      include ForestAdminDatasourceCustomizer::Decorators::Action
 
       describe Actions do
         include_context 'with caller'
@@ -91,10 +90,10 @@ module ForestAdminAgent
           before do
             @action_collection.add_action(
               'foo',
-              BaseAction.new(
-                scope: Types::ActionScope::GLOBAL,
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL,
                 form: [
-                  { type: Types::FieldType::STRING, label: 'firstname' }
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -134,10 +133,10 @@ module ForestAdminAgent
           before do
             @action_collection.add_action(
               'foo',
-              BaseAction.new(
-                scope: Types::ActionScope::SINGLE,
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE,
                 form: [
-                  { type: Types::FieldType::STRING, label: 'firstname' }
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -189,10 +188,10 @@ module ForestAdminAgent
           before do
             @action_collection.add_action(
               'foo',
-              BaseAction.new(
-                scope: Types::ActionScope::BULK,
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::BULK,
                 form: [
-                  { type: Types::FieldType::STRING, label: 'firstname' }
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
@@ -222,10 +221,10 @@ module ForestAdminAgent
           before do
             @action_collection.add_action(
               'foo',
-              BaseAction.new(
-                scope: Types::ActionScope::GLOBAL,
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL,
                 form: [
-                  { type: Types::FieldType::STRING, label: 'firstname' }
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::STRING, label: 'firstname' }
                 ]
               ) do |_context, result_builder|
                 result_builder.success
