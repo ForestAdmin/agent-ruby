@@ -7,7 +7,6 @@ require 'json'
 module ForestAdminAgent
   module Routes
     module Action
-      include ForestAdminDatasourceCustomizer::Decorators::Action
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Components::Query
