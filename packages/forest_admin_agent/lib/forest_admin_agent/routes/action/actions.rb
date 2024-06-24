@@ -5,12 +5,11 @@ require 'jwt'
 module ForestAdminAgent
   module Routes
     module Action
-      class Action < AbstractAuthenticatedRoute
+      class Actions < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-        include ForestAdminDatasourceCustomizer::Decorators::Action
 
         def initialize(collection, action)
           @action_name = action

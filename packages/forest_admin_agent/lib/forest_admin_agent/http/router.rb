@@ -30,7 +30,7 @@ module ForestAdminAgent
         routes = {}
         Facades::Container.datasource.collections.each_value do |collection|
           collection.schema[:actions].each_key do |action_name|
-            routes.merge!(Action::Action.new(collection, action_name).routes)
+            routes.merge!(Action::Actions.new(collection, action_name).routes)
           end
         end
 
