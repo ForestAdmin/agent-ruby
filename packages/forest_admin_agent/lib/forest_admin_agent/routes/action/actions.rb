@@ -10,6 +10,7 @@ module ForestAdminAgent
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminDatasourceCustomizer::Decorators::Action
 
         def initialize(collection, action)
           @action_name = action
