@@ -1,3 +1,10 @@
+# [1.0.0-beta.57](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.56...v1.0.0-beta.57) (2024-06-25)
+
+
+### Bug Fixes
+
+* release on forest_admin_datasource_customizer package ([#61](https://github.com/ForestAdmin/agent-ruby/issues/61)) ([10b8726](https://github.com/ForestAdmin/agent-ruby/commit/10b8726557a41d14f17a404f7a4012d7869083df))
+
 # [1.0.0-beta.56](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.55...v1.0.0-beta.56) (2024-06-20)
 
 
