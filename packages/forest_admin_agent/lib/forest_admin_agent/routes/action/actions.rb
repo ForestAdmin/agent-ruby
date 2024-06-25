@@ -5,7 +5,7 @@ require 'jwt'
 module ForestAdminAgent
   module Routes
     module Action
-      class Action < AbstractAuthenticatedRoute
+      class Actions < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
