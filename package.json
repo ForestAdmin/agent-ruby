@@ -1,6 +1,6 @@
 {
   "name": "agent-php",
-  "version": "1.0.0-beta.57",
+  "version": "1.0.0-beta.58",
   "description": "The official agent Ruby for Forest.",
   "private": false,
   "repository": {

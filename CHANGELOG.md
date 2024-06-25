@@ -1,3 +1,10 @@
+# [1.0.0-beta.58](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.57...v1.0.0-beta.58) (2024-06-25)
+
+
+### Bug Fixes
+
+* gemspecs load packages from rubygems ([#60](https://github.com/ForestAdmin/agent-ruby/issues/60)) ([8c3feaf](https://github.com/ForestAdmin/agent-ruby/commit/8c3feaf70734586593208bf23c74da8d5335e465))
+
 # [1.0.0-beta.57](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.56...v1.0.0-beta.57) (2024-06-25)
 
 
