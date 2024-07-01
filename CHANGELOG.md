@@ -1,3 +1,10 @@
+# [1.0.0-beta.59](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.58...v1.0.0-beta.59) (2024-07-01)
+
+
+### Features
+
+* add scope invalidation endpoint ([#58](https://github.com/ForestAdmin/agent-ruby/issues/58)) ([36a3aa7](https://github.com/ForestAdmin/agent-ruby/commit/36a3aa7e7ad890e68fcf6368b936149bb1645fae))
+
 # [1.0.0-beta.58](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.57...v1.0.0-beta.58) (2024-06-25)
 
 
