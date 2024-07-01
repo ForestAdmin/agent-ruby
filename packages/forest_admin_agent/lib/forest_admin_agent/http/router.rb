@@ -9,6 +9,7 @@ module ForestAdminAgent
           api_charts_routes,
           System::HealthCheck.new.routes,
           Security::Authentication.new.routes,
+          Security::ScopeInvalidation.new.routes,
           Charts::Charts.new.routes,
           Resources::Count.new.routes,
           Resources::Delete.new.routes,

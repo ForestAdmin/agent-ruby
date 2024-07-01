@@ -26,6 +26,10 @@ module ForestAdminAgent
         self
       end
 
+      def remove_collection(names)
+        @customizer.remove_collection(names)
+      end
+
       def add_chart(name, &definition)
         @customizer.add_chart(name, &definition)
 
