@@ -1,11 +1,11 @@
 module ForestAdminDatasourceActiveRecord
   module Utils
     ActiveRecordSerializer = Struct.new(:object) do
-      def to_hash
-        hash_object(object)
+      def to_hash(projection)
+        hash_object(object, projection)
       end
 
-      def hash_object(object, with_associations: true)
+      def hash_object(object, projection = nil, with_associations: true)
         hash = {}
 
         return {} if object.nil?
@@ -14,7 +14,11 @@ module ForestAdminDatasourceActiveRecord
 
         if with_associations
           each_association_collection(object) do |association_name, item|
-            hash[association_name] = hash_object(item, with_associations: false)
+            hash[association_name] = hash_object(
+              item,
+              projection.relations[association_name],
+              with_associations: projection.relations.key?(association_name)
+            )
           end
         end
 

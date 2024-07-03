@@ -109,7 +109,8 @@ module ForestAdminDatasourceActiveRecord
       def apply_select
         unless @projection.nil?
           @query = @query.select(@select.join(', '))
-          @query = @query.includes(@projection.relations.keys.map(&:to_sym))
+
+          @query = @query.includes(format_relation_projection(@projection))
         end
 
         @query
@@ -143,6 +144,16 @@ module ForestAdminDatasourceActiveRecord
         else
           @query.send(aggregator, query)
         end
+      end
+
+      def format_relation_projection(projection)
+        result = {}
+        projection&.relations&.each do |relation, projection_relation|
+          formatted_relations = format_relation_projection(projection_relation)
+
+          result[relation.to_sym] = formatted_relations
+        end
+        result
       end
     end
   end
