@@ -21,7 +21,11 @@ module ForestAdminDatasourceCustomizer
             computed = collection.get_computed(new_path)
             computed_dependencies = Flattener.with_null_marker(computed.dependencies)
             nested_dependencies = Projection.new(computed_dependencies)
-                                            .nest(prefix: new_path.include?(':') ? new_path.split(':')[0] : nil)
+                                            .nest(
+                                              prefix: if new_path.include?(':')
+                                                        new_path.slice(0, new_path.rindex(':'))
+                                                      end
+                                            )
 
             nested_dependencies.each do |path|
               queue_field(ctx, collection, path, paths, flatten)
