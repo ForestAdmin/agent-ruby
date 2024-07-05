@@ -60,8 +60,10 @@ module ForestAdminDatasourceCustomizer
                 { 'id' => 1 },
                 { 'id' => 2, 'book' => nil },
                 { 'id' => 3, 'book' => { 'author' => nil } },
-                { 'id' => 4, 'book' => { 'author' => { 'firstname' => 'Isaac', 'lastname' => 'Asimov' } } }
+                { 'id' => 4, 'book' => { 'author' => { 'firstname' => 'Isaac', 'lastname' => 'Asimov' } } },
+                { 'id' => 5, 'book' => { 'author' => { 'firstname' => nil, 'lastname' => nil } } }
               ]
+
               projection = Projection.new(%w[id book:author:firstname book:author:lastname])
               projection_with_marker = described_class.with_null_marker(projection)
               flattened = described_class.flatten(records, projection_with_marker)
@@ -72,22 +74,25 @@ module ForestAdminDatasourceCustomizer
               )
 
               expect(flattened).to contain_exactly(
-                contain_exactly(1, 2, 3, 4),
+                contain_exactly(1, 2, 3, 4, 5),
                 contain_exactly(
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
-                  'Isaac'
+                  'Isaac',
+                  nil
                 ),
                 contain_exactly(
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
-                  'Asimov'
+                  'Asimov',
+                  nil
                 ),
                 contain_exactly(
                   an_instance_of(Flattener::Undefined),
                   nil,
+                  an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined)
                 ),
@@ -95,6 +100,7 @@ module ForestAdminDatasourceCustomizer
                   an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined),
                   nil,
+                  an_instance_of(Flattener::Undefined),
                   an_instance_of(Flattener::Undefined)
                 )
               )
