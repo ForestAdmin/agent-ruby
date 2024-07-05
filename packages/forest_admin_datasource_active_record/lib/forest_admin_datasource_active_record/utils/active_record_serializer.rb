@@ -8,7 +8,7 @@ module ForestAdminDatasourceActiveRecord
       def hash_object(object, projection = nil, with_associations: true)
         hash = {}
 
-        return {} if object.nil?
+        return if object.nil?
 
         hash.merge! object.attributes
 
