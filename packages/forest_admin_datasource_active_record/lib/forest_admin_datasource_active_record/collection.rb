@@ -22,7 +22,7 @@ module ForestAdminDatasourceActiveRecord
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter)
 
-      query.get.map { |record| Utils::ActiveRecordSerializer.new(record).to_hash }
+      query.get.map { |record| Utils::ActiveRecordSerializer.new(record).to_hash(projection) }
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)

@@ -3,9 +3,55 @@ module ForestAdminDatasourceCustomizer
     module Computed
       module Utils
         class Flattener
+          include ForestAdminDatasourceToolkit::Components::Query
+
+          class Undefined
+            def key?(_key)
+              false
+            end
+
+            def dig(*_keys)
+              self
+            end
+          end
+
+          MARKER_NAME = '__null_marker'.freeze
+          def self.with_null_marker(projection)
+            new_projection = Projection.new(projection)
+            projection.each do |path|
+              parts = path.split(':')
+
+              parts.slice(1, parts.size).each_with_index do |_item, index|
+                new_projection << "#{parts.slice(0, index + 1).join(":")}:#{MARKER_NAME}"
+              end
+            end
+
+            new_projection.uniq
+          end
+
           def self.flatten(records, projection)
             projection.map do |field|
-              records.map { |record| ForestAdminDatasourceToolkit::Utils::Record.field_value(record, field) }
+              parts = field.split(':')
+              records.map do |record|
+                value = record
+
+                parts.slice(0, parts.size - 1).each_with_index do |_item, index|
+                  value = if value&.key?(parts[index])
+                            value[parts[index]]
+                          else
+                            Undefined.new
+                          end
+                end
+
+                # for markers, the value tells us which fields are null so that we can set them.
+                if parts[parts.length - 1] == MARKER_NAME
+                  value.nil? ? nil : Undefined.new
+                elsif value&.key?(parts[parts.length - 1])
+                  value[parts[parts.length - 1]]
+                else
+                  Undefined.new
+                end
+              end
             end
           end
 
@@ -17,11 +63,11 @@ module ForestAdminDatasourceCustomizer
               records[record_index] = {}
 
               projection.each_with_index do |path, path_index|
-                parts = path.split(':').reject { |part| part.nil? || part.empty? }
+                parts = path.split(':').reject { |part| part == MARKER_NAME }
                 value = flatten[path_index][record_index]
 
                 # Ignore undefined values.
-                next if value.nil?
+                next if value.is_a? Undefined
 
                 # Set all others (including null)
                 record = records[record_index]

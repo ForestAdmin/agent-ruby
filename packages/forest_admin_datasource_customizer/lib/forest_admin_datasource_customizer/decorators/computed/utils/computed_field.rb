@@ -19,28 +19,36 @@ module ForestAdminDatasourceCustomizer
             return if paths.include?(new_path)
 
             computed = collection.get_computed(new_path)
-            nested_dependencies = Projection.new(computed.dependencies)
-                                            .nest(prefix: new_path.include?(':') ? new_path.split(':')[0] : nil)
+            computed_dependencies = Flattener.with_null_marker(computed.dependencies)
+            nested_dependencies = Projection.new(computed_dependencies)
+                                            .nest(
+                                              prefix: if new_path.include?(':')
+                                                        new_path.slice(0, new_path.rindex(':'))
+                                                      end
+                                            )
 
             nested_dependencies.each do |path|
               queue_field(ctx, collection, path, paths, flatten)
             end
 
             dependency_values = nested_dependencies.map { |path| flatten[paths.index(path)] }
+
             paths.push(new_path)
 
-            flatten << compute_field(ctx, computed, computed.dependencies, dependency_values)
+            flatten << compute_field(ctx, computed, computed_dependencies, dependency_values)
           end
 
           def self.compute_from_records(ctx, collection, records_projection, desired_projection, records)
-            paths = records_projection.clone
+            paths = Flattener.with_null_marker(records_projection)
             flatten = Flattener.flatten(records, paths)
 
             desired_projection.each do |path|
               queue_field(ctx, collection, path, paths, flatten)
             end
 
-            Flattener.un_flatten(desired_projection.map { |path| flatten[paths.index(path)] }, desired_projection)
+            final_projection = Flattener.with_null_marker(desired_projection)
+
+            Flattener.un_flatten(final_projection.map { |path| flatten[paths.index(path)] }, final_projection)
           end
 
           def self.transform_unique_values(inputs, callback)
