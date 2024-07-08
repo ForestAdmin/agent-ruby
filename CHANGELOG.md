@@ -1,3 +1,10 @@
+# [1.0.0-beta.60](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.59...v1.0.0-beta.60) (2024-07-08)
+
+
+### Bug Fixes
+
+* **computed:** allow to use computed decorator with nested relations ([#62](https://github.com/ForestAdmin/agent-ruby/issues/62)) ([b065d84](https://github.com/ForestAdmin/agent-ruby/commit/b065d84f20faac476f5d5a05e87f01dfcbe4d95e))
+
 # [1.0.0-beta.59](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.58...v1.0.0-beta.59) (2024-07-01)
 
 
