@@ -123,14 +123,11 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def format_field(field)
-        @select << "#{@collection.model.table_name}.#{field}"
-
         if field.include?(':')
           relation_name, field = field.split(':')
           relation = @collection.schema[:fields][relation_name]
           table_name = @collection.datasource.get_collection(relation.foreign_collection).model.table_name
           add_join_relation(relation_name)
-          @select << "#{table_name}.#{field}"
 
           return "#{table_name}.#{field}"
         end

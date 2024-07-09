@@ -12,6 +12,7 @@ module ForestAdminDatasourceCustomizer
           schema[:fields] = sub_schema[:fields].dup
 
           schema[:fields].map do |_name, field_schema|
+            field_schema = field_schema.dup
             if field_schema.type == 'Column'
               new_operators = Operators.all.select do |operator|
                 ConditionTreeEquivalent.equivalent_tree?(operator, field_schema.filter_operators,
