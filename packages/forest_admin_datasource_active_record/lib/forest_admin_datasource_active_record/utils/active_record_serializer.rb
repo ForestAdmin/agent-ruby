@@ -13,7 +13,7 @@ module ForestAdminDatasourceActiveRecord
         hash.merge! object.attributes
 
         if with_associations
-          each_association_collection(object) do |association_name, item|
+          each_association_collection(object, projection) do |association_name, item|
             hash[association_name] = hash_object(
               item,
               projection.relations[association_name],
@@ -25,9 +25,10 @@ module ForestAdminDatasourceActiveRecord
         hash
       end
 
-      def each_association_collection(object)
+      def each_association_collection(object, projection)
         one_associations = %i[has_one belongs_to]
-        object.class.reflect_on_all_associations.filter { |a| one_associations.include?(a.macro) }
+        object.class.reflect_on_all_associations
+              .filter { |a| one_associations.include?(a.macro) && projection.relations.key?(a.name.to_s) }
               .each { |association| yield(association.name.to_s, object.send(association.name.to_s)) }
       end
     end
