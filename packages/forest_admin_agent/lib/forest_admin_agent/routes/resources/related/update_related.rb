@@ -80,24 +80,23 @@ module ForestAdminAgent
           def update_polymorphic_one_to_one(relation, parent_id, linked_id)
             origin_value = Collection.get_value(@collection, @caller, parent_id, relation.origin_key_target)
 
-            break_old_polymorphic_one_to_one_relationship(nil, relation, origin_value, linked_id)
-            create_new_polymorphic_one_to_one_relationship(nil, relation, origin_value, linked_id)
+            break_old_polymorphic_one_to_one_relationship(relation, origin_value, linked_id)
+            create_new_polymorphic_one_to_one_relationship(relation, origin_value, linked_id)
           end
 
           def update_one_to_one(relation, parent_id, linked_id)
             origin_value = Collection.get_value(@collection, @caller, parent_id, relation.origin_key_target)
 
-            break_old_one_to_one_relationship(nil, relation, origin_value, linked_id)
-            create_new_one_to_one_relationship(nil, relation, origin_value, linked_id)
+            break_old_one_to_one_relationship(relation, origin_value, linked_id)
+            create_new_one_to_one_relationship(relation, origin_value, linked_id)
           end
 
-          def break_old_polymorphic_one_to_one_relationship(scope, relation, origin_value, linked_id)
+          def break_old_polymorphic_one_to_one_relationship(relation, origin_value, linked_id)
             linked_id ||= []
 
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  scope,
                   @permissions.get_scope(@collection),
                   ConditionTree::Nodes::ConditionTreeBranch.new(
                     'And',
@@ -135,7 +134,7 @@ module ForestAdminAgent
             )
           end
 
-          def create_new_polymorphic_one_to_one_relationship(scope, relation, origin_value, linked_id)
+          def create_new_polymorphic_one_to_one_relationship(relation, origin_value, linked_id)
             return unless linked_id
 
             new_fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@child_collection, [linked_id])
@@ -144,7 +143,6 @@ module ForestAdminAgent
               @caller,
               Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  scope,
                   @permissions.get_scope(@collection),
                   new_fk_owner
                 ]
@@ -153,12 +151,11 @@ module ForestAdminAgent
             )
           end
 
-          def break_old_one_to_one_relationship(scope, relation, origin_value, linked_id)
+          def break_old_one_to_one_relationship(relation, origin_value, linked_id)
             linked_id ||= []
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  scope,
                   @permissions.get_scope(@collection),
                   ConditionTree::Nodes::ConditionTreeLeaf.new(
                     relation.origin_key,
@@ -182,7 +179,7 @@ module ForestAdminAgent
             @child_collection.update(@caller, old_fk_owner_filter, { relation.origin_key => nil })
           end
 
-          def create_new_one_to_one_relationship(scope, relation, origin_value, linked_id)
+          def create_new_one_to_one_relationship(relation, origin_value, linked_id)
             return unless linked_id
 
             new_fk_owner = ConditionTree::ConditionTreeFactory.match_ids(@child_collection, [linked_id])
@@ -191,7 +188,6 @@ module ForestAdminAgent
               @caller,
               Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  scope,
                   @permissions.get_scope(@collection),
                   new_fk_owner
                 ]
