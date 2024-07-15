@@ -72,10 +72,10 @@ module ForestAdminDatasourceCustomizer
             if field_schema&.type == 'Column'
               # We either call the customer handler or a default one that does nothing.
               handler = @handlers[key] || proc { |v| { key => v } }
-              field_patch = if context.record[key] && handler.call(context.record[key], context)
+              field_patch = if context.record.key?(key) && handler.call(context.record[key], context)
                               handler.call(context.record[key], context)
                             else
-                              []
+                              {}
                             end
 
               if field_patch && !field_patch.is_a?(Hash)
@@ -84,10 +84,17 @@ module ForestAdminDatasourceCustomizer
 
               # Isolate change to our own value (which should not recurse) and the rest which should
               # trigger the other handlers.
-              value = field_patch[key] || nil
+              if field_patch.key?(key)
+                value = field_patch[key]
+                is_value = true
+              else
+                value = nil
+                is_value = false
+              end
+
               new_patch = rewrite_patch(context.caller, context.action, field_patch.except(key), used + [key])
 
-              value ? deep_merge({ key => value }, new_patch) : new_patch
+              is_value ? deep_merge({ key => value }, new_patch) : new_patch
             elsif field_schema&.type == 'ManyToOne' || field_schema&.type == 'OneToOne'
               # Delegate relations to the appropriate collection.
               relation = datasource.get_collection(field_schema.foreign_collection)
