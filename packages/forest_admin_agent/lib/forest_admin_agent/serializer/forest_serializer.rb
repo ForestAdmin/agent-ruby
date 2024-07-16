@@ -21,11 +21,13 @@ module ForestAdminAgent
 
       def type
         class_name = @options[:class_name]
-        @@class_names[class_name] ||= class_name
+        @@class_names[class_name] ||= class_name.gsub('::', '__')
       end
 
       def id
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(
+          @options[:class_name].gsub('::', '__')
+        )
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(forest_collection)
         id = []
         primary_keys.each { |key| id << @object[key] }
@@ -50,7 +52,9 @@ module ForestAdminAgent
       end
 
       def attributes
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(@options[:class_name])
+        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(
+          @options[:class_name].gsub('::', '__')
+        )
         fields = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'Column' }
         fields.each { |field_name, _field| add_attribute(field_name) }
         return {} if attributes_map.nil?
@@ -110,7 +114,7 @@ module ForestAdminAgent
 
       def relationships
         datasource = ForestAdminAgent::Facades::Container.datasource
-        forest_collection = datasource.get_collection(@options[:class_name])
+        forest_collection = datasource.get_collection(@options[:class_name].gsub('::', '__'))
         relations_to_many = forest_collection.schema[:fields].select do |_field_name, field|
           %w[OneToMany ManyToMany PolymorphicOneToMany].include?(field.type)
         end
@@ -137,7 +141,8 @@ module ForestAdminAgent
           if object.nil? || object.empty?
             data[formatted_attribute_name]['data'] = nil
           else
-            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            relation = datasource.get_collection(@options[:class_name].gsub('::', '__'))
+                                 .schema[:fields][attribute_name.to_s]
             options = @options.clone
             if relation.type == 'PolymorphicManyToOne'
               options[:class_name] = @object[relation.foreign_key_type_field]
@@ -174,7 +179,7 @@ module ForestAdminAgent
           if @_include_linkages.include?(formatted_attribute_name) || attr_data[:options][:include_data]
             data[formatted_attribute_name]['data'] = []
             objects = has_many_relationship(attribute_name, attr_data) || []
-            relation = datasource.get_collection(@options[:class_name]).schema[:fields][attribute_name.to_s]
+            relation = datasource.get_collection(@options[:class_name].gsub('::', '__')).schema[:fields][attribute_name.to_s]
             options = @options.clone
             options[:class_name] = datasource.get_collection(relation.foreign_collection).name
             objects.each do |obj|

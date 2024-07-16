@@ -59,7 +59,9 @@ module ForestAdminAgent
                 # If it is not set, that indicates that this is an inner path and not a leaf and will
                 # be followed by the recursion below.
                 objects.each do |obj|
-                  relation = ForestAdminAgent::Facades::Container.datasource.get_collection(options[:class_name]).schema[:fields][attribute_name]
+                  relation = ForestAdminAgent::Facades::Container.datasource
+                                                                 .get_collection(options[:class_name].gsub('::', '__'))
+                                                                 .schema[:fields][attribute_name]
                   if relation.type == 'PolymorphicManyToOne'
                     relation_class_name = root_object[relation.foreign_key_type_field]
                   else
