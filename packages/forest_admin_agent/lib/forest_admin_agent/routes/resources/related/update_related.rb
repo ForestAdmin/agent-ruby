@@ -141,12 +141,13 @@ module ForestAdminAgent
 
             @child_collection.update(
               @caller,
-              Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-                [
-                  @permissions.get_scope(@collection),
-                  new_fk_owner
-                ]
-              )),
+              Filter.new(
+                condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                  [
+                    @permissions.get_scope(@collection), new_fk_owner
+                  ]
+                )
+              ),
               { relation.origin_key => origin_value, relation.origin_type_field => @collection.name.gsub('__', '::') }
             )
           end
@@ -171,7 +172,7 @@ module ForestAdminAgent
             )
 
             result = @child_collection.aggregate(@caller, old_fk_owner_filter, Aggregation.new(operation: 'Count'), 1)
-            return unless !(result[0][:value]).nil? && (result[0][:value]).positive?
+            return unless !(result[0]['value']).nil? && (result[0]['value']).positive?
 
             # Avoids updating records to null if it's not authorized by the ORM
             # and if there is no record to update (the filter returns no record)

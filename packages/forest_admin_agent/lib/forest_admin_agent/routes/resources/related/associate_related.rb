@@ -75,7 +75,7 @@ module ForestAdminAgent
             @child_collection.update(
               @caller,
               filter,
-              { relation.origin_key => value, relation.origin_type_field => @collection.name }
+              { relation.origin_key => value, relation.origin_type_field => @collection.name.gsub('__', '::') }
             )
           end
 
