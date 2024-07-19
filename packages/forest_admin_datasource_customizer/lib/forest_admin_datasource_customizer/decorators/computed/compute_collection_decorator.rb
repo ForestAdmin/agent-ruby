@@ -28,11 +28,11 @@ module ForestAdminDatasourceCustomizer
 
           # Check that all dependencies exist and are columns
           computed.dependencies.each do |field|
-            FieldValidator.validate(self, field)
             if field.include?(':') && schema[:fields][field.partition(':')[0]].type == 'PolymorphicManyToOne'
               raise ForestException,
-                    "Dependencies over a polymorphic relations(#{self.name}.#{field.partition(":")[0]}) is forbidden"
+                    "Dependencies over a polymorphic relations(#{self.name}.#{field.partition(":")[0]}) are forbidden"
             end
+            FieldValidator.validate(self, field)
           end
 
           if computed.dependencies.length <= 0
