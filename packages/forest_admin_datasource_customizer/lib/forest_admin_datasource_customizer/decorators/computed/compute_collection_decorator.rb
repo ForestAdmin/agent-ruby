@@ -15,7 +15,6 @@ module ForestAdminDatasourceCustomizer
         def get_computed(path)
           index = path.index(':')
           return @computeds[path] if index.nil?
-
           return @computeds[path] if schema[:fields][path[0, index]].type == 'PolymorphicManyToOne'
 
           foreign_collection = schema[:fields][path[0, index]].foreign_collection
@@ -30,6 +29,10 @@ module ForestAdminDatasourceCustomizer
           # Check that all dependencies exist and are columns
           computed.dependencies.each do |field|
             FieldValidator.validate(self, field)
+            if field.include?(':') && schema[:fields][field.partition(':')[0]].type == 'PolymorphicManyToOne'
+              raise ForestException,
+                    "Dependencies over a polymorphic relations(#{self.name}.#{field.partition(":")[0]}) is forbidden"
+            end
           end
 
           if computed.dependencies.length <= 0
