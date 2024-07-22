@@ -15,7 +15,15 @@ module ForestAdminDatasourceCustomizer
         def get_computed(path)
           index = path.index(':')
           return @computeds[path] if index.nil?
-          return @computeds[path] if schema[:fields][path[0, index]].type == 'PolymorphicManyToOne'
+
+          if schema[:fields][path[0, index]].type == 'PolymorphicManyToOne'
+            ForestAdminAgent::Facades::Container.logger.log(
+              'Debug',
+              "Cannot compute field over polymorphic relation #{name}.#{path[0, index]}."
+            )
+
+            return @computeds[path]
+          end
 
           foreign_collection = schema[:fields][path[0, index]].foreign_collection
           association = @datasource.get_collection(foreign_collection)
