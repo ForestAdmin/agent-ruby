@@ -233,6 +233,54 @@ module ForestAdminDatasourceCustomizer
             end
           end
         end
+
+        context 'with Polymorphic relation' do
+          before do
+            @collection_user = collection_build(
+              name: 'user',
+              schema: {
+                fields: {
+                  'id' => numeric_primary_key_build,
+                  'email' => column_build,
+                  'address' => Relations::PolymorphicOneToOneSchema.new(
+                    origin_key: 'addressable_id',
+                    foreign_collection: 'address',
+                    origin_key_target: 'id',
+                    origin_type_field: 'addressable_type',
+                    origin_type_value: 'order'
+                  )
+                }
+              }
+            )
+
+            @collection_address = collection_build(
+              name: 'address',
+              schema: {
+                fields: {
+                  'id' => numeric_primary_key_build,
+                  'book_id' => column_build,
+                  'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                    foreign_key_type_field: 'addressable_type',
+                    foreign_collections: ['user'],
+                    foreign_key_targets: { 'id' => 'user' },
+                    foreign_key: 'addressable_id'
+                  )
+                }
+              }
+            )
+
+            @datasource = described_class.new(datasource_with_collections_build([@collection_user, @collection_address]))
+          end
+
+          describe 'rename_collection' do
+            it 'raise an error when collection has polymorphic relation' do
+              expect { @datasource.rename_collection('user', 'renamed_user') }.to raise_error(
+                Exceptions::ForestException,
+                "🌳🌳🌳 Cannot rename collection user because it's a target of a polymorphic relation 'address.addressable'"
+              )
+            end
+          end
+        end
       end
     end
   end
