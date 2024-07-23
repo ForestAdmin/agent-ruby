@@ -75,44 +75,94 @@ module ForestAdminAgent
       end
 
       describe 'parse_projection' do
-        let(:collection) do
-          datasource = Datasource.new
-          collection_person = Collection.new(datasource, 'Person')
-          collection_person.add_fields(
-            {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'books' => Relations::ManyToManySchema.new(
-                origin_key: 'person_id',
-                origin_key_target: 'id',
-                foreign_collection: 'Book',
-                foreign_key: 'book_id',
-                foreign_key_target: 'id',
-                through_collection: 'BookPerson'
-              )
-            }
-          )
-          collection = Collection.new(datasource, 'Book')
-          collection.add_fields(
-            {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'composite_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-              'title' => ColumnSchema.new(column_type: 'String'),
-              'author_id' => ColumnSchema.new(column_type: 'Number'),
-              'author' => Relations::ManyToOneSchema.new(
-                foreign_key: 'author_id',
-                foreign_key_target: 'id',
-                foreign_collection: 'Person'
-              )
-            }
-          )
+        context 'when collection has PolymorphicManyToOne' do
+          let(:collection) do
+            datasource = Datasource.new
+            collection = Collection.new(datasource, 'Address')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                'addressable_type' => ColumnSchema.new(column_type: 'String'),
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: ['User'],
+                  foreign_key_targets: { 'id' => 'User' },
+                  foreign_key: 'addressable_id'
+                )
+              }
+            )
+            collection_user = Collection.new(datasource, 'User')
+            collection_user.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'email' => ColumnSchema.new(column_type: 'String'),
+                'address' => Relations::PolymorphicOneToOneSchema.new(
+                  origin_key: 'addressable_id',
+                  foreign_collection: 'address',
+                  origin_key_target: 'id',
+                  origin_type_field: 'addressable_type',
+                  origin_type_value: 'User'
+                )
+              }
+            )
 
-          datasource.add_collection(collection)
-          datasource.add_collection(collection_person)
+            datasource.add_collection(collection)
+            datasource.add_collection(collection_user)
 
-          return collection
+            return collection
+          end
+
+          it 'convert the request to a valid projection with polymorphic_relation:*' do
+            args = {
+              params: {
+                fields: { 'Address' => 'id,addressable,addressable_id,addressable_type' }
+              }
+            }
+            expect(described_class.parse_projection(collection, args)).to eq(
+              Projection.new(%w[id addressable:* addressable_id addressable_type])
+            )
+          end
         end
 
         context 'when request is well formed' do
+          let(:collection) do
+            datasource = Datasource.new
+            collection_person = Collection.new(datasource, 'Person')
+            collection_person.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'books' => Relations::ManyToManySchema.new(
+                  origin_key: 'person_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'Book',
+                  foreign_key: 'book_id',
+                  foreign_key_target: 'id',
+                  through_collection: 'BookPerson'
+                )
+              }
+            )
+            collection = Collection.new(datasource, 'Book')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'composite_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'title' => ColumnSchema.new(column_type: 'String'),
+                'author_id' => ColumnSchema.new(column_type: 'Number'),
+                'author' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'author_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Person'
+                )
+              }
+            )
+
+            datasource.add_collection(collection)
+            datasource.add_collection(collection_person)
+
+            return collection
+          end
+
           it 'convert the request to a valid projection' do
             args = {
               params: {
