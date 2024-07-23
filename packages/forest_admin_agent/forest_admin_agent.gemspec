@@ -47,6 +47,4 @@ admin work on any Ruby application."
   spec.add_dependency "rake", "~> 13.0"
   spec.add_dependency "rack-cors", "~> 2.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
-  spec.add_dependency "forest_admin_datasource_customizer"
-  spec.add_dependency "forest_admin_datasource_toolkit"
 end

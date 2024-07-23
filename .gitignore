@@ -16,5 +16,6 @@ vendor
 
 # GEM
 Gemfile.lock
+Gemfile-test.lock
 *.gem
 pkg/
