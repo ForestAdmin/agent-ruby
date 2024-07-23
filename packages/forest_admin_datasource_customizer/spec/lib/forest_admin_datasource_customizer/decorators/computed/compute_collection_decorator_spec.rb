@@ -58,7 +58,7 @@ module ForestAdminDatasourceCustomizer
                 'addressable' => Relations::PolymorphicManyToOneSchema.new(
                   foreign_key_type_field: 'addressable_type',
                   foreign_collections: ['person'],
-                  foreign_key_targets: { 'id' => 'person' },
+                  foreign_key_targets: { 'person' => 'id' },
                   foreign_key: 'addressable_id'
                 )
               }
