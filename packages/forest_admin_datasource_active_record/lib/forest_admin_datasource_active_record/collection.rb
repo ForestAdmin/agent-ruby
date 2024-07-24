@@ -63,49 +63,61 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    def association_primary_key?(association)
+      !association.association_primary_key.empty?
+    rescue StandardError
+      false
+    end
+
     def fetch_associations
       associations(@model).each do |association|
         case association.macro
         when :has_one
-          add_field(
-            association.name.to_s,
-            ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-              foreign_collection: association.class_name.demodulize.underscore,
-              origin_key: association.foreign_key,
-              origin_key_target: association.association_primary_key
-            )
-          )
-        when :belongs_to
-          add_field(
-            association.name.to_s,
-            ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-              foreign_collection: association.class_name.demodulize.underscore,
-              foreign_key: association.foreign_key,
-              foreign_key_target: association.association_primary_key
-            )
-          )
-        when :has_many
-          if association.through_reflection?
+          if association_primary_key?(association)
             add_field(
               association.name.to_s,
-              ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                foreign_collection: association.class_name.demodulize.underscore,
-                origin_key: association.through_reflection.foreign_key,
-                origin_key_target: association.through_reflection.join_foreign_key,
-                foreign_key: association.join_foreign_key,
-                foreign_key_target: association.association_primary_key,
-                through_collection: association.through_reflection.class_name.demodulize.underscore
-              )
-            )
-          else
-            add_field(
-              association.name.to_s,
-              ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-                foreign_collection: association.class_name.demodulize.underscore,
+              ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
+                foreign_collection: format_model_name(association.class_name),
                 origin_key: association.foreign_key,
                 origin_key_target: association.association_primary_key
               )
             )
+          end
+        when :belongs_to
+          if association_primary_key?(association)
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
+                foreign_collection: format_model_name(association.class_name),
+                foreign_key: association.foreign_key,
+                foreign_key_target: association.association_primary_key
+              )
+            )
+          end
+        when :has_many
+          if association_primary_key?(association)
+            if association.through_reflection?
+              add_field(
+                association.name.to_s,
+                ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
+                  foreign_collection: format_model_name(association.class_name),
+                  origin_key: association.through_reflection.foreign_key,
+                  origin_key_target: association.through_reflection.join_foreign_key,
+                  foreign_key: association.join_foreign_key,
+                  foreign_key_target: association.association_primary_key,
+                  through_collection: format_model_name(association.through_reflection.class_name)
+                )
+              )
+            else
+              add_field(
+                association.name.to_s,
+                ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
+                  foreign_collection: format_model_name(association.class_name),
+                  origin_key: association.foreign_key,
+                  origin_key_target: association.association_primary_key
+                )
+              )
+            end
           end
         end
       end

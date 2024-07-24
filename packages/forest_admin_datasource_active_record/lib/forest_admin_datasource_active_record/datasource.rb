@@ -19,11 +19,20 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    def primary_key?(model)
+      !model.primary_key.empty?
+    rescue StandardError
+      false
+    end
+
     def fetch_model(model)
       if model.name.start_with?('HABTM_')
         build_habtm(model)
       else
-        @models << model unless model.abstract_class? || @models.include?(model) || !model.table_exists?
+        @models << model unless model.abstract_class? ||
+                                @models.include?(model) ||
+                                !model.table_exists? ||
+                                !primary_key?(model)
       end
     end
 
