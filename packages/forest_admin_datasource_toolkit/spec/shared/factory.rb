@@ -30,7 +30,7 @@ module Factory
         update: nil,
         delete: nil,
         aggregate: nil,
-        **args.except!(:schema)
+        **args.except(:schema)
       }
     )
   end

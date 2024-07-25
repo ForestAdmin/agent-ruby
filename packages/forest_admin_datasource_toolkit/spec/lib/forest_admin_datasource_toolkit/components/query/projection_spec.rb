@@ -10,7 +10,13 @@ module ForestAdminDatasourceToolkit
           collection.add_fields(
             {
               'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
-              'name' => ColumnSchema.new(column_type: PrimitiveType::STRING)
+              'name' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+              'polymorphic_relation' => Relations::PolymorphicManyToOneSchema.new(
+                foreign_key_type_field: 'collection_type',
+                foreign_collections: %w[foo],
+                foreign_key_targets: { 'foo' => 'id' },
+                foreign_key: 'collection_id'
+              )
             }
           )
 
@@ -39,6 +45,23 @@ module ForestAdminDatasourceToolkit
             )
             projection = described_class.new(['name']).with_pks(collection)
             expect(projection).to eq(described_class.new(%w[name key1 key2]))
+          end
+
+          it 'ignore the PolymorphicManyToOne relation' do
+            collection = Collection.new(Datasource.new, '__collection__')
+            collection.add_fields(
+              {
+                'polymorphic_relation' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'collection_type',
+                  foreign_collections: %w[foo],
+                  foreign_key_targets: { 'foo' => 'id' },
+                  foreign_key: 'collection_id'
+                )
+              }
+            )
+
+            projection = described_class.new(%w[name polymorphic_relation:*]).with_pks(collection)
+            expect(projection).to eq(described_class.new(%w[name polymorphic_relation:*]))
           end
         end
 
@@ -69,6 +92,12 @@ module ForestAdminDatasourceToolkit
             projection = described_class.new(%w[id name category:label])
 
             expect(projection.relations).to eq({ 'category' => ['label'] })
+          end
+
+          it 'return only the relations keys when call with only_keys at true' do
+            projection = described_class.new(%w[id name category:label])
+
+            expect(projection.relations(only_keys: true)).to eq(['category'])
           end
         end
 
