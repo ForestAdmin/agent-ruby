@@ -4,12 +4,18 @@ require 'filecache'
 module ForestAdminAgent
   module Builder
     class AgentFactory
+      extend T::Sig
       include Singleton
 
       TTL_CONFIG = 3600
       TTL_SCHEMA = 7200
 
       attr_reader :customizer, :container, :has_env_secret
+
+      sig { returns(AgentFactory) }
+      def self.instance
+        instance
+      end
 
       def setup(options)
         @options = options
@@ -20,6 +26,7 @@ module ForestAdminAgent
         build_logger
       end
 
+      sig { params(datasource: ForestAdminDatasourceToolkit::Datasource, options: Hash).returns(self) }
       def add_datasource(datasource, options = {})
         @customizer.add_datasource(datasource, options)
 
@@ -36,6 +43,11 @@ module ForestAdminAgent
         self
       end
 
+      sig do
+        params(name: String,
+               handle: T.proc.params(customizer: ForestAdminDatasourceCustomizer::CollectionCustomizer).void)
+          .returns(self)
+      end
       def customize_collection(name, &handle)
         @customizer.customize_collection(name, handle)
 
