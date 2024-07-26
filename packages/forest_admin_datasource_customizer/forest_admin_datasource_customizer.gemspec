@@ -36,4 +36,5 @@ admin work on any Ruby application."
   spec.add_dependency "activesupport", ">= 6.1"
   spec.add_dependency 'marcel', '~> 1.0', '>= 1.0.4'
   spec.add_dependency "zeitwerk", "~> 2.3"
+  spec.add_dependency "ruby-lsp"
 end
