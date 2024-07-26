@@ -20,7 +20,7 @@ module ForestAdminDatasourceCustomizer
 
         def refine_filter(caller, filter)
           # Search string is not significant
-          return filter.override({ search: nil }) if !filter || !filter.search || filter.search.strip&.length&.zero?
+          return filter.override({ search: nil }) if !filter || !filter.search || filter.search.strip&.empty?
 
           # Implement search ourselves
           if @replacer || !@child_collection.schema[:searchable]
