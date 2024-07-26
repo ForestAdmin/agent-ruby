@@ -1,3 +1,10 @@
+# [1.0.0-beta.61](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.60...v1.0.0-beta.61) (2024-07-26)
+
+
+### Bug Fixes
+
+* **introspection:** ignore models that do not have primary key  ([#64](https://github.com/ForestAdmin/agent-ruby/issues/64)) ([49bbb97](https://github.com/ForestAdmin/agent-ruby/commit/49bbb979de11dfddb37692301d6bf5fda6afe09d))
+
 # [1.0.0-beta.60](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.59...v1.0.0-beta.60) (2024-07-08)
 
 
