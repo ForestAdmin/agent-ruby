@@ -71,6 +71,13 @@ module ForestAdminDatasourceToolkit
                 origin_key: 'bookId',
                 origin_key_target: 'id',
                 foreign_collection: 'BookPerson'
+              ),
+              'comments' => Relations::PolymorphicOneToManySchema.new(
+                origin_key: 'commentable_id',
+                foreign_collection: 'Comment',
+                origin_key_target: 'id',
+                origin_type_field: 'commentable_type',
+                origin_type_value: 'Book'
               )
             }
           )
@@ -126,10 +133,36 @@ module ForestAdminDatasourceToolkit
           return collection
         end
 
+        let(:collection_comment) do
+          collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Comment')
+          collection.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true,
+                                       filter_operators: [ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::IN, ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL]),
+              'name' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+              'commentable_id' => ColumnSchema.new(column_type: 'Number'),
+              'commentable_type' => ColumnSchema.new(column_type: 'String'),
+              'commentable' => Relations::PolymorphicManyToOneSchema.new(
+                foreign_key_type_field: 'commentable_type',
+                foreign_collections: %w[Book],
+                foreign_key_targets: { 'Book' => 'id' },
+                foreign_key: 'commentable_id'
+              )
+            }
+          )
+
+          return collection
+        end
+
         before do
           datasource.add_collection(collection_book)
           datasource.add_collection(collection_book_person)
           datasource.add_collection(collection_person)
+          datasource.add_collection(collection_comment)
+        end
+
+        it 'get_inverse_relation should inverse a polymorphic one to many relation' do
+          expect(described_class.get_inverse_relation(collection_book, 'comments')).to eq('commentable')
         end
 
         it 'get_inverse_relation should inverse a one to many relation in both directions' do
