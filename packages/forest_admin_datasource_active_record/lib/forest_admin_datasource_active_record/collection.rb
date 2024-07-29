@@ -82,19 +82,19 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.through_reflection.foreign_key,
                   origin_key_target: association.through_reflection.join_foreign_key,
                   foreign_key: association.join_foreign_key,
                   foreign_key_target: association.association_primary_key,
-                  through_collection: format_model_name(association.through_reflection.class_name)
+                  through_collection: format_model_name(association.through_reflection.klass.name)
                 )
               )
             elsif association.inverse_of.polymorphic?
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
                   origin_type_field: association.inverse_of.foreign_type,
@@ -105,7 +105,7 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key
                 )
@@ -129,7 +129,7 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   foreign_key: association.foreign_key,
                   foreign_key_target: association.association_primary_key
                 )
@@ -142,19 +142,19 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.through_reflection.foreign_key,
                   origin_key_target: association.through_reflection.join_foreign_key,
                   foreign_key: association.join_foreign_key,
                   foreign_key_target: association.association_primary_key,
-                  through_collection: format_model_name(association.through_reflection.class_name)
+                  through_collection: format_model_name(association.through_reflection.klass.name)
                 )
               )
             elsif association.inverse_of.polymorphic?
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
                   origin_type_field: association.inverse_of.foreign_type,
@@ -165,7 +165,7 @@ module ForestAdminDatasourceActiveRecord
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-                  foreign_collection: format_model_name(association.class_name),
+                  foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key
                 )
