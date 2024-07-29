@@ -70,7 +70,7 @@ module ForestAdminDatasourceActiveRecord
     def association_primary_key?(association)
       !association.association_primary_key.empty?
     rescue StandardError
-      false
+      association.polymorphic?
     end
 
     def fetch_associations
