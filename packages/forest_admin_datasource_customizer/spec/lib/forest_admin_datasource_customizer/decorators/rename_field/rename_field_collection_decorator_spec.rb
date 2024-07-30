@@ -89,20 +89,56 @@ module ForestAdminDatasourceCustomizer
               }
             }
           )
+
+          @collection_comment = collection_build(
+            name: 'comment',
+            schema: {
+              fields: {
+                'id' => numeric_primary_key_build,
+                'commentable_id' => column_build(column_type: 'Number'),
+                'commentable_type' => column_build,
+                'commentable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'commentable_type',
+                  foreign_collections: %w[book],
+                  foreign_key_targets: { 'book' => 'id' },
+                  foreign_key: 'commentable_id'
+                )
+              }
+            }
+          )
+
           datasource.add_collection(@collection_person)
           datasource.add_collection(@collection_book_person)
           datasource.add_collection(@collection_book)
+          datasource.add_collection(@collection_comment)
 
           @datasource_decorator = DatasourceDecorator.new(datasource, rename_field_collection_decorator)
           @new_person = @datasource_decorator.get_collection('person')
           @new_book = @datasource_decorator.get_collection('book')
           @new_book_person = @datasource_decorator.get_collection('book_person')
+          @new_comment = @datasource_decorator.get_collection('comment')
         end
 
         it 'raise an error when renaming a field which does not exists' do
           expect do
             @new_person.rename_field('unknown', 'somethingnew')
           end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 No such field 'unknown'")
+        end
+
+        it 'raise if renaming a field referenced in a polymorphic relation' do
+          expect do
+            @new_comment.rename_field('commentable_id', 'somethingnew')
+          end.to raise_error(
+            Exceptions::ForestException,
+            "🌳🌳🌳 Cannot rename 'comment.commentable_id', because it's implied in a polymorphic relation 'comment.commentable'"
+          )
+
+          expect do
+            @new_comment.rename_field('commentable_type', 'somethingnew')
+          end.to raise_error(
+            Exceptions::ForestException,
+            "🌳🌳🌳 Cannot rename 'comment.commentable_type', because it's implied in a polymorphic relation 'comment.commentable'"
+          )
         end
 
         it 'raise an error when renaming a field using an older name' do

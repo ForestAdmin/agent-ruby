@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module RenameField
       class RenameFieldCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Decorators
+        include ForestAdminDatasourceToolkit::Exceptions
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         attr_accessor :from_child_collection, :to_child_collection
@@ -21,6 +22,14 @@ module ForestAdminDatasourceCustomizer
           initial_name = current_name
 
           ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_name(name, new_name)
+
+          @child_collection.schema[:fields].each do |field_name, field_schema|
+            next unless field_schema.type == 'PolymorphicManyToOne' &&
+                        [field_schema.foreign_key, field_schema.foreign_key_type_field].include?(current_name)
+
+            raise ForestException, "Cannot rename '#{name}.#{current_name}', because it's implied " \
+                                   "in a polymorphic relation '#{name}.#{field_name}'"
+          end
 
           # Revert previous renaming (avoids conflicts and need to recurse on @to_child_collection).
           if to_child_collection[current_name]
