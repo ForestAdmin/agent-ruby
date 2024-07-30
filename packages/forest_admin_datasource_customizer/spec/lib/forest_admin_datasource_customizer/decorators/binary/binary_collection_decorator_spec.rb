@@ -62,8 +62,27 @@ module ForestAdminDatasourceCustomizer
               }
             }
           )
+
+          @collection_comment = collection_build(
+            name: 'comment',
+            schema: {
+              fields: {
+                'id' => numeric_primary_key_build,
+                'commentable_id' => column_build(column_type: 'Number'),
+                'commentable_type' => column_build,
+                'commentable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'commentable_type',
+                  foreign_collections: %w[book],
+                  foreign_key_targets: { 'book' => 'id' },
+                  foreign_key: 'commentable_id'
+                )
+              }
+            }
+          )
+
           datasource.add_collection(@collection_favorite)
           datasource.add_collection(@collection_book)
+          datasource.add_collection(@collection_comment)
 
           @datasource_decorator = DatasourceDecorator.new(datasource, binary_collection_decorator)
           @decorated_favorite = @datasource_decorator.get_collection('favorite')
@@ -246,6 +265,36 @@ module ForestAdminDatasourceCustomizer
                 {
                   'id' => 2,
                   'book' => nil
+                }
+              ]
+            )
+          end
+
+          it 'not transformed records when call list from polymorphic many to one' do
+            allow(@datasource_decorator.get_collection('comment')).to receive(:list)
+              .and_return([
+                            {
+                              'id' => 1,
+                              'commentable_id' => 1,
+                              'commentable_type' => 'book',
+                              'commentable' => book_record
+                            }
+                          ])
+
+            records = @datasource_decorator.get_collection('comment')
+                                           .list(
+                                             caller,
+                                             Filter.new,
+                                             Projection.new(%w[id addressable:*])
+                                           )
+
+            expect(records).to eq(
+              [
+                {
+                  'id' => 1,
+                  'commentable_id' => 1,
+                  'commentable_type' => 'book',
+                  'commentable' => book_record
                 }
               ]
             )
