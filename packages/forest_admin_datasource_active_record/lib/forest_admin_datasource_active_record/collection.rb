@@ -125,6 +125,8 @@ module ForestAdminDatasourceActiveRecord
                   foreign_key_targets: foreign_collections
                 )
               )
+              schema[:fields][association.foreign_key].is_read_only = true
+              schema[:fields][association.foreign_type].is_read_only = true
             else
               add_field(
                 association.name.to_s,
