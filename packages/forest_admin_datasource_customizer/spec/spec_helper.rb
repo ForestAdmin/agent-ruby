@@ -6,6 +6,8 @@ require 'forest_admin_datasource_toolkit'
 require 'forest_admin_datasource_customizer'
 require 'shared/factory'
 require 'shared/column_schema_factory'
+require 'filecache'
+require 'singleton'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -29,6 +31,26 @@ end
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
+  config.before do
+    cache = FileCache.new('app', 'tmp/cache/forest_admin')
+    cache.clear
+
+    agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+    agent_factory.setup(
+      {
+        auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+        env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+        is_production: false,
+        cache_dir: 'tmp/cache/forest_admin',
+        schema_path: File.join('tmp', '.forestadmin-schema.json'),
+        forest_server_url: 'https://api.development.forestadmin.com',
+        debug: true,
+        prefix: 'forest',
+        customize_error_message: nil
+      }
+    )
+  end
+
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
   # assertions if you prefer.
