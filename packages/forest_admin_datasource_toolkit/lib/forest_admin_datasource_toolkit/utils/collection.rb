@@ -22,7 +22,7 @@ module ForestAdminDatasourceToolkit
                 (field.is_a?(ManyToManySchema) && relation_field.is_a?(ManyToManySchema) &&
                   many_to_many_inverse?(field, relation_field)) ||
                   (field.is_a?(ManyToOneSchema) &&
-                    (relation_field.type == OneToOneSchema || relation_field.is_a?(OneToManySchema)) &&
+                    (relation_field.is_a?(OneToOneSchema) || relation_field.is_a?(OneToManySchema)) &&
                     many_to_one_inverse?(field, relation_field)) ||
                   ((field.is_a?(OneToOneSchema) || field.is_a?(OneToManySchema)) &&
                     relation_field.is_a?(ManyToOneSchema) && other_inverse?(field, relation_field))
