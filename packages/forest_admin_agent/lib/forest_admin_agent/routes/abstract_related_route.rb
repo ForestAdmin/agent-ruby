@@ -6,7 +6,7 @@ module ForestAdminAgent
 
         relation = @collection.schema[:fields][args[:params]['relation_name']]
         @child_collection = if relation.type == 'PolymorphicManyToOne'
-                              @datasource.get_collection(args[:params][:forest][:data][:type])
+                              @datasource.get_collection(args[:params]['data']['type'])
                             else
                               @datasource.get_collection(relation.foreign_collection)
                             end

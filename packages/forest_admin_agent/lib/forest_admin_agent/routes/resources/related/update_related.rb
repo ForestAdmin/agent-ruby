@@ -27,7 +27,7 @@ module ForestAdminAgent
             relation = @collection.schema[:fields][args[:params]['relation_name']]
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'])
 
-            linked_id = if (id = args.dig(:params, :data, :id))
+            linked_id = if (id = args.dig(:params, 'data', 'id'))
                           Utils::Id.unpack_id(@child_collection, id)
                         end
 
@@ -112,12 +112,11 @@ module ForestAdminAgent
                         @collection.name.gsub('__', '::')
                       )
                     ]
-                  )
-                ].push(
+                  ),
                   # Don't set the new record's field to null
                   # if it's already initialized with the right value
                   ConditionTree::ConditionTreeFactory.match_ids(@child_collection, [linked_id]).inverse
-                )
+                ]
               )
             )
 
@@ -162,12 +161,11 @@ module ForestAdminAgent
                     relation.origin_key,
                     ConditionTree::Operators::EQUAL,
                     origin_value
-                  )
-                ].push(
+                  ),
                   # Don't set the new record's field to null
                   # if it's already initialized with the right value
                   ConditionTree::ConditionTreeFactory.match_ids(@child_collection, [linked_id]).inverse
-                )
+                ]
               )
             )
 
