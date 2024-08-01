@@ -34,6 +34,13 @@ module ForestAdminAgent
                   origin_key: 'user_id',
                   origin_key_target: 'id',
                   foreign_collection: 'address_user'
+                ),
+                'address_poly' => Relations::PolymorphicOneToManySchema.new(
+                  origin_key: 'addressable_id',
+                  foreign_collection: 'address',
+                  origin_key_target: 'id',
+                  origin_type_field: 'addressable_type',
+                  origin_type_value: 'user'
                 )
               }
             )
@@ -63,7 +70,15 @@ module ForestAdminAgent
               {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
                                          filter_operators: [Operators::IN, Operators::EQUAL]),
-                'location' => ColumnSchema.new(column_type: 'String')
+                'location' => ColumnSchema.new(column_type: 'String'),
+                'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                'addressable_type' => ColumnSchema.new(column_type: 'String'),
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: ['user'],
+                  foreign_key_targets: { 'user' => 'id' },
+                  foreign_key: 'addressable_id'
+                )
               }
             )
 
@@ -301,6 +316,72 @@ module ForestAdminAgent
               end
 
               expect(result).to eq({ content: nil, status: 204 })
+            end
+
+            context 'with PolymorphicOneToMany' do
+              it 'call dissociate_or_delete_one_to_many without deletion' do
+                allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
+
+                args[:params]['relation_name'] = 'address_poly'
+                args[:params][:data] = [{ 'id' => 1 }]
+                args[:params]['id'] = 1
+
+                result = dissociate.handle_request(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'addressable_id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'addressable_type', operator: Operators::EQUAL, value: 'user')
+                      ]
+                    ),
+                    page: nil,
+                    search: nil,
+                    search_extended: nil,
+                    segment: nil,
+                    sort: nil
+                  )
+                  expect(data).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+                end
+
+                expect(result).to eq({ content: nil, status: 204 })
+              end
+
+              it 'call dissociate_or_delete_one_to_many with deletion' do
+                allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
+
+                args[:params][:delete] = true
+                args[:params]['relation_name'] = 'address_poly'
+                args[:params][:data] = [{ 'id' => 1 }]
+                args[:params]['id'] = 1
+
+                result = dissociate.handle_request(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'addressable_id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'addressable_type', operator: Operators::EQUAL, value: 'user')
+                      ]
+                    ),
+                    page: nil,
+                    search: nil,
+                    search_extended: nil,
+                    segment: nil,
+                    sort: nil
+                  )
+                end
+
+                expect(result).to eq({ content: nil, status: 204 })
+              end
             end
           end
         end
