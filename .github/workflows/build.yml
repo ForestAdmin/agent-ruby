@@ -69,7 +69,7 @@ jobs:
           bundle install
 
       - name: Test
-        run: cd packages/${{ matrix.package }} && bundle install --gemfile=Gemfile-test && bundle exec rspec --color --format doc && cd -
+        run: cd packages/${{ matrix.package }} && BUNDLE_GEMFILE=Gemfile-test bundle install && BUNDLE_GEMFILE=Gemfile-test bundle exec rspec --color --format doc && cd -
 
       - name: Upload coverage
         uses: actions/upload-artifact@v3
