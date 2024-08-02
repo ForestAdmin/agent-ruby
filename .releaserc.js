@@ -42,7 +42,7 @@ module.exports = {
           'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb',
           'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb',
           'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb',
-          'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_customizer/version.rb',
+          'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb',
           'packages/forest_admin_rails/lib/forest_admin_rails/version.rb',
           'package.json'
         ],
