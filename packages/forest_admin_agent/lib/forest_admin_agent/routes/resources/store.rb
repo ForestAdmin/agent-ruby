@@ -20,10 +20,16 @@ module ForestAdminAgent
           record = @collection.create(@caller, data)
           link_one_to_one_relations(args, record)
 
+          id = Utils::Id.unpack_id(@collection, record['id'], with_key: true)
+          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+            condition_tree: ConditionTree::ConditionTreeFactory.match_records(@collection, [id])
+          )
+          records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
+
           {
             name: args[:params]['collection_name'],
             content: JSONAPI::Serializer.serialize(
-              record,
+              records[0],
               is_collection: false,
               class_name: @collection.name,
               serializer: Serializer::ForestSerializer
@@ -34,7 +40,7 @@ module ForestAdminAgent
         def link_one_to_one_relations(args, record)
           args[:params][:data][:relationships]&.map do |field, value|
             schema = @collection.schema[:fields][field]
-            next unless schema.type == 'OneToOne'
+            next unless schema.type == 'OneToOne' || schema.type == 'PolymorphicOneToOne'
 
             id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)
             foreign_collection = @datasource.get_collection(schema.foreign_collection)
@@ -42,9 +48,11 @@ module ForestAdminAgent
             origin_value = record[schema.origin_key_target]
 
             # update new relation (may update zero or one records).
+            patch = { schema.origin_key => origin_value }
+            patch[schema.origin_type_field] = @collection.name.gsub('__', '::') if schema.type == 'PolymorphicOneToOne'
             condition_tree = ConditionTree::ConditionTreeFactory.match_records(foreign_collection, [id])
             filter = Filter.new(condition_tree: condition_tree)
-            foreign_collection.update(@caller, filter, { schema.origin_key => origin_value })
+            foreign_collection.update(@caller, filter, patch)
           end
         end
       end
