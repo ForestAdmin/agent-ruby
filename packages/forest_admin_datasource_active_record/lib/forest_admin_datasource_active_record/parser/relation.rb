@@ -1,14 +1,19 @@
 module ForestAdminDatasourceActiveRecord
   module Parser
     module Relation
-      def associations(model)
+      def associations(model, support_polymorphic_relations: false)
         model.reflect_on_all_associations.select do |association|
-          polymorphic?(association) ? true : !active_type?(association.klass)
+          if support_polymorphic_relations
+            polymorphic?(association) ? true : !active_type?(association.klass)
+          else
+            !polymorphic?(association) && !active_type?(association.klass)
+          end
         end
       end
 
       def polymorphic?(association)
-        association.options[:polymorphic]
+        (association.options.key?(:polymorphic) && association.options[:polymorphic]) ||
+          association.inverse_of&.polymorphic?
       end
 
       # NOTICE: Ignores ActiveType::Object association during introspection and interactions.

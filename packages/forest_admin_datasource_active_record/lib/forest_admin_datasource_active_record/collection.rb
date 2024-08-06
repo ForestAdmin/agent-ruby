@@ -6,8 +6,9 @@ module ForestAdminDatasourceActiveRecord
 
     attr_reader :model
 
-    def initialize(datasource, model)
+    def initialize(datasource, model, support_polymorphic_relations: false)
       @model = model
+      @support_polymorphic_relations = support_polymorphic_relations
       name = format_model_name(@model.name)
       super(datasource, name)
       fetch_fields
@@ -74,7 +75,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def fetch_associations
-      associations(@model).each do |association|
+      associations(@model, support_polymorphic_relations: @support_polymorphic_relations).each do |association|
         case association.macro
         when :has_one
           if association_primary_key?(association)

@@ -4,9 +4,10 @@ module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     attr_reader :models
 
-    def initialize(db_config = {})
+    def initialize(db_config = {}, support_polymorphic_relations: false)
       super()
       @models = []
+      @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}
       init_orm(db_config)
       generate
@@ -17,7 +18,9 @@ module ForestAdminDatasourceActiveRecord
     def generate
       ActiveRecord::Base.descendants.each { |model| fetch_model(model) }
       @models.each do |model|
-        add_collection(Collection.new(self, model))
+        add_collection(
+          Collection.new(self, model, support_polymorphic_relations: @support_polymorphic_relations)
+        )
       end
     end
 
