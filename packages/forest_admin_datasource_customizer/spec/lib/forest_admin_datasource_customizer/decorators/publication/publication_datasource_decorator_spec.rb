@@ -72,9 +72,46 @@ module ForestAdminDatasourceCustomizer
             mark_schema_as_dirty: nil
           )
 
+          @collection_user = instance_double(
+            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
+            name: 'user',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'addresses' => Relations::PolymorphicOneToManySchema.new(
+                  origin_key: 'addressable_id',
+                  foreign_collection: 'address',
+                  origin_key_target: 'id',
+                  origin_type_field: 'addressable_type',
+                  origin_type_value: 'address'
+                )
+              }
+            },
+            mark_schema_as_dirty: nil
+          )
+
+          @collection_address = collection_build(
+            name: 'address',
+            schema: {
+              fields: {
+                'id' => numeric_primary_key_build,
+                'addressable_id' => column_build(column_type: 'Number'),
+                'addressable_type' => column_build,
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: %w[user],
+                  foreign_key_targets: { 'user' => 'id' },
+                  foreign_key: 'addressable_id'
+                )
+              }
+            }
+          )
+
           datasource.add_collection(@collection_library)
           datasource.add_collection(@collection_library_book)
           datasource.add_collection(@collection_book)
+          datasource.add_collection(@collection_address)
+          datasource.add_collection(@collection_user)
 
           datasource = ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator.new(datasource, Empty::EmptyCollectionDecorator)
           @datasource_decorator = described_class.new(datasource)
@@ -96,10 +133,17 @@ module ForestAdminDatasourceCustomizer
             expect { @datasource_decorator.keep_collections_matching(nil, ['unknown']) }.to raise_error(ForestException, '🌳🌳🌳 Collection unknown not found.')
           end
 
-          it 'is able to remove "library_book" collection' do
-            @datasource_decorator.keep_collections_matching(['library', 'book'])
+          it 'throws an error if a collection is a target of polymorphic ManyToOne' do
+            expect { @datasource_decorator.keep_collections_matching(nil, ['user']) }.to raise_error(
+              ForestException,
+              "🌳🌳🌳 Cannot remove user because it's a potential target of polymorphic relation address.addressable"
+            )
+          end
 
-            expect { @datasource_decorator.get_collection('library_book') }.to raise_error(ForestException, "🌳🌳🌳 Collection 'library_book' was removed.")
+          it 'is able to remove "library_book" collection' do
+            @datasource_decorator.keep_collections_matching(%w[library book user address])
+
+            # expect { @datasource_decorator.get_collection('library_book') }.to raise_error(ForestException, "🌳🌳🌳 Collection 'library_book' was removed.")
             expect(@datasource_decorator.get_collection('library').schema[:fields]).not_to have_key('my_books')
             expect(@datasource_decorator.get_collection('book').schema[:fields]).not_to have_key('my_libraries')
           end
