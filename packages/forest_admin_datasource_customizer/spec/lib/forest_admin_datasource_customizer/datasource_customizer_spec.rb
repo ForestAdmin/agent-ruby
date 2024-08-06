@@ -13,7 +13,12 @@ module ForestAdminDatasourceCustomizer
         schema: {
           fields: {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true)
-          }
+          },
+          countable: false,
+          searchable: false,
+          charts: [],
+          segments: {},
+          actions: {}
         }
       )
 
