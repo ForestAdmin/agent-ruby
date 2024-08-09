@@ -4,7 +4,6 @@ require 'filecache'
 module ForestAdminAgent
   module Builder
     class AgentFactory
-      extend T::Sig
       include Singleton
 
       TTL_CONFIG = 3600

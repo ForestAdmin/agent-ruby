@@ -4,6 +4,17 @@ module ForestAdminDatasourceCustomizer
       class BaseAction
         attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute
 
+        sig do
+          params(
+            scope: String,
+            form: Array,
+            is_generate_file: T::Boolean,
+            execute: T.proc.params(
+              context: T.any(Context::ActionContext, Context::ActionContextSingle),
+              result_builder: ResultBuilder
+            ).void
+          ).returns(self)
+        end
         def initialize(scope:, form: nil, is_generate_file: false, description: nil, submit_button_label: nil, &execute)
           @scope = scope
           @form = form

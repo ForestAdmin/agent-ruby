@@ -7,6 +7,8 @@ loader.inflector.inflect('sse_cache_invalidation' => 'SSECacheInvalidation')
 loader.setup
 
 module ForestAdminAgent
+  extend T::Sig
+
   class Error < StandardError; end
   # Your code goes here...
 end
