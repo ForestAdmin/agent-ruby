@@ -33,10 +33,21 @@ module ForestAdminAgent
         self
       end
 
+      sig { params(names: Array).returns(self) }
       def remove_collection(names)
         @customizer.remove_collection(names)
+
+        self
       end
 
+      sig do
+        params(name: String,
+               handle: T.proc.params(
+                 context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext,
+                 result_builder: ForestAdminDatasourceCustomizer::Chart::ResultBuilder
+               ).void)
+          .returns(self)
+      end
       def add_chart(name, &definition)
         @customizer.add_chart(name, &definition)
 
