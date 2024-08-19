@@ -3,6 +3,8 @@ module ForestAdminDatasourceActiveRecord
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      attr_reader :query
+
       def initialize(collection, projection, filter)
         @collection = collection
         @query = @collection.model.unscoped
