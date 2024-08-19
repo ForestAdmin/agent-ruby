@@ -1,3 +1,10 @@
+# [1.0.0-beta.62](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.61...v1.0.0-beta.62) (2024-08-19)
+
+
+### Features
+
+* add polymorphic support ([#63](https://github.com/ForestAdmin/agent-ruby/issues/63)) ([80566a5](https://github.com/ForestAdmin/agent-ruby/commit/80566a5bb5083a5139426299b8d86dea33686421))
+
 # [1.0.0-beta.61](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.60...v1.0.0-beta.61) (2024-07-26)
 
 
