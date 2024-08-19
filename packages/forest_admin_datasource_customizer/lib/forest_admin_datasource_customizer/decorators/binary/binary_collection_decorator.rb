@@ -134,6 +134,8 @@ module ForestAdminDatasourceCustomizer
           prefix, suffix = path.split(':')
           field = @child_collection.schema[:fields][prefix]
 
+          return value if field.type == 'PolymorphicManyToOne'
+
           if field.type != 'Column'
             foreign_collection = @datasource.get_collection(field.foreign_collection)
 

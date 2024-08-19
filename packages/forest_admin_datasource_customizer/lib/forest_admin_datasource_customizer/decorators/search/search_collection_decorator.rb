@@ -104,7 +104,17 @@ module ForestAdminDatasourceCustomizer
           collection.schema[:fields].each do |name, field|
             fields.push([name, field]) if field.type == 'Column'
 
-            next unless extended && (field.type == 'ManyToOne' || field.type == 'OneToOne')
+            if field.type == 'PolymorphicManyToOne'
+              ForestAdminAgent::Facades::Container.logger.log(
+                'Debug',
+                "We're not searching through #{self.name}.#{name} because it's a polymorphic relation. " \
+                "You can override the default search behavior with 'replace_search'. " \
+                'See more: https://docs.forestadmin.com/developer-guide-agents-ruby/agent-customization/search'
+              )
+            end
+
+            next unless extended &&
+                        (field.type == 'ManyToOne' || field.type == 'OneToOne' || field.type == 'PolymorphicOneToOne')
 
             related = collection.datasource.get_collection(field.foreign_collection)
 

@@ -37,6 +37,25 @@ module ForestAdminAgent
         def delete_records(args, selection_ids)
           condition_tree_ids = ConditionTree::ConditionTreeFactory.match_records(@collection, selection_ids[:ids])
           condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
+
+          @collection.schema[:fields].each_value do |field_schema|
+            next unless field_schema.type == 'PolymorphicOneToOne' || field_schema.type == 'PolymorphicOneToMany'
+
+            condition_tree = Nodes::ConditionTreeBranch.new(
+              'And',
+              [
+                Nodes::ConditionTreeLeaf.new(field_schema.origin_key, Operators::IN,
+                                             selection_ids[:ids].map { |value| value['id'] }),
+                Nodes::ConditionTreeLeaf.new(field_schema.origin_type_field, Operators::EQUAL,
+                                             @collection.name.gsub('__', '::'))
+              ]
+            )
+            filter = Filter.new(condition_tree: condition_tree)
+            @datasource.get_collection(field_schema.foreign_collection)
+                       .update(@caller, filter, { field_schema.origin_key => nil,
+                                                  field_schema.origin_type_field => nil })
+          end
+
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
               [

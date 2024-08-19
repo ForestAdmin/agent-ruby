@@ -25,6 +25,7 @@ module ForestAdminAgent
               object = nil
               is_collection = false
               is_valid_attr = false
+
               if serializer.has_one_relationships.key?(unformatted_attr_name)
                 is_valid_attr = true
                 attr_data = serializer.has_one_relationships[unformatted_attr_name]
@@ -58,8 +59,15 @@ module ForestAdminAgent
                 # If it is not set, that indicates that this is an inner path and not a leaf and will
                 # be followed by the recursion below.
                 objects.each do |obj|
-                  relation = ForestAdminAgent::Facades::Container.datasource.get_collection(options[:class_name]).schema[:fields][attribute_name]
-                  relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
+                  relation = ForestAdminAgent::Facades::Container.datasource
+                                                                 .get_collection(options[:class_name].gsub('::', '__'))
+                                                                 .schema[:fields][attribute_name]
+                  if relation.type == 'PolymorphicManyToOne'
+                    relation_class_name = root_object[relation.foreign_key_type_field]
+                  else
+                    relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
+                  end
+
                   option_relation = options.clone
                   option_relation[:class_name] = relation_class_name
                   obj_serializer = JSONAPI::Serializer.find_serializer(obj, option_relation)
@@ -203,6 +211,7 @@ module ForestAdminAgent
                 # of the internal special merging logic.
                 find_recursive_relationships(obj, inclusion_tree, relationship_data, passthrough_options)
               end
+
               result['included'] = relationship_data.map do |_, data|
                 included_passthrough_options = {}
                 included_passthrough_options[:base_url] = passthrough_options[:base_url]
@@ -216,6 +225,7 @@ module ForestAdminAgent
                 serialize_primary(data[:object], included_passthrough_options)
               end
             end
+
             result
           end
         end

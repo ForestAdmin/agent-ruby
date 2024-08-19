@@ -16,6 +16,15 @@ module ForestAdminDatasourceCustomizer
           index = path.index(':')
           return @computeds[path] if index.nil?
 
+          if schema[:fields][path[0, index]].type == 'PolymorphicManyToOne'
+            ForestAdminAgent::Facades::Container.logger.log(
+              'Debug',
+              "Cannot compute field over polymorphic relation #{name}.#{path[0, index]}."
+            )
+
+            return @computeds[path]
+          end
+
           foreign_collection = schema[:fields][path[0, index]].foreign_collection
           association = @datasource.get_collection(foreign_collection)
 
@@ -27,6 +36,10 @@ module ForestAdminDatasourceCustomizer
 
           # Check that all dependencies exist and are columns
           computed.dependencies.each do |field|
+            if field.include?(':') && schema[:fields][field.partition(':')[0]].type == 'PolymorphicManyToOne'
+              raise ForestException,
+                    "Dependencies over a polymorphic relations(#{self.name}.#{field.partition(":")[0]}) are forbidden"
+            end
             FieldValidator.validate(self, field)
           end
 
@@ -90,12 +103,14 @@ module ForestAdminDatasourceCustomizer
           if path.include?(':')
             prefix = path.split(':')[0]
             schema = collection.schema[:fields][prefix]
-            association = collection.datasource.get_collection(schema.foreign_collection)
+            if schema.type != 'PolymorphicManyToOne'
+              association = collection.datasource.get_collection(schema.foreign_collection)
 
-            return Projection.new([path])
-                             .unnest
-                             .replace { |sub_path| rewrite_field(association, sub_path) }
-                             .nest(prefix: prefix)
+              return Projection.new([path])
+                               .unnest
+                               .replace { |sub_path| rewrite_field(association, sub_path) }
+                               .nest(prefix: prefix)
+            end
           end
 
           # Computed field that we own: recursively replace by dependencies

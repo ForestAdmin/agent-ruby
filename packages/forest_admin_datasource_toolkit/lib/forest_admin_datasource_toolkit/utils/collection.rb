@@ -9,20 +9,25 @@ module ForestAdminDatasourceToolkit
       def self.get_inverse_relation(collection, relation_name)
         relation_field = collection.schema[:fields][relation_name]
         foreign_collection = collection.datasource.get_collection(relation_field.foreign_collection)
+        polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
 
         inverse = foreign_collection.schema[:fields].select do |_name, field|
-          field.is_a?(RelationSchema) &&
-            field.foreign_collection == collection.name &&
-            (
-              (field.is_a?(ManyToManySchema) &&
-                relation_field.is_a?(ManyToManySchema) &&
-                many_to_many_inverse?(field, relation_field)) ||
-              (field.is_a?(ManyToOneSchema) &&
-                (relation_field.is_a?(OneToOneSchema) || relation_field.is_a?(OneToManySchema)) &&
-                many_to_one_inverse?(field, relation_field)) ||
-              ((field.is_a?(OneToOneSchema) || field.is_a?(OneToManySchema)) &&
-                relation_field.is_a?(ManyToOneSchema) && other_inverse?(field, relation_field))
-            )
+          if polymorphic_relations.include?(relation_field.type)
+            field.is_a?(PolymorphicManyToOneSchema) &&
+              field.foreign_collections.include?(collection.name)
+          else
+            field.is_a?(RelationSchema) &&
+              field.foreign_collection == collection.name &&
+              (
+                (field.is_a?(ManyToManySchema) && relation_field.is_a?(ManyToManySchema) &&
+                  many_to_many_inverse?(field, relation_field)) ||
+                  (field.is_a?(ManyToOneSchema) &&
+                    (relation_field.is_a?(OneToOneSchema) || relation_field.is_a?(OneToManySchema)) &&
+                    many_to_one_inverse?(field, relation_field)) ||
+                  ((field.is_a?(OneToOneSchema) || field.is_a?(OneToManySchema)) &&
+                    relation_field.is_a?(ManyToOneSchema) && other_inverse?(field, relation_field))
+              )
+          end
         end.keys.first
 
         inverse || nil
@@ -138,7 +143,7 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |r| r.try(foreign_relation) }
+            return records.map { |r| r[foreign_relation] }
           end
         end
 

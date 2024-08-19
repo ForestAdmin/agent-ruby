@@ -50,6 +50,13 @@ module ForestAdminAgent
                     origin_key: 'user_id',
                     origin_key_target: 'id',
                     foreign_collection: 'address_user'
+                  ),
+                  'addresses_poly' => Relations::PolymorphicOneToManySchema.new(
+                    origin_key: 'addressable_id',
+                    foreign_collection: 'address',
+                    origin_key_target: 'id',
+                    origin_type_field: 'addressable_type',
+                    origin_type_value: 'user'
                   )
                 }
               }
@@ -81,7 +88,15 @@ module ForestAdminAgent
               schema: {
                 fields: {
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                  'location' => ColumnSchema.new(column_type: 'String')
+                  'location' => ColumnSchema.new(column_type: 'String'),
+                  'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                  'addressable_type' => ColumnSchema.new(column_type: 'String'),
+                  'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                    foreign_key_type_field: 'addressable_type',
+                    foreign_collections: ['user'],
+                    foreign_key_targets: { 'user' => 'id' },
+                    foreign_key: 'addressable_id'
+                  )
                 }
               }
             )
@@ -145,6 +160,32 @@ module ForestAdminAgent
               expect(@datasource.get_collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
+              end
+              expect(result[:content]).to be_nil
+              expect(result[:status]).to eq 204
+            end
+          end
+
+          context 'when call on polymorphic one to many relation' do
+            it 'call associate_polymorphic_one_to_many' do
+              args[:params]['relation_name'] = 'addresses_poly'
+              args[:params]['data'] = [{ 'id' => 1, 'type' => 'user' }]
+              args[:params]['id'] = 1
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
+              allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
+              result = associate.handle_request(args)
+
+              expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(filter).to have_attributes(
+                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  page: nil,
+                  search: nil,
+                  search_extended: nil,
+                  segment: nil,
+                  sort: nil
+                )
+                expect(data).to eq({ 'addressable_id' => 1, 'addressable_type' => 'user' })
               end
               expect(result[:content]).to be_nil
               expect(result[:status]).to eq 204

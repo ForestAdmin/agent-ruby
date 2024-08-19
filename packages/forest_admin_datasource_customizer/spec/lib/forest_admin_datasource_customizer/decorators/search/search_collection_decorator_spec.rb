@@ -52,7 +52,13 @@ module ForestAdminDatasourceCustomizer
             schema: {
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'location' => ColumnSchema.new(column_type: 'String')
+                'location' => ColumnSchema.new(column_type: 'String'),
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: ['user'],
+                  foreign_key_targets: { 'user' => 'id' },
+                  foreign_key: 'addressable_id'
+                )
               }
             }
           )
@@ -72,6 +78,24 @@ module ForestAdminDatasourceCustomizer
         end
 
         context 'when refine_filter' do
+          context 'when the collection has polymorphic relation' do
+            it 'not search over polymorphic relations with the search extended and show a debug log' do
+              logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+              allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+              filter = Filter.new(search: 'a search value', search_extended: true)
+              search_collection_decorator = described_class.new(datasource.get_collection('address'), datasource)
+              search_collection_decorator.refine_filter(caller, filter)
+              expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log) do |level, message|
+                expect(level).to eq('Debug')
+                expect(message).to eq(
+                  "We're not searching through address.addressable because it's a polymorphic relation. " \
+                  "You can override the default search behavior with 'replace_search'. " \
+                  'See more: https://docs.forestadmin.com/developer-guide-agents-ruby/agent-customization/search'
+                )
+              end
+            end
+          end
+
           context 'when the search value is null' do
             it 'returns the given filter to return all records' do
               collection = instance_double(ForestAdminDatasourceToolkit::Collection)

@@ -47,6 +47,24 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
+          collection_address = collection_build(
+            name: 'address',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                'addressable_type' => ColumnSchema.new(column_type: 'String'),
+                'street' => ColumnSchema.new(column_type: 'String'),
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: ['person'],
+                  foreign_key_targets: { 'person' => 'id' },
+                  foreign_key: 'addressable_id'
+                )
+              }
+            }
+          )
+
           records = [
             {
               'id' => 1,
@@ -69,11 +87,13 @@ module ForestAdminDatasourceCustomizer
 
           datasource.add_collection(collection_book)
           datasource.add_collection(collection_person)
+          datasource.add_collection(collection_address)
 
           datasource_decorator = DatasourceDecorator.new(datasource, compute_collection_decorator)
 
           @new_books = datasource_decorator.get_collection('book')
           @new_persons = datasource_decorator.get_collection('person')
+          @new_addresses = datasource_decorator.get_collection('address')
         end
 
         it 'registerComputed should throw if defining a field with no dependencies' do
@@ -87,6 +107,22 @@ module ForestAdminDatasourceCustomizer
               )
             )
           end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "🌳🌳🌳 Computed field 'newField' must have at least one dependency.")
+        end
+
+        it 'registerComputed should throw if defining a field with polymorphic dependencies' do
+          expect do
+            @new_addresses.register_computed(
+              'newField',
+              ComputedDefinition.new(
+                column_type: 'String',
+                dependencies: ['addressable:foo'],
+                values: proc { |records| records }
+              )
+            )
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Dependencies over a polymorphic relations(address.addressable) are forbidden'
+          )
         end
 
         it 'registerComputed should throw if defining a field with missing dependencies' do

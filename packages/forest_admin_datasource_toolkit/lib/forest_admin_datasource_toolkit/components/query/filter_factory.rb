@@ -58,14 +58,24 @@ module ForestAdminDatasourceToolkit
           relation = ForestAdminDatasourceToolkit::Utils::Schema.get_to_many_relation(collection, relation_name)
           origin_value = ForestAdminDatasourceToolkit::Utils::Collection.get_value(collection, caller, id,
                                                                                    relation.origin_key_target)
+
           if relation.is_a?(OneToManySchema)
             origin_tree = Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value)
+          elsif relation.is_a?(PolymorphicOneToManySchema)
+            origin_tree = ConditionTreeFactory.intersect(
+              [
+                Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+                Nodes::ConditionTreeLeaf.new(relation.origin_type_field, Operators::EQUAL, relation.origin_type_value)
+              ]
+            )
           else
             through_collection = collection.datasource.get_collection(relation.through_collection)
-            through_tree = ConditionTreeFactory.intersect([
-                                                            Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
-                                                            Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
-                                                          ])
+            through_tree = ConditionTreeFactory.intersect(
+              [
+                Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+                Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
+              ]
+            )
             records = through_collection.list(
               caller,
               Filter.new(condition_tree: through_tree),

@@ -33,6 +33,7 @@ module ForestAdminDatasourceCustomizer
 
         def remove_collection(collection_name)
           validate_collection_names([collection_name])
+          validate_is_removable(collection_name)
 
           # Delete the collection
           @blacklist << collection_name
@@ -47,6 +48,17 @@ module ForestAdminDatasourceCustomizer
         end
 
         private
+
+        def validate_is_removable(collection_name)
+          collection = get_collection(collection_name)
+          collection.schema[:fields].each do |field_name, field_schema|
+            next unless field_schema.type == 'PolymorphicOneToOne' || field_schema.type == 'PolymorphicOneToMany'
+
+            inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, field_name)
+
+            raise ForestException, "Cannot remove #{collection.name} because it's a potential target of polymorphic relation #{field_schema.foreign_collection}.#{inverse}"
+          end
+        end
 
         def validate_collection_names(names)
           names.each { |name| get_collection(name) }

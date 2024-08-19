@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module RenameField
       class RenameFieldCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Decorators
+        include ForestAdminDatasourceToolkit::Exceptions
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         attr_accessor :from_child_collection, :to_child_collection
@@ -21,6 +22,14 @@ module ForestAdminDatasourceCustomizer
           initial_name = current_name
 
           ForestAdminDatasourceToolkit::Validations::FieldValidator.validate_name(name, new_name)
+
+          @child_collection.schema[:fields].each do |field_name, field_schema|
+            next unless field_schema.type == 'PolymorphicManyToOne' &&
+                        [field_schema.foreign_key, field_schema.foreign_key_type_field].include?(current_name)
+
+            raise ForestException, "Cannot rename '#{name}.#{current_name}', because it's implied " \
+                                   "in a polymorphic relation '#{name}.#{field_name}'"
+          end
 
           # Revert previous renaming (avoids conflicts and need to recurse on @to_child_collection).
           if to_child_collection[current_name]
@@ -41,6 +50,7 @@ module ForestAdminDatasourceCustomizer
 
         def refine_schema(sub_schema)
           fields = {}
+          schema = sub_schema.dup
 
           sub_schema[:fields].each do |old_name, old_schema|
             case old_schema.type
@@ -58,9 +68,9 @@ module ForestAdminDatasourceCustomizer
             fields[from_child_collection[old_name] || old_name] = old_schema
           end
 
-          sub_schema[:fields] = fields
+          schema[:fields] = fields
 
-          sub_schema
+          schema
         end
 
         def refine_filter(_caller, filter = nil)
@@ -89,7 +99,7 @@ module ForestAdminDatasourceCustomizer
         def list(caller, filter, projection)
           child_projection = projection.replace { |field| path_to_child_collection(field) }
           records = @child_collection.list(caller, filter, child_projection)
-          return records if child_projection == projection
+          return records if child_projection.sort == projection.sort
 
           records.map { |record| record_from_child_collection(record) }
         end
@@ -134,9 +144,11 @@ module ForestAdminDatasourceCustomizer
             child_field = paths[0]
             relation_name = from_child_collection[child_field] || child_field
             relation_schema = schema[:fields][relation_name]
-            relation = datasource.get_collection(relation_schema.foreign_collection)
+            if relation_schema.type != 'PolymorphicManyToOne'
+              relation = datasource.get_collection(relation_schema.foreign_collection)
 
-            return "#{relation_name}:#{relation.path_from_child_collection(paths[1])}"
+              return "#{relation_name}:#{relation.path_from_child_collection(paths[1])}"
+            end
           end
 
           from_child_collection[path] ||= path
@@ -148,10 +160,12 @@ module ForestAdminDatasourceCustomizer
             paths = path.split(':')
             relation_name = paths[0]
             relation_schema = schema[:fields][relation_name]
-            relation = datasource.get_collection(relation_schema.foreign_collection)
-            child_field = to_child_collection[relation_name] || relation_name
+            if relation_schema.type != 'PolymorphicManyToOne'
+              relation = datasource.get_collection(relation_schema.foreign_collection)
+              child_field = to_child_collection[relation_name] || relation_name
 
-            return "#{child_field}:#{relation.path_to_child_collection(paths[1])}"
+              return "#{child_field}:#{relation.path_to_child_collection(paths[1])}"
+            end
           end
 
           to_child_collection[path] ||= path
@@ -173,8 +187,8 @@ module ForestAdminDatasourceCustomizer
             field = from_child_collection[child_field] || child_field
             field_schema = schema[:fields][field]
 
-            # Perform the mapping, recurse for relations
-            if field_schema.type == 'Column' || value.nil?
+            # Perform the mapping, recurse for relation
+            if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne' || value.nil?
               record[field] = value
             else
               relation = datasource.get_collection(field_schema.foreign_collection)

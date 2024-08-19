@@ -242,6 +242,157 @@ module ForestAdminDatasourceToolkit
             )
           end
         end
+
+        context 'when call make_foreign_filter' do
+          before do
+            @datasource = datasource_with_collections_build(
+              [
+                collection_build(
+                  {
+                    name: 'Book',
+                    schema: {
+                      fields: {
+                        'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                        'reviews' => ManyToManySchema.new(
+                          origin_key: 'book_id',
+                          origin_key_target: 'id',
+                          foreign_key: 'review_id',
+                          foreign_key_target: 'id',
+                          foreign_collection: 'Review',
+                          through_collection: 'BookReview'
+                        ),
+                        'book_reviews' => OneToManySchema.new(
+                          origin_key: 'book_id',
+                          origin_key_target: 'id',
+                          foreign_collection: 'Review'
+                        ),
+                        'book_reviews_poly' => PolymorphicOneToManySchema.new(
+                          origin_key: 'book_id',
+                          foreign_collection: 'Review',
+                          origin_key_target: 'id',
+                          origin_type_field: 'reviewable_type',
+                          origin_type_value: 'Book'
+                        )
+                      }
+                    }
+                  }
+                ),
+                collection_build(
+                  {
+                    name: 'Review',
+                    schema: {
+                      fields: {
+                        'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                        'reviewable_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                        'reviewable_type' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                        'reviewable' => PolymorphicManyToOneSchema.new(
+                          foreign_key_type_field: 'reviewable_type',
+                          foreign_collections: %w[Book],
+                          foreign_key_targets: { 'Book' => 'id' },
+                          foreign_key: 'reviewable_id'
+                        )
+                      }
+                    }
+                  }
+                ),
+                collection_build(
+                  {
+                    name: 'BookReview',
+                    schema: {
+                      fields: {
+                        'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                        'book_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                        'review_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                        'review' => ManyToOneSchema.new(
+                          foreign_key: 'review_id',
+                          foreign_key_target: 'id',
+                          foreign_collection: 'Review'
+                        )
+                      }
+                    }
+                  }
+                )
+              ]
+            )
+          end
+
+          it 'add the fk condition [one to many]' do
+            book = @datasource.get_collection('Book')
+            base_filter = Filter.new(
+              condition_tree: ConditionTreeLeaf.new('some_field', Operators::EQUAL, 1),
+              segment: 'some-segment'
+            )
+
+            filter = described_class.make_foreign_filter(book, [1], 'book_reviews', caller, base_filter)
+            expect(filter.condition_tree.to_h).to eq(
+              {
+                aggregator: 'And',
+                conditions: [
+                  { field: 'some_field', operator: 'equal', value: 1 },
+                  { field: 'book_id', operator: 'equal', value: 1 }
+                ]
+              }
+            )
+            expect(filter.segment).to eq('some-segment')
+          end
+
+          it 'query the through collection [many to many]' do
+            book = @datasource.get_collection('Book')
+            book_review = @datasource.get_collection('BookReview')
+            allow(book_review).to receive(:list).and_return([{ 'review_id' => 123 }, { 'review_id' => 124 }])
+
+            base_filter = Filter.new(
+              condition_tree: ConditionTreeLeaf.new('some_field', Operators::EQUAL, 1),
+              segment: 'some-segment'
+            )
+
+            filter = described_class.make_foreign_filter(book, [1], 'reviews', caller, base_filter)
+
+            expect(book_review).to have_received(:list) do |_caller, through_filter|
+              expect(through_filter.condition_tree.to_h).to eq(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'book_id', operator: 'equal', value: 1 },
+                    { field: 'review_id', operator: 'present', value: nil }
+                  ]
+                }
+              )
+            end
+
+            expect(filter.condition_tree.to_h).to eq(
+              {
+                aggregator: 'And',
+                conditions: [
+                  { field: 'some_field', operator: 'equal', value: 1 },
+                  { field: 'id', operator: 'in', value: [123, 124] }
+                ]
+              }
+            )
+            expect(filter.segment).to eq('some-segment')
+          end
+
+          it 'add the fk condition and type [polymorphic one to many]' do
+            book = @datasource.get_collection('Book')
+            base_filter = Filter.new(
+              condition_tree: ConditionTreeLeaf.new('some_field', Operators::EQUAL, 1),
+              segment: 'some-segment'
+            )
+
+            filter = described_class.make_foreign_filter(book, [1], 'book_reviews_poly', caller, base_filter)
+            expect(filter.condition_tree.to_h).to eq(
+              {
+                aggregator: 'And',
+                conditions: [
+                  { field: 'some_field', operator: 'equal', value: 1 },
+                  { field: 'book_id', operator: 'equal', value: 1 },
+                  { field: 'reviewable_type', operator: 'equal', value: 'Book' }
+                ]
+              }
+            )
+            expect(filter.segment).to eq('some-segment')
+          end
+        end
       end
     end
   end

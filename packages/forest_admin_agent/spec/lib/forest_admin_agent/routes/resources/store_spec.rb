@@ -70,7 +70,8 @@ module ForestAdminAgent
                   'price' => ColumnSchema.new(column_type: 'Number')
                 }
               },
-              create: book
+              create: book,
+              list: [book]
             )
 
             datasource.add_collection(collection)
@@ -156,8 +157,9 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'person'
-              allow(@datasource.get_collection('person')).to receive(:create).and_return(
-                { 'id' => 1, 'name' => 'john' }
+              allow(@datasource.get_collection('person')).to receive_messages(
+                create: { 'id' => 1, 'name' => 'john' },
+                list: [{ 'id' => 1, 'name' => 'john' }]
               )
               allow(@datasource.get_collection('passport')).to receive(:update).and_return(
                 { 'id' => 1, 'person_id' => 1 }
@@ -200,8 +202,9 @@ module ForestAdminAgent
                 type: 'persons'
               }
               args[:params]['collection_name'] = 'passport'
-              allow(@datasource.get_collection('passport')).to receive(:create).and_return(
-                { 'id' => 1, 'person_id' => 1 }
+              allow(@datasource.get_collection('passport')).to receive_messages(
+                create: { 'id' => 1, 'person_id' => 1 },
+                list: [{ 'id' => 1, 'person_id' => 1 }]
               )
 
               result = store.handle_request(args)

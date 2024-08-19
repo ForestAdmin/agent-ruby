@@ -19,7 +19,7 @@ module ForestAdminAgent
           record[schema.foreign_key] = value['data'][schema.foreign_key_target] if schema.type == 'ManyToOne'
         end
 
-        record
+        record || {}
       end
     end
   end

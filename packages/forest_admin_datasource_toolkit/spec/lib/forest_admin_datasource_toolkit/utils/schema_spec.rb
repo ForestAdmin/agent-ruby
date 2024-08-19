@@ -15,6 +15,26 @@ module ForestAdminDatasourceToolkit
               foreign_key: 'author_id',
               foreign_key_target: 'id',
               foreign_collection: 'Person'
+            ),
+            'myBooks' => Relations::ManyToManySchema.new(
+              origin_key: 'personId',
+              origin_key_target: 'id',
+              foreign_key: 'bookId',
+              foreign_key_target: 'id',
+              foreign_collection: 'Book',
+              through_collection: 'BookPerson'
+            ),
+            'myBookPersons' => Relations::OneToManySchema.new(
+              origin_key: 'bookId',
+              origin_key_target: 'id',
+              foreign_collection: 'BookPerson'
+            ),
+            'comments' => Relations::PolymorphicOneToManySchema.new(
+              origin_key: 'commentable_id',
+              foreign_collection: 'Comment',
+              origin_key_target: 'id',
+              origin_type_field: 'commentable_type',
+              origin_type_value: 'Book'
             )
           }
         )
@@ -45,6 +65,30 @@ module ForestAdminDatasourceToolkit
       describe 'primary_keys' do
         it 'return all primary_keys of the collection' do
           expect(described_class.primary_keys(collection)).to eq(%w[id composite_id])
+        end
+      end
+
+      describe 'get_to_many_relation' do
+        it 'raise an error when relation do not exist' do
+          expect { described_class.get_to_many_relation(collection, 'foo') }.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 Relation foo not found'
+          )
+        end
+
+        it 'raise an error when the relation is not a to_many relation' do
+          expect { described_class.get_to_many_relation(collection, 'author') }.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            '🌳🌳🌳 Relation author has invalid type should be one of OneToMany or ManyToMany.'
+          )
+        end
+
+        it 'return the relation' do
+          expect(described_class.get_to_many_relation(collection, 'comments')).to eq(
+            collection.schema[:fields]['comments']
+          )
+          expect(described_class.get_to_many_relation(collection, 'myBookPersons')).to eq(
+            collection.schema[:fields]['myBookPersons']
+          )
         end
       end
     end

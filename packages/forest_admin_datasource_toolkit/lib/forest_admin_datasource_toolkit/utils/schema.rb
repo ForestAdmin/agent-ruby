@@ -30,7 +30,7 @@ module ForestAdminDatasourceToolkit
 
         relation = collection.schema[:fields][relation_name]
 
-        if relation.type != 'OneToMany' && relation.type != 'ManyToMany'
+        if relation.type != 'OneToMany' && relation.type != 'PolymorphicOneToMany' && relation.type != 'ManyToMany'
           raise Exceptions::ForestException,
                 "Relation #{relation_name} has invalid type should be one of OneToMany or ManyToMany."
         end

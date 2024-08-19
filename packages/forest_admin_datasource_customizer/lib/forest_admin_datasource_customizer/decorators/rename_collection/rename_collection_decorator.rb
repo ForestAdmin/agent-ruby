@@ -13,7 +13,7 @@ module ForestAdminDatasourceCustomizer
           fields = {}
 
           sub_schema[:fields].each do |name, old_schema|
-            if old_schema.type != 'Column'
+            if old_schema.type != 'Column' && old_schema.type != 'PolymorphicManyToOne'
               old_schema.foreign_collection = datasource.get_collection_name(old_schema.foreign_collection)
               if old_schema.type == 'ManyToMany'
                 old_schema.through_collection = datasource.get_collection_name(old_schema.through_collection)

@@ -17,6 +17,13 @@ module ForestAdminDatasourceCustomizer
             child_collection, name
           )
 
+          @child_collection.schema[:fields].each do |field_name, field_schema|
+            next unless field_schema.type == 'PolymorphicManyToOne' &&
+                        [field_schema.foreign_key, field_schema.foreign_key_type_field].include?(name)
+
+            raise ForestException, "Cannot remove field '#{self.name}.#{name}', because it's implied " \
+                                   "in a polymorphic relation '#{self.name}.#{field_name}'"
+          end
           if visible
             @blacklist.delete(name)
           else
@@ -37,14 +44,15 @@ module ForestAdminDatasourceCustomizer
 
         def refine_schema(child_schema)
           fields = {}
+          schema = child_schema.dup
 
-          child_schema[:fields].each do |name, field|
+          schema[:fields].each do |name, field|
             fields[name] = field if published?(name)
           end
 
-          child_schema[:fields] = fields
+          schema[:fields] = fields
 
-          child_schema
+          schema
         end
 
         def published?(name)
