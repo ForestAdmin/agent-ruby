@@ -3,9 +3,11 @@ module ForestAdminDatasourceActiveRecord
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      attr_reader :query
+
       def initialize(collection, projection, filter)
         @collection = collection
-        @query = @collection.model
+        @query = @collection.model.unscoped
         @projection = projection
         @filter = filter
         @arel_table = @collection.model.arel_table
