@@ -1,3 +1,10 @@
+# [1.0.0-beta.63](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.62...v1.0.0-beta.63) (2024-08-20)
+
+
+### Bug Fixes
+
+* unscoped active record query ([#65](https://github.com/ForestAdmin/agent-ruby/issues/65)) ([c975334](https://github.com/ForestAdmin/agent-ruby/commit/c975334d711de00878aa46f6a6266214a8084a53))
+
 # [1.0.0-beta.62](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.61...v1.0.0-beta.62) (2024-08-19)
 
 
