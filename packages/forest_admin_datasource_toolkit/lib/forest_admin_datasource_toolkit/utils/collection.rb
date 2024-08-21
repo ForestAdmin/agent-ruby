@@ -14,6 +14,8 @@ module ForestAdminDatasourceToolkit
         inverse = foreign_collection.schema[:fields].select do |_name, field|
           if polymorphic_relations.include?(relation_field.type)
             field.is_a?(PolymorphicManyToOneSchema) &&
+              field.foreign_key_type_field == relation_field.origin_type_field &&
+              field.foreign_key == relation_field.origin_key &&
               field.foreign_collections.include?(collection.name)
           else
             field.is_a?(RelationSchema) &&
