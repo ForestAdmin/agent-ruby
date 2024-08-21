@@ -3,10 +3,11 @@ module ForestAdminDatasourceActiveRecord
     module Relation
       def associations(model, support_polymorphic_relations: false)
         model.reflect_on_all_associations.select do |association|
+          is_valid_association = !get_class(association).nil? && !active_type?(get_class(association))
           if support_polymorphic_relations
-            polymorphic?(association) ? true : !active_type?(association.klass)
+            polymorphic?(association) ? true : is_valid_association
           else
-            !polymorphic?(association) && !active_type?(association.klass)
+            !polymorphic?(association) && is_valid_association
           end
         end
       end
@@ -14,6 +15,12 @@ module ForestAdminDatasourceActiveRecord
       def polymorphic?(association)
         (association.options.key?(:polymorphic) && association.options[:polymorphic]) ||
           association.inverse_of&.polymorphic?
+      end
+
+      def get_class(association)
+        association.klass
+      rescue StandardError
+        nil
       end
 
       # NOTICE: Ignores ActiveType::Object association during introspection and interactions.
