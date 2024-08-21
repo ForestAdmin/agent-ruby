@@ -40,6 +40,12 @@ module ForestAdminDatasourceActiveRecord
 
           expect(association).to be_empty
         end
+
+        it 'not fetch the association without klass' do
+          associations = dummy_class.associations(Category)
+
+          expect(associations).to be_empty
+        end
       end
     end
   end
