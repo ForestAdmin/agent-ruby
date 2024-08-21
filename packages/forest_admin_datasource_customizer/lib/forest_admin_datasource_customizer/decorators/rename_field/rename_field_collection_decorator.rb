@@ -52,6 +52,8 @@ module ForestAdminDatasourceCustomizer
           fields = {}
           schema = sub_schema.dup
 
+          # we don't handle schema modification for polymorphic many to one and reverse relations because
+          # we forbid to rename foreign key and type fields on polymorphic many to one
           sub_schema[:fields].each do |old_name, old_schema|
             case old_schema.type
             when 'ManyToOne'
@@ -160,7 +162,11 @@ module ForestAdminDatasourceCustomizer
             paths = path.split(':')
             relation_name = paths[0]
             relation_schema = schema[:fields][relation_name]
-            if relation_schema.type != 'PolymorphicManyToOne'
+            if relation_schema.type == 'PolymorphicManyToOne'
+              relation_name = to_child_collection[relation_name]
+
+              return "#{relation_name}:#{paths[1]}"
+            else
               relation = datasource.get_collection(relation_schema.foreign_collection)
               child_field = to_child_collection[relation_name] || relation_name
 
@@ -188,7 +194,8 @@ module ForestAdminDatasourceCustomizer
             field_schema = schema[:fields][field]
 
             # Perform the mapping, recurse for relation
-            if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne' || value.nil?
+            if field_schema.type == 'Column' || value.nil? || field_schema.type == 'PolymorphicManyToOne' ||
+               field_schema.type == 'PolymorphicOneToOne'
               record[field] = value
             else
               relation = datasource.get_collection(field_schema.foreign_collection)
