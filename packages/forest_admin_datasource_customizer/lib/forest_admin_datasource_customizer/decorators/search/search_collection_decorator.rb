@@ -104,7 +104,7 @@ module ForestAdminDatasourceCustomizer
           collection.schema[:fields].each do |name, field|
             fields.push([name, field]) if field.type == 'Column'
 
-            if field.type == 'PolymorphicManyToOne'
+            if field.type == 'PolymorphicManyToOne' && extended
               ForestAdminAgent::Facades::Container.logger.log(
                 'Debug',
                 "We're not searching through #{self.name}.#{name} because it's a polymorphic relation. " \
