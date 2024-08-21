@@ -1,3 +1,10 @@
+# [1.0.0-beta.64](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.63...v1.0.0-beta.64) (2024-08-21)
+
+
+### Bug Fixes
+
+* **active_record:** introspection should not crash on an unconventional relation ([#66](https://github.com/ForestAdmin/agent-ruby/issues/66)) ([976420a](https://github.com/ForestAdmin/agent-ruby/commit/976420a6354ce1ad9bc0770a88ac61f8907ff0d2))
+
 # [1.0.0-beta.63](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.62...v1.0.0-beta.63) (2024-08-20)
 
 
