@@ -69,7 +69,10 @@ module ForestAdminAgent
           end
         end
 
-        Projection.new(fields)
+        projection = Projection.new(fields)
+        Validations::ProjectionValidator.validate?(collection, projection)
+
+        projection
       end
 
       def self.parse_projection_with_pks(collection, args)
