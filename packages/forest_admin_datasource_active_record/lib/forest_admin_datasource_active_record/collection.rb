@@ -91,7 +91,7 @@ module ForestAdminDatasourceActiveRecord
                   through_collection: format_model_name(association.through_reflection.klass.name)
                 )
               )
-            elsif association.inverse_of.polymorphic?
+            elsif association.inverse_of&.polymorphic?
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
@@ -153,7 +153,7 @@ module ForestAdminDatasourceActiveRecord
                   through_collection: format_model_name(association.through_reflection.klass.name)
                 )
               )
-            elsif association.inverse_of.polymorphic?
+            elsif association.inverse_of&.polymorphic?
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
