@@ -22,19 +22,26 @@ module ForestAdminDatasourceToolkit
             end
           end
         else
-          prefix = field[0, dot_index]
+          prefix, suffix = field.split(':')
           schema = collection.schema[:fields][prefix]
 
           raise Exceptions::ValidationError, "Relation not found: '#{collection.name}.#{prefix}'" if schema.nil?
 
-          if schema.type != 'ManyToOne' && schema.type != 'OneToOne'
-            raise Exceptions::ValidationError,
-                  "Unexpected field type: '#{collection.name}.#{prefix}' (found '#{schema.type}' expected 'ManyToOne' or 'OneToOne')"
+          if schema.type == 'PolymorphicManyToOne' && suffix != '*'
+            raise Exceptions::ValidationError, "Unexpected nested field #{suffix} under generic relation: #{collection.name}.#{prefix}"
           end
 
-          suffix = field[dot_index + 1, field.length - dot_index - 1]
-          association = collection.datasource.get_collection(schema.foreign_collection)
-          validate(association, suffix, values)
+          if schema.type != 'ManyToOne' && schema.type != 'OneToOne' && schema.type != 'PolymorphicManyToOne' &&
+             schema.type != 'PolymorphicOneToOne'
+            raise Exceptions::ValidationError,
+                  "Unexpected field type: '#{collection.name}.#{prefix}' (found '#{schema.type}')"
+          end
+
+          if schema.type != 'PolymorphicManyToOne'
+            suffix = field[dot_index + 1, field.length - dot_index - 1]
+            association = collection.datasource.get_collection(schema.foreign_collection)
+            validate(association, suffix, values)
+          end
         end
       end
 

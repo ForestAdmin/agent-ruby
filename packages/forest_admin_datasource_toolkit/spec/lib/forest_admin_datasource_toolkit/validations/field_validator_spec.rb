@@ -77,7 +77,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(@collection_cars,
                                        'id:address')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 Unexpected field type: 'cars.id' (found 'Column' expected 'ManyToOne' or 'OneToOne')")
+                               "🌳🌳🌳 Unexpected field type: 'cars.id' (found 'Column')")
           end
         end
 

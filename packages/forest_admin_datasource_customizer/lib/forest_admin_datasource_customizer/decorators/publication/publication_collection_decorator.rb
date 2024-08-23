@@ -70,7 +70,8 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
-          if field.type == 'OneToOne' || field.type == 'OneToMany'
+          if field.type == 'OneToOne' || field.type == 'OneToMany' ||
+             field.type == 'PolymorphicOneToOne' || field.type == 'PolymorphicOneToMany'
             return (
               datasource.published?(field.foreign_collection) &&
               datasource.get_collection(field.foreign_collection).published?(field.origin_key) &&

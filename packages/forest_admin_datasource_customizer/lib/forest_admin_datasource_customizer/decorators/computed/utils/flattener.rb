@@ -31,7 +31,10 @@ module ForestAdminDatasourceCustomizer
 
           def self.flatten(records, projection)
             projection.map do |field|
-              parts = field.split(':')
+              # because we don't compute computed fields over polymorphic relation (only usage of *),
+              # we decide to consider the all record as a value instead of a relation
+              parts = field.split(':').reject { |part| part == '*' }
+
               records.map do |record|
                 value = record
 
@@ -63,7 +66,7 @@ module ForestAdminDatasourceCustomizer
               records[record_index] = {}
 
               projection.each_with_index do |path, path_index|
-                parts = path.split(':').reject { |part| part == MARKER_NAME }
+                parts = path.split(':').reject { |part| [MARKER_NAME, '*'].include?(part) }
                 value = flatten[path_index][record_index]
 
                 # Ignore undefined values.
