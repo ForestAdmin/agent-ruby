@@ -27,7 +27,7 @@ module ForestAdminDatasourceToolkit
 
           raise Exceptions::ValidationError, "Relation not found: '#{collection.name}.#{prefix}'" if schema.nil?
 
-          if schema.type != 'ManyToOne' && suffix != '*'
+          if schema.type == 'PolymorphicManyToOne' && suffix != '*'
             raise Exceptions::ValidationError,
                   "Unexpected nested field #{suffix} under generic relation: #{collection.name}.#{prefix}"
           end
