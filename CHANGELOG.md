@@ -1,3 +1,10 @@
+# [1.0.0-beta.65](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.64...v1.0.0-beta.65) (2024-08-23)
+
+
+### Bug Fixes
+
+* decorators and toolkit for work with polymorphic relations ([#67](https://github.com/ForestAdmin/agent-ruby/issues/67)) ([e95dd58](https://github.com/ForestAdmin/agent-ruby/commit/e95dd58dd6e2d936894acf0388a67e0cb71c5e32))
+
 # [1.0.0-beta.64](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.63...v1.0.0-beta.64) (2024-08-21)
 
 
