@@ -70,7 +70,7 @@ module ForestAdminAgent
         end
 
         projection = Projection.new(fields)
-        Validations::ProjectionValidator.validate?(collection, projection)
+        ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection)
 
         projection
       end
