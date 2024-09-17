@@ -30,6 +30,8 @@ module ForestAdminDatasourceToolkit
 
         STRING_LIST = 'StringList'.freeze
 
+        LAYOUT = 'Layout'.freeze
+
         def self.all
           constants.map { |constant| const_get(constant) }
         end

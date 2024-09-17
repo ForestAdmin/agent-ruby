@@ -10,7 +10,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_action(name, action)
-          action.build_fields
+          action.build_elements
           @actions[name] = action
 
           mark_schema_as_dirty
@@ -51,6 +51,8 @@ module ForestAdminDatasourceCustomizer
           fields = drop_deferred(context, metas[:search_values], dynamic_fields)
 
           fields.each do |field|
+            next if field.type == 'Layout'
+
             if field.value.nil?
               # customer did not define a handler to rewrite the previous value => reuse current one.
               field.value = form_values[field.label]
@@ -72,13 +74,20 @@ module ForestAdminDatasourceCustomizer
         private
 
         def drop_defaults(context, fields, data)
-          unvalued_fields = fields.reject { |field| data.key?(field.label) }
-          defaults = unvalued_fields.map { |field| evaluate(context, field.default_value) }
-          unvalued_fields.each_with_index { |field, index| data[field.label] = defaults[index] }
+          fields.map do |field|
+            if field.type == 'Layout'
+              field
+            else
+              drop_default(context, field, data)
+            end
+          end
+        end
 
-          fields.each { |field| field.default_value = nil }
+        def drop_default(context, field, data)
+          data[field.label] = evaluate(context, field.default_value) unless data.key?(field.label)
+          field.default_value = nil
 
-          fields
+          field
         end
 
         def drop_ifs(context, fields)
@@ -105,7 +114,8 @@ module ForestAdminDatasourceCustomizer
               value = field.send(key)
               key = key.to_s.concat('=').to_sym
 
-              field.send(key, evaluate(context, value, search_values&.dig(field.label)))
+              search_value = field.type == 'Layout' ? nil : search_values&.dig(field.label)
+              field.send(key, evaluate(context, value, search_value))
             end
 
             new_fields << Actions::ActionFieldFactory.build(field.to_h)

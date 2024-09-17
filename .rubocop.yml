@@ -227,6 +227,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/actions/action_field_factory.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/base_action.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/rename_field/rename_field_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/action_collection_decorator.rb'
 
 Metrics/BlockLength:
   Exclude:
@@ -258,6 +259,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/validations/rules.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_action_field_widget.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_action.rb'
 
 Style/OpenStructUse:
   Exclude:

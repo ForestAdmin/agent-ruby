@@ -69,7 +69,11 @@ module ForestAdminAgent
           )
 
           # Now that we have the field list, we can parse the data again.
-          data = Schema::ForestValueConverter.make_form_data(@datasource, raw_data, fields)
+          data = Schema::ForestValueConverter.make_form_data(
+            @datasource,
+            raw_data,
+            fields.reject { |field| field.type == 'Layout' }
+          )
 
           { content: @collection.execute(@caller, @action_name, data, filter_for_caller) }
         end
@@ -82,7 +86,7 @@ module ForestAdminAgent
           search_values = {}
           forest_fields&.each { |field| search_values[field['field']] = field['searchValue'] }
 
-          fields = @collection.get_form(
+          form = @collection.get_form(
             @caller,
             @action_name,
             data,
@@ -94,10 +98,12 @@ module ForestAdminAgent
               includeHiddenFields: false
             }
           )
+          form_elements = Schema::GeneratorAction.extract_fields_and_layout(form)
 
           {
             content: {
-              fields: fields&.map { |field| Schema::GeneratorAction.build_field_schema(@datasource, field) } || {}
+              fields: Schema::GeneratorAction.build_fields(@collection, form_elements[:fields]),
+              layout: Schema::GeneratorAction.build_layout(form_elements[:layout])
             }
           }
         end

@@ -1,22 +1,8 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
-      module WidgetField
+      module LayoutElement
         include Types
-        def self.validate_arg(options, attribute, rule)
-          case rule[attribute]
-          when 'contains'
-            unless rule[:value].include? options[attribute]
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "'#{attribute}' must have a value included in [#{rule[:value]}]"
-            end
-          when 'present'
-            unless options.key? attribute
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "key '#{attribute}' must be defined"
-            end
-          end
-        end
 
         class TimePickerField < DynamicField
           attr_accessor :widget
