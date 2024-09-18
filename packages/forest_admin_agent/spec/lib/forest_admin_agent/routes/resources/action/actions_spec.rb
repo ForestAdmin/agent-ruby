@@ -162,7 +162,7 @@ module ForestAdminAgent
 
           describe 'handle_hook' do
             it 'generate a clean form if called without params' do
-              allow(@action_collection).to receive(:get_form)
+              allow(@action_collection).to receive(:get_form).and_return([])
               action.handle_hook_request(args)
               expect(@action_collection).to have_received(:get_form) do |caller, action, data, filter, meta|
                 expect(caller).to be_instance_of(Components::Caller)

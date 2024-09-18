@@ -55,7 +55,7 @@ module ForestAdminAgent
             }
           }
 
-          return schema unless layout
+          return schema unless layout && !layout.empty?
 
           schema[:layout] = build_layout(layout)
 
@@ -125,7 +125,7 @@ module ForestAdminAgent
           layout = []
           has_real_layout = false
 
-          form.each do |element|
+          form&.each do |element|
             if element.type == Actions::FieldType::LAYOUT
               layout << element
               has_real_layout = true
