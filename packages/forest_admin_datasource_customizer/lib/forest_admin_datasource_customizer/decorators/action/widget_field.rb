@@ -246,7 +246,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [Types::FieldType::DATE, Types::FieldType::DATEONLY, Types::FieldType::NUMBER,
+                value: [Types::FieldType::DATE, Types::FieldType::DATE_ONLY, Types::FieldType::NUMBER,
                         Types::FieldType::STRING]
               }
             )
@@ -326,7 +326,7 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @widget = 'TextInput'
+            @widget = 'TextInputList'
             @allow_duplicates = options[:allow_duplicates] || nil
             @allow_empty_values = options[:allow_empty_values] || nil
             @enable_reorder = options[:enable_reorder] || nil
