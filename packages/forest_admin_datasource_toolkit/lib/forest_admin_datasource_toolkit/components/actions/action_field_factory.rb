@@ -16,6 +16,8 @@ module ForestAdminDatasourceToolkit
           case field[:component]
           when 'Separator'
             ActionLayoutElement::SeparatorElement.new(**field)
+          when 'HtmlBlock'
+            ActionLayoutElement::HtmlBlockElement.new(**field)
           end
         end
 

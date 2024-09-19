@@ -29,6 +29,15 @@ module ForestAdminDatasourceToolkit
           end
         end
 
+        class HtmlBlockElement < BaseLayoutElement
+          attr_reader :content
+
+          def initialize(content:, **options)
+            super(component: 'HtmlBlock', **options)
+            @content = content
+          end
+        end
+
         class SeparatorElement < BaseLayoutElement
           def initialize(**options)
             super(component: 'Separator', **options)
