@@ -234,19 +234,35 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      default_value: nil,
-                      description: nil,
-                      field: 'label',
-                      isReadOnly: false,
+                      defaultValue: 'Form is loading',
+                      description: '',
+                      enums: nil,
+                      field: 'Loading...',
+                      hook: nil,
+                      isReadOnly: true,
                       isRequired: false,
+                      reference: nil,
                       type: 'String',
+                      value: nil,
                       widgetEdit: nil
                     }
                   ],
-                  layout: [
-                    { component: 'input', fieldId: 'label', type: 'Layout' },
-                    { component: 'separator', type: 'Layout' }
-                  ],
+                  # uncomment when back validations will be done ...
+                  # fields: [
+                  #   {
+                  #     default_value: nil,
+                  #     description: nil,
+                  #     field: 'label',
+                  #     isReadOnly: false,
+                  #     isRequired: false,
+                  #     type: 'String',
+                  #     widgetEdit: nil
+                  #   }
+                  # ],
+                  # layout: [
+                  #   { component: 'input', fieldId: 'label', type: 'Layout' },
+                  #   { component: 'separator', type: 'Layout' }
+                  # ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
               )
