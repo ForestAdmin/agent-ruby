@@ -1,3 +1,10 @@
+# [1.0.0-beta.67](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.66...v1.0.0-beta.67) (2024-09-19)
+
+
+### Features
+
+* **form:** add separator layout element ([#69](https://github.com/ForestAdmin/agent-ruby/issues/69)) ([5bfbd7a](https://github.com/ForestAdmin/agent-ruby/commit/5bfbd7a0508486a968f959c2650e758624b18964))
+
 # [1.0.0-beta.66](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.65...v1.0.0-beta.66) (2024-09-05)
 
 
