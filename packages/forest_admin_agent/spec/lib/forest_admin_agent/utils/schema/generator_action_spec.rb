@@ -200,6 +200,70 @@ module ForestAdminAgent
             )
           end
         end
+
+        describe 'with layout element' do
+          before do
+            @collection = collection_build(
+              schema: {
+                actions: {
+                  'Send email' => BaseAction.new(
+                    scope: Types::ActionScope::SINGLE
+                  )
+                }
+              },
+              get_form: [
+                ActionField.new(label: 'label', type: 'String'),
+                ActionLayoutElement::SeparatorElement.new
+              ]
+            )
+          end
+
+          describe 'build_schema' do
+            it 'generate schema correctly' do
+              schema = described_class.build_schema(@collection, 'Send email')
+
+              expect(schema).to eq(
+                {
+                  id: 'collection-0-send-email',
+                  name: 'Send email',
+                  type: 'single',
+                  baseUrl: nil,
+                  endpoint: '/forest/_actions/collection/0/send-email',
+                  httpMethod: 'POST',
+                  redirect: nil,
+                  download: false,
+                  fields: [
+                    {
+                      default_value: nil,
+                      description: nil,
+                      field: 'label',
+                      isReadOnly: false,
+                      isRequired: false,
+                      type: 'String',
+                      widgetEdit: nil
+                    }
+                  ],
+                  layout: [
+                    { component: 'input', fieldId: 'label', type: 'Layout' },
+                    { component: 'separator', type: 'Layout' }
+                  ],
+                  hooks: { load: false, change: ['changeHook'] }
+                }
+              )
+            end
+          end
+
+          describe 'extract_fields_and_layout' do
+            it 'return fields and layout separately from form' do
+              result = described_class.extract_fields_and_layout(@collection.get_form(nil, 'Send email'))
+
+              expect(result).to have_key(:fields)
+              expect(result).to have_key(:layout)
+              expect(result[:fields]).to all(be_a(ActionField))
+              expect(result[:layout]).to all(be_a(ActionLayoutElement::BaseLayoutElement))
+            end
+          end
+        end
       end
     end
   end

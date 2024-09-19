@@ -30,7 +30,7 @@ module ForestAdminDatasourceToolkit
         end
 
         class SeparatorElement < BaseLayoutElement
-          def initialize(options)
+          def initialize(**options)
             super(component: 'Separator', **options)
           end
         end
