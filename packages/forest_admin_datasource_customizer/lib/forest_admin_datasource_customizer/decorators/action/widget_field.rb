@@ -351,10 +351,6 @@ module ForestAdminDatasourceCustomizer
             @widget = 'UserDropdown'
           end
         end
-
-        class Separator < DynamicField
-          @component = 'Separator'
-        end
       end
     end
   end
