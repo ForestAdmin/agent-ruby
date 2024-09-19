@@ -29,8 +29,8 @@ module ForestAdminAgent
           action_index = collection.schema[:actions].keys.index(name)
           slug = get_action_slug(name)
 
-          if action.static_form?
-            form_elements = extract_fields_and_layout(collection.get_form(nil, name))
+          form_elements = extract_fields_and_layout(collection.get_form(nil, name))
+          if action.static_form? && form_elements[:layout].empty?
             fields = build_fields(collection, form_elements[:fields])
             layout = form_elements[:layout]
           else
