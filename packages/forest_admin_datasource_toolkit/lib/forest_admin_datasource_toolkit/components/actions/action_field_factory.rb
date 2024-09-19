@@ -3,6 +3,23 @@ module ForestAdminDatasourceToolkit
     module Actions
       class ActionFieldFactory
         def self.build(field)
+          if field.key? :widget
+            build_widget(field)
+          elsif field[:type] == 'Layout'
+            build_layout_element(field)
+          else
+            ActionField.new(**field)
+          end
+        end
+
+        def self.build_layout_element(field)
+          case field[:component]
+          when 'Separator'
+            ActionLayoutElement::SeparatorElement.new(**field)
+          end
+        end
+
+        def self.build_widget(field)
           case field[:widget]
           when 'AddressAutocomplete'
             WidgetField::AddressAutocompleteField.new(**field)
@@ -40,8 +57,6 @@ module ForestAdminDatasourceToolkit
             WidgetField::TimePickerField.new(**field)
           when 'UserDropdown'
             WidgetField::UserDropdownField.new(**field)
-          else
-            ActionField.new(**field)
           end
         end
       end

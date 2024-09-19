@@ -2,6 +2,8 @@ module ForestAdminAgent
   module Utils
     module Schema
       class GeneratorAction
+        include ForestAdminDatasourceToolkit::Components
+
         DEFAULT_FIELDS = [
           {
             field: 'Loading...',
@@ -23,27 +25,46 @@ module ForestAdminAgent
         end
 
         def self.build_schema(collection, name)
-          schema = collection.schema[:actions][name]
+          action = collection.schema[:actions][name]
           action_index = collection.schema[:actions].keys.index(name)
           slug = get_action_slug(name)
-          fields = build_fields(collection, name, schema)
 
-          {
+          form_elements = extract_fields_and_layout(collection.get_form(nil, name))
+          if action.static_form? && form_elements[:layout].empty?
+            # if action.static_form?
+            fields = build_fields(collection, form_elements[:fields])
+            layout = form_elements[:layout]
+          else
+            fields = DEFAULT_FIELDS
+            layout = nil
+          end
+
+          schema = {
             id: "#{collection.name}-#{action_index}-#{slug}",
             name: name,
-            type: schema.scope.downcase,
+            type: action.scope.downcase,
             baseUrl: nil,
             endpoint: "/forest/_actions/#{collection.name}/#{action_index}/#{slug}",
             httpMethod: 'POST',
             redirect: nil, # frontend ignores this attribute
-            download: schema.is_generate_file,
+            download: action.is_generate_file,
             fields: fields,
             hooks: {
-              load: !schema.static_form?,
+              load: !action.static_form?,
               # Always registering the change hook has no consequences, even if we don't use it.
               change: ['changeHook']
             }
           }
+
+          return schema unless layout && !layout.empty?
+
+          schema[:layout] = build_layout(layout)
+
+          schema
+        end
+
+        def self.build_layout_schema(field)
+          { **field.to_h, component: field.component.downcase }
         end
 
         def self.build_field_schema(datasource, field)
@@ -76,26 +97,49 @@ module ForestAdminAgent
           output
         end
 
-        class << self
-          private
+        def self.build_fields(collection, fields)
+          if fields
+            return fields.map do |field|
+              new_field = build_field_schema(collection.datasource, field)
+              new_field[:default_value] = new_field[:value]
+              new_field.delete(:value)
 
-          def build_fields(collection, name, action)
-            return DEFAULT_FIELDS unless action.static_form?
-
-            fields = collection.get_form(nil, name)
-
-            if fields
-              return fields.map do |field|
-                new_field = build_field_schema(collection.datasource, field)
-                new_field[:default_value] = new_field[:value]
-                new_field.delete(:value)
-
-                new_field
-              end
+              new_field
             end
-
-            []
           end
+
+          []
+        end
+
+        def self.build_layout(elements)
+          if elements
+            return elements.map do |element|
+              build_layout_schema(element)
+            end
+          end
+
+          []
+        end
+
+        def self.extract_fields_and_layout(form)
+          fields = []
+          layout = []
+          has_real_layout = false
+
+          form&.each do |element|
+            if element.type == Actions::FieldType::LAYOUT
+              layout << element
+              has_real_layout = true
+            else
+              fields << element
+              # frontend rule
+              layout << Actions::ActionLayoutElement::InputElement.new(component: 'Input', field_id: element.label)
+            end
+          end
+
+          layout = [] unless has_real_layout
+
+          { fields: fields, layout: layout }
         end
       end
     end

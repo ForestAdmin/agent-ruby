@@ -66,6 +66,7 @@ module ForestAdminAgent
             schema[:collections].each do |collection|
               collection_actions = collection[:actions]
               collection_segments = collection[:segments]
+
               collection.delete(:actions)
               collection.delete(:segments)
 
@@ -94,6 +95,7 @@ module ForestAdminAgent
 
           def get_smart_features_by_collection(type, data, with_attributes: false)
             smart_features = []
+
             data.each do |value|
               smart_feature = { id: value[:id], type: type }
               smart_feature[:attributes] = value if with_attributes

@@ -1,22 +1,8 @@
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
-      module WidgetField
+      module LayoutElement
         include Types
-        def self.validate_arg(options, attribute, rule)
-          case rule[attribute]
-          when 'contains'
-            unless rule[:value].include? options[attribute]
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "'#{attribute}' must have a value included in [#{rule[:value]}]"
-            end
-          when 'present'
-            unless options.key? attribute
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "key '#{attribute}' must be defined"
-            end
-          end
-        end
 
         class TimePickerField < DynamicField
           attr_accessor :widget
@@ -246,7 +232,7 @@ module ForestAdminDatasourceCustomizer
               'type',
               {
                 type: 'contains',
-                value: [Types::FieldType::DATE, Types::FieldType::DATE_ONLY, Types::FieldType::NUMBER,
+                value: [Types::FieldType::DATE, Types::FieldType::DATEONLY, Types::FieldType::NUMBER,
                         Types::FieldType::STRING]
               }
             )
@@ -326,7 +312,7 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @widget = 'TextInputList'
+            @widget = 'TextInput'
             @allow_duplicates = options[:allow_duplicates] || nil
             @allow_empty_values = options[:allow_empty_values] || nil
             @enable_reorder = options[:enable_reorder] || nil
