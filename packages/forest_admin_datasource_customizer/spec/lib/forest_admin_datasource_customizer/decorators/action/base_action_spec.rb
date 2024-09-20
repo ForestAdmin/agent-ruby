@@ -206,9 +206,25 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
-        it 'builds elements correctly' do
-          action.build_elements
-          expect(action.form.first).to be_a(WidgetField::CheckboxField)
+        describe 'when build_layout_element' do
+          context 'when element is a separator' do
+            let(:element) { { type: 'Layout', component: 'Separator' } }
+
+            it 'returns a separator element' do
+              result = action.build_layout_element(element)
+              expect(result).to be_a(ForestAdminDatasourceCustomizer::Decorators::Action::FormLayoutElement::SeparatorElement)
+            end
+          end
+
+          context 'when element is a HtmlBlock' do
+            let(:element) { { type: 'Layout', component: 'HtmlBlock', content: '<p>foo</p>' } }
+
+            it 'returns a html block element' do
+              result = action.build_layout_element(element)
+              expect(result).to be_a(ForestAdminDatasourceCustomizer::Decorators::Action::FormLayoutElement::HtmlBlockElement)
+              expect(result.content).to eq('<p>foo</p>')
+            end
+          end
         end
 
         describe 'when check form is static' do
