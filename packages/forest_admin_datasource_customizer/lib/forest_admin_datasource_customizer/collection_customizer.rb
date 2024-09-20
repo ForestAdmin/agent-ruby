@@ -9,6 +9,10 @@ module ForestAdminDatasourceCustomizer
       @name = name
     end
 
+    sig do
+      params(name: String, definition: ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction)
+        .returns(self)
+    end
     def add_action(name, definition)
       push_customization { @stack.action.get_collection(@name).add_action(name, definition) }
     end
@@ -29,6 +33,10 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.schema.get_collection(@name).override_schema(countable: false) }
     end
 
+    sig do
+      params(handle: T.proc.params(search_string: String, extended_search: T::Boolean).void)
+        .returns(self)
+    end
     def replace_search(definition)
       push_customization { @stack.search.get_collection(@name).replace_search(definition) }
     end
@@ -40,6 +48,10 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.search.get_collection(@name).disable_search }
     end
 
+    sig do
+      params(name: String, definition: ForestAdminDatasourceCustomizer::Decorators::Computed::ComputedDefinition)
+        .returns(self)
+    end
     def add_field(name, definition)
       push_customization do
         collection_before_relations = @stack.early_computed.get_collection(@name)
@@ -56,6 +68,7 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig { params(name: String, operator: String).returns(self) }
     def emulate_field_operator(name, operator)
       push_customization do
         collection = if @stack.early_op_emulate.get_collection(@name).schema[:fields].key?(name)
@@ -68,6 +81,7 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig { params(name: String).returns(self) }
     def emulate_field_filtering(name)
       push_customization do
         collection = @stack.late_op_emulate.get_collection(@name)
@@ -83,6 +97,10 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig do
+      params(name: String, operator: String, handle: T.proc.params(value: String).void)
+        .returns(self)
+    end
     def replace_field_operator(name, operator, &replacer)
       push_customization do
         collection = if @stack.early_op_emulate.get_collection(@name).schema[:fields].key?(name)
@@ -95,6 +113,9 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig do
+      params(name: String, foreign_collection: String, options: T::Hash[Symbol, String]).returns(self)
+    end
     # Add a many to one relation to the collection
     # @param name name of the new relation
     # @param foreign_collection name of the targeted collection
@@ -110,6 +131,9 @@ module ForestAdminDatasourceCustomizer
                     })
     end
 
+    sig do
+      params(name: String, foreign_collection: String, options: T::Hash[Symbol, String]).returns(self)
+    end
     # Add a one to many relation to the collection
     # @param name name of the new relation
     # @param foreign_collection name of the targeted collection
@@ -125,6 +149,9 @@ module ForestAdminDatasourceCustomizer
                     })
     end
 
+    sig do
+      params(name: String, foreign_collection: String, options: T::Hash[Symbol, String]).returns(self)
+    end
     # Add a one to one relation to the collection
     # @param name name of the new relation
     # @param foreign_collection name of the targeted collection
@@ -140,6 +167,10 @@ module ForestAdminDatasourceCustomizer
                     })
     end
 
+    sig do
+      params(name: String, foreign_collection: String, through_collection: String, options: T::Hash[Symbol, String])
+        .returns(self)
+    end
     # Add a many to many relation to the collection
     # @param name name of the new relation
     # @param foreign_collection name of the targeted collection
@@ -162,14 +193,23 @@ module ForestAdminDatasourceCustomizer
                     })
     end
 
+    sig do
+      params(name: String, options: T::Hash).returns(self)
+    end
     def add_external_relation(name, definition)
       use(ForestAdminDatasourceCustomizer::Plugins::AddExternalRelation, { name: name }.merge(definition))
     end
 
+    sig do
+      params(name: String, options: T::Hash).returns(self)
+    end
     def import_field(name, definition)
       use(ForestAdminDatasourceCustomizer::Plugins::ImportField, { name: name }.merge(definition))
     end
 
+    sig do
+      params(name: String, operator: String, value: T.nilable(T.any(Integer, String))).returns(self)
+    end
     # Add a new validator to the edition form of a given field
     # @param name The name of the field
     # @param operator The validator that you wish to add
@@ -182,6 +222,7 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig { params(name: String).returns(self) }
     # Enable sorting on a specific field using emulation.
     # As for all the emulation method, the field sorting will be done in-memory.
     # @param name the name of the field to enable emulation on
@@ -191,6 +232,7 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.sort.get_collection(@name).emulate_field_sorting(name) }
     end
 
+    sig { params(name: String, equivalent_sort: T::Array[T::Hash]).returns(self) }
     # Replace an implementation for the sorting.
     # The field sorting will be done by the datasource.
     # @param name the name of the field to enable sort
@@ -218,6 +260,7 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    sig { params(current_name: String, new_name: String).returns(self) }
     # Rename fields from the exported schema.
     # @param current_name the current name of the field or the relation in a given collection
     # @param new_name the new name of the field or the relation
@@ -238,6 +281,14 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.write.get_collection(@name).replace_field_writing(name, &definition) }
     end
 
+    sig do
+      params(name: String,
+             handle: T.proc.params(
+               context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext,
+               result_builder: ForestAdminDatasourceCustomizer::Chart::ResultBuilder
+             ).void)
+        .returns(self)
+    end
     # Create a new API chart
     # @param name name of the chart
     # @param definition definition of the chart
@@ -253,6 +304,13 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.chart.get_collection(@name).add_chart(name, &definition) }
     end
 
+    sig do
+      params(
+        name: String,
+        type: String,
+        handle: T.proc.params(context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext).void
+      ).returns(self)
+    end
     # Add a new hook handler to an action
     # @param position Either if the hook is executed before or after the action
     # @param type Type of action which should be hooked
@@ -265,6 +323,12 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.hook.get_collection(@name).add_hook(position, type, handler) }
     end
 
+    sig do
+      params(
+        name: String,
+        handle: T.proc.params(context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext).void
+      ).returns(self)
+    end
     # Add a new segment on the collection.
     # @param name the name of the segment
     # @param definition a function used to generate a condition tree or a condition tree
@@ -277,6 +341,9 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.segment.get_collection(@name).add_segment(name, definition) }
     end
 
+    sig do
+      params(name: String, binary_mode: String).returns(self)
+    end
     # Choose how binary data should be transported to the GUI.
     # By default, all fields are transported as 'datauri', with the exception of primary and foreign
     # keys.
@@ -292,14 +359,26 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.binary.get_collection(@name).set_binary_mode(name, binary_mode) }
     end
 
+    sig do
+      params(handle: T.proc.params(context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext).void)
+        .returns(self)
+    end
     def override_create(&handler)
       push_customization { @stack.override.get_collection(@name).add_create_handler(handler) }
     end
 
+    sig do
+      params(handle: T.proc.params(context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext).void)
+        .returns(self)
+    end
     def override_update(&handler)
       push_customization { @stack.override.get_collection(@name).add_update_handler(handler) }
     end
 
+    sig do
+      params(handle: T.proc.params(context: ForestAdminDatasourceCustomizer::Context::AgentCustomizationContext).void)
+        .returns(self)
+    end
     def override_delete(&handler)
       push_customization { @stack.override.get_collection(@name).add_delete_handler(handler) }
     end
