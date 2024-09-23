@@ -29,6 +29,8 @@ module ForestAdminAgent
           data
         end
 
+        # Form data parser which extracts the data from what is provided by the frontend when
+        # change hooks are called.
         def self.make_form_data_from_fields(datasource, fields)
           data = {}
 
