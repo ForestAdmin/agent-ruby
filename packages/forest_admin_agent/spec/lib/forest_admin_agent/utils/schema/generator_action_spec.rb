@@ -234,31 +234,15 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      defaultValue: 'Form is loading',
-                      description: '',
-                      enums: nil,
-                      field: 'Loading...',
-                      hook: nil,
-                      isReadOnly: true,
+                      default_value: nil,
+                      description: nil,
+                      field: 'label',
+                      isReadOnly: false,
                       isRequired: false,
-                      reference: nil,
                       type: 'String',
-                      value: nil,
                       widgetEdit: nil
                     }
                   ],
-                  # uncomment when back validations will be done ...
-                  # fields: [
-                  #   {
-                  #     default_value: nil,
-                  #     description: nil,
-                  #     field: 'label',
-                  #     isReadOnly: false,
-                  #     isRequired: false,
-                  #     type: 'String',
-                  #     widgetEdit: nil
-                  #   }
-                  # ],
                   # layout: [
                   #   { component: 'input', fieldId: 'label', type: 'Layout' },
                   #   { component: 'separator', type: 'Layout' }
@@ -301,31 +285,15 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      defaultValue: 'Form is loading',
-                      description: '',
-                      enums: nil,
-                      field: 'Loading...',
-                      hook: nil,
-                      isReadOnly: true,
+                      default_value: nil,
+                      description: nil,
+                      field: 'label',
+                      isReadOnly: false,
                       isRequired: false,
-                      reference: nil,
                       type: 'String',
-                      value: nil,
                       widgetEdit: nil
                     }
                   ],
-                  # uncomment when back validations will be done ...
-                  # fields: [
-                  #   {
-                  #     default_value: nil,
-                  #     description: nil,
-                  #     field: 'label',
-                  #     isReadOnly: false,
-                  #     isRequired: false,
-                  #     type: 'String',
-                  #     widgetEdit: nil
-                  #   }
-                  # ],
                   # layout: [
                   #   { component: 'input', fieldId: 'label', type: 'Layout' },
                   #   { component: 'htmlBlock', type: 'Layout', content: '<p>foo</p>' }

@@ -30,8 +30,7 @@ module ForestAdminAgent
           slug = get_action_slug(name)
 
           form_elements = extract_fields_and_layout(collection.get_form(nil, name))
-          if action.static_form? && form_elements[:layout].empty?
-            # if action.static_form?
+          if action.static_form?
             fields = build_fields(collection, form_elements[:fields])
             layout = form_elements[:layout]
           else
@@ -58,7 +57,7 @@ module ForestAdminAgent
 
           return schema unless layout && !layout.empty?
 
-          schema[:layout] = build_layout(layout)
+          # schema[:layout] = build_layout(layout)
 
           schema
         end
