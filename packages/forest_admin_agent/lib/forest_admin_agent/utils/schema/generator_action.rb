@@ -64,6 +64,14 @@ module ForestAdminAgent
         end
 
         def self.build_layout_schema(field)
+          if field.component == 'Row'
+            return {
+              **field.to_h,
+              component: field.component.camelize(:lower),
+              fields: field.fields.map { |f| build_layout_schema(f) }
+            }
+          end
+
           { **field.to_h, component: field.component.camelize(:lower) }
         end
 
@@ -112,7 +120,7 @@ module ForestAdminAgent
         end
 
         def self.build_layout(elements)
-          if elements.any? { |element| element[:component] != 'Input' }
+          if elements.any? { |element| element.component != 'Input' }
             return elements.map do |element|
               build_layout_schema(element)
             end

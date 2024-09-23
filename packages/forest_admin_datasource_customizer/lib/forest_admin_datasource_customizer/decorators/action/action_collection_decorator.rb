@@ -48,9 +48,9 @@ module ForestAdminDatasourceCustomizer
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
-          fields = drop_deferred(context, metas[:search_values], dynamic_fields)
+          fields = drop_deferred(context, metas[:search_values], dynamic_fields).compact
 
-          fields.compact!.each do |field|
+          fields.each do |field|
             next if field.type == 'Layout'
 
             if field.value.nil?
