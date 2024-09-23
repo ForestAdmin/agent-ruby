@@ -1,3 +1,10 @@
+# [1.0.0-beta.68](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.67...v1.0.0-beta.68) (2024-09-23)
+
+
+### Features
+
+* **form:** add HtmlBlock layout element ([#70](https://github.com/ForestAdmin/agent-ruby/issues/70)) ([0ba5669](https://github.com/ForestAdmin/agent-ruby/commit/0ba5669b8ec94348d33b8981c07bbe244369a9b9))
+
 # [1.0.0-beta.67](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.66...v1.0.0-beta.67) (2024-09-19)
 
 
