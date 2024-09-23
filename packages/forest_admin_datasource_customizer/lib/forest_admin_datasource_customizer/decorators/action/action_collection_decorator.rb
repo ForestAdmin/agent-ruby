@@ -50,7 +50,7 @@ module ForestAdminDatasourceCustomizer
 
           fields = drop_deferred(context, metas[:search_values], dynamic_fields).compact
 
-          fields.compact!.each do |field|
+          fields.each do |field|
             next if field.type == 'Layout'
 
             if field.value.nil?
