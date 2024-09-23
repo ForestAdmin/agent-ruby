@@ -112,7 +112,7 @@ module ForestAdminAgent
         end
 
         def self.build_layout(elements)
-          if elements
+          if elements.any? { |element| element[:component] != 'Input' }
             return elements.map do |element|
               build_layout_schema(element)
             end
@@ -124,20 +124,24 @@ module ForestAdminAgent
         def self.extract_fields_and_layout(form)
           fields = []
           layout = []
-          has_real_layout = false
 
           form&.each do |element|
             if element.type == Actions::FieldType::LAYOUT
-              layout << element
-              has_real_layout = true
+              if element.component == 'Row'
+                extract = extract_fields_and_layout(element.fields)
+                element.fields = extract[:layout]
+                layout << element
+                fields.concat(extract[:fields])
+              else
+                layout << element
+              end
+
             else
               fields << element
               # frontend rule
               layout << Actions::ActionLayoutElement::InputElement.new(component: 'Input', field_id: element.label)
             end
           end
-
-          layout = [] unless has_real_layout
 
           { fields: fields, layout: layout }
         end
