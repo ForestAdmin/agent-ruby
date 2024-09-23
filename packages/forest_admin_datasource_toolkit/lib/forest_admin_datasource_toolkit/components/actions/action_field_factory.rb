@@ -18,6 +18,10 @@ module ForestAdminDatasourceToolkit
             ActionLayoutElement::SeparatorElement.new(**field)
           when 'HtmlBlock'
             ActionLayoutElement::HtmlBlockElement.new(**field)
+          when 'Row'
+            ActionLayoutElement::RowElement.new(**field) unless field[:fields].empty?
+
+            nil
           end
         end
 

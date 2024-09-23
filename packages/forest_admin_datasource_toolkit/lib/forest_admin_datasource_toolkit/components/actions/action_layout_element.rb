@@ -43,6 +43,15 @@ module ForestAdminDatasourceToolkit
             super(component: 'Separator', **options)
           end
         end
+
+        class RowElement < BaseLayoutElement
+          attr_accessor :fields
+
+          def initialize(fields:, **options)
+            super(component: 'Row', **options)
+            @fields = fields
+          end
+        end
       end
     end
   end
