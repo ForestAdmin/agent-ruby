@@ -108,7 +108,7 @@ module ForestAdminAgent
           if fields
             return fields.map do |field|
               new_field = build_field_schema(collection.datasource, field)
-              new_field[:default_value] = new_field[:value]
+              new_field[:defaultValue] = new_field[:value]
               new_field.delete(:value)
 
               new_field

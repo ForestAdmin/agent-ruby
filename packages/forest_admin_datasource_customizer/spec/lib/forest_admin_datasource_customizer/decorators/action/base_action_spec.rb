@@ -225,6 +225,17 @@ module ForestAdminDatasourceCustomizer
               expect(result.content).to eq('<p>foo</p>')
             end
           end
+
+          context 'when element is a Row' do
+            let(:element) { { type: 'Layout', component: 'Row', fields: [field_send_notification, field_message] } }
+
+            it 'returns a row element' do
+              result = action.build_layout_element(element)
+              expect(result).to be_a(ForestAdminDatasourceCustomizer::Decorators::Action::FormLayoutElement::RowElement)
+              expect(result.fields[0].label).to eq('Send a notification')
+              expect(result.fields[1].label).to eq('Notification message')
+            end
+          end
         end
 
         describe 'when check form is static' do

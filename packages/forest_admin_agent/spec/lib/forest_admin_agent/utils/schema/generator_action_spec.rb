@@ -74,7 +74,7 @@ module ForestAdminAgent
                 httpMethod: 'POST',
                 redirect: nil,
                 download: false,
-                fields: [{ description: 'email', isRequired: true, isReadOnly: false, field: 'label', widgetEdit: nil, type: 'String', default_value: '' }],
+                fields: [{ description: 'email', isRequired: true, isReadOnly: false, field: 'label', widgetEdit: nil, type: 'String', defaultValue: '' }],
                 hooks: { load: false, change: ['changeHook'] }
               }
             )
@@ -234,7 +234,7 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      default_value: nil,
+                      defaultValue: nil,
                       description: nil,
                       field: 'label',
                       isReadOnly: false,
@@ -285,7 +285,7 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      default_value: nil,
+                      defaultValue: nil,
                       description: nil,
                       field: 'label',
                       isReadOnly: false,
@@ -297,6 +297,69 @@ module ForestAdminAgent
                   # layout: [
                   #   { component: 'input', fieldId: 'label', type: 'Layout' },
                   #   { component: 'htmlBlock', type: 'Layout', content: '<p>foo</p>' }
+                  # ],
+                  hooks: { load: false, change: ['changeHook'] }
+                }
+              )
+            end
+          end
+
+          context 'with row element' do
+            before do
+              @collection = collection_build(
+                schema: {
+                  actions: {
+                    'Charge credit card' => BaseAction.new(
+                      scope: Types::ActionScope::SINGLE
+                    )
+                  }
+                },
+                get_form: [
+                  ActionLayoutElement::RowElement.new(
+                    fields: [
+                      ActionField.new(label: 'label', type: 'String'),
+                      ActionField.new(label: 'amount', type: 'String')
+                    ]
+                  )
+                ]
+              )
+            end
+
+            it 'generate schema correctly' do
+              schema = described_class.build_schema(@collection, 'Charge credit card')
+
+              expect(schema).to eq(
+                {
+                  id: 'collection-0-charge-credit-card',
+                  name: 'Charge credit card',
+                  type: 'single',
+                  baseUrl: nil,
+                  endpoint: '/forest/_actions/collection/0/charge-credit-card',
+                  httpMethod: 'POST',
+                  redirect: nil,
+                  download: false,
+                  fields: [
+                    {
+                      field: 'label',
+                      type: 'String',
+                      description: nil,
+                      isRequired: false,
+                      isReadOnly: false,
+                      widgetEdit: nil,
+                      defaultValue: nil
+                    },
+                    {
+                      field: 'amount',
+                      type: 'String',
+                      description: nil,
+                      isRequired: false,
+                      isReadOnly: false,
+                      widgetEdit: nil,
+                      defaultValue: nil
+                    }
+                  ],
+                  # layout: [
+                  #   { component: 'row', type: 'Layout', fields: ['label'] }
                   # ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
