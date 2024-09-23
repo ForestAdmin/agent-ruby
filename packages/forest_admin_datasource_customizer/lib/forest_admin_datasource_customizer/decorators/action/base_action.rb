@@ -70,6 +70,8 @@ module ForestAdminDatasourceCustomizer
           case field[:component]
           when 'Separator'
             FormLayoutElement::SeparatorElement.new(**field)
+          when 'HtmlBlock'
+            FormLayoutElement::HtmlBlockElement.new(**field)
           else
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                   "Unknow component type: #{field[:component]}"

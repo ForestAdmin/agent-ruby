@@ -64,7 +64,7 @@ module ForestAdminAgent
         end
 
         def self.build_layout_schema(field)
-          { **field.to_h, component: field.component.downcase }
+          { **field.to_h, component: field.component.camelize(:lower) }
         end
 
         def self.build_field_schema(datasource, field)

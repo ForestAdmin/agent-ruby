@@ -16,8 +16,17 @@ module ForestAdminDatasourceCustomizer
         end
 
         class SeparatorElement < LayoutElement
-          def initialize(options)
+          def initialize(**options)
             super(component: 'Separator', **options)
+          end
+        end
+
+        class HtmlBlockElement < LayoutElement
+          attr_accessor :content
+
+          def initialize(content:, **options)
+            super(component: 'HtmlBlock', **options)
+            @content = content
           end
         end
       end
