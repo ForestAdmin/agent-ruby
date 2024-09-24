@@ -11,6 +11,7 @@ module ForestAdminDatasourceCustomizer
 
         def add_action(name, action)
           action.build_elements
+          action.validate_fields_ids
           @actions[name] = action
 
           mark_schema_as_dirty
@@ -43,7 +44,7 @@ module ForestAdminDatasourceCustomizer
           if metas[:search_field]
             # in the case of a search hook,
             # we don't want to rebuild all the fields. only the one searched
-            dynamic_fields = dynamic_fields.select { |field| field.label == metas[:search_field] }
+            dynamic_fields = dynamic_fields.select { |field| field.id == metas[:search_field] }
           end
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
@@ -55,11 +56,11 @@ module ForestAdminDatasourceCustomizer
 
             if field.value.nil?
               # customer did not define a handler to rewrite the previous value => reuse current one.
-              field.value = form_values[field.label]
+              field.value = form_values[field.id]
             end
 
             # fields that were accessed through the context.get_form_value(x) getter should be watched.
-            field.watch_changes = used.include?(field.label)
+            field.watch_changes = used.include?(field.id)
           end
 
           fields
@@ -84,7 +85,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def drop_default(context, field, data)
-          data[field.label] = evaluate(context, field.default_value) unless data.key?(field.label)
+          data[field.id] = evaluate(context, field.default_value) unless data.key?(field.id)
           field.default_value = nil
 
           field
@@ -114,7 +115,7 @@ module ForestAdminDatasourceCustomizer
               value = field.send(key)
               key = key.to_s.concat('=').to_sym
 
-              search_value = field.type == 'Layout' ? nil : search_values&.dig(field.label)
+              search_value = field.type == 'Layout' ? nil : search_values&.dig(field.id)
               field.send(key, evaluate(context, value, search_value))
             end
 

@@ -7,6 +7,7 @@ module ForestAdminAgent
         DEFAULT_FIELDS = [
           {
             field: 'Loading...',
+            label: 'Loading...',
             type: 'String',
             isReadOnly: true,
             defaultValue: 'Form is loading',
@@ -79,7 +80,8 @@ module ForestAdminAgent
             description: field.description,
             isRequired: field.is_required,
             isReadOnly: field.is_read_only,
-            field: field.label,
+            field: field.id,
+            label: field.label,
             value: ForestValueConverter.value_to_forest(field),
             widgetEdit: GeneratorActionFieldWidget.build_widget_options(field)
           }
@@ -146,7 +148,7 @@ module ForestAdminAgent
             else
               fields << element
               # frontend rule
-              layout << Actions::ActionLayoutElement::InputElement.new(component: 'Input', field_id: element.label)
+              layout << Actions::ActionLayoutElement::InputElement.new(component: 'Input', field_id: element.id)
             end
           end
 

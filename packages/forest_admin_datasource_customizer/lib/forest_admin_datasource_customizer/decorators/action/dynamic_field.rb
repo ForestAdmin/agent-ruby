@@ -7,7 +7,8 @@ module ForestAdminDatasourceCustomizer
 
         def initialize(
           type:,
-          label:,
+          label: nil,
+          id: nil,
           description: nil,
           is_required: false,
           is_read_only: false,
@@ -21,7 +22,13 @@ module ForestAdminDatasourceCustomizer
         )
           super(type: type)
 
-          @label = label
+          if id.nil? && label.nil?
+            raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                  "A field must have an 'id' or a 'label' defined."
+          end
+
+          @id = label.nil? ? id : label
+          @label = id.nil? ? label : id
           @description = description
           @is_required = is_required
           @is_read_only = is_read_only

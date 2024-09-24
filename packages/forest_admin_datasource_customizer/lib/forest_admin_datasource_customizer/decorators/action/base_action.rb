@@ -23,6 +23,20 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        def validate_fields_ids(form = @form, used = [])
+          form.each do |element|
+            if element.type == 'Layout' && element.component == 'Row'
+              validate_fields_ids(element.fields, used)
+            else
+              if used.include?(element.id)
+                raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                      "All field must have different 'id'. Conflict come from field '#{element.id}'"
+              end
+              used << element.id
+            end
+          end
+        end
+
         def build_widget(field)
           case field[:widget]
           when 'AddressAutocomplete'

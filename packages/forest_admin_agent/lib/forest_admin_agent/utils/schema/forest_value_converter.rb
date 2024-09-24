@@ -58,7 +58,7 @@ module ForestAdminAgent
         def self.make_form_data(datasource, raw_data, fields)
           data = {}
           raw_data.each do |key, value|
-            field = fields.find { |f| f.label == key }
+            field = fields.find { |f| f.id == key }
             # Skip fields from the default form
             next if Schema::GeneratorAction::DEFAULT_FIELDS.map { |f| f[:field] }.include?(key)
 
