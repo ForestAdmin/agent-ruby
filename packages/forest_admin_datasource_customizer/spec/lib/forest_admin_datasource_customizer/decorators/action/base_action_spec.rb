@@ -248,7 +248,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           context 'when all fields are static' do
-            let(:form) { [instance_double(DynamicField, static?: true), instance_double(DynamicField, static?: true)] }
+            let(:form) { [instance_double(DynamicField, static?: true, type: 'String'), instance_double(DynamicField, static?: true, type: 'String')] }
             let(:action) { described_class.new(scope: :single, form: form) }
 
             it 'returns true' do
