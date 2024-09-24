@@ -25,6 +25,8 @@ module ForestAdminAgent
               {
                 id: 'collection-0-send-email',
                 name: 'Send email',
+                submitButtonLabel: nil,
+                description: nil,
                 type: 'single',
                 baseUrl: nil,
                 endpoint: '/forest/_actions/collection/0/send-email',
@@ -69,6 +71,8 @@ module ForestAdminAgent
               {
                 id: 'collection-0-send-email',
                 name: 'Send email',
+                submitButtonLabel: nil,
+                description: nil,
                 type: 'single',
                 baseUrl: nil,
                 endpoint: '/forest/_actions/collection/0/send-email',
@@ -101,7 +105,9 @@ module ForestAdminAgent
                     {
                       scope: Types::ActionScope::SINGLE,
                       static_form?: true,
-                      is_generate_file: false
+                      is_generate_file: false,
+                      description: nil,
+                      submit_button_label: nil
                     }
                   )
                 }
@@ -137,7 +143,9 @@ module ForestAdminAgent
                     {
                       scope: Types::ActionScope::SINGLE,
                       static_form?: true,
-                      is_generate_file: false
+                      is_generate_file: false,
+                      description: nil,
+                      submit_button_label: nil
                     }
                   )
                 }
@@ -168,7 +176,9 @@ module ForestAdminAgent
                     {
                       scope: Types::ActionScope::SINGLE,
                       static_form?: true,
-                      is_generate_file: false
+                      is_generate_file: false,
+                      description: nil,
+                      submit_button_label: nil
                     }
                   )
                 }
@@ -236,6 +246,8 @@ module ForestAdminAgent
                 {
                   id: 'collection-0-send-email',
                   name: 'Send email',
+                  submitButtonLabel: nil,
+                  description: nil,
                   type: 'single',
                   baseUrl: nil,
                   endpoint: '/forest/_actions/collection/0/send-email',
@@ -288,6 +300,8 @@ module ForestAdminAgent
                 {
                   id: 'collection-0-send-email',
                   name: 'Send email',
+                  submitButtonLabel: nil,
+                  description: nil,
                   type: 'single',
                   baseUrl: nil,
                   endpoint: '/forest/_actions/collection/0/send-email',
@@ -344,6 +358,8 @@ module ForestAdminAgent
                 {
                   id: 'collection-0-charge-credit-card',
                   name: 'Charge credit card',
+                  submitButtonLabel: nil,
+                  description: nil,
                   type: 'single',
                   baseUrl: nil,
                   endpoint: '/forest/_actions/collection/0/charge-credit-card',
