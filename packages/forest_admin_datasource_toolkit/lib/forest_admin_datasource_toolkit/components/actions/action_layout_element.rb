@@ -52,6 +52,18 @@ module ForestAdminDatasourceToolkit
             @fields = fields
           end
         end
+
+        class PageElement < BaseLayoutElement
+          attr_accessor :elements, :next_button_label, :previous_button_label
+
+          def initialize(elements:, **options)
+            super(component: 'Page', **options)
+            @elements = elements
+            @next_button_label = next_button_label
+            @previous_button_label = previous_button_label
+            @elements = elements
+          end
+        end
       end
     end
   end
