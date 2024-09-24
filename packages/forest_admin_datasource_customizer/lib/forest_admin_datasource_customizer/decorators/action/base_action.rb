@@ -90,6 +90,8 @@ module ForestAdminDatasourceCustomizer
             FormLayoutElement::HtmlBlockElement.new(**field)
           when 'Row'
             FormLayoutElement::RowElement.new(**field)
+          when 'Page'
+            FormLayoutElement::PageElement.new(**field)
           else
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                   "Unknow component type: #{field[:component]}"

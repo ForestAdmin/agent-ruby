@@ -63,6 +63,54 @@ module ForestAdminDatasourceCustomizer
             end
           end
         end
+
+        class PageElement < LayoutElement
+          attr_accessor :elements, :next_button_label, :previous_button_label
+
+          def initialize(options)
+            super(component: 'Page', **options)
+
+            validate!(options)
+            validate_button_labels!(options[:next_button_label], options[:previous_button_label])
+            validate_elements!(options[:elements])
+            @elements = instantiate_elements(options[:elements])
+          end
+
+          private
+
+          def validate!(options)
+            required_keys = %i[fields elements next_button_label previous_button_label]
+
+            return unless required_keys.none? { |key| options.key?(key) }
+
+            raise ForestException,
+                  "Using one of 'fields', 'elements', 'next_button_label', or 'previous_button_label' in a 'Page' configuration is mandatory"
+          end
+
+          def validate_button_labels!(next_button_label, previous_button_label)
+            if next_button_label && !next_button_label.is_a?(Proc)
+              raise ForestException, "The 'next_button_label' must be a Proc"
+            end
+
+            return unless previous_button_label && !previous_button_label.is_a?(Proc)
+
+            raise ForestException, "The 'previous_button_label' must be a Proc"
+          end
+
+          def validate_elements!(elements)
+            elements&.each do |element|
+              if element[:component] == 'Layout'
+                raise ForestException, "'Layout' component cannot be used within 'elements'"
+              end
+            end
+          end
+
+          def instantiate_elements(elements)
+            elements.map do |element|
+              ForestAdminDatasourceToolkit::Components::Actions::ActionFieldFactory.build(element)
+            end
+          end
+        end
       end
     end
   end
