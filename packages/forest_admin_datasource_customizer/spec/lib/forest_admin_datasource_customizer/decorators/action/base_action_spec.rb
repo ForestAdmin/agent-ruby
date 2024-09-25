@@ -245,7 +245,6 @@ module ForestAdminDatasourceCustomizer
               expect(result.fields[0].label).to eq('Send a notification')
               expect(result.fields[1].label).to eq('Notification message')
             end
-<<<<<<< HEAD
 
             it 'raises an exception when fields are missing' do
               element.delete(:fields)
