@@ -31,6 +31,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         class RowElement < LayoutElement
+          include ForestAdminDatasourceToolkit::Exceptions
           attr_accessor :fields
 
           def initialize(options)

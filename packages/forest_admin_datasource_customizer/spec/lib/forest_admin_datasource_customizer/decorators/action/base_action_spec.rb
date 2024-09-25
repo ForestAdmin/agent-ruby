@@ -235,6 +235,16 @@ module ForestAdminDatasourceCustomizer
               expect(result.fields[0].label).to eq('Send a notification')
               expect(result.fields[1].label).to eq('Notification message')
             end
+
+            it 'raises an exception when fields are missing' do
+              element.delete(:fields)
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+
+            it 'raises an exception when fields contain a layout element' do
+              element[:fields] << { type: 'Layout' }
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
           end
         end
 
