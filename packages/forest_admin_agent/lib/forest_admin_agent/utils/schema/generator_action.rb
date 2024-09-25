@@ -30,8 +30,7 @@ module ForestAdminAgent
           slug = get_action_slug(name)
 
           form_elements = extract_fields_and_layout(collection.get_form(nil, name))
-          if action.static_form? && form_elements[:layout].empty?
-            # if action.static_form?
+          if action.static_form?
             fields = build_fields(collection, form_elements[:fields])
             layout = form_elements[:layout]
           else
@@ -58,12 +57,20 @@ module ForestAdminAgent
 
           return schema unless layout && !layout.empty?
 
-          schema[:layout] = build_layout(layout)
+          # schema[:layout] = build_layout(layout)
 
           schema
         end
 
         def self.build_layout_schema(field)
+          if field.component == 'Row'
+            return {
+              **field.to_h,
+              component: field.component.camelize(:lower),
+              fields: field.fields.map { |f| build_layout_schema(f) }
+            }
+          end
+
           { **field.to_h, component: field.component.camelize(:lower) }
         end
 
@@ -101,7 +108,7 @@ module ForestAdminAgent
           if fields
             return fields.map do |field|
               new_field = build_field_schema(collection.datasource, field)
-              new_field[:default_value] = new_field[:value]
+              new_field[:defaultValue] = new_field[:value]
               new_field.delete(:value)
 
               new_field
@@ -112,7 +119,7 @@ module ForestAdminAgent
         end
 
         def self.build_layout(elements)
-          if elements
+          if elements.any? { |element| element.component != 'Input' }
             return elements.map do |element|
               build_layout_schema(element)
             end
@@ -124,20 +131,24 @@ module ForestAdminAgent
         def self.extract_fields_and_layout(form)
           fields = []
           layout = []
-          has_real_layout = false
 
           form&.each do |element|
             if element.type == Actions::FieldType::LAYOUT
-              layout << element
-              has_real_layout = true
+              if element.component == 'Row'
+                extract = extract_fields_and_layout(element.fields)
+                element.fields = extract[:layout]
+                layout << element
+                fields.concat(extract[:fields])
+              else
+                layout << element
+              end
+
             else
               fields << element
               # frontend rule
               layout << Actions::ActionLayoutElement::InputElement.new(component: 'Input', field_id: element.label)
             end
           end
-
-          layout = [] unless has_real_layout
 
           { fields: fields, layout: layout }
         end

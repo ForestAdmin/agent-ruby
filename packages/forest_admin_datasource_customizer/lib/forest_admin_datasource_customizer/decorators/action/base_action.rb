@@ -72,6 +72,8 @@ module ForestAdminDatasourceCustomizer
             FormLayoutElement::SeparatorElement.new(**field)
           when 'HtmlBlock'
             FormLayoutElement::HtmlBlockElement.new(**field)
+          when 'Row'
+            FormLayoutElement::RowElement.new(**field)
           else
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                   "Unknow component type: #{field[:component]}"
@@ -79,7 +81,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def static_form?
-          return form&.all?(&:static?) if form
+          return form&.all?(&:static?) && form&.none? { |field| field.type == 'Layout' } if form
 
           true
         end
