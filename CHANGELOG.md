@@ -1,3 +1,10 @@
+# [1.0.0-beta.69](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.68...v1.0.0-beta.69) (2024-09-25)
+
+
+### Features
+
+* **action_form:** add row layout customization ([#71](https://github.com/ForestAdmin/agent-ruby/issues/71)) ([1dea61a](https://github.com/ForestAdmin/agent-ruby/commit/1dea61abbf7ed61f956b1f6e3a173df7daa37b55))
+
 # [1.0.0-beta.68](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.67...v1.0.0-beta.68) (2024-09-23)
 
 
