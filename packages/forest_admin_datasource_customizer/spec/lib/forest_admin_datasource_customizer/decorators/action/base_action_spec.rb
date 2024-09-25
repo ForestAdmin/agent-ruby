@@ -256,6 +256,46 @@ module ForestAdminDatasourceCustomizer
               expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
             end
           end
+
+          context 'when element is a Page' do
+            let(:element) { { type: 'Layout', component: 'Page', elements: [field_send_notification, field_message], next_button_label: proc { 'Next' }, previous_button_label: proc { 'Previous' } } }
+
+            it 'returns a page element' do
+              result = action.build_layout_element(element)
+              expect(result).to be_a(ForestAdminDatasourceCustomizer::Decorators::Action::FormLayoutElement::PageElement)
+              expect(result.elements[0].label).to eq('Send a notification')
+              expect(result.elements[1].label).to eq('Notification message')
+              expect(result.next_button_label).to be_a(Proc)
+              expect(result.previous_button_label).to be_a(Proc)
+            end
+
+            it 'raises an exception when elements' do
+              element.delete(:elements)
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+
+            it 'raises an exception when next_button_label is not present' do
+              element.delete(:next_button_label)
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+
+            it 'raises an exception when previous_button_label is not present' do
+              element.delete(:previous_button_label)
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+
+            it 'raises an exception when next_button_label or previous_button_label is not a proc' do
+              element[:next_button_label] = 'Next'
+              element[:previous_button_label] = 'Previous'
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+
+            it 'raises an error when element contains a Page' do
+              element[:elements] = [element]
+              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+            end
+          end
         end
 
         describe 'when check form is static' do
