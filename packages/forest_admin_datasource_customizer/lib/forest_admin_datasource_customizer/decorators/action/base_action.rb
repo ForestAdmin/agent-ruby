@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def validate_fields_ids(form = @form, used = [])
-          form.each do |element|
+          form&.each do |element|
             if element.type == 'Layout' && element.component == 'Row'
               validate_fields_ids(element.fields, used)
             else

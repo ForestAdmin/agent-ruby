@@ -50,6 +50,7 @@ module ForestAdminAgent
               },
               get_form: [
                 ActionField.new(
+                  id: 'label',
                   label: 'label',
                   description: 'email',
                   type: 'String',
@@ -74,7 +75,16 @@ module ForestAdminAgent
                 httpMethod: 'POST',
                 redirect: nil,
                 download: false,
-                fields: [{ description: 'email', isRequired: true, isReadOnly: false, field: 'label', widgetEdit: nil, type: 'String', defaultValue: '' }],
+                fields: [{
+                  description: 'email',
+                  isRequired: true,
+                  isReadOnly: false,
+                  field: 'label',
+                  widgetEdit: nil,
+                  type: 'String',
+                  defaultValue: '',
+                  label: 'label'
+                }],
                 hooks: { load: false, change: ['changeHook'] }
               }
             )
@@ -213,7 +223,7 @@ module ForestAdminAgent
                   }
                 },
                 get_form: [
-                  ActionField.new(label: 'label', type: 'String'),
+                  ActionField.new(id: 'label', label: 'label', type: 'String'),
                   ActionLayoutElement::SeparatorElement.new
                 ]
               )
@@ -237,6 +247,7 @@ module ForestAdminAgent
                       defaultValue: nil,
                       description: nil,
                       field: 'label',
+                      label: 'label',
                       isReadOnly: false,
                       isRequired: false,
                       type: 'String',
@@ -264,7 +275,7 @@ module ForestAdminAgent
                   }
                 },
                 get_form: [
-                  ActionField.new(label: 'label', type: 'String'),
+                  ActionField.new(id: 'label_id', label: 'label', type: 'String'),
                   ActionLayoutElement::HtmlBlockElement.new(content: '<p>foo</p>')
                 ]
               )
@@ -287,7 +298,8 @@ module ForestAdminAgent
                     {
                       defaultValue: nil,
                       description: nil,
-                      field: 'label',
+                      field: 'label_id',
+                      label: 'label',
                       isReadOnly: false,
                       isRequired: false,
                       type: 'String',
@@ -317,8 +329,8 @@ module ForestAdminAgent
                 get_form: [
                   ActionLayoutElement::RowElement.new(
                     fields: [
-                      ActionField.new(label: 'label', type: 'String'),
-                      ActionField.new(label: 'amount', type: 'String')
+                      ActionField.new(id: 'label_id', label: 'label', type: 'String'),
+                      ActionField.new(id: 'amount_id', label: 'amount', type: 'String')
                     ]
                   )
                 ]
@@ -340,7 +352,8 @@ module ForestAdminAgent
                   download: false,
                   fields: [
                     {
-                      field: 'label',
+                      field: 'label_id',
+                      label: 'label',
                       type: 'String',
                       description: nil,
                       isRequired: false,
@@ -349,7 +362,8 @@ module ForestAdminAgent
                       defaultValue: nil
                     },
                     {
-                      field: 'amount',
+                      label: 'amount',
+                      field: 'amount_id',
                       type: 'String',
                       description: nil,
                       isRequired: false,
@@ -378,7 +392,7 @@ module ForestAdminAgent
                   }
                 },
                 get_form: [
-                  ActionField.new(label: 'label', type: 'String'),
+                  ActionField.new(id: 'label_id', label: 'label', type: 'String'),
                   ActionLayoutElement::SeparatorElement.new
                 ]
               )
