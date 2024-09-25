@@ -27,8 +27,8 @@ module ForestAdminDatasourceCustomizer
                   "A field must have an 'id' or a 'label' defined."
           end
 
-          @id = label.nil? ? id : label
-          @label = id.nil? ? label : id
+          @label = label.nil? ? id : label
+          @id = id.nil? ? label : id
           @description = description
           @is_required = is_required
           @is_read_only = is_read_only

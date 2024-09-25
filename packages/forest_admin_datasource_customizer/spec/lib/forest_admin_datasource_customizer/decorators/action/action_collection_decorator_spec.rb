@@ -308,6 +308,55 @@ module ForestAdminDatasourceCustomizer
             )
           end
         end
+
+        describe 'add_action' do
+          it 'raise an error if multiple fields with same id are provided' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                { id: 'id', label: 'amount', type: Types::FieldType::NUMBER },
+                { id: 'id', label: 'cost', type: Types::FieldType::NUMBER }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 All field must have different 'id'. Conflict come from field 'id'")
+          end
+
+          it 'raise an error if multiple fields with same id are provided in row' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                {
+                  type: 'Layout',
+                  component: 'Row',
+                  fields: [
+                    { id: 'id', label: 'amount', type: Types::FieldType::NUMBER },
+                    { id: 'id', label: 'cost', type: Types::FieldType::NUMBER }
+                  ]
+                }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 All field must have different 'id'. Conflict come from field 'id'")
+          end
+
+          it 'raise an error if field (hash) is provided without id and label' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                { type: Types::FieldType::NUMBER }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 A field must have an 'id' or a 'label' defined.")
+          end
+        end
       end
     end
   end
