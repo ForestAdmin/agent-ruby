@@ -65,6 +65,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         class PageElement < LayoutElement
+          include ForestAdminDatasourceToolkit::Exceptions
+
           attr_accessor :elements, :next_button_label, :previous_button_label
 
           def initialize(options)
@@ -72,6 +74,8 @@ module ForestAdminDatasourceCustomizer
 
             validate!(options)
             validate_button_labels!(options[:next_button_label], options[:previous_button_label])
+            @next_button_label = options[:next_button_label]
+            @previous_button_label = options[:previous_button_label]
             validate_elements!(options[:elements])
             @elements = instantiate_elements(options[:elements])
           end
@@ -79,12 +83,9 @@ module ForestAdminDatasourceCustomizer
           private
 
           def validate!(options)
-            required_keys = %i[fields elements next_button_label previous_button_label]
-
-            return unless required_keys.none? { |key| options.key?(key) }
-
-            raise ForestException,
-                  "Using one of 'fields', 'elements', 'next_button_label', or 'previous_button_label' in a 'Page' configuration is mandatory"
+            unless options.key?(:elements) && options.key?(:next_button_label) && options.key?(:previous_button_label)
+              raise ForestException, "Using 'elements', 'next_button_label' or 'previous_button_label' in a 'Page' configuration is mandatory"
+            end
           end
 
           def validate_button_labels!(next_button_label, previous_button_label)
@@ -99,8 +100,8 @@ module ForestAdminDatasourceCustomizer
 
           def validate_elements!(elements)
             elements&.each do |element|
-              if element[:component] == 'Layout'
-                raise ForestException, "'Layout' component cannot be used within 'elements'"
+              if element[:component] == 'Page'
+                raise ForestException, "'Page' component cannot be used within 'elements'"
               end
             end
           end
