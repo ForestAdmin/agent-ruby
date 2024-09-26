@@ -251,6 +251,25 @@ module ForestAdminDatasourceCustomizer
                     value: proc do |context|
                       context.get_form_value('change') if context.field_changed?('change')
                     end
+                  },
+                  {
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: [
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_change',
+                        is_required: true
+                      },
+                      DynamicField.new(
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_to_change',
+                        is_read_only: true,
+                        value: proc do |context|
+                          context.get_form_value('sub_field_change') if context.field_changed?('sub_field_change')
+                        end
+                      )
+                    ]
                   }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
@@ -263,6 +282,15 @@ module ForestAdminDatasourceCustomizer
             expect(form).to include(
               have_attributes(label: 'change', watch_changes: true),
               have_attributes(label: 'to change', is_read_only: true, watch_changes: false)
+            )
+          end
+
+          it 'add watchChange property to sub fields of row layout that need to trigger a recompute on change' do
+            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new)
+
+            expect(form.last.fields).to include(
+              have_attributes(label: 'sub_field_change', watch_changes: true),
+              have_attributes(label: 'sub_field_to_change', is_read_only: true, watch_changes: false)
             )
           end
         end
