@@ -228,6 +228,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/base_action.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/rename_field/rename_field_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/action_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/form_factory.rb'
 
 Metrics/BlockLength:
   Exclude:
