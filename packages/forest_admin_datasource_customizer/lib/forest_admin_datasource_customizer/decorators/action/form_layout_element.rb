@@ -5,6 +5,20 @@ module ForestAdminDatasourceCustomizer
         include Types
         include ForestAdminDatasourceToolkit::Exceptions
 
+        class ElementFactory
+          def build_elements(form)
+            form&.map do |field|
+              if field.key? :widget
+                build_widget(field)
+              elsif field[:type] == 'Layout'
+                build_layout_element(field)
+              else
+                DynamicField.new(**field)
+              end
+            end
+          end
+        end
+
         class LayoutElement < BaseFormElement
           attr_accessor :if_condition, :component
 
@@ -72,33 +86,22 @@ module ForestAdminDatasourceCustomizer
           def initialize(options)
             super(component: 'Page', **options)
 
-            validate!(options)
-            validate_button_labels!(options[:next_button_label], options[:previous_button_label])
+            validate_elements_presence!(options)
+            validate_no_page_elements!(options[:elements])
             @next_button_label = options[:next_button_label]
             @previous_button_label = options[:previous_button_label]
-            validate_elements!(options[:elements])
             @elements = instantiate_elements(options[:elements])
           end
 
           private
 
-          def validate!(options)
-            unless options.key?(:elements) && options.key?(:next_button_label) && options.key?(:previous_button_label)
-              raise ForestException, "Using 'elements', 'next_button_label' or 'previous_button_label' in a 'Page' configuration is mandatory"
-            end
+          def validate_elements_presence!(options)
+            return if options.key?(:elements)
+
+            raise ForestException, "Using 'elements' in a 'Page' configuration is mandatory"
           end
 
-          def validate_button_labels!(next_button_label, previous_button_label)
-            if next_button_label && !next_button_label.is_a?(Proc)
-              raise ForestException, "The 'next_button_label' must be a Proc"
-            end
-
-            return unless previous_button_label && !previous_button_label.is_a?(Proc)
-
-            raise ForestException, "The 'previous_button_label' must be a Proc"
-          end
-
-          def validate_elements!(elements)
+          def validate_no_page_elements!(elements)
             elements&.each do |element|
               if element[:component] == 'Page'
                 raise ForestException, "'Page' component cannot be used within 'elements'"
@@ -107,9 +110,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           def instantiate_elements(elements)
-            elements.map do |element|
-              ForestAdminDatasourceToolkit::Components::Actions::ActionFieldFactory.build(element)
-            end
+            FormFactory.build_elements(elements)
           end
         end
       end
