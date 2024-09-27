@@ -1,3 +1,10 @@
+# [1.0.0-beta.70](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.69...v1.0.0-beta.70) (2024-09-27)
+
+
+### Features
+
+* **form:** add id in form fields ([#73](https://github.com/ForestAdmin/agent-ruby/issues/73)) ([363d700](https://github.com/ForestAdmin/agent-ruby/commit/363d7003b6433255c46c7c00731ef6246b728de2))
+
 # [1.0.0-beta.69](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.68...v1.0.0-beta.69) (2024-09-25)
 
 
