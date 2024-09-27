@@ -1,3 +1,5 @@
+require 'active_support/core_ext/string/inflections'
+
 module ForestAdminDatasourceToolkit
   module Components
     module Actions
