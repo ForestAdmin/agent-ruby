@@ -127,81 +127,119 @@ module ForestAdminDatasourceCustomizer
         end
 
         describe 'with a single action with a if_conditions' do
-          before do
-            @decorated_book.add_action(
-              'make photocopy',
-              BaseAction.new(
-                scope: Types::ActionScope::GLOBAL,
-                form: [
-                  { label: 'noIf', type: Types::FieldType::STRING },
-                  {
-                    label: 'dynamicIfFalse',
-                    type: Types::FieldType::STRING,
-                    if_condition: proc { false }
-                  },
-                  {
-                    label: 'dynamicIfTrue',
-                    type: Types::FieldType::STRING,
-                    if_condition: proc { true }
-                  },
-                  {
-                    type: 'Layout',
-                    component: 'Row',
-                    fields: [
-                      {
-                        type: Types::FieldType::STRING,
-                        label: 'sub_field_1',
-                        if_condition: proc { false }
-                      },
-                      {
-                        type: Types::FieldType::STRING,
-                        label: 'sub_field_2',
-                        if_condition: proc { true }
-                      }
-                    ]
-                  },
-                  {
-                    type: 'Layout',
-                    component: 'Row',
-                    fields: [
-                      {
-                        type: Types::FieldType::STRING,
-                        label: 'sub_field_3',
-                        if_condition: proc { false }
-                      }
-                    ]
-                  }
-                ]
-              ) { |_context, result_builder| result_builder.error(message: 'meeh') }
-            )
+          context 'with row element' do
+            before do
+              @decorated_book.add_action(
+                'make photocopy',
+                BaseAction.new(
+                  scope: Types::ActionScope::GLOBAL,
+                  form: [
+                    { label: 'noIf', type: Types::FieldType::STRING },
+                    {
+                      label: 'dynamicIfFalse',
+                      type: Types::FieldType::STRING,
+                      if_condition: proc { false }
+                    },
+                    {
+                      label: 'dynamicIfTrue',
+                      type: Types::FieldType::STRING,
+                      if_condition: proc { true }
+                    },
+                    {
+                      type: 'Layout',
+                      component: 'Row',
+                      fields: [
+                        {
+                          type: Types::FieldType::STRING,
+                          label: 'sub_field_1',
+                          if_condition: proc { false }
+                        },
+                        {
+                          type: Types::FieldType::STRING,
+                          label: 'sub_field_2',
+                          if_condition: proc { true }
+                        }
+                      ]
+                    },
+                    {
+                      type: 'Layout',
+                      component: 'Row',
+                      fields: [
+                        {
+                          type: Types::FieldType::STRING,
+                          label: 'sub_field_3',
+                          if_condition: proc { false }
+                        }
+                      ]
+                    }
+                  ]
+                ) { |_context, result_builder| result_builder.error(message: 'meeh') }
+              )
+            end
+
+            it 'drop ifs which are false if required' do
+              form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
+
+              expect(form).to include(
+                have_attributes(label: 'noIf', type: 'String'),
+                have_attributes(label: 'dynamicIfTrue', type: 'String')
+              )
+            end
+
+            it 'drop row element if fields are empty and remove field not required in row' do
+              form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
+
+              expect(form.size).to eq(3)
+              expect(form.last.fields).to include(
+                have_attributes(label: 'sub_field_2', type: 'String')
+              )
+            end
+
+            it 'not dropIfs if required' do
+              form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: true })
+
+              expect(form).to include(
+                have_attributes(label: 'noIf', type: 'String'),
+                have_attributes(label: 'dynamicIfFalse', type: 'String'),
+                have_attributes(label: 'dynamicIfTrue', type: 'String')
+              )
+            end
           end
 
-          it 'drop ifs which are false if required' do
-            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
+          context 'with page element' do
+            before do
+              @decorated_book.add_action(
+                'make photocopy',
+                BaseAction.new(
+                  scope: Types::ActionScope::GLOBAL,
+                  form: [
+                    {
+                      type: 'Layout',
+                      component: 'Page',
+                      elements: [
+                        { label: 'field_1', type: Types::FieldType::STRING, if_condition: proc { false } }
+                      ]
+                    },
+                    {
+                      type: 'Layout',
+                      component: 'Page',
+                      elements: [
+                        { label: 'field_2', type: Types::FieldType::STRING, if_condition: proc { true } }
+                      ]
+                    }
+                  ]
+                ) { |_context, result_builder| result_builder.error(message: 'meeh') }
+              )
+            end
 
-            expect(form).to include(
-              have_attributes(label: 'noIf', type: 'String'),
-              have_attributes(label: 'dynamicIfTrue', type: 'String')
-            )
-          end
+            it 'drop page if element are empty' do
+              form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
 
-          it 'drop row element if fields are empty and remove field not required in row' do
-            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
-
-            expect(form.size).to eq(3)
-            expect(form.last.fields).to include(
-              have_attributes(label: 'sub_field_2', type: 'String')
-            )
-          end
-
-          it 'not dropIfs if required' do
-            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: true })
-
-            expect(form).to include(
-              have_attributes(label: 'noIf', type: 'String'),
-              have_attributes(label: 'dynamicIfFalse', type: 'String'),
-              have_attributes(label: 'dynamicIfTrue', type: 'String')
-            )
+              expect(form.size).to eq(1)
+              expect(form.first.elements).to include(
+                have_attributes(label: 'field_2', type: 'String')
+              )
+            end
           end
         end
 
@@ -212,15 +250,21 @@ module ForestAdminDatasourceCustomizer
               BaseAction.new(
                 scope: Types::ActionScope::GLOBAL,
                 form: [
-                  { label: 'field_1', type: Types::FieldType::STRING, default_value: proc { 'default value field_1' } },
                   {
                     type: 'Layout',
-                    component: 'Row',
-                    fields: [
+                    component: 'Page',
+                    elements: [
+                      { label: 'field_1', type: Types::FieldType::STRING, default_value: proc { 'default value field_1' } },
                       {
-                        type: Types::FieldType::STRING,
-                        label: 'sub_field_1',
-                        default_value: proc { 'default value sub_field_1' }
+                        type: 'Layout',
+                        component: 'Row',
+                        fields: [
+                          {
+                            type: Types::FieldType::STRING,
+                            label: 'sub_field_1',
+                            default_value: proc { 'default value sub_field_1' }
+                          }
+                        ]
                       }
                     ]
                   }
@@ -233,11 +277,17 @@ module ForestAdminDatasourceCustomizer
             form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
 
             expect(form).to include(
-              have_attributes(label: 'field_1', type: 'String', value: 'default value field_1'),
               have_attributes(
                 type: 'Layout',
-                component: 'Row',
-                fields: include(have_attributes(label: 'sub_field_1', type: 'String', value: 'default value sub_field_1'))
+                component: 'Page',
+                elements: include(
+                  have_attributes(label: 'field_1', type: 'String', value: 'default value field_1'),
+                  have_attributes(
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: include(have_attributes(label: 'sub_field_1', type: 'String', value: 'default value sub_field_1'))
+                  )
+                )
               )
             )
           end
