@@ -29,7 +29,6 @@ module ForestAdminAgent
           action = collection.schema[:actions][name]
           action_index = collection.schema[:actions].keys.index(name)
           slug = get_action_slug(name)
-
           form_elements = extract_fields_and_layout(collection.get_form(nil, name))
           if action.static_form?
             fields = build_fields(collection, form_elements[:fields])
@@ -71,6 +70,15 @@ module ForestAdminAgent
               **field.to_h,
               component: field.component.camelize(:lower),
               fields: field.fields.map { |f| build_layout_schema(f) }
+            }
+          end
+          if field.component == 'Page'
+            return {
+              **field.to_h,
+              component: field.component.camelize(:lower),
+              elements: field.elements.map do |f|
+                build_layout_schema(f)
+              end
             }
           end
 
@@ -135,18 +143,15 @@ module ForestAdminAgent
         def self.extract_fields_and_layout(form)
           fields = []
           layout = []
-
           form&.each do |element|
             if element.type == Actions::FieldType::LAYOUT
-              if element.component == 'Row'
-                extract = extract_fields_and_layout(element.fields)
-                element.fields = extract[:layout]
+              if %w[Page Row].include?(element.component)
+                extract = extract_fields_and_layout_for_component(element)
                 layout << element
                 fields.concat(extract[:fields])
               else
                 layout << element
               end
-
             else
               fields << element
               # frontend rule
@@ -155,6 +160,13 @@ module ForestAdminAgent
           end
 
           { fields: fields, layout: layout }
+        end
+
+        def self.extract_fields_and_layout_for_component(element)
+          key = element.component == 'Page' ? :elements : :fields
+          extract = extract_fields_and_layout(element.public_send(key))
+          element.public_send(:"#{key}=", extract[:layout])
+          extract
         end
       end
     end
