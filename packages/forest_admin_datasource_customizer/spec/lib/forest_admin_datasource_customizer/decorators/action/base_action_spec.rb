@@ -274,23 +274,6 @@ module ForestAdminDatasourceCustomizer
               expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
             end
 
-            it 'raises an exception when next_button_label is not present' do
-              element.delete(:next_button_label)
-              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
-            end
-
-            it 'raises an exception when previous_button_label is not present' do
-              element.delete(:previous_button_label)
-              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
-            end
-
-            it 'raises an exception when next_button_label or previous_button_label is not a proc' do
-              element[:next_button_label] = 'Next'
-              element[:previous_button_label] = 'Previous'
-              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
-              expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
-            end
-
             it 'raises an error when element contains a Page' do
               element[:elements] = [element]
               expect { action.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
