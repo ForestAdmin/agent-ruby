@@ -10,6 +10,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_action(name, action)
+          ensure_form_is_correct(action.form, name)
           action.build_elements
           action.validate_fields_ids
           @actions[name] = action
@@ -63,6 +64,18 @@ module ForestAdminDatasourceCustomizer
         end
 
         private
+
+        def ensure_form_is_correct(form, action_name)
+          is_page_component = ->(element) { element[:type] == 'Layout' && element[:component] == 'Page' }
+          pages = is_page_component.call(form.first)
+
+          form.each do |element|
+            if pages != is_page_component.call(element)
+              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                    "You cannot mix pages and other form elements in smart action '#{action_name}' form"
+            end
+          end
+        end
 
         def set_watch_changes_on_fields(form_values, used, fields)
           fields.each do |field|

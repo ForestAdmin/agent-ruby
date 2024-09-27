@@ -458,6 +458,26 @@ module ForestAdminDatasourceCustomizer
               @decorated_book.add_action('make photocopy', action)
             end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 A field must have an 'id' or a 'label' defined.")
           end
+
+          it 'raise an error if form mix form elements and pages' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                { label: 'amount', type: Types::FieldType::NUMBER },
+                {
+                  type: 'Layout',
+                  component: 'Page',
+                  elements: [
+                    { type: 'Layout', component: 'HtmlBlock', content: 'foo' }
+                  ]
+                }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 You cannot mix pages and other form elements in smart action 'make photocopy' form")
+          end
         end
       end
     end
