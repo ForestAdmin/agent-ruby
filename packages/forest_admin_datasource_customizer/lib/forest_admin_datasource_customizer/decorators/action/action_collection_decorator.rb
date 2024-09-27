@@ -50,7 +50,9 @@ module ForestAdminDatasourceCustomizer
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
-          fields = drop_deferred(context, metas[:search_values], dynamic_fields).compact
+          fields = drop_deferred(context, metas[:search_values], dynamic_fields)
+
+          fields.compact
 
           set_watch_changes_on_fields(form_values, used, fields)
 
@@ -90,14 +92,20 @@ module ForestAdminDatasourceCustomizer
               field.watch_changes = used.include?(field.id)
             elsif field.component == 'Row'
               set_watch_changes_on_fields(form_values, used, field.fields)
+            elsif field.component == 'Page'
+              set_watch_changes_on_fields(form_values, used, field.elements)
             end
           end
         end
 
         def execute_on_sub_fields(field)
-          return unless field.type == 'Layout' && field.component == 'Row'
+          return unless field.type == 'Layout' && %w[Page Row].include?(field.component)
 
-          field.fields = yield(field.fields)
+          if field.component == 'Page'
+            field.elements = yield(field.elements)
+          elsif field.component == 'Row'
+            field.fields = yield(field.fields)
+          end
         end
 
         def drop_defaults(context, fields, data)
@@ -120,13 +128,17 @@ module ForestAdminDatasourceCustomizer
         end
 
         def drop_ifs(context, fields)
+          nested_layout_elements = %w[Page Row]
           if_values = fields.map do |field|
             if evaluate(context, field.if_condition) == false
               false
-            elsif field.type == 'Layout' && field.component == 'Row'
-              field.fields = drop_ifs(context, field.fields || [])
+            elsif field.type == 'Layout' && nested_layout_elements.include?(field.component)
 
-              true unless field.fields.empty?
+              key = field.component == 'Page' ? :elements : :fields
+              field.public_send(:"#{key}=", drop_ifs(context, field.public_send(:"#{key}") || []))
+
+              true unless field.public_send(:"#{key}").empty?
+
             else
               true
             end

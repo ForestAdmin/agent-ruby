@@ -3,7 +3,7 @@ module ForestAdminDatasourceToolkit
     module Actions
       class ActionFieldFactory
         def self.build(field)
-          if field.key? :widget
+          if field.key?(:widget) && !field[:widget].nil?
             build_widget(field)
           elsif field[:type] == 'Layout'
             build_layout_element(field)

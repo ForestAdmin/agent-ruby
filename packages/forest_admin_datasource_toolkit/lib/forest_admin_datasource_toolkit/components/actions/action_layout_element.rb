@@ -74,7 +74,7 @@ module ForestAdminDatasourceToolkit
 
           def instantiate_elements(elements)
             elements.map do |element|
-              ActionFieldFactory.build(**element.to_h)
+              ActionFieldFactory.build(element.to_h)
             end
           end
         end
