@@ -22,6 +22,23 @@ module ForestAdminDatasourceCustomizer
 
           true
         end
+
+        def validate_fields_ids(form = @form, used = [])
+          form&.each do |element|
+            if element.type == 'Layout'
+              if %w[Page Row].include?(element.component)
+                key = element.component == 'Page' ? :elements : :fields
+                validate_fields_ids(element.public_send(key), used)
+              end
+            else
+              if used.include?(element.id)
+                raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                      "All field must have different 'id'. Conflict come from field '#{element.id}'"
+              end
+              used << element.id
+            end
+          end
+        end
       end
     end
   end
