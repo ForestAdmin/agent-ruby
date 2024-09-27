@@ -11,6 +11,7 @@ module ForestAdminDatasourceCustomizer
 
         def add_action(name, action)
           action.build_elements
+          action.validate_fields_ids
           @actions[name] = action
 
           mark_schema_as_dirty
@@ -43,24 +44,14 @@ module ForestAdminDatasourceCustomizer
           if metas[:search_field]
             # in the case of a search hook,
             # we don't want to rebuild all the fields. only the one searched
-            dynamic_fields = dynamic_fields.select { |field| field.label == metas[:search_field] }
+            dynamic_fields = dynamic_fields.select { |field| field.id == metas[:search_field] }
           end
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
           fields = drop_deferred(context, metas[:search_values], dynamic_fields).compact
 
-          fields.each do |field|
-            next if field.type == 'Layout'
-
-            if field.value.nil?
-              # customer did not define a handler to rewrite the previous value => reuse current one.
-              field.value = form_values[field.label]
-            end
-
-            # fields that were accessed through the context.get_form_value(x) getter should be watched.
-            field.watch_changes = used.include?(field.label)
-          end
+          set_watch_changes_on_fields(form_values, used, fields)
 
           fields
         end
@@ -73,9 +64,34 @@ module ForestAdminDatasourceCustomizer
 
         private
 
+        def set_watch_changes_on_fields(form_values, used, fields)
+          fields.each do |field|
+            if field.type != 'Layout'
+
+              if field.value.nil?
+                # customer did not define a handler to rewrite the previous value => reuse current one.
+                field.value = form_values[field.id]
+              end
+
+              # fields that were accessed through the context.get_form_value(x) getter should be watched.
+              field.watch_changes = used.include?(field.id)
+            elsif field.component == 'Row'
+              set_watch_changes_on_fields(form_values, used, field.fields)
+            end
+          end
+        end
+
+        def execute_on_sub_fields(field)
+          return unless field.type == 'Layout' && field.component == 'Row'
+
+          field.fields = yield(field.fields)
+        end
+
         def drop_defaults(context, fields, data)
           fields.map do |field|
             if field.type == 'Layout'
+              execute_on_sub_fields(field) { |sub_fields| drop_defaults(context, sub_fields, data) }
+
               field
             else
               drop_default(context, field, data)
@@ -84,14 +100,25 @@ module ForestAdminDatasourceCustomizer
         end
 
         def drop_default(context, field, data)
-          data[field.label] = evaluate(context, field.default_value) unless data.key?(field.label)
+          data[field.id] = evaluate(context, field.default_value) unless data.key?(field.id)
           field.default_value = nil
 
           field
         end
 
         def drop_ifs(context, fields)
-          if_values = fields.map { |field| !field.if_condition || evaluate(context, field.if_condition) }
+          if_values = fields.map do |field|
+            if evaluate(context, field.if_condition) == false
+              false
+            elsif field.type == 'Layout' && field.component == 'Row'
+              field.fields = drop_ifs(context, field.fields || [])
+
+              true unless field.fields.empty?
+            else
+              true
+            end
+          end
+
           new_fields = fields.select.with_index { |_field, index| if_values[index] }
           new_fields.each do |field|
             field = field.dup
@@ -105,6 +132,8 @@ module ForestAdminDatasourceCustomizer
           new_fields = []
           fields.each do |field|
             field = field.dup
+            execute_on_sub_fields(field) { |sub_fields| drop_deferred(context, search_values, sub_fields) }
+
             field.instance_variables.each do |key|
               key = key.to_s.delete('@').to_sym
 
@@ -114,7 +143,7 @@ module ForestAdminDatasourceCustomizer
               value = field.send(key)
               key = key.to_s.concat('=').to_sym
 
-              search_value = field.type == 'Layout' ? nil : search_values&.dig(field.label)
+              search_value = field.type == 'Layout' ? nil : search_values&.dig(field.id)
               field.send(key, evaluate(context, value, search_value))
             end
 

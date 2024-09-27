@@ -143,6 +143,33 @@ module ForestAdminDatasourceCustomizer
                     label: 'dynamicIfTrue',
                     type: Types::FieldType::STRING,
                     if_condition: proc { true }
+                  },
+                  {
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: [
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_1',
+                        if_condition: proc { false }
+                      },
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_2',
+                        if_condition: proc { true }
+                      }
+                    ]
+                  },
+                  {
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: [
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_3',
+                        if_condition: proc { false }
+                      }
+                    ]
                   }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
@@ -158,6 +185,15 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
+          it 'drop row element if fields are empty and remove field not required in row' do
+            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
+
+            expect(form.size).to eq(3)
+            expect(form.last.fields).to include(
+              have_attributes(label: 'sub_field_2', type: 'String')
+            )
+          end
+
           it 'not dropIfs if required' do
             form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: true })
 
@@ -165,6 +201,44 @@ module ForestAdminDatasourceCustomizer
               have_attributes(label: 'noIf', type: 'String'),
               have_attributes(label: 'dynamicIfFalse', type: 'String'),
               have_attributes(label: 'dynamicIfTrue', type: 'String')
+            )
+          end
+        end
+
+        describe 'with a single action with default values' do
+          before do
+            @decorated_book.add_action(
+              'make photocopy',
+              BaseAction.new(
+                scope: Types::ActionScope::GLOBAL,
+                form: [
+                  { label: 'field_1', type: Types::FieldType::STRING, default_value: proc { 'default value field_1' } },
+                  {
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: [
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_1',
+                        default_value: proc { 'default value sub_field_1' }
+                      }
+                    ]
+                  }
+                ]
+              ) { |_context, result_builder| result_builder.error(message: 'meeh') }
+            )
+          end
+
+          it 'drop all default values' do
+            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new, { include_hidden_fields: false })
+
+            expect(form).to include(
+              have_attributes(label: 'field_1', type: 'String', value: 'default value field_1'),
+              have_attributes(
+                type: 'Layout',
+                component: 'Row',
+                fields: include(have_attributes(label: 'sub_field_1', type: 'String', value: 'default value sub_field_1'))
+              )
             )
           end
         end
@@ -251,6 +325,25 @@ module ForestAdminDatasourceCustomizer
                     value: proc do |context|
                       context.get_form_value('change') if context.field_changed?('change')
                     end
+                  },
+                  {
+                    type: 'Layout',
+                    component: 'Row',
+                    fields: [
+                      {
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_change',
+                        is_required: true
+                      },
+                      DynamicField.new(
+                        type: Types::FieldType::STRING,
+                        label: 'sub_field_to_change',
+                        is_read_only: true,
+                        value: proc do |context|
+                          context.get_form_value('sub_field_change') if context.field_changed?('sub_field_change')
+                        end
+                      )
+                    ]
                   }
                 ]
               ) { |_context, result_builder| result_builder.error(message: 'meeh') }
@@ -263,6 +356,15 @@ module ForestAdminDatasourceCustomizer
             expect(form).to include(
               have_attributes(label: 'change', watch_changes: true),
               have_attributes(label: 'to change', is_read_only: true, watch_changes: false)
+            )
+          end
+
+          it 'add watchChange property to sub fields of row layout that need to trigger a recompute on change' do
+            form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new)
+
+            expect(form.last.fields).to include(
+              have_attributes(label: 'sub_field_change', watch_changes: true),
+              have_attributes(label: 'sub_field_to_change', is_read_only: true, watch_changes: false)
             )
           end
         end
@@ -306,6 +408,55 @@ module ForestAdminDatasourceCustomizer
                 watch_changes: false
               )
             )
+          end
+        end
+
+        describe 'add_action' do
+          it 'raise an error if multiple fields with same id are provided' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                { id: 'id', label: 'amount', type: Types::FieldType::NUMBER },
+                { id: 'id', label: 'cost', type: Types::FieldType::NUMBER }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 All field must have different 'id'. Conflict come from field 'id'")
+          end
+
+          it 'raise an error if multiple fields with same id are provided in row' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                {
+                  type: 'Layout',
+                  component: 'Row',
+                  fields: [
+                    { id: 'id', label: 'amount', type: Types::FieldType::NUMBER },
+                    { id: 'id', label: 'cost', type: Types::FieldType::NUMBER }
+                  ]
+                }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 All field must have different 'id'. Conflict come from field 'id'")
+          end
+
+          it 'raise an error if field (hash) is provided without id and label' do
+            action = BaseAction.new(
+              scope: Types::ActionScope::GLOBAL,
+              form: [
+                { type: Types::FieldType::NUMBER }
+              ]
+            ) { |_context, result_builder| result_builder.error(message: 'foo') }
+
+            expect do
+              @decorated_book.add_action('make photocopy', action)
+            end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 A field must have an 'id' or a 'label' defined.")
           end
         end
       end
