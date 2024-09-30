@@ -415,8 +415,8 @@ module ForestAdminAgent
                       ActionLayoutElement::HtmlBlockElement.new(content: '<h1>Charge the credit card of the customer</h1>'),
                       ActionLayoutElement::RowElement.new(
                         fields: [
-                          ActionField.new(label: 'label', type: 'String'),
-                          ActionField.new(label: 'amount', type: 'String')
+                          ActionField.new(id: 'label', label: 'label', type: 'String'),
+                          ActionField.new(id: 'amount', label: 'amount', type: 'String')
                         ]
                       )
                     ]
@@ -443,6 +443,7 @@ module ForestAdminAgent
                   fields: [
                     {
                       field: 'label',
+                      label: 'label',
                       type: 'String',
                       description: nil,
                       isRequired: false,
@@ -452,6 +453,7 @@ module ForestAdminAgent
                     },
                     {
                       field: 'amount',
+                      label: 'amount',
                       type: 'String',
                       description: nil,
                       isRequired: false,
