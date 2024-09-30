@@ -58,9 +58,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           def instantiate_subfields(fields)
-            fields.map do |field|
-              DynamicField.new(**field.to_h)
-            end
+            FormFactory.build_elements(fields)
           end
         end
 

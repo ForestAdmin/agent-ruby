@@ -42,11 +42,7 @@ module ForestAdminDatasourceCustomizer
           context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
           dynamic_fields = action.form
-          if metas[:search_field]
-            # in the case of a search hook,
-            # we don't want to rebuild all the fields. only the one searched
-            dynamic_fields = dynamic_fields.select { |field| field.id == metas[:search_field] }
-          end
+          dynamic_fields = select_in_form_fields(dynamic_fields, metas[:search_field]) if metas[:search_field]
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
@@ -81,6 +77,17 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        def select_in_form_fields(fields, search_field)
+          fields.select do |field|
+            if nested_layout_element?(field)
+              key = field.component == 'Page' ? :elements : :fields
+              select_in_form_fields(field.public_send(:"#{key}"), search_field)
+            else
+              field.id == search_field
+            end
+          end
+        end
+
         def set_watch_changes_on_fields(form_values, used, fields)
           fields.each do |field|
             if field.type != 'Layout'
@@ -101,7 +108,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def execute_on_sub_fields(field)
-          return unless field.type == 'Layout' && %w[Page Row].include?(field.component)
+          return unless nested_layout_element?(field)
 
           if field.component == 'Page'
             field.elements = yield(field.elements)
@@ -130,12 +137,10 @@ module ForestAdminDatasourceCustomizer
         end
 
         def drop_ifs(context, fields)
-          nested_layout_elements = %w[Page Row]
           if_values = fields.map do |field|
             if evaluate(context, field.if_condition) == false
               false
-            elsif field.type == 'Layout' && nested_layout_elements.include?(field.component)
-
+            elsif nested_layout_element?(field)
               key = field.component == 'Page' ? :elements : :fields
               field.public_send(:"#{key}=", drop_ifs(context, field.public_send(:"#{key}") || []))
 
@@ -196,6 +201,10 @@ module ForestAdminDatasourceCustomizer
           end
 
           Context::ActionContext.new(self, caller, form_values, filter, used, change_field)
+        end
+
+        def nested_layout_element?(field)
+          field.type == 'Layout' && %w[Page Row].include?(field.component)
         end
       end
     end

@@ -56,7 +56,7 @@ module ForestAdminDatasourceToolkit
 
           def instantiate_subfields(fields)
             fields.map do |field|
-              ActionField.new(**field.to_h)
+              ActionFieldFactory.build(field.to_h)
             end
           end
         end
