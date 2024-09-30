@@ -5,20 +5,6 @@ module ForestAdminDatasourceCustomizer
         include Types
         include ForestAdminDatasourceToolkit::Exceptions
 
-        class ElementFactory
-          def build_elements(form)
-            form&.map do |field|
-              if field.key? :widget
-                build_widget(field)
-              elsif field[:type] == 'Layout'
-                build_layout_element(field)
-              else
-                DynamicField.new(**field)
-              end
-            end
-          end
-        end
-
         class LayoutElement < BaseFormElement
           attr_accessor :if_condition, :component
 
