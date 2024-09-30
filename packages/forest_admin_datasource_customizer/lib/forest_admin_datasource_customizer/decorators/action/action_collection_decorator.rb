@@ -68,6 +68,8 @@ module ForestAdminDatasourceCustomizer
         private
 
         def ensure_form_is_correct(form, action_name)
+          return if form.nil? || form.empty?
+
           is_page_component = ->(element) { element[:type] == 'Layout' && element[:component] == 'Page' }
           pages = is_page_component.call(form.first)
 
