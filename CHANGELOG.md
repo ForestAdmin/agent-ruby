@@ -1,3 +1,10 @@
+# [1.0.0-beta.71](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.70...v1.0.0-beta.71) (2024-10-04)
+
+
+### Features
+
+* **form:** add description and submit button customization ([#72](https://github.com/ForestAdmin/agent-ruby/issues/72)) ([a42ce7a](https://github.com/ForestAdmin/agent-ruby/commit/a42ce7a19545e15905fe836485a11ad97bd07bf3))
+
 # [1.0.0-beta.70](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.69...v1.0.0-beta.70) (2024-09-27)
 
 
