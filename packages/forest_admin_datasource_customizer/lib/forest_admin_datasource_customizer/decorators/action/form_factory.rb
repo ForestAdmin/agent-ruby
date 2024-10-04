@@ -4,12 +4,21 @@ module ForestAdminDatasourceCustomizer
       class FormFactory
         def self.build_elements(form)
           form&.map do |field|
-            if field.key? :widget
-              build_widget(field)
-            elsif field[:type] == 'Layout'
-              build_layout_element(field)
+            case field
+            when Hash
+              if field.key?(:widget)
+                build_widget(field)
+              elsif field[:type] == 'Layout'
+                build_layout_element(field)
+              else
+                DynamicField.new(**field)
+              end
+            when FormLayoutElement::RowElement
+              build_elements(field.fields)
+            when FormLayoutElement::PageElement
+              build_elements(field.elements)
             else
-              DynamicField.new(**field)
+              field
             end
           end
         end
