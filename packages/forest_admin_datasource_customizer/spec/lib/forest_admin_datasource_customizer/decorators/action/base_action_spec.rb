@@ -21,6 +21,16 @@ module ForestAdminDatasourceCustomizer
             expect(action.form).to eq(form)
             expect(action.is_generate_file).to be(false)
             expect(action.execute).to be_nil
+            expect(action.description).to be_nil
+            expect(action.submit_button_label).to be_nil
+          end
+
+          it 'set description and submit_button_label when provided' do
+            description = 'Send a notification to the user'
+            submit_button_label = 'Send notification !'
+            action = described_class.new(scope: scope, form: form, description: description, submit_button_label: submit_button_label)
+            expect(action.description).to eq(description)
+            expect(action.submit_button_label).to eq(submit_button_label)
           end
         end
 

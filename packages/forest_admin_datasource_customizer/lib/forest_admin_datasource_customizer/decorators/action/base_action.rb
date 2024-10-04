@@ -2,12 +2,14 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class BaseAction
-        attr_reader :scope, :form, :is_generate_file, :execute
+        attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute
 
-        def initialize(scope:, form: nil, is_generate_file: false, &execute)
+        def initialize(scope:, form: nil, is_generate_file: false, description: nil, submit_button_label: nil, &execute)
           @scope = scope
           @form = form
           @is_generate_file = is_generate_file
+          @description = description
+          @submit_button_label = submit_button_label
           @execute = execute
         end
 

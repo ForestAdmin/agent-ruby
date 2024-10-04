@@ -42,6 +42,8 @@ module ForestAdminAgent
           schema = {
             id: "#{collection.name}-#{action_index}-#{slug}",
             name: name,
+            submitButtonLabel: action.submit_button_label,
+            description: action.description,
             type: action.scope.downcase,
             baseUrl: nil,
             endpoint: "/forest/_actions/#{collection.name}/#{action_index}/#{slug}",
