@@ -1,3 +1,10 @@
+# [1.0.0-beta.72](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.71...v1.0.0-beta.72) (2024-10-09)
+
+
+### Features
+
+* add pages in action forms ([#74](https://github.com/ForestAdmin/agent-ruby/issues/74)) ([2a8a7f4](https://github.com/ForestAdmin/agent-ruby/commit/2a8a7f43104bc584e1ae35d433af4b146267eb08))
+
 # [1.0.0-beta.71](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.70...v1.0.0-beta.71) (2024-10-04)
 
 
