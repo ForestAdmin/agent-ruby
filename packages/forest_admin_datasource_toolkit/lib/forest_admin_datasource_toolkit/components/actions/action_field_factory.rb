@@ -23,8 +23,9 @@ module ForestAdminDatasourceToolkit
 
             nil
           when 'Page'
-            # is it nullable if no elements ???
-            ActionLayoutElement::PageElement.new(**field)
+            return ActionLayoutElement::PageElement.new(**field) unless field[:elements].empty?
+
+            nil
           end
         end
 

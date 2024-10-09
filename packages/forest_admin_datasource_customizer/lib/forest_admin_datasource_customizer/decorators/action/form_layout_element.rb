@@ -74,7 +74,7 @@ module ForestAdminDatasourceCustomizer
             validate_no_page_elements!(options[:elements])
             @next_button_label = options[:next_button_label]
             @previous_button_label = options[:previous_button_label]
-            @elements = instantiate_elements(options[:elements])
+            @elements = instantiate_elements(options[:elements] || [])
           end
 
           private
