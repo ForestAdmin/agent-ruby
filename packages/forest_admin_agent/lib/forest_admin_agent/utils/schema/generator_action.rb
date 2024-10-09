@@ -71,8 +71,7 @@ module ForestAdminAgent
               component: field.component.camelize(:lower),
               fields: field.fields.map { |f| build_layout_schema(f) }
             }
-          end
-          if field.component == 'Page'
+          elsif field.component == 'Page'
             return {
               **field.to_h,
               component: field.component.camelize(:lower),
