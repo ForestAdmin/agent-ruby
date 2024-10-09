@@ -409,8 +409,8 @@ module ForestAdminAgent
                 },
                 get_form: [
                   ActionLayoutElement::PageElement.new(
-                    next_button_label: proc { |_context| 'Next' },
-                    previous_button_label: proc { |_context| 'Previous' },
+                    next_button_label: 'Next',
+                    previous_button_label: 'Previous',
                     elements: [
                       ActionLayoutElement::HtmlBlockElement.new(content: '<h1>Charge the credit card of the customer</h1>'),
                       ActionLayoutElement::RowElement.new(
