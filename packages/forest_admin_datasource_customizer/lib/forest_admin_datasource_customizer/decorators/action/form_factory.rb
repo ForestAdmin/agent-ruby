@@ -1,31 +1,25 @@
-module ForestAdminDatasourceToolkit
-  module Components
-    module Actions
-      class ActionFieldFactory
-        def self.build(field)
-          if field.key?(:widget) && !field[:widget].nil?
-            build_widget(field)
-          elsif field[:type] == 'Layout'
-            build_layout_element(field)
-          else
-            ActionField.new(**field)
-          end
-        end
-
-        def self.build_layout_element(field)
-          case field[:component]
-          when 'Separator'
-            ActionLayoutElement::SeparatorElement.new(**field)
-          when 'HtmlBlock'
-            ActionLayoutElement::HtmlBlockElement.new(**field)
-          when 'Row'
-            return ActionLayoutElement::RowElement.new(**field) unless field[:fields].empty?
-
-            nil
-          when 'Page'
-            return ActionLayoutElement::PageElement.new(**field) unless field[:elements].empty?
-
-            nil
+module ForestAdminDatasourceCustomizer
+  module Decorators
+    module Action
+      class FormFactory
+        def self.build_elements(form)
+          form&.map do |field|
+            case field
+            when Hash
+              if field.key?(:widget)
+                build_widget(field)
+              elsif field[:type] == 'Layout'
+                build_layout_element(field)
+              else
+                DynamicField.new(**field)
+              end
+            when FormLayoutElement::RowElement
+              build_elements(field.fields)
+            when FormLayoutElement::PageElement
+              build_elements(field.elements)
+            else
+              field
+            end
           end
         end
 
@@ -67,6 +61,24 @@ module ForestAdminDatasourceToolkit
             WidgetField::TimePickerField.new(**field)
           when 'UserDropdown'
             WidgetField::UserDropdownField.new(**field)
+          else
+            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Unknow widget type: #{field[:widget]}"
+          end
+        end
+
+        def self.build_layout_element(field)
+          case field[:component]
+          when 'Separator'
+            FormLayoutElement::SeparatorElement.new(**field)
+          when 'HtmlBlock'
+            FormLayoutElement::HtmlBlockElement.new(**field)
+          when 'Row'
+            FormLayoutElement::RowElement.new(**field)
+          when 'Page'
+            FormLayoutElement::PageElement.new(**field)
+          else
+            raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                  "Unknow component type: #{field[:component]}"
           end
         end
       end

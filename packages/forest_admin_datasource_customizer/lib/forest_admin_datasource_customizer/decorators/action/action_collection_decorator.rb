@@ -10,6 +10,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_action(name, action)
+          ensure_form_is_correct(action.form, name)
           action.build_elements
           action.validate_fields_ids
           @actions[name] = action
@@ -41,15 +42,13 @@ module ForestAdminDatasourceCustomizer
           context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
           dynamic_fields = action.form
-          if metas[:search_field]
-            # in the case of a search hook,
-            # we don't want to rebuild all the fields. only the one searched
-            dynamic_fields = dynamic_fields.select { |field| field.id == metas[:search_field] }
-          end
+          dynamic_fields = select_in_form_fields(dynamic_fields, metas[:search_field]) if metas[:search_field]
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]
 
-          fields = drop_deferred(context, metas[:search_values], dynamic_fields).compact
+          fields = drop_deferred(context, metas[:search_values], dynamic_fields)
+
+          fields.compact
 
           set_watch_changes_on_fields(form_values, used, fields)
 
@@ -64,6 +63,31 @@ module ForestAdminDatasourceCustomizer
 
         private
 
+        def ensure_form_is_correct(form, action_name)
+          return if form.nil? || form.empty?
+
+          is_page_component = ->(element) { element[:type] == 'Layout' && element[:component] == 'Page' }
+          pages = is_page_component.call(form.first)
+
+          form.each do |element|
+            if pages != is_page_component.call(element)
+              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                    "You cannot mix pages and other form elements in smart action '#{action_name}' form"
+            end
+          end
+        end
+
+        def select_in_form_fields(fields, search_field)
+          fields.select do |field|
+            if nested_layout_element?(field)
+              key = field.component == 'Page' ? :elements : :fields
+              select_in_form_fields(field.public_send(:"#{key}"), search_field)
+            else
+              field.id == search_field
+            end
+          end
+        end
+
         def set_watch_changes_on_fields(form_values, used, fields)
           fields.each do |field|
             if field.type != 'Layout'
@@ -77,14 +101,20 @@ module ForestAdminDatasourceCustomizer
               field.watch_changes = used.include?(field.id)
             elsif field.component == 'Row'
               set_watch_changes_on_fields(form_values, used, field.fields)
+            elsif field.component == 'Page'
+              set_watch_changes_on_fields(form_values, used, field.elements)
             end
           end
         end
 
         def execute_on_sub_fields(field)
-          return unless field.type == 'Layout' && field.component == 'Row'
+          return unless nested_layout_element?(field)
 
-          field.fields = yield(field.fields)
+          if field.component == 'Page'
+            field.elements = yield(field.elements)
+          elsif field.component == 'Row'
+            field.fields = yield(field.fields)
+          end
         end
 
         def drop_defaults(context, fields, data)
@@ -110,10 +140,12 @@ module ForestAdminDatasourceCustomizer
           if_values = fields.map do |field|
             if evaluate(context, field.if_condition) == false
               false
-            elsif field.type == 'Layout' && field.component == 'Row'
-              field.fields = drop_ifs(context, field.fields || [])
+            elsif nested_layout_element?(field)
+              key = field.component == 'Page' ? :elements : :fields
+              field.public_send(:"#{key}=", drop_ifs(context, field.public_send(:"#{key}") || []))
 
-              true unless field.fields.empty?
+              true unless field.public_send(:"#{key}").empty?
+
             else
               true
             end
@@ -169,6 +201,10 @@ module ForestAdminDatasourceCustomizer
           end
 
           Context::ActionContext.new(self, caller, form_values, filter, used, change_field)
+        end
+
+        def nested_layout_element?(field)
+          field.type == 'Layout' && %w[Page Row].include?(field.component)
         end
       end
     end

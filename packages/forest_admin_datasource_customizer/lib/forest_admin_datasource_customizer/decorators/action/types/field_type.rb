@@ -21,6 +21,8 @@ module ForestAdminDatasourceCustomizer
 
           JSON = 'Json'.freeze
 
+          LAYOUT = 'Layout'.freeze
+
           NUMBER = 'Number'.freeze
 
           NUMBER_LIST = 'NumberList'.freeze

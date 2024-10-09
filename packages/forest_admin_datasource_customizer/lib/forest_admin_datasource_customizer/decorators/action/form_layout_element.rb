@@ -58,9 +58,43 @@ module ForestAdminDatasourceCustomizer
           end
 
           def instantiate_subfields(fields)
-            fields.map do |field|
-              DynamicField.new(**field.to_h)
+            FormFactory.build_elements(fields)
+          end
+        end
+
+        class PageElement < LayoutElement
+          include ForestAdminDatasourceToolkit::Exceptions
+
+          attr_accessor :elements, :next_button_label, :previous_button_label
+
+          def initialize(options)
+            super(component: 'Page', **options)
+
+            validate_elements_presence!(options)
+            validate_no_page_elements!(options[:elements])
+            @next_button_label = options[:next_button_label]
+            @previous_button_label = options[:previous_button_label]
+            @elements = instantiate_elements(options[:elements] || [])
+          end
+
+          private
+
+          def validate_elements_presence!(options)
+            return if options.key?(:elements)
+
+            raise ForestException, "Using 'elements' in a 'Page' configuration is mandatory"
+          end
+
+          def validate_no_page_elements!(elements)
+            elements&.each do |element|
+              if element[:component] == 'Page'
+                raise ForestException, "'Page' component cannot be used within 'elements'"
+              end
             end
+          end
+
+          def instantiate_elements(elements)
+            FormFactory.build_elements(elements)
           end
         end
       end

@@ -397,6 +397,80 @@ module ForestAdminAgent
             end
           end
 
+          context 'with page element' do
+            before do
+              @collection = collection_build(
+                schema: {
+                  actions: {
+                    'Charge credit card' => BaseAction.new(
+                      scope: Types::ActionScope::SINGLE
+                    )
+                  }
+                },
+                get_form: [
+                  ActionLayoutElement::PageElement.new(
+                    next_button_label: 'Next',
+                    previous_button_label: 'Previous',
+                    elements: [
+                      ActionLayoutElement::HtmlBlockElement.new(content: '<h1>Charge the credit card of the customer</h1>'),
+                      ActionLayoutElement::RowElement.new(
+                        fields: [
+                          ActionField.new(id: 'label', label: 'label', type: 'String'),
+                          ActionField.new(id: 'amount', label: 'amount', type: 'String')
+                        ]
+                      )
+                    ]
+                  )
+                ]
+              )
+            end
+
+            it 'generate schema correctly' do
+              schema = described_class.build_schema(@collection, 'Charge credit card')
+
+              expect(schema).to eq(
+                {
+                  id: 'collection-0-charge-credit-card',
+                  name: 'Charge credit card',
+                  submitButtonLabel: nil,
+                  description: nil,
+                  type: 'single',
+                  baseUrl: nil,
+                  endpoint: '/forest/_actions/collection/0/charge-credit-card',
+                  httpMethod: 'POST',
+                  redirect: nil,
+                  download: false,
+                  fields: [
+                    {
+                      field: 'label',
+                      label: 'label',
+                      type: 'String',
+                      description: nil,
+                      isRequired: false,
+                      isReadOnly: false,
+                      widgetEdit: nil,
+                      defaultValue: nil
+                    },
+                    {
+                      field: 'amount',
+                      label: 'amount',
+                      type: 'String',
+                      description: nil,
+                      isRequired: false,
+                      isReadOnly: false,
+                      widgetEdit: nil,
+                      defaultValue: nil
+                    }
+                  ],
+                  # layout: [
+                  #   { component: 'page', type: 'Layout', elements: ['htmlBlock', 'row'] }
+                  # ],
+                  hooks: { load: false, change: ['changeHook'] }
+                }
+              )
+            end
+          end
+
           describe 'extract_fields_and_layout' do
             before do
               @collection = collection_build(
