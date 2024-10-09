@@ -35,7 +35,7 @@ module ForestAdminAgent
             layout = form_elements[:layout]
           else
             fields = DEFAULT_FIELDS
-            layout = nil
+            layout = []
           end
 
           schema = {
@@ -57,9 +57,9 @@ module ForestAdminAgent
             }
           }
 
-          return schema unless layout && !layout.empty?
+          return schema if layout.all? { |element| element.component == 'Input' }
 
-          # schema[:layout] = build_layout(layout)
+          schema[:layout] = build_layout(layout)
 
           schema
         end
