@@ -1,3 +1,10 @@
+# [1.0.0-beta.73](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.72...v1.0.0-beta.73) (2024-10-10)
+
+
+### Features
+
+* **form:** add support of static form with layout elements ([#76](https://github.com/ForestAdmin/agent-ruby/issues/76)) ([ecf5f1a](https://github.com/ForestAdmin/agent-ruby/commit/ecf5f1a105e38d5fe5f7df4fd970093373627938))
+
 # [1.0.0-beta.72](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.71...v1.0.0-beta.72) (2024-10-09)
 
 
