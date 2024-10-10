@@ -65,23 +65,26 @@ module ForestAdminAgent
         end
 
         def self.build_layout_schema(field)
-          if field.component == 'Row'
+          field = field.to_h
+          field.delete(:type)
+
+          if field[:component] == 'Row'
             return {
-              **field.to_h,
-              component: field.component.camelize(:lower),
-              fields: field.fields.map { |f| build_layout_schema(f) }
+              **field,
+              component: field[:component].camelize(:lower),
+              fields: field[:fields].map { |f| build_layout_schema(f) }
             }
-          elsif field.component == 'Page'
+          elsif field[:component] == 'Page'
             return {
-              **field.to_h,
-              component: field.component.camelize(:lower),
-              elements: field.elements.map do |f|
+              **field,
+              component: field[:component].camelize(:lower),
+              elements: field[:elements].map do |f|
                 build_layout_schema(f)
               end
             }
           end
 
-          { **field.to_h, component: field.component.camelize(:lower) }
+          { **field, component: field[:component].camelize(:lower) }
         end
 
         def self.build_field_schema(datasource, field)

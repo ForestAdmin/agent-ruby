@@ -267,8 +267,8 @@ module ForestAdminAgent
                     }
                   ],
                   layout: [
-                    { component: 'input', fieldId: 'label', type: 'Layout' },
-                    { component: 'separator', type: 'Layout' }
+                    { component: 'input', fieldId: 'label' },
+                    { component: 'separator' }
                   ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
@@ -321,8 +321,8 @@ module ForestAdminAgent
                     }
                   ],
                   layout: [
-                    { component: 'input', fieldId: 'label_id', type: 'Layout' },
-                    { component: 'htmlBlock', type: 'Layout', content: '<p>foo</p>' }
+                    { component: 'input', fieldId: 'label_id' },
+                    { component: 'htmlBlock', content: '<p>foo</p>' }
                   ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
@@ -391,10 +391,9 @@ module ForestAdminAgent
                   layout: [
                     {
                       component: 'row',
-                      type: 'Layout',
                       fields: [
-                        { component: 'input', fieldId: 'label_id', type: 'Layout' },
-                        { component: 'input', fieldId: 'amount_id', type: 'Layout' }
+                        { component: 'input', fieldId: 'label_id' },
+                        { component: 'input', fieldId: 'amount_id' }
                       ]
                     }
                   ],
@@ -472,21 +471,18 @@ module ForestAdminAgent
                   layout: [
                     {
                       component: 'page',
-                      type: 'Layout',
                       nextButtonLabel: 'Next',
                       previousButtonLabel: 'Previous',
                       elements: [
                         {
                           component: 'htmlBlock',
-                          content: '<h1>Charge the credit card of the customer</h1>',
-                          type: 'Layout'
+                          content: '<h1>Charge the credit card of the customer</h1>'
                         },
                         {
                           component: 'row',
-                          type: 'Layout',
                           fields: [
-                            { component: 'input', fieldId: 'label', type: 'Layout' },
-                            { component: 'input', fieldId: 'amount', type: 'Layout' }
+                            { component: 'input', fieldId: 'label' },
+                            { component: 'input', fieldId: 'amount' }
                           ]
                         }
                       ]
