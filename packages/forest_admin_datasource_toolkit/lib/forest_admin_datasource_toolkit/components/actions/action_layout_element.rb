@@ -18,6 +18,8 @@ module ForestAdminDatasourceToolkit
               result[attribute.to_s.delete('@').camelize(:lower).to_sym] = instance_variable_get(attribute)
             end
 
+            result.delete(:type)
+
             result
           end
         end
