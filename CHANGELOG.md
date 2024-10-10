@@ -1,3 +1,10 @@
+# [1.0.0-beta.75](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.74...v1.0.0-beta.75) (2024-10-10)
+
+
+### Bug Fixes
+
+* **permissions:** properly check permissions when dissociating or deleting related resources ([#75](https://github.com/ForestAdmin/agent-ruby/issues/75)) ([d0239de](https://github.com/ForestAdmin/agent-ruby/commit/d0239defa2a1e00936f8c2c64723684306c8e945))
+
 # [1.0.0-beta.74](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.73...v1.0.0-beta.74) (2024-10-10)
 
 
