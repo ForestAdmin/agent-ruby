@@ -1,3 +1,10 @@
+# [1.0.0-beta.74](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.73...v1.0.0-beta.74) (2024-10-10)
+
+
+### Bug Fixes
+
+* **form:** remove type attribute from schema layout element ([#77](https://github.com/ForestAdmin/agent-ruby/issues/77)) ([19e6b45](https://github.com/ForestAdmin/agent-ruby/commit/19e6b457aa06d9ddb89f1cbb0220832ba05dfba2))
+
 # [1.0.0-beta.73](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.72...v1.0.0-beta.73) (2024-10-10)
 
 
