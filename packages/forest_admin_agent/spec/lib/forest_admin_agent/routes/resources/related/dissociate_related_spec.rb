@@ -130,6 +130,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, @datasource.get_collection('user'))
               expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -163,6 +164,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:delete, @datasource.get_collection('address_user'))
               expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -201,6 +203,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:delete, @datasource.get_collection('address_user'))
               expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -246,6 +249,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, @datasource.get_collection('user'))
               expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -279,6 +283,7 @@ module ForestAdminAgent
 
               result = dissociate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:delete, @datasource.get_collection('address'))
               expect(@datasource.get_collection('address_user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -328,6 +333,8 @@ module ForestAdminAgent
 
                 result = dissociate.handle_request(args)
 
+                expect(permissions).to have_received(:can?).with(:edit, @datasource.get_collection('user'))
+
                 expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
                   expect(caller).to be_instance_of(Components::Caller)
                   expect(filter).to have_attributes(
@@ -360,6 +367,8 @@ module ForestAdminAgent
                 args[:params]['id'] = 1
 
                 result = dissociate.handle_request(args)
+
+                expect(permissions).to have_received(:can?).with(:delete, @datasource.get_collection('address'))
 
                 expect(@datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
                   expect(caller).to be_instance_of(Components::Caller)

@@ -21,10 +21,16 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             build(args)
-            @permissions.can?(:delete, @collection)
 
             parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
             is_delete_mode = !args.dig(:params, :delete).nil?
+
+            if is_delete_mode
+              @permissions.can?(:delete, @child_collection)
+            else
+              @permissions.can?(:edit, @collection)
+            end
+
             filter = get_base_foreign_filter(args)
             relation = Schema.get_to_many_relation(@collection, args[:params]['relation_name'])
 
