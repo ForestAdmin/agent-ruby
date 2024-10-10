@@ -42,6 +42,10 @@ module ForestAdminDatasourceCustomizer
             @fields = instantiate_subfields(options[:fields] || [])
           end
 
+          def static?
+            super && fields&.all?(&:static?)
+          end
+
           private
 
           def validate_fields_presence!(options)
@@ -75,6 +79,10 @@ module ForestAdminDatasourceCustomizer
             @next_button_label = options[:next_button_label]
             @previous_button_label = options[:previous_button_label]
             @elements = instantiate_elements(options[:elements] || [])
+          end
+
+          def static?
+            super && elements&.all?(&:static?)
           end
 
           private

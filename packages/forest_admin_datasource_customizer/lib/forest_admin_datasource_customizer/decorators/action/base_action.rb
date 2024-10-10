@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def static_form?
-          return form&.all?(&:static?) && form&.none? { |field| field.type == 'Layout' } if form
+          return form&.all?(&:static?) if form
 
           true
         end

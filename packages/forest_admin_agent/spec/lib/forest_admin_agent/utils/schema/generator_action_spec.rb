@@ -266,10 +266,10 @@ module ForestAdminAgent
                       widgetEdit: nil
                     }
                   ],
-                  # layout: [
-                  #   { component: 'input', fieldId: 'label', type: 'Layout' },
-                  #   { component: 'separator', type: 'Layout' }
-                  # ],
+                  layout: [
+                    { component: 'input', fieldId: 'label', type: 'Layout' },
+                    { component: 'separator', type: 'Layout' }
+                  ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
               )
@@ -320,10 +320,10 @@ module ForestAdminAgent
                       widgetEdit: nil
                     }
                   ],
-                  # layout: [
-                  #   { component: 'input', fieldId: 'label', type: 'Layout' },
-                  #   { component: 'htmlBlock', type: 'Layout', content: '<p>foo</p>' }
-                  # ],
+                  layout: [
+                    { component: 'input', fieldId: 'label_id', type: 'Layout' },
+                    { component: 'htmlBlock', type: 'Layout', content: '<p>foo</p>' }
+                  ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
               )
@@ -388,9 +388,16 @@ module ForestAdminAgent
                       defaultValue: nil
                     }
                   ],
-                  # layout: [
-                  #   { component: 'row', type: 'Layout', fields: ['label'] }
-                  # ],
+                  layout: [
+                    {
+                      component: 'row',
+                      type: 'Layout',
+                      fields: [
+                        { component: 'input', fieldId: 'label_id', type: 'Layout' },
+                        { component: 'input', fieldId: 'amount_id', type: 'Layout' }
+                      ]
+                    }
+                  ],
                   hooks: { load: false, change: ['changeHook'] }
                 }
               )
@@ -462,10 +469,155 @@ module ForestAdminAgent
                       defaultValue: nil
                     }
                   ],
-                  # layout: [
-                  #   { component: 'page', type: 'Layout', elements: ['htmlBlock', 'row'] }
-                  # ],
+                  layout: [
+                    {
+                      component: 'page',
+                      type: 'Layout',
+                      nextButtonLabel: 'Next',
+                      previousButtonLabel: 'Previous',
+                      elements: [
+                        {
+                          component: 'htmlBlock',
+                          content: '<h1>Charge the credit card of the customer</h1>',
+                          type: 'Layout'
+                        },
+                        {
+                          component: 'row',
+                          type: 'Layout',
+                          fields: [
+                            { component: 'input', fieldId: 'label', type: 'Layout' },
+                            { component: 'input', fieldId: 'amount', type: 'Layout' }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
                   hooks: { load: false, change: ['changeHook'] }
+                }
+              )
+            end
+          end
+
+          context 'with dynamic element' do
+            before do
+              @collection = collection_build(
+                schema: {
+                  actions: {
+                    'Charge credit card' => BaseAction.new(
+                      scope: Types::ActionScope::SINGLE,
+                      form: [
+                        FormLayoutElement::PageElement.new(
+                          if_condition: proc { true },
+                          elements: []
+                        )
+                      ]
+                    )
+                  }
+                }
+              )
+            end
+
+            it 'generate default loading schema' do
+              schema = described_class.build_schema(@collection, 'Charge credit card')
+
+              expect(schema).to eq(
+                {
+                  id: 'collection-0-charge-credit-card',
+                  name: 'Charge credit card',
+                  submitButtonLabel: nil,
+                  description: nil,
+                  type: 'single',
+                  baseUrl: nil,
+                  endpoint: '/forest/_actions/collection/0/charge-credit-card',
+                  httpMethod: 'POST',
+                  redirect: nil,
+                  download: false,
+                  fields: [
+                    {
+                      defaultValue: 'Form is loading',
+                      description: '',
+                      enums: nil,
+                      field: 'Loading...',
+                      hook: nil,
+                      isReadOnly: true,
+                      isRequired: false,
+                      label: 'Loading...',
+                      reference: nil,
+                      type: 'String',
+                      value: nil,
+                      widgetEdit: nil
+                    }
+                  ],
+                  hooks: { load: true, change: ['changeHook'] }
+                }
+              )
+            end
+          end
+
+          context 'with nested dynamic element in page' do
+            before do
+              @collection = collection_build(
+                schema: {
+                  actions: {
+                    'Charge credit card' => BaseAction.new(
+                      scope: Types::ActionScope::SINGLE,
+                      form: [
+                        FormLayoutElement::PageElement.new(
+                          elements: [
+                            {
+                              type: 'Layout',
+                              component: 'HtmlBlock',
+                              content: '<h1>Charge the credit card of the customer</h1>'
+                            },
+                            {
+                              type: 'Layout',
+                              component: 'Row',
+                              fields: [
+                                { id: 'label', label: 'label', type: 'String', if_condition: proc { true } },
+                                { id: 'amount', label: 'amount', type: 'String' }
+                              ]
+                            }
+                          ]
+                        )
+                      ]
+                    )
+                  }
+                }
+              )
+            end
+
+            it 'generate default loading schema' do
+              schema = described_class.build_schema(@collection, 'Charge credit card')
+
+              expect(schema).to eq(
+                {
+                  id: 'collection-0-charge-credit-card',
+                  name: 'Charge credit card',
+                  submitButtonLabel: nil,
+                  description: nil,
+                  type: 'single',
+                  baseUrl: nil,
+                  endpoint: '/forest/_actions/collection/0/charge-credit-card',
+                  httpMethod: 'POST',
+                  redirect: nil,
+                  download: false,
+                  fields: [
+                    {
+                      defaultValue: 'Form is loading',
+                      description: '',
+                      enums: nil,
+                      field: 'Loading...',
+                      hook: nil,
+                      isReadOnly: true,
+                      isRequired: false,
+                      label: 'Loading...',
+                      reference: nil,
+                      type: 'String',
+                      value: nil,
+                      widgetEdit: nil
+                    }
+                  ],
+                  hooks: { load: true, change: ['changeHook'] }
                 }
               )
             end
