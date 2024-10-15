@@ -19,14 +19,16 @@ module ForestAdminRails
     end
 
     def forest_response(data = {})
-      if data.dig(:content, :type) == 'File'
-        return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
-                                                  disposition: 'attachment'
-      end
+      if data[:content].is_a?(Hash)
+        if data.dig(:content, :type) == 'File'
+          return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
+                                                    disposition: 'attachment'
+        end
 
-      if data.dig(:content, :headers)
-        response.headers.merge!(data[:content][:headers] || {})
-        data[:content].delete(:headers)
+        if data.dig(:content, :headers)
+          response.headers.merge!(data[:content][:headers] || {})
+          data[:content].delete(:headers)
+        end
       end
 
       respond_to do |format|
