@@ -18,11 +18,11 @@ module ForestAdminAgent
           result = collections.map do |collection_name|
             collection = @datasource.get_collection(collection_name)
             {
-              collectionName: collection.name,
+              name: collection.name,
               fields: collection.schema[:fields].select { |_, field| field.is_a?(ColumnSchema) }.map do |name, field|
                 {
-                  fieldName: name,
-                  fieldType: field.column_type,
+                  name: name,
+                  type: field.column_type,
                   operators: field.filter_operators.map { |operator| to_pascal_case(operator) }
                 }
               end
@@ -30,7 +30,9 @@ module ForestAdminAgent
           end
 
           {
-            content: result,
+            content: {
+              collections: result
+            },
             status: 200
           }
         end
