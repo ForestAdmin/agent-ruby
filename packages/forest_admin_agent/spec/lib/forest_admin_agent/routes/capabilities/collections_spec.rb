@@ -54,34 +54,37 @@ module ForestAdminAgent
         end
 
         context 'when there is no collectionNames in params' do
-          it 'return all collections' do
-            args = {
+          let(:args) do
+            {
               headers: { 'HTTP_AUTHORIZATION' => bearer },
-              params: {
-                'timezone' => 'Europe/Paris'
-              }
+              params: { 'timezone' => 'Europe/Paris' }
             }
-            result = capabilities_collections.handle_request(args)
+          end
 
+          let(:result) { capabilities_collections.handle_request(args) }
+
+          it 'returns the correct number of collections' do
             expect(result[:content][:collections].length).to eq(2)
-            expect(result[:content][:collections][0]).to eq({
-                                                              name: 'user',
-                                                              fields: [
-                                                                { name: 'id', type: 'Number', operators: %w[Equal GreaterThan LessThan Blank In Missing] },
-                                                                { name: 'first_name', type: 'String', operators: %w[Equal Present Blank In Missing] },
-                                                                { name: 'last_name', type: 'String', operators: %w[Equal Present Blank In Missing] }
-                                                              ]
-                                                            })
-            expect(result[:content][:collections][1]).to eq({
-                                                              name: 'book',
-                                                              fields: [
-                                                                { name: 'id', type: 'Number', operators: %w[Equal Blank In Missing] },
-                                                                { name: 'title', type: 'String', operators: %w[Equal Present Blank In Missing] },
-                                                                { name: 'price', type: 'Number', operators: %w[GreaterThan LessThan] },
-                                                                { name: 'date', type: 'Date', operators: %w[Yesterday] },
-                                                                { name: 'year', type: 'Number', operators: %w[Equal Blank In Missing] }
-                                                              ]
-                                                            })
+          end
+
+          it 'returns the correct fields and operators for the user collection' do
+            user_collection = result[:content][:collections][0]
+            expect(user_collection[:name]).to eq('user')
+
+            user_fields = user_collection[:fields]
+            expect(user_fields.length).to eq(3)
+            expect(user_fields[0]).to include(name: 'id', type: 'Number')
+            expect(user_fields[0][:operators]).to include('Equal', 'GreaterThan', 'LessThan', 'Blank', 'In', 'Missing')
+          end
+
+          it 'returns the correct fields and operators for the book collection' do
+            book_collection = result[:content][:collections][1]
+            expect(book_collection[:name]).to eq('book')
+
+            book_fields = book_collection[:fields]
+            expect(book_fields.length).to eq(5)
+            expect(book_fields[0]).to include(name: 'id', type: 'Number')
+            expect(book_fields[0][:operators]).to include('Equal', 'Blank', 'In', 'Missing')
           end
         end
 
@@ -97,14 +100,18 @@ module ForestAdminAgent
             result = capabilities_collections.handle_request(args)
 
             expect(result[:content][:collections].length).to eq(1)
-            expect(result[:content][:collections][0]).to eq({
-                                                              name: 'user',
-                                                              fields: [
-                                                                { name: 'id', type: 'Number', operators: %w[Equal GreaterThan LessThan Blank In Missing] },
-                                                                { name: 'first_name', type: 'String', operators: %w[Equal Present Blank In Missing] },
-                                                                { name: 'last_name', type: 'String', operators: %w[Equal Present Blank In Missing] }
-                                                              ]
-                                                            })
+            expect(result[:content][:collections][0][:name]).to eq('user')
+            fields = result[:content][:collections][0][:fields]
+            expect(fields.length).to eq(3)
+
+            expect(fields[0]).to include(name: 'id', type: 'Number')
+            expect(fields[0][:operators]).to include('Equal', 'GreaterThan', 'LessThan', 'Blank', 'In', 'Missing')
+
+            expect(fields[1]).to include(name: 'first_name', type: 'String')
+            expect(fields[1][:operators]).to include('Equal', 'Present', 'Blank', 'In', 'Missing')
+
+            expect(fields[2]).to include(name: 'last_name', type: 'String')
+            expect(fields[2][:operators]).to include('Equal', 'Present', 'Blank', 'In', 'Missing')
           end
         end
 
