@@ -37,7 +37,7 @@ module ForestAdminAgent
               field: name,
               integration: nil,
               inverseOf: nil,
-              isFilterable: FrontendFilterable.filterable?(column.column_type, column.filter_operators),
+              isFilterable: FrontendFilterable.filterable?(column.filter_operators),
               isPrimaryKey: column.is_primary_key,
 
               # When a column is a foreign key, it is readonly.
@@ -70,7 +70,7 @@ module ForestAdminAgent
 
           def foreign_collection_filterable?(foreign_collection)
             foreign_collection.schema[:fields].values.any? do |field|
-              field.type == 'Column' && FrontendFilterable.filterable?(field.column_type, field.filter_operators)
+              field.type == 'Column' && FrontendFilterable.filterable?(field.filter_operators)
             end
           end
 
