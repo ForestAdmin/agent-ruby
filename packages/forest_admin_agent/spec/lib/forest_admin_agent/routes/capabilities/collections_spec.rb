@@ -74,7 +74,7 @@ module ForestAdminAgent
             user_fields = user_collection[:fields]
             expect(user_fields.length).to eq(3)
             expect(user_fields[0]).to include(name: 'id', type: 'Number')
-            expect(user_fields[0][:operators]).to include('Equal', 'GreaterThan', 'LessThan', 'Blank', 'In', 'Missing')
+            expect(user_fields[0][:operators]).to include('equal', 'greater_than', 'less_than', 'blank', 'in', 'missing')
           end
 
           it 'returns the correct fields and operators for the book collection' do
@@ -84,7 +84,7 @@ module ForestAdminAgent
             book_fields = book_collection[:fields]
             expect(book_fields.length).to eq(5)
             expect(book_fields[0]).to include(name: 'id', type: 'Number')
-            expect(book_fields[0][:operators]).to include('Equal', 'Blank', 'In', 'Missing')
+            expect(book_fields[0][:operators]).to include('equal', 'blank', 'in', 'missing')
           end
         end
 
@@ -105,13 +105,13 @@ module ForestAdminAgent
             expect(fields.length).to eq(3)
 
             expect(fields[0]).to include(name: 'id', type: 'Number')
-            expect(fields[0][:operators]).to include('Equal', 'GreaterThan', 'LessThan', 'Blank', 'In', 'Missing')
+            expect(fields[0][:operators]).to include('equal', 'greater_than', 'less_than', 'blank', 'in', 'missing')
 
             expect(fields[1]).to include(name: 'first_name', type: 'String')
-            expect(fields[1][:operators]).to include('Equal', 'Present', 'Blank', 'In', 'Missing')
+            expect(fields[1][:operators]).to include('equal', 'present', 'in', 'missing')
 
             expect(fields[2]).to include(name: 'last_name', type: 'String')
-            expect(fields[2][:operators]).to include('Equal', 'Present', 'Blank', 'In', 'Missing')
+            expect(fields[2][:operators]).to include('equal', 'present', 'in', 'missing')
           end
         end
 

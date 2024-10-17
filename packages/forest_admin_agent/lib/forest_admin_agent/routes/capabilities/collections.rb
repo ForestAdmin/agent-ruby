@@ -23,7 +23,7 @@ module ForestAdminAgent
                 {
                   name: name,
                   type: field.column_type,
-                  operators: field.filter_operators.map { |operator| to_pascal_case(operator) }
+                  operators: field.filter_operators.map { |operator| operator }
                 }
               end
             }
@@ -35,12 +35,6 @@ module ForestAdminAgent
             },
             status: 200
           }
-        end
-
-        private
-
-        def to_pascal_case(string)
-          string.split('_').map(&:capitalize).join
         end
       end
     end
