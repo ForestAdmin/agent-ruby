@@ -69,6 +69,26 @@ module ForestAdminAgent
           it 'returns no collection' do
             expect(result[:content][:collections].length).to eq(0)
           end
+
+          it 'returns the correct fields and operators for the user collection' do
+            user_collection = result[:content][:collections][0]
+            expect(user_collection[:name]).to eq('user')
+
+            user_fields = user_collection[:fields]
+            expect(user_fields.length).to eq(3)
+            expect(user_fields[0]).to include(name: 'id', type: 'Number')
+            expect(user_fields[0][:operators]).to include('Equal', 'GreaterThan', 'LessThan', 'Blank', 'In', 'Missing')
+          end
+
+          it 'returns the correct fields and operators for the book collection' do
+            book_collection = result[:content][:collections][1]
+            expect(book_collection[:name]).to eq('book')
+
+            book_fields = book_collection[:fields]
+            expect(book_fields.length).to eq(5)
+            expect(book_fields[0]).to include(name: 'id', type: 'Number')
+            expect(book_fields[0][:operators]).to include('Equal', 'Blank', 'In', 'Missing')
+          end
         end
 
         context 'when there is collectionNames in params' do
