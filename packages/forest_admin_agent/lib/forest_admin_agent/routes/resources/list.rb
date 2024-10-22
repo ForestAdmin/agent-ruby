@@ -30,6 +30,8 @@ module ForestAdminAgent
             segment: ForestAdminAgent::Utils::QueryStringParser.parse_segment(@collection, args)
           )
 
+          ForestAdminDatasourceToolkit::Validations::ConditionTreeValidator.validate(filter.condition_tree, @collection)
+
           projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)
           records = @collection.list(@caller, filter, projection)
 
