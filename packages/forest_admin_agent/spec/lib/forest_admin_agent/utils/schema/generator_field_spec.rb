@@ -50,7 +50,7 @@ module ForestAdminAgent
               defaultValue: nil,
               enums: [],
               integration: nil,
-              isFilterable: false,
+              isFilterable: true,
               isPrimaryKey: true,
               isReadOnly: true,
               isRequired: false,

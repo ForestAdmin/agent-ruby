@@ -5,6 +5,7 @@ module ForestAdminAgent
     module Resources
       class List < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
         def setup_routes
           add_route('forest_list', 'get', '/:collection_name', ->(args) { handle_request(args) })
 
@@ -14,6 +15,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           build(args)
           @permissions.can?(:browse, @collection)
+
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect([
                                                              @permissions.get_scope(@collection),
@@ -27,6 +29,8 @@ module ForestAdminAgent
             sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@collection, args),
             segment: ForestAdminAgent::Utils::QueryStringParser.parse_segment(@collection, args)
           )
+
+          ForestAdminDatasourceToolkit::Validations::ConditionTreeValidator.validate(filter.condition_tree, @collection)
 
           projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)
           records = @collection.list(@caller, filter, projection)
