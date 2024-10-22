@@ -6,7 +6,10 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Schema
 
         def setup_routes
-          add_route('forest_capabilities_collections', 'post', '/capabilities', ->(args) { handle_request(args) })
+          add_route('forest_capabilities_collections',
+                    'post',
+                    '/_internal/capabilities',
+                    ->(args) { handle_request(args) })
 
           self
         end
