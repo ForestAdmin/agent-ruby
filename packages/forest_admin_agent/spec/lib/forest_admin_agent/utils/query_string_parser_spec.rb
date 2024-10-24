@@ -310,7 +310,7 @@ module ForestAdminAgent
           collection_category = Collection.new(datasource, 'Category')
           collection_category.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+              'id' => ColumnSchema.new(column_type: 'Uuid', is_primary_key: true,
                                        filter_operators: [Operators::EQUAL]),
               'label' => ColumnSchema.new(column_type: 'String')
             }
