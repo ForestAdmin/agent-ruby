@@ -10,7 +10,8 @@ RSpec.shared_context 'with caller' do
       tags: [],
       timezone: 'Europe/Paris',
       permission_level: 'admin',
-      role: 'dev'
+      role: 'dev',
+      request: { ip: '127.0.0.1' }
     )
   end
 end
