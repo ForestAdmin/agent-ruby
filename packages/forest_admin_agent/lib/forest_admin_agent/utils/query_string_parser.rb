@@ -23,8 +23,10 @@ module ForestAdminAgent
         return if filters.nil?
 
         filters = JSON.parse(filters, symbolize_names: true) if filters.is_a? String
+        condition_tree = ConditionTreeParser.from_plain_object(collection, filters)
+        ConditionTreeValidator.validate(condition_tree, collection)
 
-        ConditionTreeParser.from_plain_object(collection, filters)
+        condition_tree
       end
 
       def self.parse_caller(args)
