@@ -29,9 +29,9 @@ module ForestAdminAgent
         end
 
         if context_variable_key.start_with?(USER_VALUE_TAG_PREFIX)
+          tag_key = context_variable_key[USER_VALUE_TAG_PREFIX.length..]
           user[:tags].each do |tag|
-            match_key = context_variable_key[USER_VALUE_TAG_PREFIX.length..]
-            return tag[match_key] if tag.key?(match_key)
+            return tag['value'] if tag['key'] == tag_key
           end
         end
 

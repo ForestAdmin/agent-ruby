@@ -33,8 +33,8 @@ module ForestAdminAgent
             name: 'user',
             schema: {
               fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
+                'id' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::GREATER_THAN, Operators::LESS_THAN], is_primary_key: true),
+                'first_name' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::CONTAINS]),
                 'last_name' => ColumnSchema.new(column_type: 'String')
               }
             },

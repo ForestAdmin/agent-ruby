@@ -10,7 +10,7 @@ module ForestAdminAgent
           lastName: 'Doe',
           fullName: 'John Doe',
           email: 'johndoe@forestadmin.com',
-          tags: [{ 'foo' => 'bar' }],
+          tags: [{ 'key' => 'foo', 'value' => 'bar' }],
           roleId: 1,
           permissionLevel: 'admin'
         }

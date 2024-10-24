@@ -243,9 +243,9 @@ module ForestAdminDatasourceCustomizer
           association = datasource.get_collection(field_schema.foreign_collection)
 
           if !@relations[name]
-            association.re_project_in_place(caller, records.map { |r| r[name] }.filter { |fk| !fk.nil? }, projection)
+            association.re_project_in_place(caller, records.filter_map { |r| r[name] }, projection)
           elsif field_schema.type == 'ManyToOne'
-            ids = records.map { |record| record[field_schema.foreign_key] }.filter { |fk| !fk.nil? }.uniq
+            ids = records.filter_map { |record| record[field_schema.foreign_key] }.uniq
             sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.foreign_key_target, 'In', ids))
             sub_records = association.list(caller, sub_filter, projection.union([field_schema.foreign_key_target]))
 
@@ -253,7 +253,7 @@ module ForestAdminDatasourceCustomizer
               record[name] = sub_records.find { |sr| sr[field_schema.foreign_key_target] == record[field_schema.foreign_key] }
             end
           elsif field_schema.type == 'OneToOne' || field_schema.type == 'OneToMany'
-            ids = records.map { |record| record[field_schema.origin_key_target] }.filter { |okt| !okt.nil? }.uniq
+            ids = records.filter_map { |record| record[field_schema.origin_key_target] }.uniq
             sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.origin_key, 'In', ids))
             sub_records = association.list(caller, sub_filter, projection.union([field_schema.origin_key]))
 
