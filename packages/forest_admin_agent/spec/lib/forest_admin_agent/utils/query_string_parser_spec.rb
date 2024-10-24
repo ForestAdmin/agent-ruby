@@ -372,6 +372,21 @@ module ForestAdminAgent
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
           )
         end
+
+        it 'throw an error when the operator is not allowed' do
+          args = {
+            params: {
+              filters: '{"aggregator":"And","conditions": [{"field":"id","operator":"NotEqual","value":"123e4567-e89b-12d3-a456-426614174000"}]}'
+            }
+          }
+
+          expect do
+            described_class.parse_condition_tree(collection_category, args)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "🌳🌳🌳 The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
+          )
+        end
       end
 
       describe 'when parse_search' do
