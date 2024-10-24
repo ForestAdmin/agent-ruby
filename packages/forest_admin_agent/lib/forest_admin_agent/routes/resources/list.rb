@@ -5,7 +5,6 @@ module ForestAdminAgent
     module Resources
       class List < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-        include ForestAdminDatasourceToolkit::Validations
 
         def setup_routes
           add_route('forest_list', 'get', '/:collection_name', ->(args) { handle_request(args) })
