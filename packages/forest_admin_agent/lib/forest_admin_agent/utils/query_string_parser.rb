@@ -8,6 +8,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components
       include ForestAdminDatasourceToolkit::Components::Query
+      include ForestAdminDatasourceToolkit::Validations
 
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
