@@ -51,7 +51,11 @@ module ForestAdminAgent
               name: 'category',
               schema: {
                 fields: {
-                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    filter_operators: [Operators::EQUAL, Operators::GREATER_THAN],
+                    is_primary_key: true
+                  ),
                   'label' => ColumnSchema.new(column_type: 'String')
                 }
               }

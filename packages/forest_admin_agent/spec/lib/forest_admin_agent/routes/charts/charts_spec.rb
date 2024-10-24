@@ -41,7 +41,7 @@ module ForestAdminAgent
             schema: {
               fields: {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'title' => ColumnSchema.new(column_type: 'String'),
+                'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
                 'price' => ColumnSchema.new(column_type: 'Number'),
                 'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
                 'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),

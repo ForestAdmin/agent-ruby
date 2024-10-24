@@ -9,11 +9,11 @@ module ForestAdminAgent
         subject(:frontend_filterable) { described_class }
 
         it 'returns false with no operators' do
-          expect(frontend_filterable).not_to be_filterable('String')
+          expect(frontend_filterable).not_to be_filterable([])
         end
 
         it 'returns true with only the relevant operators' do
-          expect(frontend_filterable).to be_filterable('String', [
+          expect(frontend_filterable).to be_filterable([
                                                          Operators::EQUAL,
                                                          Operators::NOT_EQUAL,
                                                          Operators::PRESENT,
@@ -26,33 +26,8 @@ module ForestAdminAgent
                                                        ])
         end
 
-        it 'returns true with the supported operators' do
-          supported_operators = described_class::BASE_OPERATORS + [
-            Operators::IN,
-            Operators::STARTS_WITH,
-            Operators::ENDS_WITH,
-            Operators::CONTAINS,
-            Operators::NOT_CONTAINS
-          ]
-          expect(frontend_filterable.filterable?('String', supported_operators)).to be(true)
-        end
-
-        it 'returns false with array and no operators' do
-          expect(frontend_filterable).not_to be_filterable(['String'])
-        end
-
         it 'returns true with includeAll' do
-          expect(frontend_filterable).to be_filterable(['String'], [Operators::INCLUDES_ALL])
-        end
-
-        it 'returns false with type Point' do
-          expect(frontend_filterable).not_to be_filterable('Point')
-          expect(frontend_filterable).not_to be_filterable('Point', Operators.all)
-        end
-
-        it 'returns false with type nested types' do
-          types = { 'firstName' => 'String', 'lastName' => 'String' }
-          expect(frontend_filterable).not_to be_filterable(types)
+          expect(frontend_filterable).to be_filterable([Operators::INCLUDES_ALL])
         end
       end
     end
