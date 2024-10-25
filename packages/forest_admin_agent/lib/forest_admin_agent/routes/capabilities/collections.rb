@@ -2,7 +2,7 @@ require 'json'
 module ForestAdminAgent
   module Routes
     module Capabilities
-      class Collections < AbstractRoute
+      class Collections < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Schema
 
         def setup_routes
