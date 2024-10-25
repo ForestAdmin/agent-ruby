@@ -16,7 +16,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           @datasource = ForestAdminAgent::Facades::Container.datasource
-          collections = args[:params]['collectionNames'] || @datasource.collections.keys
+          collections = args[:params]['collectionNames'] || []
 
           result = collections.map do |collection_name|
             collection = @datasource.get_collection(collection_name)
