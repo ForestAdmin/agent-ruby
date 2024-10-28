@@ -11,6 +11,7 @@ module ForestAdminAgent
           Security::Authentication.new.routes,
           Security::ScopeInvalidation.new.routes,
           Charts::Charts.new.routes,
+          Capabilities::Collections.new.routes,
           Resources::Count.new.routes,
           Resources::Delete.new.routes,
           Resources::Csv.new.routes,

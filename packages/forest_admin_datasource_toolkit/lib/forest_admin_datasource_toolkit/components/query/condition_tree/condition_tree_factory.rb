@@ -63,7 +63,7 @@ module ForestAdminDatasourceToolkit
             return nil if trees.nil? || trees.empty?
 
             conditions = trees
-                         .filter { |tree| !tree.nil? }
+                         .compact
                          .reduce([]) do |current_conditions, tree|
               if tree.is_a?(ConditionTreeBranch) && tree.aggregator == aggregator
                 current_conditions + tree.conditions

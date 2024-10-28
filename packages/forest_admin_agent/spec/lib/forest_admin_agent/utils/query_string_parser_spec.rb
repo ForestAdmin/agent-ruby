@@ -310,7 +310,7 @@ module ForestAdminAgent
           collection_category = Collection.new(datasource, 'Category')
           collection_category.add_fields(
             {
-              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+              'id' => ColumnSchema.new(column_type: 'Uuid', is_primary_key: true,
                                        filter_operators: [Operators::EQUAL]),
               'label' => ColumnSchema.new(column_type: 'String')
             }
@@ -370,6 +370,21 @@ module ForestAdminAgent
 
           expect(described_class.parse_condition_tree(collection_category, args)).eql?(
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
+          )
+        end
+
+        it 'throw an error when the operator is not allowed' do
+          args = {
+            params: {
+              filters: '{"aggregator":"And","conditions": [{"field":"id","operator":"NotEqual","value":"123e4567-e89b-12d3-a456-426614174000"}]}'
+            }
+          }
+
+          expect do
+            described_class.parse_condition_tree(collection_category, args)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "🌳🌳🌳 The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
           )
         end
       end

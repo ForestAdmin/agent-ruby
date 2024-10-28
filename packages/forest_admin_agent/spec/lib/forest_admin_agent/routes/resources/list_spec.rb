@@ -10,6 +10,8 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Exceptions
+
       describe List do
         include_context 'with caller'
         subject(:list) { described_class.new }
@@ -33,8 +35,8 @@ module ForestAdminAgent
             name: 'user',
             schema: {
               fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'first_name' => ColumnSchema.new(column_type: 'String'),
+                'id' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::GREATER_THAN, Operators::LESS_THAN], is_primary_key: true),
+                'first_name' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::CONTAINS]),
                 'last_name' => ColumnSchema.new(column_type: 'String')
               }
             },
@@ -120,6 +122,11 @@ module ForestAdminAgent
               expect(projection).to eq(%w[id first_name last_name])
             end
           end
+        end
+
+        it 'throws an error when the filter operator is not allowed' do
+          args[:params][:filters] = JSON.generate({ field: 'id', operator: 'shorter_than', value: 7 })
+          expect { list.handle_request(args) }.to raise_error(ForestException, "🌳🌳🌳 The given operator 'shorter_than' is not supported by the column: 'id'. The column is not filterable")
         end
       end
     end
