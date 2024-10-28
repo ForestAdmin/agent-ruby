@@ -1,3 +1,10 @@
+# [1.0.0-beta.76](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.75...v1.0.0-beta.76) (2024-10-28)
+
+
+### Features
+
+* **capabilities:** add new collections route ([#78](https://github.com/ForestAdmin/agent-ruby/issues/78)) ([d868174](https://github.com/ForestAdmin/agent-ruby/commit/d8681746c83bada9f198b99951e6ee797e9f8ea0))
+
 # [1.0.0-beta.75](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.74...v1.0.0-beta.75) (2024-10-10)
 
 
