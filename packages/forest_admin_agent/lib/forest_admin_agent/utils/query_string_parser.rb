@@ -52,6 +52,7 @@ module ForestAdminAgent
         )[0]
         token_data.delete('exp')
         token_data[:timezone] = timezone
+        token_data[:request] = { ip: args[:headers]['action_dispatch.remote_ip'].to_s }
 
         Caller.new(**token_data.transform_keys(&:to_sym))
       end

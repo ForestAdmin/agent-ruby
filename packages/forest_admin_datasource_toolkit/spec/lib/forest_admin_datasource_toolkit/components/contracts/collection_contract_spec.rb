@@ -18,7 +18,8 @@ module ForestAdminDatasourceToolkit
             tags: {},
             timezone: 'Europe/Paris',
             role: 1,
-            permission_level: 'admin'
+            permission_level: 'admin',
+            request: { ip: '127.0.0.1' }
           )
         end
 
