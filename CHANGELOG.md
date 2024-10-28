@@ -1,3 +1,10 @@
+# [1.0.0-beta.77](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.76...v1.0.0-beta.77) (2024-10-28)
+
+
+### Bug Fixes
+
+* ensure correct values are returned for user tags in context variables ([#79](https://github.com/ForestAdmin/agent-ruby/issues/79)) ([02eb548](https://github.com/ForestAdmin/agent-ruby/commit/02eb548df31c1444502340f18bd4d15ba5795ca9))
+
 # [1.0.0-beta.76](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.75...v1.0.0-beta.76) (2024-10-28)
 
 
