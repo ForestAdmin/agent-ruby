@@ -57,7 +57,10 @@ module ForestAdminAgent
           let(:args) do
             {
               headers: { 'HTTP_AUTHORIZATION' => bearer },
-              params: { 'timezone' => 'Europe/Paris' }
+              params: {
+                'collectionNames' => [],
+                'timezone' => 'Europe/Paris'
+              }
             }
           end
 
