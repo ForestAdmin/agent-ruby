@@ -1,3 +1,10 @@
+# [1.0.0-beta.78](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.77...v1.0.0-beta.78) (2024-10-28)
+
+
+### Features
+
+* add request ip to user context ([#80](https://github.com/ForestAdmin/agent-ruby/issues/80)) ([08e4276](https://github.com/ForestAdmin/agent-ruby/commit/08e4276b1b16ae0bb98257224652d3164b3d6bb1))
+
 # [1.0.0-beta.77](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.76...v1.0.0-beta.77) (2024-10-28)
 
 
