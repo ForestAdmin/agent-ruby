@@ -14,7 +14,9 @@ module ForestAdminDatasourceToolkit
         timezone:,
         permission_level:,
         role: nil,
-        request: {}
+        request: {},
+        project: nil,
+        environment: nil
       )
         @id = id
         @email = email
@@ -27,6 +29,8 @@ module ForestAdminDatasourceToolkit
         @permission_level = permission_level
         @role = role
         @request = request
+        @project = project
+        @environment = environment
       end
     end
   end

@@ -1,7 +1,3 @@
-require 'jwt'
-require 'active_support'
-require 'active_support/time'
-
 module ForestAdminAgent
   module Utils
     class QueryStringParser
@@ -31,30 +27,7 @@ module ForestAdminAgent
       end
 
       def self.parse_caller(args)
-        unless args.dig(:headers, 'HTTP_AUTHORIZATION')
-          raise Http::Exceptions::HttpException.new(
-            401,
-            'You must be logged in to access at this resource.'
-          )
-        end
-
-        timezone = args[:params]['timezone']
-        raise ForestException, 'Missing timezone' unless timezone
-
-        raise ForestException, "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
-
-        token = args[:headers]['HTTP_AUTHORIZATION'].split[1]
-        token_data = JWT.decode(
-          token,
-          Facades::Container.cache(:auth_secret),
-          true,
-          { algorithm: 'HS256' }
-        )[0]
-        token_data.delete('exp')
-        token_data[:timezone] = timezone
-        token_data[:request] = { ip: args[:headers]['action_dispatch.remote_ip'].to_s }
-
-        Caller.new(**token_data.transform_keys(&:to_sym))
+        CallerParser.new(args).parse
       end
 
       def self.parse_projection(collection, args)
