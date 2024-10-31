@@ -16,6 +16,7 @@ module ForestAdminAgent
         validate_headers
         @token_data = decode_token
         @token_data[:timezone] = extract_timezone
+        @token_data[:request] = { ip: args[:headers]['action_dispatch.remote_ip'].to_s }
         project, environment = extract_forest_context
         @token_data[:project] = project
         @token_data[:environment] = environment
