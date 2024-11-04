@@ -20,6 +20,10 @@ module ForestAdminDatasourceActiveRecord
       ActiveRecord::Base.connection
     end
 
+    def execute_native_query(query)
+      ActiveRecord::Base.connection.execute(query)
+    end
+
     def list(_caller, filter, projection)
       query = Utils::Query.new(self, projection, filter)
 

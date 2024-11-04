@@ -16,6 +16,10 @@ module ForestAdminDatasourceToolkit
         child_collection.native_driver
       end
 
+      def execute_native_query(query)
+        child_collection.execute_native_query(query)
+      end
+
       def schema
         unless @last_schema
           sub_schema = @child_collection.schema

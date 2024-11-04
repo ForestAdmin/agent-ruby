@@ -28,12 +28,11 @@ module ForestAdminAgent
           build(args)
           # TODO: update permission checker
           # @permissions.can_chart?(args[:params])
-          @args = args
-          @query = args[:params][:query]
-          self.type = args[:params][:type]
 
-          # TODO: update
-          # inject_context_variables
+          @args = args
+          self.type = args[:params][:type]
+          @query = args[:params][:query].strip
+          inject_context_variables
 
           @query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
 
@@ -44,6 +43,14 @@ module ForestAdminAgent
 
         private
 
+        def inject_context_variables
+          user = @permissions.get_user_data(@caller.id)
+          team = @permissions.get_team(@caller.rendering_id)
+          context_variables = ContextVariables.new(team, user, @args[:params][:contextVariables])
+
+          @query = ContextVariablesInjector.inject_context_in_value(@query, context_variables)
+        end
+
         def type=(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
@@ -51,19 +58,6 @@ module ForestAdminAgent
           end
 
           @type = type.downcase
-        end
-
-        def inject_context_variables
-          user = @permissions.get_user_data(@caller.id)
-          team = @permissions.get_team(@caller.rendering_id)
-
-          context_variables = ForestAdminAgent::Utils::ContextVariables.new(team, user,
-                                                                            @args[:params][:contextVariables])
-          return unless @args[:params][:filter]
-
-          @filter = @filter.override(condition_tree: ContextVariablesInjector.inject_context_in_filter(
-            @filter.condition_tree, context_variables
-          ))
         end
 
         def raise_error(result, key_names)
