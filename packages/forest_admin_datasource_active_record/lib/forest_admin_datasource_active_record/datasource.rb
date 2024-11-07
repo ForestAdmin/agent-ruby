@@ -4,11 +4,13 @@ module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     attr_reader :models
 
-    def initialize(db_config = {}, support_polymorphic_relations: false)
+    def initialize(db_config = {}, name = 'active_record', support_polymorphic_relations: false)
       super()
+      @name = name
       @models = []
       @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}
+      @configuration = {}
       init_orm(db_config)
       generate
     end
@@ -43,6 +45,14 @@ module ForestAdminDatasourceActiveRecord
 
     def init_orm(db_config)
       ActiveRecord::Base.establish_connection(db_config)
+      current_config = ActiveRecord::Base.connection_db_config.env_name
+      configurations = ActiveRecord::Base.configurations
+                                         .configurations
+                                         .group_by(&:env_name)
+                                         .transform_values do |configs|
+        configs.map(&:name)
+      end
+      @configuration = configurations[current_config]
     end
 
     def build_habtm(model)

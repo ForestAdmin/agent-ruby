@@ -1,10 +1,11 @@
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
-    attr_reader :stack
+    attr_reader :stack, :datasources
 
     def initialize(_db_config = {})
       @composite_datasource = ForestAdminDatasourceToolkit::Datasource.new
       @stack = Decorators::DecoratorsStack.new(@composite_datasource)
+      @datasources = []
     end
 
     def schema
@@ -45,6 +46,14 @@ module ForestAdminDatasourceCustomizer
           @composite_datasource.add_collection(collection)
         end
       })
+
+      datasource_name = datasource.name
+      counter = 1
+
+      counter += 1 while @datasources.any? { |ds| ds.name == "#{datasource_name}_#{counter}" }
+
+      datasource.name = "#{datasource_name}_#{counter}"
+      @datasources << datasource
 
       self
     end

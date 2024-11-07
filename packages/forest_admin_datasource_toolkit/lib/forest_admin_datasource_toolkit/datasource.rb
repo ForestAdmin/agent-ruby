@@ -1,11 +1,13 @@
 module ForestAdminDatasourceToolkit
   class Datasource < Components::Contracts::DatasourceContract
     attr_reader :collections, :schema
+    attr_accessor :name
 
     def initialize
       super
       @schema = { charts: [] }
       @collections = {}
+      @name = nil
     end
 
     def get_collection(name)
