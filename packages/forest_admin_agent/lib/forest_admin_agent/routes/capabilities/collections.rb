@@ -18,6 +18,8 @@ module ForestAdminAgent
           @datasource = ForestAdminAgent::Facades::Container.datasource
           collections = args[:params]['collectionNames'] || []
 
+          # datasources = ForestAdminAgent::Builder::AgentFactory.instance.customizer.datasources
+
           result = collections.map do |collection_name|
             collection = @datasource.get_collection(collection_name)
             {
