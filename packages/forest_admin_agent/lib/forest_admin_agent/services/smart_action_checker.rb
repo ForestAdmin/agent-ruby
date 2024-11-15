@@ -50,7 +50,8 @@ module ForestAdminAgent
         if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
           return true if smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
-          if smart_action[:approvalRequiredConditions].empty? || match_conditions(:approvalRequiredConditions)
+          approval_condition = smart_action[:approvalRequiredConditions].find { |c| c['roleId'] }
+          if approval_condition.blank? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
               'This action requires to be approved.',
               REQUIRE_APPROVAL_ERROR,
@@ -71,11 +72,11 @@ module ForestAdminAgent
                            else
                              Nodes::ConditionTreeLeaf.new(pk, 'IN', attributes[:ids])
                            end
-        condition = smart_action[condition_name][0][:filter]
+        condition = smart_action[condition_name].find { |c| c['roleId'] == @role_id }
         conditional_filter = filter.override(
           condition_tree: ConditionTreeFactory.intersect(
             [
-              ConditionTreeParser.from_plain_object(collection, condition),
+              ConditionTreeParser.from_plain_object(collection, condition[:filter]),
               filter.condition_tree,
               condition_filter
             ]
