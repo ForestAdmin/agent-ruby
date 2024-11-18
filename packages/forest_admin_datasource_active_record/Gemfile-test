@@ -14,5 +14,5 @@ group :development, :test do
   gem 'simplecov', '~> 0.22', require: false
   gem 'simplecov-html', '~> 0.12.3'
   gem 'simplecov_json_formatter', '~> 0.1.4'
-  gem 'sqlite3', '< 2.0'
+  gem 'sqlite3'
 end

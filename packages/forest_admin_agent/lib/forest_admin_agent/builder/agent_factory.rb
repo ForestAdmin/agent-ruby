@@ -80,13 +80,10 @@ module ForestAdminAgent
         return unless @has_env_secret
 
         cache = @container.resolve(:cache)
-        @options[:customize_error_message] = @options[:customize_error_message]
-                                             &.source
-                                             &.strip
-                                             &.delete_prefix('config.customize_error_message =')
-                                             &.strip
 
-        @options[:logger] = @options[:logger]&.source&.strip&.delete_prefix('config.logger =')&.strip
+        @options[:customize_error_message] =
+          clean_option_value(@options[:customize_error_message], 'config.customize_error_message =')
+        @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
 
         cache.set('config', @options.to_h)
       end
@@ -94,6 +91,14 @@ module ForestAdminAgent
       def build_logger
         @logger = Services::LoggerService.new(@options[:loggerLevel], @options[:logger])
         @container.register(:logger, @logger)
+      end
+
+      def clean_option_value(option, prefix)
+        return unless option
+
+        source = option.source
+        cleaned_option = source&.strip if source
+        cleaned_option&.delete_prefix(prefix)&.strip
       end
     end
   end

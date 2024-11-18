@@ -37,7 +37,7 @@ module ForestAdminAgent
 
       def can_approve?
         if smart_action[:userApprovalEnabled].include?(role_id) &&
-           (smart_action[:userApprovalConditions].empty? || match_conditions(:userApprovalConditions)) &&
+           (condition_by_role_id(smart_action[:userApprovalConditions]).blank? || match_conditions(:userApprovalConditions)) &&
            (attributes[:signed_approval_request][:data][:attributes][:requester_id] != caller.id ||
              smart_action[:selfApprovalEnabled].include?(role_id))
           return true
@@ -48,15 +48,17 @@ module ForestAdminAgent
 
       def can_trigger?
         if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
-          return true if smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
+          if condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
+            return true
+          end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
-          if smart_action[:approvalRequiredConditions].empty? || match_conditions(:approvalRequiredConditions)
+          if condition_by_role_id(smart_action[:approvalRequiredConditions]).blank? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
               'This action requires to be approved.',
               REQUIRE_APPROVAL_ERROR,
               smart_action[:userApprovalEnabled]
             )
-          elsif smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
+          elsif condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
             return true
           end
         end
@@ -71,11 +73,11 @@ module ForestAdminAgent
                            else
                              Nodes::ConditionTreeLeaf.new(pk, 'IN', attributes[:ids])
                            end
-        condition = smart_action[condition_name][0][:filter]
+        condition = condition_by_role_id(smart_action[condition_name])
         conditional_filter = filter.override(
           condition_tree: ConditionTreeFactory.intersect(
             [
-              ConditionTreeParser.from_plain_object(collection, condition),
+              ConditionTreeParser.from_plain_object(collection, condition[:filter]),
               filter.condition_tree,
               condition_filter
             ]
@@ -89,6 +91,10 @@ module ForestAdminAgent
           'The conditions to trigger this action cannot be verified. Please contact an administrator.',
           INVALID_ACTION_CONDITION_ERROR
         )
+      end
+
+      def condition_by_role_id(condition)
+        condition.find { |c| c['roleId'] == role_id }
       end
     end
   end
