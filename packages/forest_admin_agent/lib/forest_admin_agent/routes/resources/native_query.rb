@@ -3,8 +3,8 @@ require 'active_support/inflector'
 
 module ForestAdminAgent
   module Routes
-    module Charts
-      class LiveQueryCharts < AbstractAuthenticatedRoute
+    module Resources
+      class NativeQuery < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
@@ -13,9 +13,9 @@ module ForestAdminAgent
 
         def setup_routes
           add_route(
-            'forest_live_query_chart',
+            'forest_native_query',
             'post',
-            '/stats',
+            '/_internal/native_query',
             lambda { |args|
               handle_request(args)
             }
@@ -36,7 +36,8 @@ module ForestAdminAgent
 
           @query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
 
-          result = ActiveRecord::Base.connection.execute(@query)
+          root_datasource = AgentFactory.instance.customizer.get_datasource(args[:params][:datasource])
+          result = root_datasource.execute_native_query(@query)
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}", result)) }
         end

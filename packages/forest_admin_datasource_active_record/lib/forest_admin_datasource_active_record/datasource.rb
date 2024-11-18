@@ -15,6 +15,10 @@ module ForestAdminDatasourceActiveRecord
       generate
     end
 
+    def execute_native_query(query)
+      ActiveRecord::Base.connection.execute(query)
+    end
+
     private
 
     def generate

@@ -81,6 +81,14 @@ module ForestAdminDatasourceCustomizer
       self
     end
 
+    def get_datasource(name)
+      root_datasource = @datasources.find { |datasource| datasource.name == name }
+
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException unless root_datasource
+
+      root_datasource
+    end
+
     private
 
     def push_customization(&customization)
