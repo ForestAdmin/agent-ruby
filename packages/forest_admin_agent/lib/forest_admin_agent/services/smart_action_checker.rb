@@ -48,7 +48,9 @@ module ForestAdminAgent
 
       def can_trigger?
         if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
-          return true if smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
+          if condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
+            return true
+          end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).blank? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
