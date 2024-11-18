@@ -58,7 +58,7 @@ module ForestAdminAgent
               REQUIRE_APPROVAL_ERROR,
               smart_action[:userApprovalEnabled]
             )
-          elsif smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
+          elsif condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
             return true
           end
         end
