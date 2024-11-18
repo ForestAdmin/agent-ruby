@@ -37,7 +37,7 @@ module ForestAdminAgent
 
       def can_approve?
         if smart_action[:userApprovalEnabled].include?(role_id) &&
-           (smart_action[:userApprovalConditions].empty? || match_conditions(:userApprovalConditions)) &&
+           (condition_by_role_id(smart_action[:userApprovalConditions]).blank? || match_conditions(:userApprovalConditions)) &&
            (attributes[:signed_approval_request][:data][:attributes][:requester_id] != caller.id ||
              smart_action[:selfApprovalEnabled].include?(role_id))
           return true
@@ -50,8 +50,7 @@ module ForestAdminAgent
         if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
           return true if smart_action[:triggerConditions].empty? || match_conditions(:triggerConditions)
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
-          approval_condition = smart_action[:approvalRequiredConditions].find { |c| c['roleId'] }
-          if approval_condition.blank? || match_conditions(:approvalRequiredConditions)
+          if condition_by_role_id(smart_action[:approvalRequiredConditions]).blank? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
               'This action requires to be approved.',
               REQUIRE_APPROVAL_ERROR,
@@ -72,7 +71,7 @@ module ForestAdminAgent
                            else
                              Nodes::ConditionTreeLeaf.new(pk, 'IN', attributes[:ids])
                            end
-        condition = smart_action[condition_name].find { |c| c['roleId'] == @role_id }
+        condition = condition_by_role_id(smart_action[condition_name])
         conditional_filter = filter.override(
           condition_tree: ConditionTreeFactory.intersect(
             [
@@ -90,6 +89,10 @@ module ForestAdminAgent
           'The conditions to trigger this action cannot be verified. Please contact an administrator.',
           INVALID_ACTION_CONDITION_ERROR
         )
+      end
+
+      def condition_by_role_id(condition)
+        condition.find { |c| c['roleId'] == role_id }
       end
     end
   end
