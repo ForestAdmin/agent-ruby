@@ -1,3 +1,10 @@
+# [1.0.0-beta.79](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.78...v1.0.0-beta.79) (2024-11-18)
+
+
+### Bug Fixes
+
+* **permission:** get approval conditions by role id  ([#82](https://github.com/ForestAdmin/agent-ruby/issues/82)) ([bd4b3e7](https://github.com/ForestAdmin/agent-ruby/commit/bd4b3e7f2b978d86fb50fdcd9470162440089f64))
+
 # [1.0.0-beta.78](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.77...v1.0.0-beta.78) (2024-10-28)
 
 
