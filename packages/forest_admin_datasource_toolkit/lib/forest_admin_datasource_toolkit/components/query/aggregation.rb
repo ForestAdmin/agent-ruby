@@ -46,7 +46,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def override(**args)
-          Aggregation.new(**to_h.merge(args))
+          Aggregation.new(**to_h, **args)
         end
 
         def apply(records, timezone, limit = nil)
