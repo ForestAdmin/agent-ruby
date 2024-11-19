@@ -149,6 +149,14 @@ module ForestAdminAgent
 
         segment
       end
+
+      def self.parse_query_segment(args)
+        segment_query = args[:params]['segmentQuery']
+
+        return unless segment_query
+
+        { query: segment_query, datasource: args[:params]['datasource'] }
+      end
     end
   end
 end

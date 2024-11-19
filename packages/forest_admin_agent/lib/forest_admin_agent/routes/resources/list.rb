@@ -5,6 +5,7 @@ module ForestAdminAgent
     module Resources
       class List < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminAgent::Utils
 
         def setup_routes
           add_route('forest_list', 'get', '/:collection_name', ->(args) { handle_request(args) })
@@ -15,7 +16,6 @@ module ForestAdminAgent
         def handle_request(args = {})
           build(args)
           @permissions.can?(:browse, @collection)
-
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect([
                                                              @permissions.get_scope(@collection),
@@ -23,15 +23,15 @@ module ForestAdminAgent
                                                                @collection, args
                                                              )
                                                            ]),
-            page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
-            search: ForestAdminAgent::Utils::QueryStringParser.parse_search(@collection, args),
-            search_extended: ForestAdminAgent::Utils::QueryStringParser.parse_search_extended(args),
-            sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@collection, args),
-            segment: ForestAdminAgent::Utils::QueryStringParser.parse_segment(@collection, args),
-            segment_query: args[:params]['segmentQuery']
+            page: QueryStringParser.parse_pagination(args),
+            search: QueryStringParser.parse_search(@collection, args),
+            search_extended: QueryStringParser.parse_search_extended(args),
+            sort: QueryStringParser.parse_sort(@collection, args),
+            segment: QueryStringParser.parse_segment(@collection, args),
+            segment_query: QueryStringParser.parse_query_segment(args)
           )
 
-          projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@collection, args)
+          projection = QueryStringParser.parse_projection_with_pks(@collection, args)
           records = @collection.list(@caller, filter, projection)
 
           {
