@@ -33,9 +33,6 @@ module ForestAdminDatasourceCustomizer
           if segment && @segments.key?(segment)
             condition_tree = compute_segment(segment, filter)
             segment = nil
-          elsif filter.segment_query
-            condition_tree = compute_live_query_segment(filter)
-            segment = nil
           end
 
           filter.override(condition_tree: condition_tree, segment: segment)
@@ -56,21 +53,6 @@ module ForestAdminDatasourceCustomizer
                                      ConditionTreeFactory.from_plain_object(result)
                                    end
 
-          ConditionTreeValidator.validate(condition_tree_segment, self)
-
-          ConditionTreeFactory.intersect([condition_tree_segment, filter.condition_tree])
-        end
-
-        def compute_live_query_segment(filter)
-          # TODO: add live query checker
-          root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
-                                                                   .customizer
-                                                                   .get_datasource(filter.segment_query[:datasource])
-          ids = root_datasource.execute_native_query(filter.segment_query[:query])
-                               .to_a
-                               .map(&:values)
-
-          condition_tree_segment = ConditionTreeFactory.match_ids(@child_collection, ids)
           ConditionTreeValidator.validate(condition_tree_segment, self)
 
           ConditionTreeFactory.intersect([condition_tree_segment, filter.condition_tree])

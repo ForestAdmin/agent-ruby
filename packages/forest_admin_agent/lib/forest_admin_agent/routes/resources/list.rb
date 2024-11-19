@@ -17,18 +17,18 @@ module ForestAdminAgent
           build(args)
           @permissions.can?(:browse, @collection)
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-            condition_tree: ConditionTreeFactory.intersect([
-                                                             @permissions.get_scope(@collection),
-                                                             ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                                                               @collection, args
-                                                             )
-                                                           ]),
+            condition_tree: ConditionTreeFactory.intersect(
+              [
+                @permissions.get_scope(@collection),
+                QueryStringParser.parse_condition_tree(@collection, args),
+                QueryStringParser.parse_query_segment(@collection, args)
+              ]
+            ),
             page: QueryStringParser.parse_pagination(args),
             search: QueryStringParser.parse_search(@collection, args),
             search_extended: QueryStringParser.parse_search_extended(args),
             sort: QueryStringParser.parse_sort(@collection, args),
-            segment: QueryStringParser.parse_segment(@collection, args),
-            segment_query: QueryStringParser.parse_query_segment(args)
+            segment: QueryStringParser.parse_segment(@collection, args)
           )
 
           projection = QueryStringParser.parse_projection_with_pks(@collection, args)

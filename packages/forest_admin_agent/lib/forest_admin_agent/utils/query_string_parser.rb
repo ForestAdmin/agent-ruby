@@ -150,12 +150,22 @@ module ForestAdminAgent
         segment
       end
 
-      def self.parse_query_segment(args)
-        segment_query = args[:params]['segmentQuery']
+      def self.parse_query_segment(collection, args)
+        return unless args[:params]['datasource'] && args[:params]['segmentQuery']
 
-        return unless segment_query
+        # TODO: add live query checker
+        root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
+                                                                 .customizer
+                                                                 .get_datasource(args[:params]['datasource'])
 
-        { query: segment_query, datasource: args[:params]['datasource'] }
+        ids = root_datasource.execute_native_query(args[:params]['segmentQuery'])
+                             .to_a
+                             .map(&:values)
+
+        condition_tree_segment = ConditionTree::ConditionTreeFactory.match_ids(collection, ids)
+        ConditionTreeValidator.validate(condition_tree_segment, collection)
+
+        condition_tree_segment
       end
     end
   end
