@@ -1,42 +1,62 @@
 module ForestAdminAgent
   module Utils
-    class QueryValidator
-      include ForestAdminDatasourceToolkit::Exceptions
+    module QueryValidator
+      FORBIDDEN_KEYWORDS = %w[DROP DELETE INSERT UPDATE ALTER].freeze
 
-      def initialize(query)
-        @query = query.strip
-      end
+      def self.valid?(query)
+        query = query.strip
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Query cannot be empty.' if query.empty?
 
-      def valid?
-        raise ForestException, 'Query cannot be empty' if @query.empty?
-        raise ForestException, 'Only SELECT queries are allowed' unless select_query?
-        raise ForestException, 'Only one query is allowed' if multiple_requests?
-        raise ForestException, 'Forbidden SQL keywords detected' if forbidden_keywords?
-        raise ForestException, 'Unbalanced parentheses in query' if unbalanced_parentheses?
+        sanitized_query = remove_content_inside_strings(query)
+        check_select_only(sanitized_query)
+        check_semicolon_placement(sanitized_query)
+        check_forbidden_keywords(sanitized_query)
+        check_unbalanced_parentheses(sanitized_query)
 
         true
       end
 
-      private
+      class << self
+        include ForestAdminDatasourceToolkit::Exceptions
 
-      def select_query?
-        @query.strip.upcase.start_with?('SELECT')
-      end
+        private
 
-      def multiple_requests?
-        # check ";" dans le where ?
-        # faire check si ";" en dernier caractère
-        @query.split(';').size > 1
-      end
+        def check_select_only(query)
+          return if query.strip.start_with?('SELECT')
 
-      def forbidden_keywords?
-        forbidden_keywords = %w[DROP DELETE UPDATE INSERT]
-        forbidden_keywords.any? { |word| @query.upcase.include?(word) }
-      end
+          raise ForestException, 'Only SELECT queries are allowed.'
+        end
 
-      def unbalanced_parentheses?
-        # ignorer parentheses dans les where
-        @query.count('(') != @query.count(')')
+        def check_semicolon_placement(query)
+          semicolon_count = query.scan(';').size
+
+          raise ForestException, 'Only one query is allowed.' if semicolon_count > 1
+          return if semicolon_count != 1 || query.strip[-1] == ';'
+
+          raise ForestException, 'Semicolon must only appear as the last character in the query.'
+        end
+
+        def check_forbidden_keywords(query)
+          FORBIDDEN_KEYWORDS.each do |keyword|
+            if /\b#{Regexp.escape(keyword)}\b/i.match?(query)
+              raise ForestException, "The query contains forbidden keyword: #{keyword}."
+            end
+          end
+        end
+
+        def check_unbalanced_parentheses(query)
+          open_count = query.count('(')
+          close_count = query.count(')')
+
+          return if open_count == close_count
+
+          raise ForestException, 'The query contains unbalanced parentheses.'
+        end
+
+        def remove_content_inside_strings(query)
+          # remove content inside single and double quotes
+          query.gsub(/'(?:[^']|\\')*'/, '').gsub(/"(?:[^"]|\\")*"/, '')
+        end
       end
     end
   end
