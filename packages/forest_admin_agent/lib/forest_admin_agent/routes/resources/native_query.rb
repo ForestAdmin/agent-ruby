@@ -26,17 +26,19 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
+          @query = args[:params][:query].strip
+          @args = args
+
+          QueryValidator.valid?(@query)
           # TODO: update permission checker
           # @permissions.can_chart?(args[:params])
 
-          @args = args
-          self.type = args[:params][:type]
-          @query = args[:params][:query].strip
+          self.type = @args[:params][:type]
           inject_context_variables
 
-          @query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
+          @query.gsub!('?', @args[:params][:record_id].to_s) if @args[:params][:record_id]
 
-          root_datasource = AgentFactory.instance.customizer.get_datasource(args[:params][:datasource])
+          root_datasource = AgentFactory.instance.customizer.get_datasource(@args[:params][:datasource])
           result = root_datasource.execute_native_query(@query)
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}", result)) }

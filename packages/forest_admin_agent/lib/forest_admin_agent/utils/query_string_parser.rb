@@ -153,7 +153,8 @@ module ForestAdminAgent
       def self.parse_query_segment(collection, args)
         return unless args[:params]['datasource'] && args[:params]['segmentQuery']
 
-        # TODO: add live query checker
+        QueryValidator.valid?(args[:params]['segmentQuery'])
+
         root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
                                                                  .customizer
                                                                  .get_datasource(args[:params]['datasource'])
