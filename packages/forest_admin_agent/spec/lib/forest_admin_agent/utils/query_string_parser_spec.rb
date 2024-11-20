@@ -389,6 +389,55 @@ module ForestAdminAgent
         end
       end
 
+      describe 'parse_query_segment' do
+        let(:collection_category) do
+          datasource = datasource_build(execute_native_query: [{ id: 1 }, { id: 2 }])
+          datasource_customizer = instance_double(
+            ForestAdminDatasourceCustomizer::DatasourceCustomizer,
+            {
+              get_datasource: datasource
+            }
+          )
+          allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:customizer)
+            .and_return(datasource_customizer)
+          collection_category = collection_build(
+            datasource: datasource,
+            name: 'Category',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                         filter_operators: [Operators::EQUAL, Operators::IN]),
+                'label' => ColumnSchema.new(column_type: 'String')
+              }
+            }
+          )
+
+          datasource.add_collection(collection_category)
+
+          collection_category
+        end
+
+        it 'return null when not provided' do
+          expect(described_class.parse_query_segment(collection_category, { params: {} })).to be_nil
+        end
+
+        it 'return null when datasource not provided' do
+          expect(described_class.parse_query_segment(collection_category, { params: { segmentQuery: 'select id from user' } })).to be_nil
+        end
+
+        it 'work when passed in the querystring for list' do
+          args = {
+            params: {
+              segmentQuery: 'SELECT id from user',
+              datasource: 'category'
+            }
+          }
+
+          condition_tree = described_class.parse_query_segment(collection_category, args)
+          expect(condition_tree.to_h).to eq({ field: 'id', operator: Operators::IN, value: [1, 2] })
+        end
+      end
+
       describe 'when parse_search' do
         let(:collection_category) do
           datasource = Datasource.new
