@@ -28,7 +28,7 @@ module ForestAdminDatasourceToolkit
       raise Exceptions::ForestException, "No chart named #{name} exists on this datasource."
     end
 
-    def execute_native_query(_query)
+    def execute_native_query(_connection_name, _query)
       raise Exceptions::ForestException, 'this datasource do not support native query.'
     end
   end

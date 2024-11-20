@@ -47,12 +47,6 @@ module ForestAdminDatasourceCustomizer
         end
       })
 
-      datasource_name = datasource.name
-      counter = 1
-
-      counter += 1 while @datasources.any? { |ds| ds.name == "#{datasource_name}_#{counter}" }
-
-      datasource.name = "#{datasource_name}_#{counter}"
       @datasources << datasource
 
       self
@@ -81,8 +75,10 @@ module ForestAdminDatasourceCustomizer
       self
     end
 
-    def get_datasource(name)
-      root_datasource = @datasources.find { |datasource| datasource.name == name }
+    def get_root_datasource_by_connection(name)
+      root_datasource = @datasources.find do |datasource|
+        datasource.live_query_connections.any? { |connection_name, _connection| connection_name == name }
+      end
 
       raise ForestAdminDatasourceToolkit::Exceptions::ForestException unless root_datasource
 

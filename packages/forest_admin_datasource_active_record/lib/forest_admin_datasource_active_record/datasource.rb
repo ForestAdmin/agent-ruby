@@ -2,21 +2,37 @@ require 'active_record'
 
 module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
-    attr_reader :models
+    attr_reader :models, :live_query_connections
 
-    def initialize(db_config = {}, name = 'active_record', support_polymorphic_relations: false)
+    def initialize(
+      db_config = {},
+      name = 'active_record',
+      support_polymorphic_relations: false,
+      live_query_connections: nil
+    )
       super()
       @name = name
       @models = []
       @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}
-      @configuration = {}
+      @db_connections = {}
+
+      @live_query_connections = if live_query_connections.is_a?(String)
+                                  { live_query_connections => 'primary' }
+                                elsif live_query_connections.is_a?(Hash)
+                                  live_query_connections
+                                else
+                                  {}
+                                end
+
       init_orm(db_config)
       generate
     end
 
-    def execute_native_query(query)
-      ActiveRecord::Base.connection.execute(query)
+    def execute_native_query(connection_name, query)
+      # TODO: check if connection is valid
+      connection = @live_query_connections[connection_name]
+      ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first.connection.execute(query)
     end
 
     private
@@ -53,10 +69,9 @@ module ForestAdminDatasourceActiveRecord
       configurations = ActiveRecord::Base.configurations
                                          .configurations
                                          .group_by(&:env_name)
-                                         .transform_values do |configs|
-        configs.map(&:name)
-      end
-      @configuration = configurations[current_config]
+                                         .transform_values { |configs| configs.map(&:name) }
+
+      @db_connections = configurations[current_config]
     end
 
     def build_habtm(model)

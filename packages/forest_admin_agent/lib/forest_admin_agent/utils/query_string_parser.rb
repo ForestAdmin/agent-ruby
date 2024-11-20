@@ -151,15 +151,17 @@ module ForestAdminAgent
       end
 
       def self.parse_query_segment(collection, args)
-        return unless args[:params][:datasource] && args[:params][:segmentQuery]
+        return unless args[:params][:connectionName] && args[:params][:segmentQuery]
 
         QueryValidator.valid?(args[:params][:segmentQuery])
 
         root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
                                                                  .customizer
-                                                                 .get_datasource(args[:params][:datasource])
+                                                                 .get_root_datasource_by_connection(
+                                                                   args[:params][:connectionName]
+                                                                 )
 
-        ids = root_datasource.execute_native_query(args[:params][:segmentQuery])
+        ids = root_datasource.execute_native_query(args[:params][:connectionName], args[:params][:segmentQuery])
                              .to_a
                              .map(&:values)
 
