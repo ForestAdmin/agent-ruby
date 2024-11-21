@@ -29,10 +29,14 @@ module ForestAdminDatasourceActiveRecord
       generate
     end
 
-    def execute_native_query(connection_name, query)
+    def execute_native_query(connection_name, query, binds)
       # TODO: check if connection is valid
       connection = @live_query_connections[connection_name]
-      ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first.connection.execute(query)
+
+      ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
+                        .first
+                        .connection
+                        .exec_query(query, 'SQL Native Query', binds)
     end
 
     private

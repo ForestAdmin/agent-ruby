@@ -9,6 +9,29 @@ module ForestAdminAgent
         end
       end
 
+      def self.inject_context_in_native_query(query, context_variables)
+        return query unless query.is_a?(String)
+
+        query_with_context_variables_injected = query
+        regex = /{{([^}]+)}}/
+        encountered_variables = {}
+
+        while (match = regex.match(query_with_context_variables_injected))
+          context_variable_key = match[1]
+
+          next if encountered_variables.value?(context_variable_key)
+
+          index = "$#{encountered_variables.size + 1}"
+          query_with_context_variables_injected.gsub!(
+            /{{#{context_variable_key}}}/,
+            index
+          )
+          encountered_variables[index] = context_variables.get_value(context_variable_key)
+        end
+
+        [query_with_context_variables_injected, encountered_variables]
+      end
+
       def self.inject_context_in_value_custom(value)
         return value unless value.is_a?(String)
 

@@ -34,12 +34,19 @@ module ForestAdminAgent
           # @permissions.can_chart?(args[:params])
 
           self.type = @args[:params][:type]
-          inject_context_variables
-
+          @query, context_variables = inject_context_variables
           @query.gsub!('?', @args[:params][:record_id].to_s) if @args[:params][:record_id]
 
-          root_datasource = AgentFactory.instance.customizer.get_datasource(@args[:params][:datasource])
-          result = root_datasource.execute_native_query(@query)
+          root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
+                                                                   .customizer
+                                                                   .get_root_datasource_by_connection(
+                                                                     args[:params][:connectionName]
+                                                                   )
+          result = root_datasource.execute_native_query(
+            args[:params][:connectionName],
+            @query,
+            context_variables.values
+          )
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}", result)) }
         end
@@ -51,7 +58,7 @@ module ForestAdminAgent
           team = @permissions.get_team(@caller.rendering_id)
           context_variables = ContextVariables.new(team, user, @args[:params][:contextVariables])
 
-          @query = ContextVariablesInjector.inject_context_in_value(@query, context_variables)
+          ContextVariablesInjector.inject_context_in_native_query(@query, context_variables)
         end
 
         def type=(type)
