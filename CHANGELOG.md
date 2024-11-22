@@ -1,3 +1,10 @@
+# [1.0.0-beta.81](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.80...v1.0.0-beta.81) (2024-11-22)
+
+
+### Bug Fixes
+
+* **security:** patch micromatch dependency vulnerabilities ([#84](https://github.com/ForestAdmin/agent-ruby/issues/84)) ([fa5b38f](https://github.com/ForestAdmin/agent-ruby/commit/fa5b38fbb6fbaf9b46d14e1f1794a0dd5c1ca5bf))
+
 # [1.0.0-beta.80](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.79...v1.0.0-beta.80) (2024-11-22)
 
 
