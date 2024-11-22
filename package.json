@@ -20,5 +20,8 @@
     "@semantic-release/git": "10.0.1",
     "semantic-release": "21.1.1",
     "semantic-release-slack-bot": "4.0.2"
+  },
+  "resolutions": {
+    "semantic-release-slack-bot/**/micromatch": "^4.0.8"
   }
 }
