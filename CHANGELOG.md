@@ -1,3 +1,10 @@
+# [1.0.0-beta.80](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.79...v1.0.0-beta.80) (2024-11-22)
+
+
+### Bug Fixes
+
+* **security:** patch cross-spawn dependency vulnerabilities ([#83](https://github.com/ForestAdmin/agent-ruby/issues/83)) ([9fd5aeb](https://github.com/ForestAdmin/agent-ruby/commit/9fd5aeb4e63f5b7542d389c99153e379499e7624))
+
 # [1.0.0-beta.79](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.78...v1.0.0-beta.79) (2024-11-18)
 
 
