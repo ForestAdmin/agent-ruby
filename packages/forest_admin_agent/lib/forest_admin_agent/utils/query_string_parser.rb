@@ -161,7 +161,7 @@ module ForestAdminAgent
                                                                    args[:params][:connectionName]
                                                                  )
 
-        ids = root_datasource.execute_native_query(args[:params][:connectionName], args[:params][:segmentQuery])
+        ids = root_datasource.execute_native_query(args[:params][:connectionName], args[:params][:segmentQuery], [])
                              .to_a
                              .map(&:values)
 

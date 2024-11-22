@@ -26,16 +26,15 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           build(args)
-          @query = args[:params][:query].strip
-          @args = args
+          query = args[:params][:query].strip
 
-          QueryValidator.valid?(@query)
+          QueryValidator.valid?(query)
           # TODO: update permission checker
           # @permissions.can_chart?(args[:params])
 
-          self.type = @args[:params][:type]
-          @query, context_variables = inject_context_variables
-          @query.gsub!('?', @args[:params][:record_id].to_s) if @args[:params][:record_id]
+          self.type = args[:params][:type]
+          query, context_variables = inject_context_variables(query, args[:params][:contextVariables])
+          query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
 
           root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
                                                                    .customizer
@@ -44,7 +43,7 @@ module ForestAdminAgent
                                                                    )
           result = root_datasource.execute_native_query(
             args[:params][:connectionName],
-            @query,
+            query,
             context_variables.values
           )
 
@@ -53,12 +52,12 @@ module ForestAdminAgent
 
         private
 
-        def inject_context_variables
+        def inject_context_variables(query, context_variables)
           user = @permissions.get_user_data(@caller.id)
           team = @permissions.get_team(@caller.rendering_id)
-          context_variables = ContextVariables.new(team, user, @args[:params][:contextVariables])
+          context_variables = ContextVariables.new(team, user, context_variables)
 
-          ContextVariablesInjector.inject_context_in_native_query(@query, context_variables)
+          ContextVariablesInjector.inject_context_in_native_query(query, context_variables)
         end
 
         def type=(type)
