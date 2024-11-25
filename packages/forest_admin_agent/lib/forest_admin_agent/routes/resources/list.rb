@@ -16,12 +16,15 @@ module ForestAdminAgent
         def handle_request(args = {})
           build(args)
           @permissions.can?(:browse, @collection)
+          user = @permissions.get_user_data(@caller.id)
+          team = @permissions.get_team(@caller.rendering_id)
+
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
                 @permissions.get_scope(@collection),
                 QueryStringParser.parse_condition_tree(@collection, args),
-                QueryStringParser.parse_query_segment(@collection, args)
+                QueryStringParser.parse_query_segment(@collection, args, team, user)
               ]
             ),
             page: QueryStringParser.parse_pagination(args),

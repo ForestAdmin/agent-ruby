@@ -150,7 +150,7 @@ module ForestAdminAgent
         segment
       end
 
-      def self.parse_query_segment(collection, args)
+      def self.parse_query_segment(collection, args, team, user)
         return unless args[:params][:connectionName] && args[:params][:segmentQuery]
 
         QueryValidator.valid?(args[:params][:segmentQuery])
@@ -161,7 +161,11 @@ module ForestAdminAgent
                                                                    args[:params][:connectionName]
                                                                  )
 
-        ids = root_datasource.execute_native_query(args[:params][:connectionName], args[:params][:segmentQuery], [])
+        query = args[:params][:segmentQuery].strip
+        context_variables = ContextVariables.new(team, user, context_variables)
+        query = ContextVariablesInjector.inject_context_in_native_query(query, context_variables)
+
+        ids = root_datasource.execute_native_query(args[:params][:connectionName], query, [])
                              .to_a
                              .map(&:values)
 
