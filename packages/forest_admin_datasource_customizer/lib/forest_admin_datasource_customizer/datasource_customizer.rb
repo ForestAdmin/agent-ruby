@@ -80,7 +80,10 @@ module ForestAdminDatasourceCustomizer
         datasource.live_query_connections.any? { |connection_name, _connection| connection_name == name }
       end
 
-      raise ForestAdminDatasourceToolkit::Exceptions::ForestException unless root_datasource
+      unless root_datasource
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "Unknown datasource with connection name '#{name}'"
+      end
 
       root_datasource
     end

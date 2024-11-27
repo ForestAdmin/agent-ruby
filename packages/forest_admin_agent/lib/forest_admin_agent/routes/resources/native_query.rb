@@ -7,8 +7,8 @@ module ForestAdminAgent
       class NativeQuery < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
-        include ForestAdminDatasourceToolkit::Components::Query
-        include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminDatasourceToolkit::Exceptions
+        # include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Charts
 
         def setup_routes
@@ -75,38 +75,30 @@ module ForestAdminAgent
         end
 
         def make_value(result)
-          # not sure if it's useful
           return unless result.count
 
-          # TODO: check the result format with MYSQL2 ADAPTER
-          # result_line = ForestLiana::AdapterHelper.format_live_query_result(result, type)
           result = result.first
 
-          raise_error(result, "'value'") unless result.key?('value')
+          raise_error(result, "'value'") unless result.key?(:value)
 
-          ValueChart.new(result['value'] || 0, result['previous'] || 0).serialize
+          ValueChart.new(result[:value] || 0, result[:previous] || nil).serialize
         end
 
         def make_objective(result)
           return unless result.count
 
-          # TODO: check the result format with MYSQL2 ADAPTER
-          # result_line = ForestLiana::AdapterHelper.format_live_query_result(result, type)
           result = result.first
 
-          raise_error(result, "'value', 'objective'") unless result.key?('value') || result.key?('objective')
+          raise_error(result, "'value', 'objective'") unless result.key?(:value) || result.key?(:objective)
 
-          ObjectiveChart.new(result['value'] || 0, result['objective']).serialize
+          ObjectiveChart.new(result[:value] || 0, result[:objective]).serialize
         end
 
         def make_pie(result)
           return unless result.count
 
-          # TODO: check the result format with MYSQL2 ADAPTER
-          # result_line = ForestLiana::AdapterHelper.format_live_query_result(result, type)
-
           result.each do |result_line|
-            raise_error(result_line, "'key', 'value'") if !result_line.key?('value') || !result_line.key?('key')
+            raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
           end
 
           PieChart.new(result).serialize
@@ -115,11 +107,8 @@ module ForestAdminAgent
         def make_leaderboard(result)
           return unless result.count
 
-          # TODO: check the result format with MYSQL2 ADAPTER
-          # result_line = ForestLiana::AdapterHelper.format_live_query_result(result, type)
-
           result.each do |result_line|
-            raise_error(result_line, "'key', 'value'") if !result_line.key?('value') || !result_line.key?('key')
+            raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
           end
 
           LeaderboardChart.new(result).serialize
@@ -128,13 +117,10 @@ module ForestAdminAgent
         def make_line(result)
           return unless result.count
 
-          # TODO: check the result format with MYSQL2 ADAPTER
-          # result_line = ForestLiana::AdapterHelper.format_live_query_result(result, type)
+          result = result.map! do |result_line|
+            raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
 
-          result.map do |result_line|
-            raise_error(result_line, "'key', 'value'") if !result_line.key?('value') || !result_line.key?('key')
-
-            { label: result_line['key'], values: { value: result_line['value'] } }
+            { label: result_line[:key], values: { value: result_line[:value] } }
           end
 
           LineChart.new(result).serialize

@@ -2,7 +2,7 @@ require 'active_record'
 
 module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
-    attr_reader :models, :live_query_connections
+    attr_reader :models
 
     def initialize(
       db_config = {},

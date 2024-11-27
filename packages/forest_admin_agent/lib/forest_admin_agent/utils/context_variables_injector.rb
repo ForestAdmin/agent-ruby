@@ -3,7 +3,7 @@ module ForestAdminAgent
     class ContextVariablesInjector
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
 
-      REGEX = '/{{([^}]+)}}/'.freeze
+      REGEX = /{{([^}]+)}}/
 
       def self.inject_context_in_value(value, context_variables)
         inject_context_in_value_custom(value) do |context_variable_key|
