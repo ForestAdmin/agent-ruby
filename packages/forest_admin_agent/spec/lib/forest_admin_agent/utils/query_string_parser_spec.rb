@@ -390,17 +390,31 @@ module ForestAdminAgent
       end
 
       describe 'parse_query_segment' do
-        let(:collection_category) do
-          datasource = datasource_build(execute_native_query: [{ id: 1 }, { id: 2 }])
+        let(:team) { { id: 100, name: 'Operations' } }
+        let(:user) do
+          {
+            id: 1,
+            firstName: 'John',
+            lastName: 'Doe',
+            fullName: 'John Doe',
+            email: 'johndoe@forestadmin.com',
+            tags: { 'foo' => 'bar' },
+            roleId: 1,
+            permissionLevel: 'admin'
+          }
+        end
+        let(:datasource) { datasource_build(execute_native_query: [{ id: 1 }, { id: 2 }]) }
+
+        let(:collection) do
           datasource_customizer = instance_double(
             ForestAdminDatasourceCustomizer::DatasourceCustomizer,
             {
-              get_datasource: datasource
+              get_root_datasource_by_connection: datasource
             }
           )
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:customizer)
             .and_return(datasource_customizer)
-          collection_category = collection_build(
+          collection = collection_build(
             datasource: datasource,
             name: 'Category',
             schema: {
@@ -412,29 +426,50 @@ module ForestAdminAgent
             }
           )
 
-          datasource.add_collection(collection_category)
+          datasource.add_collection(collection)
 
-          collection_category
+          collection
         end
 
         it 'return null when not provided' do
-          expect(described_class.parse_query_segment(collection_category, { params: {} })).to be_nil
+          expect(described_class.parse_query_segment(collection, { params: {} }, team, user)).to be_nil
         end
 
         it 'return null when datasource not provided' do
-          expect(described_class.parse_query_segment(collection_category, { params: { segmentQuery: 'select id from user' } })).to be_nil
+          expect(described_class.parse_query_segment(
+                   collection,
+                   { params: { segmentQuery: 'select id from user' } },
+                   team,
+                   user
+                 )).to be_nil
         end
 
         it 'work when passed in the querystring for list' do
           args = {
             params: {
               segmentQuery: 'SELECT id from user',
-              datasource: 'category'
+              connectionName: 'primary'
             }
           }
 
-          condition_tree = described_class.parse_query_segment(collection_category, args)
+          condition_tree = described_class.parse_query_segment(collection, args, team, user)
           expect(condition_tree.to_h).to eq({ field: 'id', operator: Operators::IN, value: [1, 2] })
+        end
+
+        it 'work with inject context varaible' do
+          args = {
+            params: {
+              segmentQuery: 'SELECT id FROM users WHERE id > {{currentUser.id}};',
+              connectionName: 'primary'
+            }
+          }
+
+          described_class.parse_query_segment(collection, args, team, user)
+          expect(datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
+            expect(connection_name).to eq('primary')
+            expect(query).to eq('SELECT id FROM users WHERE id > $1;')
+            expect(binds).to eq([1])
+          end
         end
       end
 

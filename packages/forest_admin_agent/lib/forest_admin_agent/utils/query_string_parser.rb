@@ -163,9 +163,9 @@ module ForestAdminAgent
 
         query = args[:params][:segmentQuery].strip
         context_variables = ContextVariables.new(team, user, context_variables)
-        query = ContextVariablesInjector.inject_context_in_native_query(query, context_variables)
+        query, binds = ContextVariablesInjector.inject_context_in_native_query(query, context_variables)
 
-        ids = root_datasource.execute_native_query(args[:params][:connectionName], query, [])
+        ids = root_datasource.execute_native_query(args[:params][:connectionName], query, binds.values)
                              .to_a
                              .map(&:values)
 
