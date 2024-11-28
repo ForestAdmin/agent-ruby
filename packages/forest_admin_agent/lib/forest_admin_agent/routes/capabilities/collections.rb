@@ -18,7 +18,12 @@ module ForestAdminAgent
           @datasource = ForestAdminAgent::Facades::Container.datasource
           collections = args[:params]['collectionNames'] || []
 
-          # datasources = ForestAdminAgent::Builder::AgentFactory.instance.customizer.datasources
+          connections = []
+          ForestAdminAgent::Builder::AgentFactory.instance.customizer.datasources.map do |root_datasource|
+            connections = connections.union(
+              root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
+            )
+          end
 
           result = collections.map do |collection_name|
             collection = @datasource.get_collection(collection_name)
@@ -36,7 +41,8 @@ module ForestAdminAgent
 
           {
             content: {
-              collections: result
+              collections: result,
+              nativeQueryConnections: connections
             },
             status: 200
           }
