@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is an enum' do
         it 'raise an error when the field value is not a valid enum' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'enum_field' => ColumnSchema.new(
@@ -31,7 +31,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'raise an error when the at least one field value is not a valid enum' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'enum_field' => ColumnSchema.new(
@@ -53,7 +53,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when all enum values are allowed' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'enum_field' => ColumnSchema.new(
@@ -70,7 +70,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when enum must be present' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'enum_field' => ColumnSchema.new(

@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is an UUID' do
         let(:collection) do
-          collection_build({
+          build_collection({
                              schema: {
                                fields: {
                                  'uuid_field' => ColumnSchema.new(

@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is a number' do
         let(:collection) do
-          collection_build({
+          build_collection({
                              schema: {
                                fields: {
                                  'number_field' => ColumnSchema.new(

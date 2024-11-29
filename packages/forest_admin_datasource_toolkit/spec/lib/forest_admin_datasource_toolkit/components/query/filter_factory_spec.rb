@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 require 'active_support/all'
 require 'active_support/core_ext/numeric/time'
 
@@ -239,9 +238,9 @@ module ForestAdminDatasourceToolkit
 
         context 'when call make_foreign_filter' do
           before do
-            @datasource = datasource_with_collections_build(
+            @datasource = build_datasource_with_collections(
               [
-                collection_build(
+                build_collection(
                   {
                     name: 'Book',
                     schema: {
@@ -271,7 +270,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'Review',
                     schema: {
@@ -289,7 +288,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'BookReview',
                     schema: {

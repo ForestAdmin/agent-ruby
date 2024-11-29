@@ -1,7 +1,12 @@
 PATH
+  remote: ../forest_admin_test_toolkit
+  specs:
+    forest_admin_test_toolkit (1.0.0.pre.beta.81)
+
+PATH
   remote: .
   specs:
-    forest_admin_datasource_toolkit (1.0.0.pre.beta.60)
+    forest_admin_datasource_toolkit (1.0.0.pre.beta.81)
       activesupport (>= 6.1)
       zeitwerk (~> 2.3)
 
@@ -86,6 +91,7 @@ PLATFORMS
 
 DEPENDENCIES
   forest_admin_datasource_toolkit!
+  forest_admin_test_toolkit!
   rake (~> 13.0)
   rspec (~> 3.0)
   rubocop (~> 1.21)

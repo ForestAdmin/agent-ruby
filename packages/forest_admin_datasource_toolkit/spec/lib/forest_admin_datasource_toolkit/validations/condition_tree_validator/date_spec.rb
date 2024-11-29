@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is a date' do
         it 'not raise an error when it using the BeforeXHoursAgo operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'a_date_field' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::BEFORE_X_HOURS_AGO])
@@ -22,7 +22,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when it using the AfterXHoursAgo operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'a_date_field' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::AFTER_X_HOURS_AGO])
@@ -35,7 +35,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when it using the PreviousXDaysToDate operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'a_date_field' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::PREVIOUS_X_DAYS_TO_DATE])
@@ -48,7 +48,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when it using the PreviousXDays operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'a_date_field' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::PREVIOUS_X_DAYS])
@@ -62,7 +62,7 @@ module ForestAdminDatasourceToolkit
 
         describe 'date operators' do
           let(:collection) do
-            collection_build({
+            build_collection({
                                schema: {
                                  fields: {
                                    'date_field' => ColumnSchema.new(column_type: 'Date', filter_operators: Operators.all)
