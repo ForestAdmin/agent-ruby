@@ -347,12 +347,10 @@ module ForestAdminDatasourceCustomizer
         end
 
         describe 'when renaming primary keys' do
-          before do
+          it 'the relations should be updated in all collections' do
             @new_book.rename_field('id', 'new_book_id')
             @new_person.rename_field('id', 'new_person_id')
-          end
 
-          it 'the relations should be updated in all collections' do
             book_fields = @new_book.schema[:fields]
             book_person_fields = @new_book_person.schema[:fields]
             person_fields = @new_person.schema[:fields]

@@ -65,7 +65,7 @@ module ForestAdminDatasourceCustomizer
               relation = datasource.get_collection(old_schema.foreign_collection)
               old_schema.origin_key = relation.from_child_collection[old_schema.origin_key] || old_schema.origin_key
               old_schema.origin_key_target =
-                relation.from_child_collection[old_schema.origin_key_target] || old_schema.origin_key_target
+                from_child_collection[old_schema.origin_key_target] || old_schema.origin_key_target
             when 'ManyToMany'
               through = datasource.get_collection(old_schema.through_collection)
               relation = datasource.get_collection(old_schema.foreign_collection)
