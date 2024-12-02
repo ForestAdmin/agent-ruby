@@ -33,10 +33,12 @@ module ForestAdminDatasourceActiveRecord
       # TODO: check if connection is valid
       connection = @live_query_connections[connection_name]
 
-      ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
-                        .first
-                        .connection
-                        .exec_query(query, 'SQL Native Query', binds)
+      result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
+                                 .first
+                                 .connection
+                                 .exec_query(query, 'SQL Native Query', binds)
+
+      ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
     end
 
     private
