@@ -8,8 +8,8 @@ module ForestAdminAgent
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Exceptions
-        # include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Charts
+        include ForestAdminAgent::Routes::QueryHandler
 
         def setup_routes
           add_route(
@@ -29,36 +29,22 @@ module ForestAdminAgent
           query = args[:params][:query].strip
 
           QueryValidator.valid?(query)
-          # TODO: update permission checker
-          # @permissions.can_chart?(args[:params])
+          @permissions.can_chart?(args[:params])
 
-          self.type = args[:params][:type]
-          query, context_variables = inject_context_variables(query, args[:params][:contextVariables])
           query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
-
-          root_datasource = ForestAdminAgent::Builder::AgentFactory.instance
-                                                                   .customizer
-                                                                   .get_root_datasource_by_connection(
-                                                                     args[:params][:connectionName]
-                                                                   )
-          result = root_datasource.execute_native_query(
-            args[:params][:connectionName],
+          self.type = args[:params][:type]
+          result = execute_query(
             query,
-            context_variables.values
+            args[:params][:connectionName],
+            @permissions,
+            @caller,
+            args[:params][:contextVariables]
           )
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}", result)) }
         end
 
         private
-
-        def inject_context_variables(query, context_variables)
-          user = @permissions.get_user_data(@caller.id)
-          team = @permissions.get_team(@caller.rendering_id)
-          context_variables = ContextVariables.new(team, user, context_variables)
-
-          ContextVariablesInjector.inject_context_in_native_query(query, context_variables)
-        end
 
         def type=(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]

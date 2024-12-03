@@ -6,6 +6,8 @@ module ForestAdminAgent
       class Count < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminAgent::Routes::QueryHandler
+
         def setup_routes
           add_route('forest_count', 'get', '/:collection_name/count', ->(args) { handle_request(args) })
 
@@ -18,7 +20,16 @@ module ForestAdminAgent
 
           if @collection.is_countable?
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-              condition_tree: @permissions.get_scope(@collection)
+              condition_tree: ConditionTreeFactory.intersect(
+                [
+                  @permissions.get_scope(@collection),
+                  parse_query_segment(@collection, args, @permissions, @caller),
+                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@collection, args)
+                ]
+              ),
+              search: QueryStringParser.parse_search(@collection, args),
+              search_extended: QueryStringParser.parse_search_extended(args),
+              segment: QueryStringParser.parse_segment(@collection, args)
             )
             aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
             result = @collection.aggregate(@caller, filter, aggregation)

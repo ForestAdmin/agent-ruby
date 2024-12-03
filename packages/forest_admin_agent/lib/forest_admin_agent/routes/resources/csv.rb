@@ -4,6 +4,7 @@ module ForestAdminAgent
       class Csv < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminAgent::Utils
+        include ForestAdminAgent::Routes::QueryHandler
 
         def setup_routes
           add_route(
@@ -25,6 +26,7 @@ module ForestAdminAgent
             condition_tree: ConditionTreeFactory.intersect(
               [
                 @permissions.get_scope(@collection),
+                parse_query_segment(@collection, args, @permissions, @caller),
                 ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
                   @collection, args
                 )
