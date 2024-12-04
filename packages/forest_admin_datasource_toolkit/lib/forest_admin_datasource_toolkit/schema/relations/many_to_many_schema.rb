@@ -2,8 +2,7 @@ module ForestAdminDatasourceToolkit
   module Schema
     module Relations
       class ManyToManySchema < RelationSchema
-        attr_accessor :origin_key, :through_collection, :foreign_key
-        attr_reader :origin_key_target, :foreign_key_target
+        attr_accessor :origin_key, :through_collection, :foreign_key, :origin_key_target, :foreign_key_target
 
         def initialize(
           origin_key:,

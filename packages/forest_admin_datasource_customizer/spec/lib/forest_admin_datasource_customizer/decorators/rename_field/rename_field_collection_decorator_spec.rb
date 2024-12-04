@@ -318,6 +318,50 @@ module ForestAdminDatasourceCustomizer
             expect(rows).to eq([{ 'value' => 34, 'group' => { 'my_novel_author:created_at' => 'abc' } }])
           end
         end
+
+        describe 'when renaming foreign keys' do
+          before do
+            @new_book_person.rename_field('book_id', 'novel_id')
+            @new_book_person.rename_field('person_id', 'author_id')
+          end
+
+          it 'the columns should be renamed in the schema' do
+            fields = @new_book_person.schema[:fields]
+            expect(fields['author_id']).to be_a(ColumnSchema)
+            expect(fields['novel_id']).to be_a(ColumnSchema)
+            expect(fields['person_id']).to be_nil
+            expect(fields['book_id']).to be_nil
+          end
+
+          it 'the relations should be updated in all collections' do
+            book_fields = @new_book.schema[:fields]
+            book_person_fields = @new_book_person.schema[:fields]
+            person_fields = @new_person.schema[:fields]
+
+            expect(book_fields['my_persons'].foreign_key).to eq('author_id')
+            expect(book_fields['my_persons'].origin_key).to eq('novel_id')
+            expect(book_person_fields['my_book'].foreign_key).to eq('novel_id')
+            expect(book_person_fields['my_person'].foreign_key).to eq('author_id')
+            expect(person_fields['my_book_person'].origin_key).to eq('author_id')
+          end
+        end
+
+        describe 'when renaming primary keys' do
+          it 'the relations should be updated in all collections' do
+            @new_book.rename_field('id', 'new_book_id')
+            @new_person.rename_field('id', 'new_person_id')
+
+            book_fields = @new_book.schema[:fields]
+            book_person_fields = @new_book_person.schema[:fields]
+            person_fields = @new_person.schema[:fields]
+
+            expect(book_fields['my_persons'].origin_key_target).to eq('new_book_id')
+            expect(book_fields['my_persons'].foreign_key_target).to eq('new_person_id')
+            expect(book_person_fields['my_book'].foreign_key_target).to eq('new_book_id')
+            expect(book_person_fields['my_person'].foreign_key_target).to eq('new_person_id')
+            expect(person_fields['my_book_person'].origin_key_target).to eq('new_person_id')
+          end
+        end
       end
     end
   end

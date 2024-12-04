@@ -57,14 +57,24 @@ module ForestAdminDatasourceCustomizer
           sub_schema[:fields].each do |old_name, old_schema|
             case old_schema.type
             when 'ManyToOne'
+              relation = datasource.get_collection(old_schema.foreign_collection)
               old_schema.foreign_key = from_child_collection[old_schema.foreign_key] || old_schema.foreign_key
+              old_schema.foreign_key_target =
+                relation.from_child_collection[old_schema.foreign_key_target] || old_schema.foreign_key_target
             when 'OneToMany', 'OneToOne'
               relation = datasource.get_collection(old_schema.foreign_collection)
               old_schema.origin_key = relation.from_child_collection[old_schema.origin_key] || old_schema.origin_key
+              old_schema.origin_key_target =
+                from_child_collection[old_schema.origin_key_target] || old_schema.origin_key_target
             when 'ManyToMany'
               through = datasource.get_collection(old_schema.through_collection)
+              relation = datasource.get_collection(old_schema.foreign_collection)
               old_schema.foreign_key = through.from_child_collection[old_schema.foreign_key] || old_schema.foreign_key
               old_schema.origin_key = through.from_child_collection[old_schema.origin_key] || old_schema.origin_key
+              old_schema.origin_key_target =
+                from_child_collection[old_schema.origin_key_target] || old_schema.origin_key_target
+              old_schema.foreign_key_target =
+                relation.from_child_collection[old_schema.foreign_key_target] || old_schema.foreign_key_target
             end
 
             fields[from_child_collection[old_name] || old_name] = old_schema
