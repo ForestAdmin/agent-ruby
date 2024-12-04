@@ -1,3 +1,10 @@
+# [1.0.0-beta.82](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.81...v1.0.0-beta.82) (2024-12-04)
+
+
+### Bug Fixes
+
+* **rename decorator:** properly map relation when renaming pk field  ([#85](https://github.com/ForestAdmin/agent-ruby/issues/85)) ([cfb2d12](https://github.com/ForestAdmin/agent-ruby/commit/cfb2d128e06b44c1533e4cbfe96128326229c8d4))
+
 # [1.0.0-beta.81](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.80...v1.0.0-beta.81) (2024-11-22)
 
 
