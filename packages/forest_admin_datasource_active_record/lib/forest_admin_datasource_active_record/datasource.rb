@@ -30,15 +30,23 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def execute_native_query(connection_name, query, binds)
-      # TODO: check if connection is valid
-      connection = @live_query_connections[connection_name]
+      unless @live_query_connections[connection_name]
+        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+              "Connection named '#{connection_name}' is unknown."
+      end
 
-      result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
-                                 .first
-                                 .connection
-                                 .exec_query(query, 'SQL Native Query', binds)
+      begin
+        connection = @live_query_connections[connection_name]
+        result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
+                                   .first
+                                   .connection
+                                   .exec_query(query, 'SQL Native Query', binds)
 
-      ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
+        ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
+      rescue StandardError => e
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "Error when executing SQL query: '#{e.full_message}'"
+      end
     end
 
     private
