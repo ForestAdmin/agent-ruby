@@ -29,6 +29,10 @@ module ForestAdminAgent
           query = args[:params][:query].strip
 
           QueryValidator.valid?(query)
+          unless args[:params][:connectionName]
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "'connectionName' parameter is mandatory"
+          end
+
           @permissions.can_chart?(args[:params])
 
           query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]

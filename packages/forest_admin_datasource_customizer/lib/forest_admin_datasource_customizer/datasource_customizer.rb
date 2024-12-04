@@ -81,8 +81,8 @@ module ForestAdminDatasourceCustomizer
       end
 
       unless root_datasource
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "Unknown datasource with connection name '#{name}'"
+        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+              "Connection named '#{name}' is unknown."
       end
 
       root_datasource
