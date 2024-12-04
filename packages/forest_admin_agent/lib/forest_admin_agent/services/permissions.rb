@@ -80,6 +80,31 @@ module ForestAdminAgent
         is_allowed
       end
 
+      def can_execute_query_segment?(collection, query, connection_name)
+        hash_request = array_hash({ query: query, connectionName: connection_name })
+        is_allowed = get_segments(collection).include?(hash_request)
+
+        # Refetch
+        is_allowed ||= get_segments(collection, force_fetch: true).include?(hash_request)
+
+        # still not allowed - throw forbidden message
+        unless is_allowed
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "User #{caller.id} cannot retrieve query segment on rendering #{caller.rendering_id}"
+          )
+
+          raise ForbiddenError, "You don't have permission to use this query segment."
+        end
+
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Debug',
+          "User #{caller.id} can retrieve query segment on rendering #{caller.rendering_id}"
+        )
+
+        is_allowed
+      end
+
       def can_smart_action?(request, collection, filter, allow_fetch: true)
         return true unless permission_system?
 
@@ -103,7 +128,7 @@ module ForestAdminAgent
       end
 
       def get_scope(collection)
-        permissions = get_scope_and_team_data(caller.rendering_id)
+        permissions = get_rendering_data(caller.rendering_id)
         scope = permissions[:scopes][collection.name.to_sym]
 
         return nil if scope.nil?
@@ -114,6 +139,12 @@ module ForestAdminAgent
         context_variables = ContextVariables.new(team, user)
 
         ContextVariablesInjector.inject_context_in_filter(scope, context_variables)
+      end
+
+      def get_segments(collection, force_fetch: false)
+        permissions = get_rendering_data(caller.rendering_id, force_fetch: force_fetch)
+
+        permissions[:segments][collection.name.to_sym]
       end
 
       def get_user_data(user_id)
@@ -132,7 +163,7 @@ module ForestAdminAgent
       end
 
       def get_team(rendering_id)
-        permissions = get_scope_and_team_data(rendering_id)
+        permissions = get_rendering_data(rendering_id)
 
         permissions[:team]
       end
@@ -157,35 +188,23 @@ module ForestAdminAgent
       end
 
       def get_chart_data(rendering_id, force_fetch: false)
-        self.class.invalidate_cache('forest.stats') if force_fetch == true
+        rendering_data = get_rendering_data(rendering_id, force_fetch: force_fetch)
 
-        cache.get_or_set('forest.stats') do
-          response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
-          stat_hash = []
-          response[:stats].each do |stat|
-            stat = stat.select { |_, value| !value.nil? && value != '' }
-            stat_hash << "#{stat[:type]}:#{array_hash(stat)}"
-          end
-
-          ForestAdminAgent::Facades::Container.logger.log(
-            'Debug',
-            "Loading rendering permissions for rendering #{rendering_id}"
-          )
-
-          stat_hash
-        end
+        rendering_data[:charts]
       end
 
       def sanitize_chart_parameters(parameters)
         parameters.delete(:timezone)
         parameters.delete(:collection)
         parameters.delete(:contextVariables)
+        parameters.delete(:record_id)
         # rails
         parameters.delete(:route_alias)
         parameters.delete(:controller)
         parameters.delete(:action)
         parameters.delete(:collection_name)
         parameters.delete(:forest)
+        parameters.delete(:format)
 
         parameters.select { |_, value| !value.nil? && value != '' }
       end
@@ -194,13 +213,17 @@ module ForestAdminAgent
         Digest::SHA1.hexdigest(data.deep_sort.to_h.to_s)
       end
 
-      def get_scope_and_team_data(rendering_id)
-        cache.get_or_set('forest.scopes') do
+      def get_rendering_data(rendering_id, force_fetch: false)
+        self.class.invalidate_cache('forest.rendering') if force_fetch == true
+
+        cache.get_or_set('forest.rendering') do
           data = {}
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
 
           data[:scopes] = decode_scope_permissions(response[:collections])
           data[:team] = response[:team]
+          data[:segments] = decode_segment_permissions(response[:collections])
+          data[:charts] = decode_charts_permissions(response[:stats])
 
           data
         end
@@ -263,6 +286,26 @@ module ForestAdminAgent
         end
 
         scopes
+      end
+
+      def decode_charts_permissions(raw_permissions)
+        charts = []
+
+        raw_permissions.each do |chart|
+          chart = chart.select { |_, value| !value.nil? && value != '' }
+          charts << "#{chart[:type]}:#{array_hash(chart)}"
+        end
+
+        charts
+      end
+
+      def decode_segment_permissions(raw_permissions)
+        segments = {}
+        raw_permissions.each do |collection_name, value|
+          segments[collection_name] = value[:liveQuerySegments].map { |segment| array_hash(segment) }
+        end
+
+        segments
       end
 
       def fetch(url)

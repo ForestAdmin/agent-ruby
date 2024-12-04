@@ -38,6 +38,8 @@ module ForestAdminAgent
 
         QueryValidator.valid?(args[:params][:segmentQuery])
 
+        permissions.can_execute_query_segment?(collection, args[:params][:segmentQuery], args[:params][:connectionName])
+
         ids = execute_query(
           args[:params][:segmentQuery],
           args[:params][:connectionName],

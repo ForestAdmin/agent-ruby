@@ -18,7 +18,7 @@ module ForestAdminAgent
         def handle_request(args)
           # Check if user is logged
           Utils::QueryStringParser.parse_caller(args)
-          Permissions.invalidate_cache('forest.scopes')
+          Permissions.invalidate_cache('forest.rendering')
 
           { content: nil, status: 204 }
         end
