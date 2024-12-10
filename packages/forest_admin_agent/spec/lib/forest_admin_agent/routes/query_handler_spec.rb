@@ -74,7 +74,7 @@ module ForestAdminAgent
               permission,
               caller
             )
-          end.to raise_error(UnprocessableError, "'connectionName' parameter is mandatory")
+          end.to raise_error(UnprocessableError, 'Missing native query connection attribute')
         end
 
         it 'work when passed in the querystring for list' do
@@ -116,7 +116,7 @@ module ForestAdminAgent
               caller,
               {}
             )
-          end.to raise_error(NotFoundError, "Connection named 'foo' is unknown.")
+          end.to raise_error(NotFoundError, "Native query connection 'foo' is unknown.")
         end
 
         it 'work when passed in the querystring for list' do

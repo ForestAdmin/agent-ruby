@@ -82,7 +82,7 @@ module ForestAdminDatasourceCustomizer
 
       unless root_datasource
         raise ForestAdminAgent::Http::Exceptions::NotFoundError,
-              "Connection named '#{name}' is unknown."
+              "Native query connection '#{name}' is unknown."
       end
 
       root_datasource

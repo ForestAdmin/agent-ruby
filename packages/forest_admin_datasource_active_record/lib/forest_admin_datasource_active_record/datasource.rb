@@ -32,7 +32,7 @@ module ForestAdminDatasourceActiveRecord
     def execute_native_query(connection_name, query, binds)
       unless @live_query_connections[connection_name]
         raise ForestAdminAgent::Http::Exceptions::NotFoundError,
-              "Connection named '#{connection_name}' is unknown."
+              "Native query connection '#{connection_name}' is unknown."
       end
 
       begin

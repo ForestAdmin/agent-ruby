@@ -30,7 +30,7 @@ module ForestAdminAgent
 
           QueryValidator.valid?(query)
           unless args[:params][:connectionName]
-            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "'connectionName' parameter is mandatory"
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
           end
 
           @permissions.can_chart?(args[:params])
