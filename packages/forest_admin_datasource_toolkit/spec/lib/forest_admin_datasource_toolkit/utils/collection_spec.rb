@@ -227,7 +227,7 @@ module ForestAdminDatasourceToolkit
 
         it 'get_field_schema should work with simple column' do
           expect(described_class.get_field_schema(collection_person, 'name'))
-            .eql?(ColumnSchema.new(column_type: PrimitiveType::STRING))
+            .to eq(ColumnSchema.new(column_type: PrimitiveType::STRING))
         end
 
         it 'get_field_schema should throw with unknown relation:column' do
@@ -246,7 +246,7 @@ module ForestAdminDatasourceToolkit
 
         it 'get_field_schema should work with relation column' do
           expect(described_class.get_field_schema(collection_book_person, 'myPerson:name'))
-            .eql?(ColumnSchema.new(column_type: PrimitiveType::STRING))
+            .to eq(ColumnSchema.new(column_type: PrimitiveType::STRING))
         end
 
         it 'get_through_target should throw with invalid relation type' do

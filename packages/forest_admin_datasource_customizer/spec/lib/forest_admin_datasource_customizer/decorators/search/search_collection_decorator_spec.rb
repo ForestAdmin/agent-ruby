@@ -101,7 +101,7 @@ module ForestAdminDatasourceCustomizer
               collection = instance_double(ForestAdminDatasourceToolkit::Collection)
               search_collection_decorator = described_class.new(collection, datasource)
               filter = Filter.new(search: nil)
-              expect(search_collection_decorator.refine_filter(nil, filter)).eql?(filter)
+              expect(search_collection_decorator.refine_filter(nil, filter)).to eq(filter)
             end
           end
 
@@ -111,7 +111,7 @@ module ForestAdminDatasourceCustomizer
               search_collection_decorator = described_class.new(@collection_user, datasource)
               refined_filter = search_collection_decorator.refine_filter(caller, filter)
 
-              expect(refined_filter).eql?(Filter.new)
+              expect(refined_filter).to eq(Filter.new)
             end
           end
 
@@ -130,7 +130,7 @@ module ForestAdminDatasourceCustomizer
               filter = Filter.new(search: 'a text')
               refined_filter = search_collection_decorator.refine_filter(caller, filter)
 
-              expect(refined_filter).eql?(filter)
+              expect(refined_filter).to eq(filter)
             end
           end
 
@@ -273,11 +273,11 @@ module ForestAdminDatasourceCustomizer
                 search_collection_decorator = described_class.new(collection, nil)
 
                 refined_filter = search_collection_decorator.refine_filter(caller, filter)
-                expect(refined_filter).eql?(Filter.new(search: nil,
-                                                       condition_tree: ConditionTree::Nodes::ConditionTreeLeaf.new(
-                                                         'fieldName',
-                                                         ConditionTree::Operators::EQUAL, 'a text'
-                                                       )))
+                expect(refined_filter).to eq(Filter.new(search: nil,
+                                                        condition_tree: ConditionTree::Nodes::ConditionTreeLeaf.new(
+                                                          'fieldName',
+                                                          ConditionTree::Operators::EQUAL, 'a text'
+                                                        )))
               end
             end
 
@@ -400,7 +400,7 @@ module ForestAdminDatasourceCustomizer
                 search_collection_decorator = described_class.new(collection, nil)
 
                 refined_filter = search_collection_decorator.refine_filter(caller, filter)
-                expect(refined_filter).eql?(
+                expect(refined_filter).to eq(
                   Filter.new(
                     search: nil,
                     condition_tree: ConditionTree::Nodes::ConditionTreeLeaf.new(

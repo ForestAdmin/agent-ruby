@@ -41,7 +41,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [])).eql?(ConditionTreeBranch.new('Or', []))
+              expect(condition_tree_factory.match_records(collection, [])).to eq(ConditionTreeBranch.new('Or', []))
             end
 
             it 'generates equal with simple PK' do
@@ -52,7 +52,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }])).eql?(ConditionTreeLeaf.new('id', Operators::EQUAL, 1))
+              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }])).to eq(ConditionTreeLeaf.new('id', Operators::EQUAL, 1))
             end
 
             it 'generates "In" with simple PK' do
@@ -63,7 +63,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }, { 'id' => 2 }])).eql?(ConditionTreeLeaf.new('id', Operators::IN, [1, 2]))
+              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }, { 'id' => 2 }])).to eq(ConditionTreeLeaf.new('id', Operators::IN, [1, 2]))
             end
 
             it 'generates a simple "And" with a composite PK' do
@@ -85,10 +85,10 @@ module ForestAdminDatasourceToolkit
 
               expect do
                 condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }])
-              end.eql?(ConditionTreeBranch.new('And', [
-                                                 ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                 ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
-                                               ]))
+              end.to eq(ConditionTreeBranch.new('And', [
+                                                  ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
+                                                  ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
+                                                ]))
             end
 
             it 'factorizes with a composite PK' do
@@ -110,10 +110,10 @@ module ForestAdminDatasourceToolkit
 
               expect do
                 condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 1, 'col2' => 2 }])
-              end.eql?(ConditionTreeBranch.new('And', [
-                                                 ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                 ConditionTreeLeaf.new('col2', Operators::IN, [1, 2])
-                                               ]))
+              end.to eq(ConditionTreeBranch.new('And', [
+                                                  ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
+                                                  ConditionTreeLeaf.new('col2', Operators::IN, [1, 2])
+                                                ]))
             end
 
             it 'does not factorize with a composite PK' do
@@ -135,16 +135,16 @@ module ForestAdminDatasourceToolkit
 
               expect do
                 condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 2, 'col2' => 2 }])
-              end.eql?(ConditionTreeBranch.new('Or', [
-                                                 ConditionTreeBranch.new('And', [
-                                                                           ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                                           ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
-                                                                         ]),
-                                                 ConditionTreeBranch.new('And', [
-                                                                           ConditionTreeLeaf.new('col1', Operators::EQUAL, 2),
-                                                                           ConditionTreeLeaf.new('col2', Operators::EQUAL, 2)
-                                                                         ])
-                                               ]))
+              end.to eq(ConditionTreeBranch.new('Or', [
+                                                  ConditionTreeBranch.new('And', [
+                                                                            ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
+                                                                            ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
+                                                                          ]),
+                                                  ConditionTreeBranch.new('And', [
+                                                                            ConditionTreeLeaf.new('col1', Operators::EQUAL, 2),
+                                                                            ConditionTreeLeaf.new('col2', Operators::EQUAL, 2)
+                                                                          ])
+                                                ]))
             end
           end
 
@@ -158,13 +158,13 @@ module ForestAdminDatasourceToolkit
             it 'returns the parameter when called with only one param' do
               tree = condition_tree_factory.intersect([ConditionTreeLeaf.new('column', Operators::EQUAL, true)])
 
-              expect(tree).eql?(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
+              expect(tree).to eq(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
             end
 
             it 'ignores null params' do
               tree = condition_tree_factory.intersect([nil, ConditionTreeLeaf.new('column', Operators::EQUAL, true), nil])
 
-              expect(tree).eql?(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
+              expect(tree).to eq(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
             end
 
             it 'returns multiple trees when receiving multiple trees' do
@@ -172,10 +172,10 @@ module ForestAdminDatasourceToolkit
               other_condition_tree = ConditionTreeLeaf.new('otherColumn', Operators::EQUAL, true)
               tree = condition_tree_factory.intersect([condition_tree, other_condition_tree])
 
-              expect(tree).eql?(ConditionTreeBranch.new('And', [
-                                                          ConditionTreeLeaf.new('column', Operators::EQUAL, true),
-                                                          ConditionTreeLeaf.new('otherColumn', Operators::EQUAL, true)
-                                                        ]))
+              expect(tree).to eq(ConditionTreeBranch.new('And', [
+                                                           ConditionTreeLeaf.new('column', Operators::EQUAL, true),
+                                                           ConditionTreeLeaf.new('otherColumn', Operators::EQUAL, true)
+                                                         ]))
             end
           end
 
@@ -191,7 +191,7 @@ module ForestAdminDatasourceToolkit
                 { field: 'field', operator: 'Equal', value: 'something' }
               )
 
-              expect(tree).eql?(ConditionTreeLeaf.new('field', 'Equal', 'something'))
+              expect(tree).to eq(ConditionTreeLeaf.new('field', 'Equal', 'something'))
             end
 
             it 'removes useless aggregators from the frontend' do
@@ -199,7 +199,7 @@ module ForestAdminDatasourceToolkit
                 { aggregator: 'And', conditions: [{ field: 'field', operator: 'Equal', value: 'something' }] }
               )
 
-              expect(tree).eql?(ConditionTreeLeaf.new('field', 'Equal', 'something'))
+              expect(tree).to eq(ConditionTreeLeaf.new('field', 'Equal', 'something'))
             end
 
             it 'works with an aggregator' do
@@ -213,10 +213,10 @@ module ForestAdminDatasourceToolkit
                 }
               )
 
-              expect(tree).eql?(ConditionTreeBranch.new('And', [
-                                                          ConditionTreeLeaf.new('field', 'Equal', 'something'),
-                                                          ConditionTreeLeaf.new('field', 'Equal', 'something')
-                                                        ]))
+              expect(tree).to eq(ConditionTreeBranch.new('And', [
+                                                           ConditionTreeLeaf.new('field', 'Equal', 'something'),
+                                                           ConditionTreeLeaf.new('field', 'Equal', 'something')
+                                                         ]))
             end
           end
         end

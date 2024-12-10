@@ -20,21 +20,21 @@ module ForestAdminDatasourceToolkit
 
             context 'when calling inverse method' do
               it 'works with not_equal' do
-                expect(@condition_tree_branch.inverse).eql?(
+                expect(@condition_tree_branch.inverse).to eq(
                   ConditionTreeBranch.new('Or', [
                                             ConditionTreeLeaf.new('column1', Operators::NOT_EQUAL, true),
                                             ConditionTreeLeaf.new('column2', Operators::NOT_EQUAL, true)
                                           ])
                 )
-                expect(@condition_tree_branch.inverse.inverse).eql?(@condition_tree_branch)
+                expect(@condition_tree_branch.inverse.inverse).to eq(@condition_tree_branch)
               end
 
               it 'works with blank' do
                 condition_tree_leaf = ConditionTreeLeaf.new('column1', Operators::BLANK)
-                expect(condition_tree_leaf.inverse).eql?(
+                expect(condition_tree_leaf.inverse).to eq(
                   ConditionTreeLeaf.new('column1', Operators::PRESENT)
                 )
-                expect(condition_tree_leaf.inverse.inverse).eql?(condition_tree_leaf)
+                expect(condition_tree_leaf.inverse.inverse).to eq(condition_tree_leaf)
               end
 
               it 'crashes with unsupported operator' do
@@ -46,7 +46,7 @@ module ForestAdminDatasourceToolkit
             end
 
             it 'when calling replace_leafs should work' do
-              expect(@condition_tree_branch.replace_leafs { |leaf| leaf.override(value: !leaf.value) }).eql?(
+              expect(@condition_tree_branch.replace_leafs { |leaf| leaf.override(value: !leaf.value) }).to eq(
                 ConditionTreeBranch.new('And', [
                                           ConditionTreeLeaf.new('column1', Operators::EQUAL, false),
                                           ConditionTreeLeaf.new('column2', Operators::EQUAL, false)
@@ -136,7 +136,7 @@ module ForestAdminDatasourceToolkit
             end
 
             it 'when calling for_each_leaf should work' do
-              expect(@condition_tree_branch.for_each_leaf { |leaf| leaf.override(field: 'field') }).eql?(
+              expect(@condition_tree_branch.for_each_leaf { |leaf| leaf.override(field: 'field') }).to eq(
                 ConditionTreeBranch.new('And', [
                                           ConditionTreeLeaf.new('field', Operators::EQUAL, true),
                                           ConditionTreeLeaf.new('field', Operators::EQUAL, true)
@@ -181,7 +181,7 @@ module ForestAdminDatasourceToolkit
             end
 
             it 'when calling nest should work' do
-              expect(@condition_tree_branch.nest('prefix')).eql?(
+              expect(@condition_tree_branch.nest('prefix')).to eq(
                 ConditionTreeBranch.new('And', [
                                           ConditionTreeLeaf.new('prefix:column1', Operators::EQUAL, true),
                                           ConditionTreeLeaf.new('prefix:column2', Operators::EQUAL, true)
@@ -191,13 +191,13 @@ module ForestAdminDatasourceToolkit
 
             context 'when calling unnest' do
               it 'works with conditionTreeBranch' do
-                expect(@condition_tree_branch.nest('prefix').unnest).eql?(@condition_tree_branch)
+                expect(@condition_tree_branch.nest('prefix').unnest).to eq(@condition_tree_branch)
               end
 
               it 'works with conditionTreeLeaf' do
                 @condition_tree_branch = @condition_tree_branch.nest('prefix')
                 condition_tree_leaf = @condition_tree_branch.conditions[0]
-                expect(condition_tree_leaf.unnest).eql?(ConditionTreeLeaf.new('column1', Operators::EQUAL, true))
+                expect(condition_tree_leaf.unnest).to eq(ConditionTreeLeaf.new('column1', Operators::EQUAL, true))
               end
 
               it 'throws' do
@@ -208,7 +208,7 @@ module ForestAdminDatasourceToolkit
             end
 
             it 'when calling replace_fields should work' do
-              expect(@condition_tree_branch.replace_fields { |field| "#{field}:suffix" }).eql?(
+              expect(@condition_tree_branch.replace_fields { |field| "#{field}:suffix" }).to eq(
                 ConditionTreeBranch.new('And', [
                                           ConditionTreeLeaf.new('column1:suffix', Operators::EQUAL, true),
                                           ConditionTreeLeaf.new('column2:suffix', Operators::EQUAL, true)

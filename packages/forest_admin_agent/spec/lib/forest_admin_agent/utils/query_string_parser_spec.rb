@@ -332,7 +332,7 @@ module ForestAdminAgent
             }
           }
 
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+          expect(described_class.parse_condition_tree(collection_category, args)).to eq(
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
           )
         end
@@ -350,7 +350,7 @@ module ForestAdminAgent
             }
           }
 
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+          expect(described_class.parse_condition_tree(collection_category, args)).to eq(
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174001')
           )
         end
@@ -368,7 +368,7 @@ module ForestAdminAgent
             }
           }
 
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
+          expect(described_class.parse_condition_tree(collection_category, args)).to eq(
             ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
           )
         end

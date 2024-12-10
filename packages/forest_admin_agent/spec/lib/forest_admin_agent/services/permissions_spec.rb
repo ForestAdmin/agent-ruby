@@ -523,7 +523,7 @@ module ForestAdminAgent
           }
 
           expect(@permissions.get_scope(@datasource.collections['Book']))
-            .eql?(ConditionTreeFactory.from_plain_object(scope))
+            .to eq(ConditionTreeFactory.from_plain_object(scope))
         end
 
         it 'works with substitutions' do
@@ -539,7 +539,7 @@ module ForestAdminAgent
           }
 
           expect(@permissions.get_scope(@datasource.collections['Book']))
-            .eql?(ConditionTreeFactory.from_plain_object(scope))
+            .to eq(ConditionTreeFactory.from_plain_object(scope))
         end
       end
 

@@ -20,7 +20,7 @@ module ForestAdminDatasourceToolkit
           it 'when no interval operator is present in the condition tree should not modify the condition tree' do
             leaf = ConditionTreeLeaf.new('someField', 'Like', 'someValue')
             filter = Filter.new(condition_tree: leaf)
-            expect(described_class.get_previous_period_filter(filter, timezone)).eql?(filter)
+            expect(described_class.get_previous_period_filter(filter, timezone)).to eq(filter)
           end
 
           it 'overrides baseOperator by previousOperator' do
@@ -35,7 +35,7 @@ module ForestAdminDatasourceToolkit
             operators.each do |operator|
               filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', operator[:base], 'someValue'))
               expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-                .eql?(ConditionTreeLeaf.new('someField', operator[:previous], 'someValue'))
+                .to eq(ConditionTreeLeaf.new('someField', operator[:previous], 'someValue'))
             end
           end
 
@@ -56,13 +56,13 @@ module ForestAdminDatasourceToolkit
               end_period = Time.now.in_time_zone(timezone).send(:"prev_#{operator[:unit].downcase}").send(end_)
 
               expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-                .eql?(ConditionTreeBranch.new(
-                        'And',
-                        [
-                          ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                          ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                        ]
-                      ))
+                .to eq(ConditionTreeBranch.new(
+                         'And',
+                         [
+                           ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
+                           ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
+                         ]
+                       ))
             end
           end
 
@@ -73,13 +73,13 @@ module ForestAdminDatasourceToolkit
             end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value).beginning_of_day
 
             expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-              .eql?(ConditionTreeBranch.new(
-                      'And',
-                      [
-                        ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                        ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                      ]
-                    ))
+              .to eq(ConditionTreeBranch.new(
+                       'And',
+                       [
+                         ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
+                         ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
+                       ]
+                     ))
           end
 
           it 'replaces PreviousXDays operator by a greater/less than' do
@@ -88,13 +88,13 @@ module ForestAdminDatasourceToolkit
             end_period = Time.now.in_time_zone(timezone).beginning_of_day
 
             expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-              .eql?(ConditionTreeBranch.new(
-                      'And',
-                      [
-                        ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                        ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                      ]
-                    ))
+              .to eq(ConditionTreeBranch.new(
+                       'And',
+                       [
+                         ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
+                         ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
+                       ]
+                     ))
           end
         end
 
@@ -172,7 +172,7 @@ module ForestAdminDatasourceToolkit
             base_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::EQUAL, 1))
             filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
 
-            expect(filter).eql?(
+            expect(filter).to eq(
               Filter.new(
                 condition_tree: ConditionTreeBranch.new(
                   'And',
@@ -191,7 +191,7 @@ module ForestAdminDatasourceToolkit
                                      segment: 'someSegment')
             filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
 
-            expect(filter).eql?(
+            expect(filter).to eq(
               Filter.new(
                 condition_tree: ConditionTreeBranch.new(
                   'And',
@@ -209,7 +209,7 @@ module ForestAdminDatasourceToolkit
                                      segment: 'someSegment')
             filter = described_class.make_foreign_filter(collection_book, [1], 'bookReviews', caller, base_filter)
 
-            expect(filter).eql?(
+            expect(filter).to eq(
               Filter.new(
                 condition_tree: ConditionTreeBranch.new(
                   'And',
@@ -228,7 +228,7 @@ module ForestAdminDatasourceToolkit
                                      segment: 'someSegment')
             filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
 
-            expect(filter).eql?(
+            expect(filter).to eq(
               Filter.new(
                 condition_tree: ConditionTreeBranch.new(
                   'And',
