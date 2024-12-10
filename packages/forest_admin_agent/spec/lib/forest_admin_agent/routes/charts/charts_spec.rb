@@ -492,13 +492,17 @@ module ForestAdminAgent
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             chart.handle_request(args)
 
-            expect(chart.filter).to eq(Filter.new(
-                                         condition_tree: { field: 'title', operator: Operators::EQUAL,
-                                                           value: 'FOO' }, search: nil, search_extended: nil, segment: nil, sort: nil, page: nil
-                                       ))
+            expect(chart.filter).to have_attributes(
+              condition_tree: have_attributes(field: 'title', operator: Operators::EQUAL, value: 'FOO'),
+              search: nil,
+              search_extended: nil,
+              segment: nil,
+              sort: nil,
+              page: nil
+            )
           end
 
-          it 'doeses not override the filter when there is no filter with a context variable' do
+          it 'does not override the filter when there is no filter with a context variable' do
             args[:params] = args[:params].merge({
                                                   type: 'Value',
                                                   sourceCollectionName: 'book',
@@ -509,8 +513,14 @@ module ForestAdminAgent
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
             chart.handle_request(args)
 
-            expect(chart.filter).to eq(Filter.new(condition_tree: nil, search: nil, search_extended: nil, segment: nil,
-                                                  sort: nil, page: nil))
+            expect(chart.filter).to have_attributes(
+              condition_tree: nil,
+              search: nil,
+              search_extended: nil,
+              segment: nil,
+              sort: nil,
+              page: nil
+            )
           end
         end
       end

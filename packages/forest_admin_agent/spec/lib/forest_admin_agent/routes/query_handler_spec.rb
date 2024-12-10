@@ -108,6 +108,10 @@ module ForestAdminAgent
 
       describe 'execute_query' do
         it 'raise an error when connectionName was unknown' do
+          datasource_customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
+          allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:customizer)
+            .and_return(datasource_customizer)
+
           expect do
             dummy_class.execute_query(
               'select id from user',

@@ -28,7 +28,6 @@ module ForestAdminAgent
         before do
           @root_datasource = Datasource.new
           ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@root_datasource)
-          ForestAdminAgent::Builder::AgentFactory.instance.build
           customizer = instance_double(
             ForestAdminDatasourceCustomizer::DatasourceCustomizer,
             get_root_datasource_by_connection: @root_datasource
@@ -62,8 +61,20 @@ module ForestAdminAgent
           expect(native_query.routes.length).to eq 1
         end
 
+        it 'throw an error when request does not have connectionName' do
+          args[:params][:type] = 'unknown_type'
+          args[:params][:query] = 'select * from table'
+
+          expect do
+            native_query.handle_request(args)
+          end.to raise_error(
+            ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
+          )
+        end
+
         it 'throw an error when request has a bad chart type' do
           args[:params][:type] = 'unknown_type'
+          args[:params][:connectionName] = 'primary'
           args[:params][:query] = 'select * from table'
 
           expect do
