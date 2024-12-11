@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceToolkit::Schema
+  include ForestAdminAgent::Http::Exceptions
 
   describe DatasourceCustomizer do
     let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
@@ -60,6 +61,27 @@ module ForestAdminDatasourceCustomizer
 
         expect(datasource.schema[:charts]).to include('my_chart')
         expect(datasource.render_chart(caller, 'my_chart')).to eq({ countCurrent: 10, countPrevious: nil })
+      end
+    end
+
+    context 'when using get_root_datasource_by_connection' do
+      it 'raise an error when connection is unknown' do
+        datasource_customizer = described_class.new
+
+        expect do
+          datasource_customizer.get_root_datasource_by_connection('unknown_connection')
+        end.to raise_error(NotFoundError, "Native query connection 'unknown_connection' is unknown.")
+      end
+
+      it 'return the expected datasource' do
+        datasource_customizer = described_class.new
+        first_datasource = datasource_build(live_query_connections: { 'primary' => 'primary' })
+        second_datasource = datasource_build(live_query_connections: { 'replica' => 'replica' })
+        datasource_customizer.add_datasource(first_datasource, {})
+        datasource_customizer.add_datasource(second_datasource, {})
+
+        expect(datasource_customizer.get_root_datasource_by_connection('primary'))
+          .to eq(first_datasource)
       end
     end
   end
