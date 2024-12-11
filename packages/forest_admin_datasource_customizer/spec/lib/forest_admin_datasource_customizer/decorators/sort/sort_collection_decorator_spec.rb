@@ -45,7 +45,7 @@ module ForestAdminDatasourceCustomizer
             name: 'book',
             schema: {
               fields: {
-                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
                 'author_id' => ColumnSchema.new(column_type: 'String'),
                 'author' => Relations::ManyToOneSchema.new(
                   foreign_key: 'author_id',

@@ -33,14 +33,14 @@ module ForestAdminDatasourceToolkit
           it 'works with one arg' do
             aggregation = described_class.new(operation: 'Count')
 
-            expect(aggregation.override(operation: 'Sum')).to eq(described_class.new(operation: 'Sum'))
+            expect(aggregation.override(operation: 'Sum')).to have_attributes(operation: 'Sum')
           end
 
           it 'works with all args' do
             aggregation = described_class.new(operation: 'Count')
 
             expect(aggregation.override(operation: 'Sum', field: 'aggregateField', groups: [{ field: 'groupField' }]))
-              .to eq(described_class.new(operation: 'Sum', field: 'aggregateField', groups: [{ field: 'groupField' }]))
+              .to have_attributes(operation: 'Sum', field: 'aggregateField', groups: [{ field: 'groupField' }])
           end
         end
 
@@ -177,11 +177,11 @@ module ForestAdminDatasourceToolkit
             )
 
             expect(aggregation.nest('prefix'))
-              .to eq(described_class.new(
-                       operation: 'Sum',
-                       field: 'prefix:aggregateField',
-                       groups: [{ field: 'prefix:groupField', operation: 'Week' }]
-                     ))
+              .to have_attributes(
+                operation: 'Sum',
+                field: 'prefix:aggregateField',
+                groups: [{ field: 'prefix:groupField', operation: 'Week' }]
+              )
           end
 
           it 'works with null prefix' do
@@ -192,11 +192,11 @@ module ForestAdminDatasourceToolkit
             )
 
             expect(aggregation.nest(nil))
-              .to eq(described_class.new(
-                       operation: 'Sum',
-                       field: 'aggregateField',
-                       groups: [{ field: 'groupField', operation: 'Week' }]
-                     ))
+              .to have_attributes(
+                operation: 'Sum',
+                field: 'aggregateField',
+                groups: [{ field: 'groupField', operation: 'Week' }]
+              )
           end
         end
       end

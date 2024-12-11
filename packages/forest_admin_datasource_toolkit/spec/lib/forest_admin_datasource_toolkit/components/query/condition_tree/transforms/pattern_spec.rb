@@ -16,50 +16,50 @@ module ForestAdminDatasourceToolkit
 
             it 'Contains should be rewritten' do
               expect(@pattern[Operators::CONTAINS][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                            Operators::CONTAINS, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, '%something%'))
+                                                                                            Operators::CONTAINS, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, '%something%').to_h)
             end
 
             it 'StartsWith should be rewritten' do
               expect(@pattern[Operators::STARTS_WITH][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                               Operators::STARTS_WITH, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, 'something%'))
+                                                                                               Operators::STARTS_WITH, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, 'something%').to_h)
             end
 
             it 'EndsWith should be rewritten' do
               expect(@pattern[Operators::ENDS_WITH][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                             Operators::ENDS_WITH, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, '%something'))
+                                                                                             Operators::ENDS_WITH, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::LIKE, '%something').to_h)
             end
 
             it 'I_Contains should be rewritten' do
               expect(@pattern[Operators::I_CONTAINS][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                              Operators::CONTAINS, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, '%something%'))
+                                                                                              Operators::CONTAINS, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, '%something%').to_h)
             end
 
             it 'IStartsWith should be rewritten' do
               expect(@pattern[Operators::I_STARTS_WITH][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                                 Operators::STARTS_WITH, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, 'something%'))
+                                                                                                 Operators::STARTS_WITH, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, 'something%').to_h)
             end
 
             it 'IEndsWith should be rewritten' do
               expect(@pattern[Operators::I_ENDS_WITH][0][:replacer].call(ConditionTreeLeaf.new('column',
-                                                                                               Operators::ENDS_WITH, 'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, '%something'))
+                                                                                               Operators::ENDS_WITH, 'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::I_LIKE, '%something').to_h)
             end
 
             it 'Like should be rewritten' do
               expect(@pattern[Operators::LIKE][0][:replacer].call(ConditionTreeLeaf.new('column', Operators::EQUAL,
-                                                                                        'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/'))
+                                                                                        'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/').to_h)
             end
 
             it 'ILike should be rewritten' do
               expect(@pattern[Operators::I_LIKE][0][:replacer].call(ConditionTreeLeaf.new('column', Operators::EQUAL,
-                                                                                          'something')))
-                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/i'))
+                                                                                          'something')).to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/i').to_h)
             end
           end
         end

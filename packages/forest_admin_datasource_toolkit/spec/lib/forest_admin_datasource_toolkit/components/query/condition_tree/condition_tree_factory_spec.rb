@@ -41,7 +41,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [])).to eq(ConditionTreeBranch.new('Or', []))
+              expect(condition_tree_factory.match_records(collection, [])).to have_attributes(aggregator: 'Or', conditions: [])
             end
 
             it 'generates equal with simple PK' do
@@ -52,7 +52,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }])).to eq(ConditionTreeLeaf.new('id', Operators::EQUAL, 1))
+              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }])).to have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
             end
 
             it 'generates "In" with simple PK' do
@@ -63,7 +63,7 @@ module ForestAdminDatasourceToolkit
                 is_primary_key: true
               ) })
 
-              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }, { 'id' => 2 }])).to eq(ConditionTreeLeaf.new('id', Operators::IN, [1, 2]))
+              expect(condition_tree_factory.match_records(collection, [{ 'id' => 1 }, { 'id' => 2 }])).to have_attributes(field: 'id', operator: Operators::IN, value: [1, 2])
             end
 
             it 'generates a simple "And" with a composite PK' do
@@ -83,12 +83,14 @@ module ForestAdminDatasourceToolkit
                 }
               )
 
-              expect do
-                condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }])
-              end.to eq(ConditionTreeBranch.new('And', [
-                                                  ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                  ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
-                                                ]))
+              expect(condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }]))
+                .to have_attributes(
+                  aggregator: 'And',
+                  conditions: contain_exactly(
+                    have_attributes(field: 'col1', operator: Operators::EQUAL, value: 1),
+                    have_attributes(field: 'col2', operator: Operators::EQUAL, value: 1)
+                  )
+                )
             end
 
             it 'factorizes with a composite PK' do
@@ -108,12 +110,14 @@ module ForestAdminDatasourceToolkit
                 }
               )
 
-              expect do
-                condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 1, 'col2' => 2 }])
-              end.to eq(ConditionTreeBranch.new('And', [
-                                                  ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                  ConditionTreeLeaf.new('col2', Operators::IN, [1, 2])
-                                                ]))
+              expect(condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 1, 'col2' => 2 }]))
+                .to have_attributes(
+                  aggregator: 'And',
+                  conditions: contain_exactly(
+                    have_attributes(field: 'col1', operator: Operators::EQUAL, value: 1),
+                    have_attributes(field: 'col2', operator: Operators::IN, value: [1, 2])
+                  )
+                )
             end
 
             it 'does not factorize with a composite PK' do
@@ -133,18 +137,26 @@ module ForestAdminDatasourceToolkit
                 }
               )
 
-              expect do
-                condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 2, 'col2' => 2 }])
-              end.to eq(ConditionTreeBranch.new('Or', [
-                                                  ConditionTreeBranch.new('And', [
-                                                                            ConditionTreeLeaf.new('col1', Operators::EQUAL, 1),
-                                                                            ConditionTreeLeaf.new('col2', Operators::EQUAL, 1)
-                                                                          ]),
-                                                  ConditionTreeBranch.new('And', [
-                                                                            ConditionTreeLeaf.new('col1', Operators::EQUAL, 2),
-                                                                            ConditionTreeLeaf.new('col2', Operators::EQUAL, 2)
-                                                                          ])
-                                                ]))
+              expect(condition_tree_factory.match_records(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 2, 'col2' => 2 }]))
+                .to have_attributes(
+                  aggregator: 'Or',
+                  conditions: contain_exactly(
+                    have_attributes(
+                      aggregator: 'And',
+                      conditions: contain_exactly(
+                        have_attributes(field: 'col1', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'col2', operator: Operators::EQUAL, value: 1)
+                      )
+                    ),
+                    have_attributes(
+                      aggregator: 'And',
+                      conditions: contain_exactly(
+                        have_attributes(field: 'col1', operator: Operators::EQUAL, value: 2),
+                        have_attributes(field: 'col2', operator: Operators::EQUAL, value: 2)
+                      )
+                    )
+                  )
+                )
             end
           end
 
@@ -158,13 +170,13 @@ module ForestAdminDatasourceToolkit
             it 'returns the parameter when called with only one param' do
               tree = condition_tree_factory.intersect([ConditionTreeLeaf.new('column', Operators::EQUAL, true)])
 
-              expect(tree).to eq(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
+              expect(tree).to have_attributes(field: 'column', operator: Operators::EQUAL, value: true)
             end
 
             it 'ignores null params' do
               tree = condition_tree_factory.intersect([nil, ConditionTreeLeaf.new('column', Operators::EQUAL, true), nil])
 
-              expect(tree).to eq(ConditionTreeLeaf.new('column', Operators::EQUAL, true))
+              expect(tree).to have_attributes(field: 'column', operator: Operators::EQUAL, value: true)
             end
 
             it 'returns multiple trees when receiving multiple trees' do
@@ -172,10 +184,13 @@ module ForestAdminDatasourceToolkit
               other_condition_tree = ConditionTreeLeaf.new('otherColumn', Operators::EQUAL, true)
               tree = condition_tree_factory.intersect([condition_tree, other_condition_tree])
 
-              expect(tree).to eq(ConditionTreeBranch.new('And', [
-                                                           ConditionTreeLeaf.new('column', Operators::EQUAL, true),
-                                                           ConditionTreeLeaf.new('otherColumn', Operators::EQUAL, true)
-                                                         ]))
+              expect(tree).to have_attributes(
+                aggregator: 'And',
+                conditions: contain_exactly(
+                  have_attributes(field: 'column', operator: Operators::EQUAL, value: true),
+                  have_attributes(field: 'otherColumn', operator: Operators::EQUAL, value: true)
+                )
+              )
             end
           end
 
@@ -188,18 +203,18 @@ module ForestAdminDatasourceToolkit
 
             it 'works with a simple case' do
               tree = condition_tree_factory.from_plain_object(
-                { field: 'field', operator: 'Equal', value: 'something' }
+                { field: 'field', operator: Operators::EQUAL, value: 'something' }
               )
 
-              expect(tree).to eq(ConditionTreeLeaf.new('field', 'Equal', 'something'))
+              expect(tree).to have_attributes(field: 'field', operator: Operators::EQUAL, value: 'something')
             end
 
             it 'removes useless aggregators from the frontend' do
               tree = condition_tree_factory.from_plain_object(
-                { aggregator: 'And', conditions: [{ field: 'field', operator: 'Equal', value: 'something' }] }
+                { aggregator: 'And', conditions: [{ field: 'field', operator: Operators::EQUAL, value: 'something' }] }
               )
 
-              expect(tree).to eq(ConditionTreeLeaf.new('field', 'Equal', 'something'))
+              expect(tree).to have_attributes(field: 'field', operator: Operators::EQUAL, value: 'something')
             end
 
             it 'works with an aggregator' do
@@ -207,16 +222,19 @@ module ForestAdminDatasourceToolkit
                 {
                   aggregator: 'And',
                   conditions: [
-                    { field: 'field', operator: 'Equal', value: 'something' },
-                    { field: 'field', operator: 'Equal', value: 'something' }
+                    { field: 'field', operator: Operators::EQUAL, value: 'something' },
+                    { field: 'field', operator: Operators::EQUAL, value: 'something' }
                   ]
                 }
               )
 
-              expect(tree).to eq(ConditionTreeBranch.new('And', [
-                                                           ConditionTreeLeaf.new('field', 'Equal', 'something'),
-                                                           ConditionTreeLeaf.new('field', 'Equal', 'something')
-                                                         ]))
+              expect(tree).to have_attributes(
+                aggregator: 'And',
+                conditions: contain_exactly(
+                  have_attributes(field: 'field', operator: Operators::EQUAL, value: 'something'),
+                  have_attributes(field: 'field', operator: Operators::EQUAL, value: 'something')
+                )
+              )
             end
           end
         end

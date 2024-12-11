@@ -42,10 +42,10 @@ module ForestAdminDatasourceCustomizer
           reference_records = child_filter.page.apply(reference_records) if child_filter.page
 
           # We now have the information we need to sort by the field
-          new_filter = Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_records(schema,
+          new_filter = Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_records(self,
                                                                                                     reference_records))
 
-          records = child_collection.list(caller, new_filter, projection.with_pks(self))
+          records = child_collection.list(caller, new_filter, projection.clone.with_pks(self))
           records = sort_records(reference_records, records)
 
           projection.apply(records)
@@ -89,7 +89,7 @@ module ForestAdminDatasourceCustomizer
 
         def emulated?(path)
           index = path.index(':')
-          return @sorts[path] if index.nil?
+          return @sorts.key?(path) if index.nil?
 
           foreign_collection = schema[:fields][path[0, index]].foreign_collection
           association = datasource.get_collection(foreign_collection)
@@ -101,7 +101,7 @@ module ForestAdminDatasourceCustomizer
 
         def replace_or_emulate_field_sorting(name, equivalent_sort)
           FieldValidator.validate(self, name)
-          @sorts[name] =
+          @sorts[name.to_s] =
             equivalent_sort ? ForestAdminDatasourceToolkit::Components::Query::Sort.new(equivalent_sort) : nil
           mark_schema_as_dirty
         end
@@ -111,11 +111,11 @@ module ForestAdminDatasourceCustomizer
           sorted = Array.new(records.length)
 
           reference_records.each_with_index do |record, index|
-            position_by_id[Record.primary_keys(schema, record).join('|')] = index
+            position_by_id[Record.primary_keys(self, record).join('|')] = index
           end
 
           records.each do |record|
-            id = Record.primary_keys(schema, record).join('|')
+            id = Record.primary_keys(self, record).join('|')
             sorted[position_by_id[id]] = record
           end
 
