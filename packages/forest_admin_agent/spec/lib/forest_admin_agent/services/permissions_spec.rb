@@ -365,6 +365,78 @@ module ForestAdminAgent
         end
       end
 
+      context 'when can_execute_query_segment? is called' do
+        let(:query) { 'select id from books' }
+        let(:connection_name) { 'default' }
+
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: connection_name }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+        end
+
+        it 'returns true when user is allowed' do
+          expect(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)).to be true
+        end
+
+        it 'calls get_segments to check if permissions has changed' do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: connection_name }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            ),
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: 'primary' }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+
+          expect(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'primary')).to be true
+        end
+
+        it "raise error when user doesn't have the right access" do
+          expect do
+            @permissions.can?(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'foo'))
+          end.to raise_error(ForbiddenError, "You don't have permission to use this query segment.")
+        end
+      end
+
       context 'when can_chart is called' do
         before do
           allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
