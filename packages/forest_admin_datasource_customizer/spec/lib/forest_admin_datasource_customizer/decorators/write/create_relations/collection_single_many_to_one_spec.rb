@@ -21,8 +21,8 @@ module ForestAdminDatasourceCustomizer
               name: 'price',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'value' => column_build(column_type: 'Number')
+                  'id' => build_column(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'value' => build_column(column_type: 'Number')
                 }
               }
             )
@@ -32,10 +32,10 @@ module ForestAdminDatasourceCustomizer
               name: 'person',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'name' => column_build,
-                  'price_id' => column_build(column_type: 'Uuid'),
-                  'my_price' => many_to_one_build(foreign_collection: 'price', foreign_key: 'price_id')
+                  'id' => build_column(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'name' => build_column,
+                  'price_id' => build_column(column_type: 'Uuid'),
+                  'my_price' => build_many_to_one(foreign_collection: 'price', foreign_key: 'price_id')
                 }
               }
             )
@@ -45,10 +45,10 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'title' => column_build,
-                  'author_id' => column_build(column_type: 'Uuid'),
-                  'my_author' => many_to_one_build(foreign_collection: 'person', foreign_key: 'author_id')
+                  'id' => build_column(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'title' => build_column,
+                  'author_id' => build_column(column_type: 'Uuid'),
+                  'my_author' => build_many_to_one(foreign_collection: 'person', foreign_key: 'author_id')
                 }
               }
             )

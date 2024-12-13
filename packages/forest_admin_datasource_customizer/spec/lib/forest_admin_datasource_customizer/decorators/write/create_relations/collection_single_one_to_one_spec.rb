@@ -21,9 +21,9 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'title' => column_build,
-                  'my_owner' => one_to_one_build(foreign_collection: 'owner', origin_key: 'book_id')
+                  'id' => build_column(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'title' => build_column,
+                  'my_owner' => build_one_to_one(foreign_collection: 'owner', origin_key: 'book_id')
                 }
               }
             )
@@ -32,9 +32,9 @@ module ForestAdminDatasourceCustomizer
               name: 'owner',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'book_id' => column_build(column_type: 'Uuid'),
-                  'name' => column_build
+                  'id' => build_column(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'book_id' => build_column(column_type: 'Uuid'),
+                  'name' => build_column
                 }
               }
             )

@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_category = collection_build(
+          @collection_category = build_collection(
             name: 'category',
             schema: {
               fields: {

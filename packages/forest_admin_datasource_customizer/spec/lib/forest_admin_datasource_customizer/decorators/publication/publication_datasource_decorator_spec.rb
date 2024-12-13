@@ -90,13 +90,13 @@ module ForestAdminDatasourceCustomizer
             mark_schema_as_dirty: nil
           )
 
-          @collection_address = collection_build(
+          @collection_address = build_collection(
             name: 'address',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'addressable_id' => column_build(column_type: 'Number'),
-                'addressable_type' => column_build,
+                'id' => build_numeric_primary_key,
+                'addressable_id' => build_column(column_type: 'Number'),
+                'addressable_type' => build_column,
                 'addressable' => Relations::PolymorphicManyToOneSchema.new(
                   foreign_key_type_field: 'addressable_type',
                   foreign_collections: %w[user],

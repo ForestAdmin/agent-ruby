@@ -20,10 +20,10 @@ module ForestAdminDatasourceCustomizer
               name: 'author',
               schema: {
                 fields: {
-                  'first_name' => column_build,
-                  'last_name' => column_build,
+                  'first_name' => build_column,
+                  'last_name' => build_column,
                   # This field will have a rewrite rule to alias first_name
-                  'first_name_alias' => column_build
+                  'first_name_alias' => build_column
                 }
               }
             )
@@ -33,13 +33,13 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'title' => column_build,
-                  'author_id' => column_build(column_type: 'Number'),
-                  'author' => many_to_one_build(foreign_collection: 'author', foreign_key: 'author_id'),
+                  'id' => build_numeric_primary_key,
+                  'title' => build_column,
+                  'author_id' => build_column(column_type: 'Number'),
+                  'author' => build_many_to_one(foreign_collection: 'author', foreign_key: 'author_id'),
                   # Those fields will have rewrite handler to the corresponding author fields
-                  'author_first_name' => column_build,
-                  'author_last_name' => column_build
+                  'author_first_name' => build_column,
+                  'author_last_name' => build_column
                 }
               }
             )

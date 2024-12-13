@@ -20,10 +20,10 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number'),
-                  'title' => column_build,
-                  'my_owner' => one_to_one_build(foreign_collection: 'owner', origin_key: 'book_id'),
-                  'my_format' => one_to_one_build(foreign_collection: 'format', origin_key: 'book_id')
+                  'id' => build_column(column_type: 'Number'),
+                  'title' => build_column,
+                  'my_owner' => build_one_to_one(foreign_collection: 'owner', origin_key: 'book_id'),
+                  'my_format' => build_one_to_one(foreign_collection: 'format', origin_key: 'book_id')
                 }
               }
             )
@@ -33,9 +33,9 @@ module ForestAdminDatasourceCustomizer
               name: 'owner',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number'),
-                  'name' => column_build,
-                  'book_id' => column_build(column_type: 'Number')
+                  'id' => build_column(column_type: 'Number'),
+                  'name' => build_column,
+                  'book_id' => build_column(column_type: 'Number')
                 }
               }
             )
@@ -45,9 +45,9 @@ module ForestAdminDatasourceCustomizer
               name: 'format',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number'),
-                  'name' => column_build,
-                  'book_id' => column_build(column_type: 'Number')
+                  'id' => build_column(column_type: 'Number'),
+                  'name' => build_column,
+                  'book_id' => build_column(column_type: 'Number')
                 }
               }
             )

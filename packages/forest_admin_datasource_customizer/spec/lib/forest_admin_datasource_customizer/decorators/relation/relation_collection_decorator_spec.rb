@@ -49,7 +49,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          collection_picture = collection_build(
+          collection_picture = build_collection(
             name: 'picture',
             schema: {
               fields: {
@@ -60,7 +60,7 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          collection_passport = collection_build(
+          collection_passport = build_collection(
             name: 'passport',
             schema: {
               fields: {
@@ -85,7 +85,7 @@ module ForestAdminDatasourceCustomizer
             aggregation.apply(passport_records, caller.timezone, limit)
           end
 
-          collection_person = collection_build(
+          collection_person = build_collection(
             name: 'person',
             schema: {
               fields: {

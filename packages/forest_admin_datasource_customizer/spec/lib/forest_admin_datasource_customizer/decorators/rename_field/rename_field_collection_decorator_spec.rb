@@ -29,7 +29,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_person = collection_build(
+          @collection_person = build_collection(
             name: 'person',
             schema: {
               fields: {
@@ -44,7 +44,7 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_book_person = collection_build(
+          @collection_book_person = build_collection(
             name: 'book_person',
             schema: {
               fields: {
@@ -67,7 +67,7 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_book = collection_build(
+          @collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {
@@ -90,13 +90,13 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_comment = collection_build(
+          @collection_comment = build_collection(
             name: 'comment',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'commentable_id' => column_build(column_type: 'Number'),
-                'commentable_type' => column_build,
+                'id' => build_numeric_primary_key,
+                'commentable_id' => build_column(column_type: 'Number'),
+                'commentable_type' => build_column,
                 'commentable' => Relations::PolymorphicManyToOneSchema.new(
                   foreign_key_type_field: 'commentable_type',
                   foreign_collections: %w[book],

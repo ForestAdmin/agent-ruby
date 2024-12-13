@@ -33,20 +33,20 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_favorite = collection_build(
+          @collection_favorite = build_collection(
             name: 'favorite',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'book' => many_to_one_build(foreign_key: 'book_id', foreign_collection: 'book')
+                'id' => build_numeric_primary_key,
+                'book' => build_many_to_one(foreign_key: 'book_id', foreign_collection: 'book')
               }
             }
           )
-          @collection_book = collection_build(
+          @collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {
-                'id' => column_build(
+                'id' => build_column(
                   is_primary_key: true,
                   column_type: 'Binary',
                   validations: [
@@ -56,20 +56,20 @@ module ForestAdminDatasourceCustomizer
                     { operator: Operators::NOT_EQUAL, value: BinaryHelper.hex_to_bin('1234') }
                   ]
                 ),
-                'title' => column_build,
-                'cover' => column_build(column_type: 'Binary'),
-                'author' => column_build(column_type: { 'name' => 'String', 'picture' => 'Binary', 'tags' => ['String'] })
+                'title' => build_column,
+                'cover' => build_column(column_type: 'Binary'),
+                'author' => build_column(column_type: { 'name' => 'String', 'picture' => 'Binary', 'tags' => ['String'] })
               }
             }
           )
 
-          @collection_comment = collection_build(
+          @collection_comment = build_collection(
             name: 'comment',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'commentable_id' => column_build(column_type: 'Number'),
-                'commentable_type' => column_build,
+                'id' => build_numeric_primary_key,
+                'commentable_id' => build_column(column_type: 'Number'),
+                'commentable_type' => build_column,
                 'commentable' => Relations::PolymorphicManyToOneSchema.new(
                   foreign_key_type_field: 'commentable_type',
                   foreign_collections: %w[book],

@@ -14,19 +14,19 @@ module ForestAdminDatasourceCustomizer
         include_context 'with caller'
 
         before do
-          @book = collection_build(
+          @book = build_collection(
             {
               name: 'book',
               schema: {
                 charts: ['child_chart'],
-                fields: { id: numeric_primary_key_build }
+                fields: { id: build_numeric_primary_key }
               },
               list: [{ id: 123 }],
               render_chart: { countCurrent: 1 }
             }
           )
 
-          @datasource = datasource_with_collections_build([@book])
+          @datasource = build_datasource_with_collections([@book])
           @decorated_datasource = DatasourceDecorator.new(@datasource, described_class)
           @decorated_book = @decorated_datasource.get_collection('book')
         end

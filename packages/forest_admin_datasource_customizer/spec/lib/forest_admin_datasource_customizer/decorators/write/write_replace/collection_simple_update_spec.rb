@@ -21,10 +21,10 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'name' => column_build,
-                  'age' => column_build,
-                  'price' => column_build
+                  'id' => build_numeric_primary_key,
+                  'name' => build_column,
+                  'age' => build_column,
+                  'price' => build_column
                 }
               }
             )

@@ -15,8 +15,8 @@ module ForestAdminDatasourceCustomizer
         subject(:rename_collection_decorator) { described_class }
 
         it 'return the real name when it is not renamed' do
-          datasource = datasource_with_collections_build(
-            [collection_build(name: 'foo', schema: { fields: { 'id' => numeric_primary_key_build } })]
+          datasource = build_datasource_with_collections(
+            [build_collection(name: 'foo', schema: { fields: { 'id' => build_numeric_primary_key } })]
           )
           decorated_datasource = described_class.new(datasource)
           collection = decorated_datasource.get_collection('foo')
@@ -25,8 +25,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'return the new name when it is renamed' do
-          datasource = datasource_with_collections_build(
-            [collection_build(name: 'foo', schema: { fields: { 'id' => numeric_primary_key_build } })]
+          datasource = build_datasource_with_collections(
+            [build_collection(name: 'foo', schema: { fields: { 'id' => build_numeric_primary_key } })]
           )
           decorated_datasource = described_class.new(datasource)
           decorated_datasource.rename_collection('foo', 'new_name')
@@ -39,12 +39,12 @@ module ForestAdminDatasourceCustomizer
 
         context 'with ManyToMany relation' do
           before do
-            @collection_library = collection_build(
+            @collection_library = build_collection(
               name: 'library',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'many_to_many_relation' => many_to_many_build(
+                  'id' => build_numeric_primary_key,
+                  'many_to_many_relation' => build_many_to_many(
                     foreign_collection: 'book',
                     origin_key: 'library_id',
                     through_collection: 'library_book',
@@ -54,24 +54,24 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @collection_library_book = collection_build(
+            @collection_library_book = build_collection(
               name: 'library_book',
               schema: {
                 fields: {
-                  'book_id' => numeric_primary_key_build,
-                  'library_id' => numeric_primary_key_build,
-                  'my_book' => many_to_one_build(foreign_collection: 'book', foreign_key: 'book_id'),
-                  'my_library' => many_to_one_build(foreign_collection: 'library', foreign_key: 'library_id')
+                  'book_id' => build_numeric_primary_key,
+                  'library_id' => build_numeric_primary_key,
+                  'my_book' => build_many_to_one(foreign_collection: 'book', foreign_key: 'book_id'),
+                  'my_library' => build_many_to_one(foreign_collection: 'library', foreign_key: 'library_id')
                 }
               }
             )
 
-            @collection_book = collection_build(
+            @collection_book = build_collection(
               name: 'book',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'many_to_many_relation' => many_to_many_build(
+                  'id' => build_numeric_primary_key,
+                  'many_to_many_relation' => build_many_to_many(
                     foreign_collection: 'library',
                     origin_key: 'book_id',
                     through_collection: 'library_book',
@@ -82,7 +82,7 @@ module ForestAdminDatasourceCustomizer
             )
 
             @datasource = described_class.new(
-              datasource_with_collections_build(
+              build_datasource_with_collections(
                 [
                   @collection_book,
                   @collection_library_book,
@@ -153,28 +153,28 @@ module ForestAdminDatasourceCustomizer
 
         context 'with OneToOne relation' do
           before do
-            @collection_book = collection_build(
+            @collection_book = build_collection(
               name: 'book',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'owner' => one_to_one_build(foreign_collection: 'owner', origin_key: 'book_id')
+                  'id' => build_numeric_primary_key,
+                  'owner' => build_one_to_one(foreign_collection: 'owner', origin_key: 'book_id')
                 }
               }
             )
 
-            @collection_owner = collection_build(
+            @collection_owner = build_collection(
               name: 'owner',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'book_id' => column_build,
-                  'owner' => many_to_one_build(foreign_collection: 'owner', foreign_key: 'book_id')
+                  'id' => build_numeric_primary_key,
+                  'book_id' => build_column,
+                  'owner' => build_many_to_one(foreign_collection: 'owner', foreign_key: 'book_id')
                 }
               }
             )
 
-            @datasource = described_class.new(datasource_with_collections_build([@collection_book, @collection_owner]))
+            @datasource = described_class.new(build_datasource_with_collections([@collection_book, @collection_owner]))
           end
 
           describe 'rename_collection' do
@@ -194,29 +194,29 @@ module ForestAdminDatasourceCustomizer
 
         context 'with ManyToOne and OneToMany relation' do
           before do
-            @collection_book = collection_build(
+            @collection_book = build_collection(
               name: 'book',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'person_id' => column_build,
-                  'my_person' => many_to_one_build(foreign_collection: 'person', foreign_key: 'person_id')
+                  'id' => build_numeric_primary_key,
+                  'person_id' => build_column,
+                  'my_person' => build_many_to_one(foreign_collection: 'person', foreign_key: 'person_id')
                 }
               }
             )
 
-            @collection_person = collection_build(
+            @collection_person = build_collection(
               name: 'person',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'name' => column_build,
-                  'my_books' => one_to_many_build(foreign_collection: 'book', origin_key: 'id')
+                  'id' => build_numeric_primary_key,
+                  'name' => build_column,
+                  'my_books' => build_one_to_many(foreign_collection: 'book', origin_key: 'id')
                 }
               }
             )
 
-            @datasource = described_class.new(datasource_with_collections_build([@collection_book, @collection_person]))
+            @datasource = described_class.new(build_datasource_with_collections([@collection_book, @collection_person]))
           end
 
           describe 'rename_collection' do
@@ -236,12 +236,12 @@ module ForestAdminDatasourceCustomizer
 
         context 'with Polymorphic relation' do
           before do
-            @collection_user = collection_build(
+            @collection_user = build_collection(
               name: 'user',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'email' => column_build,
+                  'id' => build_numeric_primary_key,
+                  'email' => build_column,
                   'address' => Relations::PolymorphicOneToOneSchema.new(
                     origin_key: 'addressable_id',
                     foreign_collection: 'address',
@@ -253,12 +253,12 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @collection_address = collection_build(
+            @collection_address = build_collection(
               name: 'address',
               schema: {
                 fields: {
-                  'id' => numeric_primary_key_build,
-                  'book_id' => column_build,
+                  'id' => build_numeric_primary_key,
+                  'book_id' => build_column,
                   'addressable' => Relations::PolymorphicManyToOneSchema.new(
                     foreign_key_type_field: 'addressable_type',
                     foreign_collections: ['user'],
@@ -269,7 +269,7 @@ module ForestAdminDatasourceCustomizer
               }
             )
 
-            @datasource = described_class.new(datasource_with_collections_build([@collection_user, @collection_address]))
+            @datasource = described_class.new(build_datasource_with_collections([@collection_user, @collection_address]))
           end
 
           describe 'rename_collection' do
