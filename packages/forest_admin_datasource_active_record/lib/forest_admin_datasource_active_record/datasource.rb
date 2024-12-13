@@ -15,7 +15,7 @@ module ForestAdminDatasourceActiveRecord
       @models = []
       @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}
-      @db_connections = {}
+      @connection_drivers = {}
 
       @live_query_connections = if live_query_connections.is_a?(String)
                                   { live_query_connections => 'primary' }
@@ -37,15 +37,22 @@ module ForestAdminDatasourceActiveRecord
 
       begin
         connection = @live_query_connections[connection_name]
-        result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym })
-                                   .first
-                                   .connection
+
+        result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first.connection
                                    .exec_query(query, 'SQL Native Query', binds)
 
         ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
       rescue StandardError => e
         raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
               "Error when executing SQL query: '#{e.full_message}'"
+      end
+    end
+
+    def generate_bind_symbol(connection_name, binds)
+      if @connection_drivers[@live_query_connections[connection_name]] == 'postgresql'
+        "$#{binds.size + 1}"
+      else
+        '?'
       end
     end
 
@@ -83,9 +90,13 @@ module ForestAdminDatasourceActiveRecord
       configurations = ActiveRecord::Base.configurations
                                          .configurations
                                          .group_by(&:env_name)
-                                         .transform_values { |configs| configs.map(&:name) }
+                                         .transform_values do |configs|
+        configs.to_h do |config|
+          [config.name, config.adapter]
+        end
+      end.to_h
 
-      @db_connections = configurations[current_config]
+      @connection_drivers = configurations[current_config]
     end
 
     def build_habtm(model)
