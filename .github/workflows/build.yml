@@ -19,6 +19,7 @@ jobs:
           - forest_admin_datasource_active_record
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
+          - forest_admin_test_toolkit
           - forest_admin_rails
 
     steps:
@@ -53,6 +54,7 @@ jobs:
           - forest_admin_datasource_active_record
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
+          - forest_admin_test_toolkit
           - forest_admin_rails
     steps:
       - name: Checkout
@@ -100,7 +102,7 @@ jobs:
             ${{github.workspace}}/reports/forest_admin_agent/coverage.json:simplecov
             ${{github.workspace}}/reports/forest_admin_datasource_active_record/coverage.json:simplecov
             ${{github.workspace}}/reports/forest_admin_datasource_toolkit/coverage.json:simplecov
-#            ${{github.workspace}}/reports/forest_admin_rails/coverage.json:simplecov
+          #            ${{github.workspace}}/reports/forest_admin_rails/coverage.json:simplecov
           debug: true
 
   deploy:
