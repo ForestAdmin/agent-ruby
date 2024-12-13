@@ -1,3 +1,10 @@
+# [1.0.0-beta.83](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.82...v1.0.0-beta.83) (2024-12-13)
+
+
+### Features
+
+* add package to provide test tools  ([#88](https://github.com/ForestAdmin/agent-ruby/issues/88)) ([6e15882](https://github.com/ForestAdmin/agent-ruby/commit/6e15882e3dd8e8976d2de5de176c0c07d4faee46))
+
 # [1.0.0-beta.82](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.81...v1.0.0-beta.82) (2024-12-04)
 
 

@@ -1,3 +1,3 @@
 module ForestAdminRails
-  VERSION = "1.0.0-beta.82"
+  VERSION = "1.0.0-beta.83"
 end
