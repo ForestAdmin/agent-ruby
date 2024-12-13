@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
+
 require 'json'
 
 module ForestAdminAgent
@@ -28,7 +28,7 @@ module ForestAdminAgent
 
         describe 'nominal case' do
           before do
-            datasource = datasource_build(
+            datasource = build_datasource(
               schema: { charts: ['my_chart'] },
               render_chart: { countCurrent: 12 }
             )

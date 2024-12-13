@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminAgent
   module Routes
@@ -51,7 +50,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_address = collection_build(
+            collection_address = build_collection(
               name: 'address',
               schema: {
                 fields: {

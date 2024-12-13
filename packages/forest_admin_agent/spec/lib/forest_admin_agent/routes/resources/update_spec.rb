@@ -1,7 +1,6 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
 
 module ForestAdminAgent
   module Routes
@@ -45,7 +44,7 @@ module ForestAdminAgent
             end
             stub_const('Book', book_class)
             @datasource = Datasource.new
-            collection = collection_build(
+            collection = build_collection(
               name: 'book',
               schema: {
                 fields: {

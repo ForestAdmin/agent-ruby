@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
+
 require 'json'
 
 module ForestAdminAgent
@@ -29,12 +29,12 @@ module ForestAdminAgent
 
         describe 'nominal case' do
           before do
-            collection = collection_build(
+            collection = build_collection(
               name: 'book',
-              schema: { charts: ['my_chart'], fields: { 'id' => numeric_primary_key_build } },
+              schema: { charts: ['my_chart'], fields: { 'id' => build_numeric_primary_key } },
               render_chart: { countCurrent: 12 }
             )
-            @datasource = datasource_with_collections_build([collection])
+            @datasource = build_datasource_with_collections([collection])
             ForestAdminAgent::Facades::Container.instance.register(:datasource, @datasource)
           end
 

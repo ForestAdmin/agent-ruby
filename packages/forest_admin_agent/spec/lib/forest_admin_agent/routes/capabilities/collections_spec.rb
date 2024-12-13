@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminAgent
   module Routes
@@ -14,7 +13,7 @@ module ForestAdminAgent
 
         before do
           datasource = Datasource.new
-          collection_user = collection_build(
+          collection_user = build_collection(
             name: 'user',
             schema: {
               fields: {
@@ -25,7 +24,7 @@ module ForestAdminAgent
             }
           )
 
-          collection_book = collection_build(
+          collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {

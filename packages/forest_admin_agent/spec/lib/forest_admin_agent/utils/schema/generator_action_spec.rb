@@ -9,7 +9,7 @@ module ForestAdminAgent
       describe GeneratorAction do
         describe 'without form' do
           before do
-            @collection = collection_build(
+            @collection = build_collection(
               schema: {
                 actions: {
                   'Send email' => BaseAction.new(scope: Types::ActionScope::SINGLE)
@@ -42,7 +42,7 @@ module ForestAdminAgent
 
         describe 'with no hooks' do
           before do
-            @collection = collection_build(
+            @collection = build_collection(
               schema: {
                 actions: {
                   'Send email' => BaseAction.new(
@@ -97,7 +97,7 @@ module ForestAdminAgent
 
         describe 'with change hooks' do
           before do
-            @collection = collection_build(
+            @collection = build_collection(
               schema: {
                 actions: {
                   'Send email' => instance_double(
@@ -135,7 +135,7 @@ module ForestAdminAgent
 
         describe 'with widget' do
           it 'set the value null to widgetEdit if no widget is specified' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
                 actions: {
                   'Send email' => instance_double(
@@ -168,7 +168,7 @@ module ForestAdminAgent
           end
 
           it 'generate the right configuration for dropdowns' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
                 actions: {
                   'Send email' => instance_double(
@@ -224,7 +224,7 @@ module ForestAdminAgent
         describe 'build_schema with layout element' do
           context 'with separator element' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Send email' => BaseAction.new(
@@ -278,7 +278,7 @@ module ForestAdminAgent
 
           context 'with html block element' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Send email' => BaseAction.new(
@@ -332,7 +332,7 @@ module ForestAdminAgent
 
           context 'with row element' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Charge credit card' => BaseAction.new(
@@ -405,7 +405,7 @@ module ForestAdminAgent
 
           context 'with page element' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Charge credit card' => BaseAction.new(
@@ -496,7 +496,7 @@ module ForestAdminAgent
 
           context 'with dynamic element' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Charge credit card' => BaseAction.new(
@@ -552,7 +552,7 @@ module ForestAdminAgent
 
           context 'with nested dynamic element in page' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Charge credit card' => BaseAction.new(
@@ -621,7 +621,7 @@ module ForestAdminAgent
 
           describe 'extract_fields_and_layout' do
             before do
-              @collection = collection_build(
+              @collection = build_collection(
                 schema: {
                   actions: {
                     'Send email' => BaseAction.new(

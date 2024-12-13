@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
+
 require 'json'
 
 module ForestAdminAgent
@@ -32,7 +32,7 @@ module ForestAdminAgent
             stub_const('Address', address_class)
 
             datasource = Datasource.new
-            collection_user = collection_build(
+            collection_user = build_collection(
               name: 'user',
               schema: {
                 fields: {
@@ -62,7 +62,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_address_user = collection_build(
+            collection_address_user = build_collection(
               name: 'address_user',
               schema: {
                 fields: {
@@ -83,7 +83,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_address = collection_build(
+            collection_address = build_collection(
               name: 'address',
               schema: {
                 fields: {
