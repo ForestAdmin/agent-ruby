@@ -22,12 +22,14 @@ module.exports = {
             'sed -i \'s/LIANA_VERSION = ".*"/LIANA_VERSION = "${nextRelease.version}"/g\' packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb; ' +
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
         successCmd:
             '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-*.gem );' +
             '( cd packages/forest_admin_datasource_active_record && gem build && gem push forest_admin_datasource_active_record-*.gem );' +
             '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-*.gem );' +
+            '( cd packages/forest_admin_test_toolkit && gem build && gem push forest_admin_test_toolkit-*.gem );' +
             '( cd packages/forest_admin_datasource_customizer && gem build && gem push forest_admin_datasource_customizer-*.gem );' +
             '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-*.gem );' ,
       },
@@ -42,6 +44,7 @@ module.exports = {
           'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb',
           'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb',
           'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb',
+          'packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb',
           'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb',
           'packages/forest_admin_rails/lib/forest_admin_rails/version.rb',
           'package.json'
