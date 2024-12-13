@@ -5,6 +5,7 @@ gemspec
 group :development, :test do
   gem 'forest_admin_datasource_customizer'
   gem 'forest_admin_datasource_toolkit'
+  gem 'forest_admin_test_toolkit'
   gem 'rspec', '~> 3.0'
   gem 'simplecov', '~> 0.22', require: false
   gem 'simplecov-html', '~> 0.12.3'
