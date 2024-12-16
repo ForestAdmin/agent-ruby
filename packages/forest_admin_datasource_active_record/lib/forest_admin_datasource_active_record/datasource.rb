@@ -6,12 +6,10 @@ module ForestAdminDatasourceActiveRecord
 
     def initialize(
       db_config = {},
-      name = 'active_record',
       support_polymorphic_relations: false,
       live_query_connections: nil
     )
       super()
-      @name = name
       @models = []
       @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}

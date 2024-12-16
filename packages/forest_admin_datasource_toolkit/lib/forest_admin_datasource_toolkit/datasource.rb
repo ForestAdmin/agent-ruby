@@ -1,13 +1,11 @@
 module ForestAdminDatasourceToolkit
   class Datasource < Components::Contracts::DatasourceContract
     attr_reader :collections, :schema, :live_query_connections
-    attr_accessor :name
 
     def initialize
       super
       @schema = { charts: [] }
       @collections = {}
-      @name = nil
       @live_query_connections = {}
     end
 
