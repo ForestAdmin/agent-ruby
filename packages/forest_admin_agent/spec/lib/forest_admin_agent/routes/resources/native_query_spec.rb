@@ -370,7 +370,7 @@ module ForestAdminAgent
               }
             )
 
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ value: 10, previous: 10 }])
+            allow(@root_datasource).to receive_messages(execute_native_query: [{ value: 10, previous: 10 }], build_binding_symbol: '$1')
             native_query.handle_request(args)
 
             expect(@root_datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
