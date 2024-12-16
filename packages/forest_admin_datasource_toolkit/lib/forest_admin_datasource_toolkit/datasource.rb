@@ -32,5 +32,9 @@ module ForestAdminDatasourceToolkit
     def execute_native_query(_connection_name, _query, _binds)
       raise Exceptions::ForestException, 'this datasource do not support native query.'
     end
+
+    def build_binding_symbol(_connection_name, _binds)
+      raise Exceptions::ForestException, 'this datasource do not support native query.'
+    end
   end
 end

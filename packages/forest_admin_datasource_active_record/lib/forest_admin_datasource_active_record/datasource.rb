@@ -48,7 +48,7 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
-    def generate_bind_symbol(connection_name, binds)
+    def build_binding_symbol(connection_name, binds)
       if @connection_drivers[@live_query_connections[connection_name]] == 'postgresql'
         "$#{binds.size + 1}"
       else

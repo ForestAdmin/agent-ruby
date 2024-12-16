@@ -24,7 +24,7 @@ module ForestAdminAgent
 
           next if encountered_variables.value?(context_variable_key)
 
-          index = datasource.generate_bind_symbol(connection_name, encountered_variables)
+          index = datasource.build_binding_symbol(connection_name, encountered_variables)
           query_with_context_variables_injected.gsub!(
             /{{#{context_variable_key}}}/,
             index

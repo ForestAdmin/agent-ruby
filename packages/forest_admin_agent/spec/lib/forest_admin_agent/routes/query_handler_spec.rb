@@ -12,7 +12,7 @@ module ForestAdminAgent
       include_context 'with caller'
 
       let(:dummy_class) { Class.new { extend QueryHandler } }
-      let(:datasource) { datasource_build(execute_native_query: [{ id: 1 }, { id: 2 }]) }
+      let(:datasource) { datasource_build(execute_native_query: [{ id: 1 }, { id: 2 }], build_binding_symbol: '$1') }
 
       let(:permission) do
         instance_double(
