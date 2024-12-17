@@ -5,7 +5,7 @@ module ForestAdminDatasourceCustomizer
 
       attr_reader :datasource, :schema, :search, :early_computed, :late_computed, :action, :relation, :late_op_emulate,
                   :early_op_emulate, :validation, :sort, :rename_field, :publication, :write, :chart, :hook, :segment,
-                  :binary, :override
+                  :binary, :override, :lazy_join
 
       def initialize(datasource)
         @customizations = []
@@ -19,6 +19,8 @@ module ForestAdminDatasourceCustomizer
         last = @early_op_emulate = DatasourceDecorator.new(last, OperatorsEmulate::OperatorsEmulateCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
         last = @relation = DatasourceDecorator.new(last, Relation::RelationCollectionDecorator)
+        # lazy join is just before relation, to avoid relations to do useless stuff
+        last = @lazy_join = DatasourceDecorator.new(last, LazyJoin::LazyJoinCollectionDecorator)
         last = @late_computed = DatasourceDecorator.new(last, Computed::ComputeCollectionDecorator)
         last = @late_op_emulate = DatasourceDecorator.new(last, OperatorsEmulate::OperatorsEmulateCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
