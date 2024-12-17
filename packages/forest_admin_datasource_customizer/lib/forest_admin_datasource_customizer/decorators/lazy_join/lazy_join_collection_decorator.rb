@@ -19,7 +19,7 @@ module ForestAdminDatasourceCustomizer
           filter&.override(
             condition_tree: filter.condition_tree&.replace_leafs do |leaf|
               if useless_join?(leaf.field.split(':')[0], filter.condition_tree.projection)
-                leaf.override(field: get_foreign_key_for_projection(leaf))
+                leaf.override(field: get_foreign_key_for_projection(leaf.field))
               else
                 leaf
               end
@@ -38,7 +38,7 @@ module ForestAdminDatasourceCustomizer
 
         def useless_join?(relation_name, projection)
           relation_schema = schema[:fields][relation_name]
-          sub_projection = projection.relation[relation_name]
+          sub_projection = projection.relations[relation_name]
 
           relation_schema.type == 'ManyToOne' &&
             sub_projection.size == 1 &&
@@ -58,6 +58,8 @@ module ForestAdminDatasourceCustomizer
             fk_field = get_foreign_key_for_projection("#{relation_name}:#{relation_projection[0]}")
             new_projection << fk_field
           end
+
+          new_projection
         end
 
         def apply_joins_on_records(initial_projection, requested_projection, records)
@@ -70,10 +72,10 @@ module ForestAdminDatasourceCustomizer
 
           records.each do |record|
             # add to records relation:id
-            projections_to_add.each do |relation_name, relation_projection|
+            projections_to_add.relations.each do |relation_name, relation_projection|
               relation_schema = schema[:fields][relation_name]
 
-              if relation_schema.type == 'ManyToOne'
+              if relation_schema && relation_schema.type == 'ManyToOne'
                 fk_value = record[get_foreign_key_for_projection("#{relation_name}:#{relation_projection[0]}")]
                 record[relation_name] = fk_value.nil? ? nil : { relation_projection[0] => fk_value }
               end
