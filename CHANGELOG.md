@@ -1,3 +1,5 @@
+# [1.0.0-beta.85](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.84...v1.0.0-beta.85) (2024-12-19)
+
 # [1.0.0-beta.84](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.83...v1.0.0-beta.84) (2024-12-19)
 
 
