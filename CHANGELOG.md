@@ -1,3 +1,10 @@
+# [1.0.0-beta.84](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.83...v1.0.0-beta.84) (2024-12-19)
+
+
+### Features
+
+* **capabilities:** add native query support ([#86](https://github.com/ForestAdmin/agent-ruby/issues/86)) ([88213ae](https://github.com/ForestAdmin/agent-ruby/commit/88213ae41a0c43fd82b1bf815fc0806ff568ce4e))
+
 # [1.0.0-beta.83](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.82...v1.0.0-beta.83) (2024-12-13)
 
 
