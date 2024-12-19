@@ -1,10 +1,11 @@
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
-    attr_reader :stack
+    attr_reader :stack, :datasources
 
     def initialize(_db_config = {})
       @composite_datasource = ForestAdminDatasourceToolkit::Datasource.new
       @stack = Decorators::DecoratorsStack.new(@composite_datasource)
+      @datasources = []
     end
 
     def schema
@@ -46,6 +47,8 @@ module ForestAdminDatasourceCustomizer
         end
       })
 
+      @datasources << datasource
+
       self
     end
 
@@ -70,6 +73,19 @@ module ForestAdminDatasourceCustomizer
       @stack.queue_customization(-> { @stack.publication.keep_collections_matching(nil, names) })
 
       self
+    end
+
+    def get_root_datasource_by_connection(name)
+      root_datasource = @datasources.find do |datasource|
+        datasource.live_query_connections.any? { |connection_name, _connection| connection_name == name }
+      end
+
+      unless root_datasource
+        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+              "Native query connection '#{name}' is unknown."
+      end
+
+      root_datasource
     end
 
     private

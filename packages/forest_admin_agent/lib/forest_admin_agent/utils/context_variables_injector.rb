@@ -2,6 +2,9 @@ module ForestAdminAgent
   module Utils
     class ContextVariablesInjector
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+      include ForestAdminAgent::Builder
+
+      REGEX = /{{([^}]+)}}/
 
       def self.inject_context_in_value(value, context_variables)
         inject_context_in_value_custom(value) do |context_variable_key|
@@ -9,14 +12,36 @@ module ForestAdminAgent
         end
       end
 
+      def self.inject_context_in_native_query(connection_name, query, context_variables)
+        return query unless query.is_a?(String)
+
+        query_with_context_variables_injected = query
+        encountered_variables = {}
+        datasource = AgentFactory.instance.customizer.get_root_datasource_by_connection(connection_name)
+
+        while (match = REGEX.match(query_with_context_variables_injected))
+          context_variable_key = match[1]
+
+          next if encountered_variables.value?(context_variable_key)
+
+          index = datasource.build_binding_symbol(connection_name, encountered_variables)
+          query_with_context_variables_injected.gsub!(
+            /{{#{context_variable_key}}}/,
+            index
+          )
+          encountered_variables[index] = context_variables.get_value(context_variable_key)
+        end
+
+        [query_with_context_variables_injected, encountered_variables]
+      end
+
       def self.inject_context_in_value_custom(value)
         return value unless value.is_a?(String)
 
         value_with_context_variables_injected = value
-        regex = /{{([^}]+)}}/
         encountered_variables = []
 
-        while (match = regex.match(value_with_context_variables_injected))
+        while (match = REGEX.match(value_with_context_variables_injected))
           context_variable_key = match[1]
 
           unless encountered_variables.include?(context_variable_key)

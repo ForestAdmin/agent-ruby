@@ -41,7 +41,7 @@ module ForestAdminAgent
           it 'call the invalidate_cache method' do
             scope_invalidation.handle_request(args)
 
-            expect(permissions).to have_received(:invalidate_cache).with('forest.scopes')
+            expect(permissions).to have_received(:invalidate_cache).with('forest.rendering')
           end
         end
       end

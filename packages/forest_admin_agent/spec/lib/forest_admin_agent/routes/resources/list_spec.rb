@@ -51,7 +51,21 @@ module ForestAdminAgent
           allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo', 'foo')])
 
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: nil)
+          allow(permissions).to receive_messages(
+            can?: true,
+            get_scope: nil,
+            get_user_data: {
+              id: 1,
+              firstName: 'John',
+              lastName: 'Doe',
+              fullName: 'John Doe',
+              email: 'johndoe@forestadmin.com',
+              tags: { 'foo' => 'bar' },
+              roleId: 1,
+              permissionLevel: 'admin'
+            },
+            get_team: { id: 100, name: 'Operations' }
+          )
         end
 
         it 'adds the route forest_list' do

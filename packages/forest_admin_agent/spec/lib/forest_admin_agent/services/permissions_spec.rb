@@ -365,6 +365,78 @@ module ForestAdminAgent
         end
       end
 
+      context 'when can_execute_query_segment? is called' do
+        let(:query) { 'select id from books' }
+        let(:connection_name) { 'default' }
+
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: connection_name }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+        end
+
+        it 'returns true when user is allowed' do
+          expect(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)).to be true
+        end
+
+        it 'calls get_segments to check if permissions has changed' do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: connection_name }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            ),
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => [{ query: query, connectionName: 'primary' }]
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+
+          expect(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'primary')).to be true
+        end
+
+        it "raise error when user doesn't have the right access" do
+          expect do
+            @permissions.can?(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'foo'))
+          end.to raise_error(ForbiddenError, "You don't have permission to use this query segment.")
+        end
+      end
+
       context 'when can_chart is called' do
         before do
           allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
@@ -374,7 +446,8 @@ module ForestAdminAgent
                               'collections' => {
                                 'Book' => {
                                   'scope' => nil,
-                                  'segments' => []
+                                  'segments' => [],
+                                  'liveQuerySegments' => []
                                 }
                               },
                               'stats' => [
@@ -425,9 +498,12 @@ module ForestAdminAgent
 
           allow(@permissions).to receive(:fetch).and_return(
             {
-              stats: []
+              collections: {},
+              stats: [],
+              team: {}
             },
             {
+              collections: {},
               stats: [
                 {
                   type: 'Pie',
@@ -437,7 +513,8 @@ module ForestAdminAgent
                   aggregateFieldName: nil,
                   sourceCollectionName: 'Book'
                 }
-              ]
+              ],
+              team: {}
             }
           )
 
@@ -452,7 +529,13 @@ module ForestAdminAgent
             type: 'Pie'
           }
 
-          allow(@permissions).to receive(:fetch).and_return({ stats: [] })
+          allow(@permissions).to receive(:fetch).and_return(
+            {
+              collections: {},
+              stats: [],
+              team: {}
+            }
+          )
 
           expect do
             @permissions.can_chart?(args[:params])
@@ -462,45 +545,25 @@ module ForestAdminAgent
       end
 
       context 'when get_scope is called' do
-        let(:scope) { nil }
-
-        before do
-          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
-            instance_double(Faraday::Response,
-                            status: 200,
-                            body: {
-                              'collections' => {
-                                'Book' => {
-                                  'scope' => scope,
-                                  'segments' => []
-                                }
-                              },
-                              'stats' => [
-                                {
-                                  'type' => 'Pie',
-                                  'filter' => nil,
-                                  'aggregator' => 'Count',
-                                  'groupByFieldName' => 'id',
-                                  'aggregateFieldName' => nil,
-                                  'sourceCollectionName' => 'Book'
-                                },
-                                {
-                                  'type' => 'Value',
-                                  'filter' => nil,
-                                  'aggregator' => 'Count',
-                                  'aggregateFieldName' => nil,
-                                  'sourceCollectionName' => 'Book'
-                                }
-                              ],
-                              'team' => {
-                                'id' => 1,
-                                'name' => 'Operations'
-                              }
-                            }.to_json)
-          )
-        end
-
         it 'returns nil when permission has no scopes' do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => nil,
+                    'segments' => [],
+                    'liveQuerySegments' => []
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+
           fake_collection = instance_double(Collection, name: 'FakeCollection')
           expect(@permissions.get_scope(fake_collection)).to be_nil
         end
@@ -521,25 +584,69 @@ module ForestAdminAgent
               }
             ]
           }
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => scope,
+                    'segments' => [],
+                    'liveQuerySegments' => []
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
 
-          expect(@permissions.get_scope(@datasource.collections['Book']))
-            .eql?(ConditionTreeFactory.from_plain_object(scope))
+          expect(@permissions.get_scope(@datasource.collections['Book']).to_h)
+            .to eq(ConditionTreeFactory.from_plain_object(scope).to_h)
         end
 
         it 'works with substitutions' do
-          scope = {
-            aggregator: 'and',
-            conditions: [
-              {
-                field: 'id',
-                operator: 'equal',
-                value: '{{currentUser.id}}'
-              }
-            ]
-          }
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => {
+                      aggregator: 'and',
+                      conditions: [
+                        {
+                          field: 'id',
+                          operator: 'equal',
+                          value: '{{currentUser.id}}'
+                        }
+                      ]
+                    },
+                    'segments' => [],
+                    'liveQuerySegments' => []
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
 
-          expect(@permissions.get_scope(@datasource.collections['Book']))
-            .eql?(ConditionTreeFactory.from_plain_object(scope))
+          expect(@permissions.get_scope(@datasource.collections['Book']).to_h)
+            .to eq(ConditionTreeFactory.from_plain_object(
+              {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    operator: 'equal',
+                    value: '1'
+                  }
+                ]
+              }
+            ).to_h)
         end
       end
 

@@ -384,7 +384,7 @@ module ForestAdminDatasourceCustomizer
         sort_collection = @datasource_customizer.stack.sort.get_collection('person')
 
         expect(sort_collection.sorts).to have_key('name')
-        expect(sort_collection.emulated?('name')).to be_nil
+        expect(sort_collection.emulated?('name')).to be(true)
       end
     end
 

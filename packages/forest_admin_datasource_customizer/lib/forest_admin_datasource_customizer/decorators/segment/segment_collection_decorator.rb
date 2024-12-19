@@ -25,34 +25,37 @@ module ForestAdminDatasourceCustomizer
           sub_schema
         end
 
-        def refine_filter(caller, filter = nil)
+        def refine_filter(_caller, filter = nil)
           return nil unless filter
 
           condition_tree = filter.condition_tree
           segment = filter.segment
-
           if segment && @segments.key?(segment)
-            definition = @segments[segment]
-
-            result = if definition.respond_to? :call
-                       definition.call(Context::CollectionCustomizationContext.new(self, caller))
-                     else
-                       definition
-                     end
-
-            condition_tree_segment = if result.is_a? Nodes::ConditionTree
-                                       result
-                                     else
-                                       ConditionTreeFactory.from_plain_object(result)
-                                     end
-
-            ConditionTreeValidator.validate(condition_tree_segment, self)
-
-            condition_tree = ConditionTreeFactory.intersect([condition_tree_segment, filter.condition_tree])
+            condition_tree = compute_segment(segment, filter)
             segment = nil
           end
 
           filter.override(condition_tree: condition_tree, segment: segment)
+        end
+
+        def compute_segment(segment_name, filter)
+          definition = @segments[segment_name]
+
+          result = if definition.respond_to? :call
+                     definition.call(Context::CollectionCustomizationContext.new(self, caller))
+                   else
+                     definition
+                   end
+
+          condition_tree_segment = if result.is_a? Nodes::ConditionTree
+                                     result
+                                   else
+                                     ConditionTreeFactory.from_plain_object(result)
+                                   end
+
+          ConditionTreeValidator.validate(condition_tree_segment, self)
+
+          ConditionTreeFactory.intersect([condition_tree_segment, filter.condition_tree])
         end
       end
     end

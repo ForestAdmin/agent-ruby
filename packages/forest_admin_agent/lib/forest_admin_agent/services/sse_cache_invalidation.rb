@@ -8,7 +8,7 @@ module ForestAdminAgent
       MESSAGE_CACHE_KEYS = {
         'refresh-users': %w[forest.users],
         'refresh-roles': %w[forest.collections],
-        'refresh-renderings': %w[forest.collections forest.stats forest.scopes]
+        'refresh-renderings': %w[forest.collections forest.rendering]
         # TODO: add one for ip whitelist when server implement it
       }.freeze
 

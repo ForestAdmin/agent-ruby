@@ -14,7 +14,7 @@ module ForestAdminDatasourceToolkit
             def self.compare(operator)
               {
                 depends_on: [operator],
-                for_types: ['Date', 'Dateonly'],
+                for_types: %w[Date Dateonly],
                 replacer: proc { |leaf, tz|
                   leaf.override(operator: operator, value: format(yield(Time.now.in_time_zone(tz), leaf.value)))
                 }
@@ -24,7 +24,7 @@ module ForestAdminDatasourceToolkit
             def self.interval(start_fn, end_fn)
               {
                 depends_on: [Operators::LESS_THAN, Operators::GREATER_THAN],
-                for_types: ['Date', 'Dateonly'],
+                for_types: %w[Date Dateonly],
                 replacer: proc do |leaf, tz|
                   value_greater_than = if leaf.value.nil?
                                          format(start_fn.call(Time.now.in_time_zone(tz)))

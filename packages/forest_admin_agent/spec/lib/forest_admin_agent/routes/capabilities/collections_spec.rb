@@ -45,6 +45,9 @@ module ForestAdminAgent
           ForestAdminAgent::Builder::AgentFactory.instance.build
           @datasource = ForestAdminAgent::Facades::Container.datasource
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(datasource).to receive(:live_query_connections).and_return(
+            { 'primary_db' => 'primary', 'replica_db' => 'replica' }
+          )
         end
 
         it 'adds the route forest_list' do
@@ -69,19 +72,28 @@ module ForestAdminAgent
           it 'returns no collection' do
             expect(result[:content][:collections].length).to eq(0)
           end
+
+          it 'returns all existing native query connections' do
+            expect(result[:content][:nativeQueryConnections]).to eq(
+              [{ name: 'primary_db' }, { name: 'replica_db' }]
+            )
+          end
         end
 
         context 'when there is collectionNames in params' do
-          it 'return the collections provided in params' do
-            args = {
+          let(:args) do
+            {
               headers: { 'HTTP_AUTHORIZATION' => bearer },
               params: {
                 'collectionNames' => ['user'],
                 'timezone' => 'Europe/Paris'
               }
             }
-            result = capabilities_collections.handle_request(args)
+          end
 
+          let(:result) { capabilities_collections.handle_request(args) }
+
+          it 'return the collections provided in params' do
             expect(result[:content][:collections].length).to eq(1)
             expect(result[:content][:collections][0][:name]).to eq('user')
             fields = result[:content][:collections][0][:fields]
@@ -95,6 +107,12 @@ module ForestAdminAgent
 
             expect(fields[2]).to include(name: 'last_name', type: 'String')
             expect(fields[2][:operators]).to include('equal', 'present', 'in', 'missing')
+          end
+
+          it 'returns all existing native query connections' do
+            expect(result[:content][:nativeQueryConnections]).to eq(
+              [{ name: 'primary_db' }, { name: 'replica_db' }]
+            )
           end
         end
 

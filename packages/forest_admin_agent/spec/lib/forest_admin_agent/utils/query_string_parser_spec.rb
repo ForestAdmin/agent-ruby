@@ -328,30 +328,12 @@ module ForestAdminAgent
         it 'work when passed in the querystring for list' do
           args = {
             params: {
-              filters: '{"aggregator":"And","conditions": [{"field":"id","operator":"Equal","value":"123e4567-e89b-12d3-a456-426614174000"}]}'
+              filters: '{"aggregator":"And","conditions": [{"field":"id","operator":"equal","value":"123e4567-e89b-12d3-a456-426614174000"}]}'
             }
           }
 
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
-            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
-          )
-        end
-
-        it 'works when passed in the body for charts' do
-          args = {
-            params: {
-              data: {
-                attributes: {
-                  all_records_subset_query: {
-                    filters: '{"field":"id","operator":"Equal","value":"123e4567-e89b-12d3-a456-426614174000"}'
-                  }
-                }
-              }
-            }
-          }
-
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
-            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174001')
+          expect(described_class.parse_condition_tree(collection_category, args)).to have_attributes(
+            field: 'id', operator: 'equal', value: '123e4567-e89b-12d3-a456-426614174000'
           )
         end
 
@@ -361,15 +343,15 @@ module ForestAdminAgent
               data: {
                 attributes: {
                   all_records_subset_query: {
-                    filters: '{"field":"id","operator":"Equal","value":"123e4567-e89b-12d3-a456-426614174000"}'
+                    filters: '{"field":"id","operator":"equal","value":"123e4567-e89b-12d3-a456-426614174000"}'
                   }
                 }
               }
             }
           }
 
-          expect(described_class.parse_condition_tree(collection_category, args)).eql?(
-            ConditionTreeLeaf.new('id', 'Equal', '123e4567-e89b-12d3-a456-426614174000')
+          expect(described_class.parse_condition_tree(collection_category, args)).to have_attributes(
+            field: 'id', operator: 'equal', value: '123e4567-e89b-12d3-a456-426614174000'
           )
         end
 

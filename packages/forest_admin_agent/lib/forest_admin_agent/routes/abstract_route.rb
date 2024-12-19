@@ -8,6 +8,8 @@ module ForestAdminAgent
 
       def build(args)
         @datasource = ForestAdminAgent::Facades::Container.datasource
+        return unless args[:params]['collection_name']
+
         @collection = @datasource.get_collection(args[:params]['collection_name'])
       end
 

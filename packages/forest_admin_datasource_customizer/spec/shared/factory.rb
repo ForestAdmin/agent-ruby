@@ -8,6 +8,7 @@ module Factory
         get_collection: nil,
         add_collection: nil,
         render_chart: nil,
+        live_query_connections: {},
         **args
       }
     )

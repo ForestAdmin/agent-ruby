@@ -33,9 +33,9 @@ module ForestAdminDatasourceToolkit
                                             when Operators::TODAY
                                               leaf.override(operator: Operators::YESTERDAY)
                                             when Operators::PREVIOUS_X_DAYS
-                                              get_previous_x_days_period(leaf, timezone, 'Previous_X_Days')
+                                              get_previous_x_days_period(leaf, timezone, Operators::PREVIOUS_X_DAYS)
                                             when Operators::PREVIOUS_X_DAYS_TO_DATE
-                                              get_previous_x_days_period(leaf, timezone, 'Previous_X_Days_To_Date')
+                                              get_previous_x_days_period(leaf, timezone, Operators::PREVIOUS_X_DAYS_TO_DATE)
                                             else
                                               leaf
                                             end

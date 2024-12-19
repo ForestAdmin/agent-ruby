@@ -20,7 +20,7 @@ module ForestAdminDatasourceToolkit
           it 'when no interval operator is present in the condition tree should not modify the condition tree' do
             leaf = ConditionTreeLeaf.new('someField', 'Like', 'someValue')
             filter = Filter.new(condition_tree: leaf)
-            expect(described_class.get_previous_period_filter(filter, timezone)).eql?(filter)
+            expect(described_class.get_previous_period_filter(filter, timezone).to_h).to eq(filter.to_h)
           end
 
           it 'overrides baseOperator by previousOperator' do
@@ -34,8 +34,8 @@ module ForestAdminDatasourceToolkit
 
             operators.each do |operator|
               filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', operator[:base], 'someValue'))
-              expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-                .eql?(ConditionTreeLeaf.new('someField', operator[:previous], 'someValue'))
+              expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+                .to eq(ConditionTreeLeaf.new('someField', operator[:previous], 'someValue').to_h)
             end
           end
 
@@ -52,49 +52,68 @@ module ForestAdminDatasourceToolkit
               filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', operator[:base], 'someValue'))
               start = "beginning_of_#{operator[:unit].downcase}"
               end_ = "end_of_#{operator[:unit].downcase}"
-              start_period = Time.now.in_time_zone(timezone).send(:"prev_#{operator[:unit].downcase}").send(start)
-              end_period = Time.now.in_time_zone(timezone).send(:"prev_#{operator[:unit].downcase}").send(end_)
+              start_period = Time.now.in_time_zone(timezone)
+                                 .send(:"prev_#{operator[:unit].downcase}")
+                                 .send(start)
+                                 .to_datetime
+                                 .strftime('%Y-%m-%d %H:%M:%S')
+              end_period = Time.now.in_time_zone(timezone)
+                               .send(:"prev_#{operator[:unit].downcase}")
+                               .send(end_)
+                               .to_datetime
+                               .strftime('%Y-%m-%d %H:%M:%S')
 
-              expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-                .eql?(ConditionTreeBranch.new(
-                        'And',
-                        [
-                          ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                          ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                        ]
-                      ))
+              expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+                .to eq(ConditionTreeBranch.new(
+                  'And',
+                  [
+                    ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
+                    ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
+                  ]
+                ).to_h)
             end
           end
 
           it 'replaces PreviousXDaysToDate operator by a greater/less than' do
             filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_X_DAYS_TO_DATE,
                                                                       3))
-            start_period = Time.now.in_time_zone(timezone).prev_day(2 * filter.condition_tree.value).beginning_of_day
-            end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value).beginning_of_day
+            start_period = Time.now.in_time_zone(timezone).prev_day(2 * filter.condition_tree.value)
+                               .beginning_of_day
+                               .to_datetime
+                               .strftime('%Y-%m-%d %H:%M:%S')
+            end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value)
+                             .to_datetime
+                             .strftime('%Y-%m-%d %H:%M:%S')
 
-            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-              .eql?(ConditionTreeBranch.new(
-                      'And',
-                      [
-                        ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                        ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                      ]
-                    ))
+            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+              .to eq(ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
+                  ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
+                ]
+              ).to_h)
           end
 
           it 'replaces PreviousXDays operator by a greater/less than' do
             filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_X_DAYS, 3))
-            start_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value).beginning_of_day
-            end_period = Time.now.in_time_zone(timezone).beginning_of_day
+            start_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value * 2)
+                               .beginning_of_day
+                               .to_datetime
+                               .strftime('%Y-%m-%d %H:%M:%S')
+            end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value)
+                             .beginning_of_day
+                             .to_datetime
+                             .strftime('%Y-%m-%d %H:%M:%S')
 
-            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree)
-              .eql?(ConditionTreeBranch.new(
-                      'And',
-                      [
-                        ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period.to_datetime),
-                        ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period.to_datetime)
-                      ]
-                    ))
+            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+              .to eq(ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
+                  ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
+                ]
+              ).to_h)
           end
         end
 
@@ -140,7 +159,7 @@ module ForestAdminDatasourceToolkit
             collection.add_fields(
               {
                 'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
-                'review_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                'review_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::PRESENT]),
                 'review' => ManyToOneSchema.new(
                   foreign_key: 'review_id',
                   foreign_key_target: 'id',
@@ -172,17 +191,15 @@ module ForestAdminDatasourceToolkit
             base_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::EQUAL, 1))
             filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
 
-            expect(filter).eql?(
-              Filter.new(
-                condition_tree: ConditionTreeBranch.new(
-                  'And',
-                  [
-                    ConditionTreeLeaf.new('book_id', Operators::EQUAL, value: 1),
-                    ConditionTreeLeaf.new('review_id', Operators::PRESENT),
-                    ConditionTreeLeaf.new('review:someField', Operators::EQUAL, value: 1)
-                  ]
-                )
-              )
+            expect(filter.condition_tree.to_h).to eq(
+              ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('book_id', Operators::EQUAL, 1),
+                  ConditionTreeLeaf.new('review:someField', Operators::EQUAL, 1),
+                  ConditionTreeLeaf.new('review_id', Operators::PRESENT)
+                ]
+              ).to_h
             )
           end
 
@@ -191,16 +208,14 @@ module ForestAdminDatasourceToolkit
                                      segment: 'someSegment')
             filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
 
-            expect(filter).eql?(
-              Filter.new(
-                condition_tree: ConditionTreeBranch.new(
-                  'And',
-                  [
-                    ConditionTreeLeaf.new('book_id', Operators::EQUAL, value: 1),
-                    ConditionTreeLeaf.new('review_id', Operators::IN, value: [1, 2])
-                  ]
-                )
-              )
+            expect(filter.condition_tree.to_h).to eq(
+              ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('book_id', Operators::EQUAL, 1),
+                  ConditionTreeLeaf.new('review_id', Operators::IN, [1, 2])
+                ]
+              ).to_h
             )
           end
 
@@ -209,36 +224,15 @@ module ForestAdminDatasourceToolkit
                                      segment: 'someSegment')
             filter = described_class.make_foreign_filter(collection_book, [1], 'bookReviews', caller, base_filter)
 
-            expect(filter).eql?(
-              Filter.new(
-                condition_tree: ConditionTreeBranch.new(
-                  'And',
-                  [
-                    ConditionTreeLeaf.new('someField', Operators::EQUAL, value: 1),
-                    ConditionTreeLeaf.new('book_id', Operators::EQUAL, value: 1)
-                  ]
-                ),
-                segment: 'someSegment'
-              )
-            )
-          end
-
-          it 'queries the through collection many to many' do
-            base_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::EQUAL, 1),
-                                     segment: 'someSegment')
-            filter = described_class.make_through_filter(collection_book, [1], 'reviews', caller, base_filter)
-
-            expect(filter).eql?(
-              Filter.new(
-                condition_tree: ConditionTreeBranch.new(
-                  'And',
-                  [
-                    ConditionTreeLeaf.new('someField', Operators::EQUAL, value: 1),
-                    ConditionTreeLeaf.new('book_id', Operators::IN, value: [1, 2])
-                  ]
-                ),
-                segment: 'someSegment'
-              )
+            expect(filter.segment).to eq('someSegment')
+            expect(filter.condition_tree.to_h).to eq(
+              ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('someField', Operators::EQUAL, 1),
+                  ConditionTreeLeaf.new('book_id', Operators::EQUAL, 1)
+                ]
+              ).to_h
             )
           end
         end

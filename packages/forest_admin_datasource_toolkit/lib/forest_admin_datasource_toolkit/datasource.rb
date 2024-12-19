@@ -1,11 +1,12 @@
 module ForestAdminDatasourceToolkit
   class Datasource < Components::Contracts::DatasourceContract
-    attr_reader :collections, :schema
+    attr_reader :collections, :schema, :live_query_connections
 
     def initialize
       super
       @schema = { charts: [] }
       @collections = {}
+      @live_query_connections = {}
     end
 
     def get_collection(name)
@@ -24,6 +25,14 @@ module ForestAdminDatasourceToolkit
 
     def render_chart(_caller, name)
       raise Exceptions::ForestException, "No chart named #{name} exists on this datasource."
+    end
+
+    def execute_native_query(_connection_name, _query, _binds)
+      raise Exceptions::ForestException, 'this datasource do not support native query.'
+    end
+
+    def build_binding_symbol(_connection_name, _binds)
+      raise Exceptions::ForestException, 'this datasource do not support native query.'
     end
   end
 end

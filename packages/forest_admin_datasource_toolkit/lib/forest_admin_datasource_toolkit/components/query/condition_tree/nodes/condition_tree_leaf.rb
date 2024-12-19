@@ -40,9 +40,9 @@ module ForestAdminDatasourceToolkit
 
               case @operator
               when Operators::BLANK
-                override(operator: Operators::BLANK)
-              when Operators::PRESENT
                 override(operator: Operators::PRESENT)
+              when Operators::PRESENT
+                override(operator: Operators::BLANK)
               else
                 raise ForestException, "Operator: #{@operator} cannot be inverted."
               end
@@ -133,7 +133,7 @@ module ForestAdminDatasourceToolkit
               ConditionTreeLeaf.new(
                 args[:field] || @field,
                 args[:operator] || @operator,
-                args[:value] || @value
+                args[:value].nil? ? @value : args[:value]
               )
             end
 

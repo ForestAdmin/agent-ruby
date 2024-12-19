@@ -4,13 +4,54 @@ module ForestAdminDatasourceActiveRecord
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     attr_reader :models
 
-    def initialize(db_config = {}, support_polymorphic_relations: false)
+    def initialize(
+      db_config = {},
+      support_polymorphic_relations: false,
+      live_query_connections: nil
+    )
       super()
       @models = []
       @support_polymorphic_relations = support_polymorphic_relations
       @habtm_models = {}
+      @connection_drivers = {}
+
+      @live_query_connections = if live_query_connections.is_a?(String)
+                                  { live_query_connections => 'primary' }
+                                elsif live_query_connections.is_a?(Hash)
+                                  live_query_connections
+                                else
+                                  {}
+                                end
+
       init_orm(db_config)
       generate
+    end
+
+    def execute_native_query(connection_name, query, binds)
+      unless @live_query_connections[connection_name]
+        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+              "Native query connection '#{connection_name}' is unknown."
+      end
+
+      begin
+        connection = @live_query_connections[connection_name]
+
+        result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first.connection
+                                   .exec_query(query, "SQL Native Query on '#{connection_name}'", binds)
+
+        ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
+      rescue StandardError => e
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "Error when executing SQL query: '#{e.full_message}'"
+      end
+    end
+
+    def build_binding_symbol(connection_name, binds)
+      if @connection_drivers[@live_query_connections[connection_name]] == 'postgresql'
+        "$#{binds.size + 1}"
+      else
+        '?'
+      end
     end
 
     private
@@ -43,6 +84,17 @@ module ForestAdminDatasourceActiveRecord
 
     def init_orm(db_config)
       ActiveRecord::Base.establish_connection(db_config)
+      current_config = ActiveRecord::Base.connection_db_config.env_name
+      configurations = ActiveRecord::Base.configurations
+                                         .configurations
+                                         .group_by(&:env_name)
+                                         .transform_values do |configs|
+        configs.to_h do |config|
+          [config.name, config.adapter]
+        end
+      end.to_h
+
+      @connection_drivers = configurations[current_config]
     end
 
     def build_habtm(model)

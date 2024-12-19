@@ -60,8 +60,7 @@ module ForestAdminAgent
 
         described_class.run
         expect(permissions).to have_received(:invalidate_cache).with('forest.collections')
-        expect(permissions).to have_received(:invalidate_cache).with('forest.stats')
-        expect(permissions).to have_received(:invalidate_cache).with('forest.scopes')
+        expect(permissions).to have_received(:invalidate_cache).with('forest.rendering')
       end
     end
   end
