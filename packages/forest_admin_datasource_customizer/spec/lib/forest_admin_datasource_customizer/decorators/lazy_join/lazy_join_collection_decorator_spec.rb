@@ -24,7 +24,8 @@ module ForestAdminDatasourceCustomizer
                 'id' => numeric_primary_key_build,
                 'author_id' => column_build(column_type: 'Number'),
                 'author' => many_to_one_build(foreign_collection: 'person', foreign_key: 'author_id'),
-                'title' => column_build
+                'title' => column_build,
+                'price' => column_build(column_type: 'Number')
               }
             }
           )
@@ -126,9 +127,9 @@ module ForestAdminDatasourceCustomizer
           it 'disable join on condition tree but not in projection' do
             allow(@collection_book).to receive(:list).and_return(
               [
-                { 'id' => 1, 'author' => { 'id' => 2, 'first_name' => 'Isaac' } },
-                { 'id' => 2, 'author' => { 'id' => 5, 'first_name' => 'J.K' } },
-                { 'id' => 3, 'author' => { 'id' => 5, 'first_name' => 'J.K' } }
+                { 'id' => 1, 'author' => { 'first_name' => 'Isaac' } },
+                { 'id' => 2, 'author' => { 'first_name' => 'J.K' } },
+                { 'id' => 3, 'author' => { 'first_name' => 'J.K' } }
               ]
             )
 
@@ -146,9 +147,9 @@ module ForestAdminDatasourceCustomizer
             end
             expect(result).to eq(
               [
-                { 'id' => 1, 'author' => { 'id' => 2, 'first_name' => 'Isaac' } },
-                { 'id' => 2, 'author' => { 'id' => 5, 'first_name' => 'J.K' } },
-                { 'id' => 3, 'author' => { 'id' => 5, 'first_name' => 'J.K' } }
+                { 'id' => 1, 'author' => { 'first_name' => 'Isaac' } },
+                { 'id' => 2, 'author' => { 'first_name' => 'J.K' } },
+                { 'id' => 3, 'author' => { 'first_name' => 'J.K' } }
               ]
             )
           end
@@ -193,6 +194,140 @@ module ForestAdminDatasourceCustomizer
               expect(projection).to eq(%w[id author_id])
             end
             expect(result).to eq([{ 'id' => 1, 'author' => { 'id' => 2 } }, { 'id' => 2, 'author' => nil }])
+          end
+        end
+
+        context 'when call aggregate' do
+          it 'not join on aggregate when group by foreign key' do
+            allow(@collection_book).to receive(:aggregate).and_return(
+              [
+                { 'value' => 1824.11, 'group' => { 'author_id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author_id' => 3 } }
+              ]
+            )
+
+            result = @datasource_decorator.get_collection('book').aggregate(
+              caller,
+              Filter.new,
+              Aggregation.new(operation: 'Sum', field: 'price', groups: [{ field: 'author:id' }])
+            )
+
+            expect(@collection_book).to have_received(:aggregate) do |_caller, _filter, aggregation|
+              expect(aggregation.to_h).to eq(
+                Aggregation.new(operation: 'Sum', field: 'price', groups: [{ field: 'author_id', operation: nil }]).to_h
+              )
+            end
+            expect(result).to eq(
+              [
+                { 'value' => 1824.11, 'group' => { 'author:id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author:id' => 3 } }
+              ]
+            )
+          end
+
+          it 'join on aggregate when group by foreign field' do
+            allow(@collection_book).to receive(:aggregate).and_return(
+              [
+                { 'value' => 1824.11, 'group' => { 'author:first_name' => 'Isaac' } },
+                { 'value' => 824.11, 'group' => { 'author:first_name' => 'JK' } }
+              ]
+            )
+
+            result = @datasource_decorator.get_collection('book').aggregate(
+              caller,
+              Filter.new,
+              Aggregation.new(operation: 'Sum', field: 'price', groups: [{ field: 'author:first_name' }])
+            )
+
+            expect(@collection_book).to have_received(:aggregate) do |_caller, _filter, aggregation|
+              expect(aggregation.to_h).to eq(
+                Aggregation.new(
+                  operation: 'Sum',
+                  field: 'price',
+                  groups: [{ field: 'author:first_name', operation: nil }]
+                ).to_h
+              )
+            end
+            expect(result).to eq(
+              [
+                { 'value' => 1824.11, 'group' => { 'author:first_name' => 'Isaac' } },
+                { 'value' => 824.11, 'group' => { 'author:first_name' => 'JK' } }
+              ]
+            )
+          end
+
+          it 'not join on aggregate when group by foreign pk and filter on foreign pk' do
+            allow(@collection_book).to receive(:aggregate).and_return(
+              [
+                { 'value' => 1824.11, 'group' => { 'author_id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author_id' => 3 } }
+              ]
+            )
+
+            result = @datasource_decorator.get_collection('book').aggregate(
+              caller,
+              Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('author:id', Operators::NOT_EQUAL, 50)),
+              Aggregation.new(operation: 'Sum', field: 'price', groups: [{ field: 'author:id' }])
+            )
+
+            expect(@collection_book).to have_received(:aggregate) do |_caller, filter, aggregation|
+              expect(filter.condition_tree.to_h).to eq(
+                Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 50).to_h
+              )
+              expect(aggregation.to_h).to eq(
+                Aggregation.new(
+                  operation: 'Sum',
+                  field: 'price',
+                  groups: [{ field: 'author_id', operation: nil }]
+                ).to_h
+              )
+            end
+            expect(result).to eq(
+              [
+                { 'value' => 1824.11, 'group' => { 'author:id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author:id' => 3 } }
+              ]
+            )
+          end
+
+          it 'join on aggregate when group by foreign pk and filter on foreign field' do
+            allow(@collection_book).to receive(:aggregate).and_return(
+              [
+                { 'value' => 1824.11, 'group' => { 'author_id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author_id' => 3 } }
+              ]
+            )
+
+            result = @datasource_decorator.get_collection('book').aggregate(
+              caller,
+              Filter.new(
+                condition_tree: Nodes::ConditionTreeLeaf.new(
+                  'author:first_name',
+                  Operators::NOT_EQUAL,
+                  'wrong_name'
+                )
+              ),
+              Aggregation.new(operation: 'Sum', field: 'price', groups: [{ field: 'author:id' }])
+            )
+
+            expect(@collection_book).to have_received(:aggregate) do |_caller, filter, aggregation|
+              expect(filter.condition_tree.to_h).to eq(
+                Nodes::ConditionTreeLeaf.new('author:first_name', Operators::NOT_EQUAL, 'wrong_name').to_h
+              )
+              expect(aggregation.to_h).to eq(
+                Aggregation.new(
+                  operation: 'Sum',
+                  field: 'price',
+                  groups: [{ field: 'author_id', operation: nil }]
+                ).to_h
+              )
+            end
+            expect(result).to eq(
+              [
+                { 'value' => 1824.11, 'group' => { 'author:id' => 2 } },
+                { 'value' => 824.11, 'group' => { 'author:id' => 3 } }
+              ]
+            )
           end
         end
       end
