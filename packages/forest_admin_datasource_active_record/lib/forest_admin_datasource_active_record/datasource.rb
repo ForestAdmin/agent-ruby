@@ -37,7 +37,7 @@ module ForestAdminDatasourceActiveRecord
         connection = @live_query_connections[connection_name]
 
         result = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first.connection
-                                   .exec_query(query, 'SQL Native Query', binds)
+                                   .exec_query(query, "SQL Native Query on '#{connection_name}'", binds)
 
         ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
       rescue StandardError => e

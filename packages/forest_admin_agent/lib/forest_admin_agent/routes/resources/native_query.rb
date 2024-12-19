@@ -87,9 +87,7 @@ module ForestAdminAgent
         def make_pie(result)
           return unless result.count
 
-          result.each do |result_line|
-            raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
-          end
+          raise_error(result[0], "'key', 'value'") if !result[0]&.key?(:value) || !result[0]&.key?(:key)
 
           PieChart.new(result).serialize
         end
@@ -97,9 +95,7 @@ module ForestAdminAgent
         def make_leaderboard(result)
           return unless result.count
 
-          result.each do |result_line|
-            raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
-          end
+          raise_error(result[0], "'key', 'value'") if !result[0]&.key?(:value) || !result[0]&.key?(:key)
 
           LeaderboardChart.new(result).serialize
         end

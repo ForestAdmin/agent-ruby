@@ -2,14 +2,13 @@ module ForestAdminDatasourceToolkit
   module Components
     module Query
       class Filter
-        attr_reader :condition_tree, :segment, :segment_query, :sort, :search, :search_extended, :page
+        attr_reader :condition_tree, :segment, :sort, :search, :search_extended, :page
 
         def initialize(
           condition_tree: nil,
           search: nil,
           search_extended: nil,
           segment: nil,
-          segment_query: nil,
           sort: nil,
           page: nil
         )
@@ -17,7 +16,6 @@ module ForestAdminDatasourceToolkit
           @search = search
           @search_extended = search_extended
           @segment = segment
-          @segment_query = segment_query
           @sort = sort
           @page = page
         end
@@ -28,7 +26,6 @@ module ForestAdminDatasourceToolkit
             search: @search,
             search_extended: @search_extended,
             segment: @segment,
-            segment_query: @segment_query,
             sort: @sort,
             page: @page
           }
