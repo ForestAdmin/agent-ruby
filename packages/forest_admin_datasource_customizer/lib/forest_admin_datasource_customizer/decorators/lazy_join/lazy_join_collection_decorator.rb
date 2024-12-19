@@ -14,8 +14,26 @@ module ForestAdminDatasourceCustomizer
           apply_joins_on_records(projection, simplified_projection, records)
         end
 
+        def aggregate(caller, filter, aggregation, limit = nil)
+          refined_filter = refine_filter(caller, filter)
+          replaced = {}
+          refined_aggregation = aggregation.replace_fields do |field_name|
+            if useless_join?(field_name.split(':')[0], aggregation.projection)
+              new_field_name = get_foreign_key_for_projection(field_name)
+              replaced[new_field_name] = field_name
+
+              new_field_name
+            else
+              field_name
+            end
+          end
+
+          results = child_collection.aggregate(caller, refined_filter, refined_aggregation, limit)
+
+          apply_joins_on_aggregate_result(aggregation, refined_aggregation, results, replaced)
+        end
+
         def refine_filter(_caller, filter = nil)
-          super
           filter&.override(
             condition_tree: filter.condition_tree&.replace_leafs do |leaf|
               if useless_join?(leaf.field.split(':')[0], filter.condition_tree.projection)
@@ -71,7 +89,7 @@ module ForestAdminDatasourceCustomizer
           projections_to_rm = Projection.new(requested_projection.reject { |field| initial_projection.include?(field) })
 
           records.each do |record|
-            # add to records relation:id
+            # add to record relation:id
             projections_to_add.relations.each do |relation_name, relation_projection|
               relation_schema = schema[:fields][relation_name]
 
@@ -86,6 +104,24 @@ module ForestAdminDatasourceCustomizer
           end
 
           records
+        end
+
+        def apply_joins_on_aggregate_result(initial_aggregation, requested_aggregation, results, fields_to_replace)
+          return result if initial_aggregation == requested_aggregation
+
+          results.each do |result|
+            group = {}
+            result['group'].each do |field, value|
+              if fields_to_replace.include?(field)
+                group[fields_to_replace[field]] = value
+              else
+                group[field] = value
+              end
+            end
+            result['group'] = group
+          end
+
+          results
         end
       end
     end
