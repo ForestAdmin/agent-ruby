@@ -148,7 +148,7 @@ module ForestAdminAgent
                                                   type: 'Value',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
             result = chart.handle_request(args)
 
             expect(result).to match(
@@ -175,8 +175,8 @@ module ForestAdminAgent
                                                 })
             @datasource.get_collection('book')
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
-              [{ value: 10, group: [] }], # first call
-              [{ value: 5, group: [] }] # second call
+              [{ 'value' => 10, 'group' => [] }], # first call
+              [{ 'value' => 5, 'group' => [] }] # second call
             )
             result = chart.handle_request(args)
 
@@ -203,7 +203,7 @@ module ForestAdminAgent
                                                   type: 'Objective',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
             result = chart.handle_request(args)
 
             expect(result).to match(
@@ -231,8 +231,8 @@ module ForestAdminAgent
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
-                { value: 100, group: { 'year' => 2021 } },
-                { value: 150, group: { 'year' => 2022 } }
+                { 'value' => 100, 'group' => { 'year' => 2021 } },
+                { 'value' => 150, 'group' => { 'year' => 2022 } }
               ]
             )
             result = chart.handle_request(args)
@@ -263,8 +263,8 @@ module ForestAdminAgent
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'date' => Time.parse('2022-01-03 00:00:00') } },
-                { value: 15, group: { 'date' => Time.parse('2022-01-07 00:00:00') } }
+                { 'value' => 10, 'group' => { 'date' => Time.parse('2022-01-03 00:00:00') } },
+                { 'value' => 15, 'group' => { 'date' => Time.parse('2022-01-07 00:00:00') } }
               ]
             )
             result = chart.handle_request(args)
@@ -299,8 +299,8 @@ module ForestAdminAgent
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'date' => Time.parse('2022-01-03 00:00:00') } },
-                { value: 15, group: { 'date' => Time.parse('2022-01-10 00:00:00') } }
+                { 'value' => 10, 'group' => { 'date' => Time.parse('2022-01-03 00:00:00') } },
+                { 'value' => 15, 'group' => { 'date' => Time.parse('2022-01-10 00:00:00') } }
               ]
             )
             result = chart.handle_request(args)
@@ -332,8 +332,8 @@ module ForestAdminAgent
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'date' => Time.parse('2022-01-01 00:00:00') } },
-                { value: 15, group: { 'date' => Time.parse('2022-02-01 00:00:00') } }
+                { 'value' => 10, 'group' => { 'date' => Time.parse('2022-01-01 00:00:00') } },
+                { 'value' => 15, 'group' => { 'date' => Time.parse('2022-02-01 00:00:00') } }
               ]
             )
             result = chart.handle_request(args)
@@ -365,8 +365,8 @@ module ForestAdminAgent
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'date' => Time.parse('2022-01-01 00:00:00') } },
-                { value: 15, group: { 'date' => Time.parse('2023-01-01 00:00:00') } }
+                { 'value' => 10, 'group' => { 'date' => Time.parse('2022-01-01 00:00:00') } },
+                { 'value' => 15, 'group' => { 'date' => Time.parse('2023-01-01 00:00:00') } }
               ]
             )
             result = chart.handle_request(args)
@@ -402,8 +402,8 @@ module ForestAdminAgent
             allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
             allow(@datasource.get_collection('review')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'author' => 'Isaac Asimov' } },
-                { value: 15, group: { 'author' => 'Jules Verne' } }
+                { 'value' => 10, 'group' => { 'author' => 'Isaac Asimov' } },
+                { 'value' => 15, 'group' => { 'author' => 'Jules Verne' } }
               ]
             )
             result = chart.handle_request(args)
@@ -434,8 +434,8 @@ module ForestAdminAgent
             allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
             allow(@datasource.get_collection('book_review')).to receive(:aggregate).and_return(
               [
-                { value: 10, group: { 'book:year' => 2022 } },
-                { value: 15, group: { 'book:year' => 2023 } }
+                { 'value' => 10, 'group' => { 'book:year' => 2022 } },
+                { 'value' => 15, 'group' => { 'book:year' => 2023 } }
               ]
             )
             result = chart.handle_request(args)
@@ -489,7 +489,7 @@ module ForestAdminAgent
                 timezone: 'Europe/Paris'
               }
             )
-            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
             chart.handle_request(args)
 
             expect(chart.filter).to have_attributes(
@@ -510,7 +510,7 @@ module ForestAdminAgent
                                                   aggregator: 'Count',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ value: 10, group: [] }])
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
             chart.handle_request(args)
 
             expect(chart.filter).to have_attributes(
