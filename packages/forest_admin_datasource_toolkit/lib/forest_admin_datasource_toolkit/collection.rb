@@ -25,12 +25,20 @@ module ForestAdminDatasourceToolkit
       schema[:countable] = true
     end
 
+    def enable_search
+      schema[:searchable] = true
+    end
+
     def is_countable?
       schema[:countable]
     end
 
     def is_searchable?
       schema[:searchable]
+    end
+
+    def add_segments(segments)
+      schema[:segments] = schema[:segments] | segments
     end
 
     def fields
