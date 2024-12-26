@@ -16,7 +16,7 @@ module ForestAdminDatasourceToolkit
         countable: false,
         searchable: false,
         charts: [],
-        segments: {},
+        segments: [],
         actions: {}
       }
     end
