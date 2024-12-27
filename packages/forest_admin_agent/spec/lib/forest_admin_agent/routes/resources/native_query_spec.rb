@@ -1,7 +1,6 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
 require 'json'
 
 module ForestAdminAgent

@@ -20,9 +20,12 @@ RSpec.shared_context 'with caller' do
     # TODO: improve with a build token function
     'Bearer eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjEiLCJlbWFpbCI6Im5pY29sYXNhQGZvcmVzdGFkbWluLmNvbSIsImZpcnN0X25hbWUiOiJOaWNvbGFzIiwibGFzdF9uYW1lIjoiQWxleGFuZHJlIiwidGVhbSI6Ik9wZXJhdGlvbnMiLCJ0YWdzIjpbXSwicmVuZGVyaW5nX2lkIjoxMTQsImV4cCI6MTk5ODAzNjQ0OSwicGVybWlzc2lvbl9sZXZlbCI6ImFkbWluIn0.5LFmtMqZMfinLZLGdPvTlr22YDfU-B30z7MQxlb8vng'
   end
+
+  let(:caller) { build_caller }
 end
 
 RSpec.configure do |config|
+  config.include ForestAdminTestToolkit::Factory::Caller
   config.include ForestAdminTestToolkit::Factory::Collection
   config.include ForestAdminTestToolkit::Factory::Datasource
   config.include ForestAdminTestToolkit::Factory::Column
