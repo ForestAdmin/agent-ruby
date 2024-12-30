@@ -8,11 +8,11 @@ module ForestAdminDatasourceCustomizer
         def initialize(child_collection, datasource)
           super
           @replacer = nil
-          @disable_search = get_fields(false).empty?
+          @disabled_search = get_fields(false).empty?
         end
 
         def disable_search
-          @disable_search = true
+          @disabled_search = true
         end
 
         def replace_search(replacer)
@@ -20,7 +20,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(sub_schema)
-          sub_schema.merge({ searchable: !@disable_search })
+          sub_schema.merge({ searchable: !@disabled_search })
         end
 
         def refine_filter(caller, filter)
@@ -125,7 +125,7 @@ module ForestAdminDatasourceCustomizer
 
             related.schema[:fields].each do |sub_name, sub_field|
               fields.push(["#{name}:#{sub_name}", sub_field]) if sub_field.type == 'Column' &&
-                                                                 searchable_field?(field)
+                                                                 searchable_field?(sub_field)
             end
           end
 
@@ -135,11 +135,13 @@ module ForestAdminDatasourceCustomizer
         def searchable_field?(field)
           operators = field.filter_operators
 
-          if field.type == PrimitiveType::STRING
-            return operators&.include?(Operators::EQUAL) || operators&.include?(Operators::CONTAINS)
+          if field.column_type == PrimitiveType::STRING
+            return operators&.include?(Operators::EQUAL) ||
+                   operators&.include?(Operators::CONTAINS) ||
+                   operators&.include?(Operators::I_CONTAINS)
           end
 
-          [PrimitiveType::UUID, PrimitiveType::ENUM, PrimitiveType::NUMBER].include?(field.type) &&
+          [PrimitiveType::UUID, PrimitiveType::ENUM, PrimitiveType::NUMBER].include?(field.column_type) &&
             operators&.include?(Operators::EQUAL)
         end
 
