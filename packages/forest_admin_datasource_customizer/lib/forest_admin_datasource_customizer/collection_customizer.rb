@@ -33,6 +33,13 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.search.get_collection(@name).replace_search(definition) }
     end
 
+    # Disable the search bar
+    # Example:
+    #   collection.disable_search
+    def disable_search
+      push_customization { @stack.search.get_collection(@name).disable_search }
+    end
+
     def add_field(name, definition)
       push_customization do
         collection_before_relations = @stack.early_computed.get_collection(@name)
