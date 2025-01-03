@@ -20,7 +20,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(sub_schema)
-          sub_schema[:segments] = sub_schema[:segments] | @segments.keys
+          sub_schema[:segments] = Array(sub_schema[:segments])
+          sub_schema[:segments] |= @segments.keys
 
           sub_schema
         end
