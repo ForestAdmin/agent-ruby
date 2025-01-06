@@ -1,3 +1,10 @@
+# [1.0.0-beta.87](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.86...v1.0.0-beta.87) (2025-01-06)
+
+
+### Bug Fixes
+
+* **search:** collection is not always searchable ([#92](https://github.com/ForestAdmin/agent-ruby/issues/92)) ([96824b7](https://github.com/ForestAdmin/agent-ruby/commit/96824b7c07a6497f874f076aad80dceb599b5326))
+
 # [1.0.0-beta.86](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.85...v1.0.0-beta.86) (2025-01-06)
 
 
