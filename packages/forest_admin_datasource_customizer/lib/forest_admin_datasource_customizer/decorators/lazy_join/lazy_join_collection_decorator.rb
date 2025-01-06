@@ -97,10 +97,10 @@ module ForestAdminDatasourceCustomizer
                 fk_value = record[get_foreign_key_for_projection("#{relation_name}:#{relation_projection[0]}")]
                 record[relation_name] = fk_value.nil? ? nil : { relation_projection[0] => fk_value }
               end
-
-              # remove foreign keys
-              projections_to_rm.each { |field| record.delete(field) }
             end
+
+            # remove foreign keys
+            projections_to_rm.each { |field| record.delete(field) }
           end
 
           records

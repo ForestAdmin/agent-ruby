@@ -23,7 +23,9 @@ module ForestAdminDatasourceCustomizer
               fields: {
                 'id' => numeric_primary_key_build,
                 'author_id' => column_build(column_type: 'Number'),
+                'editor_id' => column_build(column_type: 'Number'),
                 'author' => many_to_one_build(foreign_collection: 'person', foreign_key: 'author_id'),
+                'editor' => many_to_one_build(foreign_collection: 'person', foreign_key: 'editor_id'),
                 'title' => column_build,
                 'price' => column_build(column_type: 'Number')
               }
@@ -60,6 +62,28 @@ module ForestAdminDatasourceCustomizer
               expect(projection).to eq(%w[id author_id])
             end
             expect(result).to eq([{ 'id' => 1, 'author' => { 'id' => 2 } }, { 'id' => 2, 'author' => { 'id' => 5 } }])
+          end
+
+          it 'not join when projection ask for target field only with multiple relations' do
+            allow(@collection_book).to receive(:list).and_return(
+              [
+                { 'id' => 1, 'author_id' => 2, 'editor_id' => 3 },
+                { 'id' => 2, 'author_id' => 5, 'editor_id' => 4 }
+              ]
+            )
+
+            result = @datasource_decorator.get_collection('book')
+                                          .list(caller, Filter.new, Projection.new(%w[id author:id editor:id]))
+
+            expect(@collection_book).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to eq(%w[id author_id editor_id])
+            end
+            expect(result).to eq(
+              [
+                { 'id' => 1, 'author' => { 'id' => 2 }, 'editor' => { 'id' => 3 } },
+                { 'id' => 2, 'author' => { 'id' => 5 }, 'editor' => { 'id' => 4 } }
+              ]
+            )
           end
 
           it 'join when projection ask for multiple fields in foreign collection' do
