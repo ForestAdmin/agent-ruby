@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Search
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Schema
 
@@ -70,10 +71,29 @@ module ForestAdminDatasourceCustomizer
 
         context 'when refine_schema' do
           it 'sets the schema searchable' do
-            collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+            collection = collection_build(
+              schema: {
+                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+              }
+            )
             search_collection_decorator = described_class.new(collection, datasource)
             unsearchable_schema = { searchable: false }
             expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: true })
+          end
+
+          context 'when disable search' do
+            it 'sets the schema not searchable' do
+              collection = collection_build(
+                schema: {
+                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                }
+              )
+              search_collection_decorator = described_class.new(collection, datasource)
+              unsearchable_schema = { searchable: true }
+              expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: true })
+              search_collection_decorator.disable_search
+              expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: false })
+            end
           end
         end
 
@@ -98,7 +118,11 @@ module ForestAdminDatasourceCustomizer
 
           context 'when the search value is null' do
             it 'returns the given filter to return all records' do
-              collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+              collection = collection_build(
+                schema: {
+                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                }
+              )
               search_collection_decorator = described_class.new(collection, datasource)
               filter = Filter.new(search: nil)
               expect(search_collection_decorator.refine_filter(nil, filter).to_h).to eq(filter.to_h)
@@ -121,6 +145,7 @@ module ForestAdminDatasourceCustomizer
                 ForestAdminDatasourceToolkit::Collection,
                 name: 'foo',
                 schema: {
+                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) },
                   searchable: true
                 }
               )
@@ -140,7 +165,7 @@ module ForestAdminDatasourceCustomizer
                 ForestAdminDatasourceToolkit::Collection,
                 name: 'foo',
                 schema: {
-                  fields: { id: ColumnSchema.new(column_type: 'Number', is_primary_key: true) }
+                  fields: { id: numeric_primary_key_build }
                 }
               )
               filter = Filter.new(search: 'something')
@@ -166,6 +191,7 @@ module ForestAdminDatasourceCustomizer
                   ForestAdminDatasourceToolkit::Collection,
                   name: 'foo',
                   schema: {
+                    fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) },
                     searchable: false
                   }
                 )
@@ -188,7 +214,7 @@ module ForestAdminDatasourceCustomizer
                     fields: {
                       'fieldName' => ColumnSchema.new(
                         column_type: 'String',
-                        filter_operators: [ConditionTree::Operators::I_CONTAINS]
+                        filter_operators: [Operators::I_CONTAINS]
                       )
                     }
                   }
@@ -196,11 +222,11 @@ module ForestAdminDatasourceCustomizer
 
                 filter = Filter.new(
                   search: 'a text',
-                  condition_tree: ConditionTree::Nodes::ConditionTreeBranch.new(
+                  condition_tree: Nodes::ConditionTreeBranch.new(
                     'And',
                     [
-                      ConditionTree::Nodes::ConditionTreeLeaf.new('aFieldName', ConditionTree::Operators::EQUAL,
-                                                                  'fieldValue')
+                      Nodes::ConditionTreeLeaf.new('aFieldName', Operators::EQUAL,
+                                                   'fieldValue')
                     ]
                   )
                 )
@@ -213,9 +239,9 @@ module ForestAdminDatasourceCustomizer
                   condition_tree: have_attributes(
                     aggregator: 'And',
                     conditions: [
-                      have_attributes(field: 'aFieldName', operator: ConditionTree::Operators::EQUAL,
+                      have_attributes(field: 'aFieldName', operator: Operators::EQUAL,
                                       value: 'fieldValue'),
-                      have_attributes(field: 'fieldName', operator: ConditionTree::Operators::I_CONTAINS,
+                      have_attributes(field: 'fieldName', operator: Operators::I_CONTAINS,
                                       value: 'a text')
                     ]
                   )
@@ -442,9 +468,9 @@ module ForestAdminDatasourceCustomizer
                     schema: {
                       searchable: false,
                       fields: {
-                        'fieldName' => ColumnSchema.new(
-                          column_type: 'Enum'
-                          # enum values is not defined
+                        'fieldName' => column_build(
+                          column_type: 'Enum',
+                          filter_operators: [Operators::EQUAL]
                         )
                       }
                     }
@@ -484,7 +510,7 @@ module ForestAdminDatasourceCustomizer
                   refined_filter = search_collection_decorator.refine_filter(caller, filter)
                   expect(refined_filter).to have_attributes(
                     search: nil,
-                    condition_tree: have_attributes(aggregator: 'Or', conditions: [])
+                    condition_tree: nil
                   )
                 end
               end
@@ -500,11 +526,11 @@ module ForestAdminDatasourceCustomizer
                     fields: {
                       'numberField1' => ColumnSchema.new(
                         column_type: 'Number',
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       ),
                       'numberField2' => ColumnSchema.new(
                         column_type: 'Number',
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       ),
                       'fieldNotReturned' => ColumnSchema.new(column_type: 'Uuid')
                     }
@@ -521,8 +547,8 @@ module ForestAdminDatasourceCustomizer
                   condition_tree: have_attributes(
                     aggregator: 'Or',
                     conditions: [
-                      have_attributes(field: 'numberField1', operator: ConditionTree::Operators::EQUAL, value: 1584),
-                      have_attributes(field: 'numberField2', operator: ConditionTree::Operators::EQUAL, value: 1584)
+                      have_attributes(field: 'numberField1', operator: Operators::EQUAL, value: 1584),
+                      have_attributes(field: 'numberField2', operator: Operators::EQUAL, value: 1584)
                     ]
                   )
                 )
@@ -539,7 +565,7 @@ module ForestAdminDatasourceCustomizer
                       'id' => ColumnSchema.new(
                         column_type: 'Uuid',
                         is_primary_key: true,
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       ),
                       'my_persons' => Relations::OneToOneSchema.new(
                         origin_key: 'person_id',
@@ -563,12 +589,12 @@ module ForestAdminDatasourceCustomizer
                       'book_id' => ColumnSchema.new(
                         column_type: 'Uuid',
                         is_primary_key: true,
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       ),
                       'person_id' => ColumnSchema.new(
                         column_type: 'Uuid',
                         is_primary_key: true,
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       )
                     }
                   )
@@ -582,7 +608,7 @@ module ForestAdminDatasourceCustomizer
                       'id' => ColumnSchema.new(
                         column_type: 'Uuid',
                         is_primary_key: true,
-                        filter_operators: [ConditionTree::Operators::EQUAL]
+                        filter_operators: [Operators::EQUAL]
                       )
                     }
                   )
@@ -605,13 +631,13 @@ module ForestAdminDatasourceCustomizer
                     condition_tree: have_attributes(
                       aggregator: 'Or',
                       conditions: [
-                        have_attributes(field: 'id', operator: ConditionTree::Operators::EQUAL,
+                        have_attributes(field: 'id', operator: Operators::EQUAL,
                                         value: '2d162303-78bf-599e-b197-93590ac3d315'),
-                        have_attributes(field: 'my_persons:id', operator: ConditionTree::Operators::EQUAL,
+                        have_attributes(field: 'my_persons:id', operator: Operators::EQUAL,
                                         value: '2d162303-78bf-599e-b197-93590ac3d315'),
-                        have_attributes(field: 'my_book_persons:book_id', operator: ConditionTree::Operators::EQUAL,
+                        have_attributes(field: 'my_book_persons:book_id', operator: Operators::EQUAL,
                                         value: '2d162303-78bf-599e-b197-93590ac3d315'),
-                        have_attributes(field: 'my_book_persons:person_id', operator: ConditionTree::Operators::EQUAL,
+                        have_attributes(field: 'my_book_persons:person_id', operator: Operators::EQUAL,
                                         value: '2d162303-78bf-599e-b197-93590ac3d315')
                       ]
                     )

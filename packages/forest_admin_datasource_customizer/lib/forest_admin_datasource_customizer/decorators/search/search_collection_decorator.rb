@@ -8,6 +8,11 @@ module ForestAdminDatasourceCustomizer
         def initialize(child_collection, datasource)
           super
           @replacer = nil
+          @disabled_search = get_fields(false).empty?
+        end
+
+        def disable_search
+          @disabled_search = true
         end
 
         def replace_search(replacer)
@@ -15,7 +20,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(sub_schema)
-          sub_schema.merge({ searchable: true })
+          sub_schema.merge({ searchable: !@disabled_search })
         end
 
         def refine_filter(caller, filter)
@@ -48,7 +53,7 @@ module ForestAdminDatasourceCustomizer
         private
 
         def default_replacer(search, extended)
-          searchable_fields = get_fields(@child_collection, extended)
+          searchable_fields = get_fields(extended)
 
           conditions = searchable_fields.map do |field, schema|
             build_condition(field, schema, search)
@@ -64,11 +69,11 @@ module ForestAdminDatasourceCustomizer
           is_number = number?(search_string)
           is_uuid = uuid?(search_string)
 
-          if column_type == PrimitiveType::NUMBER && is_number && filter_operators&.include?(Operators::EQUAL)
+          if column_type == PrimitiveType::NUMBER && is_number
             return Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, search_string.to_f)
           end
 
-          if column_type == PrimitiveType::ENUM && filter_operators&.include?(Operators::EQUAL)
+          if column_type == PrimitiveType::ENUM
             search_value = lenient_find(enum_values, search_string)
 
             return Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, search_value) if search_value
@@ -92,17 +97,17 @@ module ForestAdminDatasourceCustomizer
             return Nodes::ConditionTreeLeaf.new(field, operator, search_string) if operator
           end
 
-          if column_type == PrimitiveType::UUID && is_uuid && filter_operators&.include?(Operators::EQUAL)
+          if column_type == PrimitiveType::UUID && is_uuid
             return Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, search_string)
           end
 
           nil
         end
 
-        def get_fields(collection, extended)
+        def get_fields(extended)
           fields = []
-          collection.schema[:fields].each do |name, field|
-            fields.push([name, field]) if field.type == 'Column'
+          @child_collection.schema[:fields].each do |name, field|
+            fields.push([name, field]) if field.type == 'Column' && searchable_field?(field)
 
             if field.type == 'PolymorphicManyToOne' && extended
               ForestAdminAgent::Facades::Container.logger.log(
@@ -116,14 +121,28 @@ module ForestAdminDatasourceCustomizer
             next unless extended &&
                         (field.type == 'ManyToOne' || field.type == 'OneToOne' || field.type == 'PolymorphicOneToOne')
 
-            related = collection.datasource.get_collection(field.foreign_collection)
+            related = @child_collection.datasource.get_collection(field.foreign_collection)
 
             related.schema[:fields].each do |sub_name, sub_field|
-              fields.push(["#{name}:#{sub_name}", sub_field]) if sub_field.type == 'Column'
+              fields.push(["#{name}:#{sub_name}", sub_field]) if sub_field.type == 'Column' &&
+                                                                 searchable_field?(sub_field)
             end
           end
 
           fields
+        end
+
+        def searchable_field?(field)
+          operators = field.filter_operators
+
+          if field.column_type == PrimitiveType::STRING
+            return operators&.include?(Operators::EQUAL) ||
+                   operators&.include?(Operators::CONTAINS) ||
+                   operators&.include?(Operators::I_CONTAINS)
+          end
+
+          [PrimitiveType::UUID, PrimitiveType::ENUM, PrimitiveType::NUMBER].include?(field.column_type) &&
+            operators&.include?(Operators::EQUAL)
         end
 
         def lenient_find(haystack, needle)
