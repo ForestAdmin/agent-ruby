@@ -1,3 +1,10 @@
+# [1.0.0-beta.86](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.85...v1.0.0-beta.86) (2025-01-06)
+
+
+### Bug Fixes
+
+* **collection:** add missing function enable_search and add_segments ([#91](https://github.com/ForestAdmin/agent-ruby/issues/91)) ([58dc7e6](https://github.com/ForestAdmin/agent-ruby/commit/58dc7e6eeea8d529b356dbf5607e840599b55634))
+
 # [1.0.0-beta.85](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.84...v1.0.0-beta.85) (2024-12-19)
 
 # [1.0.0-beta.84](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.83...v1.0.0-beta.84) (2024-12-19)
