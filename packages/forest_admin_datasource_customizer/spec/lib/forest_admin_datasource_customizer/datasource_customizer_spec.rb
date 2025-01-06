@@ -18,7 +18,7 @@ module ForestAdminDatasourceCustomizer
           countable: false,
           searchable: false,
           charts: [],
-          segments: {},
+          segments: [],
           actions: {}
         }
       )

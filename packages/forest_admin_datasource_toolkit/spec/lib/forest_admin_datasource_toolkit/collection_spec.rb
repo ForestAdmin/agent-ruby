@@ -65,5 +65,40 @@ module ForestAdminDatasourceToolkit
         )
       end
     end
+
+    describe 'enable_count' do
+      it 'set at true the countable option' do
+        expect(@collection.is_countable?).to be false
+
+        @collection.enable_count
+
+        expect(@collection.is_countable?).to be true
+      end
+    end
+
+    describe 'enable_search' do
+      it 'set at true the searchable option' do
+        expect(@collection.is_searchable?).to be false
+
+        @collection.enable_search
+
+        expect(@collection.is_searchable?).to be true
+      end
+    end
+
+    describe 'add_segments' do
+      it 'add segments into the schema' do
+        @collection.add_segments(%w[segment_1 segment_2])
+
+        expect(@collection.schema[:segments]).to eq(%w[segment_1 segment_2])
+      end
+
+      it 'add segments into the schema with existing segments' do
+        @collection.add_segments(%w[segment_1 segment_2])
+        @collection.add_segments(%w[segment_3])
+
+        expect(@collection.schema[:segments]).to eq(%w[segment_1 segment_2 segment_3])
+      end
+    end
   end
 end

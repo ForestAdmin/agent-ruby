@@ -40,7 +40,7 @@ module ForestAdminAgent
 
         def self.build_segments(collection)
           if collection.schema[:segments]
-            collection.schema[:segments].keys.sort.map { |name| { id: "#{collection.name}.#{name}", name: name } }
+            collection.schema[:segments].sort.map { |name| { id: "#{collection.name}.#{name}", name: name } }
           else
             []
           end
