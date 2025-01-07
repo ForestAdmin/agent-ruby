@@ -69,6 +69,59 @@ module ForestAdminDatasourceCustomizer
           datasource.add_collection(collection_address)
         end
 
+        context 'when disable search' do
+          it 'mark schema as dirty' do
+            collection = collection_build(
+              schema: {
+                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+              }
+            )
+            search_collection_decorator = described_class.new(collection, datasource)
+            search_collection_decorator.disable_search
+
+            expect(search_collection_decorator.last_schema).to be_nil
+          end
+
+          it 'sets the schema not searchable' do
+            collection = collection_build(
+              schema: {
+                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+              }
+            )
+            search_collection_decorator = described_class.new(collection, datasource)
+            unsearchable_schema = { searchable: true }
+            expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: true })
+            search_collection_decorator.disable_search
+            expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: false })
+          end
+        end
+
+        context 'when replace search' do
+          it 'mark schema as dirty' do
+            collection = collection_build(
+              schema: {
+                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+              }
+            )
+            search_collection_decorator = described_class.new(collection, datasource)
+            search_collection_decorator.replace_search(proc {})
+
+            expect(search_collection_decorator.last_schema).to be_nil
+          end
+
+          it 'sets the schema searchable' do
+            collection = collection_build(
+              schema: {
+                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+              }
+            )
+            search_collection_decorator = described_class.new(collection, datasource)
+            search_collection_decorator.replace_search(proc {})
+
+            expect(search_collection_decorator.schema[:searchable]).to be(true)
+          end
+        end
+
         context 'when refine_schema' do
           it 'sets the schema searchable' do
             collection = build_collection(
@@ -79,21 +132,6 @@ module ForestAdminDatasourceCustomizer
             search_collection_decorator = described_class.new(collection, datasource)
             unsearchable_schema = { searchable: false }
             expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: true })
-          end
-
-          context 'when disable search' do
-            it 'sets the schema not searchable' do
-              collection = build_collection(
-                schema: {
-                  fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
-                }
-              )
-              search_collection_decorator = described_class.new(collection, datasource)
-              unsearchable_schema = { searchable: true }
-              expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: true })
-              search_collection_decorator.disable_search
-              expect(search_collection_decorator.refine_schema(unsearchable_schema)).to eq({ searchable: false })
-            end
           end
         end
 
