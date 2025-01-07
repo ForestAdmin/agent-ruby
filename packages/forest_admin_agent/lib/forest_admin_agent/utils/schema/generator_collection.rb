@@ -11,7 +11,7 @@ module ForestAdminAgent
             icon: nil,
             integration: nil,
             isReadOnly: collection.schema[:fields].all? { |_k, field| field.type != 'Column' || field.is_read_only },
-            isSearchable: true,
+            isSearchable: collection.schema[:searchable],
             isVirtual: false,
             name: collection.name,
             onlyForRelationships: false,
