@@ -1,3 +1,10 @@
+# [1.0.0-beta.89](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.88...v1.0.0-beta.89) (2025-01-08)
+
+
+### Features
+
+* **caller:** add project and environment ([#81](https://github.com/ForestAdmin/agent-ruby/issues/81)) ([59a98fa](https://github.com/ForestAdmin/agent-ruby/commit/59a98fa766dafc172cd6eed9b952b75acb918015))
+
 # [1.0.0-beta.88](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.87...v1.0.0-beta.88) (2025-01-08)
 
 
