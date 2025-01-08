@@ -109,11 +109,8 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def apply_select
-        unless @projection.nil?
-          @query = @query.select(@select.join(', '))
-
-          @query = @query.includes(format_relation_projection(@projection))
-        end
+        @query = @query.select(@select.join(', ')) if @select
+        @query = @query.includes(format_relation_projection(@projection)) unless @projection.nil?
 
         @query
       end

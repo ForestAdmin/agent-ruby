@@ -44,6 +44,12 @@ module ForestAdminDatasourceActiveRecord
           }
         end
       end
+
+      def add_join_relation(relation_name)
+        @query = @query.left_joins(relation_name.to_sym)
+
+        @query
+      end
     end
   end
 end

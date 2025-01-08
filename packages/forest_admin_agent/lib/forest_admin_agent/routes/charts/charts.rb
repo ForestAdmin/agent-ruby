@@ -99,7 +99,7 @@ module ForestAdminAgent
 
           result = @collection.aggregate(@caller, @filter, aggregation)
 
-          PieChart.new(result.map { |row| { key: row[:group][group_field], value: row[:value] } }).serialize
+          PieChart.new(result.map { |row| { key: row['group'][group_field], value: row['value'] } }).serialize
         end
 
         def make_line
@@ -124,7 +124,7 @@ module ForestAdminAgent
           )
 
           values = {}
-          rows.each { |row| values[row[:group][group_by_field_name]] = row[:value] }
+          rows.each { |row| values[row['group'][group_by_field_name]] = row['value'] }
           dates = values.keys.sort
           current = dates[0]
           last = dates.last
@@ -189,8 +189,8 @@ module ForestAdminAgent
 
             result = rows.map do |row|
               {
-                key: row[:group][aggregation.groups[0][:field]],
-                value: row[:value]
+                key: row['group'][aggregation.groups[0][:field]],
+                value: row['value']
               }
             end
 
@@ -206,7 +206,7 @@ module ForestAdminAgent
                                         field: @args[:params][:aggregateFieldName])
           result = @collection.aggregate(@caller, filter, aggregation)
 
-          result[0][:value] || 0
+          result[0]['value'] || 0
         end
       end
     end
