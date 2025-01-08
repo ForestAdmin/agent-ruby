@@ -1,3 +1,10 @@
+# [1.0.0-beta.88](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.87...v1.0.0-beta.88) (2025-01-08)
+
+
+### Features
+
+* add lazy join decorator to improve performance ([#89](https://github.com/ForestAdmin/agent-ruby/issues/89)) ([3a17fd1](https://github.com/ForestAdmin/agent-ruby/commit/3a17fd160eae5a340660588c32f55823312036d2))
+
 # [1.0.0-beta.87](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.86...v1.0.0-beta.87) (2025-01-06)
 
 
