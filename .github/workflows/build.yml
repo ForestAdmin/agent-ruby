@@ -100,6 +100,12 @@ jobs:
         with:
           path: reports
 
+      - name: Log coverage percentage before sending
+        run: |
+          coverage_percentage=$(ruby -e "require '${{ github.workspace }}/spec/spec_helper'; puts SimpleCov.result.covered_percent")
+          echo "Coverage Percentage: $coverage_percentage%"
+          echo "::set-output name=coverage_percentage::$coverage_percentage"
+
       - name: Send coverage
         uses: paambaati/codeclimate-action@v5.0.0
         env:

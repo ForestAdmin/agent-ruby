@@ -10,6 +10,13 @@ SimpleCov.start do
   add_filter 'spec'
 end
 
+SimpleCov.at_exit do
+  result = SimpleCov.result
+  coverage_percent = result.covered_percent
+  puts "Coverage Report Generated"
+  puts "Covered Percent: #{coverage_percent}%"
+end
+
 ENV['RAILS_ENV'] ||= 'test'
 require File.expand_path('dummy/config/environment', __dir__)
 Rails.application.eager_load!
