@@ -98,7 +98,7 @@ jobs:
       - name: Download coverage reports
         uses: actions/download-artifact@v4
         with:
-          name: ${{ matrix.ruby-version }}-${{ matrix.packages }}
+          name: 3.2-forest_admin_datasource_active_record
           path: reports
 
       - name: Debug coverage file
