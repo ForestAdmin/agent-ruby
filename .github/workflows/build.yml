@@ -98,13 +98,13 @@ jobs:
       - name: Download coverage reports
         uses: actions/download-artifact@v4
         with:
-          name: 3.2-forest_admin_datasource_active_record
           path: reports
 
       - name: Debug coverage file
         run: |
           echo "Contents of coverage.json:"
           ls -R ${{ github.workspace }}/reports || echo "Reports directory not found"
+          ls -R ${{ github.workspace }}/reports/3.2-forest_admin_datasource_active_record || echo "Reports for active_record package not found"
           cat ${{ github.workspace }}/reports/3.2-forest_admin_datasource_active_record/coverage.json || echo "coverage.json not found"
 
       - name: Send coverage
