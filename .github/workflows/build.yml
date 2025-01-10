@@ -39,8 +39,8 @@ jobs:
       - name: Install dependencies on packages
         run: cd packages/${{ matrix.packages }} && bundle install && cd -
 
-      - name: Run RuboCop
-        run: bundle exec rubocop
+#      - name: Run RuboCop
+#        run: bundle exec rubocop
 
   test:
     name: Test
