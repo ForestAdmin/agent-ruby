@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -22,9 +21,9 @@ module ForestAdminDatasourceCustomizer
               name: 'author',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'first_name' => column_build,
-                  'last_name' => column_build
+                  'id' => build_column(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'first_name' => build_column,
+                  'last_name' => build_column
                 }
               }
             )
@@ -34,10 +33,10 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
-                  'author_id' => column_build(column_type: 'Number'),
-                  'author' => many_to_one_build(foreign_collection: 'author', foreign_key: 'author_id'),
-                  'title' => column_build
+                  'id' => build_column(column_type: 'Number', is_primary_key: true, filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'author_id' => build_column(column_type: 'Number'),
+                  'author' => build_many_to_one(foreign_collection: 'author', foreign_key: 'author_id'),
+                  'title' => build_column
                 }
               }
             )

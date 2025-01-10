@@ -12,11 +12,11 @@ module ForestAdminDatasourceCustomizer
       describe SegmentCollectionDecorator do
         before do
           datasource = Datasource.new
-          @collection = collection_build(
+          @collection = build_collection(
             name: 'book',
             schema: {
               fields: {
-                'name' => column_build({ filter_operators: [Operators::EQUAL, Operators::IN] })
+                'name' => build_column({ filter_operators: [Operators::EQUAL, Operators::IN] })
               }
             }
           )

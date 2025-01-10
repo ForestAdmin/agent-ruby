@@ -8,9 +8,9 @@ module ForestAdminDatasourceToolkit
       describe ProjectionFactory do
         describe 'with one to one and many to one relations' do
           before do
-            @datasource = datasource_with_collections_build(
+            @datasource = build_datasource_with_collections(
               [
-                collection_build(
+                build_collection(
                   {
                     name: 'Book',
                     schema: {
@@ -32,7 +32,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'Author',
                     schema: {
@@ -44,7 +44,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'Format',
                     schema: {
@@ -72,9 +72,9 @@ module ForestAdminDatasourceToolkit
 
         describe 'with other relations' do
           before do
-            @datasource = datasource_with_collections_build(
+            @datasource = build_datasource_with_collections(
               [
-                collection_build(
+                build_collection(
                   {
                     name: 'Book',
                     schema: {
@@ -90,7 +90,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'Person',
                     schema: {
@@ -115,9 +115,9 @@ module ForestAdminDatasourceToolkit
 
         describe 'with polymorphic one to one and polymorphic many to one relations' do
           before do
-            @datasource = datasource_with_collections_build(
+            @datasource = build_datasource_with_collections(
               [
-                collection_build(
+                build_collection(
                   {
                     name: 'Address',
                     schema: {
@@ -135,7 +135,7 @@ module ForestAdminDatasourceToolkit
                     }
                   }
                 ),
-                collection_build(
+                build_collection(
                   {
                     name: 'User',
                     schema: {

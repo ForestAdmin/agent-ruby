@@ -75,8 +75,8 @@ module ForestAdminDatasourceCustomizer
 
       it 'return the expected datasource' do
         datasource_customizer = described_class.new
-        first_datasource = datasource_build(live_query_connections: { 'primary' => 'primary' })
-        second_datasource = datasource_build(live_query_connections: { 'replica' => 'replica' })
+        first_datasource = build_datasource(live_query_connections: { 'primary' => 'primary' })
+        second_datasource = build_datasource(live_query_connections: { 'replica' => 'replica' })
         datasource_customizer.add_datasource(first_datasource, {})
         datasource_customizer.add_datasource(second_datasource, {})
 

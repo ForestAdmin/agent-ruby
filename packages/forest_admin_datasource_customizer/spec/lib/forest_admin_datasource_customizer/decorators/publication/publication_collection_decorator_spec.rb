@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -75,13 +74,13 @@ module ForestAdminDatasourceCustomizer
             }
           )
 
-          @collection_comment = collection_build(
+          @collection_comment = build_collection(
             name: 'comment',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'commentable_id' => column_build(column_type: 'Number'),
-                'commentable_type' => column_build,
+                'id' => build_numeric_primary_key,
+                'commentable_id' => build_column(column_type: 'Number'),
+                'commentable_type' => build_column,
                 'commentable' => Relations::PolymorphicManyToOneSchema.new(
                   foreign_key_type_field: 'commentable_type',
                   foreign_collections: %w[book],

@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -11,10 +10,10 @@ module ForestAdminDatasourceCustomizer
       describe ChartContext do
         include_context 'with caller'
         before do
-          collection = collection_build(
+          collection = build_collection(
             name: 'my_collection',
             schema: {
-              fields: { 'id1' => numeric_primary_key_build, 'id2' => numeric_primary_key_build }
+              fields: { 'id1' => build_numeric_primary_key, 'id2' => build_numeric_primary_key }
             },
             list: [{ id1: 1, id2: 2 }]
           )

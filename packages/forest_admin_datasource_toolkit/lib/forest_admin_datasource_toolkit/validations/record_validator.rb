@@ -13,7 +13,7 @@ module ForestAdminDatasourceToolkit
             raise ForestException, "Unknown field #{key}"
           elsif schema.type == 'Column'
             FieldValidator.validate(collection, key, record_data[key])
-          elsif schema.type == 'OneToOne' || schema.type == 'ManyToOne'
+          elsif ['OneToOne', 'ManyToOne'].include?(schema.type)
             sub_record = record_data[key]
             association = collection.datasource.get_collection(schema.foreign_collection)
             RecordValidator.validate(association, sub_record)

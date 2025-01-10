@@ -1,7 +1,6 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
 
 module ForestAdminAgent
   module Routes
@@ -56,7 +55,7 @@ module ForestAdminAgent
             book = { 'id' => 1 }.merge(attributes)
 
             datasource = Datasource.new
-            collection = collection_build(
+            collection = build_collection(
               name: 'book',
               schema: {
                 fields: {
@@ -105,7 +104,7 @@ module ForestAdminAgent
         describe 'with relation' do
           before do
             @datasource = Datasource.new
-            collection_person = collection_build(
+            collection_person = build_collection(
               name: 'person',
               schema: {
                 fields: {
@@ -124,7 +123,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_passport = collection_build(
+            collection_passport = build_collection(
               name: 'passport',
               schema: {
                 fields: {

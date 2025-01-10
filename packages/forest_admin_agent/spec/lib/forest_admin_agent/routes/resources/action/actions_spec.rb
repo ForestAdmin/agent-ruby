@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
+
 require 'json'
 
 module ForestAdminAgent
@@ -36,7 +36,7 @@ module ForestAdminAgent
 
         before do
           datasource = Datasource.new
-          collection_book = collection_build(
+          collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {

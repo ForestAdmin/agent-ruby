@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -20,11 +19,11 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
-                  'title' => column_build,
-                  'my_author' => one_to_one_build(foreign_collection: 'author', origin_key: 'book_id'),
-                  'format_id' => column_build(column_type: 'Uuid'),
-                  'my_format' => many_to_one_build(foreign_collection: 'format', foreign_key: 'format_id')
+                  'id' => build_column(column_type: 'Uuid'),
+                  'title' => build_column,
+                  'my_author' => build_one_to_one(foreign_collection: 'author', origin_key: 'book_id'),
+                  'format_id' => build_column(column_type: 'Uuid'),
+                  'my_format' => build_many_to_one(foreign_collection: 'format', foreign_key: 'format_id')
                 }
               }
             )
@@ -34,9 +33,9 @@ module ForestAdminDatasourceCustomizer
               name: 'author',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
-                  'name' => column_build,
-                  'book_id' => column_build(column_type: 'Uuid')
+                  'id' => build_column(column_type: 'Uuid'),
+                  'name' => build_column,
+                  'book_id' => build_column(column_type: 'Uuid')
                 }
               }
             )
@@ -46,8 +45,8 @@ module ForestAdminDatasourceCustomizer
               name: 'format',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
-                  'name' => column_build
+                  'id' => build_column(column_type: 'Uuid'),
+                  'name' => build_column
                 }
               }
             )

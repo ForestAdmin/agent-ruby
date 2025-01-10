@@ -40,7 +40,7 @@ module ForestAdminAgent
         def link_one_to_one_relations(args, record)
           args[:params][:data][:relationships]&.map do |field, value|
             schema = @collection.schema[:fields][field]
-            next unless schema.type == 'OneToOne' || schema.type == 'PolymorphicOneToOne'
+            next unless ['OneToOne', 'PolymorphicOneToOne'].include?(schema.type)
 
             id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)
             foreign_collection = @datasource.get_collection(schema.foreign_collection)

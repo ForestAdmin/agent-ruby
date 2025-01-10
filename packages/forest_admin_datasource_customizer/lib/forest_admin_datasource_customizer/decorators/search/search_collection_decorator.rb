@@ -118,8 +118,8 @@ module ForestAdminDatasourceCustomizer
               )
             end
 
-            next unless extended &&
-                        (field.type == 'ManyToOne' || field.type == 'OneToOne' || field.type == 'PolymorphicOneToOne')
+            to_one_relations = %w[ManyToOne OneToOne PolymorphicOneToOne]
+            next unless extended && to_one_relations.include?(field.type)
 
             related = @child_collection.datasource.get_collection(field.foreign_collection)
 

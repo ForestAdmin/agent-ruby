@@ -49,7 +49,7 @@ module ForestAdminDatasourceToolkit
 
         context 'when the field(s) does not exist in the schema' do
           it 'raise an error' do
-            collection = collection_build(
+            collection = build_collection(
               {
                 schema: { fields: { target: ColumnSchema.new(column_type: 'String') } }
               }
@@ -67,9 +67,9 @@ module ForestAdminDatasourceToolkit
 
           describe 'when there are relations in the datasource' do
             it 'not raise an error' do
-              datasource = datasource_with_collections_build(
+              datasource = build_datasource_with_collections(
                 [
-                  collection_build({
+                  build_collection({
                                      name: 'book',
                                      schema: {
                                        fields: {
@@ -83,7 +83,7 @@ module ForestAdminDatasourceToolkit
                                        }
                                      }
                                    }),
-                  collection_build({
+                  build_collection({
                                      name: 'person',
                                      schema: {
                                        fields: {
@@ -102,7 +102,7 @@ module ForestAdminDatasourceToolkit
 
           describe 'when there are several fields' do
             it 'raise an error when a field does not exist' do
-              collection = collection_build({
+              collection = build_collection({
                                               schema: {
                                                 fields: {
                                                   'target' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL])
@@ -130,7 +130,7 @@ module ForestAdminDatasourceToolkit
 
         context 'when the field(s) exist' do
           it 'not raise an error' do
-            collection = collection_build({
+            collection = build_collection({
                                             schema: {
                                               fields: {
                                                 'target' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL])
@@ -145,7 +145,7 @@ module ForestAdminDatasourceToolkit
 
           describe 'when there are several fields' do
             it 'not raise an error' do
-              collection = collection_build({
+              collection = build_collection({
                                               schema: {
                                                 fields: {
                                                   'target' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL])
@@ -168,7 +168,7 @@ module ForestAdminDatasourceToolkit
 
         context 'when the field has an operator incompatible with the schema type' do
           it 'raise an error' do
-            collection = collection_build({
+            collection = build_collection({
                                             schema: {
                                               fields: {
                                                 'target' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::CONTAINS])
@@ -190,7 +190,7 @@ module ForestAdminDatasourceToolkit
 
         context 'when the operator is incompatible with the given value' do
           it 'raise an error' do
-            collection = collection_build({
+            collection = build_collection({
                                             schema: {
                                               fields: {
                                                 'target' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::GREATER_THAN])
@@ -210,7 +210,7 @@ module ForestAdminDatasourceToolkit
 
         context 'when the value is not compatible with the column type' do
           it 'raise an error' do
-            collection = collection_build({
+            collection = build_collection({
                                             schema: {
                                               fields: {
                                                 'target' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::IN])

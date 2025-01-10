@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminAgent
   module Services

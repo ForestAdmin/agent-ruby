@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -14,7 +13,7 @@ module ForestAdminDatasourceCustomizer
         include_context 'with caller'
 
         context 'when decorating an empty datasource' do
-          let(:datasource) { datasource_build }
+          let(:datasource) { build_datasource }
           let(:decorator) { described_class.new(datasource) }
 
           context 'with no charts' do
@@ -56,7 +55,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         context 'when decorating a datasource with charts' do
-          let(:datasource) { datasource_build({ schema: { charts: ['my_chart'] } }) }
+          let(:datasource) { build_datasource({ schema: { charts: ['my_chart'] } }) }
           let(:decorator) { described_class.new(datasource) }
 
           it 'raise an error when adding a duplicate' do
@@ -67,7 +66,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         context 'when adding charts on a lower layer' do
-          let(:datasource) { datasource_build }
+          let(:datasource) { build_datasource }
           let(:first_decorator) { described_class.new(datasource) }
           let(:second_decorator) { described_class.new(first_decorator) }
 

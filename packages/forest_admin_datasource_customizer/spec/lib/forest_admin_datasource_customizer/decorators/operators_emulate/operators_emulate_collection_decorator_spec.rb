@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -15,7 +14,7 @@ module ForestAdminDatasourceCustomizer
         context 'when the collection pk does not supports EQUAL or IN operators' do
           before do
             datasource = Datasource.new
-            @child_collection_book = collection_build(
+            @child_collection_book = build_collection(
               name: 'book',
               schema: {
                 fields: {
@@ -50,7 +49,7 @@ module ForestAdminDatasourceCustomizer
         context 'when the collection pk supports EQUAL or IN operators' do
           before do
             datasource = Datasource.new
-            @child_collection_book = collection_build(
+            @child_collection_book = build_collection(
               name: 'book',
               schema: {
                 fields: {
@@ -69,7 +68,7 @@ module ForestAdminDatasourceCustomizer
                 }
               }
             )
-            @child_collection_person = collection_build(
+            @child_collection_person = build_collection(
               name: 'person',
               schema: {
                 fields: {

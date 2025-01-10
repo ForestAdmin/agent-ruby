@@ -2,11 +2,15 @@ require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_datasource_toolkit'
-require 'shared/factory'
+require 'forest_admin_test_toolkit'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
   add_filter 'spec'
+end
+
+RSpec.shared_context 'with caller' do
+  let(:caller) { build_caller }
 end
 
 RSpec.configure do |config|
@@ -17,5 +21,7 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 
-  config.include Factory
+  config.include ForestAdminTestToolkit::Factory::Caller
+  config.include ForestAdminTestToolkit::Factory::Collection
+  config.include ForestAdminTestToolkit::Factory::Datasource
 end

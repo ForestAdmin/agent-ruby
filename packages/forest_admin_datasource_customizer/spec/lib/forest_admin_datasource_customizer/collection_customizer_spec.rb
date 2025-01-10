@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceToolkit
@@ -12,7 +11,7 @@ module ForestAdminDatasourceCustomizer
     include_context 'with caller'
     before do
       datasource = Datasource.new
-      collection_book = collection_build(
+      collection_book = build_collection(
         name: 'book',
         schema: {
           charts: [],
@@ -40,7 +39,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_book_person = collection_build(
+      collection_book_person = build_collection(
         name: 'book_person',
         schema: {
           charts: [],
@@ -62,7 +61,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_person = collection_build(
+      collection_person = build_collection(
         name: 'person',
         schema: {
           charts: [],
@@ -87,7 +86,7 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
-      collection_category = collection_build(
+      collection_category = build_collection(
         name: 'category',
         schema: {
           charts: [],

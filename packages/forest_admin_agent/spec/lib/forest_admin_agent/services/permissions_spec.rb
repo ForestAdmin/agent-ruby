@@ -1,5 +1,5 @@
 require 'spec_helper'
-require 'shared/caller'
+
 require 'faraday'
 require 'filecache'
 

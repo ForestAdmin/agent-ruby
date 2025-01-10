@@ -13,3 +13,7 @@
 
 # rspec failure tracking
 .rspec_status
+
+# GEM
+Gemfile.lock
+Gemfile-test.lock

@@ -9,7 +9,7 @@ module ForestAdminDatasourceCustomizer
 
         describe HookContext do
           let(:hook_context) do
-            described_class.new(collection_build, caller)
+            described_class.new(build_collection, caller)
           end
 
           describe 'raise_error' do

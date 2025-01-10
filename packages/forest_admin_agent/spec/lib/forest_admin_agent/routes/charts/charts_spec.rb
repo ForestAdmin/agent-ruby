@@ -1,7 +1,7 @@
 require 'spec_helper'
 require 'singleton'
 require 'ostruct'
-require 'shared/caller'
+
 require 'json'
 
 module ForestAdminAgent
@@ -36,7 +36,7 @@ module ForestAdminAgent
           stub_const('Review', review_class)
 
           datasource = Datasource.new
-          collection_book = collection_build(
+          collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {
@@ -61,7 +61,7 @@ module ForestAdminAgent
               }
             }
           )
-          collection_book_review = collection_build(
+          collection_book_review = build_collection(
             name: 'book_review',
             schema: {
               fields: {
@@ -81,7 +81,7 @@ module ForestAdminAgent
               }
             }
           )
-          collection_review = collection_build(
+          collection_review = build_collection(
             name: 'review',
             schema: {
               fields: {

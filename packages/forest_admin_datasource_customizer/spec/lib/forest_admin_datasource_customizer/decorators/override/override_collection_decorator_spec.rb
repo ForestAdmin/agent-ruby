@@ -14,13 +14,13 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @transaction = collection_build(
+          @transaction = build_collection(
             name: 'transaction',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'description' => column_build,
-                'amount_in_euro' => column_build
+                'id' => build_numeric_primary_key,
+                'description' => build_column,
+                'amount_in_euro' => build_column
               }
             },
             list: [],

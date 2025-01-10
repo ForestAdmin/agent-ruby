@@ -8,7 +8,7 @@ module ForestAdminAgent
       describe GeneratorField do
         context 'when field is polymorphic relation' do
           before do
-            collection_address = collection_build(
+            collection_address = build_collection(
               name: 'Address',
               schema: {
                 fields: {
@@ -25,7 +25,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_user = collection_build(
+            collection_user = build_collection(
               name: 'User',
               schema: {
                 fields: {
@@ -42,7 +42,7 @@ module ForestAdminAgent
               }
             )
 
-            collection_order = collection_build(
+            collection_order = build_collection(
               name: 'Order',
               schema: {
                 fields: {
@@ -59,7 +59,7 @@ module ForestAdminAgent
               }
             )
 
-            @datasource = datasource_with_collections_build(
+            @datasource = build_datasource_with_collections(
               [collection_address, collection_order, collection_user]
             )
           end

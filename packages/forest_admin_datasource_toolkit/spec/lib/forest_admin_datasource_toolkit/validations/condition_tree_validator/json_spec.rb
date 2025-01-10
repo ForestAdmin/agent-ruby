@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is a JSON' do
         let(:collection) do
-          collection_build({
+          build_collection({
                              schema: {
                                fields: {
                                  'json_field' => ColumnSchema.new(

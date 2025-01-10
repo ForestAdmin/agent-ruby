@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
     describe ConditionTreeValidator do
       describe 'when the field is a string' do
         it 'not raise an error when it using the ShorterThan operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'string_field' => ColumnSchema.new(
@@ -25,7 +25,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when it using the LongerThan operator' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'string_field' => ColumnSchema.new(
@@ -41,7 +41,7 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'not raise an error when it using the In operator with an empty array' do
-          collection = collection_build({
+          collection = build_collection({
                                           schema: {
                                             fields: {
                                               'string_field' => ColumnSchema.new(

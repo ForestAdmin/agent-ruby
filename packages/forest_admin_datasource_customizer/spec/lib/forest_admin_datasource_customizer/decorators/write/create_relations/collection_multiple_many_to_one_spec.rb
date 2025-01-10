@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -20,12 +19,12 @@ module ForestAdminDatasourceCustomizer
               name: 'book',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
-                  'title' => column_build,
-                  'author_id' => column_build(column_type: 'Number'),
-                  'my_author' => many_to_one_build(foreign_collection: 'author', foreign_key: 'author_id'),
-                  'format_id' => column_build(column_type: 'Number'),
-                  'my_format' => many_to_one_build(foreign_collection: 'format', foreign_key: 'format_id')
+                  'id' => build_column(column_type: 'Uuid'),
+                  'title' => build_column,
+                  'author_id' => build_column(column_type: 'Number'),
+                  'my_author' => build_many_to_one(foreign_collection: 'author', foreign_key: 'author_id'),
+                  'format_id' => build_column(column_type: 'Number'),
+                  'my_format' => build_many_to_one(foreign_collection: 'format', foreign_key: 'format_id')
                 }
               }
             )
@@ -35,9 +34,9 @@ module ForestAdminDatasourceCustomizer
               name: 'author',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Uuid'),
-                  'name' => column_build,
-                  'price_id' => column_build(column_type: 'Number')
+                  'id' => build_column(column_type: 'Uuid'),
+                  'name' => build_column,
+                  'price_id' => build_column(column_type: 'Number')
                 }
               }
             )
@@ -47,8 +46,8 @@ module ForestAdminDatasourceCustomizer
               name: 'format',
               schema: {
                 fields: {
-                  'id' => column_build(column_type: 'Number'),
-                  'name' => column_build
+                  'id' => build_column(column_type: 'Number'),
+                  'name' => build_column
                 }
               }
             )

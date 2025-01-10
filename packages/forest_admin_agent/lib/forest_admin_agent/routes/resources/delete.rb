@@ -39,7 +39,7 @@ module ForestAdminAgent
           condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
 
           @collection.schema[:fields].each_value do |field_schema|
-            next unless field_schema.type == 'PolymorphicOneToOne' || field_schema.type == 'PolymorphicOneToMany'
+            next unless ['PolymorphicOneToOne', 'PolymorphicOneToMany'].include?(field_schema.type)
 
             condition_tree = Nodes::ConditionTreeBranch.new(
               'And',

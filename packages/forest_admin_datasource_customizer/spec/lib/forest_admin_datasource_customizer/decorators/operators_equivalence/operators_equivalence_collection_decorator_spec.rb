@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared/caller'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -19,7 +18,7 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @child_collection_book = collection_build(
+          @child_collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {
