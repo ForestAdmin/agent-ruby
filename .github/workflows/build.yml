@@ -87,34 +87,33 @@ jobs:
           path: packages/${{ matrix.packages }}/coverage/*
           retention-days: 1
 
-  coverage:
-    name: Coverage
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download coverage reports
-        uses: actions/download-artifact@v4
-        with:
-          path: reports
-
-      - name: Debug coverage file
-        run: |
-          echo "Contents of coverage.json:"
-          ls -R ${{ github.workspace }} || echo "Reports directory not found"
-          ls -R ${{ github.workspace }}/reports/3.2-forest_admin_datasource_active_record || echo "Reports for active_record package not found"
-          cat ${{ github.workspace }}/reports/3.2-forest_admin_datasource_active_record/coverage.json || echo "coverage.json not found"
-
-      - name: Send coverage
-        uses: paambaati/codeclimate-action@v5.0.0
-        env:
-          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-        with:
-          coverageLocations: |
-            ${{github.workspace}}/reports/3.2-forest_admin_datasource_active_record/coverage.json:simplecov
-          debug: true
+#  coverage:
+#    name: Coverage
+#    runs-on: ubuntu-latest
+#    needs: [test]
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v4
+#
+#      - name: Download coverage reports
+#        uses: actions/download-artifact@v4
+#        with:
+#          path: reports
+#
+#      - name: Debug coverage file
+#        run: |
+#          echo "Contents of coverage.json:"
+#          ls -R ${{ github.workspace }}/reports || echo "Reports directory not found"
+#          cat ${{ github.workspace }}/reports/3.2-forest_admin_datasource_active_record/coverage.json || echo "coverage.json not found"
+#
+#      - name: Send coverage
+#        uses: paambaati/codeclimate-action@v5.0.0
+#        env:
+#          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
+#        with:
+#          coverageLocations: |
+#            ${{github.workspace}}/reports/3.2-forest_admin_datasource_active_record/coverage.json:simplecov
+#          debug: true
 
 #  deploy:
 #    name: Release package

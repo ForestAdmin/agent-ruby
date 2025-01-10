@@ -1,3 +1,6 @@
-plugins:
-  rubocop:
+version: "2"
+checks:
+  argument-count:
     enabled: true
+test_reporter:
+  formatter: simplecov
