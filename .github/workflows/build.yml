@@ -102,7 +102,7 @@ jobs:
 
       - name: Log coverage percentage before sending
         run: |
-          coverage_percentage=$(ruby -e "require '${{ github.workspace }}/spec/spec_helper'; puts SimpleCov.result.covered_percent")
+          coverage_percentage=$(ruby -e "require '${{ github.workspace }}/packages/forest_admin_datasource_active_record/spec/spec_helper'; puts SimpleCov.result.covered_percent")
           echo "Coverage Percentage: $coverage_percentage%"
           echo "::set-output name=coverage_percentage::$coverage_percentage"
 
