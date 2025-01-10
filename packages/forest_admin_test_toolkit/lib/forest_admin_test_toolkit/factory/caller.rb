@@ -12,7 +12,10 @@ module ForestAdminTestToolkit
           tags: [],
           timezone: 'Europe/Paris',
           permission_level: 'admin',
-          role: 'dev'
+          role: 'dev',
+          request: { ip: '127.0.0.1' },
+          project: 'terminator',
+          environment: 'Development'
         )
       end
     end

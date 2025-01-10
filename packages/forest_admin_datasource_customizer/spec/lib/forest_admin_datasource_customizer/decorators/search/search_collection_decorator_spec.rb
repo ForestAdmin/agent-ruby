@@ -71,9 +71,9 @@ module ForestAdminDatasourceCustomizer
 
         context 'when refine_schema' do
           it 'sets the schema searchable' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
-                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
               }
             )
             search_collection_decorator = described_class.new(collection, datasource)
@@ -83,9 +83,9 @@ module ForestAdminDatasourceCustomizer
 
           context 'when disable search' do
             it 'sets the schema not searchable' do
-              collection = collection_build(
+              collection = build_collection(
                 schema: {
-                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                  fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
                 }
               )
               search_collection_decorator = described_class.new(collection, datasource)
@@ -118,9 +118,9 @@ module ForestAdminDatasourceCustomizer
 
           context 'when the search value is null' do
             it 'returns the given filter to return all records' do
-              collection = collection_build(
+              collection = build_collection(
                 schema: {
-                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                  fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
                 }
               )
               search_collection_decorator = described_class.new(collection, datasource)
@@ -145,7 +145,7 @@ module ForestAdminDatasourceCustomizer
                 ForestAdminDatasourceToolkit::Collection,
                 name: 'foo',
                 schema: {
-                  fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) },
+                  fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) },
                   searchable: true
                 }
               )
@@ -165,7 +165,7 @@ module ForestAdminDatasourceCustomizer
                 ForestAdminDatasourceToolkit::Collection,
                 name: 'foo',
                 schema: {
-                  fields: { id: numeric_primary_key_build }
+                  fields: { id: build_numeric_primary_key }
                 }
               )
               filter = Filter.new(search: 'something')
@@ -191,7 +191,7 @@ module ForestAdminDatasourceCustomizer
                   ForestAdminDatasourceToolkit::Collection,
                   name: 'foo',
                   schema: {
-                    fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) },
+                    fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) },
                     searchable: false
                   }
                 )
@@ -468,7 +468,7 @@ module ForestAdminDatasourceCustomizer
                     schema: {
                       searchable: false,
                       fields: {
-                        'fieldName' => column_build(
+                        'fieldName' => build_column(
                           column_type: 'Enum',
                           filter_operators: [Operators::EQUAL]
                         )

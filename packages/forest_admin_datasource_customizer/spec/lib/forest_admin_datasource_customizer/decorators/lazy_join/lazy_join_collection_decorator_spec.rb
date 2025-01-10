@@ -17,29 +17,29 @@ module ForestAdminDatasourceCustomizer
 
         before do
           datasource = Datasource.new
-          @collection_book = collection_build(
+          @collection_book = build_collection(
             name: 'book',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'author_id' => column_build(column_type: 'Number'),
-                'editor_id' => column_build(column_type: 'Number'),
-                'author' => many_to_one_build(foreign_collection: 'person', foreign_key: 'author_id'),
-                'editor' => many_to_one_build(foreign_collection: 'person', foreign_key: 'editor_id'),
-                'title' => column_build,
-                'price' => column_build(column_type: 'Number')
+                'id' => build_numeric_primary_key,
+                'author_id' => build_column(column_type: 'Number'),
+                'editor_id' => build_column(column_type: 'Number'),
+                'author' => build_many_to_one(foreign_collection: 'person', foreign_key: 'author_id'),
+                'editor' => build_many_to_one(foreign_collection: 'person', foreign_key: 'editor_id'),
+                'title' => build_column,
+                'price' => build_column(column_type: 'Number')
               }
             }
           )
 
-          @collection_person = collection_build(
+          @collection_person = build_collection(
             name: 'person',
             schema: {
               fields: {
-                'id' => numeric_primary_key_build,
-                'books' => one_to_many_build(foreign_collection: 'person', origin_key: 'author_id'),
-                'first_name' => column_build,
-                'last_name' => column_build
+                'id' => build_numeric_primary_key,
+                'books' => build_one_to_many(foreign_collection: 'person', origin_key: 'author_id'),
+                'first_name' => build_column,
+                'last_name' => build_column
               }
             }
           )
