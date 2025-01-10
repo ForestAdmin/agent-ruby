@@ -51,8 +51,9 @@ module ForestAdminDatasourceCustomizer
 
         def validate_is_removable(collection_name)
           collection = get_collection(collection_name)
+          polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
           collection.schema[:fields].each do |field_name, field_schema|
-            next unless field_schema.type == 'PolymorphicOneToOne' || field_schema.type == 'PolymorphicOneToMany'
+            next unless polymorphic_relations.include?(field_schema.type)
 
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, field_name)
 

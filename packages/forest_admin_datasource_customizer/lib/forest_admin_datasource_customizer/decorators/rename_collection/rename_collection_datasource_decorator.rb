@@ -55,8 +55,9 @@ module ForestAdminDatasourceCustomizer
                   "Cannot rename a collection twice: #{@to_child_name[current_name]}->#{current_name}->#{new_name}"
           end
 
+          polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
           get_collection(current_name).schema[:fields].each do |field_name, field_schema|
-            next unless field_schema.type == 'PolymorphicOneToOne' || field_schema.type == 'PolymorphicOneToMany'
+            next unless polymorphic_relations.include?(field_schema.type)
 
             reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)
 

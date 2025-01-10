@@ -17,10 +17,11 @@ module ForestAdminDatasourceCustomizer
             raise ForestException, "Field #{field} not found in collection #{collection.name}"
           end
 
+          to_one_relations = %w[ManyToOne OneToOne]
           field_schema = collection.schema[:fields][field]
           if field_schema.type == 'Column'
             { schema: field_schema }
-          elsif field_schema.type == 'ManyToOne' || field_schema.type == 'OneToOne'
+          elsif to_one_relations.include?(field_schema.type)
             { collection: field_schema.foreign_collection }
           end
         end

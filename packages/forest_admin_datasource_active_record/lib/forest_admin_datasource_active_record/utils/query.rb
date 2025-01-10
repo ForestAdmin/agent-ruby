@@ -97,7 +97,7 @@ module ForestAdminDatasourceActiveRecord
           @select += @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
           @projection.relations.each_key do |relation|
             relation_schema = @collection.schema[:fields][relation]
-            @select << if relation_schema.type == 'OneToOne' || relation_schema.type == 'PolymorphicOneToOne'
+            @select << if ['OneToOne', 'PolymorphicOneToOne'].include?(relation_schema.type)
                          "#{@collection.model.table_name}.#{relation_schema.origin_key_target}"
                        else
                          "#{@collection.model.table_name}.#{relation_schema.foreign_key}"

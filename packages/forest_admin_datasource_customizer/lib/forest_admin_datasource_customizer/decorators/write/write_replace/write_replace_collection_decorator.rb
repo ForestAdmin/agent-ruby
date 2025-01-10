@@ -95,7 +95,7 @@ module ForestAdminDatasourceCustomizer
               new_patch = rewrite_patch(context.caller, context.action, field_patch.except(key), used + [key])
 
               is_value ? deep_merge({ key => value }, new_patch) : new_patch
-            elsif field_schema&.type == 'ManyToOne' || field_schema&.type == 'OneToOne'
+            elsif ['ManyToOne', 'OneToOne'].include?(field_schema&.type)
               # Delegate relations to the appropriate collection.
               relation = datasource.get_collection(field_schema.foreign_collection)
 

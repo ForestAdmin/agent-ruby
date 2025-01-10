@@ -34,7 +34,7 @@ module ForestAdminAgent
             filter = get_base_foreign_filter(args)
             relation = Schema.get_to_many_relation(@collection, args[:params]['relation_name'])
 
-            if relation.type == 'OneToMany' || relation.type == 'PolymorphicOneToMany'
+            if ['OneToMany', 'PolymorphicOneToMany'].include?(relation.type)
               dissociate_or_delete_one_to_many(relation, args[:params]['relation_name'], parent_id, is_delete_mode,
                                                filter)
             else

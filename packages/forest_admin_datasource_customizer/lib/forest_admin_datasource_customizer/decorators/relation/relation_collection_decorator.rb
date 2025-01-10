@@ -129,7 +129,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def check_foreign_keys(relation)
-          return unless relation.type == 'ManyToOne' || relation.type == 'ManyToMany'
+          return unless ['ManyToOne', 'ManyToMany'].include?(relation.type)
 
           check_keys(
             relation.type == 'ManyToMany' ? datasource.get_collection(relation.through_collection) : self,
@@ -140,7 +140,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def check_origin_keys(relation)
-          return unless relation.type == 'OneToMany' || relation.type == 'OneToOne' || relation.type == 'ManyToMany'
+          return unless %w[OneToMany OneToOne ManyToMany].include?(relation.type)
 
           check_keys(
             relation.type == 'ManyToMany' ? datasource.get_collection(relation.through_collection) : datasource.get_collection(relation.foreign_collection),
@@ -177,7 +177,7 @@ module ForestAdminDatasourceCustomizer
           prefix = field.split(':').first
           field_schema = schema[:fields][prefix]
 
-          return [field] if field_schema.type == 'Column' || field_schema.type == 'PolymorphicManyToOne'
+          return [field] if ['Column', 'PolymorphicManyToOne'].include?(field_schema.type)
 
           relation = datasource.get_collection(field_schema.foreign_collection)
           result = []
@@ -252,7 +252,7 @@ module ForestAdminDatasourceCustomizer
             records.each do |record|
               record[name] = sub_records.find { |sr| sr[field_schema.foreign_key_target] == record[field_schema.foreign_key] }
             end
-          elsif field_schema.type == 'OneToOne' || field_schema.type == 'OneToMany'
+          elsif ['OneToOne', 'OneToMany'].include?(field_schema.type)
             ids = records.filter_map { |record| record[field_schema.origin_key_target] }.uniq
             sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.origin_key, 'In', ids))
             sub_records = association.list(caller, sub_filter, projection.union([field_schema.origin_key]))
