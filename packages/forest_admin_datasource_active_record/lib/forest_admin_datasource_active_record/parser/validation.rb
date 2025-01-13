@@ -1,6 +1,7 @@
 module ForestAdminDatasourceActiveRecord
   module Parser
     module Validation
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       def get_validations(column)
         validations = []
         # NOTICE: Do not consider validations if a before_validation Active Records
@@ -14,10 +15,7 @@ module ForestAdminDatasourceActiveRecord
 
             case validator
             when ActiveRecord::Validations::PresenceValidator
-              validations << {
-                type: 'is present',
-                message: validator.options[:message]
-              }
+              validations << { operator: Operators::PRESENT }
             when ActiveModel::Validations::NumericalityValidator
               validations = parse_numericality_validator(validator, validations)
             when ActiveModel::Validations::LengthValidator
@@ -35,17 +33,9 @@ module ForestAdminDatasourceActiveRecord
         validator.options.each do |option, value|
           case option
           when :greater_than, :greater_than_or_equal_to
-            parsed_validations << {
-              type: 'is greater than',
-              value: value,
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::GREATER_THAN, value: value }
           when :less_than, :less_than_or_equal_to
-            parsed_validations << {
-              type: 'is less than',
-              value: value,
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::LESS_THAN, value: value }
           end
         end
       end
@@ -56,28 +46,12 @@ module ForestAdminDatasourceActiveRecord
         validator.options.each do |option, value|
           case option
           when :minimum
-            parsed_validations << {
-              type: 'is longer than',
-              value: value,
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::LONGER_THAN, value: value }
           when :maximum
-            parsed_validations << {
-              type: 'is shorter than',
-              value: value,
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::SHORTER_THAN, value: value }
           when :is
-            parsed_validations << {
-              type: 'is longer than',
-              value: value,
-              message: validator.options[:message]
-            }
-            parsed_validations << {
-              type: 'is shorter than',
-              value: value,
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::LONGER_THAN, value: value }
+            parsed_validations << { operator: Operators::SHORTER_THAN, value: value }
           end
         end
       end
@@ -93,11 +67,7 @@ module ForestAdminDatasourceActiveRecord
             # NOTICE: Transform a Ruby regex into a JS one
             regex = regex.sub('\\A', '^').sub('\\Z', '$').sub('\\z', '$').gsub(/\n+|\s+/, '')
 
-            parsed_validations << {
-              type: 'is like',
-              value: "/#{regex}/#{options}",
-              message: validator.options[:message]
-            }
+            parsed_validations << { operator: Operators::CONTAINS, value: "/#{regex}/#{options}" }
           end
         end
 
