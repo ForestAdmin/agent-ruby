@@ -7,6 +7,7 @@ AllCops:
   NewCops: enable
   Exclude:
     - 'packages/forest_admin_datasource_active_record/spec/dummy/**/*'
+    - 'packages/forest_admin_datasource_mongoid/spec/dummy/**/*'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer_override.rb'
     - 'node_modules/semantic-release-rubygem/**/*'
@@ -16,6 +17,7 @@ Gemspec/OrderedDependencies:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_mongoid/forest_admin_datasource_mongoid.gemspec'
     - 'packages/forest_admin_test_toolkit/forest_admin_test_toolkit.gemspec'
     - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
@@ -26,6 +28,7 @@ Gemspec/RequireMFA:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_mongoid/forest_admin_datasource_mongoid.gemspec'
     - 'packages/forest_admin_test_toolkit/forest_admin_test_toolkit.gemspec'
     - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
@@ -37,6 +40,7 @@ Lint/PercentStringArray:
     - 'packages/forest_admin_agent/forest_admin_agent.gemspec'
     - 'packages/forest_admin_rails/forest_admin_rails.gemspec'
     - 'packages/forest_admin_datasource_toolkit/forest_admin_datasource_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_mongoid/forest_admin_datasource_mongoid.gemspec'
     - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
 
@@ -60,6 +64,7 @@ Style/BlockComments:
     - 'packages/forest_admin_agent/spec/spec_helper.rb'
     - 'packages/forest_admin_rails/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_mongoid/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_customizer/spec/spec_helper.rb'
     - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
 
@@ -86,6 +91,7 @@ Style/MutableConstant:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/schema_emitter.rb'
     - 'packages/forest_admin_rails/lib/forest_admin_rails/version.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/version.rb'
     - 'packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
@@ -127,7 +133,14 @@ Style/StringLiterals:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb'
     - 'packages/forest_admin_datasource_toolkit/spec/spec_helper.rb'
-    - 'packages/forest_admin_datasource_toolkit/forest_admin_test_toolkit.gemspec'
+    - 'packages/forest_admin_datasource_mongoid/forest_admin_datasource_mongoid.gemspec'
+    - 'packages/forest_admin_datasource_mongoid/Gemfile'
+    - 'packages/forest_admin_datasource_mongoid/Rakefile'
+    - 'packages/forest_admin_datasource_mongoid/bin/console'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/version.rb'
+    - 'packages/forest_admin_datasource_mongoid/spec/spec_helper.rb'
+    - 'packages/forest_admin_test_toolkit/forest_admin_test_toolkit.gemspec'
     - 'packages/forest_admin_test_toolkit/Gemfile'
     - 'packages/forest_admin_test_toolkit/Rakefile'
     - 'packages/forest_admin_test_toolkit/bin/console'
@@ -208,6 +221,7 @@ Metrics/ModuleLength:
     - 'packages/forest_admin_agent/spec/**/*'
     - 'packages/forest_admin_datasource_active_record/spec/**/*'
     - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_mongoid/spec/**/*'
     - 'packages/forest_admin_datasource_customizer/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
 
@@ -273,6 +287,8 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_action.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/action_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/collection.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/query.rb'
 
 Style/OpenStructUse:
   Exclude:
@@ -292,6 +308,7 @@ Layout/LineLength:
     - 'packages/forest_admin_agent/spec/**/*'
     - 'packages/forest_admin_datasource_active_record/spec/**/*'
     - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_mongoid/spec/**/*'
     - 'packages/forest_admin_datasource_customizer/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/http/forest_admin_api_requester.rb'
