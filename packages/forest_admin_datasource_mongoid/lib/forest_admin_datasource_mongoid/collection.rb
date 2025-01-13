@@ -1,6 +1,7 @@
 module ForestAdminDatasourceMongoid
   class Collection < ForestAdminDatasourceToolkit::Collection
     include Parser::Column
+    include Parser::Validation
     # include Parser::Relation
     include ForestAdminDatasourceToolkit::Components::Query
 
@@ -55,9 +56,8 @@ module ForestAdminDatasourceMongoid
           is_read_only: false,
           is_sortable: true,
           default_value: column.object_id_field? ? nil : get_default_value(column),
-          enum_values: get_enum_values(column),
-          # validations: get_validations(column)
-          validations: []
+          enum_values: [],
+          validations: get_validations(column)
         )
 
         add_field(column_name, field)

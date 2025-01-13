@@ -46,17 +46,6 @@ module ForestAdminDatasourceMongoid
         nil
       end
 
-      def get_enum_values(_column)
-        []
-        # if get_column_type(model, column) == 'Enum'
-        #   if sti_column?(model, column)
-        #     model.descendants.each { |sti_model| enum_values << sti_model.name }
-        #   else
-        #     model.defined_enums[column.name].each_key { |name| enum_values << name }
-        #   end
-        # end
-      end
-
       def operators_for_column_type(type)
         result = [Operators::PRESENT, Operators::MISSING]
         equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
