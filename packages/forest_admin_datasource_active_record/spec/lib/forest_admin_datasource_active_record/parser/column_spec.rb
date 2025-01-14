@@ -19,6 +19,10 @@ module ForestAdminDatasourceActiveRecord
         it { expect(dummy_class.get_column_type(User, columns['time_field'])).to eq 'Time' }
         it { expect(dummy_class.get_column_type(User, columns['binary_field'])).to eq 'Binary' }
         it { expect(dummy_class.get_column_type(User, columns['enum_field'])).to eq 'Enum' }
+
+        it 'return string type by default when column type is unknown' do
+          expect(dummy_class.get_column_type(User, columns['foo'])).to eq 'String'
+        end
       end
 
       describe 'get_enum_values' do
