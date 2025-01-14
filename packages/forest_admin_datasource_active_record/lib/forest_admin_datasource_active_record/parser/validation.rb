@@ -51,7 +51,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def parse_length_validator(validator, parsed_validations)
-        return unless get_column_type(column) == 'String'
+        return unless get_column_type(@model, column) == 'String'
 
         validator.options.each do |option, value|
           case option

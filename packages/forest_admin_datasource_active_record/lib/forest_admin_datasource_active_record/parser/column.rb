@@ -27,8 +27,18 @@ module ForestAdminDatasourceActiveRecord
           return 'Enum'
         end
 
+        if TYPES.key?(column.type)
+          type = TYPES[column.type]
+        else
+          type = TYPES[:string]
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Info',
+            "unknown type '#{column.type}' for field named '#{column.name}', '#{TYPES[:string]}' type use by default"
+          )
+        end
+
         is_array = column.respond_to?(:array) && column.array == true
-        is_array ? "[#{TYPES[column.type]}]" : TYPES[column.type]
+        is_array ? "[#{type}]" : type
       end
 
       def get_enum_values(model, column)
