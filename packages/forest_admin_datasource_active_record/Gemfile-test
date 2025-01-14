@@ -9,6 +9,7 @@ gem 'rubocop', '~> 1.21'
 group :development, :test do
   gem 'database_cleaner-active_record'
   gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
+  gem 'forest_admin_agent', path: '../forest_admin_agent'
   gem 'rails'
   gem 'rspec-rails', '~> 3.0'
   gem 'simplecov', '~> 0.22', require: false
