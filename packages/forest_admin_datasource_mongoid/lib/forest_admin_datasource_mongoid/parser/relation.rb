@@ -41,6 +41,28 @@ module ForestAdminDatasourceMongoid
       #
       #   types
       # end
+
+      # def get_polymorphic_types(relation_name)
+      #   ObjectSpace.each_object(Class).select do |klass|
+      #     next unless klass < Mongoid::Document
+      #     klass.relations.any? do |_rel_name, relation|
+      #       relation.options[:as].to_s == relation_name.to_s
+      #     end
+      #   end.map(&:name)
+      # end
+
+      def get_polymorphic_types(relation_name)
+        types = {}
+
+        ObjectSpace.each_object(Class).select { |klass| klass < Mongoid::Document }.each do |model|
+          if model.relations.any? { |_, relation| relation.options[:as] == relation_name.to_sym }
+            primary_key = model.fields.keys.find { |key| model.fields[key].options[:as] == :id } || :_id
+            types[model.name] = primary_key
+          end
+        end
+
+        types
+      end
     end
   end
 end
