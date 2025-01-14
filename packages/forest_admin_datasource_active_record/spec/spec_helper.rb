@@ -2,7 +2,6 @@ require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_datasource_active_record'
-require 'forest_admin_agent'
 require 'active_record'
 require 'database_cleaner-active_record'
 
