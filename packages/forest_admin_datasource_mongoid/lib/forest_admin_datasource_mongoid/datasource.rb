@@ -12,8 +12,7 @@ module ForestAdminDatasourceMongoid
 
     def simulate_habtm(model)
       model.reflect_on_all_associations(:has_and_belongs_to_many).each do |association|
-        make_through_model(model, association) unless collections.key?(create_through_model_name(model,
-                                                                                                 association))
+        make_through_model(model, association) unless collections.key?(create_through_model_name(model, association))
       end
     end
 
@@ -43,30 +42,23 @@ module ForestAdminDatasourceMongoid
       end
 
       options = {}
-
       options[:name] = create_through_model_name(model, association)
       options[:collection_name] = options[:name].downcase
+
       options[:associations] = [
         {
           name: model.name.demodulize.underscore.to_sym,
-          foreign_collection: model.name,
+          foreign_collection: model.name.gsub('::', '__'),
           foreign_key: fetch_foreign_key(model),
-          foreign_key_target: fetch_foreign_key(model)
+          foreign_key_target: fetch_primary_key(association.klass)
         },
         {
           name: association.klass.name.demodulize.underscore.to_sym,
-          foreign_collection: association.klass.name,
+          foreign_collection: association.klass.name.gsub('::', '__'),
           foreign_key: fetch_foreign_key(association.klass),
-          foreign_key_target: fetch_foreign_key(association.klass)
+          foreign_key_target: fetch_primary_key(model)
         }
       ]
-
-      # through_model.add_association(model.name.demodulize.underscore.to_sym,
-      #                               class_name: model.name,
-      #                               foreign_key: fetch_foreign_key(model))
-      # through_model.add_association(association.klass.name.demodulize.underscore.to_sym,
-      #                               class_name: association.klass.name,
-      #                               foreign_key: fetch_foreign_key(association.klass))
 
       add_collection(ThroughCollection.new(self, options))
     end
