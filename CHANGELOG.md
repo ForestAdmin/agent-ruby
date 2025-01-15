@@ -1,3 +1,10 @@
+# [1.0.0-beta.90](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.89...v1.0.0-beta.90) (2025-01-15)
+
+
+### Bug Fixes
+
+* **active_record:** return default string type and add log when field type is unknown ([#95](https://github.com/ForestAdmin/agent-ruby/issues/95)) ([19db22a](https://github.com/ForestAdmin/agent-ruby/commit/19db22a30f6cc9df0f09e1ad1d532a1afb44c05a))
+
 # [1.0.0-beta.89](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.88...v1.0.0-beta.89) (2025-01-08)
 
 
