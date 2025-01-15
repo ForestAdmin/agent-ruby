@@ -114,13 +114,16 @@ module ForestAdminDatasourceMongoid
         when Mongoid::Association::Embedded::EmbedsOne
           # 'embeds_one'
         when Mongoid::Association::Referenced::HasAndBelongsToMany
-          datasource.simulate_habtm(model)
+          # datasource.simulate_habtm(model)
+          foreign_key_of_association = association.klass.reflect_on_all_associations.find do |assoc|
+            assoc.klass == association.inverse_class_name.constantize
+          end&.foreign_key
 
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
               foreign_collection: format_model_name(association.klass.name),
-              origin_key: association.foreign_key,
+              origin_key: foreign_key_of_association,
               origin_key_target: association.primary_key
             )
           )
