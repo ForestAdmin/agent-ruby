@@ -2,7 +2,7 @@ module ForestAdminDatasourceMongoid
   class Collection < ForestAdminDatasourceToolkit::Collection
     include Parser::Column
     include Parser::Validation
-    # include Parser::Relation
+    include Parser::Relation
     include ForestAdminDatasourceToolkit::Components::Query
 
     attr_reader :model
@@ -71,7 +71,7 @@ module ForestAdminDatasourceMongoid
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-              foreign_collection: format_model_name(association.class_name),
+              foreign_collection: format_model_name(association.klass.name),
               origin_key: association.foreign_key,
               origin_key_target: association.primary_key
             )
@@ -94,7 +94,7 @@ module ForestAdminDatasourceMongoid
             add_field(
               association.name.to_s,
               ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-                foreign_collection: format_model_name(association.class_name),
+                foreign_collection: format_model_name(association.klass.name),
                 foreign_key: association.foreign_key,
                 foreign_key_target: association.primary_key
               )
@@ -119,7 +119,7 @@ module ForestAdminDatasourceMongoid
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-              foreign_collection: format_model_name(association.class_name),
+              foreign_collection: format_model_name(association.klass.name),
               origin_key: association.foreign_key,
               origin_key_target: association.primary_key
             )
