@@ -17,10 +17,10 @@ module ForestAdminDatasourceMongoid
       # enable_count
     end
 
-    def list(_caller, _filter, projection)
-      # query = Utils::Query.new(self, projection, filter)
-
-      @model.all.map { |record| Utils::MongoidSerializer.new(record).to_hash(projection) }
+    def list(_caller, filter, projection)
+      Utils::Query.new(self, projection, filter)
+                  .get
+                  .map { |record| Utils::MongoidSerializer.new(record).to_hash(projection) }
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)

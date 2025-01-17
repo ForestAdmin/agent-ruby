@@ -254,6 +254,8 @@ Metrics/MethodLength:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/action_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/form_factory.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/collection.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/query.rb'
+
 
 Metrics/BlockLength:
   Exclude:

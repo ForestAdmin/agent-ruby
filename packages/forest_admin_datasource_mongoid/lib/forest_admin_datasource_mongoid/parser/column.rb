@@ -26,13 +26,8 @@ module ForestAdminDatasourceMongoid
       }.freeze
 
       def get_column_type(column)
-        # if model.respond_to?(:defined_enums) &&
-        #    model.defined_enums.key?(column.name)
-        #   return 'Enum'
-        # end
+        return 'String' if column.foreign_key?
 
-        # is_array = column.respond_to?(:array) && column.array == true
-        # is_array ? "[#{TYPES[column.type]}]" : TYPES[column.type]
         TYPES[column.type.to_s] || 'String'
       end
 
@@ -47,21 +42,26 @@ module ForestAdminDatasourceMongoid
       end
 
       def operators_for_column_type(type)
-        result = [Operators::PRESENT, Operators::MISSING]
-        equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
+        default_operators = [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL]
+        in_operators = [Operators::IN, Operators::NOT_IN]
+        string_operators = [Operators::MATCH, Operators::NOT_CONTAINS, Operators::NOT_I_CONTAINS]
+        comparison_operators = [Operators::GREATER_THAN, Operators::LESS_THAN]
+        result = []
 
         if type.is_a? String
-          orderables = [Operators::LESS_THAN, Operators::GREATER_THAN]
-          strings = [Operators::LIKE, Operators::I_LIKE, Operators::NOT_CONTAINS]
-
-          result += equality if %w[Boolean Binary Enum Uuid].include?(type)
-
-          result = result + equality + orderables if %w[Date Dateonly Number].include?(type)
-
-          result = result + equality + orderables + strings if %w[String].include?(type)
+          case type
+          when 'Boolean', 'Binary', 'Json'
+            result = default_operators
+          when 'Date', 'Dateonly', 'Number'
+            result = default_operators + in_operators + comparison_operators
+          when 'Enum'
+            result = default_operators + in_operators
+          when 'String'
+            result = default_operators + in_operators + string_operators
+          end
         end
 
-        result = result + equality + ['Includes_All'] if type.is_a? Array
+        result = default_operators if type.is_a? Array
 
         result
       end
