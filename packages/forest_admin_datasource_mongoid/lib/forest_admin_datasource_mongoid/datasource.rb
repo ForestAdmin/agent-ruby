@@ -20,12 +20,16 @@ module ForestAdminDatasourceMongoid
 
     def generate
       models = ObjectSpace.each_object(Class).select do |klass|
-        klass < Mongoid::Document && !klass.name.start_with?('Mongoid::')
+        klass < Mongoid::Document && !klass.name.start_with?('Mongoid::') && !embedded_in_relation?(klass)
       end
 
       models.each do |model|
         add_collection(Collection.new(self, model))
       end
+    end
+
+    def embedded_in_relation?(klass)
+      klass.relations.any? { |_name, association| association.is_a?(Mongoid::Association::Embedded::EmbeddedIn) }
     end
 
     def make_through_model(model, association)
