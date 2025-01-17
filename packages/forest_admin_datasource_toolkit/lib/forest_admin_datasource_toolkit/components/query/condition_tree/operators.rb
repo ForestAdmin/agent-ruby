@@ -13,6 +13,7 @@ module ForestAdminDatasourceToolkit
           NOT_CONTAINS = 'not_contains'.freeze
           CONTAINS = 'contains'.freeze
           I_CONTAINS = 'i_contains'.freeze
+          NOT_I_CONTAINS = 'not_i_contains'.freeze
           LONGER_THAN = 'longer_than'.freeze
           SHORTER_THAN = 'shorter_than'.freeze
           INCLUDES_ALL = 'includes_all'.freeze
