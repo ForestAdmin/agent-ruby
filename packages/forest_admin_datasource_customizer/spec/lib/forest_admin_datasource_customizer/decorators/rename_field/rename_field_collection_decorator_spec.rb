@@ -190,6 +190,19 @@ module ForestAdminDatasourceCustomizer
             expect(result).to eq(records)
           end
 
+          it 'act as a pass-through when call list() on collection with a polymorphic relation' do
+            records = [{ 'id' => '1', 'commentable' => { 'id' => '1' } }]
+            projection = Projection.new(%w[id commentable:*])
+            allow(@collection_comment).to receive(:list).and_return(records)
+
+            result = @new_comment.list(caller, filter, projection)
+
+            expect(@collection_comment).to have_received(:list) do |_caller, _filter, child_projection|
+              expect(child_projection).to match_array(projection)
+            end
+            expect(result).to eq(records)
+          end
+
           it 'act as a pass-through when call update()' do
             allow(@collection_person).to receive(:update)
             @new_person.update(caller, filter, { 'id' => 55 })
