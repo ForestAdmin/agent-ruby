@@ -173,7 +173,7 @@ module ForestAdminDatasourceCustomizer
             relation_name = paths[0]
             relation_schema = schema[:fields][relation_name]
             if relation_schema.type == 'PolymorphicManyToOne'
-              relation_name = to_child_collection[relation_name]
+              relation_name = to_child_collection[relation_name] || relation_name
 
               return "#{relation_name}:#{paths[1]}"
             else
