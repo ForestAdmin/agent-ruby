@@ -16,7 +16,7 @@ module ForestAdminDatasourceMongoid
 
       fetch_fields(@model)
       fetch_associations
-      # enable_count
+      enable_count
     end
 
     def list(_caller, filter, projection)
@@ -26,7 +26,7 @@ module ForestAdminDatasourceMongoid
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
-      # Utils::QueryAggregate.new(self, aggregation, filter, limit).get
+      Utils::QueryAggregate.new(self, aggregation, filter, limit).get
     end
 
     def create(_caller, data)
