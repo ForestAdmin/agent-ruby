@@ -125,6 +125,7 @@ module ForestAdminDatasourceMongoid
       end
 
       def format_field(field)
+        # TODO
         if field.include?(':')
           relation_name, field = field.split(':')
           relation = @collection.schema[:fields][relation_name]
