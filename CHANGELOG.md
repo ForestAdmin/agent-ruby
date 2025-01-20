@@ -1,3 +1,10 @@
+# [1.0.0-beta.91](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.90...v1.0.0-beta.91) (2025-01-20)
+
+
+### Bug Fixes
+
+* **polymorphic:** prevent update path when not rename polymorphic relation field ([#96](https://github.com/ForestAdmin/agent-ruby/issues/96)) ([46d3251](https://github.com/ForestAdmin/agent-ruby/commit/46d32518e16efda9558f2aaea4873d7249a199d1))
+
 # [1.0.0-beta.90](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.89...v1.0.0-beta.90) (2025-01-15)
 
 

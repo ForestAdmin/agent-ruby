@@ -1,3 +1,3 @@
 module ForestAdminTestToolkit
-  VERSION = "1.0.0-beta.90"
+  VERSION = "1.0.0-beta.91"
 end
