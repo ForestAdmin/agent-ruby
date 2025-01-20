@@ -139,12 +139,20 @@ module ForestAdminDatasourceMongoid
       end
 
       def format_relation_projection(projection)
-        result = {}
-        projection&.relations&.each do |relation, projection_relation|
-          formatted_relations = format_relation_projection(projection_relation)
+        # result = {}
+        # projection&.relations&.each do |relation, projection_relation|
+        #   formatted_relations = format_relation_projection(projection_relation)
+        #
+        #   result[relation.to_sym] = formatted_relations
+        # end
+        # result
 
-          result[relation.to_sym] = formatted_relations
+        result = []
+        projection&.relations&.each_value do |projection_relation|
+          formatted_relations = format_relation_projection(projection_relation)
+          result += formatted_relations
         end
+
         result
       end
     end

@@ -74,14 +74,27 @@ module ForestAdminDatasourceMongoid
       @model.relations.transform_values do |association|
         case association
         when Mongoid::Association::Referenced::HasMany
-          add_field(
-            association.name.to_s,
-            ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-              foreign_collection: format_model_name(association.klass.name),
-              origin_key: association.foreign_key,
-              origin_key_target: association.primary_key
+          if association.polymorphic?
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
+                foreign_collection: format_model_name(association.klass.name),
+                origin_key: association.foreign_key,
+                origin_key_target: association.primary_key,
+                origin_type_field: association.type,
+                origin_type_value: association.inverse_class_name.constantize
+              )
             )
-          )
+          else
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
+                foreign_collection: format_model_name(association.klass.name),
+                origin_key: association.foreign_key,
+                origin_key_target: association.primary_key
+              )
+            )
+          end
         when Mongoid::Association::Referenced::BelongsTo
           if association.polymorphic?
             foreign_collections = get_polymorphic_types(association.name)
@@ -107,14 +120,27 @@ module ForestAdminDatasourceMongoid
             )
           end
         when Mongoid::Association::Referenced::HasOne
-          add_field(
-            association.name.to_s,
-            ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-              foreign_collection: format_model_name(association.klass.name),
-              origin_key: association.foreign_key,
-              origin_key_target: association.primary_key
+          if association.polymorphic?
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
+                foreign_collection: format_model_name(association.klass.name),
+                origin_key: association.foreign_key,
+                origin_key_target: association.primary_key,
+                origin_type_field: association.type,
+                origin_type_value: association.inverse_class_name.constantize
+              )
             )
-          )
+          else
+            add_field(
+              association.name.to_s,
+              ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
+                foreign_collection: format_model_name(association.klass.name),
+                origin_key: association.foreign_key,
+                origin_key_target: association.primary_key
+              )
+            )
+          end
         when Mongoid::Association::Embedded::EmbedsMany
           # simplify this type of relationship by considering them to be sub-fields and encapsulating it in an array
           add_embedded_fields(association, "#{association.name}.[]")
@@ -164,6 +190,8 @@ module ForestAdminDatasourceMongoid
     #   end
     # end
     def add_embedded_fields(association, prefix = '')
+      return make_field(association.name.to_s, Hash) if association.is_a?(Mongoid::Association::Embedded::EmbedsMany)
+
       fetch_fields(association.klass, prefix)
 
       association.klass.relations.each do |sub_name, sub_association|
