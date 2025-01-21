@@ -13,6 +13,8 @@ ENV['RAILS_ENV'] ||= 'test'
 
 require File.expand_path('dummy/config/environment', __dir__)
 Mongoid.load!(File.expand_path('dummy/config/mongoid.yml', __dir__), :test)
+Mongoid.logger.level = Logger::ERROR
+Mongo::Logger.logger.level = Logger::ERROR
 
 RSpec.configure do |config|
   config.include Mongoid::Matchers, type: :model
