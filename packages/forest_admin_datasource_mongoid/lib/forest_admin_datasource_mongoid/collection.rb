@@ -54,7 +54,7 @@ module ForestAdminDatasourceMongoid
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(column),
           filter_operators: operators_for_column_type(get_column_type(column)),
-          is_primary_key: column.object_id_field?,
+          is_primary_key: column.object_id_field? && column.association.nil?,
           is_read_only: false,
           is_sortable: true,
           default_value: column.object_id_field? ? nil : get_default_value(column),
