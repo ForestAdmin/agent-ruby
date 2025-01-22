@@ -12,7 +12,8 @@ end
 ENV['RAILS_ENV'] ||= 'test'
 
 require File.expand_path('dummy/config/environment', __dir__)
-Mongoid.load!(File.expand_path('dummy/config/mongoid.yml', __dir__), :test)
+Dir[File.expand_path('dummy/app/models/**/*.rb', __dir__)].each { |file| require file }
+
 Mongoid.logger.level = Logger::ERROR
 Mongo::Logger.logger.level = Logger::ERROR
 
@@ -20,13 +21,10 @@ RSpec.configure do |config|
   config.include Mongoid::Matchers, type: :model
 
   config.before(:suite) do
-    Mongoid.purge!
+    Mongoid.load!(File.expand_path('dummy/config/mongoid.yml', __dir__), :test)
   end
 
   config.after do
     Mongoid.purge!
   end
-
-  # config.infer_spec_type_from_file_location!
-  # config.filter_rails_from_backtrace!
 end
