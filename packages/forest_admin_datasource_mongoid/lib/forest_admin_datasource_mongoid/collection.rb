@@ -148,7 +148,6 @@ module ForestAdminDatasourceMongoid
           # simplify this type of relationship by considering them to be sub-fields
           add_embedded_fields(association, association.name)
         when Mongoid::Association::Referenced::HasAndBelongsToMany
-          # datasource.simulate_habtm(model)
           foreign_key_of_association = association.klass.reflect_on_all_associations.find do |assoc|
             assoc.klass == association.inverse_class_name.constantize
           end&.foreign_key
@@ -161,34 +160,10 @@ module ForestAdminDatasourceMongoid
               origin_key_target: association.primary_key
             )
           )
-        else
-          'unknown'
         end
       end
     end
 
-    # def add_embedded_fields(association, prefix = '', depth = 0)
-    #   fetch_fields(association.klass, prefix)
-    #   association.klass.relations.each do |sub_name, sub_association|
-    #     field_name = "#{prefix}.#{sub_name}"
-    #
-    #     if depth >= MAX_DEPTH
-    #       make_field(field_name, Hash)
-    #     else
-    #       case sub_association
-    #       when Mongoid::Association::Embedded::EmbedsOne
-    #         make_field(field_name, Hash)
-    #         add_embedded_fields(sub_association, field_name, depth + 1)
-    #         debugger
-    #       when Mongoid::Association::Embedded::EmbedsMany
-    #         make_field(field_name, Array)
-    #         add_embedded_fields(sub_association, "#{field_name}[]", depth + 1)
-    #       else
-    #         make_field(field_name, sub_association.class)
-    #       end
-    #     end
-    #   end
-    # end
     def add_embedded_fields(association, prefix = '')
       return make_field(association.name.to_s, Hash) if association.is_a?(Mongoid::Association::Embedded::EmbedsMany)
 
