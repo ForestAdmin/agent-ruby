@@ -49,7 +49,8 @@ module ForestAdminDatasourceMongoid
       class_name.gsub('::', '__')
     end
 
-    def fetch_fields(model, prefix = nil)
+    def fetch_fields(model)
+      # Standard fields
       model.fields.each do |column_name, column|
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(column),
@@ -62,11 +63,17 @@ module ForestAdminDatasourceMongoid
           validations: get_validations(column)
         )
 
-        if prefix
-          add_field("#{prefix}.#{column_name}", field)
-        else
-          add_field(column_name, field)
-        end
+        add_field(column_name, field)
+      end
+
+      # Embedded field (EmbedsMany and EmbedsOne)
+      get_embedded_fields(model).each do |column_name, column|
+        field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
+          column_type: get_column_type(column),
+          is_primary_key: false,
+          is_sortable: false
+        )
+        add_field(column_name, field)
       end
     end
 
@@ -141,12 +148,6 @@ module ForestAdminDatasourceMongoid
               )
             )
           end
-        when Mongoid::Association::Embedded::EmbedsMany
-          # simplify this type of relationship by considering them to be sub-fields and encapsulating it in an array
-          add_embedded_fields(association, "#{association.name}.[]")
-        when Mongoid::Association::Embedded::EmbedsOne
-          # simplify this type of relationship by considering them to be sub-fields
-          add_embedded_fields(association, association.name)
         when Mongoid::Association::Referenced::HasAndBelongsToMany
           foreign_key_of_association = association.klass.reflect_on_all_associations.find do |assoc|
             assoc.klass == association.inverse_class_name.constantize
@@ -162,33 +163,6 @@ module ForestAdminDatasourceMongoid
           )
         end
       end
-    end
-
-    def add_embedded_fields(association, prefix = '')
-      return make_field(association.name.to_s, Hash) if association.is_a?(Mongoid::Association::Embedded::EmbedsMany)
-
-      fetch_fields(association.klass, prefix)
-
-      association.klass.relations.each do |sub_name, sub_association|
-        field_name = "#{prefix}.#{sub_name}"
-
-        next if sub_association.is_a?(Mongoid::Association::Embedded::EmbeddedIn)
-
-        if sub_association.is_a?(Mongoid::Association::Embedded::EmbedsOne) ||
-           sub_association.is_a?(Mongoid::Association::Embedded::EmbedsMany)
-          make_field(field_name, Hash)
-        else
-          make_field(field_name, sub_association.class)
-        end
-      end
-    end
-
-    def make_field(name, type)
-      schema[:fields][name] = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-        column_type: type.to_s,
-        is_primary_key: false,
-        is_sortable: true
-      )
     end
   end
 end

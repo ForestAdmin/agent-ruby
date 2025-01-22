@@ -26,9 +26,21 @@ module ForestAdminDatasourceMongoid
       }.freeze
 
       def get_column_type(column)
-        return 'String' if column.foreign_key?
+        if column.is_a? Mongoid::Fields::Standard
+          return TYPES[column.type.to_s] || 'String'
+        elsif column.is_a? Mongoid::Fields::ForeignKey
+          return 'String'
+        elsif column.respond_to?(:embedded?) && column.embedded?
+          model = column.class_name.constantize
+          fields = model.fields.merge(get_embedded_fields(model))
+          type = fields.reduce({}) do |memo, (name, column)|
+            memo.merge({ name => get_column_type(column) })
+          end
 
-        TYPES[column.type.to_s] || 'String'
+          return column.is_a?(Mongoid::Association::Embedded::EmbedsMany) ? [type] : type
+        end
+
+        'String'
       end
 
       def get_default_value(column)
@@ -39,6 +51,11 @@ module ForestAdminDatasourceMongoid
         end
 
         nil
+      end
+
+      def get_embedded_fields(model)
+        embedded_class = [Mongoid::Association::Embedded::EmbedsMany, Mongoid::Association::Embedded::EmbedsOne]
+        model.relations.select { |_name, association| embedded_class.include?(association.class) }
       end
 
       def operators_for_column_type(type)
