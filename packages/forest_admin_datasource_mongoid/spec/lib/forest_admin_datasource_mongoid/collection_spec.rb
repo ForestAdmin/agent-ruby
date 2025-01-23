@@ -39,19 +39,22 @@ module ForestAdminDatasourceMongoid
         expect(collection_comment.schema[:fields]['post']).to be_a(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
       end
 
-      # TODO: UNCOMMENT when embedded relations types are fixed
-      # context 'when the relation is embedded' do
-      #   it 'add a single field for an embedded many relation' do
-      #     expect(collection_user.schema[:fields]['addresses']).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
-      #   end
-      #
-      #   it 'add a single field for each key of an embedded one relation' do
-      #     expect(collection_band.schema[:fields].keys).to include('label._id', 'label.name', 'label.section')
-      #     expect(collection_band.schema[:fields]['label._id']).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
-      #     expect(collection_band.schema[:fields]['label.name']).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
-      #     expect(collection_band.schema[:fields]['label.section']).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
-      #   end
-      # end
+      context 'when the relation is embedded' do
+        it 'add a single field for an embedded many relation' do
+          expect(collection_user.schema[:fields]['addresses']).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
+        end
+
+        it 'add single field with a composite type' do
+          expect(collection_band.schema[:fields].keys).to include('label')
+          expect(collection_band.schema[:fields]['label'].column_type).to eq(
+            {
+              '_id' => 'String',
+              'name' => 'String',
+              'section' => { '_id' => 'String', 'content' => 'String', 'body' => 'String' }
+            }
+          )
+        end
+      end
     end
 
     it 'serializes the schema to JSON' do
@@ -60,12 +63,13 @@ module ForestAdminDatasourceMongoid
       expect(JSON.parse(json_schema)['fields'].keys).to include('title', 'body', 'comments')
     end
 
+    # TODO: works but waiting crud is fully implemented
     # describe '#list' do
     #   it 'returns a serialized list of records' do
     #     allow(Utils::Query).to receive_message_chain(:new, :get).and_return([Post.new(title: 'Test', body: 'Body')])
     #     allow(Utils::MongoidSerializer).to receive(:new).and_return(double(to_hash: { title: 'Test', body: 'Body' }))
     #
-    #     result = collection.list(nil, {}, nil)
+    #     result = collection_post.list(nil, {}, nil)
     #
     #     expect(result).to eq([{ title: 'Test', body: 'Body' }])
     #   end
