@@ -14,7 +14,7 @@ module ForestAdminDatasourceMongoid
       name = format_model_name(@model.name)
       super(datasource, name)
 
-      fetch_fields(@model)
+      fetch_fields
       fetch_associations
       enable_count
     end
@@ -30,17 +30,17 @@ module ForestAdminDatasourceMongoid
     end
 
     def create(_caller, data)
-      # Utils::ActiveRecordSerializer.new(@model.create(data)).to_hash(ProjectionFactory.all(self))
+      Utils::MongoidSerializer.new(@model.create(data)).to_hash(ProjectionFactory.all(self))
     end
 
     def update(_caller, filter, data)
-      # entity = Utils::Query.new(self, nil, filter).build.first
-      # entity&.update(data)
+      entity = Utils::Query.new(self, nil, filter).build.first
+      entity&.update(data)
     end
 
     def delete(_caller, filter)
-      # entities = Utils::Query.new(self, nil, filter).build
-      # entities&.each(&:destroy)
+      entities = Utils::Query.new(self, nil, filter).build
+      entities&.each(&:destroy)
     end
 
     private
@@ -49,9 +49,9 @@ module ForestAdminDatasourceMongoid
       class_name.gsub('::', '__')
     end
 
-    def fetch_fields(model)
+    def fetch_fields
       # Standard fields
-      model.fields.each do |column_name, column|
+      @model.fields.each do |column_name, column|
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(column),
           filter_operators: operators_for_column_type(get_column_type(column)),
@@ -67,7 +67,7 @@ module ForestAdminDatasourceMongoid
       end
 
       # Embedded field (EmbedsMany and EmbedsOne)
-      get_embedded_fields(model).each do |column_name, column|
+      get_embedded_fields(@model).each do |column_name, column|
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(column),
           is_primary_key: false,
