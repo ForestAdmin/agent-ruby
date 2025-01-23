@@ -11,7 +11,7 @@ module ForestAdminAgent
       end
 
       def format_attributes(args)
-        record = args[:params][:data][:attributes]
+        record = args[:params][:data][:attributes] || {}
 
         args[:params][:data][:relationships]&.map do |field, value|
           schema = @collection.schema[:fields][field]

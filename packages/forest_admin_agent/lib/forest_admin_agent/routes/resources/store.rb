@@ -19,10 +19,9 @@ module ForestAdminAgent
           data = format_attributes(args)
           record = @collection.create(@caller, data)
           link_one_to_one_relations(args, record)
-
-          id = Utils::Id.unpack_id(@collection, record['id'], with_key: true)
+          id = ForestAdminDatasourceToolkit::Utils::Record.primary_keys(@collection, record)
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-            condition_tree: ConditionTree::ConditionTreeFactory.match_records(@collection, [id])
+            condition_tree: ConditionTree::ConditionTreeFactory.match_ids(@collection, [id])
           )
           records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
 
@@ -40,7 +39,7 @@ module ForestAdminAgent
         def link_one_to_one_relations(args, record)
           args[:params][:data][:relationships]&.map do |field, value|
             schema = @collection.schema[:fields][field]
-            next unless ['OneToOne', 'PolymorphicOneToOne'].include?(schema.type)
+            next unless %w[OneToOne PolymorphicOneToOne].include?(schema.type)
 
             id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)
             foreign_collection = @datasource.get_collection(schema.foreign_collection)
