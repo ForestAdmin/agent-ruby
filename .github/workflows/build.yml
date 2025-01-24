@@ -78,7 +78,17 @@ jobs:
       - name: Debug Coverage Directory
         run: ls -R packages/${{ matrix.packages }}/coverage/
 
-#      - name: Upload coverage
+      - name: Debug file structure
+        run: tree -a packages/forest_admin_datasource_active_record
+
+      - name: Verify coverage.json presence
+        run: |
+          if [ -f packages/forest_admin_datasource_active_record/coverage/coverage.json ]; then
+            echo "Coverage file exists"
+          else
+            echo "Coverage file is missing"
+          fi
+      #      - name: Upload coverage
 #        uses: actions/upload-artifact@v4
 #        with:
 #          name: ${{ matrix.ruby-version }}-${{ matrix.packages }}
