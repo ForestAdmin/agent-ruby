@@ -13,7 +13,7 @@ gem 'rubocop', '~> 1.21'
 group :development, :test do
   gem 'rails'
   gem 'rspec-rails', '~> 3.0'
-  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov', '~> 0.17', require: false
   gem 'simplecov-html', '~> 0.12.3'
   gem 'simplecov_json_formatter', '~> 0.1.4'
   gem 'sqlite3'
