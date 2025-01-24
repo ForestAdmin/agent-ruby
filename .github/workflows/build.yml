@@ -74,6 +74,10 @@ jobs:
       - name: Test
         run: cd packages/${{ matrix.packages }} && BUNDLE_GEMFILE=Gemfile-test bundle install && BUNDLE_GEMFILE=Gemfile-test bundle exec rspec --color --format doc && cd -
 
+      # temp debug
+      - name: Debug Coverage Directory
+        run: ls -R packages/${{ matrix.packages }}/coverage/
+
 #      - name: Upload coverage
 #        uses: actions/upload-artifact@v4
 #        with:

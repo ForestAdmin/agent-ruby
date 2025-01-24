@@ -12,8 +12,10 @@ end
 
 SimpleCov.at_exit do
   result = SimpleCov.result
+  coverage_file = File.join(SimpleCov.coverage_dir, 'coverage.json')
   coverage_percent = result.covered_percent
   puts "Coverage Report Generated"
+  puts "Coverage file generated at: #{coverage_file}"
   puts "Covered Percent: #{coverage_percent}%"
 end
 
