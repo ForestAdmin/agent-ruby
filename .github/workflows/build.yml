@@ -110,7 +110,7 @@ jobs:
           CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
         with:
           coverageLocations: |
-            ${{ github.workspace }}/packages/${{ matrix.packages }}/coverage.json:simplecov
+            ${{ github.workspace }}/reports/3.2-${{ matrix.packages }}/coverage.json:simplecov
           debug: true
 
 #  deploy:
