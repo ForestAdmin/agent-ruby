@@ -74,15 +74,6 @@ jobs:
       - name: Test
         run: cd packages/${{ matrix.packages }} && BUNDLE_GEMFILE=Gemfile-test bundle install && BUNDLE_GEMFILE=Gemfile-test bundle exec rspec --color --format doc && cd -
 
-      - name: test debug main Directory
-        run: tree -a coverage/
-
-      - name: Debug Coverage Directory
-        run: tree -a packages/${{ matrix.packages }}/coverage/
-
-      - name: Debug file structure
-        run: tree -a packages/forest_admin_datasource_active_record
-
       - name: Verify coverage.json presence
         run: |
           if [ -f packages/forest_admin_datasource_active_record/coverage/coverage.json ]; then
@@ -90,6 +81,13 @@ jobs:
           else
             echo "Coverage file is missing"
           fi
+
+      - name: Debug Coverage Directory
+        run: tree -a packages/${{ matrix.packages }}/coverage/
+
+      - name: Debug file structure
+        run: tree -a packages/forest_admin_datasource_active_record
+
       #      - name: Upload coverage
 #        uses: actions/upload-artifact@v4
 #        with:
