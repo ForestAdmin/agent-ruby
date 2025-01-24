@@ -13,11 +13,20 @@ puts "Current working directory: #{Dir.pwd}"
 SimpleCov.coverage_dir 'coverage'
 SimpleCov.at_exit do
   result = SimpleCov.result
+  result.format!
   coverage_file = File.join(SimpleCov.coverage_dir, 'coverage.json')
+
+  # coverage_file = File.join(SimpleCov.coverage_dir, 'coverage.json')
   coverage_percent = result.covered_percent
   puts "Coverage Report Generated"
   puts "Coverage file generated at: #{coverage_file}"
   puts "Covered Percent: #{coverage_percent}%"
+
+  if File.exist?(coverage_file)
+    puts "SUCCESS: Coverage file (coverage.json) exists!"
+  else
+    puts "ERROR: Coverage file (coverage.json) is missing!"
+  end
 end
 
 ENV['RAILS_ENV'] ||= 'test'
