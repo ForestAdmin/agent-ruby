@@ -10,7 +10,7 @@ SimpleCov.start do
   add_filter 'spec'
 end
 puts "Current working directory: #{Dir.pwd}"
-SimpleCov.coverage_dir File.join(Dir.pwd, 'packages/forest_admin_datasource_active_record/coverage')
+SimpleCov.coverage_dir 'coverage'
 SimpleCov.at_exit do
   result = SimpleCov.result
   coverage_file = File.join(SimpleCov.coverage_dir, 'coverage.json')
