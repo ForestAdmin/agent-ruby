@@ -30,7 +30,7 @@ module ForestAdminDatasourceMongoid
     end
 
     def create(_caller, data)
-      Utils::MongoidSerializer.new(@model.create(data)).to_hash(ProjectionFactory.all(self))
+      Utils::MongoidSerializer.new(model.create(data)).to_hash(ProjectionFactory.all(self))
     end
 
     def update(_caller, filter, data)
