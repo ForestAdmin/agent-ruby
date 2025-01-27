@@ -15,6 +15,12 @@ SimpleCov.start do
   add_filter 'lib/forest_admin_agent/serializer/json_api_serializer.rb'
 end
 
+SimpleCov.coverage_dir 'coverage'
+SimpleCov.at_exit do
+  result = SimpleCov.result
+  result.format!
+end
+
 RSpec.shared_context 'with caller' do
   let(:bearer) do
     # TODO: improve with a build token function

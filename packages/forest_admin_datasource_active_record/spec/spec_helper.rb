@@ -10,6 +10,12 @@ SimpleCov.start do
   add_filter 'spec'
 end
 
+SimpleCov.coverage_dir 'coverage'
+SimpleCov.at_exit do
+  result = SimpleCov.result
+  result.format!
+end
+
 ENV['RAILS_ENV'] ||= 'test'
 require File.expand_path('dummy/config/environment', __dir__)
 Rails.application.eager_load!

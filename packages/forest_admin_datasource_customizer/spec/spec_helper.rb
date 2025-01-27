@@ -13,6 +13,12 @@ SimpleCov.start do
   add_filter 'spec'
 end
 
+SimpleCov.coverage_dir 'coverage'
+SimpleCov.at_exit do
+  result = SimpleCov.result
+  result.format!
+end
+
 RSpec.shared_context 'with caller' do
   let(:caller) { build_caller }
 end
