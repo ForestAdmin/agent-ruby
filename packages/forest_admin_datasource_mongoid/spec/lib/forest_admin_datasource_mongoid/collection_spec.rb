@@ -1,6 +1,8 @@
 require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
+  include ForestAdminDatasourceToolkit::Components::Query
+
   describe Collection do
     let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
     let(:collection_post) { described_class.new(datasource, Post) }
@@ -63,16 +65,96 @@ module ForestAdminDatasourceMongoid
       expect(JSON.parse(json_schema)['fields'].keys).to include('title', 'body', 'comments')
     end
 
-    # TODO: works but waiting crud is fully implemented
-    # describe '#list' do
-    #   it 'returns a serialized list of records' do
-    #     allow(Utils::Query).to receive_message_chain(:new, :get).and_return([Post.new(title: 'Test', body: 'Body')])
-    #     allow(Utils::MongoidSerializer).to receive(:new).and_return(double(to_hash: { title: 'Test', body: 'Body' }))
-    #
-    #     result = collection_post.list(nil, {}, nil)
-    #
-    #     expect(result).to eq([{ title: 'Test', body: 'Body' }])
-    #   end
-    # end
+    describe '#list' do
+      it 'returns a serialized list of records' do
+        post = Post.new(title: 'Test', body: 'Body')
+        query_result = [post]
+        query = instance_double(Utils::Query, get: query_result)
+        allow(Utils::Query).to receive_messages(new: query)
+
+        result = collection_post.list(nil, Filter.new, Projection.new(%w[_id title body]))
+
+        expect(result).to eq([{ '_id' => post._id, 'title' => post.title, 'body' => post.body }])
+      end
+
+      it 'returns a serialized list of records with many to one relation' do
+        post = Post.new(title: 'Test', body: 'Body')
+        comment = Comment.new(name: 'foo', message: 'lorem ipsum', post: post)
+        query_result = [comment]
+        query = instance_double(Utils::Query, get: query_result)
+        allow(Utils::Query).to receive_messages(new: query)
+
+        result = collection_comment.list(nil, Filter.new, Projection.new(%w[_id name message post:title]))
+
+        expect(result).to eq(
+          [
+            {
+              '_id' => comment._id,
+              'message' => comment.message,
+              'name' => comment.name,
+              'post' => { 'title' => post.title }
+            }
+          ]
+        )
+      end
+    end
+
+    describe '#aggregate' do
+      it 'call QueryAggregate and return an aggregate result' do
+        Post.new(title: 'Test', body: 'Body')
+        query = instance_double(Utils::QueryAggregate, get: [{ 'value' => 1 }])
+        allow(Utils::QueryAggregate).to receive_messages(new: query)
+
+        filter = Filter.new
+        aggregation = Aggregation.new(operation: 'Count')
+        result = collection_post.aggregate(nil, filter, aggregation, 10)
+
+        expect(Utils::QueryAggregate).to(
+          have_received(:new) do |collection, aggregation_request, filter_request, limit|
+            expect(collection).to eq(collection_post)
+            expect(filter).to eq(filter_request)
+            expect(aggregation).to eq(aggregation_request)
+            expect(limit).to eq(10)
+          end
+        )
+        expect(result).to eq([{ 'value' => 1 }])
+      end
+    end
+
+    describe '#create' do
+      it 'call create method of model and return object with full projection' do
+        post = Post.new(title: 'Test', body: 'Body')
+        model = class_double(Post, create: post)
+        allow(collection_post).to receive(:model).and_return(model)
+
+        result = collection_post.create(nil, { title: 'Test', body: 'Body' })
+
+        expect(result).to eq({ '_id' => post._id, 'title' => post.title, 'body' => post.body, 'author' => nil })
+      end
+    end
+
+    describe '#update' do
+      it 'call update method of object' do
+        model = instance_double(Post, update: true)
+        query = instance_double(Utils::Query, build: [model])
+        allow(Utils::Query).to receive_messages(new: query)
+
+        collection_post.update(nil, Filter.new, { title: 'new title' })
+        expect(model).to have_received(:update) do |data|
+          expect(data).to eq({ title: 'new title' })
+        end
+      end
+    end
+
+    describe '#delete' do
+      it 'call destroy method of object' do
+        model = instance_double(Post, destroy: true)
+        query = instance_double(Utils::Query, build: [model])
+        allow(Utils::Query).to receive_messages(new: query)
+
+        collection_post.delete(nil, Filter.new)
+        expect(model).to have_received(:destroy)
+      end
+    end
   end
 end
