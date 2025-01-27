@@ -99,11 +99,6 @@ jobs:
         with:
           path: reports
 
-      - name: Debug coverage directory
-        run: |
-          echo "Debugging reports directory:"
-          tree -a reports || ls -la reports
-
       - name: Send coverage
         uses: paambaati/codeclimate-action@v5.0.0
         env:
