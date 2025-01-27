@@ -2,5 +2,6 @@ version: "2"
 plugins:
   rubocop:
     enabled: true
+    channel: "rubocop-1-56-3"
   test-reporter:
     formatter: simplecov
