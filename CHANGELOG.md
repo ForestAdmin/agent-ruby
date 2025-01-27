@@ -1,3 +1,10 @@
+# [1.0.0-beta.93](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.92...v1.0.0-beta.93) (2025-01-27)
+
+
+### Bug Fixes
+
+* add safe navigation operator to get the inverse_of relation ([#97](https://github.com/ForestAdmin/agent-ruby/issues/97)) ([bc17389](https://github.com/ForestAdmin/agent-ruby/commit/bc17389282c17f0f8cf852273b58b1a558bdff17))
+
 # [1.0.0-beta.92](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.91...v1.0.0-beta.92) (2025-01-27)
 
 
