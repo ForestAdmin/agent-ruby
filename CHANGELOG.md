@@ -1,3 +1,10 @@
+# [1.0.0-beta.92](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.91...v1.0.0-beta.92) (2025-01-27)
+
+
+### Bug Fixes
+
+* workflow for coverage upload to codeclimate ([#99](https://github.com/ForestAdmin/agent-ruby/issues/99)) ([ef38cd3](https://github.com/ForestAdmin/agent-ruby/commit/ef38cd3d37fb3a3ee6395a8fcfa55122c4c3c87c))
+
 # [1.0.0-beta.91](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.90...v1.0.0-beta.91) (2025-01-20)
 
 
