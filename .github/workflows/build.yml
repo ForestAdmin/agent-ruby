@@ -17,6 +17,7 @@ jobs:
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
+          - forest_admin_datasource_mongoid
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
           - forest_admin_test_toolkit
@@ -52,6 +53,7 @@ jobs:
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
+          - forest_admin_datasource_mongoid
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
     steps:
@@ -107,6 +109,7 @@ jobs:
           coverageLocations: |
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json:simplecov
+            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json:simplecov
           debug: true
