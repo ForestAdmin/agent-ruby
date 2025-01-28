@@ -1,11 +1,11 @@
 module ForestAdminDatasourceMongoid
   module Utils
     MongoidSerializer = Struct.new(:object) do
-      def to_hash(projection = nil)
+      def to_hash(projection)
         hash_object(object, projection)
       end
 
-      def hash_object(object, projection = nil, with_associations: true)
+      def hash_object(object, projection, with_associations: true)
         hash = {}
 
         return if object.nil?
