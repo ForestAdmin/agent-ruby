@@ -10,7 +10,7 @@ module ForestAdminDatasourceMongoid
 
         return if object.nil?
 
-        object.attributes.select { |key, _value| projection.columns.include? key }.each do |key, value|
+        object.attributes.slice(*projection.columns).each do |key, value|
           hash[key] = value
         end
 
