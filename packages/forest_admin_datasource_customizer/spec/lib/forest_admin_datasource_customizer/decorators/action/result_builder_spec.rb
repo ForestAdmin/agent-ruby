@@ -16,7 +16,7 @@ module ForestAdminDatasourceCustomizer
             {
               headers: { 'header_key' => 'header_value' },
               type: 'Success',
-              message: 'Success',
+              success: 'Success',
               refresh: { relationships: [] },
               html: nil
             }
@@ -28,7 +28,7 @@ module ForestAdminDatasourceCustomizer
             {
               headers: {},
               type: 'Success',
-              message: 'Success',
+              success: 'Success',
               refresh: { relationships: [] },
               html: nil
             }
@@ -38,7 +38,7 @@ module ForestAdminDatasourceCustomizer
             {
               headers: {},
               type: 'Success',
-              message: 'foo',
+              success: 'foo',
               refresh: { relationships: [] },
               html: '<div>That worked!</div>'
             }
@@ -50,7 +50,7 @@ module ForestAdminDatasourceCustomizer
             {
               headers: {},
               type: 'Error',
-              message: 'Error',
+              error: 'Error',
               status: 400,
               html: nil
             }
@@ -60,7 +60,7 @@ module ForestAdminDatasourceCustomizer
             {
               headers: {},
               type: 'Error',
-              message: 'foo',
+              error: 'foo',
               status: 400,
               html: '<div>That worked!</div>'
             }
