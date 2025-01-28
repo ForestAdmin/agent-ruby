@@ -16,7 +16,7 @@ module ForestAdminDatasourceCustomizer
           {
             headers: @headers,
             type: 'Success',
-            message: message,
+            success: message,
             refresh: { relationships: options.key?(:invalidated) ? options[:invalidated] : [] },
             html: options.key?(:html) ? options[:html] : nil
           }
@@ -27,7 +27,7 @@ module ForestAdminDatasourceCustomizer
             headers: @headers,
             type: 'Error',
             status: 400,
-            message: message,
+            error: message,
             html: options.key?(:html) ? options[:html] : nil
           }
         end
