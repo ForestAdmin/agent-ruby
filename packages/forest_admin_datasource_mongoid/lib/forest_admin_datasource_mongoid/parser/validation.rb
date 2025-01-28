@@ -22,7 +22,7 @@ module ForestAdminDatasourceMongoid
             when ActiveModel::Validations::NumericalityValidator.to_s
               validations = parse_numericality_validator(validator, validations)
             when Mongoid::Validatable::LengthValidator.to_s
-              validations = parse_length_validator(validator, validations)
+              validations = parse_length_validator(validator, validations, column)
             when Mongoid::Validatable::FormatValidator.to_s
               validations = parse_format_validator(validator, validations)
             end
@@ -41,9 +41,11 @@ module ForestAdminDatasourceMongoid
             parsed_validations << { operator: Operators::LESS_THAN, value: value }
           end
         end
+
+        parsed_validations
       end
 
-      def parse_length_validator(validator, parsed_validations)
+      def parse_length_validator(validator, parsed_validations, column)
         return unless get_column_type(column) == 'String'
 
         validator.options.each do |option, value|
@@ -57,6 +59,8 @@ module ForestAdminDatasourceMongoid
             parsed_validations << { operator: Operators::SHORTER_THAN, value: value }
           end
         end
+
+        parsed_validations
       end
 
       def parse_format_validator(validator, parsed_validations)
