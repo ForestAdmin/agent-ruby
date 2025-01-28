@@ -23,7 +23,7 @@ module ForestAdminDatasourceToolkit
                   regex.gsub!('%', '.*')
                   regex.tr!('_', '.')
 
-                  leaf.override(operator: Operators::MATCH, value: Regexp.new("^#{regex}$", case_sensitive ? '' : 'i'))
+                  leaf.override(operator: Operators::MATCH, value: Regexp.new("^#{regex}$", case_sensitive ? nil : 'i'))
                 }
               }
             end
