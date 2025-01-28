@@ -70,21 +70,21 @@ module ForestAdminAgent
         filters = { field: 'label', operator: Operators::IN, value: ' id1,id2 , id3' }
 
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
-          .to have_attributes(field: filters[:field], operator: filters[:operator], value: filters[:value])
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[id1 id2 id3])
       end
 
       it 'works with "IN" on a boolean' do
         filters = { field: 'active', operator: Operators::IN, value: 'true,0,false,yes,no' }
 
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
-          .to have_attributes(field: filters[:field], operator: filters[:operator], value: filters[:value])
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: [true, false, false, true, false])
       end
 
       it 'works with "IN" on a number' do
         filters = { field: 'id', operator: Operators::IN, value: '1,2,3' }
 
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
-          .to have_attributes(field: filters[:field], operator: filters[:operator], value: filters[:value])
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: [1, 2, 3])
       end
     end
   end
