@@ -2,11 +2,9 @@ require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
   module Parser
-    # include ForestAdminDatasourceToolkit
-    # include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
     describe Column do
       let(:dummy_class) { Class.new { extend Column } }
-      # let(:dummy_class) { Class.new { extend ForestAdminDatasourceMongoid::Parser::Column } }
 
       let(:columns) do
         {
@@ -94,15 +92,21 @@ module ForestAdminDatasourceMongoid
           expect(result).to eq({})
         end
 
-        # {
-        #   'Boolean' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
-        #   'Date' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
-        #   'String' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::MATCH, Operators::NOT_CONTAINS, Operators::NOT_I_CONTAINS]
-        # }.each do |type, expected_operators|
-        #   it "returns correct operators for type #{type}" do
-        #     expect(dummy_class.operators_for_column_type(type)).to eq expected_operators
-        #   end
-        # end
+        {
+          'Boolean' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
+          'Binary' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
+          'Json' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
+          'Array' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
+          'Date' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
+          'Dateonly' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
+          'Number' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
+          'String' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::MATCH, Operators::NOT_CONTAINS, Operators::NOT_I_CONTAINS],
+          'Enum' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
+        }.each do |type, expected_operators|
+          it "returns correct operators for type #{type}" do
+            expect(dummy_class.operators_for_column_type(type)).to eq expected_operators
+          end
+        end
       end
     end
   end
