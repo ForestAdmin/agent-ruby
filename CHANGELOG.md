@@ -1,3 +1,10 @@
+# [1.0.0-beta.94](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.93...v1.0.0-beta.94) (2025-01-28)
+
+
+### Bug Fixes
+
+* display custom success/error messages for actions ([#101](https://github.com/ForestAdmin/agent-ruby/issues/101)) ([083c8e0](https://github.com/ForestAdmin/agent-ruby/commit/083c8e05799dd139744204008bd359653add52d3))
+
 # [1.0.0-beta.93](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.92...v1.0.0-beta.93) (2025-01-27)
 
 
