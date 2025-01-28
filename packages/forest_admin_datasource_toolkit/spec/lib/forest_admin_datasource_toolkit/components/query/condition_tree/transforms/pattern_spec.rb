@@ -53,13 +53,13 @@ module ForestAdminDatasourceToolkit
             it 'Like should be rewritten' do
               expect(@pattern[Operators::LIKE][0][:replacer].call(ConditionTreeLeaf.new('column', Operators::EQUAL,
                                                                                         'something')).to_h)
-                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/').to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, /^something$/).to_h)
             end
 
             it 'ILike should be rewritten' do
               expect(@pattern[Operators::I_LIKE][0][:replacer].call(ConditionTreeLeaf.new('column', Operators::EQUAL,
                                                                                           'something')).to_h)
-                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, '/^something$/i').to_h)
+                .to eq(ConditionTreeLeaf.new('column', Operators::MATCH, /^something$/i).to_h)
             end
           end
         end
