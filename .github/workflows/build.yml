@@ -17,11 +17,11 @@ jobs:
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
-          - forest_admin_datasource_mongoid
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
           - forest_admin_test_toolkit
           - forest_admin_rails
+          - forest_admin_datasource_mongoid
 
     steps:
       - name: Checkout
@@ -53,9 +53,15 @@ jobs:
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
-          - forest_admin_datasource_mongoid
           - forest_admin_datasource_customizer
           - forest_admin_datasource_toolkit
+          - forest_admin_datasource_mongoid
+    services:
+      mongodb:
+        if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
+        image: mongo:latest
+        ports:
+          - 27017:27017
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,6 +75,16 @@ jobs:
         run: |
           gem install bundler
           bundle install
+
+      - name: Wait for MongoDB
+        if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 27017 && echo "MongoDB is up" && exit 0
+            echo "Waiting for MongoDB..."
+            sleep 1
+          done
+          exit 1
 
       - name: Test
         run: |
@@ -109,9 +125,9 @@ jobs:
           coverageLocations: |
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json:simplecov
-            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json:simplecov
             ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json:simplecov
+            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json:simplecov
           debug: true
 
   deploy:
