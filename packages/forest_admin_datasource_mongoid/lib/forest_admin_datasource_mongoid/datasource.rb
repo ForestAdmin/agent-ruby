@@ -14,7 +14,7 @@ module ForestAdminDatasourceMongoid
 
     def generate
       models = ObjectSpace.each_object(Class).select do |klass|
-        klass < Mongoid::Document && !klass.name.start_with?('Mongoid::') && !embedded_in_relation?(klass)
+        klass < Mongoid::Document && klass.name && !klass.name.start_with?('Mongoid::') && !embedded_in_relation?(klass)
       end
 
       models.each do |model|

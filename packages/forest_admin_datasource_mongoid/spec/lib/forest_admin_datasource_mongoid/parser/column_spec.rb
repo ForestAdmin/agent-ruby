@@ -96,7 +96,7 @@ module ForestAdminDatasourceMongoid
           'Boolean' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
           'Binary' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
           'Json' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
-          'Array' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
+          [] => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL],
           'Date' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
           'Dateonly' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
           'Number' => [Operators::PRESENT, Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN, Operators::GREATER_THAN, Operators::LESS_THAN],
