@@ -22,20 +22,40 @@ module ForestAdminDatasourceMongoid
         end
 
         describe 'with relations' do
-          let(:post) { Post.create!(title: 'foo', body: 'fake content') }
+          let(:post) { Post.first }
+          let(:author) { Author.first }
 
-          it 'return a mongoid object serialized with full projection' do
-            expect(described_class.new(post).to_hash(Projection.new(%w[title body]))).to eq(
-              { 'title' => 'foo', 'body' => 'fake content' }
+          before do
+            Author.create!(
+              first_name: 'john',
+              last_name: 'doe',
+              post: Post.create!(title: 'foo', body: 'fake content')
             )
           end
 
-          # it 'return a mongoid object serialized with partial projection' do
-          #   post = Post.new(title: 'foo', body: 'fake content')
-          #   expect(described_class.new(post).to_hash(Projection.new(%w[title]))).to eq(
-          #     { 'title' => 'foo' }
-          #   )
-          # end
+          it 'return a mongoid object serialized based on projection with ManyToOne relation' do
+            projection = Projection.new(%w[first_name last_name post:title post:body])
+
+            expect(described_class.new(author).to_hash(projection)).to eq(
+              {
+                'first_name' => 'john',
+                'last_name' => 'doe',
+                'post' => { 'title' => 'foo', 'body' => 'fake content' }
+              }
+            )
+          end
+
+          it 'return a mongoid object serialized based on projection with OneToOne relation' do
+            projection = Projection.new(%w[title body author:first_name author:lastname])
+
+            expect(described_class.new(post).to_hash(projection)).to eq(
+              {
+                'title' => 'foo',
+                'body' => 'fake content',
+                'author' => { 'first_name' => 'john' }
+              }
+            )
+          end
         end
       end
     end
