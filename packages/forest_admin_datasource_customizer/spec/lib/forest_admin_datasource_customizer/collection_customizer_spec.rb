@@ -192,7 +192,7 @@ module ForestAdminDatasourceCustomizer
         condition = proc { |search| [{ field: 'title', operator: Operators::EQUAL, value: search }] }
 
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
-        customizer.replace_search(condition)
+        customizer.replace_search(&condition)
         stack.apply_queued_customizations({})
 
         search_collection = @datasource_customizer.stack.search.get_collection('book')
