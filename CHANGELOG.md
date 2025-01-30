@@ -1,3 +1,10 @@
+# [1.0.0-beta.95](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.94...v1.0.0-beta.95) (2025-01-30)
+
+
+### Bug Fixes
+
+* allow replace_search to accept a block ([#102](https://github.com/ForestAdmin/agent-ruby/issues/102)) ([6f2d35e](https://github.com/ForestAdmin/agent-ruby/commit/6f2d35ee59f8e9a980651ec85aa660d170626574))
+
 # [1.0.0-beta.94](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.93...v1.0.0-beta.94) (2025-01-28)
 
 
