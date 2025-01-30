@@ -67,7 +67,6 @@ module ForestAdminDatasourceMongoid
           aggregator = condition_tree.aggregator.downcase.to_sym
           condition_tree.conditions.each do |condition|
             @query = apply_condition_tree(condition, aggregator)
-            @query = @query.send(aggregator, @query)
           end
         elsif referenced_relation?(condition_tree.field)
           relation_name, field_name = condition_tree.field.split(':')
@@ -128,18 +127,17 @@ module ForestAdminDatasourceMongoid
       end
 
       def build_select
-        unless @projection.nil?
-          @select = @projection.columns
-          @projection.relations.each_key do |relation|
-            relation_schema = @collection.schema[:fields][relation]
-            @select << if %w[OneToOne PolymorphicOneToOne].include?(relation_schema.type)
-                         "#{@collection.model.collection_name}.#{relation_schema.origin_key_target}"
-                       else
-                         "#{@collection.model.collection_name}.#{relation_schema.foreign_key}"
-                       end
-          end
+        return if @projection.nil?
+
+        @select = @projection.columns
+        @projection.relations.each_key do |relation|
+          relation_schema = @collection.schema[:fields][relation]
+          @select << if %w[OneToOne PolymorphicOneToOne].include?(relation_schema.type)
+                       "#{@collection.model.collection_name}.#{relation_schema.origin_key_target}"
+                     else
+                       "#{@collection.model.collection_name}.#{relation_schema.foreign_key}"
+                     end
         end
-        @query
       end
 
       def apply_select
