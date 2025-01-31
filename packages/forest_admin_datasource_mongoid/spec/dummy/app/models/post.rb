@@ -3,6 +3,7 @@ class Post
   include Mongoid::Timestamps
   field :title, type: String
   field :body, type: String
+  field :rating, type: Integer
 
   has_many :comments, dependent: :destroy
   has_one :author
