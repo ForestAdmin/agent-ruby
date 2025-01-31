@@ -11,7 +11,7 @@ module ForestAdminDatasourceMongoid
         'Week' => '%Y-%m-%d'
       }.freeze
 
-      def initialize(collection, aggregation, filter = nil, limit = nil)
+      def initialize(collection, aggregation, filter, limit = nil)
         super(collection, ForestAdminDatasourceToolkit::Components::Query::Projection.new, filter)
         @aggregation = aggregation
         @limit = limit
