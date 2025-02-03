@@ -255,6 +255,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/form_factory.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/collection.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/query.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/schema/mongoid_schema.rb'
 
 
 Metrics/BlockLength:
@@ -326,6 +327,7 @@ Layout/LineLength:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/publication/publication_datasource_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/relation/relation_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/sort/sort_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/schema/mongoid_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/condition_tree_factory.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/utils/collection.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter_factory.rb'
