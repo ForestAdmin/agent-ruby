@@ -1,7 +1,7 @@
 module ForestAdminDatasourceMongoid
   class OptionsParser
     def self.parse_options(model, options)
-      schema = '' # MongoidSchema.from_model(model) TODO
+      schema = ForestAdminDatasourceMongoid::Utils::Schema::MongoidSchema.from_model(model)
 
       case options[:flatten_mode]
       when 'auto'
@@ -16,33 +16,48 @@ module ForestAdminDatasourceMongoid
     end
 
     class << self
-      def self.get_auto_flatten_options(schema); end
+      private
 
-      def self.get_manual_flatten_options(schema, options, model_name); end
+      def get_auto_flatten_options(schema)
+        forbidden_paths = schema.list_paths_matching(->(_, s) { !can_be_flattened(s) })
 
-      # if (options?.asModels?.[modelName]) {
-      #       // [legacy mode] retro-compatibility when customer provided asModels
-      #       const cuts = new Set(options.asModels[modelName].map(f => f.replace(/:/g, '.')));
-      #
-      #       for (let field of cuts) {
-      #         while (field.lastIndexOf('.') !== -1) {
-      #           field = field.substring(0, field.lastIndexOf('.'));
-      #           cuts.add(field);
-      #         }
-      #       }
-      #
-      #       asFields = [];
-      #       asModels = [...cuts].sort();
-      #     } else {
-      #       // [legacy mode] retro-compatibility when customer did not provice anything
-      #       asFields = [];
-      #       asModels = Object.keys(schema.fields)
-      #         .filter(field => schema.fields[field]?.['[]']?.options?.ref)
-      #         .sort();
-      #     }
-      #
-      #     return { asFields, asModels };
-      def self.get_legacy_flatten_options(_schema, options, model_name); end
+        # Split on all arrays of objects and arrays of references.
+        as_models = schema.list_paths_matching(proc do |field, path_schema|
+          path_schema.is_array &&
+            # FIX SCHEMA NODE OPTIONS REF
+            (!path_schema.is_leaf || path_schema.schema_node&.options&.ref) &&
+            forbidden_paths.none? { |p| field == p || field.start_with?("#{p}.") }
+        end).sort
+
+        # flatten all fields which are nested
+        as_fields = schema.list_paths_matching(proc do |field, path_schema|
+          # on veut flatten si on est à plus de 1 niveau de profondeur par rapport au asModels
+          min_distance = field.split('.').length
+
+          as_models.each do |as_model|
+            if field.start_with?("#{as_model}.")
+              distance = field.split('.').length - as_model.split('.').length
+              min_distance = distance if distance < min_distance
+            end
+          end
+
+          !as_models.include?(field) && path_schema.is_leaf && min_distance > 1 && forbidden_paths.none? do |p|
+            field.start_with?("#{p}.")
+          end
+        end)
+
+        { as_fields: as_fields, as_models: as_models }
+      end
+
+      def can_be_flattened(schema)
+        return true if schema.is_leaf
+
+        !schema.fields.empty?
+      end
+
+      def get_manual_flatten_options(schema, options, model_name); end
+
+      def get_legacy_flatten_options(_schema, options, model_name); end
     end
   end
 end
