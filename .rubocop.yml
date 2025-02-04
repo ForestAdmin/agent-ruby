@@ -295,6 +295,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/action/action_collection_decorator.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/collection.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/query.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/schema/mongoid_schema.rb'
 
 Style/OpenStructUse:
   Exclude:

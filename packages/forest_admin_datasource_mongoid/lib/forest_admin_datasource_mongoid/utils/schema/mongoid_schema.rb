@@ -3,6 +3,7 @@ module ForestAdminDatasourceMongoid
     module Schema
       class MongoidSchema
         include ForestAdminDatasourceToolkit::Exceptions
+        include Utils::Helpers
         attr_reader :is_array, :is_leaf, :fields
 
         def initialize(model, fields, is_array, is_leaf)
@@ -75,7 +76,8 @@ module ForestAdminDatasourceMongoid
             sub_prefix = prefix ? "#{prefix}.#{field}" : field
             sub_fields = schema.list_paths_matching(handle, sub_prefix)
             sub_fields.map { |sub_field| "#{field}.#{sub_field}" }
-            handle.call(sub_prefix, schema) ? [field, *sub_fields] : sub_fields
+            # debugger
+            handle.call(sub_prefix, schema) ? [sub_prefix, *sub_fields] : sub_fields
           end
         end
 
@@ -115,6 +117,53 @@ module ForestAdminDatasourceMongoid
           end
 
           MongoidSchema.new(@model, child, is_array, is_leaf).get_sub_schema(suffix)
+        end
+
+        def apply_stack(stack, skip_as_models: false)
+          raise ForestException, 'Stack can never be empty.' if stack.empty?
+
+          step = stack.pop
+          sub_schema = get_sub_schema(step[:prefix])
+
+          step[:as_fields].each do |field|
+            field_schema = sub_schema.get_sub_schema(field)
+            recursive_delete(sub_schema.fields, field)
+
+            sub_schema.fields[field.gsub('.', '@@@')] = if field_schema.is_array
+                                                          { '[]' => field_schema.schema_node }
+                                                        else
+                                                          field_schema.schema_node
+                                                        end
+          end
+
+          unless stack.empty?
+            sub_schema.fields['_id'] = Mongoid::Fields::Standard.new('__placeholder__', { type: String })
+            sub_schema.fields['parent'] = apply_stack(stack).fields
+            sub_schema.fields['parent_id'] = sub_schema.fields['parent']['_id']
+          end
+
+          if skip_as_models
+            # Here we actually should recurse into the subSchema and add the _id and parentId fields
+            # to the virtual one-to-one relations.
+            #
+            # The issue is that we can't do that because we don't know where the relations are after
+            # the first level of nesting (we would need to have the complete asModel / asFields like in
+            # the datasource.ts file).
+            #
+            # Because of that, we need to work around the missing fields in:
+            # - pipeline/virtual-fields.ts file: we're throwing an error when we can't guess the value
+            #   of a given _id / parentId field.
+            # - pipeline/filter.ts: we're using an educated guess for the types of the _id / parentId
+            #   fields (String or ObjectId)
+          else
+            step[:as_models].each do |field|
+              recursive_delete(@fields, field)
+            end
+          end
+
+          stack << step
+
+          sub_schema
         end
       end
     end
