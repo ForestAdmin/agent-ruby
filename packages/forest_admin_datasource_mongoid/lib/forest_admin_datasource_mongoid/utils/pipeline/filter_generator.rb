@@ -76,7 +76,7 @@ module ForestAdminDatasourceMongoid
         end
 
         def self.compute_sort(sort)
-          return if sort.empty?
+          return if sort.nil? || sort.empty?
 
           result = {}
 
