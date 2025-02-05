@@ -38,7 +38,7 @@ module ForestAdminDatasourceMongoid
       end
 
       # Add one-to-many, one-to-one and many-to-many relations.
-      # RelationGenerator.addImplicitRelations(this.collections);
+      ForestAdminDatasourceMongoid::Utils::Schema::RelationGenerator.add_implicit_relations(@collections)
     end
 
     def add_model(
