@@ -52,7 +52,7 @@ module ForestAdminDatasourceMongoid
       local_as_fields = as_fields.filter { |f| as_models.none? { |i| f.start_with?("#{i}.") } }
       local_as_models = as_models.filter { |f| as_models.none? { |i| f.start_with?("#{i}.") } }
       # peut etre faut faire un union parce qu'on pige rien ici de ce merdier
-      local_stack = stack + [{ prefix: prefix, as_fields: local_as_fields, as_models: local_as_models }]
+      local_stack = stack.union([{ prefix: prefix, as_fields: local_as_fields, as_models: local_as_models }])
 
       add_collection(Collection.new(self, model, local_stack))
 

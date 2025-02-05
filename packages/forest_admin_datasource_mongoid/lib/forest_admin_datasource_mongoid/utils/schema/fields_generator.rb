@@ -16,7 +16,7 @@ module ForestAdminDatasourceMongoid
             our_schema[name] = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
               column_type: get_column_type(field),
               filter_operators: operators_for_column_type(get_column_type(field)),
-              is_primary_key: field.object_id_field? && field.association.nil?,
+              is_primary_key: name == '_id',
               is_read_only: false,
               is_sortable: get_column_type(field) != 'Json',
               default_value: field.object_id_field? ? nil : get_default_value(field),

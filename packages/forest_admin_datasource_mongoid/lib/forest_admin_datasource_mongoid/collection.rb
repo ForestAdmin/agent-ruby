@@ -6,10 +6,9 @@ module ForestAdminDatasourceMongoid
     include ForestAdminDatasourceToolkit::Components::Query
     include Utils::Helpers
     include Utils::Schema
+    include Utils::Pipeline
 
-    MAX_DEPTH = 1
-
-    attr_reader :model
+    attr_reader :model, :stack
 
     def initialize(datasource, model, stack)
       prefix = stack[stack.length - 1][:prefix]
@@ -27,9 +26,11 @@ module ForestAdminDatasourceMongoid
     end
 
     def list(_caller, filter, projection)
-      Utils::Query.new(self, projection, filter)
-                  .get
-                  .map { |record| Utils::MongoidSerializer.new(record).to_hash(projection) }
+      projection = projection.union(filter.condition_tree&.projection || [], filter.sort&.projection || [])
+      pipeline = [*build_base_pipeline(filter, projection), *ProjectionGenerator.project(projection)]
+      # return addNullValues(replaceMongoTypes(await this.model.aggregate(pipeline)), projection);
+
+      model.unscoped.collection.aggregate(pipeline).to_a
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
@@ -51,6 +52,40 @@ module ForestAdminDatasourceMongoid
     end
 
     private
+
+    def build_base_pipeline(filter, projection)
+      fields_used_in_filters = FilterGenerator.list_relations_used_in_filter(filter)
+
+      pre_sort_and_paginate,
+        sort_and_paginate_post_filtering,
+        sort_and_paginate_all = FilterGenerator.sort_and_paginate(model, filter)
+
+      reparent_stages = ReparentGenerator.reparent(model, stack)
+
+      # For performance reasons, we want to only include the relationships that are used in filters
+      # before applying the filters
+      lookup_used_in_filters_stage = LookupGenerator.lookup(model, stack, projection,
+                                                            { include: fields_used_in_filters })
+      filter_stage = FilterGenerator.filter(model, stack, filter)
+      # Here are the remaining relationships that are not used in filters. For performance reasons
+      # they are computed after the filters.
+      lookup_not_filtered_stage = LookupGenerator.lookup(
+        model,
+        stack,
+        projection,
+        { exclude: fields_used_in_filters }
+      )
+
+      [
+        *pre_sort_and_paginate,
+        *reparent_stages,
+        *lookup_used_in_filters_stage,
+        *filter_stage,
+        *sort_and_paginate_post_filtering,
+        *lookup_not_filtered_stage,
+        *sort_and_paginate_all
+      ]
+    end
 
     def format_model_name(class_name)
       class_name.gsub('::', '__')
