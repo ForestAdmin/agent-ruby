@@ -4,14 +4,12 @@ module ForestAdminDatasourceMongoid
       schema = ForestAdminDatasourceMongoid::Utils::Schema::MongoidSchema.from_model(model)
 
       case options[:flatten_mode]
-      when 'auto'
-        get_auto_flatten_options(schema)
       when 'manual'
         get_manual_flatten_options(schema, options, model.name)
       when 'none'
         { as_fields: [], as_models: [] }
       else
-        get_legacy_flatten_options(schema, options, model.name)
+        get_auto_flatten_options(schema)
       end
     end
 
@@ -55,7 +53,27 @@ module ForestAdminDatasourceMongoid
         !schema.fields.empty?
       end
 
-      def get_manual_flatten_options(schema, options, model_name); end
+      def get_manual_flatten_options(schema, options, model_name)
+        as_models = (options[:flatten_options]&.[](model_name)&.[](:as_models) || [])
+                    .map { |f| f.tr(':', '.') }
+                    .sort
+
+        as_fields = (options[:flatten_options]&.[](model_name)&.[](:as_fields) || [])
+                    .flat_map do |item|
+                      field = (item.is_a?(String) ? item : item[:field]).tr(':', '.')
+                      level = item.is_a?(String) ? 99 : item[:level]
+                      sub_schema = schema.get_sub_schema(field)
+
+                      if sub_schema.is_leaf
+                        [field]
+                      else
+                        sub_schema.list_fields(level).map { |f| "#{field}.#{f}" }
+                      end
+                    end
+        as_fields = as_fields.reject { |f| as_models.include?(f) }.sort
+
+        { as_fields: as_fields, as_models: as_models }
+      end
 
       def get_legacy_flatten_options(_schema, options, model_name); end
     end
