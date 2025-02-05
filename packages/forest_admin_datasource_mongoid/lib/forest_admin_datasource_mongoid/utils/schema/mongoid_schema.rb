@@ -107,7 +107,7 @@ module ForestAdminDatasourceMongoid
 
             return MongoidSchema.new(@models[relation_name], child, is_array, is_leaf).get_sub_schema(suffix)
           elsif child.nil?
-            raise ForestException, "Field '#{prefix}' not found. Available fields are: balbalblablalblalalbla"
+            raise ForestException, "Field '#{prefix}' not found. Available fields are: #{list_fields}"
           end
 
           # We ended up on a field => box it.
@@ -164,6 +164,24 @@ module ForestAdminDatasourceMongoid
           stack << step
 
           sub_schema
+        end
+
+        # List leafs and arrays up to a certain level
+        # Arrays are never traversed
+        def list_fields(level = Float::INFINITY)
+          raise ForestException, 'Cannot list fields on a leaf schema.' if @is_leaf
+          raise ForestException, 'Level must be greater than 0.' if level.zero?
+
+          return @fields.keys if level == 1
+
+          @fields.keys.flat_map do |field|
+            schema = get_sub_schema(field)
+            if schema.is_leaf || schema.is_array
+              [field]
+            else
+              schema.list_fields(level - 1).map { |sub_field| "#{field}.#{sub_field}" }
+            end
+          end
         end
       end
     end
