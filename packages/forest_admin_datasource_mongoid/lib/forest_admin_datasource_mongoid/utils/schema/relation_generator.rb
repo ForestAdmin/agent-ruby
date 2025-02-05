@@ -19,9 +19,6 @@ module ForestAdminDatasourceMongoid
         # inverse relationship on the foreignCollection.
         # /!\ The inverse can be a OneToOne, or a ManyToOne
         def self.add_many_to_one_inverse(collection, name, schema)
-          type = nil
-          inverse_name = nil
-
           if name == 'parent'
             # Create inverse of 'parent' relationship so that the relation name matches the actual name
             # of the data which is stored in the database.
