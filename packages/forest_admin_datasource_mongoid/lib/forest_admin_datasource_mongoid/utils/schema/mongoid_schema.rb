@@ -20,6 +20,12 @@ module ForestAdminDatasourceMongoid
           @is_leaf ? @fields[:content] : @fields
         end
 
+        def schema_type
+          raise ForestException, 'Schema is not a leaf.' unless @is_leaf
+
+          @fields[:content]
+        end
+
         def self.from_model(model)
           fields = fields_and_embedded_relations(model)
 

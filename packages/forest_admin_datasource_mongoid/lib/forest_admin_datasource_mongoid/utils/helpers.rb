@@ -27,6 +27,22 @@ module ForestAdminDatasourceMongoid
           end
         end
       end
+
+      # not sure it this method is relevant for mongoid
+      def replace_mongo_types(data)
+        case data
+        when BSON::ObjectId
+          data.to_s
+        when Date
+          data.iso8601
+        when Array
+          data.map { |item| replace_mongo_types(item) }
+        when Hash
+          data.transform_values { |value| replace_mongo_types(value) }
+        else
+          data
+        end
+      end
     end
   end
 end

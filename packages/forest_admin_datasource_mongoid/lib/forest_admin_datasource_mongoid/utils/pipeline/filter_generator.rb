@@ -4,6 +4,8 @@ module ForestAdminDatasourceMongoid
       class FilterGenerator
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        STRING_OPERATORS = [Operators::MATCH, Operators::NOT_CONTAINS, Operators::NOT_I_CONTAINS].freeze
+
         def self.sort_and_paginate(model, filter)
           sort = compute_sort(filter.sort)
 
@@ -38,7 +40,7 @@ module ForestAdminDatasourceMongoid
         end
 
         def self.filter(model, stack, filter)
-          fields = {}
+          fields = []
           tree = filter.condition_tree
           match = compute_match(model, stack, tree, fields)
 
@@ -114,10 +116,31 @@ module ForestAdminDatasourceMongoid
           nil
         end
 
-        def self.format_and_cast_leaf_value(_schema, tree, _fields)
-          # TODO
+        def self.format_and_cast_leaf_value(schema, leaf, fields)
+          value = leaf.value
+          leaf = leaf.override(field: format_nested_field_path(leaf.field))
+          is_array, instance = get_field_metadata(schema, leaf.field)
 
-          tree.value
+          if is_array
+            if instance == Date && value.is_a?(Array) && value.all? { |v| valid_iso_date?(v) }
+              value = value.map { |v| Date.parse(v) }
+            elsif instance == BSON::ObjectId && value.is_a?(Array) && value.all? { |v| BSON::ObjectId.legal?(v) }
+              value = value.map { |id| BSON::ObjectId.from_string(id) }
+            end
+          elsif instance == BSON::ObjectId
+            if STRING_OPERATORS.include?(leaf.operator)
+              fields << leaf.field
+              leaf.override(field: format_string_field_name(leaf.field))
+            elsif value.is_a?(Array) && value.all? { |v| BSON::ObjectId.legal?(v) }
+              value = value.map { |id| BSON::ObjectId.from_string(id) }
+            elsif BSON::ObjectId.legal?(value)
+              value = BSON::ObjectId.from_string(value)
+            end
+          elsif instance == Date && valid_iso_date?(value)
+            value = Date.parse(value)
+          end
+
+          value
         end
 
         def self.build_match_condition(operator, value)
@@ -159,6 +182,26 @@ module ForestAdminDatasourceMongoid
           parts << "string_#{parts.pop}"
 
           parts.join('.')
+        end
+
+        def self.get_field_metadata(schema, field)
+          begin
+            sub_schema = schema.get_sub_schema(field)
+            is_array = sub_schema.is_array
+            instance = sub_schema.schema_type.type
+          rescue StandardError
+            is_array = false
+            instance = 'String'
+          end
+
+          [is_array, instance]
+        end
+
+        def self.valid_iso_date?(value)
+          DateTime.iso8601(value)
+          true
+        rescue ArgumentError
+          false
         end
       end
     end
