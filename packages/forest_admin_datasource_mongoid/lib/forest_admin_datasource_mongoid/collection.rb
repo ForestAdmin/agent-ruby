@@ -7,6 +7,7 @@ module ForestAdminDatasourceMongoid
     include Utils::Helpers
     include Utils::Schema
     include Utils::Pipeline
+    include Utils::AddNullValues
 
     attr_reader :model, :stack
 
@@ -28,9 +29,9 @@ module ForestAdminDatasourceMongoid
     def list(_caller, filter, projection)
       projection = projection.union(filter.condition_tree&.projection || [], filter.sort&.projection || [])
       pipeline = [*build_base_pipeline(filter, projection), *ProjectionGenerator.project(projection)]
-      # return addNullValues(replaceMongoTypes(await this.model.aggregate(pipeline)), projection);
 
-      model.unscoped.collection.aggregate(pipeline).to_a
+      add_null_values(replace_mongo_types(model.collection.aggregate(pipeline).to_a), projection)
+      # model.unscoped.collection.aggregate(pipeline).to_a
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
