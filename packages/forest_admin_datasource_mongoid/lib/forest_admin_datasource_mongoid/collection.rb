@@ -35,7 +35,17 @@ module ForestAdminDatasourceMongoid
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
-      Utils::QueryAggregate.new(self, aggregation, filter, limit).get
+      lookup_projection = aggregation.projection.union(filter.condition_tree&.projection || [])
+      pipeline = [
+        *build_base_pipeline(filter, lookup_projection),
+        *GroupGenerator.group(aggregation),
+        { '$sort' => { value: -1 } }
+      ]
+      pipeline << { '$limit' => limit } if limit
+      rows = model.collection.aggregate(pipeline).to_a
+
+      replace_mongo_types(rows)
+      # Utils::QueryAggregate.new(self, aggregation, filter, limit).get
     end
 
     def create(_caller, data)
