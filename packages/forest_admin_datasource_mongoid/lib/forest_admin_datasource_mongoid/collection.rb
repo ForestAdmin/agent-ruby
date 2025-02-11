@@ -1,13 +1,14 @@
 module ForestAdminDatasourceMongoid
   class Collection < ForestAdminDatasourceToolkit::Collection
-    include Parser::Column
-    include Parser::Validation
-    include Parser::Relation
     include ForestAdminDatasourceToolkit::Components::Query
-    include Utils::Helpers
+    include ForestAdminDatasourceToolkit::Exceptions
+    include Parser::Column
+    include Parser::Relation
+    include Parser::Validation
+    include Utils::AddNullValues
     include Utils::Schema
     include Utils::Pipeline
-    include Utils::AddNullValues
+    include Utils::Helpers
 
     attr_reader :model, :stack
 
@@ -48,8 +49,29 @@ module ForestAdminDatasourceMongoid
       # Utils::QueryAggregate.new(self, aggregation, filter, limit).get
     end
 
-    def create(_caller, data)
-      Utils::MongoidSerializer.new(model.create(data)).to_hash(ProjectionFactory.all(self))
+    def create(caller, data)
+      handle_validation_error { _create(caller, data) }
+      # Utils::MongoidSerializer.new(model.create(data)).to_hash(ProjectionFactory.all(self))
+    end
+
+    def _create(_caller, flat_data)
+      as_fields = @stack[stack.length - 1][:as_fields]
+      data = unflatten_record(flat_data, as_fields)
+
+      if @stack.length < 2
+        inserted_record = @model.create(data)
+
+        return { '_id' => inserted_record.attributes['_id'], **flat_data }
+      end
+
+      # Only array fields can create subdocuments (the others should use update)
+      schema = MongoidSchema.from_model(@model).apply_stack(@stack)
+
+      if schema.is_array
+        create_for_array_subfield(data, flat_data, schema)
+      else
+        create_for_object_subfield(data, flat_data)
+      end
     end
 
     def update(_caller, filter, data)
@@ -100,6 +122,22 @@ module ForestAdminDatasourceMongoid
 
     def format_model_name(class_name)
       class_name.gsub('::', '__')
+    end
+
+    def create_for_array_subfield(data, flat_data, schema)
+      # TODO
+    end
+
+    def create_for_object_subfield(data, _flat_data)
+      # TODO
+      raise ValidationError, 'Trying to create multiple subrecords at once' if data.length > 1
+      raise ValidationError, 'Trying to create without data' if data.empty?
+    end
+
+    def handle_validation_error
+      yield
+    rescue Mongoid::Errors::Validations => e
+      raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, e.message
     end
 
     # def fetch_fields

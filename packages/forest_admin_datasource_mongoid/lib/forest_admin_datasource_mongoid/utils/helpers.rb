@@ -12,6 +12,18 @@ module ForestAdminDatasourceMongoid
         str.tr('.', '_')
       end
 
+      def recursive_set(target, path, value)
+        index = path.index('.')
+        if index.nil?
+          target[path] = value
+        else
+          prefix = path[0, index]
+          suffix = path[index + 1, path.length]
+          target[prefix] ||= {}
+          recursive_set(target[prefix], suffix, value)
+        end
+      end
+
       def recursive_delete(target, path)
         index = path.index('.')
 
@@ -42,6 +54,29 @@ module ForestAdminDatasourceMongoid
         else
           data
         end
+      end
+
+      # Unflattend patches and records
+      def unflatten_record(record, as_fields, patch_mode: false)
+        new_record = record.dup
+
+        as_fields.each do |field|
+          alias_field = field.gsub('.', '@@@')
+
+          value = new_record[alias_field]
+
+          next if value.nil?
+
+          if patch_mode
+            new_record[field] = value
+          else
+            recursive_set(new_record, field, value)
+          end
+
+          new_record.delete(alias_field)
+        end
+
+        new_record
       end
     end
   end
