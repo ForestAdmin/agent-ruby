@@ -74,14 +74,47 @@ module ForestAdminDatasourceMongoid
       end
     end
 
-    def update(_caller, filter, data)
-      entity = Utils::Query.new(self, nil, filter).build.first
-      entity&.update(data)
+    def update(caller, filter, data)
+      handle_validation_error { _update(caller, filter, data) }
+      # entity = Utils::Query.new(self, nil, filter).build.first
+      # entity&.update(data)
     end
 
-    def delete(_caller, filter)
-      entities = Utils::Query.new(self, nil, filter).build
-      entities&.each(&:destroy)
+    def _update(_caller, filter, flat_patch)
+      as_fields = @stack[stack.length - 1][:as_fields]
+      patch = unflatten_record(flat_patch, as_fields, patch_mode: true)
+
+      records = list(nil, filter, Projection.new(['_id']))
+      ids = records.map { |record| record['_id'] }
+
+      if @stack.length < 2
+        if ids.length > 1
+          @model.where(_id: ids).update_all(patch)
+        else
+          @model.find(ids.first).update(patch)
+        end
+      end
+
+      # TODO: Other cases
+      nil
+    end
+
+    def delete(caller, filter)
+      handle_validation_error { _delete(caller, filter) }
+      # entities = Utils::Query.new(self, nil, filter).build
+      # entities&.each(&:destroy)
+    end
+
+    def _delete(_caller, filter)
+      records = list(nil, filter, Projection.new(['_id']))
+      ids = records.map { |record| record['_id'] }
+
+      @model.where(_id: ids).delete_all if @stack.length < 2
+
+      # TODO: Other cases
+      # schema = MongoidSchema.from_model(@model).apply_stack(@stack)
+      # ids_by_path = group_ids_by_path(ids)
+      nil
     end
 
     private
