@@ -31,10 +31,12 @@ module ForestAdminDatasourceMongoid
 
       # Create collections (with only many to one relations).
       models.each do |model|
+        # if model.name == 'Mongo::User'
         ForestAdminDatasourceMongoid::Utils::Schema::MongoidSchema.from_model(model)
         options_parser = OptionsParser.parse_options(model, options)
 
         add_model(model, schema, [], nil, options_parser[:as_fields], options_parser[:as_models])
+        # end
       end
 
       # Add one-to-many, one-to-one and many-to-many relations.
