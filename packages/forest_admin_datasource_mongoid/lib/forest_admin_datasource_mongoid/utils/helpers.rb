@@ -78,6 +78,28 @@ module ForestAdminDatasourceMongoid
 
         new_record
       end
+
+      def reformat_patch(patch)
+        patch.each_with_object({}) do |(key, value), result|
+          keys = key.split('.')
+          last_key = keys.pop
+          nested_hash = keys.reverse.inject({ last_key => value }) do |hash, k|
+            { k => hash }
+          end
+          deep_merge(result, nested_hash)
+        end
+      end
+
+      def deep_merge(target, source)
+        source.each do |key, value|
+          if target[key].is_a?(Hash) && value.is_a?(Hash)
+            deep_merge(target[key], value)
+          else
+            target[key] ||= value
+          end
+        end
+        target
+      end
     end
   end
 end

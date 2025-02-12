@@ -83,15 +83,16 @@ module ForestAdminDatasourceMongoid
     def _update(_caller, filter, flat_patch)
       as_fields = @stack[stack.length - 1][:as_fields]
       patch = unflatten_record(flat_patch, as_fields, patch_mode: true)
+      formatted_patch = reformat_patch(patch)
 
       records = list(nil, filter, Projection.new(['_id']))
       ids = records.map { |record| record['_id'] }
 
       if @stack.length < 2
         if ids.length > 1
-          @model.where(_id: ids).update_all(patch)
+          @model.where(_id: ids).update_all(formatted_patch)
         else
-          @model.find(ids.first).update(patch)
+          @model.find(ids.first).update(formatted_patch)
         end
       end
 
