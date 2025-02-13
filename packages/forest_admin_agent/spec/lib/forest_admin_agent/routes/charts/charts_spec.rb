@@ -321,6 +321,41 @@ module ForestAdminAgent
             )
           end
 
+          it 'return a LineChart with week time range - should be iso date' do
+            args[:params] = args[:params].merge({
+                                                  groupByFieldName: 'date',
+                                                  aggregator: 'Count',
+                                                  sourceCollectionName: 'book',
+                                                  timeRange: 'Week',
+                                                  type: 'Line',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return(
+              [
+                { 'value' => 10, 'group' => { 'date' => Time.parse('2024-12-23 00:00:00') } },
+                { 'value' => 15, 'group' => { 'date' => Time.parse('2024-12-30 00:00:00') } },
+                { 'value' => 20, 'group' => { 'date' => Time.parse('2025-01-06 00:00:00') } }
+              ]
+            )
+            result = chart.handle_request(args)
+
+            expect(result).to match(
+              content: {
+                data: {
+                  id: be_a(String),
+                  type: 'stats',
+                  attributes: {
+                    value: [
+                      { label: 'W52-2024', values: { value: 10 } },
+                      { label: 'W01-2025', values: { value: 15 } },
+                      { label: 'W02-2025', values: { value: 20 } }
+                    ]
+                  }
+                }
+              }
+            )
+          end
+
           it 'return a LineChart with month time range' do
             args[:params] = args[:params].merge({
                                                   groupByFieldName: 'date',
