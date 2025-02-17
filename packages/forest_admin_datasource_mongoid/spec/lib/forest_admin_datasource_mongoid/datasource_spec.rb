@@ -29,7 +29,9 @@ module ForestAdminDatasourceMongoid
     end
 
     it 'raises an exception if trying to add a collection with an existing name' do
-      expect { datasource.add_collection(Collection.new(datasource, Post)) }
+      logger = instance_double(Logger, log: nil)
+      allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+      expect { datasource.add_collection(Collection.new(datasource, Post, [{ prefix: nil, as_fields: [], as_models: [] }])) }
         .to raise_error(ForestException, '🌳🌳🌳 Collection Post already defined in datasource')
     end
   end

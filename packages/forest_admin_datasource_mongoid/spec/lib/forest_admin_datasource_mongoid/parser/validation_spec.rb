@@ -4,8 +4,13 @@ module ForestAdminDatasourceMongoid
   module Parser
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
     describe Validation do
+      before do
+        logger = instance_double(Logger, log: nil)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+      end
+
       let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
-      let(:collection) { ForestAdminDatasourceMongoid::Collection.new(datasource, model) }
+      let(:collection) { ForestAdminDatasourceMongoid::Collection.new(datasource, model, [{ prefix: nil, as_fields: [], as_models: [] }]) }
 
       context 'when the model has a before_validation callback' do
         let(:model) do

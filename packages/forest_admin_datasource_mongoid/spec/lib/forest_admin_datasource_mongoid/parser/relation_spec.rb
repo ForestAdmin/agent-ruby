@@ -4,8 +4,13 @@ module ForestAdminDatasourceMongoid
   module Parser
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
     describe Validation do
+      before do
+        logger = instance_double(Logger, log: nil)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+      end
+
       let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
-      let(:collection) { ForestAdminDatasourceMongoid::Collection.new(datasource, model_class) }
+      let(:collection) { ForestAdminDatasourceMongoid::Collection.new(datasource, model_class, [{ prefix: nil, as_fields: [], as_models: [] }]) }
 
       context 'when models with polymorphic relations exist' do
         let(:model_class) { User }

@@ -8,6 +8,7 @@ gem 'rubocop', '~> 1.21'
 gem 'mongoid', '~> 9.0'
 
 group :development, :test do
+  gem 'forest_admin_agent', path: '../forest_admin_agent'
   gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
   gem 'mongoid-rspec', '~> 4.0'
   gem 'rails'
