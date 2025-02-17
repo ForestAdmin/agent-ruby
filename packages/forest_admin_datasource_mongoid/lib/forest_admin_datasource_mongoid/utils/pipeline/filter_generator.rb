@@ -52,15 +52,24 @@ module ForestAdminDatasourceMongoid
         end
 
         def self.list_relations_used_in_filter(filter)
-          fields = []
+          fields = Set.new
 
           filter.sort&.each do |clause|
-            list_paths(clause[:field]).each { |field| fields << field }
+            next unless clause[:field].include?(':') # only relations (fields containing ':')
+
+            list_paths(clause[:field]).each do |field|
+              parts = field.split('.') # Split into nested levels ("author.country.name"→ ["author", "country", "name"])
+
+              (1...parts.length).each do |i|
+                parent_field = parts[0...i].join('.')
+                fields.add(parent_field)
+              end
+            end
           end
 
           list_fields_used_in_filter_tree(filter.condition_tree, fields)
 
-          fields
+          fields.to_a
         end
 
         def self.list_fields_used_in_filter_tree(condition_tree, fields)
