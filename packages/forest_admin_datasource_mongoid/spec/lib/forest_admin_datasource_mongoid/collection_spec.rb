@@ -2,14 +2,18 @@ require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
   include ForestAdminDatasourceToolkit::Components::Query
-
   describe Collection do
+    before do
+      logger = instance_double(Logger, log: nil)
+      allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+    end
+
     let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
-    let(:collection_post) { described_class.new(datasource, Post) }
-    let(:collection_user) { described_class.new(datasource, User) }
-    let(:collection_departure) { described_class.new(datasource, Departure) }
-    let(:collection_comment) { described_class.new(datasource, Comment) }
-    let(:collection_band) { described_class.new(datasource, Band) }
+    let(:collection_post) { described_class.new(datasource, Post, [{ prefix: nil, as_fields: [], as_models: [] }]) }
+    let(:collection_user) { described_class.new(datasource, User, [{ prefix: nil, as_fields: [], as_models: [] }]) }
+    let(:collection_departure) { described_class.new(datasource, Departure, [{ prefix: nil, as_fields: [], as_models: [] }]) }
+    let(:collection_comment) { described_class.new(datasource, Comment, [{ prefix: nil, as_fields: [], as_models: [] }]) }
+    let(:collection_band) { described_class.new(datasource, Band, [{ prefix: nil, as_fields: [], as_models: [] }]) }
 
     it 'initializes with the correct model name' do
       expect(collection_post.name).to eq('Post')
