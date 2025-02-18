@@ -93,9 +93,9 @@ module ForestAdminDatasourceMongoid
 
           # General case: go down the tree
           prefix, suffix = path.split(/\.(.*)/)
-          is_array = false
           is_leaf = false
           child = @fields[prefix]
+          is_array = child.is_a?(Mongoid::Fields::Standard) && child.options[:type] == Array
 
           # Traverse relations
           if child.is_a?(Hash)
