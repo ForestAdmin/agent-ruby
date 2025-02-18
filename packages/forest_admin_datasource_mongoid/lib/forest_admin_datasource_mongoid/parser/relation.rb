@@ -7,7 +7,7 @@ module ForestAdminDatasourceMongoid
         ObjectSpace.each_object(Class).select { |klass| klass < Mongoid::Document }.each do |model|
           if model.relations.any? { |_, relation| relation.options[:as] == relation_name.to_sym }
             primary_key = model.fields.keys.find { |key| model.fields[key].options[:as] == :id } || :_id
-            types[format_model_name(model.name)] = primary_key.to_s
+            types[model.name.gsub('::', '__')] = primary_key.to_s
           end
         end
 

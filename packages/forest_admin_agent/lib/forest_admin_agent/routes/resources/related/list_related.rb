@@ -31,7 +31,8 @@ module ForestAdminAgent
                   ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
                 ]
               ),
-              page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args)
+              page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
+              sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@child_collection, args)
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
             id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)

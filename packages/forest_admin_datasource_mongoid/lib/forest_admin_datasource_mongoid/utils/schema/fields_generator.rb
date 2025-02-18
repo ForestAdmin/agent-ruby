@@ -24,10 +24,9 @@ module ForestAdminDatasourceMongoid
               validations: [] # get_validations(field)
             )
 
-            # TODO: check BelongsTo embed
-            # if (field instanceof SchemaType && field.options.ref) {
-            #  ourSchema[`${name}__manyToOne`] = this.buildManyToOne(field.options.ref, name);
-            # }
+            if field.foreign_key? && !field.association.polymorphic?
+              our_schema["#{name}__many_to_one"] = build_many_to_one(field)
+            end
           end
 
           return our_schema unless stack.length > 1
@@ -64,6 +63,15 @@ module ForestAdminDatasourceMongoid
             is_primary_key: true,
             is_read_only: true,
             is_sortable: true
+          )
+        end
+
+        def self.build_many_to_one(field)
+          association = field.options[:association]
+          ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
+            foreign_collection: association.klass.name.gsub('::', '__'),
+            foreign_key: association.foreign_key,
+            foreign_key_target: '_id'
           )
         end
       end

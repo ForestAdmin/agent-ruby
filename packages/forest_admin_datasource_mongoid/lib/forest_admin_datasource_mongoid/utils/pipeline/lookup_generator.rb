@@ -7,14 +7,14 @@ module ForestAdminDatasourceMongoid
         # Transform a forest admin projection into a mongo pipeline that performs the lookups
         # and transformations to target them
         def self.lookup(model, stack, projection, options)
-          stack.each_with_index.reduce([MongoidSchema.from_model(model)]) do |acc, (_, index)|
+          schema_stack = stack.each_with_index.reduce([MongoidSchema.from_model(model)]) do |acc, (_, index)|
             [
               *acc,
               MongoidSchema.from_model(model).apply_stack(stack.slice(0..index + 1), skip_as_models: true)
             ]
           end
 
-          lookup_projection(nil, stack.map { |s| s[:fields] }, projection, options)
+          lookup_projection(nil, schema_stack.map(&:fields), projection, options)
         end
 
         def self.lookup_projection(current_path, schema_stack, projection, options)
@@ -22,7 +22,8 @@ module ForestAdminDatasourceMongoid
           fields = {}
 
           projection.relations.each do |name, relation_projection|
-            pipeline << lookup_relation(current_path, schema_stack, name, relation_projection, options)
+            pipeline.push(*lookup_relation(current_path, schema_stack, name, relation_projection, options))
+            # pipeline = [*pipeline, *lookup_relation(current_path, schema_stack, name, relation_projection, options)]
             fields.merge!(add_fields(name, relation_projection, options))
           end
 
@@ -41,38 +42,40 @@ module ForestAdminDatasourceMongoid
         end
 
         def self.lookup_relation(current_path, schema_stack, name, projection, options)
-          ObjectSpace.each_object(Class)
-                     .select { |klass| klass < Mongoid::Document && klass.name && !klass.name.start_with?('Mongoid::') }
-                     .to_h { |klass| [klass.name, klass] }
+          models = ObjectSpace
+                   .each_object(Class)
+                   .select { |klass| klass < Mongoid::Document && klass.name && !klass.name.start_with?('Mongoid::') }
+                   .to_h { |klass| [klass.name, klass] }
+
           as = current_path ? "#{current_path}.#{name}" : name
 
           last_schema = schema_stack[schema_stack.length - 1]
           previous_schema = schema_stack.slice(0..schema_stack.length - 1)
 
-          return [] if options[:include] && !options[:include].include?(as)
-          return [] if options[:exclude]&.include?(as)
+          return {} if options[:include] && !options[:include].include?(as)
+          return {} if options[:exclude]&.include?(as)
 
           # Native many to one relation
-          # TODO
-          # if (name.endsWith('__manyToOne')) {
-          #       const foreignKeyName = name.substring(0, name.length - '__manyToOne'.length);
-          #       const model = models[lastSchema[foreignKeyName].options.ref];
-          #
-          #       const from = model.collection.collectionName;
-          #       const localField = currentPath ? `${currentPath}.${foreignKeyName}` : foreignKeyName;
-          #       const foreignField = '_id';
-          #
-          #       const subSchema = MongooseSchema.fromModel(model).fields;
-          #
-          #       return [
-          #         // Push lookup to pipeline
-          #         { $lookup: { from, localField, foreignField, as } },
-          #         { $unwind: { path: `$${as}`, preserveNullAndEmptyArrays: true } },
-          #
-          #         // Recurse to get relations of relations
-          #         ...this.lookupProjection(models, as, [...schemaStack, subSchema], subProjection, options),
-          #       ];
-          #     }
+          identifier = '__many_to_one'
+          if name.end_with?(identifier)
+            foreign_key_name = name[0..(name.length - identifier.length - 1)]
+            model = models[last_schema[foreign_key_name].options[:association].class_name]
+
+            from = model.name.gsub('::', '__')
+            local_field = current_path ? "#{current_path}.#{foreign_key_name}" : foreign_key_name
+            foreign_field = '_id'
+            sub_schema = MongoidSchema.from_model(model).fields
+
+            return [
+              # Push lookup to pipeline
+              { '$lookup' =>
+                { 'from' => from, 'localField' => local_field, 'foreignField' => foreign_field, 'as' => as } },
+              { '$unwind' => { 'path' => "$#{as}", 'preserveNullAndEmptyArrays' => true } },
+
+              # Recurse to get relations of relations
+              *lookup_projection(as, [*schema_stack, sub_schema], projection, options)
+            ]
+          end
 
           # inverse of fake relation
           if name == 'parent' && !previous_schema.empty?

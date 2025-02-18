@@ -46,7 +46,7 @@ module ForestAdminDatasourceMongoid
                       {
                         '_id' => { '$concat' => [{ '$toString' => '$_id' }, ".#{prefix}.",
                                                  { '$toString' => '$index' }] },
-                        'parentId' => '$_id',
+                        'parent_id' => '$_id',
                         'parent' => '$$ROOT'
                       }
                     )
@@ -68,7 +68,7 @@ module ForestAdminDatasourceMongoid
                       prefix,
                       {
                         '_id' => { '$concat' => [{ '$toString' => '$_id' }, ".#{prefix}"] },
-                        'parentId' => '$_id',
+                        'parent_id' => '$_id',
                         'parent' => '$$ROOT'
                       }
                     )
