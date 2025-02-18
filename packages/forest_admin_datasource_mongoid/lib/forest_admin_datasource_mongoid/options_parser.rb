@@ -74,8 +74,6 @@ module ForestAdminDatasourceMongoid
 
         { as_fields: as_fields, as_models: as_models }
       end
-
-      def get_legacy_flatten_options(_schema, options, model_name); end
     end
   end
 end
