@@ -11,7 +11,10 @@ module ForestAdminDatasourceMongoid
           schema = MongoidSchema.from_model(model)
 
           stack.flat_map.with_index do |step, index|
-            return unflatten(step[:as_fields]) if index.zero?
+            # If this is the first step in the stack and there are no fields to flatten, return an empty list
+            next [] if index.zero? && step[:as_fields].empty?
+            # If this is the first step in the stack, only flatten the provided fields without reparenting
+            next unflatten(step[:as_fields]) if index.zero?
 
             local_schema = schema.get_sub_schema(step[:prefix])
             relative_prefix = if stack[index - 1][:prefix].nil?
@@ -20,16 +23,13 @@ module ForestAdminDatasourceMongoid
                                 step[:prefix][stack[index - 1][:prefix].length + 1..]
                               end
 
-            [
-              *(if local_schema.is_array
-                  reparent_array(relative_prefix,
-                                 local_schema.is_leaf)
-                else
-                  reparent_object(relative_prefix,
-                                  local_schema.is_leaf)
-                end),
-              *unflatten(step[:as_fields])
-            ]
+            result = if local_schema.is_array
+                       reparent_array(relative_prefix, local_schema.is_leaf)
+                     else
+                       reparent_object(relative_prefix, local_schema.is_leaf)
+                     end
+
+            [*result, *unflatten(step[:as_fields])]
           end
         end
 
@@ -82,24 +82,14 @@ module ForestAdminDatasourceMongoid
         def self.unflatten(as_fields)
           return [] if as_fields.empty?
 
-          unflatten_results = []
-          add_fields = as_fields.map { |f| [f.gsub('.', '@@@'), "$#{f}"] }
-          # DocumentDB limits the addFields stage to 30 fields.
           chunk_size = 30
+          add_fields = as_fields.map { |f| [f.gsub('.', '@@@'), "$#{f}"] }
 
-          # TODO: refactor if/else
-          if add_fields.length > chunk_size
-            (0..(add_fields.length - 1).step(chunk_size)).each do |i|
-              chunk = add_fields.slice(i..i + chunk_size)
-              unflatten_results << { '$addFields' => chunk }
-            end
-          else
-            unflatten_results << { '$addFields' => add_fields.to_h }
-          end
+          # MongoDB (DocumentDB) enforces a limit of 30 fields per $addFields stage.
+          # We split the list into chunks of 30 to prevent errors.
+          unflatten_results = add_fields.each_slice(chunk_size).map { |chunk| { '$addFields' => chunk.to_h } }
 
           unflatten_results << { '$project' => as_fields.to_h { |f| [f, 0] } }
-
-          unflatten_results
         end
       end
     end
