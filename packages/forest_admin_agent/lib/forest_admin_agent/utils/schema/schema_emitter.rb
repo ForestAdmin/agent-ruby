@@ -88,7 +88,7 @@ module ForestAdminAgent
 
             {
               data: data,
-              included: included.reject!(&:empty?)&.flatten,
+              included: included.reject!(&:empty?)&.flatten || [],
               meta: schema[:meta]
             }
           end
