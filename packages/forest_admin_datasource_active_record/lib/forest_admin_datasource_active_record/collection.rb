@@ -180,10 +180,10 @@ module ForestAdminDatasourceActiveRecord
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
               foreign_collection: format_model_name(association.klass.name),
-              origin_key: association.association_foreign_key,
-              origin_key_target: association.association_primary_key,
-              foreign_key: association.join_primary_key,
-              foreign_key_target: association.join_foreign_key,
+              origin_key: association.join_primary_key,
+              origin_key_target: association.join_foreign_key,
+              foreign_key: association.association_foreign_key,
+              foreign_key_target: association.association_primary_key,
               through_collection: association.join_table.singularize
             )
           )
