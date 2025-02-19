@@ -7,9 +7,11 @@ module ForestAdminDatasourceMongoid
       def remove_not_exist_record(record)
         return nil if record.nil? || record[Pipeline::ConditionGenerator::FOREST_RECORD_DOES_NOT_EXIST]
 
-        record.each do |key, value|
-          if value.is_a?(Hash) && value.value?(Pipeline::ConditionGenerator::FOREST_RECORD_DOES_NOT_EXIST)
-            record[key] = nil
+        record.transform_values! do |value|
+          if value.is_a?(Hash) && value[Pipeline::ConditionGenerator::FOREST_RECORD_DOES_NOT_EXIST]
+            nil
+          else
+            value
           end
         end
 
