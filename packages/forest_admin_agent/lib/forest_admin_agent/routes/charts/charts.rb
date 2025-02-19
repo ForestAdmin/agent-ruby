@@ -15,7 +15,7 @@ module ForestAdminAgent
 
         FORMAT = {
           Day: '%d/%m/%Y',
-          Week: 'W%W-%Y',
+          Week: 'W%V-%G',
           Month: '%b %y',
           Year: '%Y'
         }.freeze
