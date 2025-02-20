@@ -184,7 +184,7 @@ module ForestAdminDatasourceActiveRecord
               origin_key_target: association.join_foreign_key,
               foreign_key: association.association_foreign_key,
               foreign_key_target: association.association_primary_key,
-              through_collection: association.join_table.singularize
+              through_collection: association.join_table.classify
             )
           )
         end
