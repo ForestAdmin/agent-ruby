@@ -22,8 +22,8 @@ module ForestAdminDatasourceMongoid
         # Split on all arrays of objects and arrays of references.
         as_models = schema.list_paths_matching(proc do |field, path_schema|
           path_schema.is_array &&
-            # FIX SCHEMA NODE OPTIONS REF
-            (!path_schema.is_leaf || path_schema.schema_node&.options&.ref) &&
+            (!path_schema.is_leaf ||
+              (path_schema.schema_node&.options.is_a?(Hash) && path_schema.schema_node.options[:ref])) &&
             forbidden_paths.none? { |p| field == p || field.start_with?("#{p}.") }
         end).sort
 
