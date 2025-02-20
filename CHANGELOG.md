@@ -1,3 +1,11 @@
+# [1.0.0-beta.96](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.95...v1.0.0-beta.96) (2025-02-20)
+
+
+### Bug Fixes
+
+* **charts:** properly format week of year ([#103](https://github.com/ForestAdmin/agent-ruby/issues/103)) ([6774d27](https://github.com/ForestAdmin/agent-ruby/commit/6774d27b1352af219048599ad42bbba225c56703))
+* **relation:** add support of has_and_belongs_to_many relations ([#105](https://github.com/ForestAdmin/agent-ruby/issues/105)) ([09eeca0](https://github.com/ForestAdmin/agent-ruby/commit/09eeca08accc01f46ee60e474b851cda3441665a))
+
 # [1.0.0-beta.95](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.94...v1.0.0-beta.95) (2025-01-30)
 
 
