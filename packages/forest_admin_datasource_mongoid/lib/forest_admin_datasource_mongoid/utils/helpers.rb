@@ -43,9 +43,9 @@ module ForestAdminDatasourceMongoid
       # not sure it this method is relevant for mongoid
       def replace_mongo_types(data)
         case data
-        when BSON::ObjectId
+        when BSON::ObjectId, BSON::Decimal128
           data.to_s
-        when Date
+        when Date, Time
           data.iso8601
         when Array
           data.map { |item| replace_mongo_types(item) }
@@ -99,6 +99,52 @@ module ForestAdminDatasourceMongoid
           end
         end
         target
+      end
+
+      # Compare two ids.
+      # This is useful to ensure we perform array operations in the right order.
+      #
+      # @example
+      # compareIds('a.20.a', 'a.1.b') => 1 (because 1 < 20)
+      # compareIds('a.0.a', 'b.1.b') => -1 (because 'a' < 'b')
+      def compare_ids(id_a, id_b)
+        parts_a = id_a.split('.')
+        parts_b = id_b.split('.')
+        length = [parts_a.length, parts_b.length].min
+
+        (0...length).each do |i|
+          # if both parts are numbers, we compare them numerically
+          result = if parts_a[i] =~ /^\d+$/ && parts_b[i] =~ /^\d+$/
+                     parts_a[i].to_i <=> parts_b[i].to_i
+                   else
+                     # else, we compare as strings
+                     parts_a[i] <=> parts_b[i]
+                   end
+          return result unless result.zero?
+        end
+
+        parts_a.length <=> parts_b.length
+      end
+
+      def split_id(id)
+        dot_index = id.index('.')
+        root_id = id[0...dot_index]
+        path = id[(dot_index + 1)..]
+
+        root_id = BSON::ObjectId.from_string(root_id) if BSON::ObjectId.legal?(root_id)
+
+        [root_id, path]
+      end
+
+      def group_ids_by_path(ids)
+        updates = Hash.new { |hash, key| hash[key] = [] }
+
+        ids.each do |id|
+          root_id, path = split_id(id)
+          updates[path] << root_id
+        end
+
+        updates
       end
     end
   end

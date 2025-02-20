@@ -225,6 +225,7 @@ Metrics/ModuleLength:
     - 'packages/forest_admin_datasource_mongoid/spec/**/*'
     - 'packages/forest_admin_datasource_customizer/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/helpers.rb'
 
 Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']
