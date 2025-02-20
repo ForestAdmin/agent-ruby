@@ -35,6 +35,12 @@ module ForestAdminDatasourceActiveRecord
           expect(datasource.get_collection('User').schema[:fields].keys).not_to include('address')
           expect(datasource.get_collection('Address').schema[:fields].keys).not_to include('addressable')
         end
+
+        it 'add has_and_belongs_to_many relation' do
+          collection = described_class.new(datasource, Company)
+
+          expect(collection.schema[:fields].keys).to include('users')
+        end
       end
     end
 
