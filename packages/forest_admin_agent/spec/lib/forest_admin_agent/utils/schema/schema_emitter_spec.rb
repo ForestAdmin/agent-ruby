@@ -91,7 +91,7 @@ module ForestAdminAgent
             expect(schema).to eq(
               {
                 data: [],
-                included: nil,
+                included: [],
                 meta: {
                   liana: described_class::LIANA_NAME,
                   liana_version: described_class::LIANA_VERSION,
@@ -123,7 +123,7 @@ module ForestAdminAgent
             expect(schema).to eq(
               {
                 data: [],
-                included: nil,
+                included: [],
                 meta: json_schema[:meta]
               }
             )

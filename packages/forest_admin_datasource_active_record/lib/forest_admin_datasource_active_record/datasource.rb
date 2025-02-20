@@ -78,7 +78,8 @@ module ForestAdminDatasourceActiveRecord
         @models << model unless model.abstract_class? ||
                                 @models.include?(model) ||
                                 !model.table_exists? ||
-                                !primary_key?(model)
+                                !primary_key?(model) ||
+                                model.const_defined?(:VIRTUAL_THROUGH_COLLECTION)
       end
     end
 
@@ -101,12 +102,16 @@ module ForestAdminDatasourceActiveRecord
       if @habtm_models.key?(model.table_name)
         @habtm_models[model.table_name].left_reflection = model.right_reflection
         # when the second model is added, we can push the HABTM model to the models list
-        @models << make_through_model(
+        through_model = make_through_model(
           model.table_name,
           [
             @habtm_models[model.table_name].left_reflection,
             @habtm_models[model.table_name].right_reflection
           ]
+        )
+
+        add_collection(
+          Collection.new(self, through_model, support_polymorphic_relations: @support_polymorphic_relations)
         )
       else
         @habtm_models[model.table_name] = model
@@ -114,6 +119,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def make_through_model(table_name, associations)
+      through_model_name = table_name.classify
       through_model = Class.new(ActiveRecord::Base) do
         class << self
           attr_accessor :name, :table_name
@@ -124,12 +130,14 @@ module ForestAdminDatasourceActiveRecord
         end
       end
 
-      through_model.name = table_name.singularize
+      through_model.name = through_model_name
       through_model.table_name = table_name
       through_model.primary_key = [associations[0].foreign_key, associations[1].foreign_key]
       associations.each do |association|
         through_model.add_association(association.name, association.options)
       end
+
+      through_model.const_set(:VIRTUAL_THROUGH_COLLECTION, true)
 
       through_model
     end

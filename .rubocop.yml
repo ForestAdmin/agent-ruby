@@ -1,4 +1,4 @@
-require:
+plugins:
   - rubocop-performance
   - rubocop-rspec
 
@@ -329,3 +329,6 @@ Lint/InterpolationCheck:
 Lint/UnusedMethodArgument:
   Exclude:
     - 'packages/forest_admin_rails/config/initializers/forest_admin_error_subscriber.rb'
+
+Style/RedundantParentheses:
+  Enabled: false
