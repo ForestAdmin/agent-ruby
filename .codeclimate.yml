@@ -1,20 +1,12 @@
 version: "2"
 plugins:
-  rubocop:
-    enabled: true
-    channel: "rubocop-1-56-3"
-    config:
-      file: ".rubocop.yml"
+#  rubocop:
+#    enabled: true
+#    channel: "rubocop-1-56-3"
+#    config:
+#      file: ".rubocop.yml"
 ##      require:
 ##        - rubocop-performance
 ##        - rubocop-rspec
   test-reporter:
     formatter: simplecov
-prepare:
-  steps:
-    - run:
-        name: Install Bundler and RuboCop Plugins
-        command: |
-          gem install bundler
-          bundle config set --local path 'vendor/bundle'
-          bundle install
