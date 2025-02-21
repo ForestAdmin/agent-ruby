@@ -10,3 +10,10 @@ plugins:
 #        - rubocop-rspec
   test-reporter:
     formatter: simplecov
+prepare:
+  steps:
+    - run:
+        name: Install RuboCop Performance and RSpec
+        command: |
+          gem install rubocop-performance
+          gem install rubocop-rspec
