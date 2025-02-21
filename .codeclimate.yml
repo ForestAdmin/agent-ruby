@@ -2,11 +2,11 @@ version: "2"
 plugins:
   rubocop:
     enabled: false
-#    channel: "rubocop-1-56-3"
-#    config:
-#      file: ".rubocop.yml"
-##      require:
-##        - rubocop-performance
-##        - rubocop-rspec
+    channel: "rubocop-1-56-3"
+    config:
+      file: ".rubocop.yml"
+      require:
+        - rubocop-performance
+        - rubocop-rspec
   test-reporter:
     formatter: simplecov
