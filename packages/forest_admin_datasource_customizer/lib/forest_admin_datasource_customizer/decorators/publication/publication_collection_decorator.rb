@@ -62,6 +62,12 @@ module ForestAdminDatasourceCustomizer
           # Implicitly hidden
           field = child_collection.schema[:fields][name]
 
+          if field.nil?
+            message = "Field '#{name}' not found in schema of collection '#{self.name}'"
+            ForestAdminAgent::Facades::Container.logger.log('Warn', message)
+            return false
+          end
+
           if field.type == 'ManyToOne'
             return (
               datasource.published?(field.foreign_collection) &&
