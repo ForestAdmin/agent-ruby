@@ -1,6 +1,6 @@
 require:
-#  - rubocop-performance
-#  - rubocop-rspec
+  - rubocop-performance
+  - rubocop-rspec
 
 AllCops:
   TargetRubyVersion: 3.0
