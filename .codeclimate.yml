@@ -4,6 +4,7 @@ plugins:
     enabled: true
     channel: "rubocop-1-56-3"
     config:
+      file: ".rubocop.yml"
       require:
         - rubocop-performance
         - rubocop-rspec
