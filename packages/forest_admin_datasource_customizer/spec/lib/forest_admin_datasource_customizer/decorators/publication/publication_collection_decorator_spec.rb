@@ -191,6 +191,18 @@ module ForestAdminDatasourceCustomizer
             expect(@decorated_person.schema[:fields]).to have_key('my_book_person')
           end
         end
+
+        context 'when the relations is unknown (type nil)' do
+          it 'logs a warning and returns false when the field is not found in the schema' do
+            logger = instance_spy(Logger)
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+            result = @decorated_book.published?('unknown_field')
+
+            expect(logger).to have_received(:log).with('Warn', "Field 'unknown_field' not found in schema of collection 'book'")
+            expect(result).to be(false)
+          end
+        end
       end
     end
   end
