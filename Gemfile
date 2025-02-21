@@ -5,7 +5,7 @@ gemspec
 group :development, :test do
   gem "overcommit", "~> 0.60"
   gem "rspec", "~> 3.0"
-  gem 'rubocop', require: false
+  gem 'rubocop', '~> 1.56.3', require: false
   gem 'rubocop-performance', require: false
   gem 'rubocop-rspec', require: false
   gem 'simplecov', "~> 0.22", require: false
