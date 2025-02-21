@@ -178,6 +178,7 @@ Lint/NestedMethodDefinition:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter_factory.rb'
 
 Performance/CollectionLiteralInLoop:
+  Enabled: true
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/condition_tree_parser.rb'
 
@@ -279,12 +280,22 @@ Style/OpenStructUse:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/resources/**/*.rb'
 
 RSpec/ExampleLength:
-  CountAsOne: [ 'array', 'hash', 'method_call' ]
   Max: 20
-
+  Exclude:
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_customizer/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
 
 RSpec/MultipleExpectations:
   Max: 10
+  Exclude:
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_customizer/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
 
 Layout/LineLength:
   Max: 120
@@ -312,6 +323,12 @@ Layout/LineLength:
 
 RSpec/MultipleMemoizedHelpers:
   Max: 10
+  Exclude:
+    - 'packages/forest_admin_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_active_record/spec/**/*'
+    - 'packages/forest_admin_datasource_toolkit/spec/**/*'
+    - 'packages/forest_admin_datasource_customizer/spec/**/*'
+    - 'packages/forest_admin_rails/spec/**/*'
 
 Security/Eval:
   Exclude:
