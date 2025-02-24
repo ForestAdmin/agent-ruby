@@ -1,6 +1,7 @@
 require 'spec_helper'
 
 module ForestAdminDatasourceActiveRecord
+  include ForestAdminDatasourceToolkit::Schema
   describe Collection do
     context 'without polymorphic support' do
       let(:datasource) { Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }) }
@@ -40,6 +41,14 @@ module ForestAdminDatasourceActiveRecord
           collection = described_class.new(datasource, Company)
 
           expect(collection.schema[:fields].keys).to include('users')
+        end
+
+        it 'add has_one_through relation' do
+          collection = described_class.new(datasource, Supplier)
+
+          expect(collection.schema[:fields].keys).to include('account_history')
+
+          expect(collection.schema[:fields]['account_history'].class).to eq(Relations::ManyToManySchema)
         end
       end
     end
