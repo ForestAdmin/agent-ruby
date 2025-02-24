@@ -1,3 +1,10 @@
+# [1.0.0-beta.97](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.96...v1.0.0-beta.97) (2025-02-24)
+
+
+### Bug Fixes
+
+* **publication:** log warning when relation field is unknown and return false ([#107](https://github.com/ForestAdmin/agent-ruby/issues/107)) ([14adf3f](https://github.com/ForestAdmin/agent-ruby/commit/14adf3fc021fcafa3736ca16aeea67b327d10fe7))
+
 # [1.0.0-beta.96](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.95...v1.0.0-beta.96) (2025-02-20)
 
 
