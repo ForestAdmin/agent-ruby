@@ -3,7 +3,7 @@ module ForestAdminDatasourceActiveRecord
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :query
+      attr_reader :query, :select
 
       def initialize(collection, projection, filter)
         @collection = collection
