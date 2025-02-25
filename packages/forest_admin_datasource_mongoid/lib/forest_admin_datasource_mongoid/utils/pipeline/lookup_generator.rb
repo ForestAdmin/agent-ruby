@@ -20,7 +20,6 @@ module ForestAdminDatasourceMongoid
         def self.lookup_projection(current_path, schema_stack, projection, options)
           pipeline = []
           fields = {}
-          puts projection.relations.inspect
           projection.relations.each do |name, relation_projection|
             pipeline.push(*lookup_relation(current_path, schema_stack, name, relation_projection, options))
             # pipeline = [*pipeline, *lookup_relation(current_path, schema_stack, name, relation_projection, options)]
