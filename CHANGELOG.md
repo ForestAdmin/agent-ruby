@@ -1,3 +1,10 @@
+# [1.0.0-beta.98](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.97...v1.0.0-beta.98) (2025-02-25)
+
+
+### Bug Fixes
+
+* **relation:** support has_one through when through collection has 2 belongs_to ([#109](https://github.com/ForestAdmin/agent-ruby/issues/109)) ([3bf698c](https://github.com/ForestAdmin/agent-ruby/commit/3bf698cabbd8a9901216e778c71036ba81ae045c))
+
 # [1.0.0-beta.97](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.96...v1.0.0-beta.97) (2025-02-24)
 
 
