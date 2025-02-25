@@ -3,7 +3,7 @@ module ForestAdminDatasourceActiveRecord
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :query
+      attr_reader :query, :select
 
       def initialize(collection, projection, filter)
         @collection = collection
@@ -15,7 +15,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def build
-        build_select
+        build_select(@collection, @projection)
         apply_filter
         apply_select
       end
@@ -92,20 +92,26 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
-      def build_select
-        unless @projection.nil?
-          @select += @projection.columns.map { |field| "#{@collection.model.table_name}.#{field}" }
-          @projection.relations.each_key do |relation|
-            relation_schema = @collection.schema[:fields][relation]
-            @select << if ['OneToOne', 'PolymorphicOneToOne'].include?(relation_schema.type)
-                         "#{@collection.model.table_name}.#{relation_schema.origin_key_target}"
-                       else
-                         "#{@collection.model.table_name}.#{relation_schema.foreign_key}"
-                       end
-          end
+      def build_select(collection, projection)
+        return if projection.nil?
+
+        if collection.model.table_name == @collection.model.table_name
+          @select += projection.columns.map { |field| "#{collection.model.table_name}.#{field}" }
         end
 
-        @query
+        one_to_one_relations = %w[OneToOne PolymorphicOneToOne]
+        projection.relations.each do |relation_name, sub_projection|
+          relation_schema = collection.schema[:fields][relation_name]
+          if collection.model.table_name == @collection.model.table_name
+            @select << if one_to_one_relations.include?(relation_schema.type)
+                         "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
+                       else
+                         "#{collection.model.table_name}.#{relation_schema.foreign_key}"
+                       end
+          end
+
+          build_select(collection.datasource.get_collection(relation_schema.foreign_collection), sub_projection)
+        end
       end
 
       def apply_select
@@ -149,6 +155,7 @@ module ForestAdminDatasourceActiveRecord
 
           result[relation.to_sym] = formatted_relations
         end
+
         result
       end
     end
