@@ -24,7 +24,7 @@ module ForestAdminDatasourceMongoid
               validations: [] # get_validations(field)
             )
 
-            if field.foreign_key? && !field.association.polymorphic?
+            if field.foreign_key? && field.type != Array && !field.association.polymorphic?
               our_schema["#{name}__many_to_one"] = build_many_to_one(field)
             end
           end
