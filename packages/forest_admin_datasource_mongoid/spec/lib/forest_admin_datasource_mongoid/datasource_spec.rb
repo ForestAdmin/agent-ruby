@@ -5,8 +5,13 @@ module ForestAdminDatasourceMongoid
   describe Datasource do
     let(:datasource) { described_class.new }
 
+    before do
+      logger = instance_double(Logger, log: nil)
+      allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+    end
+
     it 'adds collections to the datasource' do
-      expected = %w[Band Author Tag Comment Departure Post User Team]
+      expected = %w[Band Author Tag Comment Departure Post User Team addresses_User]
 
       expect(datasource.collections.keys).to match_array(expected)
     end
