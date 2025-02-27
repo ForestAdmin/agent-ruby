@@ -47,6 +47,9 @@ module ForestAdminAgent
             raise OpenIDConnect::BadRequest.new('API Access Failed', response)
           when 401
             raise OpenIDConnect::Unauthorized.new(Utils::ErrorMessages::AUTHORIZATION_FAILED, response)
+          when 403
+            error = response.body['errors'].first
+            raise OpenIDConnect::Forbidden.new(error['name'], error['detail'])
           when 404
             raise OpenIDConnect::HttpError.new(response.status, Utils::ErrorMessages::SECRET_NOT_FOUND, response)
           when 422
