@@ -8,4 +8,7 @@ class Post
   has_many :comments, dependent: :destroy
   has_one :author
   has_and_belongs_to_many :tags
+  belongs_to :user
+
+  embeds_one :co_author
 end

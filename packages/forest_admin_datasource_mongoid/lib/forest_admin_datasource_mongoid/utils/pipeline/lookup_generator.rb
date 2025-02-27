@@ -26,6 +26,8 @@ module ForestAdminDatasourceMongoid
             fields.merge!(add_fields(name, relation_projection, options))
           end
 
+          pipeline.push({ '$addFields' => fields }) unless fields.empty?
+
           pipeline
         end
 
@@ -36,7 +38,7 @@ module ForestAdminDatasourceMongoid
           projection.filter { |field| field.include?('@@@') }
                     .map { |field_name| "#{name}.#{field_name.tr(":", ".")}" }
                     .each_with_object({}) do |curr, acc|
-                      acc[curr] = "$#{curr.tr("@@@", ".")}"
+                      acc[curr] = "$#{curr.gsub("@@@", ".")}"
                     end
         end
 
@@ -67,8 +69,10 @@ module ForestAdminDatasourceMongoid
 
             return [
               # Push lookup to pipeline
-              { '$lookup' =>
-                { 'from' => from, 'localField' => local_field, 'foreignField' => foreign_field, 'as' => as } },
+              {
+                '$lookup' => { 'from' => from, 'localField' => local_field, 'foreignField' => foreign_field,
+                               'as' => as }
+              },
               { '$unwind' => { 'path' => "$#{as}", 'preserveNullAndEmptyArrays' => true } },
 
               # Recurse to get relations of relations
