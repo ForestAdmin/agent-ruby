@@ -49,7 +49,6 @@ module ForestAdminDatasourceMongoid
 
     def create(caller, data)
       handle_validation_error { _create(caller, data) }
-      # Utils::MongoidSerializer.new(model.create(data)).to_hash(ProjectionFactory.all(self))
     end
 
     def _create(_caller, flat_data)
@@ -74,8 +73,6 @@ module ForestAdminDatasourceMongoid
 
     def update(caller, filter, data)
       handle_validation_error { _update(caller, filter, data) }
-      # entity = Utils::Query.new(self, nil, filter).build.first
-      # entity&.update(data)
     end
 
     def _update(_caller, filter, flat_patch)
@@ -100,8 +97,6 @@ module ForestAdminDatasourceMongoid
 
     def delete(caller, filter)
       handle_validation_error { _delete(caller, filter) }
-      # entities = Utils::Query.new(self, nil, filter).build
-      # entities&.each(&:destroy)
     end
 
     def _delete(_caller, filter)
