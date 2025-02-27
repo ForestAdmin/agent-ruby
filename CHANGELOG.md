@@ -1,3 +1,10 @@
+# [1.0.0-beta.99](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.98...v1.0.0-beta.99) (2025-02-27)
+
+
+### Bug Fixes
+
+* proper raise of OpenIDConnect Exceptions ([#112](https://github.com/ForestAdmin/agent-ruby/issues/112)) ([81370ed](https://github.com/ForestAdmin/agent-ruby/commit/81370ed5e25b8e4250de18b65e8c58afec042665))
+
 # [1.0.0-beta.98](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.97...v1.0.0-beta.98) (2025-02-25)
 
 
