@@ -43,7 +43,6 @@ module ForestAdminDatasourceMongoid
           targets = {}
 
           schema_fields.each do |name, field|
-            # start_with?("$") useless ??
             next if name.start_with?('$') || name.include?('__') || (name == '_id' && level.positive?)
 
             if VersionManager.sub_document?(field)

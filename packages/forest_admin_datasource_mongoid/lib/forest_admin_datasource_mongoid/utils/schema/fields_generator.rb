@@ -13,18 +13,24 @@ module ForestAdminDatasourceMongoid
           child_schema.fields.each do |name, field|
             next unless name != 'parent'
 
+            default_value = if field.respond_to?(:object_id_field?) && field.object_id_field?
+                              nil
+                            else
+                              get_default_value(field)
+                            end
+
             our_schema[name] = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
               column_type: get_column_type(field),
               filter_operators: operators_for_column_type(get_column_type(field)),
               is_primary_key: name == '_id',
               is_read_only: false,
               is_sortable: get_column_type(field) != 'Json',
-              default_value: field.object_id_field? ? nil : get_default_value(field),
+              default_value: default_value,
               enum_values: [],
               validations: [] # get_validations(field)
             )
 
-            if field.foreign_key? && field.type != Array && !field.association.polymorphic?
+            if !field.is_a?(Hash) && field.foreign_key? && field.type != Array && !field.association.polymorphic?
               our_schema["#{name}__many_to_one"] = build_many_to_one(field)
             end
           end

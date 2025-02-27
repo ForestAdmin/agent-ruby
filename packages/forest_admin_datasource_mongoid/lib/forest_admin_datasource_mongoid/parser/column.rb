@@ -38,13 +38,17 @@ module ForestAdminDatasourceMongoid
           end
 
           return column.is_a?(Mongoid::Association::Embedded::EmbedsMany) ? [type] : type
+        elsif column.is_a? Hash
+          return column.reduce({}) do |memo, (name, sub_column)|
+            memo.merge({ name => get_column_type(sub_column) })
+          end
         end
 
         'String'
       end
 
       def get_default_value(column)
-        if column.options.key?(:default)
+        if column.respond_to?(:options) && column.options.key?(:default)
           default = column.options[:default]
 
           return default.respond_to?(:call) ? default.call : default

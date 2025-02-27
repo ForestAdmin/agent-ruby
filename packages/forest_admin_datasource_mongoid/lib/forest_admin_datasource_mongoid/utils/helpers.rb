@@ -30,7 +30,7 @@ module ForestAdminDatasourceMongoid
         if index.nil?
           target.delete(path)
         else
-          prefix = path[0, index]
+          prefix = path[0..index - 1]
           suffix = path[index + 1..]
 
           if target.is_a?(Hash) && target.key?(prefix)
