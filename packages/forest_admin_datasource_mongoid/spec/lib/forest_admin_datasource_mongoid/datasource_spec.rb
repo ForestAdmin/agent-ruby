@@ -11,7 +11,7 @@ module ForestAdminDatasourceMongoid
     end
 
     it 'adds collections to the datasource' do
-      expected = %w[Band Author Tag Comment Departure Post User Team addresses_User]
+      expected = %w[Band Author Tag Comment Departure Post User Team addresses_User CoAuthor Dummy__MyModel]
 
       expect(datasource.collections.keys).to match_array(expected)
     end

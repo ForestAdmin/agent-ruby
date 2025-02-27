@@ -9,7 +9,7 @@ module ForestAdminDatasourceMongoid
         allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
       end
 
-      let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
+      let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new(options: { flatten_mode: 'auto' }) }
       let(:collection) { ForestAdminDatasourceMongoid::Collection.new(datasource, model_class, [{ prefix: nil, as_fields: [], as_models: [] }]) }
 
       context 'when models with polymorphic relations exist' do

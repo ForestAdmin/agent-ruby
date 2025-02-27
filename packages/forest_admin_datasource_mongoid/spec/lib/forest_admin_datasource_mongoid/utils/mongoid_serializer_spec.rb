@@ -26,10 +26,12 @@ module ForestAdminDatasourceMongoid
           let(:author) { Author.first }
 
           before do
+            user = User.create!(name: 'Sarah Connor')
             Author.create!(
               first_name: 'john',
               last_name: 'doe',
-              post: Post.create!(title: 'foo', body: 'fake content')
+              post: Post.create!(title: 'foo', body: 'fake content', user: user),
+              user: user
             )
           end
 

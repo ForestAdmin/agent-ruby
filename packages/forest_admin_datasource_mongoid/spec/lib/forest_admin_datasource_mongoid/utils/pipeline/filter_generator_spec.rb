@@ -10,7 +10,7 @@ module ForestAdminDatasourceMongoid
           allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
         end
 
-        let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
+        let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new(options: { flatten_mode: 'auto' }) }
         let(:model) { datasource.get_collection('Post').model }
         let(:stack) { [{ prefix: nil, as_fields: [], as_models: [] }] }
 

@@ -19,14 +19,14 @@ module ForestAdminDatasourceMongoid
       it 'compares using both ordinal and lexicographical order' do
         expect(helpers_module.compare_ids('a', 'a')).to eq(0)
 
-        expect(helpers_module.compare_ids('a', 'b')).to be.negative?
-        expect(helpers_module.compare_ids('b', 'a')).to be.positive?
+        expect(helpers_module.compare_ids('a', 'b')).to be_negative
+        expect(helpers_module.compare_ids('b', 'a')).to be_positive
 
-        expect(helpers_module.compare_ids('a', 'a.b')).to be.negative?
-        expect(helpers_module.compare_ids('a.b', 'a')).to be.positive?
+        expect(helpers_module.compare_ids('a', 'a.b')).to be_negative
+        expect(helpers_module.compare_ids('a.b', 'a')).to be_positive
 
-        expect(helpers_module.compare_ids('a.2.b', 'a.10.a')).to be.negative?
-        expect(helpers_module.compare_ids('a.10.a', 'a.2.b')).to be.positive?
+        expect(helpers_module.compare_ids('a.2.b', 'a.10.a')).to be_negative
+        expect(helpers_module.compare_ids('a.10.a', 'a.2.b')).to be_positive
       end
 
       it 'splitId should separate rootId and path' do

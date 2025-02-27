@@ -8,7 +8,7 @@ module ForestAdminDatasourceMongoid
       allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
     end
 
-    let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new }
+    let(:datasource) { ForestAdminDatasourceMongoid::Datasource.new(options: { flatten_mode: 'auto' }) }
     let(:collection_post) { described_class.new(datasource, Post, [{ prefix: nil, as_fields: [], as_models: [] }]) }
     let(:collection_user) { described_class.new(datasource, User, [{ prefix: nil, as_fields: [], as_models: [] }]) }
     let(:collection_departure) { described_class.new(datasource, Departure, [{ prefix: nil, as_fields: [], as_models: [] }]) }
@@ -28,7 +28,18 @@ module ForestAdminDatasourceMongoid
       expect(schema[:countable]).to be(true)
       expect(schema[:searchable]).to be(false)
       expect(schema[:segments]).to eq([])
-      expect(schema[:fields].keys).to include('_id', 'created_at', 'updated_at', 'title', 'body', 'rating', 'tag_ids', 'tag_ids__many_to_one')
+      expect(schema[:fields].keys).to include(
+        '_id',
+        'created_at',
+        'updated_at',
+        'title',
+        'body',
+        'rating',
+        'tag_ids',
+        'user_id',
+        'user_id__many_to_one',
+        'co_author'
+      )
     end
 
     it 'escapes collection names' do
