@@ -5,6 +5,7 @@ module ForestAdminDatasourceMongoid
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         extend Utils::Helpers
         extend Parser::Column
+        extend Parser::Validation
 
         def self.build_fields_schema(model, stack)
           our_schema = {}
@@ -27,7 +28,7 @@ module ForestAdminDatasourceMongoid
               is_sortable: get_column_type(field) != 'Json',
               default_value: default_value,
               enum_values: [],
-              validations: [] # get_validations(field)
+              validations: get_validations(model, field)
             )
 
             if !field.is_a?(Hash) && field.foreign_key? && field.type != Array && !field.association.polymorphic?

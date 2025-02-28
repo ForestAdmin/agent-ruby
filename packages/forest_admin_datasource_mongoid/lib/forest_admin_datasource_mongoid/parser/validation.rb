@@ -2,17 +2,19 @@ module ForestAdminDatasourceMongoid
   module Parser
     module Validation
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-      def get_validations(column)
+      def get_validations(model, column)
+        return [] if column.is_a?(Hash)
+
         validations = []
         # NOTICE: Do not consider validations if a before_validation Active Records
         #         Callback is detected.
         default_callback_excluded = [:normalize_changed_in_place_attributes]
-        return validations if @model._validation_callbacks
-                                    .reject { |callback| default_callback_excluded.include?(callback.filter) }
-                                    .map(&:kind).include?(:before)
+        return validations if model._validation_callbacks
+                                   .reject { |callback| default_callback_excluded.include?(callback.filter) }
+                                   .map(&:kind).include?(:before)
 
-        if @model._validators? && @model._validators[column.name.to_sym].size.positive?
-          @model._validators[column.name.to_sym].each do |validator|
+        if model._validators? && model._validators[column.name.to_sym].size.positive?
+          model._validators[column.name.to_sym].each do |validator|
             # NOTICE: Do not consider conditional validations
             next if validator.options[:if] || validator.options[:unless] || validator.options[:on]
 
