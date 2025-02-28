@@ -28,7 +28,7 @@ module ForestAdminDatasourceMongoid
         end
 
         it 'returns empty validations' do
-          result = collection.get_validations('email')
+          result = collection.get_validations(model, 'email')
           expect(result).to eq([])
         end
       end
@@ -47,7 +47,7 @@ module ForestAdminDatasourceMongoid
 
         it 'returns validations' do
           email_column = model.fields['email']
-          result = collection.get_validations(email_column)
+          result = collection.get_validations(model, email_column)
 
           expect(result).to eq([{ operator: Operators::PRESENT }])
         end
@@ -68,7 +68,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a greater_than validation' do
             age_column = model.fields['age']
-            result = collection.get_validations(age_column)
+            result = collection.get_validations(model, age_column)
 
             expect(result).to include({ operator: Operators::GREATER_THAN, value: 20 })
           end
@@ -88,7 +88,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a less_than validation' do
             age_column = model.fields['age']
-            result = collection.get_validations(age_column)
+            result = collection.get_validations(model, age_column)
 
             expect(result).to include({ operator: Operators::LESS_THAN, value: 50 })
           end
@@ -110,7 +110,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a minimum length validation' do
             title_column = model.fields['title']
-            result = collection.get_validations(title_column)
+            result = collection.get_validations(model, title_column)
 
             expect(result).to include({ operator: Operators::LONGER_THAN, value: 5 })
           end
@@ -130,7 +130,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a maximum length validation' do
             title_column = model.fields['title']
-            result = collection.get_validations(title_column)
+            result = collection.get_validations(model, title_column)
 
             expect(result).to include({ operator: Operators::SHORTER_THAN, value: 10 })
           end
@@ -150,7 +150,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns an exact length validation' do
             title_column = model.fields['title']
-            result = collection.get_validations(title_column)
+            result = collection.get_validations(model, title_column)
 
             expect(result).to include({ operator: Operators::LONGER_THAN, value: 8 })
             expect(result).to include({ operator: Operators::SHORTER_THAN, value: 8 })
@@ -173,7 +173,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a format validation for email' do
             email_column = model.fields['email']
-            result = collection.get_validations(email_column)
+            result = collection.get_validations(model, email_column)
 
             expect(result).to include({ operator: Operators::CONTAINS, value: "/^[a-zA-Z0-9.!\\\#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/" })
           end
@@ -193,7 +193,7 @@ module ForestAdminDatasourceMongoid
 
           it 'returns a custom format validation' do
             username_column = model.fields['username']
-            result = collection.get_validations(username_column)
+            result = collection.get_validations(model, username_column)
 
             expect(result).to include({ operator: Operators::CONTAINS, value: '/^[a-zA-Z0-9_]+$/' })
           end
