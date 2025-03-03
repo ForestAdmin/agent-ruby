@@ -18,7 +18,7 @@ module ForestAdminDatasourceMongoid
       @model = model
       @stack = stack
       model_name = format_model_name(@model.name)
-      name = escape(prefix ? "#{prefix}.#{model_name}" : model_name)
+      name = escape(prefix ? "#{model_name}.#{prefix}" : model_name)
       super(datasource, name)
 
       add_fields(FieldsGenerator.build_fields_schema(model, stack))

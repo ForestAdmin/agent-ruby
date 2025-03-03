@@ -28,6 +28,13 @@ Mongo::Logger.logger.level = Logger::ERROR
 RSpec.configure do |config|
   config.include Mongoid::Matchers, type: :model
 
+  config.before do
+    models_to_load = Dir.glob(File.join('spec', 'dummy', 'app', 'models', '**', '*.rb'))
+                        .collect { |file_path| File.basename(file_path, '.rb').camelize.constantize }
+
+    allow(ObjectSpace).to receive(:each_object).and_return(models_to_load)
+  end
+
   config.before(:suite) do
     Mongoid.load!(File.expand_path('dummy/config/mongoid.yml', __dir__), :test)
   end

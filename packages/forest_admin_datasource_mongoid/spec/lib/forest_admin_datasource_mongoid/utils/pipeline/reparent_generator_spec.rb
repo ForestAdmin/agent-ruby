@@ -41,6 +41,8 @@ module ForestAdminDatasourceMongoid
           stub_const('Dummy::Author', author_model)
           stub_const('Dummy::Edition', edition_model)
           stub_const('Dummy::Book', model)
+
+          allow(ObjectSpace).to receive(:each_object).and_return([Dummy::Author, Dummy::Edition, Dummy::Book])
         end
 
         after do

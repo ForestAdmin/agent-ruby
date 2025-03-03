@@ -4,7 +4,7 @@ module ForestAdminDatasourceMongoid
       class MongoidSchema
         include ForestAdminDatasourceToolkit::Exceptions
         include Utils::Helpers
-        attr_reader :is_array, :is_leaf, :fields
+        attr_reader :is_array, :is_leaf, :fields, :models
 
         def initialize(model, fields, is_array, is_leaf)
           @models = ObjectSpace.each_object(Class)
@@ -99,6 +99,8 @@ module ForestAdminDatasourceMongoid
           # Traverse relations
           if child.is_a?(Hash)
             relation_name = @model.relations[prefix].class_name
+
+            raise ForestException, "Collection '#{relation_name}' not found." unless @models.key?(relation_name)
 
             # Traverse arrays
             if child.is_a?(Hash) && child['[]']
