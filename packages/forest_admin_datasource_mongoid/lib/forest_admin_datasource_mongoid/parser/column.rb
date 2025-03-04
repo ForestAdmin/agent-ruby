@@ -26,19 +26,14 @@ module ForestAdminDatasourceMongoid
       }.freeze
 
       def get_column_type(column)
-        if column.is_a? Mongoid::Fields::Standard
+        case column
+        when Mongoid::Fields::Standard
           return TYPES[column.type.to_s] || 'String'
-        elsif column.is_a? Mongoid::Fields::ForeignKey
+        when Mongoid::Fields::ForeignKey
           return 'String'
-        elsif column.respond_to?(:embedded?) && column.embedded?
-          model = column.class_name.constantize
-          fields = model.fields.merge(get_embedded_fields(model))
-          type = fields.reduce({}) do |memo, (name, column)|
-            memo.merge({ name => get_column_type(column) })
-          end
+        when Hash
+          return [get_column_type(column['[]'])] if column.key?('[]')
 
-          return column.is_a?(Mongoid::Association::Embedded::EmbedsMany) ? [type] : type
-        elsif column.is_a? Hash
           return column.reduce({}) do |memo, (name, sub_column)|
             memo.merge({ name => get_column_type(sub_column) })
           end
