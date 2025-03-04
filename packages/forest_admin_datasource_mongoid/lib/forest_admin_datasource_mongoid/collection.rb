@@ -22,15 +22,12 @@ module ForestAdminDatasourceMongoid
       super(datasource, name)
 
       add_fields(FieldsGenerator.build_fields_schema(model, stack))
-      # fetch_fields
-      # fetch_associations
       enable_count
     end
 
     def list(_caller, filter, projection)
       projection = projection.union(filter.condition_tree&.projection || [], filter.sort&.projection || [])
       pipeline = [*build_base_pipeline(filter, projection), *ProjectionGenerator.project(projection)]
-
       add_null_values(replace_mongo_types(model.unscoped.collection.aggregate(pipeline).to_a), projection)
     end
 
@@ -54,21 +51,9 @@ module ForestAdminDatasourceMongoid
     def _create(_caller, flat_data)
       as_fields = @stack[stack.length - 1][:as_fields]
       data = unflatten_record(flat_data, as_fields)
+      inserted_record = @model.create(data)
 
-      if @stack.length < 2
-        inserted_record = @model.create(data)
-
-        return { '_id' => inserted_record.attributes['_id'], **flat_data }
-      end
-
-      # Only array fields can create subdocuments (the others should use update)
-      schema = MongoidSchema.from_model(@model).apply_stack(@stack)
-
-      if schema.is_array
-        create_for_array_subfield(data, flat_data, schema)
-      else
-        create_for_object_subfield(data, flat_data)
-      end
+      { '_id' => inserted_record.attributes['_id'], **flat_data }
     end
 
     def update(caller, filter, data)
@@ -83,16 +68,11 @@ module ForestAdminDatasourceMongoid
       records = list(nil, filter, Projection.new(['_id']))
       ids = records.map { |record| record['_id'] }
 
-      if @stack.length < 2
-        if ids.length > 1
-          @model.where(_id: ids).update_all(formatted_patch)
-        else
-          @model.find(ids.first).update(formatted_patch)
-        end
+      if ids.length > 1
+        @model.where(_id: ids).update_all(formatted_patch)
+      else
+        @model.find(ids.first).update(formatted_patch)
       end
-
-      # TODO: Other cases
-      nil
     end
 
     def delete(caller, filter)
@@ -103,12 +83,7 @@ module ForestAdminDatasourceMongoid
       records = list(nil, filter, Projection.new(['_id']))
       ids = records.map { |record| record['_id'] }
 
-      @model.where(_id: ids).delete_all if @stack.length < 2
-
-      # TODO: Other cases
-      # schema = MongoidSchema.from_model(@model).apply_stack(@stack)
-      # ids_by_path = group_ids_by_path(ids)
-      nil
+      @model.where(_id: ids).delete_all
     end
 
     private
@@ -147,140 +122,10 @@ module ForestAdminDatasourceMongoid
       ]
     end
 
-    def format_model_name(class_name)
-      class_name.gsub('::', '__')
-    end
-
-    def create_for_array_subfield(data, flat_data, schema)
-      # TODO
-    end
-
-    def create_for_object_subfield(data, _flat_data)
-      # TODO
-      raise ValidationError, 'Trying to create multiple subrecords at once' if data.length > 1
-      raise ValidationError, 'Trying to create without data' if data.empty?
-    end
-
     def handle_validation_error
       yield
     rescue Mongoid::Errors::Validations => e
       raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, e.message
     end
-
-    # def fetch_fields
-    #   # Standard fields
-    #   @model.fields.each do |column_name, column|
-    #     field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-    #       column_type: get_column_type(column),
-    #       filter_operators: operators_for_column_type(get_column_type(column)),
-    #       is_primary_key: column.object_id_field? && column.association.nil?,
-    #       is_read_only: false,
-    #       is_sortable: true,
-    #       default_value: column.object_id_field? ? nil : get_default_value(column),
-    #       enum_values: [],
-    #       validations: get_validations(column)
-    #     )
-    #
-    #     add_field(column_name, field)
-    #   end
-    #
-    #   # Embedded field (EmbedsMany and EmbedsOne)
-    #   get_embedded_fields(@model).each do |column_name, column|
-    #     field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-    #       column_type: get_column_type(column),
-    #       is_primary_key: false,
-    #       is_sortable: false
-    #     )
-    #     add_field(column_name, field)
-    #   end
-    # end
-
-    # def fetch_associations
-    #   @model.relations.transform_values do |association|
-    #     case association
-    #     when Mongoid::Association::Referenced::HasMany
-    #       if association.polymorphic?
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
-    #             foreign_collection: format_model_name(association.klass.name),
-    #             origin_key: association.foreign_key,
-    #             origin_key_target: association.primary_key,
-    #             origin_type_field: association.type,
-    #             origin_type_value: association.inverse_class_name.constantize
-    #           )
-    #         )
-    #       else
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-    #             foreign_collection: format_model_name(association.klass.name),
-    #             origin_key: association.foreign_key,
-    #             origin_key_target: association.primary_key
-    #           )
-    #         )
-    #       end
-    #     when Mongoid::Association::Referenced::BelongsTo
-    #       if association.polymorphic?
-    #         foreign_collections = get_polymorphic_types(association.name)
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(
-    #             foreign_collections: foreign_collections.keys,
-    #             foreign_key: association.foreign_key,
-    #             foreign_key_type_field: association.inverse_type,
-    #             foreign_key_targets: foreign_collections
-    #           )
-    #         )
-    #         schema[:fields][association.foreign_key].is_read_only = true
-    #         schema[:fields][association.inverse_type].is_read_only = true
-    #       else
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
-    #             foreign_collection: format_model_name(association.klass.name),
-    #             foreign_key: association.foreign_key,
-    #             foreign_key_target: association.primary_key
-    #           )
-    #         )
-    #       end
-    #     when Mongoid::Association::Referenced::HasOne
-    #       if association.polymorphic?
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
-    #             foreign_collection: format_model_name(association.klass.name),
-    #             origin_key: association.foreign_key,
-    #             origin_key_target: association.primary_key,
-    #             origin_type_field: association.type,
-    #             origin_type_value: association.inverse_class_name.constantize
-    #           )
-    #         )
-    #       else
-    #         add_field(
-    #           association.name.to_s,
-    #           ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
-    #             foreign_collection: format_model_name(association.klass.name),
-    #             origin_key: association.foreign_key,
-    #             origin_key_target: association.primary_key
-    #           )
-    #         )
-    #       end
-    #     when Mongoid::Association::Referenced::HasAndBelongsToMany
-    #       foreign_key_of_association = association.klass.reflect_on_all_associations.find do |assoc|
-    #         assoc.klass == association.inverse_class_name.constantize
-    #       end&.foreign_key
-    #
-    #       add_field(
-    #         association.name.to_s,
-    #         ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
-    #           foreign_collection: format_model_name(association.klass.name),
-    #           origin_key: foreign_key_of_association,
-    #           origin_key_target: association.primary_key
-    #         )
-    #       )
-    #     end
-    #   end
-    # end
   end
 end
