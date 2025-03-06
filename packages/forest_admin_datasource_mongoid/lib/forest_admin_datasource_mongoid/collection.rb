@@ -122,6 +122,10 @@ module ForestAdminDatasourceMongoid
       ]
     end
 
+    def format_model_name(class_name)
+      class_name.gsub('::', '__')
+    end
+
     def handle_validation_error
       yield
     rescue Mongoid::Errors::Validations => e
