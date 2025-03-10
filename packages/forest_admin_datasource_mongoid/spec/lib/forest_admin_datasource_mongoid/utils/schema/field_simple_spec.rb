@@ -125,7 +125,7 @@ module ForestAdminDatasourceMongoid
 
               fields_schema = described_class.build_fields_schema(ObjectArrayModel, stack)
 
-              expect(fields_schema['nested_objects'].column_type).to eq('[]' => { 'level' => 'Number' })
+              expect(fields_schema['nested_objects'].column_type).to eq([{ 'level' => 'Number' }])
             end
           end
         end
