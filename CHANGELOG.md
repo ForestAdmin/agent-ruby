@@ -1,3 +1,10 @@
+# [1.0.0-beta.100](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.99...v1.0.0-beta.100) (2025-03-10)
+
+
+### Features
+
+* add mongoid datasource ([#111](https://github.com/ForestAdmin/agent-ruby/issues/111)) ([b9b90cc](https://github.com/ForestAdmin/agent-ruby/commit/b9b90cc5041a5867cfa08a2a7eaa7113fb9b8618))
+
 # [1.0.0-beta.99](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.98...v1.0.0-beta.99) (2025-02-27)
 
 
