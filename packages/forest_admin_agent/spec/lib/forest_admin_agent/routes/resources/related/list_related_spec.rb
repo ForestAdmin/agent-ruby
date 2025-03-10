@@ -97,7 +97,7 @@ module ForestAdminAgent
                   search: nil,
                   search_extended: nil,
                   segment: nil,
-                  sort: nil
+                  sort: [{ ascending: true, field: 'id' }]
                 )
                 expect(projection).to eq(%w[id label])
               end
@@ -130,7 +130,7 @@ module ForestAdminAgent
                   search: nil,
                   search_extended: nil,
                   segment: nil,
-                  sort: nil
+                  sort: [{ ascending: true, field: 'id' }]
                 )
                 expect(projection).to eq(%w[id label])
               end

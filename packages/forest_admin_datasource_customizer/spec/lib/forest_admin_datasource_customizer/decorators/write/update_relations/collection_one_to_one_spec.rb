@@ -75,7 +75,7 @@ module ForestAdminDatasourceCustomizer
             )
 
             # Check that the decorator listed the authors to update
-            expect(@collection_book).to have_received(:list).with(caller, filter, Projection.new(['author:id', 'id']))
+            expect(@collection_book).to have_received(:list).with(caller, filter, Projection.new(%w[id author:id]))
 
             # Check that the normal update was made
             expect(@collection_book).to have_received(:update).with(caller, filter, { 'title' => 'New title' })
@@ -100,7 +100,7 @@ module ForestAdminDatasourceCustomizer
             )
 
             # Check that the decorator listed the authors to update
-            expect(@collection_book).to have_received(:list).with(caller, filter, Projection.new(['author:id', 'id']))
+            expect(@collection_book).to have_received(:list).with(caller, filter, Projection.new(%w[id author:id]))
 
             # Check that the update was made on both collections
             expect(@collection_book).to have_received(:update).with(caller, filter, { 'title' => 'New title' })

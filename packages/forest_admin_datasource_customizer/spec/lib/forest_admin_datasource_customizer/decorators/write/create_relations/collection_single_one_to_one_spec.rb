@@ -78,7 +78,7 @@ module ForestAdminDatasourceCustomizer
                 segment: nil,
                 sort: nil
               )
-              expect(projection).to eq Projection.new(['my_owner:id', 'id'])
+              expect(projection).to eq Projection.new(%w[id my_owner:id])
             end
             expect(@collection_owner).to have_received(:update) do |_caller, filter_, data|
               expect(filter_).to have_attributes(

@@ -11,12 +11,12 @@ module ForestAdminAgent
       end
 
       def format_attributes(args)
-        record = args[:params][:data][:attributes]
+        record = args[:params][:data][:attributes] || {}
 
         args[:params][:data][:relationships]&.map do |field, value|
           schema = @collection.schema[:fields][field]
 
-          record[schema.foreign_key] = value['data'][schema.foreign_key_target] if schema.type == 'ManyToOne'
+          record[schema.foreign_key] = value['data']['id'] if schema.type == 'ManyToOne'
         end
 
         record || {}

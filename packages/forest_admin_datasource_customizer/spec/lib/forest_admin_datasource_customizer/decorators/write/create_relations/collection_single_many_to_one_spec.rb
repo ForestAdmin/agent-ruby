@@ -79,7 +79,7 @@ module ForestAdminDatasourceCustomizer
 
             expect(@collection_book).to have_received(:list) do |context_caller, _filter, projection|
               expect(context_caller).to eq caller
-              expect(projection).to eq Projection.new(['my_author:id', 'id'])
+              expect(projection).to eq Projection.new(%w[id my_author:id])
             end
 
             expect(@collection_person).to have_received(:update) do |context_caller, filter, data|
@@ -114,7 +114,7 @@ module ForestAdminDatasourceCustomizer
             @decorated_book.update(caller, Filter.new, { 'title' => 'a title' })
 
             expect(@collection_book).to have_received(:list) do |_caller, _filter, projection|
-              expect(projection).to eq Projection.new(['my_author:id', 'id'])
+              expect(projection).to eq Projection.new(%w[id my_author:id])
             end
 
             expect(@collection_person).to have_received(:list) do |_caller, filter, projection|
@@ -126,7 +126,7 @@ module ForestAdminDatasourceCustomizer
                 segment: nil,
                 sort: nil
               )
-              expect(projection).to eq Projection.new(['my_price:id', 'id'])
+              expect(projection).to eq Projection.new(%w[id my_price:id])
             end
 
             expect(@collection_price).to have_received(:update) do |_caller, filter, data|

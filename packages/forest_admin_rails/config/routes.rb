@@ -7,7 +7,8 @@ ForestAdminRails::Engine.routes.draw do
               to: 'forest#index',
               via: agent_route[:method],
               as: name,
-              route_alias: name
+              route_alias: name,
+              constraints: { id: /[a-zA-Z0-9\.]*+/ }
       end
     end
   end

@@ -274,7 +274,7 @@ module ForestAdminDatasourceCustomizer
             result = @new_person.list(caller, new_person_filter, projection)
 
             expect(@collection_person).to have_received(:list) do |_caller, _filter, base_projection|
-              expect(base_projection.to_a).to eq(%w[my_book_person:date id])
+              expect(base_projection.to_a).to eq(%w[id my_book_person:date])
             end
             expect(result).to eq([{ 'primary_key' => '1', 'my_novel_author' => { 'created_at' => 'something' } }])
           end

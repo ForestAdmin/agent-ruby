@@ -31,9 +31,8 @@ module ForestAdminAgent
 
       def self.parse_value(collection, leaf)
         schema = Collection.get_field_schema(collection, leaf[:field])
-        operator = leaf[:operator].titleize.tr(' ', '_')
 
-        if operator == Operators::IN && leaf[:field].is_a?(String)
+        if leaf[:operator] == Operators::IN && leaf[:field].is_a?(String)
           values = leaf[:value].split(',').map(&:strip)
 
           return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
