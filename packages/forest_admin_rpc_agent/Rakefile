@@ -1,12 +1,14 @@
-# frozen_string_literal: true
+require 'rake'
 
-require "bundler/gem_tasks"
-require "rspec/core/rake_task"
+PROTO_DIR = 'lib/forest_admin_rpc_agent/proto'.freeze
+OUTPUT_DIR = 'lib/forest_admin_rpc_agent'.freeze
 
-RSpec::Core::RakeTask.new(:spec)
-
-require "rubocop/rake_task"
-
-RuboCop::RakeTask.new
-
-task default: %i[spec rubocop]
+namespace :proto do
+  desc 'generate ruby files from proto files'
+  task :generate do
+    sh "grpc_tools_ruby_protoc -I #{PROTO_DIR} " \
+       "--ruby_out=#{OUTPUT_DIR} " \
+       "--grpc_out=#{OUTPUT_DIR} " \
+       "#{PROTO_DIR}/rpc.proto"
+  end
+end
