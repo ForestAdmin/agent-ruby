@@ -1,26 +1,12 @@
-require 'rake'
+# frozen_string_literal: true
 
-PROTO_DIR = 'lib/forest_admin_rpc_agent/proto'.freeze
-OUTPUT_DIR = 'lib/forest_admin_rpc_agent/proto'.freeze
+require 'bundler/gem_tasks'
+require 'rspec/core/rake_task'
 
-namespace :proto do
-  desc 'generate ruby files from proto files'
-  task :generate do
-    sh "grpc_tools_ruby_protoc -I #{PROTO_DIR} " \
-       "--ruby_out=#{OUTPUT_DIR} " \
-       "--grpc_out=#{OUTPUT_DIR} " \
-       "#{PROTO_DIR}/rpc.proto"
+RSpec::Core::RakeTask.new(:spec)
 
-    # fix require in generated files
-    %w[rpc_pb.rb rpc_services_pb.rb].each do |file|
-      path = File.join(OUTPUT_DIR, file)
-      next unless File.exist?(path)
+require 'rubocop/rake_task'
 
-      content = File.read(path)
-      updated_content = content.gsub("require 'rpc_pb'", "require_relative 'rpc_pb'")
-      updated_content.gsub!("require 'rpc_services_pb'", "require_relative 'rpc_services_pb'")
+RuboCop::RakeTask.new
 
-      File.write(path, updated_content)
-    end
-  end
-end
+task default: %i[spec rubocop]
