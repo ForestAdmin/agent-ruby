@@ -3,7 +3,7 @@
 Make sure that:
 
 - You have a database postgres and a mysql database.
-- You have create a `.env` contains a valid `forest_env_secret` based on `.env-example`.
+- You have create a `.env` contains a valid `forest_env_secret` based on `.env.example`.
 
 ## Installation
 
