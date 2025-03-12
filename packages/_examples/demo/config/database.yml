@@ -1,0 +1,62 @@
+default_primary: &default_primary
+  port: 5432
+  adapter: postgresql
+  encoding: unicode
+  username: <%= ENV['DB_USER'] %>
+  password: <%= ENV['DB_PASSWORD'] %>
+  pool: 5
+  timeout: 5000
+  host: <%= ENV['DB_HOST'] %>
+
+default_mysql: &default_mysql
+  port: 3307
+  migrations_paths: "db/mysql_db_migrate"
+  adapter: mysql2
+  encoding: utf8
+  username: <%= ENV['DB_USER_MYSQL'] %>
+  password: <%= ENV['DB_PASSWORD_MYSQL'] %>
+  pool: 5
+  timeout: 5000
+  host: <%= ENV['DB_HOST_MYSQL'] %>
+  prepared_statements: true
+
+
+development:
+  primary:
+    <<: *default_primary
+    database: <%= ENV['DB_DATABASE'] %>
+  mysql_db:
+    <<: *default_mysql
+    database: <%= ENV['DB_DATABASE_MYSQL'] %>
+
+
+# WARNING: to update if you need this environment test
+test:
+  primary:
+    <<: *default_primary
+    database: <%= ENV['DB_DATABASE'] %>
+  mysql_db:
+    <<: *default_mysql
+    database: <%= ENV['DB_DATABASE_MYSQL'] %>
+
+
+# WARNING: to update if you need environment production
+production:
+  primary:
+    <<: *default_primary
+    database: <%= ENV['DB_DATABASE'] %>
+  mysql_db:
+    <<: *default_mysql
+    database: <%= ENV['DB_DATABASE_MYSQL'] %>
+#  cache:
+#    <<: *default
+#    database: storage/production_cache.sqlite3
+#    migrations_paths: db/cache_migrate
+#  queue:
+#    <<: *default
+#    database: storage/production_queue.sqlite3
+#    migrations_paths: db/queue_migrate
+#  cable:
+#    <<: *default
+#    database: storage/production_cable.sqlite3
+#    migrations_paths: db/cable_migrate

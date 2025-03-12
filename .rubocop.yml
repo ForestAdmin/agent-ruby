@@ -11,6 +11,7 @@ AllCops:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer_override.rb'
     - 'node_modules/semantic-release-rubygem/**/*'
+    - 'packages/_examples/**/*'
 
 Gemspec/OrderedDependencies:
   Exclude:
