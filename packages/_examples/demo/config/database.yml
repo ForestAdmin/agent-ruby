@@ -1,19 +1,19 @@
 default_primary: &default_primary
-  port: 5432
+  port: <%= ENV['DB_PORT'] %>
   adapter: postgresql
   encoding: unicode
-  username: <%= ENV['DB_USER'] %>
+  username: <%= ENV['DB_USERNAME'] %>
   password: <%= ENV['DB_PASSWORD'] %>
   pool: 5
   timeout: 5000
   host: <%= ENV['DB_HOST'] %>
 
 default_mysql: &default_mysql
-  port: 3307
+  port: <%= ENV['DB_PORT_MYSQL'] %>
   migrations_paths: "db/mysql_db_migrate"
   adapter: mysql2
   encoding: utf8
-  username: <%= ENV['DB_USER_MYSQL'] %>
+  username: <%= ENV['DB_USERNAME_MYSQL'] %>
   password: <%= ENV['DB_PASSWORD_MYSQL'] %>
   pool: 5
   timeout: 5000
