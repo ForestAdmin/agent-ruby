@@ -4,3 +4,8 @@ plugins:
     enabled: false
   test-reporter:
     formatter: simplecov
+exclude_patterns:
+  - "packages/_examples/"
+  - "**/spec/"
+  - "**/coverage/"
+  - "**/sig/"
