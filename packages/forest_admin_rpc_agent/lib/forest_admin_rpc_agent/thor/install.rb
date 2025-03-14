@@ -12,6 +12,13 @@ module ForestAdminRpcAgent
 
       desc 'install ENV_SECRET', 'Install ForestAdmin RPC Agent by generating necessary configuration and files'
       method_option :app_file, type: :string, required: false, desc: 'Main file of the Sinatra application (ex: app.rb)'
+
+      RAILS_CONFIG_PATH = 'config/initializers/forest_admin_rpc_agent.rb'.freeze
+      RAILS_AGENT_PATH  = 'app/lib/forest_admin_rpc_agent/create_rpc_agent.rb'.freeze
+
+      SINATRA_CONFIG_PATH = 'config/forest_admin_rpc_agent.rb'.freeze
+      SINATRA_AGENT_PATH  = 'config/create_rpc_agent.rb'.freeze
+
       def install(env_secret)
         if rails_app?
           say_status('info', 'Rails framework detected ✅', :green)
@@ -35,7 +42,7 @@ module ForestAdminRpcAgent
         require 'rails/generators'
         require 'rails/generators/actions'
 
-        create_config_files(env_secret)
+        create_config_files(env_secret, RAILS_CONFIG_PATH, RAILS_AGENT_PATH)
 
         klass = Class.new(Rails::Generators::Base) do
           include Rails::Generators::Actions
@@ -46,12 +53,12 @@ module ForestAdminRpcAgent
       end
 
       def setup_sinatra(env_secret)
-        create_config_files(env_secret)
+        create_config_files(env_secret, SINATRA_CONFIG_PATH, SINATRA_AGENT_PATH)
 
         app_file_content = File.read(options[:app_file])
         if app_file_content.include?("require 'sinatra'")
           insert_into_file options[:app_file], <<~RUBY, after: "require 'sinatra'\n"
-            require_relative 'config/initializers/forest_admin_rpc_agent'
+            require_relative 'config/forest_admin_rpc_agent'
             require 'forest_admin_rpc_agent/sinatra_extension'
           RUBY
 
@@ -62,15 +69,15 @@ module ForestAdminRpcAgent
         end
       end
 
-      def create_config_files(env_secret)
+      def create_config_files(env_secret, config_path, agent_path)
         auth_secret = SecureRandom.hex(20)
 
-        # Create directories if they don't exist
-        FileUtils.mkdir_p('config/initializers')
-        FileUtils.mkdir_p('app/lib/forest_admin_rpc_agent')
+        # Create necessary directories
+        FileUtils.mkdir_p(File.dirname(config_path))
+        FileUtils.mkdir_p(File.dirname(agent_path))
 
         # Create configuration file
-        create_file 'config/initializers/forest_admin_rpc_agent.rb', <<~RUBY
+        create_file config_path, <<~RUBY
           ForestAdminRpcAgent.configure do |config|
             config.auth_secret = '#{auth_secret}'
             config.env_secret = '#{env_secret}'
@@ -78,7 +85,7 @@ module ForestAdminRpcAgent
         RUBY
 
         # Create agent setup file
-        create_file 'app/lib/forest_admin_rpc_agent/create_rpc_agent.rb', <<~RUBY
+        create_file agent_path, <<~RUBY
           # This file contains code to create and configure your Forest Admin agent
           # You can customize this file according to your needs
 
