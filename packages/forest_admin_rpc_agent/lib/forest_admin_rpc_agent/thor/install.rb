@@ -50,8 +50,11 @@ module ForestAdminRpcAgent
 
         app_file_content = File.read(options[:app_file])
         if app_file_content.include?("require 'sinatra'")
-          insert_into_file options[:app_file], "require 'forest_admin_rpc_agent/sinatra_extension'\n",
-                           after: "require 'sinatra'\n"
+          insert_into_file options[:app_file], <<~RUBY, after: "require 'sinatra'\n"
+            require_relative 'config/initializers/forest_admin_rpc_agent'
+            require 'forest_admin_rpc_agent/sinatra_extension'
+          RUBY
+
           say_status('success', 'ForestAdmin RPC Agent installed on Sinatra ✅', :green)
         else
           say_status('error', "Could not find `require 'sinatra'` in #{options[:app_file]}", :red)
