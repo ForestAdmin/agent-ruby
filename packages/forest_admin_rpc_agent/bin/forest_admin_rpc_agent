@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'thor'
+
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+require 'forest_admin_rpc_agent/thor/install'
+
+ForestAdminRpcAgent::Thor::Install.start(ARGV)

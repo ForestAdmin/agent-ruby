@@ -1,0 +1,129 @@
+require 'thor'
+require 'securerandom'
+require 'fileutils'
+
+module ForestAdminRpcAgent
+  module Thor
+    class Install < ::Thor
+      include ::Thor::Actions
+      # Run the command:
+      # for a rails app : forest_admin_rpc_agent install ENV_SECRET
+      # for a sinatra app : forest_admin_rpc_agent install ENV_SECRET --app_file=app.rb
+
+      desc 'install ENV_SECRET', 'Install ForestAdmin RPC Agent by generating necessary configuration and files'
+      method_option :app_file, type: :string, required: false, desc: 'Main file of the Sinatra application (ex: app.rb)'
+      def install(env_secret)
+        if rails_app?
+          say_status('info', 'Rails framework detected ✅', :green)
+          setup_rails(env_secret)
+        elsif sinatra_app?
+          if options[:app_file].nil?
+            say_status('error', 'You must specify the main file of the Sinatra application with --app_file', :red)
+            raise ::Thor::Error, 'You must specify the main file of the Sinatra application with --app_file'
+          end
+          say_status('info', 'Sinatra framework detected ✅', :green)
+          setup_sinatra(env_secret)
+        else
+          say_status('error', 'Unsupported framework', :red)
+          raise ::Thor::Error, 'Unsupported framework, only Rails and Sinatra are supported with ForestAdmin RPC Agent'
+        end
+      end
+
+      private
+
+      def setup_rails(env_secret)
+        require 'rails/generators'
+        require 'rails/generators/actions'
+
+        create_config_files(env_secret)
+
+        klass = Class.new(Rails::Generators::Base) do
+          include Rails::Generators::Actions
+        end
+        klass.new.route("mount ForestAdminRpcAgent::Extensions::Engine => '/forest_admin_rpc'")
+
+        say_status('success', 'ForestAdmin RPC Agent installed on Rails ✅', :green)
+      end
+
+      def setup_sinatra(env_secret)
+        create_config_files(env_secret)
+
+        app_file_content = File.read(options[:app_file])
+        if app_file_content.include?("require 'sinatra'")
+          insert_into_file options[:app_file], "require 'forest_admin_rpc_agent/sinatra_extension'\n",
+                           after: "require 'sinatra'\n"
+          say_status('success', 'ForestAdmin RPC Agent installed on Sinatra ✅', :green)
+        else
+          say_status('error', "Could not find `require 'sinatra'` in #{options[:app_file]}", :red)
+          raise ::Thor::Error, "Please add `require 'sinatra'` in #{options[:app_file]} before running this command."
+        end
+      end
+
+      def create_config_files(env_secret)
+        auth_secret = SecureRandom.hex(20)
+
+        # Create directories if they don't exist
+        FileUtils.mkdir_p('config/initializers')
+        FileUtils.mkdir_p('app/lib/forest_admin_rpc_agent')
+
+        # Create configuration file
+        create_file 'config/initializers/forest_admin_rpc_agent.rb', <<~RUBY
+          ForestAdminRpcAgent.configure do |config|
+            config.auth_secret = '#{auth_secret}'
+            config.env_secret = '#{env_secret}'
+          end
+        RUBY
+
+        # Create agent setup file
+        create_file 'app/lib/forest_admin_rpc_agent/create_rpc_agent.rb', <<~RUBY
+          # This file contains code to create and configure your Forest Admin agent
+          # You can customize this file according to your needs
+
+          module ForestAdminRpcAgent
+            class CreateRpcAgent
+              def self.setup!
+                # Initialize your agent here
+              end
+            end
+          end
+        RUBY
+      end
+
+      def rails_app?
+        return true if Object.const_defined?(:Rails) && Rails.respond_to?(:root)
+
+        File.exist?('config/application.rb') && Dir.exist?('app/controllers')
+      end
+
+      def sinatra_app?
+        # 1. Check if Sinatra is already loaded in memory
+        return true if defined?(Sinatra::Base)
+
+        # 2. Check Gemfile.lock
+        return true if File.exist?('Gemfile.lock') && File.read('Gemfile.lock').include?('sinatra')
+
+        # 3. Check config.ru
+        return true if File.exist?('config.ru') && File.read('config.ru') =~ %r{require ['"]sinatra(/base)?['"]}
+
+        # 4. Look for a class that inherits from Sinatra in Ruby files
+        Dir.glob('*.rb').any? do |file|
+          content = File.read(file)
+          content.match?(%r{require ['"](sinatra|sinatra/base)['"]}) &&
+            (content.include?('< Sinatra::') || content.include?('Sinatra::Application'))
+        end
+      end
+
+      class << self
+        private
+
+        def exit_on_failure?
+          true
+        end
+
+        def source_root
+          File.dirname(__FILE__)
+        end
+      end
+    end
+  end
+end
