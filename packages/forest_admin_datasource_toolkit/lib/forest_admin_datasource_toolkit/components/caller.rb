@@ -32,6 +32,15 @@ module ForestAdminDatasourceToolkit
         @project = project
         @environment = environment
       end
+
+      def to_h
+        result = {}
+        instance_variables.each do |attribute|
+          result[attribute.to_s.delete('@').to_sym] = instance_variable_get(attribute)
+        end
+
+        result
+      end
     end
   end
 end
