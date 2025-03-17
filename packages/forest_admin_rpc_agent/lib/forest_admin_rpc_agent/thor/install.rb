@@ -47,7 +47,7 @@ module ForestAdminRpcAgent
         klass = Class.new(Rails::Generators::Base) do
           include Rails::Generators::Actions
         end
-        klass.new.route("mount ForestAdminRpcAgent::Extensions::Engine => '/forest_admin_rpc'")
+        klass.new.route("mount ForestAdminRpcAgent::Engine => '/forest_admin_rpc'")
 
         say_status('success', 'ForestAdmin RPC Agent installed on Rails ✅', :green)
       end
@@ -59,7 +59,7 @@ module ForestAdminRpcAgent
         if app_file_content.include?("require 'sinatra'")
           insert_into_file options[:app_file], <<~RUBY, after: "require 'sinatra'\n"
             require_relative 'config/forest_admin_rpc_agent'
-            require 'forest_admin_rpc_agent/sinatra_extension'
+            require 'forest_admin_rpc_agent/extensions/sinatra_extension'
           RUBY
 
           say_status('success', 'ForestAdmin RPC Agent installed on Sinatra ✅', :green)
