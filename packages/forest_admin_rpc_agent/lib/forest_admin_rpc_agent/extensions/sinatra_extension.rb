@@ -10,11 +10,20 @@ module ForestAdminRpcAgent
           ForestAdminRpcAgent::Extensions::ConfigLoader.load_configuration
         end
 
-        app.get '/forest_admin_rpc' do
-          'ForestAdmin RPC Agent is running!'
-        end
+        app.use ForestAdminRpcAgent::Middleware::Authentication
 
-        # TODO: OTHERS ROUTES
+        route_classes = ForestAdminRpcAgent::Routes.constants.reject { |route| route.name == 'BaseRoute' }
+        route_classes.each do |route|
+          route_class = ForestAdminRpcAgent::Routes.const_get(route)
+
+          if route_class.respond_to?(:registered)
+            puts "Registering #{route_class}"
+            route_class.registered(app)
+          else
+            ForestAdminAgent::Facades::Container.logger.log('warn',
+                                                            "Skipping #{route_class} (does not respond to :registered)")
+          end
+        end
       end
     end
   end
