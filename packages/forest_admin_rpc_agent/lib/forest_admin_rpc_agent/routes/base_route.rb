@@ -16,7 +16,7 @@ module ForestAdminRpcAgent
   module Routes
     class BaseRoute
       def self.registered(app)
-        if defined?(Sinatra) && app.is_a?(Sinatra::Base)
+        if defined?(Sinatra) && (app == Sinatra::Base || app.ancestors.include?(Sinatra::Base))
           register_sinatra(app)
         elsif defined?(Rails) && app.is_a?(ActionDispatch::Routing::Mapper)
           register_rails(app)
