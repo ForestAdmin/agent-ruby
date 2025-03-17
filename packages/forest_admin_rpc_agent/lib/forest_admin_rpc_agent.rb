@@ -1,5 +1,6 @@
 require 'dry-configurable'
 require 'forest_admin_rpc_agent/version'
+require 'forest_admin_rpc_agent/engine'
 require 'forest_admin_agent'
 require 'forest_admin_datasource_customizer'
 require 'forest_admin_datasource_toolkit'
