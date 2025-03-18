@@ -10,15 +10,43 @@ module ForestAdminDatasourceRpc
 
       enable_count if schema[:countable]
       enable_search if schema[:searchable]
-
       schema[:actions].each { |action_name, action_schema| add_action(action_name, action_schema) }
       # schema[:charts].each { |chart| add_chart(chart) }
-      schema[:fields].each { |field_name, field_schema| add_field(field_name, field_schema) }
+      add_fields(schema[:fields])
       add_segments(schema[:segments])
     end
 
+    def add_fields(fields)
+      fields.each do |field_name, schema|
+        type = schema[:type]
+        schema.delete(:type)
+        case type
+        when 'Column'
+          add_field(field_name, ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(**schema))
+        when 'ManyToMany'
+          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(**schema))
+        when 'OneToMany'
+          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(**schema))
+        when 'ManyToOne'
+          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(**schema))
+        when 'OneToOne'
+          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(**schema))
+        when 'PolymorphicManyToOne'
+          add_field(field_name,
+                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(**schema))
+        when 'PolymorphicOneToMany'
+          add_field(field_name,
+                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(**schema))
+        when 'PolymorphicOneToOne'
+          add_field(field_name,
+                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(**schema))
+        end
+      end
+    end
+
     def list(caller, filter, projection)
-      params = { caller: caller.to_h, filter: filter.to_h, projection: projection, timezone: caller.timezone }
+      params = { collection_name: name, caller: caller.to_h, filter: filter.to_h, projection: projection,
+                 timezone: caller.timezone }
       # url = "/list?#{URI.encode_www_form(params)}"
       url = '/list'
 
