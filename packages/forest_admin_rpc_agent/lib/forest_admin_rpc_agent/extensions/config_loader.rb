@@ -5,9 +5,6 @@ module ForestAdminRpcAgent
         config_file = File.join(Dir.pwd, 'app', 'lib', 'forest_admin_rpc_agent', 'create_rpc_agent.rb')
         return unless File.exist?(config_file)
 
-        # force eager loading models
-        Rails.application.eager_load!
-
         ForestAdminRpcAgent::CreateRpcAgent.setup!
       end
     end
