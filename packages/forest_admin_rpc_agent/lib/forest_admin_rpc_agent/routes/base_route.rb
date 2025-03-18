@@ -1,21 +1,13 @@
-# module ForestAdminRpcAgent
-#   module Routes
-#     if defined?(Sinatra)
-#       require 'sinatra/base'
-#     end
-#
-#     class BaseRoute
-#       def self.registered(app)
-#         raise NotImplementedError, "Each route class must implement `.registered`"
-#       end
-#     end
-#   end
-# end
-
 module ForestAdminRpcAgent
   module Routes
     class BaseRoute
-      def self.registered(app)
+      def initialize(url, method, name)
+        @url = url
+        @method = method
+        @name = name
+      end
+
+      def registered(app)
         if defined?(Sinatra) && (app == Sinatra::Base || app.ancestors.include?(Sinatra::Base))
           register_sinatra(app)
         elsif defined?(Rails) && app.is_a?(ActionDispatch::Routing::Mapper)
@@ -26,12 +18,26 @@ module ForestAdminRpcAgent
         end
       end
 
-      def self.register_sinatra(app)
-        raise NotImplementedError, "#{self} must implement `register_sinatra`"
+      def register_sinatra(app)
+        app.send(@method.to_sym, @url) do
+          handle_request(params)
+        end
       end
 
-      def self.register_rails(router)
-        raise NotImplementedError, "#{self} must implement `register_rails`"
+      def register_rails(router)
+        handler = proc do |hash|
+          request = ActionDispatch::Request.new(hash)
+          params = request.query_parameters.merge(request.request_parameters)
+
+          [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params })]]
+        end
+
+        router.match @url,
+                     defaults: { format: 'json' },
+                     to: handler,
+                     via: @method,
+                     as: @name,
+                     route_alias: @name
       end
     end
   end

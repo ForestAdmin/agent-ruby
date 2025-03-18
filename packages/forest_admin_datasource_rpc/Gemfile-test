@@ -7,6 +7,7 @@ gem 'rake', '~> 13.0'
 gem 'rubocop', '~> 1.21'
 
 group :development, :test do
+  gem 'forest_admin_rpc_agent', path: '../forest_admin_rpc_agent'
   gem 'rails'
   gem 'rspec-rails', '~> 3.0'
   gem 'simplecov', '~> 0.22', require: false
