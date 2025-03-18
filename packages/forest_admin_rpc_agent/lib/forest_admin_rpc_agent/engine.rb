@@ -6,6 +6,10 @@ module ForestAdminRpcAgent
       Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
         agent = ForestAdminRpcAgent::Agent.instance
         agent.setup(ForestAdminRpcAgent.config)
+
+        # force eager loading models
+        Rails.application.eager_load!
+
         ForestAdminRpcAgent::Extensions::ConfigLoader.load_configuration
       end
     end
