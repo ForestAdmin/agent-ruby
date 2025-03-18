@@ -1,5 +1,4 @@
 require 'thor'
-require 'securerandom'
 require 'fileutils'
 
 module ForestAdminRpcAgent
@@ -7,10 +6,11 @@ module ForestAdminRpcAgent
     class Install < ::Thor
       include ::Thor::Actions
       # Run the command:
-      # for a rails app : forest_admin_rpc_agent install ENV_SECRET
-      # for a sinatra app : forest_admin_rpc_agent install ENV_SECRET --app_file=app.rb
+      # for a rails app : forest_admin_rpc_agent install AUTH_SECRET_FROM_YOUR_FOREST_APP
+      # for a sinatra app : forest_admin_rpc_agent install AUTH_SECRET_FROM_YOUR_FOREST_APP --app_file=app.rb
 
-      desc 'install ENV_SECRET', 'Install ForestAdmin RPC Agent by generating necessary configuration and files'
+      desc 'install AUTH_SECRET_FROM_YOUR_FOREST_APP',
+           'Install ForestAdmin RPC Agent by generating necessary configuration and files'
       method_option :app_file, type: :string, required: false, desc: 'Main file of the Sinatra application (ex: app.rb)'
 
       RAILS_CONFIG_PATH = 'config/initializers/forest_admin_rpc_agent.rb'.freeze
@@ -19,17 +19,17 @@ module ForestAdminRpcAgent
       SINATRA_CONFIG_PATH = 'config/forest_admin_rpc_agent.rb'.freeze
       SINATRA_AGENT_PATH  = 'config/create_rpc_agent.rb'.freeze
 
-      def install(env_secret)
+      def install(auth_secret)
         if rails_app?
           say_status('info', 'Rails framework detected ✅', :green)
-          setup_rails(env_secret)
+          setup_rails(auth_secret)
         elsif sinatra_app?
           if options[:app_file].nil?
             say_status('error', 'You must specify the main file of the Sinatra application with --app_file', :red)
             raise ::Thor::Error, 'You must specify the main file of the Sinatra application with --app_file'
           end
           say_status('info', 'Sinatra framework detected ✅', :green)
-          setup_sinatra(env_secret)
+          setup_sinatra(auth_secret)
         else
           say_status('error', 'Unsupported framework', :red)
           raise ::Thor::Error, 'Unsupported framework, only Rails and Sinatra are supported with ForestAdmin RPC Agent'
@@ -38,11 +38,11 @@ module ForestAdminRpcAgent
 
       private
 
-      def setup_rails(env_secret)
+      def setup_rails(auth_secret)
         require 'rails/generators'
         require 'rails/generators/actions'
 
-        create_config_files(env_secret, RAILS_CONFIG_PATH, RAILS_AGENT_PATH)
+        create_config_files(auth_secret, RAILS_CONFIG_PATH, RAILS_AGENT_PATH)
 
         klass = Class.new(Rails::Generators::Base) do
           include Rails::Generators::Actions
@@ -52,8 +52,8 @@ module ForestAdminRpcAgent
         say_status('success', 'ForestAdmin RPC Agent installed on Rails ✅', :green)
       end
 
-      def setup_sinatra(env_secret)
-        create_config_files(env_secret, SINATRA_CONFIG_PATH, SINATRA_AGENT_PATH)
+      def setup_sinatra(auth_secret)
+        create_config_files(auth_secret, SINATRA_CONFIG_PATH, SINATRA_AGENT_PATH)
 
         app_file_content = File.read(options[:app_file])
         if app_file_content.include?("require 'sinatra'")
@@ -69,9 +69,7 @@ module ForestAdminRpcAgent
         end
       end
 
-      def create_config_files(env_secret, config_path, agent_path)
-        auth_secret = SecureRandom.hex(20)
-
+      def create_config_files(auth_secret, config_path, agent_path)
         # Create necessary directories
         FileUtils.mkdir_p(File.dirname(config_path))
         FileUtils.mkdir_p(File.dirname(agent_path))
@@ -80,7 +78,6 @@ module ForestAdminRpcAgent
         create_file config_path, <<~RUBY
           ForestAdminRpcAgent.configure do |config|
             config.auth_secret = '#{auth_secret}'
-            config.env_secret = '#{env_secret}'
           end
         RUBY
 
