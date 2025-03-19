@@ -13,6 +13,10 @@ module ForestAdminDatasourceToolkit
           end_index = @limit ? @offset + @limit : nil
           records[@offset...end_index]
         end
+
+        def to_h
+          { offset: @offset, limit: @limit }
+        end
       end
     end
   end

@@ -3,7 +3,7 @@ require 'jsonapi-serializers'
 module ForestAdminRpcAgent
   module Routes
     class List < BaseRoute
-      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+      include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminAgent::Utils
       include ForestAdminAgent::Routes::QueryHandler
 
@@ -19,19 +19,20 @@ module ForestAdminRpcAgent
         )
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
-        projection = ForestAdminDatasourceToolkit::Components::Query::Projection.new(args[:params]['projection'])
-        filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new
-        # condition_tree: ConditionTreeFactory.intersect(
-        #   [
-        #     QueryStringParser.parse_condition_tree(collection, args),
-        #     # parse_query_segment(collection, args, @permissions, @caller)
-        #   ]
-        # ),
-        # page: QueryStringParser.parse_pagination(params),
-        # search: QueryStringParser.parse_search(@collection, params),
-        # search_extended: QueryStringParser.parse_search_extended(params),
-        # sort: QueryStringParser.parse_sort(@collection, params),
-        # segment: QueryStringParser.parse_segment(@collection, params)
+        projection = Projection.new(args[:params]['projection'])
+        filter = Filter.new(
+          condition_tree: ConditionTree::ConditionTreeFactory.from_plain_object(
+            args[:params]['filter']['condition_tree']
+          ),
+          page: Page.new(
+            offset: args[:params]['filter']['page']['offset'],
+            limit: args[:params]['filter']['page']['limit']
+          ),
+          search: args[:params]['filter']['search'],
+          search_extended: args[:params]['filter']['search_extended'],
+          sort: Sort.new(args[:params]['filter']['sort']),
+          segment: args[:params]['filter']['segment']
+        )
 
         collection.list(caller, filter, projection).to_json
       end
