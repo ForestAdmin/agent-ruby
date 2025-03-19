@@ -16,9 +16,11 @@ module ForestAdminRails
       )
       mongo_datasource = ForestAdminDatasourceMongoid::Datasource.new(options: { flatten_mode: 'none' })
 
-      @agent = ForestAdminAgent::Builder::AgentFactory.instance
-                                                      .add_datasource(datasource)
-                                                      .add_datasource(mongo_datasource)
+      rpc_datasource = ForestAdminDatasourceRpc.build({uri: 'http://0.0.0.0:3000'})
+
+      @agent = ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(rpc_datasource)
+                                                      # .add_datasource(datasource)
+                                                      # .add_datasource(mongo_datasource)
 
       @agent.build
     end
