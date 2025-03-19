@@ -64,3 +64,13 @@ group :test do
   gem "capybara"
   gem "selenium-webdriver"
 end
+
+
+
+gem 'forest_admin_agent', path: '../../forest_admin_agent'
+gem 'forest_admin_datasource_active_record', path: '../../forest_admin_datasource_active_record'
+gem 'forest_admin_datasource_customizer', path: '../../forest_admin_datasource_customizer'
+gem 'forest_admin_rpc_agent', path: '../../forest_admin_rpc_agent'
+gem 'forest_admin_datasource_rpc', path: '../../forest_admin_datasource_rpc'
+gem 'forest_admin_datasource_toolkit', path: '../../forest_admin_datasource_toolkit'
+gem 'forest_admin_rails', path: '../../forest_admin_rails'
