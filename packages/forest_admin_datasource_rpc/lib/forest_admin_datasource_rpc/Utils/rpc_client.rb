@@ -11,10 +11,10 @@ module ForestAdminDatasourceRpc
         @auth_secret = auth_secret
       end
 
-      def call_rpc(endpoint, method: :get, payload: nil)
+      def call_rpc(endpoint, method: :get, payload: nil, symbolize_keys: false)
         client = Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
-          faraday.response :json, parser_options: { symbolize_names: true }
+          faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
           faraday.adapter Faraday.default_adapter
           faraday.ssl.verify = false # !ForestAdminRpcAgent::Facades::Container.cache(:debug)
         end
@@ -40,7 +40,7 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_response(response)
-        raise "RPC request failed: #{response.status} - #{response.body}" unless response.success?
+        raise "RPC request failed: #{response.status}" unless response.success?
 
         response.body
       end
