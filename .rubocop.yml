@@ -391,3 +391,7 @@ Lint/UnusedMethodArgument:
 
 Style/RedundantParentheses:
   Enabled: false
+
+Style/ClassVars:
+  Enabled:
+    - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/middleware/authentication.rb'
