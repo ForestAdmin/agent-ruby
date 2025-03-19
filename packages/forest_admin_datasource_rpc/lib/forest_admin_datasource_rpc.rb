@@ -20,6 +20,8 @@ module ForestAdminDatasourceRpc
 
     ForestAdminRpcAgent::Facades::Container.logger.log('Info', "Getting schema from Rpc agent on #{uri}.")
 
+    # response = Utils::RpcClient.new(uri, ForestAdminAgent::Facades::Container.cache(:auth_secret))
+    #            .call_rpc('/forest_admin_rpc/rpc-schema', method: :get)
     response = Utils::ApiRequester.new(uri, token).get('/forest_admin_rpc/rpc-schema')
     schema = JSON.parse(response.body, symbolize_names: true)
 
