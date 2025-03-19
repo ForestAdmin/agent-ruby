@@ -1,10 +1,13 @@
 module ForestAdminDatasourceRpc
   class Collection < ForestAdminDatasourceToolkit::Collection
+    include ForestAdminDatasourceRpc::Utils
+
     def initialize(datasource, name, options, schema)
       super(datasource, name)
       @options = options
       @rpc_collection_uri = "#{options[:uri]}/forest/rpc/#{name}"
-      @client = Utils::ApiRequester.new(@rpc_collection_uri, @options[:token])
+      # @client = Utils::ApiRequester.new(@rpc_collection_uri, @options[:token])
+      @client = RpcClient.new(@rpc_collection_uri, ForestAdminAgent::Facades::Container.cache(:auth_secret))
 
       ForestAdminAgent::Facades::Container.logger.log('Debug', "Create Rpc collection #{name}.")
 
@@ -55,7 +58,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
 
-      response = @client.get(url, params)
+      # response = @client.get(url, params)
+      response = @client.call_rpc(url, method: :get, payload: params)
       response.body
     end
 
@@ -68,7 +72,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
 
-      response = @client.post(url, params)
+      # response = @client.post(url, params)
+      response = @client.call_rpc(url, method: :post, payload: params)
       response.body
     end
 
@@ -81,7 +86,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
 
-      @client.put(url, params)
+      # @client.put(url, params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def delete(caller, filter)
@@ -93,7 +99,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' delete call to the Rpc agent on #{url}."
       )
 
-      @client.delete(url, params)
+      # @client.delete(url, params)
+      @client.call_rpc(url, method: :delete, payload: params)
     end
 
     def aggregate(caller, filter, aggregation, limit = nil)
@@ -106,7 +113,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' aggregation call to the Rpc agent on #{url}."
       )
 
-      response = @client.get(url, params)
+      # response = @client.get(url, params)
+      response = @client.call_rpc(url, method: :get, payload: params)
       response.body
     end
 
@@ -119,7 +127,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      response = @client.post(url, params)
+      # response = @client.post(url, params)
+      response = @client.call_rpc(url, method: :post, payload: params)
       # TODO: action with file
       response.body
     end
@@ -133,7 +142,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action form #{name} call to the Rpc agent on #{url}."
       )
 
-      response = @client.post(url, params)
+      # response = @client.post(url, params)
+      response = @client.call_rpc(url, method: :post, payload: params)
       response.body
     end
 
@@ -146,7 +156,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
 
-      response = @client.get(url, params)
+      # response = @client.get(url, params)
+      response = @client.call_rpc(url, method: :get, payload: params)
       response.body
     end
   end
