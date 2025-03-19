@@ -20,14 +20,14 @@ module ForestAdminDatasourceToolkit
           @page = page
         end
 
-        def to_h
+        def to_h(deeply: true)
           {
-            condition_tree: @condition_tree,
+            condition_tree: deeply && !@condition_tree.nil? ? @condition_tree.to_h : @condition_tree,
             search: @search,
             search_extended: @search_extended,
             segment: @segment,
             sort: @sort,
-            page: @page
+            page: deeply && !page.nil? ? @page.to_h : @page
           }
         end
 
@@ -36,7 +36,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def override(args)
-          args = to_h.merge(args)
+          args = to_h(deeply: false).merge(args)
 
           Filter.new(**args)
         end
