@@ -40,7 +40,7 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_response(response)
-        raise "RPC request failed: #{response.status}" unless response.success?
+        raise "RPC request failed: #{response.status} for uri #{response.env.url}" unless response.success?
 
         response.body
       end
