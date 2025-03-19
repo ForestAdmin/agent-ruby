@@ -47,7 +47,7 @@ module ForestAdminRpcAgent
         klass = Class.new(Rails::Generators::Base) do
           include Rails::Generators::Actions
         end
-        klass.new.route("mount ForestAdminRpcAgent::Engine => '/forest_admin_rpc'")
+        klass.new.route("mount ForestAdminRpcAgent::Engine => '/forest'")
 
         say_status('success', 'ForestAdmin RPC Agent installed on Rails ✅', :green)
       end

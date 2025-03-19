@@ -31,11 +31,13 @@ module ForestAdminRpcAgent
           auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
           status, headers, response = auth_middleware.call(request.env)
 
-          return [status, headers, response] if status != 200
+          if status == 200
+            params = request.query_parameters.merge(request.request_parameters)
 
-          params = request.query_parameters.merge(request.request_parameters)
-
-          [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params })]]
+            [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params })]]
+          else
+            [status, headers, response]
+          end
         end
 
         router.match @url,

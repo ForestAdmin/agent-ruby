@@ -5,9 +5,8 @@ module ForestAdminDatasourceRpc
     def initialize(datasource, name, options, schema)
       super(datasource, name)
       @options = options
-      @rpc_collection_uri = "#{options[:uri]}/forest/rpc/#{name}"
-      # @client = Utils::ApiRequester.new(@rpc_collection_uri, @options[:token])
-      @client = RpcClient.new(@rpc_collection_uri, ForestAdminAgent::Facades::Container.cache(:auth_secret))
+      @client = RpcClient.new(@options[:uri], ForestAdminAgent::Facades::Container.cache(:auth_secret))
+      @rpc_collection_uri = "/forest/rpc/#{name}"
 
       ForestAdminAgent::Facades::Container.logger.log('Debug', "Create Rpc collection #{name}.")
 
@@ -21,6 +20,7 @@ module ForestAdminDatasourceRpc
 
     def add_fields(fields)
       fields.each do |field_name, schema|
+        field_name = field_name.to_s
         type = schema[:type]
         schema.delete(:type)
         case type
@@ -50,17 +50,14 @@ module ForestAdminDatasourceRpc
     def list(caller, filter, projection)
       params = { collection_name: name, caller: caller.to_h, filter: filter.to_h, projection: projection,
                  timezone: caller.timezone }
-      # url = "/list?#{URI.encode_www_form(params)}"
-      url = '/list'
+      url = "#{@rpc_collection_uri}/list"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
 
-      # response = @client.get(url, params)
-      response = @client.call_rpc(url, method: :get, payload: params)
-      response.body
+      @client.call_rpc(url, method: :get, payload: params)
     end
 
     def create(caller, data)
