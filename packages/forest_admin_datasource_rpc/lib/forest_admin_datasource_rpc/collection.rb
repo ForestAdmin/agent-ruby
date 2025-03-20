@@ -48,8 +48,8 @@ module ForestAdminDatasourceRpc
     end
 
     def list(caller, filter, projection)
-      params = { collection_name: name, caller: caller.to_h, filter: filter.to_h, projection: projection,
-                 timezone: caller.timezone }
+      params = build_params(caller: caller.to_h, filter: filter.to_h, projection: projection,
+                            timezone: caller.timezone)
       url = "#{@rpc_collection_uri}/list"
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -61,8 +61,8 @@ module ForestAdminDatasourceRpc
     end
 
     def create(caller, data)
-      params = { caller: caller.to_h, timezone: caller.timezone, data: data }
-      url = '/create'
+      params = build_params(caller: caller.to_h, timezone: caller.timezone, data: data)
+      url = "#{@rpc_collection_uri}/create"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
