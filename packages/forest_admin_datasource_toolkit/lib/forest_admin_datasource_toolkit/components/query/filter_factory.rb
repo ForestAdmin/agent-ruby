@@ -14,15 +14,16 @@ module ForestAdminDatasourceToolkit
 
           Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.from_plain_object(
-              json['filter']['condition_tree']
+              json['filter']['condition_tree'] || nil
             ),
-            page: Page.new(
-              offset: json['filter']['page']['offset'],
-              limit: json['filter']['page']['limit']
-            ),
+            page: if json['filter']['page'].nil?
+                    nil
+                  else
+                    Page.new(offset: json['filter']['page']['offset'], limit: json['filter']['page']['limit'])
+                  end,
             search: json['filter']['search'],
             search_extended: json['filter']['search_extended'],
-            sort: Sort.new(json['filter']['sort']),
+            sort: json['filter']['sort'].nil? ? nil : Sort.new(json['filter']['sort']),
             segment: json['filter']['segment']
           )
         end
