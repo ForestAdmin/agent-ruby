@@ -70,7 +70,6 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
 
-      # response = @client.post(url, params)
       response = @client.call_rpc(url, method: :post, payload: params)
       response.body
     end
@@ -102,18 +101,16 @@ module ForestAdminDatasourceRpc
     end
 
     def aggregate(caller, filter, aggregation, limit = nil)
-      params = { caller: caller.to_h, timezone: caller.timezone, filter: filter, aggregation: aggregation,
-                 limit: limit }
-      url = '/aggregate'
+      params = build_params(caller: caller.to_h, filter: filter.to_h, aggregation: aggregation.to_h, limit: limit,
+                            timezone: caller.timezone)
+      url = "#{@rpc_collection_uri}/aggregate"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
-        "Forwarding '#{@name}' aggregation call to the Rpc agent on #{url}."
+        "Forwarding '#{@name}' aggregate call to the Rpc agent on #{url}."
       )
 
-      # response = @client.get(url, params)
-      response = @client.call_rpc(url, method: :get, payload: params)
-      response.body
+      @client.call_rpc(url, method: :get, payload: params)
     end
 
     def execute(caller, name, _data, filter = nil)
