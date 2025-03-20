@@ -86,15 +86,14 @@ module ForestAdminDatasourceRpc
     end
 
     def delete(caller, filter)
-      params = { caller: caller.to_h, timezone: caller.timezone, filter: filter }
-      url = '/delete'
+      params = build_params(caller: caller.to_h, filter: filter.to_h, timezone: caller.timezone)
+      url = "#{@rpc_collection_uri}/delete"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
-        "Forwarding '#{@name}' delete call to the Rpc agent on #{url}."
+        "Forwarding '#{@name}' deletion call to the Rpc agent on #{url}."
       )
 
-      # @client.delete(url, params)
       @client.call_rpc(url, method: :delete, payload: params)
     end
 
