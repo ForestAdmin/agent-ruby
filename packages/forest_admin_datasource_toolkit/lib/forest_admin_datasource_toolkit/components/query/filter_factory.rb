@@ -9,6 +9,24 @@ module ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Schema::Relations
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        def self.from_plain_object(json)
+          Filter.new if json.nil? || json.empty?
+
+          Filter.new(
+            condition_tree: ConditionTree::ConditionTreeFactory.from_plain_object(
+              json['filter']['condition_tree']
+            ),
+            page: Page.new(
+              offset: json['filter']['page']['offset'],
+              limit: json['filter']['page']['limit']
+            ),
+            search: json['filter']['search'],
+            search_extended: json['filter']['search_extended'],
+            sort: Sort.new(json['filter']['sort']),
+            segment: json['filter']['segment']
+          )
+        end
+
         def self.get_previous_period_filter(filter, timezone)
           filter.override(condition_tree: filter.condition_tree.replace_leafs do |leaf|
                                             case leaf.operator

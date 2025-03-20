@@ -20,19 +20,7 @@ module ForestAdminRpcAgent
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
         projection = Projection.new(args[:params]['projection'])
-        filter = Filter.new(
-          condition_tree: ConditionTree::ConditionTreeFactory.from_plain_object(
-            args[:params]['filter']['condition_tree']
-          ),
-          page: Page.new(
-            offset: args[:params]['filter']['page']['offset'],
-            limit: args[:params]['filter']['page']['limit']
-          ),
-          search: args[:params]['filter']['search'],
-          search_extended: args[:params]['filter']['search_extended'],
-          sort: Sort.new(args[:params]['filter']['sort']),
-          segment: args[:params]['filter']['segment']
-        )
+        filter = FilterFactory.from_plain_object(args[:params])
 
         collection.list(caller, filter, projection).to_json
       end
