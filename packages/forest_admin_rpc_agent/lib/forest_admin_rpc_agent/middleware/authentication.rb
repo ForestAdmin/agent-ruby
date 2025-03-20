@@ -2,6 +2,7 @@ module ForestAdminRpcAgent
   module Middleware
     class Authentication
       ALLOWED_TIME_DIFF = 300
+      SIGNATURE_REUSE_WINDOW = 5
       @@used_signatures = {}
 
       def initialize(app)
@@ -24,7 +25,6 @@ module ForestAdminRpcAgent
 
       def valid_signature?(signature, timestamp)
         return false if signature.nil? || timestamp.nil?
-
         return false unless valid_timestamp?(timestamp)
 
         expected_signature = OpenSSL::HMAC.hexdigest('SHA256', auth_secret, timestamp)
@@ -32,8 +32,10 @@ module ForestAdminRpcAgent
         return false unless Rack::Utils.secure_compare(signature, expected_signature)
 
         # check if this signature has already been used (replay attack)
-        return false if @@used_signatures.key?(signature)
-
+        if @@used_signatures.key?(signature)
+          last_used = @@used_signatures[signature]
+          return false if Time.now.utc.to_i - last_used > SIGNATURE_REUSE_WINDOW
+        end
         @@used_signatures[signature] = Time.now.utc.to_i
 
         cleanup_old_signatures
@@ -54,7 +56,7 @@ module ForestAdminRpcAgent
 
       def cleanup_old_signatures
         now = Time.now.utc.to_i
-        @@used_signatures.delete_if { |_key, timestamp| now - timestamp > ALLOWED_TIME_DIFF }
+        @@used_signatures.delete_if { |_signature, last_used| now - last_used > ALLOWED_TIME_DIFF }
       end
 
       def auth_secret
