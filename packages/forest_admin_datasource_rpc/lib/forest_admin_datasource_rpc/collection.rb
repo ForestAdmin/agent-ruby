@@ -7,6 +7,7 @@ module ForestAdminDatasourceRpc
       @options = options
       @client = RpcClient.new(@options[:uri], ForestAdminAgent::Facades::Container.cache(:auth_secret))
       @rpc_collection_uri = "/forest/rpc/#{name}"
+      @base_params = { collection_name: name }
 
       ForestAdminAgent::Facades::Container.logger.log('Debug', "Create Rpc collection #{name}.")
 
@@ -156,6 +157,12 @@ module ForestAdminDatasourceRpc
       # response = @client.get(url, params)
       response = @client.call_rpc(url, method: :get, payload: params)
       response.body
+    end
+
+    private
+
+    def build_params(extra_params = {})
+      @base_params.merge(extra_params)
     end
   end
 end

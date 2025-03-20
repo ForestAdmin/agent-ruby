@@ -19,7 +19,6 @@ module ForestAdminDatasourceToolkit
         segments: [],
         actions: {}
       }
-      @base_params = { collection_name: name }
     end
 
     def enable_count
@@ -72,12 +71,6 @@ module ForestAdminDatasourceToolkit
 
     def render_chart(_caller, name, _record_id)
       raise Exceptions::ForestException, "Chart #{name} is not implemented."
-    end
-
-    private
-
-    def build_params(extra_params = {})
-      @base_params.merge(extra_params)
     end
   end
 end
