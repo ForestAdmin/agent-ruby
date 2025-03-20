@@ -70,21 +70,19 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
 
-      response = @client.call_rpc(url, method: :post, payload: params)
-      response.body
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def update(caller, filter, data)
-      params = { caller: caller.to_h, timezone: caller.timezone, filter: filter, data: data }
-      url = '/update'
+      params = build_params(caller: caller.to_h, filter: filter, data: data)
+      url = "#{@rpc_collection_uri}/update"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
 
-      # @client.put(url, params)
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, method: :put, payload: params)
     end
 
     def delete(caller, filter)
