@@ -4,11 +4,7 @@ module ForestAdminSinatra
   module Extensions
     module SinatraExtension
       def self.registered(app)
-        app.before do
-          agent = ForestAdminAgent::Builder::AgentFactory.instance
-          agent.setup(ForestAdminSinatra.config)
-          ForestAdminSinatra::Extensions::ConfigLoader.load_configuration
-        end
+        ForestAdminAgent::Builder::AgentFactory.instance.setup(ForestAdminSinatra.config)
 
         route_classes = ForestAdminSinatra::Routes.constants.reject { |route| route.name == 'BaseRoute' }
         route_classes.each do |route|
