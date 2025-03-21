@@ -5,7 +5,7 @@ require_relative "lib/forest_admin_sinatra/version"
 
 Gem::Specification.new do |spec|
   spec.name = "forest_admin_sinatra"
-  spec.version = ForestAdminSinatraAgent::VERSION
+  spec.version = ForestAdminSinatra::VERSION
   spec.authors      = ["Matthieu", "Nicolas"]
   spec.email        = ["matthv@gmail.com", "nicolasalexandre9@gmail.com"]
   spec.homepage     = "https://www.forestadmin.com"
