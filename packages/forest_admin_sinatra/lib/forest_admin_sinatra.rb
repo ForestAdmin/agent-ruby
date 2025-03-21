@@ -26,10 +26,10 @@ module ForestAdminSinatra
   setting :customize_error_message, default: nil
   setting :instant_cache_refresh, default: false
 
-  # begin
-  #   require 'thor'
-  #   require 'forest_admin_sinatra/thor/install'
-  # rescue LoadError
-  #   # Thor is not available, skip loading commands
-  # end
+  begin
+    require 'thor'
+    require 'forest_admin_sinatra/thor/install'
+  rescue LoadError
+    # Thor is not available, skip loading commands
+  end
 end

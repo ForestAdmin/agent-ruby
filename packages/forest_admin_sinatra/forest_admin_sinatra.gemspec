@@ -27,7 +27,7 @@ admin work on any Ruby application."
     "LICENSE"
   ]
   spec.bindir = "bin"
-  spec.executables = ["forest_admin_sinatra_agent"]
+  spec.executables = ["forest_admin_sinatra"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "dry-configurable", "~> 1.1"

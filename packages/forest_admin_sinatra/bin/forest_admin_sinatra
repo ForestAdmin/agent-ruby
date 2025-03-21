@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'thor'
+
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+require 'forest_admin_sinatra/thor/install'
+
+ForestAdminSinatra::Thor::Install.start(ARGV)
