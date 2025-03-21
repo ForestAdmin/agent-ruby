@@ -5,6 +5,7 @@ gemspec
 
 gem 'forest_admin_agent'
 gem 'forest_admin_datasource_active_record'
+gem 'sinatra-activerecord'
 
 group :development, :test do
   gem 'rspec-rails', '~> 6.0.0'
