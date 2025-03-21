@@ -13,7 +13,6 @@ module ForestAdminSinatra
       method_option :app_file, type: :string, required: false, desc: 'Main file of the Sinatra application (ex: app.rb)'
 
       SINATRA_CONFIG_PATH = 'config/forest_admin_sinatra.rb'.freeze
-      SINATRA_AGENT_PATH  = 'config/create_agent.rb'.freeze
 
       def install(env_secret)
         if sinatra_app?
@@ -32,7 +31,7 @@ module ForestAdminSinatra
       private
 
       def setup_sinatra(env_secret)
-        create_config_files(env_secret, SINATRA_CONFIG_PATH, SINATRA_AGENT_PATH)
+        create_config_files(env_secret, SINATRA_CONFIG_PATH)
 
         app_file_content = File.read(options[:app_file])
         if app_file_content.include?("require 'sinatra'")
@@ -48,31 +47,16 @@ module ForestAdminSinatra
         end
       end
 
-      def create_config_files(env_secret, config_path, agent_path)
+      def create_config_files(env_secret, config_path)
         auth_secret = SecureRandom.hex(20)
         # Create necessary directories
         FileUtils.mkdir_p(File.dirname(config_path))
-        FileUtils.mkdir_p(File.dirname(agent_path))
 
         # Create configuration file
         create_file config_path, <<~RUBY
           ForestAdminSinatra.configure do |config|
             config.auth_secret = '#{auth_secret}'
             config.env_secret = '#{env_secret}'
-          end
-        RUBY
-
-        # Create agent setup file
-        create_file agent_path, <<~RUBY
-          # This file contains code to create and configure your Forest Admin agent
-          # You can customize this file according to your needs
-
-          module ForestAdminSinatra
-            class CreateAgent
-              def self.setup!
-                # Initialize your agent here
-              end
-            end
           end
         RUBY
       end
