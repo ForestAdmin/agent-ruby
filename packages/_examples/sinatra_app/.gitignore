@@ -1,0 +1,25 @@
+vendor
+.rspec
+.rvmrc
+/.bundle
+/vendor/bundle
+/log/*
+/tmp/*
+/db/*.sqlite3
+/*.sqlite3*
+/public/system/*
+/spec/tmp/*
+**.orig
+rerun.txt
+pickle-email-*.html
+.project
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+manifest.yml
+
+# Thumbnails
+._*
+
+.forestadmin-schema.json
