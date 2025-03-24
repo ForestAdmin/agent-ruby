@@ -20,7 +20,7 @@ module ForestAdminRpcAgent
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
         projection = Projection.new(args[:params]['projection'])
-        filter = FilterFactory.from_plain_object(args[:params])
+        filter = FilterFactory.from_plain_object(args[:params]['filter'])
 
         collection.list(caller, filter, projection).to_json
       end

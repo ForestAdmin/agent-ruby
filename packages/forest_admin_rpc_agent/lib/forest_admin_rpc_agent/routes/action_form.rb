@@ -2,32 +2,32 @@ require 'jsonapi-serializers'
 
 module ForestAdminRpcAgent
   module Routes
-    class Aggregate < BaseRoute
+    class ActionForm < BaseRoute
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminAgent::Utils
       include ForestAdminAgent::Routes::QueryHandler
 
       def initialize
-        super('rpc/:collection_name/aggregate', 'get', 'rpc_aggregate')
+        super('rpc/:collection_name/action-form', 'post', 'rpc_action_form')
       end
 
       def handle_request(args)
         return '{}' unless args[:params]['collection_name']
 
-        caller = ForestAdminDatasourceToolkit::Components::Caller.new(
-          **args[:params]['caller'].to_h.transform_keys(&:to_sym)
-        )
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
 
-        aggregation = Aggregation.new(
-          operation: args[:params]['aggregation']['operation'],
-          field: args[:params]['aggregation']['field'],
-          groups: args[:params]['aggregation']['groups']
-        )
+        caller = if args[:params].key?('caller')
+                   ForestAdminDatasourceToolkit::Components::Caller.new(
+                     **args[:params]['caller'].to_h.transform_keys(&:to_sym)
+                   )
+                 end
         filter = FilterFactory.from_plain_object(args[:params]['filter'])
+        metas = args[:params]['metas'] || {}
+        data = args[:params]['data']
+        action = args[:params]['action']
 
-        collection.aggregate(caller, filter, aggregation, args[:params]['limit']).to_json
+        collection.get_form(caller, action, data, filter, metas).to_json
       end
     end
   end

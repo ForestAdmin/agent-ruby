@@ -19,7 +19,7 @@ module ForestAdminRpcAgent
         )
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
-        filter = FilterFactory.from_plain_object(args[:params])
+        filter = FilterFactory.from_plain_object(args[:params]['filter'])
 
         collection.delete(caller, filter).to_json
       end
