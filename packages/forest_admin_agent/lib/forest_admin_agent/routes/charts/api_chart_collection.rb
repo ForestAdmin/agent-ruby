@@ -44,6 +44,7 @@ module ForestAdminAgent
         end
 
         def handle_api_chart(args)
+          build(args)
           {
             content: Serializer::ForestChartSerializer.serialize(
               @collection.render_chart(
@@ -56,6 +57,7 @@ module ForestAdminAgent
         end
 
         def handle_smart_chart(args)
+          build(args)
           {
             content: @collection.render_chart(
               @caller,
