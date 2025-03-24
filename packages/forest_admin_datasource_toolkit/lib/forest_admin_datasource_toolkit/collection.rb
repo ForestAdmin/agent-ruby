@@ -64,7 +64,10 @@ module ForestAdminDatasourceToolkit
     end
 
     def add_chart(name)
-      raise Exceptions::ForestException, "Chart #{name} already defined in collection" if @schema[:charts].key?(name)
+      if @schema[:charts].include?(name)
+        raise Exceptions::ForestException,
+              "Chart #{name} already defined in collection"
+      end
 
       schema[:charts] << name
     end

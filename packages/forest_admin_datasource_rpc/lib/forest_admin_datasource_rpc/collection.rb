@@ -14,7 +14,7 @@ module ForestAdminDatasourceRpc
       enable_count if schema[:countable]
       enable_search if schema[:searchable]
       schema[:actions].each { |action_name, action_schema| add_action(action_name, action_schema) }
-      # schema[:charts].each { |chart| add_chart(chart) }
+      schema[:charts].each { |chart| add_chart(chart) }
       add_fields(schema[:fields])
       add_segments(schema[:segments])
     end
@@ -140,17 +140,15 @@ module ForestAdminDatasourceRpc
     end
 
     def render_chart(caller, name, record_id)
-      params = { caller: caller.to_h, timezone: caller.timezone, name: name, record_id: record_id }
-      url = '/chart'
+      params = build_params(caller: caller.to_h, name: name, record_id: record_id)
+      url = "#{@rpc_collection_uri}/chart"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
 
-      # response = @client.get(url, params)
-      response = @client.call_rpc(url, method: :get, payload: params)
-      response.body
+      @client.call_rpc(url, method: :get, payload: params)
     end
 
     private
