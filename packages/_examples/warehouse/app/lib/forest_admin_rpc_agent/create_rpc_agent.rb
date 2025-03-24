@@ -9,9 +9,7 @@ module ForestAdminRpcAgent
     def self.setup!
       datasource = ForestAdminDatasourceActiveRecord::Datasource.new(Rails.env.to_sym)
 
-      agent = ForestAdminRpcAgent::Agent.instance
-                                .add_datasource(datasource)
-
+      agent = ForestAdminRpcAgent::Agent.instance.add_datasource(datasource)
 
       agent.customize_collection('Product') do |collection|
         collection.add_chart('groupByManufacturer') do |context, result_builder|
@@ -30,9 +28,9 @@ module ForestAdminRpcAgent
         end
       end
 
-      # @agent.add_chart('appointments') do |_context, result_builder|
-      #   result_builder.value(784, 760)
-      # end
+      agent.add_chart('appointments') do |_context, result_builder|
+        result_builder.value(784, 760)
+      end
 
       agent.build
 
