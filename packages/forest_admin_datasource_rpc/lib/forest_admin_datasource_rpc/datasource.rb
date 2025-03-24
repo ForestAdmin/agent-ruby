@@ -1,5 +1,7 @@
 module ForestAdminDatasourceRpc
   class Datasource < ForestAdminDatasourceToolkit::Datasource
+    include ForestAdminDatasourceRpc::Utils
+
     def initialize(options, introspection)
       super()
 
@@ -20,8 +22,16 @@ module ForestAdminDatasourceRpc
       @schema = { charts: @charts }
     end
 
-    def render_chart(_caller, _name)
-      # TODO
+    def render_chart(caller, name)
+      client = RpcClient.new(@options[:uri], ForestAdminAgent::Facades::Container.cache(:auth_secret))
+      url = 'forest/rpc/datasource-chart'
+
+      ForestAdminAgent::Facades::Container.logger.log(
+        'Debug',
+        "Forwarding datasource chart '#{name}' call to the Rpc agent on #{url}."
+      )
+
+      client.call_rpc(url, method: :get, payload: { chart: name, caller: caller.to_h })
     end
   end
 end
