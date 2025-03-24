@@ -1,6 +1,8 @@
 module ForestAdminDatasourceRpc
   class Collection < ForestAdminDatasourceToolkit::Collection
+    include ForestAdminDatasourceToolkit::Components
     include ForestAdminDatasourceRpc::Utils
+    include ForestAdminDatasourceCustomizer::Decorators::Action
 
     def initialize(datasource, name, options, schema)
       super(datasource, name)
@@ -13,10 +15,12 @@ module ForestAdminDatasourceRpc
 
       enable_count if schema[:countable]
       enable_search if schema[:searchable]
-      schema[:actions].each { |action_name, action_schema| add_action(action_name, action_schema) }
-      schema[:charts].each { |chart| add_chart(chart) }
       add_fields(schema[:fields])
       add_segments(schema[:segments])
+      schema[:charts].each { |chart| add_chart(chart) }
+      schema[:actions].each do |action_name, action_schema|
+        add_action(action_name.to_s, BaseAction.from_plain_object(action_schema))
+      end
     end
 
     def add_fields(fields)
@@ -110,33 +114,36 @@ module ForestAdminDatasourceRpc
       @client.call_rpc(url, method: :get, payload: params)
     end
 
-    def execute(caller, name, _data, filter = nil)
-      params = { caller: caller.to_h, timezone: caller.timezone, filter: filter, name: name }
-      url = '/action-execute'
+    def execute(caller, name, data, filter = nil)
+      params = build_params(caller: caller.to_h, timezone: caller.timezone, action: name, filter: filter, data: data)
+      url = "#{@rpc_collection_uri}/action-execute"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      # response = @client.post(url, params)
-      response = @client.call_rpc(url, method: :post, payload: params)
       # TODO: action with file
-      response.body
+
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)
-      params = { caller: caller.to_h, timezone: caller.timezone, filter: filter, name: name, metas: metas, data: data }
-      url = '/action-form'
+      params = build_params(action: name)
+      if caller
+        params = params.merge({ caller: caller.to_h, timezone: caller.timezone, filter: filter, metas: metas,
+                                data: data })
+      end
+      url = "#{@rpc_collection_uri}/action-form"
 
       ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' action form #{name} call to the Rpc agent on #{url}."
       )
 
-      # response = @client.post(url, params)
-      response = @client.call_rpc(url, method: :post, payload: params)
-      response.body
+      result = @client.call_rpc(url, method: :post, payload: params, symbolize_keys: true)
+
+      FormFactory.build_elements(result).map { |field| Actions::ActionFieldFactory.build(field.to_h) }
     end
 
     def render_chart(caller, name, record_id)

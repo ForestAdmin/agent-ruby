@@ -13,6 +13,17 @@ module ForestAdminDatasourceCustomizer
           @execute = execute
         end
 
+        def self.from_plain_object(action)
+          new(
+            scope: action[:scope],
+            form: FormFactory.build_elements(action[:form]),
+            is_generate_file: action[:is_generate_file],
+            description: action[:description],
+            submit_button_label: action[:submit_button_label],
+            &action[:execute]
+          )
+        end
+
         def build_elements
           @form = FormFactory.build_elements(form)
         end

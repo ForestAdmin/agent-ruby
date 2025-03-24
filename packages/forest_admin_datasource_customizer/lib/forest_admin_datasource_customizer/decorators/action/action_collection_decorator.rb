@@ -56,7 +56,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         def refine_schema(sub_schema)
-          sub_schema[:actions] = @actions
+          sub_schema[:actions] = sub_schema[:actions].merge(@actions)
 
           sub_schema
         end

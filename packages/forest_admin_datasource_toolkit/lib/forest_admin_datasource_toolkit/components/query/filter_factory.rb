@@ -10,21 +10,21 @@ module ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
         def self.from_plain_object(json)
-          Filter.new if json.nil? || json.empty?
+          return Filter.new if json.nil? || json.empty?
 
           Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.from_plain_object(
-              json['filter']['condition_tree'] || nil
+              json['condition_tree'] || nil
             ),
-            page: if json['filter']['page'].nil?
+            page: if json['page'].nil?
                     nil
                   else
-                    Page.new(offset: json['filter']['page']['offset'], limit: json['filter']['page']['limit'])
+                    Page.new(offset: json['page']['offset'], limit: json['page']['limit'])
                   end,
-            search: json['filter']['search'],
-            search_extended: json['filter']['search_extended'],
-            sort: json['filter']['sort'].nil? ? nil : Sort.new(json['filter']['sort']),
-            segment: json['filter']['segment']
+            search: json['search'],
+            search_extended: json['search_extended'],
+            sort: json['sort'].nil? ? nil : Sort.new(json['sort']),
+            segment: json['segment']
           )
         end
 

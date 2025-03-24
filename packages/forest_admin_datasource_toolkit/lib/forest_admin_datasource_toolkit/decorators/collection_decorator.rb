@@ -1,6 +1,8 @@
 module ForestAdminDatasourceToolkit
   module Decorators
     class CollectionDecorator < Collection
+      include ForestAdminDatasourceToolkit::Components::Query
+
       attr_reader :datasource, :child_collection, :last_schema
       attr_writer :parent
 
@@ -36,7 +38,7 @@ module ForestAdminDatasourceToolkit
       end
 
       def get_form(caller, name, data = nil, filter = nil, metas = {})
-        refined_filter = refine_filter(caller, filter)
+        refined_filter = refine_filter(caller, filter || Filter.new)
 
         @child_collection.get_form(caller, name, data, refined_filter, metas)
       end
