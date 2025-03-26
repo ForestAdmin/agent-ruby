@@ -23,4 +23,16 @@ module ForestAdminDatasourceRpc
 
     ForestAdminDatasourceRpc::Datasource.new(options, schema)
   end
+
+  def self.generate_rpc_relations(composite_datasource)
+    composite_datasource.datasources.each do |d|
+      next unless d.is_a? ForestAdminDatasourceRpc::Datasource
+      # d.rpc_relations.each do |name, relations|
+      #   cz = composite_datasource.get_collection(name)
+      #   relations.each do |relation_name, relation_definition|
+      #     # todo
+      #   end
+      # end
+    end
+  end
 end

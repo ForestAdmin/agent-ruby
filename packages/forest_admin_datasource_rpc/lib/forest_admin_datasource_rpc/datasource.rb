@@ -1,6 +1,7 @@
 module ForestAdminDatasourceRpc
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     include ForestAdminDatasourceRpc::Utils
+    attr_reader :rpc_relations
 
     def initialize(options, introspection)
       super()

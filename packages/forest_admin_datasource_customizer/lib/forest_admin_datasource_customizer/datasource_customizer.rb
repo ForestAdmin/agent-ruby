@@ -1,6 +1,6 @@
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
-    attr_reader :stack, :datasources
+    attr_reader :stack, :datasources, :composite_datasource
 
     def initialize(_db_config = {})
       @composite_datasource = ForestAdminDatasourceToolkit::Datasource.new

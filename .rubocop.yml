@@ -287,6 +287,7 @@ Metrics/MethodLength:
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/pipeline/filter_generator.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/pipeline/lookup_generator.rb'
     - 'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/collection.rb'
+    - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/routes/schema.rb'
 
 
 Metrics/BlockLength:
