@@ -31,9 +31,18 @@ module ForestAdminDatasourceCustomizer
           super
         end
 
-        def rename_collections(renames = [])
-          renames.each do |current_name, new_name|
-            rename_collection(current_name, new_name)
+        def rename_collections(renames)
+          case renames
+          when Proc
+            collections.each_key do |name|
+              rename_collection(name, renames.call(name) || name)
+            end
+          when Hash
+            renames.each do |old_name, new_name|
+              rename_collection(old_name, new_name)
+            end
+          else
+            raise Exceptions::ForestException, 'Invalid argument for rename_collections, must be a function or a hash'
           end
         end
 

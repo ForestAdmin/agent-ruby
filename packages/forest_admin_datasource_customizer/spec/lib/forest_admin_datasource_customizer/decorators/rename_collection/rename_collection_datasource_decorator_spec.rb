@@ -136,7 +136,7 @@ module ForestAdminDatasourceCustomizer
 
           describe 'rename_collections' do
             it 'work with undefined' do
-              @datasource.rename_collections
+              @datasource.rename_collections({})
 
               expect(@datasource.collections.keys).to include('library_book')
             end
@@ -146,6 +146,31 @@ module ForestAdminDatasourceCustomizer
               collection_name = @datasource.collections.map { |_key, collection| collection.name }
 
               expect(collection_name).to include('renamed_library_book')
+            end
+
+            it 'renames collection using a function' do
+              @datasource.rename_collections(->(name) { name == 'library_book' ? 'renamed_library_book' : name })
+              collection_name = @datasource.collections.map { |_key, collection| collection.name }
+
+              expect(collection_name).to include('renamed_library_book')
+            end
+
+            it 'renames collection using a function returning null' do
+              @datasource.rename_collections(->(name) { name == 'library_book' ? 'renamed_library_book' : nil })
+              collection_name = @datasource.collections.map { |_key, collection| collection.name }
+
+              expect(collection_name).to include('library')
+              expect(collection_name).to include('renamed_library_book')
+              expect(collection_name).to include('book')
+            end
+
+            it 'raise an error if the argument is not a function or a hash' do
+              expect do
+                @datasource.rename_collections('not a function')
+              end.to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                '🌳🌳🌳 Invalid argument for rename_collections, must be a function or a hash'
+              )
             end
           end
         end
