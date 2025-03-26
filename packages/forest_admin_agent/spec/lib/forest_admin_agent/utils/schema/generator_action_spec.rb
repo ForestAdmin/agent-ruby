@@ -104,7 +104,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil
@@ -142,7 +142,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil
@@ -175,7 +175,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil

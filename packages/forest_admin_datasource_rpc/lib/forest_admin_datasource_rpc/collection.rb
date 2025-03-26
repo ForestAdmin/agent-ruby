@@ -115,6 +115,7 @@ module ForestAdminDatasourceRpc
     end
 
     def execute(caller, name, data, filter = nil)
+      data = encode_form_data(data)
       params = build_params(caller: caller.to_h, timezone: caller.timezone, action: name, filter: filter, data: data)
       url = "#{@rpc_collection_uri}/action-execute"
 
@@ -123,14 +124,13 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      # TODO: action with file
-
       @client.call_rpc(url, method: :post, payload: params)
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)
       params = build_params(action: name)
       if caller
+        data = encode_form_data(data)
         params = params.merge({ caller: caller.to_h, timezone: caller.timezone, filter: filter, metas: metas,
                                 data: data })
       end
@@ -142,8 +142,9 @@ module ForestAdminDatasourceRpc
       )
 
       result = @client.call_rpc(url, method: :post, payload: params, symbolize_keys: true)
-
-      FormFactory.build_elements(result).map { |field| Actions::ActionFieldFactory.build(field.to_h) }
+      FormFactory.build_elements(result).map do |field|
+        Actions::ActionFieldFactory.build(field.to_h)
+      end
     end
 
     def render_chart(caller, name, record_id)
@@ -162,6 +163,16 @@ module ForestAdminDatasourceRpc
 
     def build_params(extra_params = {})
       @base_params.merge(extra_params)
+    end
+
+    def encode_form_data(data)
+      data.to_h do |key, value|
+        if value.is_a?(Hash) && value.key?('buffer')
+          [key, "data:#{value["mime_type"]};base64,#{Base64.strict_encode64(value["buffer"])}"]
+        else
+          [key, value]
+        end
+      end
     end
   end
 end

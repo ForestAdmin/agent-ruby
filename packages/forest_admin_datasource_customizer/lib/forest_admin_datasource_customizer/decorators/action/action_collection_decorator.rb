@@ -41,7 +41,7 @@ module ForestAdminDatasourceCustomizer
           used = []
           context = get_context(caller, action, form_values, filter, used, metas[:change_field])
 
-          dynamic_fields = action.form
+          dynamic_fields = action.form.deep_dup
           dynamic_fields = select_in_form_fields(dynamic_fields, metas[:search_field]) if metas[:search_field]
           dynamic_fields = drop_defaults(context, dynamic_fields, form_values)
           dynamic_fields = drop_ifs(context, dynamic_fields) unless metas[:include_hidden_fields]

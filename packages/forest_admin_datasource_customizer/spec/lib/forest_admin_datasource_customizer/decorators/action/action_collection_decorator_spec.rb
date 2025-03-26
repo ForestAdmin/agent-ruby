@@ -83,7 +83,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'be flagged as static form' do
-            expect(@decorated_book.schema[:actions]['make photocopy'].static_form?).to be(true)
+            expect(@decorated_book.schema[:actions]['make photocopy'].static_form).to be(true)
           end
 
           it 'execute and return default response' do
@@ -112,7 +112,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'be flagged as static form' do
-            expect(@decorated_book.schema[:actions]['make photocopy'].static_form?).to be(true)
+            expect(@decorated_book.schema[:actions]['make photocopy'].static_form).to be(true)
           end
 
           it 'generate form' do
@@ -315,7 +315,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'be flagged as dynamic form' do
-            expect(@decorated_book.schema[:actions]['make photocopy'].static_form?).to be(false)
+            expect(@decorated_book.schema[:actions]['make photocopy'].static_form).to be(false)
           end
 
           it 'compute dynamic default value (no data == load hook)' do

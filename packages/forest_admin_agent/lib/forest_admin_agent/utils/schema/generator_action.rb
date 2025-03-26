@@ -30,7 +30,7 @@ module ForestAdminAgent
           action_index = collection.schema[:actions].keys.index(name)
           slug = get_action_slug(name)
           form_elements = extract_fields_and_layout(collection.get_form(nil, name))
-          if action.static_form?
+          if action.static_form
             fields = build_fields(collection, form_elements[:fields])
             layout = form_elements[:layout]
           else
@@ -51,7 +51,7 @@ module ForestAdminAgent
             download: action.is_generate_file,
             fields: fields,
             hooks: {
-              load: !action.static_form?,
+              load: !action.static_form,
               # Always registering the change hook has no consequences, even if we don't use it.
               change: ['changeHook']
             }

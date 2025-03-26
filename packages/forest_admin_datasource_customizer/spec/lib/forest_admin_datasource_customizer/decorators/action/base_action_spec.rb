@@ -39,7 +39,7 @@ module ForestAdminDatasourceCustomizer
             let(:action) { described_class.new(scope: :single) }
 
             it 'returns true' do
-              expect(action.static_form?).to be true
+              expect(action.static_form).to be true
             end
           end
 
@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
             let(:action) { described_class.new(scope: :single, form: form) }
 
             it 'returns true' do
-              expect(action.static_form?).to be true
+              expect(action.static_form).to be true
             end
           end
 
@@ -57,7 +57,7 @@ module ForestAdminDatasourceCustomizer
             let(:action) { described_class.new(scope: :single, form: form) }
 
             it 'returns false' do
-              expect(action.static_form?).to be false
+              expect(action.static_form).to be false
             end
           end
         end
