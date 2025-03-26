@@ -26,8 +26,10 @@ module ForestAdminDatasourceCustomizer
         end
 
         def build_elements
-          @form = FormFactory.build_elements(form)
+          @form = FormFactory.build_elements(@form)
           @static_form = @form ? @form&.all?(&:static?) : true
+
+          self
         end
 
         def validate_fields_ids(form = @form, used = [])

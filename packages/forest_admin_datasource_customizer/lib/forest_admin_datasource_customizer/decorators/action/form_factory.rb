@@ -14,9 +14,11 @@ module ForestAdminDatasourceCustomizer
                 DynamicField.new(**field)
               end
             when FormLayoutElement::RowElement
-              build_elements(field.fields)
+              field.fields = build_elements(field.fields)
+              field
             when FormLayoutElement::PageElement
-              build_elements(field.elements)
+              field.elements = build_elements(field.elements)
+              field
             else
               field
             end
