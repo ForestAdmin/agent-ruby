@@ -1,3 +1,5 @@
+require 'base64'
+
 module ForestAdminDatasourceRpc
   class Collection < ForestAdminDatasourceToolkit::Collection
     include ForestAdminDatasourceToolkit::Components
@@ -78,7 +80,7 @@ module ForestAdminDatasourceRpc
     end
 
     def update(caller, filter, data)
-      params = build_params(caller: caller.to_h, filter: filter, data: data)
+      params = build_params(caller: caller.to_h, filter: filter.to_h, data: data, timezone: caller.timezone)
       url = "#{@rpc_collection_uri}/update"
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -116,7 +118,13 @@ module ForestAdminDatasourceRpc
 
     def execute(caller, name, data, filter = nil)
       data = encode_form_data(data)
-      params = build_params(caller: caller.to_h, timezone: caller.timezone, action: name, filter: filter, data: data)
+      params = build_params(
+        caller: caller.to_h,
+        timezone: caller.timezone,
+        action: name,
+        filter: filter&.to_h,
+        data: data
+      )
       url = "#{@rpc_collection_uri}/action-execute"
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -131,7 +139,7 @@ module ForestAdminDatasourceRpc
       params = build_params(action: name)
       if caller
         data = encode_form_data(data)
-        params = params.merge({ caller: caller.to_h, timezone: caller.timezone, filter: filter, metas: metas,
+        params = params.merge({ caller: caller.to_h, timezone: caller.timezone, filter: filter&.to_h, metas: metas,
                                 data: data })
       end
       url = "#{@rpc_collection_uri}/action-form"

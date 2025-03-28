@@ -1,6 +1,11 @@
 require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
+require 'forest_admin_datasource_rpc'
+require 'forest_admin_datasource_toolkit'
+require 'forest_admin_datasource_customizer'
+require 'forest_admin_agent'
+require 'forest_admin_test_toolkit'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -13,4 +18,13 @@ SimpleCov.at_exit do
   result.format!
 end
 
-# TODO
+RSpec.configure do |config|
+  # Enable flags like --only-failures and --next-failure
+  config.example_status_persistence_file_path = ".rspec_status"
+
+  config.expect_with :rspec do |c|
+    c.syntax = :expect
+  end
+
+  config.include ForestAdminTestToolkit::Factory::Caller
+end
