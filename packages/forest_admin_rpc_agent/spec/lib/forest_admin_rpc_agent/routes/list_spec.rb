@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module ForestAdminRpcAgent
   module Routes
+    include ForestAdminDatasourceRpc
     describe List do
       include_context 'with caller'
 
