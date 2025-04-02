@@ -94,9 +94,11 @@ module ForestAdminRpcAgent
         end
       end
 
+      # rubocop:disable Style/OpenStructUse
+      # rubocop:disable RSpec/VerifiedDoubles
       describe '#encode_file_element' do
         context 'when element is of type "File"' do
-          let(:file_element) { instance_double(FileElement, type: 'File', value: instance_double(File)) }
+          let(:file_element) { OpenStruct.new(type: 'File', value: double('File')) }
           let(:elements) { [file_element] }
 
           before do
@@ -115,7 +117,7 @@ module ForestAdminRpcAgent
         end
 
         context 'when element is not of type "File"' do
-          let(:non_file_element) { instance_double(NonFileElement, type: 'Text') }
+          let(:non_file_element) { double('NonFileElement', type: 'Text') }
           let(:elements) { [non_file_element] }
 
           it 'does not alter the element' do
@@ -124,6 +126,8 @@ module ForestAdminRpcAgent
           end
         end
       end
+      # rubocop:enable Style/OpenStructUse
+      # rubocop:enable RSpec/VerifiedDoubles
     end
   end
 end
