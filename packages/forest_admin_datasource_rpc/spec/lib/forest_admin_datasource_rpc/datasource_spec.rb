@@ -9,7 +9,7 @@ module ForestAdminDatasourceRpc
   describe Datasource do
     before do
       logger = instance_double(Logger, log: nil)
-      allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
+      allow(ForestAdminRpcAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
       allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
     end
 

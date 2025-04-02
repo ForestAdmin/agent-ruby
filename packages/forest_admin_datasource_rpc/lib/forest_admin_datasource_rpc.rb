@@ -13,7 +13,7 @@ module ForestAdminDatasourceRpc
     ForestAdminRpcAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
     begin
-      schema = Utils::RpcClient.new(uri, ForestAdminAgent::Facades::Container.cache(:auth_secret))
+      schema = Utils::RpcClient.new(uri, ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
                                .call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
     rescue StandardError
       raise ForestAdminDatasourceToolkit::Exceptions::ForestException,

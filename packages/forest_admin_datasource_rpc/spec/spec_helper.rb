@@ -5,6 +5,7 @@ require 'forest_admin_datasource_rpc'
 require 'forest_admin_datasource_toolkit'
 require 'forest_admin_datasource_customizer'
 require 'forest_admin_agent'
+require 'forest_admin_rpc_agent'
 require 'forest_admin_test_toolkit'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
