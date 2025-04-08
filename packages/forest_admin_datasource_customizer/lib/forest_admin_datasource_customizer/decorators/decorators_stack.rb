@@ -9,7 +9,48 @@ module ForestAdminDatasourceCustomizer
 
       def initialize(datasource)
         @customizations = []
+        @applied_customizations = []
+        init_stack(datasource)
+      end
 
+      def queue_customization(customization)
+        @customizations << customization
+      end
+
+      # Apply all customizations
+      # Plugins may queue new customizations, or call other plugins which will queue customizations.
+      #
+      # This method will be called recursively and clears the queue at each recursion to ensure
+      # that all customizations are applied in the right order.
+      def apply_queued_customizations(logger)
+        queued_customizations = @customizations.clone
+        @customizations = []
+
+        while queued_customizations.length.positive?
+          queued_customizations.shift.call
+          apply_queued_customizations(logger)
+        end
+      end
+
+      def reload!(datasource, logger)
+        backup = backup_stack
+        @customizations = @applied_customizations.dup
+        @applied_customizations = []
+
+        begin
+          init_stack(datasource)
+          apply_queued_customizations(logger)
+          logger.log('Debug', 'Reloading customizations')
+        rescue StandardError => e
+          logger.log('Error', "Error while reloading customizations: #{e.message}, restoring previous state")
+          restore_stack(backup)
+          raise e
+        end
+      end
+
+      private
+
+      def init_stack(datasource)
         last = datasource
         last = @override = DatasourceDecorator.new(last, Override::OverrideCollectionDecorator)
         last = DatasourceDecorator.new(last, Empty::EmptyCollectionDecorator)
@@ -42,22 +83,15 @@ module ForestAdminDatasourceCustomizer
         @datasource = last
       end
 
-      def queue_customization(customization)
-        @customizations << customization
+      def backup_stack
+        instance_variables.each_with_object({}) do |var, hash|
+          hash[var] = instance_variable_get(var)
+        end
       end
 
-      # Apply all customizations
-      # Plugins may queue new customizations, or call other plugins which will queue customizations.
-      #
-      # This method will be called recursively and clears the queue at each recursion to ensure
-      # that all customizations are applied in the right order.
-      def apply_queued_customizations(logger)
-        queued_customizations = @customizations.clone
-        @customizations = []
-
-        while queued_customizations.length.positive?
-          queued_customizations.shift.call
-          apply_queued_customizations(logger)
+      def restore_stack(backup)
+        backup.each do |var, value|
+          instance_variable_set(var, value)
         end
       end
     end

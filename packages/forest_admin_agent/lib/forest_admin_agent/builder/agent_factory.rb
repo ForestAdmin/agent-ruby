@@ -47,6 +47,21 @@ module ForestAdminAgent
         send_schema
       end
 
+      def reload!
+        begin
+          @customizer.reload!(logger: @logger)
+        rescue StandardError => e
+          @logger.log('Error', "Error reloading agent: #{e.message}")
+          return
+        end
+
+        # build_container
+        # build_cache
+        # build_logger
+        # @container.register(:datasource, @customizer.datasource(@logger), replace: true)
+        send_schema
+      end
+
       def send_schema(force: false)
         return unless @has_env_secret
 
