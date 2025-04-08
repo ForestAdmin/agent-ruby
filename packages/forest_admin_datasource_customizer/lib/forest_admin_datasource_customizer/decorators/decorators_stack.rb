@@ -22,13 +22,17 @@ module ForestAdminDatasourceCustomizer
       #
       # This method will be called recursively and clears the queue at each recursion to ensure
       # that all customizations are applied in the right order.
-      def apply_queued_customizations(logger)
+      def apply_queued_customizations(logger, store_customizations: true)
         queued_customizations = @customizations.clone
         @customizations = []
 
         while queued_customizations.length.positive?
-          queued_customizations.shift.call
-          apply_queued_customizations(logger)
+          customization = queued_customizations.shift
+          customization.call
+
+          @applied_customizations << customization if store_customizations
+
+          apply_queued_customizations(logger, store_customizations: false)
         end
       end
 
