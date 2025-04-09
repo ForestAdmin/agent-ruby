@@ -31,7 +31,6 @@ module ForestAdminRpcAgent
           status, headers, response = auth_middleware.call(request.env)
 
           if status == 200
-            status = 200
             headers = {
               'Content-Type' => 'text/event-stream',
               'Cache-Control' => 'no-cache',
