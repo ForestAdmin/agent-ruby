@@ -26,7 +26,7 @@ module ForestAdminRpcAgent
 
       def register_rails(router)
         handler = proc do |hash|
-          ActionDispatch::Request.new(hash)
+          request = ActionDispatch::Request.new(hash)
           auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
           status, headers, response = auth_middleware.call(request.env)
 
@@ -34,9 +34,13 @@ module ForestAdminRpcAgent
             headers = {
               'Content-Type' => 'text/event-stream',
               'Cache-Control' => 'no-cache',
-              'Connection' => 'keep-alive',
-              'Transfer-Encoding' => 'chunked'
+              'Connection' => 'keep-alive'
             }
+
+            should_continue = true
+            # Intercept CTRL+C
+            stop_proc = proc { should_continue = false }
+            original_handler = trap('INT', stop_proc)
 
             body = Enumerator.new do |yielder|
               stream = SseStreamer.new(yielder)
@@ -45,7 +49,7 @@ module ForestAdminRpcAgent
                 puts '[SSE] start streaming'
                 stream.write('ready', event: 'ready')
 
-                loop do
+                while should_continue
                   puts '[SSE] heartbeat'
                   stream.write('', event: 'heartbeat')
                   sleep 1
@@ -54,7 +58,9 @@ module ForestAdminRpcAgent
                 puts '[SSE] disconnected'
                 # Client disconnected
               ensure
+                trap('INT', original_handler)
                 stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
+                puts '[SSE] stopped streaming'
               end
             end
 
