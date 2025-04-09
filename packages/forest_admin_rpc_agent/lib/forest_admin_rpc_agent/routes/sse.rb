@@ -16,7 +16,7 @@ module ForestAdminRpcAgent
           register_rails(app)
         else
           raise NotImplementedError,
-                'Unsupported application type'
+                "Unsupported application type: #{app.class}. #{self} works with Sinatra::Base or ActionDispatch::Routing::Mapper."
         end
       end
 
@@ -25,31 +25,44 @@ module ForestAdminRpcAgent
       end
 
       def register_rails2(router)
-        sse_route = self
         handler = proc do |hash|
           ActionDispatch::Request.new(hash)
+          auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
+          status, headers, response = auth_middleware.call(request.env)
 
-          # auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
-          # status, headers, response = auth_middleware.call(request.env)
+          if status == 200
+            status = 200
+            headers = {
+              'Content-Type' => 'text/event-stream',
+              'Cache-Control' => 'no-cache',
+              'Connection' => 'keep-alive',
+              'Transfer-Encoding' => 'chunked'
+            }
 
-          # if status == 200
-          streaming_response = ActionDispatch::Response.new
-          streaming_response.headers['Content-Type'] = 'text/event-stream'
-          streaming_response.headers['Cache-Control'] = 'no-cache'
-          streaming_response.headers['Connection'] = 'keep-alive'
+            body = Enumerator.new do |yielder|
+              stream = SseStreamer.new(yielder)
 
-          Thread.new do
-            sse_route.stream_events(streaming_response.stream)
-          rescue StandardError => e
-            ForestAdminAgent::Facades::Container.logger.log('debug', "Error in SSE stream: #{e.message}")
-          ensure
-            streaming_response.stream.close
+              begin
+                puts '[SSE] start streaming'
+                stream.write('ready', event: 'ready')
+
+                loop do
+                  puts '[SSE] heartbeat'
+                  stream.write('', event: 'heartbeat')
+                  sleep 1
+                end
+              rescue IOError
+                puts '[SSE] disconnected'
+                # Client disconnected
+              ensure
+                stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
+              end
+            end
+
+            [status, headers, body]
+          else
+            [status, headers, response]
           end
-
-          [200, streaming_response.headers, streaming_response]
-          # else
-          #   [status, headers, response]
-          # end
         end
 
         router.match @url,
@@ -58,30 +71,6 @@ module ForestAdminRpcAgent
                      via: @method,
                      as: @name,
                      route_alias: @name
-      end
-
-      def stream_events(stream)
-        puts '[SSE] start streaming'
-        sse = SseStreamer.new(stream)
-        sse.write('ready', event: 'ready')
-        begin
-          while connected?(stream)
-            sse.write('', event: 'heartbeat')
-            sleep 1
-          end
-        rescue IOError
-          # Client disconnected
-        ensure
-          sse.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
-          sse.close
-        end
-      end
-
-      def connected?(stream)
-        puts '[SSE] check connection'
-        !stream.closed?
-      rescue IOError
-        false
       end
     end
   end

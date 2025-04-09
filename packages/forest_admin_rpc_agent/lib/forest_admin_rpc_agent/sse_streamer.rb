@@ -2,18 +2,13 @@ require 'json'
 
 module ForestAdminRpcAgent
   class SseStreamer
-    def initialize(io)
-      @io = io
+    def initialize(yielder)
+      @yielder = yielder
     end
 
     def write(object, event: nil)
-      @io.write("event: #{event}\n") if event
-      @io.write("data: #{JSON.dump(object)}\n\n")
-      @io.flush
-    end
-
-    def close
-      @io.close
+      @yielder << "event: #{event}\n" if event
+      @yielder << "data: #{JSON.dump(object)}\n\n"
     end
   end
 end
