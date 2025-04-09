@@ -24,7 +24,7 @@ module ForestAdminRpcAgent
         # TODO
       end
 
-      def register_rails2(router)
+      def register_rails(router)
         handler = proc do |hash|
           ActionDispatch::Request.new(hash)
           auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
