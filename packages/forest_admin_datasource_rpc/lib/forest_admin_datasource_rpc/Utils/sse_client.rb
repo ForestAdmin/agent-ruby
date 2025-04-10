@@ -6,13 +6,17 @@ require 'ld-eventsource'
 module ForestAdminDatasourceRpc
   module Utils
     class SseClient
-      def initialize(uri, auth_secret)
+      def initialize(uri, auth_secret, &on_rpc_stop)
         @uri = uri
         @auth_secret = auth_secret
-        start
+        @on_rpc_stop = on_rpc_stop
+        @client = nil
+        @closed = false
       end
 
       def start
+        return if @closed
+
         timestamp = Time.now.utc.iso8601
         signature = generate_signature(timestamp)
 
@@ -25,13 +29,12 @@ module ForestAdminDatasourceRpc
         ForestAdminRpcAgent::Facades::Container.logger.log('Debug', "Connecting to SSE at #{@uri}.")
 
         @client = SSE::Client.new(@uri, headers: headers) do |client|
-          Thread.new do
-            client.on_event do |event|
-              handle_event(event)
-            end
-          rescue StandardError => e
-            puts "[SSE] Connection closed or failed: #{e.class} - #{e.message}"
-            close
+          client.on_event do |event|
+            handle_event(event)
+          end
+
+          client.on_error do |err|
+            puts "[SSE] ⚠️ Error: #{err.class} - #{err.message}"
           end
         end
       end
@@ -47,14 +50,17 @@ module ForestAdminDatasourceRpc
       private
 
       def handle_event(event)
-        case event.type.to_s.strip
+        type = event.type.to_s.strip
+        data = event.data.to_s.strip
+
+        case type
         when 'heartbeat'
-          puts '[SSE] Heartbeat'
+          puts '[SSE] 💓 Heartbeat'
         when 'RpcServerStop'
-          puts '[SSE] Server requested stop'
-          close
+          puts '[SSE] 🛑 RpcServerStop received'
+          @on_rpc_stop&.call
         else
-          puts "[SSE] Unknown event: #{event.type} with payload: #{event.data}"
+          puts "[SSE] Unknown event: #{type} with payload: #{data}"
         end
       end
 

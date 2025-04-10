@@ -46,9 +46,6 @@ module ForestAdminRpcAgent
               stream = SseStreamer.new(yielder)
 
               begin
-                puts '[SSE] start streaming'
-                stream.write('ready', event: 'ready')
-
                 while should_continue
                   puts '[SSE] heartbeat'
                   stream.write('', event: 'heartbeat')
@@ -61,6 +58,7 @@ module ForestAdminRpcAgent
                 trap('INT', original_handler)
                 stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
                 puts '[SSE] stopped streaming'
+                yielder.close if yielder.respond_to?(:close)
               end
             end
 
