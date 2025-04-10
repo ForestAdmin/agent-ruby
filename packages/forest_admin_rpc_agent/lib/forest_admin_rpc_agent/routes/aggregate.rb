@@ -8,7 +8,7 @@ module ForestAdminRpcAgent
       include ForestAdminAgent::Routes::QueryHandler
 
       def initialize
-        super('rpc/:collection_name/aggregate', 'get', 'rpc_aggregate')
+        super('rpc/:collection_name/aggregate', 'post', 'rpc_aggregate')
       end
 
       def handle_request(args)

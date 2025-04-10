@@ -8,7 +8,7 @@ module ForestAdminRpcAgent
       include ForestAdminAgent::Routes::QueryHandler
 
       def initialize
-        super('rpc/:collection_name/delete', 'delete', 'rpc_delete')
+        super('rpc/:collection_name/delete', 'post', 'rpc_delete')
       end
 
       def handle_request(args)

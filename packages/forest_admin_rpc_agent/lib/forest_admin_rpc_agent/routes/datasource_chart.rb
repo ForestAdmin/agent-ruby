@@ -4,7 +4,7 @@ module ForestAdminRpcAgent
   module Routes
     class DatasourceChart < BaseRoute
       def initialize
-        super('rpc/datasource-chart', 'get', 'rpc_chart_datasource')
+        super('rpc/datasource-chart', 'post', 'rpc_chart_datasource')
       end
 
       def handle_request(args)

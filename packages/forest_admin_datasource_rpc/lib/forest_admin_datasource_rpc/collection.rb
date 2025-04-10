@@ -64,7 +64,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :get, payload: params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def create(caller, data)
@@ -88,7 +88,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :put, payload: params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def delete(caller, filter)
@@ -100,7 +100,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' deletion call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :delete, payload: params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def aggregate(caller, filter, aggregation, limit = nil)
@@ -113,7 +113,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' aggregate call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :get, payload: params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     def execute(caller, name, data, filter = nil)
@@ -164,7 +164,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :get, payload: params)
+      @client.call_rpc(url, method: :post, payload: params)
     end
 
     private

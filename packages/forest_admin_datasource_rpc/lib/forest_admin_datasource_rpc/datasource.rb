@@ -31,7 +31,7 @@ module ForestAdminDatasourceRpc
         "Forwarding datasource chart '#{name}' call to the Rpc agent on #{url}."
       )
 
-      client.call_rpc(url, method: :get, payload: { chart: name, caller: caller.to_h })
+      client.call_rpc(url, method: :post, payload: { chart: name, caller: caller.to_h })
     end
   end
 end

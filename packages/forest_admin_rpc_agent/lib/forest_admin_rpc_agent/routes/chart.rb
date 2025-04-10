@@ -6,7 +6,7 @@ module ForestAdminRpcAgent
       include ForestAdminDatasourceToolkit::Components::Query
 
       def initialize
-        super('rpc/:collection_name/chart', 'get', 'rpc_chart_collection')
+        super('rpc/:collection_name/chart', 'post', 'rpc_chart_collection')
       end
 
       def handle_request(args)

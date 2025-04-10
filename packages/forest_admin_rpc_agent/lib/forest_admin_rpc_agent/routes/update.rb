@@ -6,7 +6,7 @@ module ForestAdminRpcAgent
       include ForestAdminDatasourceToolkit::Components::Query
 
       def initialize
-        super('rpc/:collection_name/update', 'put', 'rpc_update')
+        super('rpc/:collection_name/update', 'post', 'rpc_update')
       end
 
       def handle_request(args)
