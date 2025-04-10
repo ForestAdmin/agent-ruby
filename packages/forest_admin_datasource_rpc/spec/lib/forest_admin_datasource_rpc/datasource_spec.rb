@@ -35,7 +35,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('forest/rpc/datasource-chart')
-          expect(options[:method]).to eq(:get)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq({ caller: caller.to_h, chart: 'my_chart' })
         end
       end

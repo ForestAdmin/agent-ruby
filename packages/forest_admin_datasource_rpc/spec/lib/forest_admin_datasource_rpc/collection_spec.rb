@@ -26,7 +26,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/list')
-          expect(options[:method]).to eq(:get)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               caller: caller.to_h,
@@ -57,7 +57,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/list')
-          expect(options[:method]).to eq(:get)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               collection_name: 'Product',
@@ -123,7 +123,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/update')
-          expect(options[:method]).to eq(:put)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               caller: caller.to_h,
@@ -144,7 +144,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/delete')
-          expect(options[:method]).to eq(:delete)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               caller: caller.to_h,
@@ -163,7 +163,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/aggregate')
-          expect(options[:method]).to eq(:get)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               caller: caller.to_h,
@@ -184,7 +184,7 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/chart')
-          expect(options[:method]).to eq(:get)
+          expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               caller: caller.to_h,
