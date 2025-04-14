@@ -33,5 +33,6 @@ admin work on any Ruby application."
   spec.require_paths = ["lib"]
 
   spec.add_dependency "faraday", "~> 2.7"
+  spec.add_dependency "ld-eventsource", "~> 2.2"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end

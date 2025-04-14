@@ -55,9 +55,9 @@ module ForestAdminDatasourceRpc
 
         case type
         when 'heartbeat'
-          puts '[SSE] 💓 Heartbeat'
+          puts '[SSE] Heartbeat'
         when 'RpcServerStop'
-          puts '[SSE] 🛑 RpcServerStop received'
+          puts '[SSE] RpcServerStop received'
           @on_rpc_stop&.call
         else
           puts "[SSE] Unknown event: #{type} with payload: #{data}"
