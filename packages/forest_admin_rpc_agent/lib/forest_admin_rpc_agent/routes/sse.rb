@@ -47,17 +47,17 @@ module ForestAdminRpcAgent
 
               begin
                 while should_continue
-                  puts '[SSE] heartbeat'
+                  # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] heartbeat')
                   stream.write('', event: 'heartbeat')
                   sleep 1
                 end
               rescue IOError
-                puts '[SSE] disconnected'
                 # Client disconnected
+                # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] disconnected')
               ensure
                 trap('INT', original_handler)
                 stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
-                puts '[SSE] stopped streaming'
+                # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] stopped streaming')
                 yielder.close if yielder.respond_to?(:close)
               end
             end

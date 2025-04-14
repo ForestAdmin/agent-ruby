@@ -34,7 +34,7 @@ module ForestAdminDatasourceRpc
           end
 
           client.on_error do |err|
-            puts "[SSE] ⚠️ Error: #{err.class} - #{err.message}"
+            ForestAdminRpcAgent::Facades::Container.logger.log('Warn', "[SSE] ⚠️ Error: #{err.class} - #{err.message}")
           end
         end
       end
@@ -44,7 +44,7 @@ module ForestAdminDatasourceRpc
 
         @closed = true
         @client&.close
-        puts '[SSE] Client closed'
+        # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] Client closed')
       end
 
       private
@@ -55,12 +55,13 @@ module ForestAdminDatasourceRpc
 
         case type
         when 'heartbeat'
-          puts '[SSE] Heartbeat'
+          # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] Heartbeat')
         when 'RpcServerStop'
-          puts '[SSE] RpcServerStop received'
+          # ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[SSE] RpcServerStop received')
           @on_rpc_stop&.call
         else
-          puts "[SSE] Unknown event: #{type} with payload: #{data}"
+          ForestAdminRpcAgent::Facades::Container.logger.log('Debug',
+                                                             "[SSE] Unknown event: #{type} with payload: #{data}")
         end
       end
 
