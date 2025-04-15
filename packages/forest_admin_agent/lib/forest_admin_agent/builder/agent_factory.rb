@@ -55,10 +55,7 @@ module ForestAdminAgent
           return
         end
 
-        # build_container
-        # build_cache
-        # build_logger
-        # @container.register(:datasource, @customizer.datasource(@logger), replace: true)
+        @container.register(:datasource, @customizer.datasource(@logger), replace: true)
         send_schema
       end
 
