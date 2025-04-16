@@ -64,6 +64,45 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    context 'when using reload!' do
+      it 'reloads the stack and updates the composite datasource' do
+        logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+        customizer = described_class.new
+        stack_spy = instance_spy(ForestAdminDatasourceCustomizer::Decorators::DecoratorsStack)
+        composite_before = customizer.instance_variable_get(:@composite_datasource)
+        customizer.instance_variable_set(:@stack, stack_spy)
+
+        allow(stack_spy).to receive(:reload!) do |new_composite, _logger|
+          expect(new_composite).to be_a(ForestAdminDatasourceToolkit::Datasource)
+        end
+
+        allow(customizer).to receive(:datasource)
+        customizer.reload!(logger: logger)
+
+        expect(stack_spy).to have_received(:reload!).with(instance_of(ForestAdminDatasourceToolkit::Datasource), logger)
+        composite_after = customizer.instance_variable_get(:@composite_datasource)
+        expect(composite_after).not_to eq(composite_before)
+      end
+
+      it 'restores the old composite datasource if reload! fails' do
+        logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+        customizer = described_class.new
+        stack_spy = instance_spy(ForestAdminDatasourceCustomizer::Decorators::DecoratorsStack)
+
+        old_composite = customizer.instance_variable_get(:@composite_datasource)
+        customizer.instance_variable_set(:@stack, stack_spy)
+
+        allow(stack_spy).to receive(:reload!).and_raise(StandardError.new('reload fail'))
+        allow(customizer).to receive(:datasource)
+
+        expect do
+          customizer.reload!(logger: logger)
+        end.to raise_error(StandardError, 'reload fail')
+
+        expect(customizer.instance_variable_get(:@composite_datasource)).to eq(old_composite)
+      end
+    end
+
     context 'when using get_root_datasource_by_connection' do
       it 'raise an error when connection is unknown' do
         datasource_customizer = described_class.new
