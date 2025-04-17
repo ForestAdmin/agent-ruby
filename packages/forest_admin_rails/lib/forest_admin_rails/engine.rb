@@ -43,7 +43,11 @@ module ForestAdminRails
       # force eager loading models
       Rails.application.eager_load!
 
-      ForestAdminRails::CreateAgent.setup!
+      begin
+        ForestAdminRails::CreateAgent.setup!
+      rescue StandardError
+        # Ignored
+      end
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
       sse.run if ForestAdminRails.config[:instant_cache_refresh]

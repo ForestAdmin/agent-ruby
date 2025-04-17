@@ -7,6 +7,13 @@ Make sure that:
 
 ## Installation
 
+# 1. Construire les conteneurs
+docker compose build
+
+# 2. Démarrer les services
+docker compose up -d
+
+
 Install the requirements
 
 ```
@@ -36,4 +43,3 @@ Run the app
 ```
 rails server
 ```
-
