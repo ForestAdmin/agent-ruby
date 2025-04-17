@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_DATABASE}
     ports:
-      - "5434:${DB_PORT}"
+      - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -20,7 +20,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD_MYSQL}
       MYSQL_DATABASE: ${DB_DATABASE_MYSQL}
     ports:
-      - "3308:${DB_PORT_MYSQL}"
+      - "${DB_PORT_MYSQL}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
