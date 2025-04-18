@@ -34,7 +34,8 @@ module ForestAdminDatasourceRpc
           end
 
           client.on_error do |err|
-            ForestAdminRpcAgent::Facades::Container.logger.log('Warn', "[SSE] ⚠️ Error: #{err.class} - #{err.message}")
+            # TODO: optimisation on client close
+            # ForestAdminRpcAgent::Facades::Container.logger.log('Warn', "[SSE] Error: #{err.class} - #{err.message}")
           end
         end
       end
