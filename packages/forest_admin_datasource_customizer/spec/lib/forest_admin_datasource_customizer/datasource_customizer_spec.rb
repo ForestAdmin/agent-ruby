@@ -62,6 +62,22 @@ module ForestAdminDatasourceCustomizer
         expect(datasource.schema[:charts]).to include('my_chart')
         expect(datasource.render_chart(caller, 'my_chart')).to eq({ countCurrent: 10, countPrevious: nil })
       end
+
+      it 'adds charts from datasource schema to the composite datasource' do
+        chart = 'my_chart'
+        collection = instance_double(ForestAdminDatasourceToolkit::Collection, name: 'dummy')
+
+        datasource = instance_double(ForestAdminDatasourceToolkit::Datasource,
+                                     schema: { charts: [chart] },
+                                     collections: { 'dummy' => collection })
+
+        customizer = described_class.new
+        customizer.add_datasource(datasource, {})
+        customizer.stack.apply_queued_customizations({})
+
+        charts = customizer.instance_variable_get(:@composite_datasource).schema[:charts]
+        expect(charts).to include(chart)
+      end
     end
 
     context 'when using reload!' do
@@ -122,6 +138,70 @@ module ForestAdminDatasourceCustomizer
         expect(datasource_customizer.get_root_datasource_by_connection('primary'))
           .to eq(first_datasource)
       end
+    end
+
+    it 'returns the validation schema' do
+      customizer = described_class.new
+      validation = instance_double(ValidationDecorator, schema: { foo: 'bar' })
+      customizer.stack.instance_variable_set(:@validation, validation)
+
+      expect(customizer.schema).to eq(foo: 'bar')
+    end
+
+    it 'applies include/exclude filters using PublicationDatasourceDecorator' do
+      decorated = described_class.new
+      datasource = build_datasource
+      publication_spy = instance_spy(ForestAdminDatasourceCustomizer::Decorators::Publication::PublicationDatasourceDecorator)
+
+      allow(ForestAdminDatasourceCustomizer::Decorators::Publication::PublicationDatasourceDecorator)
+        .to receive(:new).and_return(publication_spy)
+
+      allow(publication_spy).to receive_messages(schema: { charts: [] }, collections: {})
+      allow(publication_spy).to receive(:keep_collections_matching)
+
+      decorated.add_datasource(datasource, include: ['users'])
+
+      decorated.stack.apply_queued_customizations({})
+
+      expect(publication_spy).to have_received(:keep_collections_matching).with(['users'], nil)
+    end
+
+    it 'raises an error if the chart is not found in any datasource' do
+      datasource = instance_double(ForestAdminDatasourceToolkit::Datasource,
+                                   schema: { charts: [] },
+                                   render_chart: nil)
+
+      customizer = described_class.new
+      customizer.add_datasource(datasource, {})
+
+      expect do
+        customizer.render_chart(:caller, 'unknown_chart')
+      end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart 'unknown_chart' is not defined in the dataSource.")
+    end
+
+    it 'calls run on the plugin with correct arguments' do
+      plugin_instance = instance_double(MyPlugin, run: nil)
+      plugin = class_double(MyPlugin, new: plugin_instance)
+
+      customizer = described_class.new
+      customizer.use(plugin, [:a])
+
+      customizer.stack.apply_queued_customizations({})
+
+      expect(plugin_instance).to have_received(:run).with(customizer, nil, [:a])
+    end
+
+    it 'calls the handle with the collection customizer' do
+      customizer = described_class.new
+      customizer.add_datasource(datasource, {})
+      customizer.stack.apply_queued_customizations({})
+
+      received_name = nil
+      handle = ->(collection) { received_name = collection.name }
+
+      customizer.customize_collection('collection', handle)
+
+      expect(received_name).to eq('collection')
     end
   end
 end
