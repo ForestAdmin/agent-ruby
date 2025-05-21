@@ -71,9 +71,9 @@ module ForestAdminDatasourceCustomizer
 
         context 'when disable search' do
           it 'mark schema as dirty' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
-                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
               }
             )
             search_collection_decorator = described_class.new(collection, datasource)
@@ -83,9 +83,9 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'sets the schema not searchable' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
-                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
               }
             )
             search_collection_decorator = described_class.new(collection, datasource)
@@ -98,9 +98,9 @@ module ForestAdminDatasourceCustomizer
 
         context 'when replace search' do
           it 'mark schema as dirty' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
-                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
               }
             )
             search_collection_decorator = described_class.new(collection, datasource)
@@ -110,9 +110,9 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'sets the schema searchable' do
-            collection = collection_build(
+            collection = build_collection(
               schema: {
-                fields: { 'foo' => column_build(filter_operators: [Operators::EQUAL]) }
+                fields: { 'foo' => build_column(filter_operators: [Operators::EQUAL]) }
               }
             )
             search_collection_decorator = described_class.new(collection, datasource)
