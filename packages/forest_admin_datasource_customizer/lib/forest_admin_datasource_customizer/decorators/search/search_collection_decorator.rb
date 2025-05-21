@@ -13,10 +13,13 @@ module ForestAdminDatasourceCustomizer
 
         def disable_search
           @disabled_search = true
+          mark_schema_as_dirty
         end
 
         def replace_search(replacer)
           @replacer = replacer
+          @disabled_search = false
+          mark_schema_as_dirty
         end
 
         def refine_schema(sub_schema)

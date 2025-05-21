@@ -201,6 +201,22 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    context 'when using disable_search' do
+      it 'calls the search decorator and disable the search' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+        allow(stack.search).to receive(:get_collection).with('book').and_return(@datasource_customizer.stack.search.get_collection('book'))
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.disable_search
+        stack.apply_queued_customizations({})
+
+        search_collection = @datasource_customizer.stack.search.get_collection('book')
+
+        expect(search_collection.schema[:searchable]).to be(false)
+      end
+    end
+
     context 'when using disable_count' do
       it 'disables count on the collection' do
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
