@@ -1,3 +1,10 @@
+# [1.0.0-beta.101](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.100...v1.0.0-beta.101) (2025-05-21)
+
+
+### Bug Fixes
+
+* **search:** mark schema as dirty when search is disable or replace search is set ([#93](https://github.com/ForestAdmin/agent-ruby/issues/93)) ([b5f4799](https://github.com/ForestAdmin/agent-ruby/commit/b5f4799c9416b40d9989eef4f6f714cbb5d4ff41))
+
 # [1.0.0-beta.100](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.99...v1.0.0-beta.100) (2025-03-10)
 
 
