@@ -23,6 +23,16 @@ module ForestAdminDatasourceCustomizer
         }
       )
 
+      stub_const('MyPlugin', Class.new do
+        def run(_, _, _); end
+      end)
+
+      stub_const('ValidationFakeDecorator', Class.new do
+        def schema
+          { foo: 'bar' }
+        end
+      end)
+
       datasource.add_collection(@collection)
     end
 
@@ -142,7 +152,7 @@ module ForestAdminDatasourceCustomizer
 
     it 'returns the validation schema' do
       customizer = described_class.new
-      validation = instance_double(ValidationDecorator, schema: { foo: 'bar' })
+      validation = instance_double(ValidationFakeDecorator, schema: { foo: 'bar' })
       customizer.stack.instance_variable_set(:@validation, validation)
 
       expect(customizer.schema).to eq(foo: 'bar')
