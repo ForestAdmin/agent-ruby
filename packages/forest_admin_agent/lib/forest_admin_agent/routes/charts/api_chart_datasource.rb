@@ -7,7 +7,7 @@ module ForestAdminAgent
       class ApiChartDatasource < AbstractAuthenticatedRoute
         def initialize(chart_name)
           @chart_name = chart_name
-          @datasource = ForestAdminAgent::Builder::AgentFactory.instance.customizer
+          @datasource = ForestAdminAgent::Facades::Container.datasource
 
           super()
         end

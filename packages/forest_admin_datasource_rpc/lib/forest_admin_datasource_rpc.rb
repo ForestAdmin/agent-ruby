@@ -18,22 +18,29 @@ module ForestAdminDatasourceRpc
       schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
       last_hash_schema = Digest::SHA1.hexdigest(schema.to_h.to_s)
     rescue StandardError
-      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            'Failed to get schema from RPC agent. Please check the RPC agent is running.'
+      ForestAdminRpcAgent::Facades::Container.logger.log(
+        'Error',
+        'Failed to get schema from RPC agent. Please check the RPC agent is running.'
+      )
     end
 
-    sse = Utils::SseClient.new("#{uri}/forest/rpc/sse", auth_secret) do
-      ForestAdminRpcAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
-      new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
+    if schema.nil?
+      # return empty datasource for not breaking stack
+      ForestAdminDatasourceToolkit::Datasource.new
+    else
+      sse = Utils::SseClient.new("#{uri}/forest/rpc/sse", auth_secret) do
+        ForestAdminRpcAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
+        new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
 
-      if last_hash_schema == Digest::SHA1.hexdigest(new_schema.to_h.to_s)
-        ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed')
-      else
-        ForestAdminAgent::Builder::AgentFactory.instance.reload!
+        if last_hash_schema == Digest::SHA1.hexdigest(new_schema.to_h.to_s)
+          ForestAdminRpcAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed')
+        else
+          ForestAdminAgent::Builder::AgentFactory.instance.reload!
+        end
       end
-    end
-    sse.start
+      sse.start
 
-    ForestAdminDatasourceRpc::Datasource.new(options, schema)
+      ForestAdminDatasourceRpc::Datasource.new(options, schema)
+    end
   end
 end
