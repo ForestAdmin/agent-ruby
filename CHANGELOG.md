@@ -1,3 +1,10 @@
+# [1.0.0-beta.102](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.101...v1.0.0-beta.102) (2025-05-27)
+
+
+### Features
+
+* add RPC datasource support ([#114](https://github.com/ForestAdmin/agent-ruby/issues/114)) ([b87bd75](https://github.com/ForestAdmin/agent-ruby/commit/b87bd75bfa8832e4bbe8d253a287faa4f544e27a))
+
 # [1.0.0-beta.101](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.100...v1.0.0-beta.101) (2025-05-21)
 
 
