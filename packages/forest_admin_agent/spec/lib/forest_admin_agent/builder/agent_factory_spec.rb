@@ -49,6 +49,42 @@ module ForestAdminAgent
           end
         end
 
+        describe 'reload!' do
+          it 'reloads the customizer' do
+            instance = described_class.instance
+            allow(instance).to receive(:send_schema)
+            allow(instance.customizer).to receive(:reload!)
+            instance.reload!
+
+            expect(instance.customizer).to have_received(:reload!)
+          end
+
+          it 'add datasource to the container' do
+            allow(described_class.instance).to receive(:send_schema)
+            described_class.instance.reload!
+
+            expect(described_class.instance.container.resolve(:datasource))
+              .to eq(described_class.instance.customizer.datasource({}))
+          end
+
+          it 'logs an error and does not register the datasource if reload! raises' do
+            instance = described_class.instance
+
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            allow(instance.customizer).to receive(:reload!).and_raise(StandardError.new('Foo'))
+            allow(instance).to receive(:send_schema)
+            allow(instance.container).to receive(:register)
+
+            instance.reload!
+
+            expect(logger).to have_received(:log).with('Error', 'Error reloading agent: Foo')
+            expect(instance.container).not_to have_received(:register)
+            expect(instance).not_to have_received(:send_schema)
+          end
+        end
+
         describe 'send_schema' do
           it 'do nothing if env_secret is nil' do
             described_class.instance.instance_variable_set(:@has_env_secret, false)

@@ -36,19 +36,19 @@ module ForestAdminDatasourceCustomizer
 
         describe 'when check form is static' do
           context 'when form is nil' do
-            let(:action) { described_class.new(scope: :single) }
+            let(:action) { described_class.new(scope: :single).build_elements }
 
             it 'returns true' do
-              expect(action.static_form?).to be true
+              expect(action.static_form).to be true
             end
           end
 
           context 'when all fields are static' do
             let(:form) { [instance_double(DynamicField, static?: true, type: 'String'), instance_double(DynamicField, static?: true, type: 'String')] }
-            let(:action) { described_class.new(scope: :single, form: form) }
+            let(:action) { described_class.new(scope: :single, form: form).build_elements }
 
             it 'returns true' do
-              expect(action.static_form?).to be true
+              expect(action.static_form).to be true
             end
           end
 
@@ -57,7 +57,7 @@ module ForestAdminDatasourceCustomizer
             let(:action) { described_class.new(scope: :single, form: form) }
 
             it 'returns false' do
-              expect(action.static_form?).to be false
+              expect(action.static_form).to be false
             end
           end
         end

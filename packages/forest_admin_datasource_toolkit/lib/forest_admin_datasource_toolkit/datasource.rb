@@ -34,5 +34,16 @@ module ForestAdminDatasourceToolkit
     def build_binding_symbol(_connection_name, _binds)
       raise Exceptions::ForestException, 'this datasource do not support native query.'
     end
+
+    def add_chart(chart)
+      if @schema[:charts].any? do |c|
+        c[:name] == chart[:name]
+      end
+        raise Exceptions::ForestException,
+              "Chart #{chart[:name]} already defined in datasource"
+      end
+
+      @schema[:charts] << chart
+    end
   end
 end

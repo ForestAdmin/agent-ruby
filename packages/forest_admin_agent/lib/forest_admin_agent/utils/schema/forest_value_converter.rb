@@ -100,6 +100,9 @@ module ForestAdminAgent
         def self.make_data_uri(file)
           return if file.nil?
 
+          # file is already a data_uri
+          return file if file.is_a?(String) && file.start_with?('data:')
+
           mime_type = `file --b --mime-type #{file.path}`.strip
           value = Base64.strict_encode64(File.read(file.path))
 

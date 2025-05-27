@@ -12,7 +12,7 @@ module ForestAdminAgent
             @collection = build_collection(
               schema: {
                 actions: {
-                  'Send email' => BaseAction.new(scope: Types::ActionScope::SINGLE)
+                  'Send email' => BaseAction.new(scope: Types::ActionScope::SINGLE).build_elements
                 }
               }
             )
@@ -47,7 +47,7 @@ module ForestAdminAgent
                 actions: {
                   'Send email' => BaseAction.new(
                     scope: Types::ActionScope::SINGLE
-                  )
+                  ).build_elements
                 }
               },
               get_form: [
@@ -104,7 +104,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil
@@ -142,7 +142,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil
@@ -175,7 +175,7 @@ module ForestAdminAgent
                     BaseAction,
                     {
                       scope: Types::ActionScope::SINGLE,
-                      static_form?: true,
+                      static_form: true,
                       is_generate_file: false,
                       description: nil,
                       submit_button_label: nil
@@ -229,7 +229,7 @@ module ForestAdminAgent
                   actions: {
                     'Send email' => BaseAction.new(
                       scope: Types::ActionScope::SINGLE
-                    )
+                    ).build_elements
                   }
                 },
                 get_form: [
@@ -283,7 +283,7 @@ module ForestAdminAgent
                   actions: {
                     'Send email' => BaseAction.new(
                       scope: Types::ActionScope::SINGLE
-                    )
+                    ).build_elements
                   }
                 },
                 get_form: [
@@ -337,7 +337,7 @@ module ForestAdminAgent
                   actions: {
                     'Charge credit card' => BaseAction.new(
                       scope: Types::ActionScope::SINGLE
-                    )
+                    ).build_elements
                   }
                 },
                 get_form: [
@@ -410,7 +410,7 @@ module ForestAdminAgent
                   actions: {
                     'Charge credit card' => BaseAction.new(
                       scope: Types::ActionScope::SINGLE
-                    )
+                    ).build_elements
                   }
                 },
                 get_form: [
@@ -507,7 +507,7 @@ module ForestAdminAgent
                           elements: []
                         )
                       ]
-                    )
+                    ).build_elements
                   }
                 }
               )
@@ -576,7 +576,7 @@ module ForestAdminAgent
                           ]
                         )
                       ]
-                    )
+                    ).build_elements
                   }
                 }
               )
@@ -626,7 +626,7 @@ module ForestAdminAgent
                   actions: {
                     'Send email' => BaseAction.new(
                       scope: Types::ActionScope::SINGLE
-                    )
+                    ).build_elements
                   }
                 },
                 get_form: [

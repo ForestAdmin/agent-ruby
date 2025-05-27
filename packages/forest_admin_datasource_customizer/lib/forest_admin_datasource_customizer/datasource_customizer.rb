@@ -45,6 +45,10 @@ module ForestAdminDatasourceCustomizer
         datasource.collections.each_value do |collection|
           @composite_datasource.add_collection(collection)
         end
+
+        datasource.schema[:charts].each do |chart|
+          @composite_datasource.add_chart(chart)
+        end
       })
 
       @datasources << datasource
@@ -86,6 +90,27 @@ module ForestAdminDatasourceCustomizer
       end
 
       root_datasource
+    end
+
+    def render_chart(caller, name)
+      return @composite_datasource.render_chart(caller, name) if @composite_datasource.schema[:charts].any?(name)
+
+      raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart '#{name}' is not defined in the dataSource."
+    end
+
+    def reload!(logger: nil)
+      old_composite = @composite_datasource
+
+      begin
+        new_composite = ForestAdminDatasourceToolkit::Datasource.new
+        @stack.reload!(new_composite, logger)
+        @composite_datasource = new_composite
+      rescue StandardError => e
+        @composite_datasource = old_composite
+        raise e
+      end
+
+      datasource(logger)
     end
 
     private

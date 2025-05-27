@@ -2,7 +2,7 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class BaseAction
-        attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute
+        attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute, :static_form
 
         def initialize(scope:, form: nil, is_generate_file: false, description: nil, submit_button_label: nil, &execute)
           @scope = scope
@@ -11,16 +11,25 @@ module ForestAdminDatasourceCustomizer
           @description = description
           @submit_button_label = submit_button_label
           @execute = execute
+          @static_form = false
+        end
+
+        def self.from_plain_object(action)
+          new(
+            scope: action[:scope],
+            form: FormFactory.build_elements(action[:form]),
+            is_generate_file: action[:is_generate_file],
+            description: action[:description],
+            submit_button_label: action[:submit_button_label],
+            &action[:execute]
+          )
         end
 
         def build_elements
-          @form = FormFactory.build_elements(form)
-        end
+          @form = FormFactory.build_elements(@form)
+          @static_form = @form ? @form&.all?(&:static?) : true
 
-        def static_form?
-          return form&.all?(&:static?) if form
-
-          true
+          self
         end
 
         def validate_fields_ids(form = @form, used = [])

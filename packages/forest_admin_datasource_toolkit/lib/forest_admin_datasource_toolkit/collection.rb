@@ -63,6 +63,15 @@ module ForestAdminDatasourceToolkit
       schema[:actions][name] = action
     end
 
+    def add_chart(name)
+      if @schema[:charts].include?(name)
+        raise Exceptions::ForestException,
+              "Chart #{name} already defined in collection"
+      end
+
+      schema[:charts] << name
+    end
+
     def render_chart(_caller, name, _record_id)
       raise Exceptions::ForestException, "Chart #{name} is not implemented."
     end
