@@ -1,3 +1,5 @@
+require 'openid_connect'
+
 module ForestAdminRails
   class ForestController < ActionController::Base
     include ForestAdminAgent::Http::ErrorHandling
