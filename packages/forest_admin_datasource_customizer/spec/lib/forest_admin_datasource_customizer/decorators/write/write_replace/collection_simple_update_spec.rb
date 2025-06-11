@@ -151,7 +151,7 @@ module ForestAdminDatasourceCustomizer
               raise ForestAdminAgent::Error, 'Some error'
             end
 
-            expect { @decorated_book.update(caller, filter, { 'name' => 'a name' }) }.to raise_error(Error, 'Some error')
+            expect { @decorated_book.update(caller, filter, { 'name' => 'a name' }) }.to raise_error(ForestAdminAgent::Error, 'Some error')
           end
         end
       end
