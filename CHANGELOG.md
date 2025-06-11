@@ -1,3 +1,10 @@
+# [1.0.0-beta.105](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.104...v1.0.0-beta.105) (2025-06-11)
+
+
+### Bug Fixes
+
+* replace ambiguous Error with ForestAdminAgent Error ([#117](https://github.com/ForestAdmin/agent-ruby/issues/117)) ([6529ca0](https://github.com/ForestAdmin/agent-ruby/commit/6529ca0322c8ea2f1032ebfe37ccfa406975baee))
+
 # [1.0.0-beta.104](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.103...v1.0.0-beta.104) (2025-06-11)
 
 
