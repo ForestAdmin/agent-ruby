@@ -1,3 +1,10 @@
+# [1.0.0-beta.103](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.102...v1.0.0-beta.103) (2025-06-11)
+
+
+### Bug Fixes
+
+* load OpenIDConnect constant to prevent uninitialized error ([edf557a](https://github.com/ForestAdmin/agent-ruby/commit/edf557a8c83ebfd12a0f0d7a79ee8d10ca317533))
+
 # [1.0.0-beta.102](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.101...v1.0.0-beta.102) (2025-05-27)
 
 
