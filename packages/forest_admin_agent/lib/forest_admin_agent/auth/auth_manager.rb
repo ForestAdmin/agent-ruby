@@ -1,3 +1,4 @@
+require 'openid_connect'
 require 'json'
 
 module ForestAdminAgent
