@@ -148,7 +148,7 @@ module ForestAdminDatasourceCustomizer
 
           it 'throws when a handler throws' do
             @decorated_book.replace_field_writing('name') do
-              raise Error, 'Some error'
+              raise ForestAdminAgent::Error, 'Some error'
             end
 
             expect { @decorated_book.update(caller, filter, { 'name' => 'a name' }) }.to raise_error(Error, 'Some error')
