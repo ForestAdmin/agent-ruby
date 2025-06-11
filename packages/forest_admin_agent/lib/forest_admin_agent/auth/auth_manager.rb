@@ -14,7 +14,10 @@ module ForestAdminAgent
       end
 
       def verify_code_and_generate_token(params)
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_MISSING unless params['state']
+        unless params['state']
+          raise ForestAdminAgent::Error,
+                ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_MISSING
+        end
 
         if Facades::Container.cache(:debug)
           OpenIDConnect.http_config do |options|
@@ -36,12 +39,15 @@ module ForestAdminAgent
 
       def get_rendering_id_from_state(state)
         state = JSON.parse(state.tr("'", '"').gsub('=>', ':'))
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_RENDERING_ID unless state.key? 'renderingId'
+        unless state.key? 'renderingId'
+          raise ForestAdminAgent::Error,
+                ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_RENDERING_ID
+        end
 
         begin
           Integer(state['renderingId'])
         rescue ArgumentError
-          raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
         end
 
         state['renderingId'].to_i

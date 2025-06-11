@@ -39,7 +39,7 @@ module ForestAdminAgent
             server_error = response.body.key?('errors') ? response.body['errors'][0] : nil
             if server_error &&
                server_error['name'] == Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
-              raise Error, Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
+              raise ForestAdminAgent::Error, Utils::ErrorMessages::TWO_FACTOR_AUTHENTICATION_REQUIRED
             end
 
             response.body.with_indifferent_access

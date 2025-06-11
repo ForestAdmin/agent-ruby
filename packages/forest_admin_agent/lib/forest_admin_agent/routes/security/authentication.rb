@@ -80,12 +80,15 @@ module ForestAdminAgent
         protected
 
         def get_and_check_rendering_id(params)
-          raise Error, ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID unless params['renderingId']
+          unless params['renderingId']
+            raise ForestAdminAgent::Error,
+                  ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID
+          end
 
           begin
             Integer(params['renderingId'])
           rescue ArgumentError
-            raise Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+            raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
           end
 
           params['renderingId'].to_i

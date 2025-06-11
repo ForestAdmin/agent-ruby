@@ -71,7 +71,7 @@ module ForestAdminAgent
       def retrieve_config(uri)
         OAuth2::OidcConfig.discover! uri
       rescue OpenIDConnect::Discovery::DiscoveryFailed
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN
+        raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::SERVER_DOWN
       end
     end
   end

@@ -93,7 +93,7 @@ module ForestAdminAgent
         @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
         @rules = ip_whitelist_data['rules']
       rescue StandardError
-        raise Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+        raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
       end
     end
   end
