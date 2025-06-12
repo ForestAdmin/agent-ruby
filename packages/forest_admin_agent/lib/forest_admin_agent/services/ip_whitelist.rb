@@ -92,7 +92,12 @@ module ForestAdminAgent
 
         @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
         @rules = ip_whitelist_data['rules']
-      rescue StandardError
+      rescue StandardError => e
+        ForestAdminAgent::Facades::Container.logger.log('Debug', {
+                                                          error: e.message,
+                                                          status: response&.status,
+                                                          response: response&.body
+                                                        })
         raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
       end
     end
