@@ -40,12 +40,17 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      if exception.is_a?(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient) ||
-         exception.is_a?(OpenIDConnect::Exception)
+      case exception
+      when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+           OpenIDConnect::Exception
         data = {
           error: exception.message,
           error_description: exception.response,
           state: exception.status
+        }
+      when ForestAdminAgent::Error
+        data = {
+          error: exception.message
         }
       else
         data = {
