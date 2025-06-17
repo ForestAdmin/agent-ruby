@@ -118,7 +118,7 @@ module ForestAdminAgent
             filter_only_with_values,
             Aggregation.new(
               operation: @args[:params][:aggregator],
-              field: @args[:params][:aggregateField],
+              field: @args[:params][:aggregateFieldName],
               groups: [{ field: group_by_field_name, operation: time_range }]
             )
           )
