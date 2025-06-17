@@ -13,6 +13,9 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def get
+        build_select(@collection, @projection)
+        apply_filter
+
         group_fields = []
         @aggregation.groups.each do |group|
           field = format_field(group[:field])
@@ -29,7 +32,7 @@ module ForestAdminDatasourceActiveRecord
         @query = @query.order("#{@operation} DESC")
         @query = @query.limit(@limit) if @limit
         @query = @query.group(group_fields.join(','))
-        build
+        apply_select
 
         compute_result_aggregate(@query)
       end
