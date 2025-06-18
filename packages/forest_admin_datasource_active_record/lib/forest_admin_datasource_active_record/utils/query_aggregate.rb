@@ -5,6 +5,7 @@ module ForestAdminDatasourceActiveRecord
       include ForestAdminDatasourceToolkit::Components::Query
 
       def initialize(collection, aggregation, filter = nil, limit = nil)
+        filter ||= Filter.new
         super(collection, ForestAdminDatasourceToolkit::Components::Query::Projection.new, filter)
         @aggregation = aggregation
         @limit = limit
