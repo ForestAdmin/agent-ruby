@@ -38,7 +38,6 @@ module ForestAdminDatasourceActiveRecord
         before do
           Car.delete_all
           Category.delete_all
-
           category = Category.create!(label: 'SUV')
           Car.create!(category: category, brand: 'Toyota', nb_seats: 4, created_at: Time.parse('2024-01-01 UTC'))
           Car.create!(category: category, brand: 'Toyota', nb_seats: 5, created_at: Time.parse('2024-01-01 UTC'))
