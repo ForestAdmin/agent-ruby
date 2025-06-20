@@ -73,7 +73,7 @@ module ForestAdminAgent
         ip_range_maximum = (IPAddress max)
         ip_value = (IPAddress ip)
 
-        ip_value >= ip_range_minimum && ip_value <= ip_range_maximum
+        ip_value.between?(ip_range_minimum, ip_range_maximum)
       end
 
       def ip_match_subnet?(ip, subnet)

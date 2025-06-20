@@ -32,7 +32,7 @@ module ForestAdminDatasourceMongoid
 
         nested_prefixes.each do |nested_prefix|
           child_paths = projection.filter { |field| field.start_with?("#{nested_prefix}:") }
-                                  .map { |field| field[nested_prefix.size + 1..] }
+                                  .map { |field| field[(nested_prefix.size + 1)..] }
 
           next unless result[nested_prefix] && !result[nested_prefix].nil?
 

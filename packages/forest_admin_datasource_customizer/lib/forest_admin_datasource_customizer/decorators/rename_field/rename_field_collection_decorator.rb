@@ -152,13 +152,13 @@ module ForestAdminDatasourceCustomizer
         # Convert field path from child collection to this collection
         def path_from_child_collection(path)
           if path.include?(':')
-            child_field = path[0..path.index(':') - 1]
+            child_field = path[0..(path.index(':') - 1)]
             relation_name = from_child_collection[child_field] || child_field
             relation_schema = schema[:fields][relation_name]
             if relation_schema.type != 'PolymorphicManyToOne'
               relation = datasource.get_collection(relation_schema.foreign_collection)
 
-              return "#{relation_name}:#{relation.path_from_child_collection(path[path.index(":") + 1..])}"
+              return "#{relation_name}:#{relation.path_from_child_collection(path[(path.index(":") + 1)..])}"
             end
           end
 
@@ -168,17 +168,17 @@ module ForestAdminDatasourceCustomizer
         # Convert field path from this collection to child collection
         def path_to_child_collection(path)
           if path.include?(':')
-            relation_name = path[0..path.index(':') - 1]
+            relation_name = path[0..(path.index(':') - 1)]
             relation_schema = schema[:fields][relation_name]
             if relation_schema.type == 'PolymorphicManyToOne'
               relation_name = to_child_collection[relation_name] || relation_name
 
-              return "#{relation_name}:#{path[path.index(":") + 1..]}"
+              return "#{relation_name}:#{path[(path.index(":") + 1)..]}"
             else
               relation = datasource.get_collection(relation_schema.foreign_collection)
               child_field = to_child_collection[relation_name] || relation_name
 
-              return "#{child_field}:#{relation.path_to_child_collection(path[path.index(":") + 1..])}"
+              return "#{child_field}:#{relation.path_to_child_collection(path[(path.index(":") + 1)..])}"
             end
           end
 

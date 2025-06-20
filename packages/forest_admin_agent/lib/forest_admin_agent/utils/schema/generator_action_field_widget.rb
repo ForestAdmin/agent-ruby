@@ -171,7 +171,7 @@ module ForestAdminAgent
               parameters: {
                 placeholder: field.placeholder,
                 allowDuplicate: field.allow_duplicates.nil? ? false : field.allow_duplicates,
-                enableReorder: field.enable_reorder.nil? ? true : field.enable_reorder,
+                enableReorder: field.enable_reorder.nil? || field.enable_reorder,
                 min: valid_number?(field.min) ? field.min : nil,
                 max: valid_number?(field.max) ? field.max : nil,
                 step: valid_number?(field.step) ? field.step : nil

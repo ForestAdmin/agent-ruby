@@ -56,7 +56,7 @@ module ForestAdminDatasourceToolkit
                 raise ForestException, 'Cannot unnest condition tree.'
               end
 
-              replace_leafs { |leaf| leaf.override(field: leaf.field[prefix.length + 1..]) }
+              replace_leafs { |leaf| leaf.override(field: leaf.field[(prefix.length + 1)..]) }
             end
 
             def replace_fields
