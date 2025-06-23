@@ -45,9 +45,10 @@ module ForestAdminRails
 
       begin
         ForestAdminRails::CreateAgent.setup!
-      rescue StandardError
+      rescue StandardError => e
         logger = ActiveSupport::Logger.new($stdout)
-        logger.warn 'WARNING -- : An error has occurred during setup of the Forest Admin agent.'
+        logger.warn 'An error has occurred during setup of the Forest Admin agent.'
+        raise e.message
       end
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
