@@ -42,5 +42,6 @@ RSpec.configure do |config|
     DatabaseCleaner.cleaning do
       example.run
     end
+    DatabaseCleaner.strategy = :transaction
   end
 end
