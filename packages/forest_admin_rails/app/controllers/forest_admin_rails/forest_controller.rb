@@ -40,31 +40,32 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      case exception
-      when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
-           OpenIDConnect::Exception
-        data = {
-          error: exception.message,
-          error_description: exception.response,
-          state: exception.status
-        }
-      when ForestAdminAgent::Error
-        data = {
-          error: exception.message
-        }
-      else
-        data = {
-          errors: [
-            {
-              name: exception.name,
-              detail: get_error_message(exception),
-              status: exception.try(:status)
-            }
-          ]
-        }
-
-        data[:errors][0][:data] = exception.try(:data)
-      end
+      data = case exception
+             when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+               OpenIDConnect::Exception
+               {
+                 error: exception.message,
+                 error_description: exception.response,
+                 state: exception.status
+               }
+             else
+               if exception.respond_to?(:name) && exception.name.present?
+                 {
+                   errors: [
+                     {
+                       name: exception.name,
+                       detail: get_error_message(exception),
+                       status: exception.try(:status),
+                       data: exception.try(:data)
+                     }
+                   ]
+                 }
+               else
+                 {
+                   error: exception.message
+                 }
+               end
+             end
 
       unless ForestAdminAgent::Facades::Container.cache(:is_production)
         ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
