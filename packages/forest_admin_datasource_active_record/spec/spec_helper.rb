@@ -37,9 +37,11 @@ RSpec.configure do |config|
     DatabaseCleaner.clean_with :truncation
   end
 
-  config.around do |example|
+  config.around(:each, :db_truncation) do |example|
+    DatabaseCleaner.strategy = :truncation
     DatabaseCleaner.cleaning do
       example.run
     end
+    DatabaseCleaner.strategy = :transaction
   end
 end
