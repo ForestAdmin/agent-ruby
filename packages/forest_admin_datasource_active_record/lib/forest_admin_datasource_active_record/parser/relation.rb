@@ -5,7 +5,7 @@ module ForestAdminDatasourceActiveRecord
         model.reflect_on_all_associations.select do |association|
           is_valid_association = !get_class(association).nil? && !active_type?(get_class(association))
           if support_polymorphic_relations
-            polymorphic?(association) ? true : is_valid_association
+            polymorphic?(association) || is_valid_association
           else
             !polymorphic?(association) && is_valid_association
           end

@@ -20,7 +20,7 @@ module ForestAdminDatasourceMongoid
             relative_prefix = if stack[index - 1][:prefix].nil?
                                 step[:prefix]
                               else
-                                step[:prefix][stack[index - 1][:prefix].length + 1..]
+                                step[:prefix][(stack[index - 1][:prefix].length + 1)..]
                               end
 
             result = if local_schema.is_array

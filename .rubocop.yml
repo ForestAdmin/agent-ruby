@@ -219,7 +219,7 @@ Performance/CollectionLiteralInLoop:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/condition_tree_parser.rb'
 
-Naming/PredicateName:
+Naming/PredicatePrefix:
   Exclude:
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/collection.rb'
 
@@ -312,6 +312,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/query.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/collection.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/datasource.rb'
+    - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/query_aggregate.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/collection_customizer.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/binary/binary_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/search/search_collection_decorator.rb'
@@ -401,3 +402,10 @@ Style/RedundantParentheses:
 Style/ClassVars:
   Enabled:
     - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/middleware/authentication.rb'
+
+Naming/PredicateMethod:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/query_string_parser.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/empty/empty_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/condition_tree/nodes/condition_tree_leaf.rb'
+    - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/options_parser.rb'

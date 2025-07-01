@@ -46,7 +46,7 @@ module ForestAdminDatasourceToolkit
         def apply(records)
           records.sort do |a, b|
             comparison = 0
-            (0..length - 1).each do |i|
+            (0..(length - 1)).each do |i|
               field = self[i][:field]
               ascending = self[i][:ascending]
               break unless comparison.zero?

@@ -64,7 +64,7 @@ module ForestAdminDatasourceToolkit
             end
           end
 
-          rows = rows[0..limit - 1] if limit && rows.size > limit
+          rows = rows[0..(limit - 1)] if limit && rows.size > limit
 
           rows
         end

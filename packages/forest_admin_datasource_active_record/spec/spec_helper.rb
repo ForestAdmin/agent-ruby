@@ -33,18 +33,15 @@ RSpec.configure do |config|
 
   # database_cleaner config
   config.before(:suite) do
-    DatabaseCleaner.clean_with :truncation, except: %w[ar_internal_metadata]
-  end
-
-  config.before do
     DatabaseCleaner.strategy = :transaction
+    DatabaseCleaner.clean_with :truncation
   end
 
-  config.before do
-    DatabaseCleaner.start
-  end
-
-  config.after do
-    DatabaseCleaner.clean
+  config.around(:each, :db_truncation) do |example|
+    DatabaseCleaner.strategy = :truncation
+    DatabaseCleaner.cleaning do
+      example.run
+    end
+    DatabaseCleaner.strategy = :transaction
   end
 end

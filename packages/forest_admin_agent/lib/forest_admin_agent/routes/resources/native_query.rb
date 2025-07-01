@@ -103,7 +103,7 @@ module ForestAdminAgent
         def make_line(result)
           return unless result.count
 
-          result = result.map! do |result_line|
+          result.map! do |result_line|
             raise_error(result_line, "'key', 'value'") if !result_line.key?(:value) || !result_line.key?(:key)
 
             { label: result_line[:key], values: { value: result_line[:value] } }

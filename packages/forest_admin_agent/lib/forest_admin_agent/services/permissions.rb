@@ -123,7 +123,7 @@ module ForestAdminAgent
         is_allowed = smart_action_approval.can_execute?
         ForestAdminAgent::Facades::Container.logger.log(
           'Debug',
-          "User #{user_data[:roleId]} is #{is_allowed ? "" : "not"} allowed to perform #{action["name"]}"
+          "User #{user_data[:roleId]} is #{"not" unless is_allowed} allowed to perform #{action["name"]}"
         )
       end
 

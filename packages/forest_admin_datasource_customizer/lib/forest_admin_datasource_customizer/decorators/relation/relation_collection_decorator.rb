@@ -183,7 +183,7 @@ module ForestAdminDatasourceCustomizer
           result = []
 
           if !@relations.key?(prefix)
-            result = relation.rewrite_field(field[prefix.length + 1..]).map { |sub_field| "#{prefix}:#{sub_field}" }
+            result = relation.rewrite_field(field[(prefix.length + 1)..]).map { |sub_field| "#{prefix}:#{sub_field}" }
           elsif field_schema.is_a? Relations::ManyToOneSchema
             result = [field_schema.foreign_key]
           elsif field_schema.is_a?(Relations::OneToOneSchema) ||

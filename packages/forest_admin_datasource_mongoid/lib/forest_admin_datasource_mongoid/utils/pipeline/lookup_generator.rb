@@ -10,7 +10,7 @@ module ForestAdminDatasourceMongoid
           schema_stack = stack.each_with_index.reduce([MongoidSchema.from_model(model)]) do |acc, (_, index)|
             [
               *acc,
-              MongoidSchema.from_model(model).apply_stack(stack.slice(0..index + 1), skip_as_models: true)
+              MongoidSchema.from_model(model).apply_stack(stack.slice(0..(index + 1)), skip_as_models: true)
             ]
           end
 
@@ -51,7 +51,7 @@ module ForestAdminDatasourceMongoid
           as = current_path ? "#{current_path}.#{name}" : name
 
           last_schema = schema_stack[schema_stack.length - 1]
-          previous_schema = schema_stack.slice(0..schema_stack.length - 1)
+          previous_schema = schema_stack.slice(0..(schema_stack.length - 1))
 
           return {} if options[:include] && !options[:include].include?(as)
           return {} if options[:exclude]&.include?(as)
