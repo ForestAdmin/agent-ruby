@@ -1,3 +1,10 @@
+# [1.0.0-beta.107](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.106...v1.0.0-beta.107) (2025-07-01)
+
+
+### Bug Fixes
+
+* reorder filter and grouping operations in QueryAggregate ([#119](https://github.com/ForestAdmin/agent-ruby/issues/119)) ([65e76a1](https://github.com/ForestAdmin/agent-ruby/commit/65e76a181ae621021029dde0328183c1fe1c475a))
+
 # [1.0.0-beta.106](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.105...v1.0.0-beta.106) (2025-06-12)
 
 
