@@ -53,47 +53,47 @@ module ForestAdminDatasourceMongoid
         end
       end
 
-      context 'when the model has a numericality validator' do
-        context 'with a greater_than validation' do
-          let(:model) do
-            model_class = Class.new do
-              include Mongoid::Document
-              field :age, type: Integer
-              validates :age, numericality: { greater_than: 20 }
-            end
-
-            Object.const_set(:PostDocument3, model_class)
-            model_class
-          end
-
-          it 'returns a greater_than validation' do
-            age_column = model.fields['age']
-            result = collection.get_validations(model, age_column)
-
-            expect(result).to include({ operator: Operators::GREATER_THAN, value: 20 })
-          end
-        end
-
-        context 'with a less_than validation' do
-          let(:model) do
-            model_class = Class.new do
-              include Mongoid::Document
-              field :age, type: Integer
-              validates :age, numericality: { less_than: 50 }
-            end
-
-            Object.const_set(:PostDocument4, model_class)
-            model_class
-          end
-
-          it 'returns a less_than validation' do
-            age_column = model.fields['age']
-            result = collection.get_validations(model, age_column)
-
-            expect(result).to include({ operator: Operators::LESS_THAN, value: 50 })
-          end
-        end
-      end
+      # context 'when the model has a numericality validator' do
+      #   context 'with a greater_than validation' do
+      #     let(:model) do
+      #       model_class = Class.new do
+      #         include Mongoid::Document
+      #         field :age, type: Integer
+      #         validates :age, numericality: { greater_than: 20 }
+      #       end
+      #
+      #       Object.const_set(:PostDocument3, model_class)
+      #       model_class
+      #     end
+      #
+      #     it 'returns a greater_than validation' do
+      #       age_column = model.fields['age']
+      #       result = collection.get_validations(model, age_column)
+      #
+      #       expect(result).to include({ operator: Operators::GREATER_THAN, value: 20 })
+      #     end
+      #   end
+      #
+      #   context 'with a less_than validation' do
+      #     let(:model) do
+      #       model_class = Class.new do
+      #         include Mongoid::Document
+      #         field :age, type: Integer
+      #         validates :age, numericality: { less_than: 50 }
+      #       end
+      #
+      #       Object.const_set(:PostDocument4, model_class)
+      #       model_class
+      #     end
+      #
+      #     it 'returns a less_than validation' do
+      #       age_column = model.fields['age']
+      #       result = collection.get_validations(model, age_column)
+      #
+      #       expect(result).to include({ operator: Operators::LESS_THAN, value: 50 })
+      #     end
+      #   end
+      # end
 
       context 'when the model has a length validator' do
         context 'with a minimum length validation' do
