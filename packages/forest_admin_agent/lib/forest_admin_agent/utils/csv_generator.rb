@@ -12,7 +12,7 @@ module ForestAdminAgent
           data[col_name] = []
           records.each do |row|
             data[col_name] << if is_relation
-                                row[col_name][schema_field.split(':').last]
+                                row[col_name]&.[](schema_field.split(':').last)
                               else
                                 row[col_name]
                               end
