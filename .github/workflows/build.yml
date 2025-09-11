@@ -120,19 +120,13 @@ jobs:
         with:
           path: reports
 
-      - name: List downloaded coverage files
-        run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          ls -R reports || true
-
       - name: Send coverage
         uses: qltysh/qlty-action/coverage@8d5c844f32f80364ccc135534671640466e7f610 #v1.1
         with:
           verbose: true
           oidc: true
           files: |
-            ${{ github.workspace }}/reports/**/coverage.json:simplecov
-# ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json
+            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
 #          ,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json
 
   deploy:
