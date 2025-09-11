@@ -125,8 +125,7 @@ jobs:
         with:
           verbose: true
           oidc: true
-          files: |
-            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
+          files: ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
 #          ,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json
 
   deploy:
