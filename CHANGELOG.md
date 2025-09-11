@@ -1,3 +1,10 @@
+# [1.0.0-beta.108](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.107...v1.0.0-beta.108) (2025-09-11)
+
+
+### Features
+
+* improve error handling ([#120](https://github.com/ForestAdmin/agent-ruby/issues/120)) ([7952e95](https://github.com/ForestAdmin/agent-ruby/commit/7952e957041ca76652c6888db66a796734f49431))
+
 # [1.0.0-beta.107](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.106...v1.0.0-beta.107) (2025-07-01)
 
 
