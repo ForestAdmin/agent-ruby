@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ruby-version: ["3.3"] #"3.2", "3.3"]
+        ruby-version: ["3.2", "3.3"]
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
@@ -53,7 +53,7 @@ jobs:
     needs: [lint]
     strategy:
       matrix:
-        ruby-version: ["3.3"] #"3.2", "3.3"]
+        ruby-version: ["3.2", "3.3"]
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
