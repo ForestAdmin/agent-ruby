@@ -110,7 +110,12 @@ module ForestAdminDatasourceActiveRecord
                        end
           end
 
-          build_select(collection.datasource.get_collection(relation_schema.foreign_collection), sub_projection)
+          next if relation_schema.type == 'PolymorphicManyToOne'
+
+          if relation_schema.respond_to?(:foreign_collection)
+            target_collection = collection.datasource.get_collection(relation_schema.foreign_collection)
+            build_select(target_collection, sub_projection)
+          end
         end
       end
 
