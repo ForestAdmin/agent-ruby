@@ -116,18 +116,17 @@ jobs:
         with:
           path: reports
 
-#      - name: Send coverage
-#        uses: paambaati/codeclimate-action@v5.0.0
-#        env:
-#          CC_TEST_REPORTER_ID: ${{ secrets.CC_TEST_REPORTER_ID }}
-#        with:
-#          coverageLocations: |
-#            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
-#            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json:simplecov
-#            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json:simplecov
-#            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json:simplecov
-#            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json:simplecov
-#          debug: true
+      - name: Send coverage
+        uses: qltysh/qlty-action/coverage@8d5c844f32f80364ccc135534671640466e7f610 #v1.1
+        with:
+          verbose: true
+          oidc: true
+          files: |
+            ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
+              ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json:simplecov
+              ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json:simplecov
+              ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json:simplecov
+              ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json:simplecov
 
   deploy:
     name: Release package
