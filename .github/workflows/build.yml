@@ -20,12 +20,12 @@ jobs:
         ruby-version: ["3.3"] #"3.2", "3.3"]
         packages:
           - forest_admin_agent
-#          - forest_admin_datasource_active_record
-#          - forest_admin_datasource_customizer
-#          - forest_admin_datasource_toolkit
-#          - forest_admin_test_toolkit
-#          - forest_admin_rails
-#          - forest_admin_datasource_mongoid
+          - forest_admin_datasource_active_record
+          - forest_admin_datasource_customizer
+          - forest_admin_datasource_toolkit
+          - forest_admin_test_toolkit
+          - forest_admin_rails
+          - forest_admin_datasource_mongoid
 
     steps:
       - name: Checkout
@@ -56,10 +56,10 @@ jobs:
         ruby-version: ["3.3"] #"3.2", "3.3"]
         packages:
           - forest_admin_agent
-#          - forest_admin_datasource_active_record
-#          - forest_admin_datasource_customizer
-#          - forest_admin_datasource_toolkit
-#          - forest_admin_datasource_mongoid
+          - forest_admin_datasource_active_record
+          - forest_admin_datasource_customizer
+          - forest_admin_datasource_toolkit
+          - forest_admin_datasource_mongoid
     services:
       mongodb:
         image: mongo:latest
@@ -125,8 +125,7 @@ jobs:
         with:
           verbose: true
           oidc: true
-          files: ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json:simplecov
-#          ,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json
+          files: ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json
 
   deploy:
     name: Release package
