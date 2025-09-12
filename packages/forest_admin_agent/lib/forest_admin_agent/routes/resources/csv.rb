@@ -32,7 +32,7 @@ module ForestAdminAgent
                 )
               ]
             ),
-            page: QueryStringParser.parse_export_pagination(ForestAdminRails.config[:limit_export_size]),
+            page: QueryStringParser.parse_export_pagination(Facades::Container.config_from_cache[:limit_export_size]),
             search: QueryStringParser.parse_search(@collection, args),
             search_extended: QueryStringParser.parse_search_extended(args)
           )
