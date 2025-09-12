@@ -96,7 +96,7 @@ module ForestAdminAgent
                 expect(relation_name).to eq('category')
                 expect(foreign_filter).to have_attributes(
                   condition_tree: have_attributes(aggregator: 'Or', conditions: []),
-                  page: nil,
+                  page: have_attributes(offset: 0, limit: nil),
                   search: nil,
                   search_extended: nil,
                   segment: nil,
