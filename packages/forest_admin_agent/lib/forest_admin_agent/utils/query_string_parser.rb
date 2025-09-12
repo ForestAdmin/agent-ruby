@@ -74,6 +74,14 @@ module ForestAdminAgent
         Page.new(offset: offset, limit: items_per_pages.to_i)
       end
 
+      def self.parse_export_pagination(limit)
+        page = DEFAULT_PAGE_TO_SKIP
+
+        offset = (page.to_i - 1) * (limit ? limit.to_i : 0)
+
+        Page.new(offset: offset, limit: limit&.to_i)
+      end
+
       def self.parse_search(collection, args)
         search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
 
