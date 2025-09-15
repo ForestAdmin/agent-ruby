@@ -17,6 +17,10 @@ module ForestAdminDatasourceCustomizer
         end
 
         def replace_search(replacer)
+          unless replacer.respond_to?(:call) || replacer.respond_to?(:build_condition_tree)
+            raise ArgumentError, 'replacer must be a Proc or a BaseSearchStrategy'
+          end
+
           @replacer = replacer
           @disabled_search = false
           mark_schema_as_dirty
@@ -35,9 +39,11 @@ module ForestAdminDatasourceCustomizer
             ctx = ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext.new(self, caller)
             tree = default_replacer(filter.search, filter.search_extended)
 
-            if @replacer
+            if @replacer.respond_to?(:call)
               plain_tree = @replacer.call(filter.search, filter.search_extended, ctx)
               tree = ConditionTreeFactory.from_plain_object(plain_tree)
+            elsif @replacer.respond_to?(:build_condition_tree)
+              tree = @replacer.build_condition_tree(filter.search, filter.search_extended, ctx)
             end
 
             # Note that if no fields are searchable with the provided searchString, the conditions
