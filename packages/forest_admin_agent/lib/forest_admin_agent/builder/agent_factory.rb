@@ -36,6 +36,12 @@ module ForestAdminAgent
         self
       end
 
+      def add_replacer(definition)
+        @customizer.add_replacer(definition)
+
+        self
+      end
+
       def customize_collection(name, &handle)
         @customizer.customize_collection(name, handle)
 

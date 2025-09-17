@@ -65,6 +65,10 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.chart.add_chart(name, &definition) }
     end
 
+    def add_replacer(definition)
+      push_customization { @stack.search.add_replacer(definition) }
+    end
+
     def use(plugin, options)
       push_customization { plugin.new.run(self, nil, options) }
     end
