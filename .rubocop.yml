@@ -187,6 +187,7 @@ Style/StringLiterals:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
     - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/Utils/sse_client.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
@@ -396,6 +397,10 @@ Lint/InterpolationCheck:
 Lint/UnusedMethodArgument:
   Exclude:
     - 'packages/forest_admin_rails/config/initializers/forest_admin_error_subscriber.rb'
+
+Lint/UnusedBlockArgument:
+  Exclude:
+    - 'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/Utils/sse_client.rb'
 
 Style/RedundantParentheses:
   Enabled: false
