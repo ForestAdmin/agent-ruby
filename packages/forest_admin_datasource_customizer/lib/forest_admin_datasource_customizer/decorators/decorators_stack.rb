@@ -70,7 +70,8 @@ module ForestAdminDatasourceCustomizer
         last = @late_op_emulate = DatasourceDecorator.new(last, OperatorsEmulate::OperatorsEmulateCollectionDecorator)
         last = DatasourceDecorator.new(last, OperatorsEquivalence::OperatorsEquivalenceCollectionDecorator)
 
-        last = @search = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
+        # last = @search = DatasourceDecorator.new(last, Search::SearchCollectionDecorator)
+        last = @search = Search::SearchDatasourceDecorator.new(last)
         last = @segment = DatasourceDecorator.new(last, Segment::SegmentCollectionDecorator)
         last = @sort = DatasourceDecorator.new(last, Sort::SortCollectionDecorator)
 
