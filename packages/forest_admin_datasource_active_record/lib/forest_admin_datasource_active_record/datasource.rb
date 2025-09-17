@@ -58,7 +58,7 @@ module ForestAdminDatasourceActiveRecord
 
     def generate
       ActiveRecord::Base.descendants.each { |model| fetch_model(model) }
-      @models.each do |model|
+      @models.sort_by(&:name).each do |model|
         add_collection(
           Collection.new(self, model, support_polymorphic_relations: @support_polymorphic_relations)
         )

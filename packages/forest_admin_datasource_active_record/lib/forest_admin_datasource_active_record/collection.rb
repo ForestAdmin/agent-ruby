@@ -51,7 +51,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def fetch_fields
-      @model.columns_hash.each do |column_name, column|
+      @model.columns_hash.sort_by { |column_name, _| column_name }.each do |column_name, column|
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: get_column_type(@model, column),
           filter_operators: operators_for_column_type(get_column_type(@model, column)),
