@@ -1,3 +1,10 @@
+# [1.0.0-beta.109](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.108...v1.0.0-beta.109) (2025-09-17)
+
+
+### Features
+
+* add sorting of models and fields in apimap ([#121](https://github.com/ForestAdmin/agent-ruby/issues/121)) ([18b63e0](https://github.com/ForestAdmin/agent-ruby/commit/18b63e0b6b0e192350651e9c0aa6db31ca6ca051))
+
 # [1.0.0-beta.108](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.107...v1.0.0-beta.108) (2025-09-11)
 
 
