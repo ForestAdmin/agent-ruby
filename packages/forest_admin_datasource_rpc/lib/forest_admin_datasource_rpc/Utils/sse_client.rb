@@ -36,6 +36,10 @@ module ForestAdminDatasourceRpc
           client.on_error do |err|
             # TODO: optimisation on client close
             # ForestAdminRpcAgent::Facades::Container.logger.log('Warn', "[SSE] Error: #{err.class} - #{err.message}")
+            unless @closed
+              puts "[SSE] ❌ Connection lost unexpectedly. Triggering fallback."
+              @on_rpc_stop&.call
+            end
           end
         end
       end

@@ -39,8 +39,12 @@ module ForestAdminRpcAgent
 
             should_continue = true
             # Intercept CTRL+C
-            stop_proc = proc { should_continue = false }
-            original_handler = trap('INT', stop_proc)
+            # stop_proc = proc { should_continue = false }
+            # original_handler = trap('INT', stop_proc)
+            original_handler = trap('INT') do
+              should_continue = false
+              original_handler.call if original_handler.respond_to?(:call)
+            end
 
             body = Enumerator.new do |yielder|
               stream = SseStreamer.new(yielder)
