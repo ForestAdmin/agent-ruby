@@ -1,3 +1,10 @@
+# [1.0.0-beta.110](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.109...v1.0.0-beta.110) (2025-09-22)
+
+
+### Features
+
+* add export_limit_size support for csv ([#123](https://github.com/ForestAdmin/agent-ruby/issues/123)) ([8712d35](https://github.com/ForestAdmin/agent-ruby/commit/8712d35bf99b7c77cbb662f5f95dae4b253fb60d))
+
 # [1.0.0-beta.109](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.108...v1.0.0-beta.109) (2025-09-17)
 
 
