@@ -26,6 +26,7 @@ module ForestAdminRails
   setting :logger, default: nil
   setting :customize_error_message, default: nil
   setting :instant_cache_refresh, default: Rails.env.production?
+  setting :limit_export_size, default: nil
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

@@ -30,7 +30,8 @@ module ForestAdminAgent
                   @permissions.get_scope(@collection),
                   ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
                 ]
-              )
+              ),
+              page: QueryStringParser.parse_export_pagination(Facades::Container.config_from_cache[:limit_export_size])
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
             id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)

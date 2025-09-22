@@ -27,15 +27,16 @@ module ForestAdminAgent
               [
                 @permissions.get_scope(@collection),
                 parse_query_segment(@collection, args, @permissions, @caller),
-                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+                QueryStringParser.parse_condition_tree(
                   @collection, args
                 )
               ]
             ),
-            search: ForestAdminAgent::Utils::QueryStringParser.parse_search(@collection, args),
-            search_extended: ForestAdminAgent::Utils::QueryStringParser.parse_search_extended(args)
+            page: QueryStringParser.parse_export_pagination(Facades::Container.config_from_cache[:limit_export_size]),
+            search: QueryStringParser.parse_search(@collection, args),
+            search_extended: QueryStringParser.parse_search_extended(args)
           )
-          projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection(@collection, args)
+          projection = QueryStringParser.parse_projection(@collection, args)
           records = @collection.list(@caller, filter, projection)
           filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
           filename += '.csv' unless /\.csv$/i.match?(filename)

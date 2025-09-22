@@ -541,6 +541,22 @@ module ForestAdminAgent
           end
         end
       end
+
+      describe 'parse_export_pagination' do
+        it 'returns a Page with offset 0 and the given limit when limit is provided' do
+          page = described_class.parse_export_pagination(100)
+
+          expect(page.offset).to eq(0)
+          expect(page.limit).to eq(100)
+        end
+
+        it 'returns a Page with offset 0 and nil limit when no limit is provided' do
+          page = described_class.parse_export_pagination(nil)
+
+          expect(page.offset).to eq(0)
+          expect(page.limit).to be_nil
+        end
+      end
     end
   end
 end
