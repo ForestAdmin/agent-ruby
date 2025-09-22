@@ -1,0 +1,9 @@
+module ForestAdminAgent
+  module Http
+    class Router
+      def self.routes: -> Array[String]
+      def self.actions_routes: -> Array[String]
+      def self.api_charts_routes: -> Array[String]
+    end
+  end
+end

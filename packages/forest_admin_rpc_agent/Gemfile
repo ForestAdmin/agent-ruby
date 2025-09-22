@@ -1,0 +1,16 @@
+source "https://rubygems.org"
+
+# Specify your gem's dependencies in forest_admin_rpc_agent.gemspec
+gemspec
+
+gem 'forest_admin_agent'
+gem 'forest_admin_datasource_toolkit'
+gem 'rake', '~> 13.0'
+gem 'rubocop', '~> 1.21'
+
+group :development, :test do
+  gem 'rspec-rails', '~> 3.0'
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov-html', '~> 0.12.3'
+  gem 'simplecov_json_formatter', '~> 0.1.4'
+end

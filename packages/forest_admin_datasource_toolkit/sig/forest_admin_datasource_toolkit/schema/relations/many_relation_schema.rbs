@@ -1,0 +1,10 @@
+module ForestAdminDatasourceToolkit
+  module Schema
+    module Relations
+      class ManyRelationSchema
+        attr_accessor foreign_key: String
+        attr_accessor foreign_key_target: String
+      end
+    end
+  end
+end

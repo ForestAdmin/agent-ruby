@@ -1,0 +1,19 @@
+source "https://rubygems.org"
+
+# Specify your gem's dependencies in forest_admin_datasource_mongoid.gemspec
+gemspec
+
+gem 'mongoid', '~> 9.0'
+
+gem 'forest_admin_datasource_toolkit'
+gem 'rake', '~> 13.0'
+gem 'rubocop', '~> 1.21'
+
+group :development, :test do
+  gem 'mongoid-rspec', '~> 4.0'
+  gem 'rails'
+  gem 'rspec-rails', '~> 3.0'
+  gem 'simplecov', '~> 0.22', require: false
+  gem 'simplecov-html', '~> 0.12.3'
+  gem 'simplecov_json_formatter', '~> 0.1.4'
+end

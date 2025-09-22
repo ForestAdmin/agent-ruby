@@ -1,0 +1,14 @@
+module ForestAdminAgent
+  module Routes
+    module Security
+      class Authentication
+        def setup_routes: -> Authentication
+        def handle_authentication: (?Hash[untyped, untyped] args) -> {content: {authorizationUrl: String}}
+        def handle_authentication_callback: (?Hash[untyped, untyped] args) -> {content: {token: String, tokenData: String}}
+        def handle_authentication_logout: (?Hash[untyped, untyped] _args) -> {content: nil, status: Integer}
+        def auth: -> ForestAdminAgent::Auth::AuthManager
+        def get_and_check_rendering_id: (Hash[untyped, untyped] params) -> Integer
+      end
+    end
+  end
+end

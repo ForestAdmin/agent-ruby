@@ -1,0 +1,10 @@
+module ForestAdminDatasourceToolkit
+  module Schema
+    module Relations
+      class SingleRelationSchema
+        attr_accessor origin_key: String
+        attr_accessor origin_key_target: String
+      end
+    end
+  end
+end

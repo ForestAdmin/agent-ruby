@@ -1,0 +1,66 @@
+{
+  "collections": [{
+    "name": "Book",
+    "name_old": "Book",
+    "icon": null,
+    "is_read_only": false,
+    "is_searchable": true,
+    "is_virtual": false,
+    "only_for_relationships": false,
+    "pagination_type": "page",
+    "fields": [{
+      "field": "id",
+      "type": "Number",
+      "default_value": null,
+      "enums": null,
+      "integration": null,
+      "is_filterable": true,
+      "is_read_only": false,
+      "is_required": false,
+      "is_sortable": true,
+      "is_virtual": false,
+      "reference": null,
+      "inverse_of": null,
+      "widget": null,
+      "validations": []
+    }, {
+      "field": "title",
+      "type": "String",
+      "default_value": null,
+      "enums": null,
+      "integration": null,
+      "is_filterable": true,
+      "is_read_only": false,
+      "is_required": false,
+      "is_sortable": true,
+      "is_virtual": false,
+      "reference": null,
+      "inverse_of": null,
+      "widget": null,
+      "validations": []
+    }],
+    "segments": [],
+    "actions": [{
+      "name": "make-photocopy",
+      "type": "single",
+      "base_url": null,
+      "endpoint": "/forest/_actions/Book/0/make-photocopy",
+      "http_method": "POST",
+      "redirect": null,
+      "download": false,
+      "fields": [],
+      "hooks": {
+        "load": false,
+        "change": []
+      }
+    }]
+  }],
+  "meta": {
+    "liana": "agent-ruby",
+    "liana_version": "1.0.16",
+    "stack": {
+      "database_type": "postgresql",
+      "orm_version": "7.0.8"
+    }
+  }
+}

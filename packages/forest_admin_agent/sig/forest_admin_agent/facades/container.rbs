@@ -1,0 +1,9 @@
+module ForestAdminAgent
+  module Facades
+    class Container
+      def self.instance: -> untyped
+      def self.config_from_cache: -> untyped
+      def self.get: (untyped key) -> untyped
+    end
+  end
+end

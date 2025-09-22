@@ -1,0 +1,9 @@
+test:
+  clients:
+    default:
+      database: dummy_test
+      hosts:
+        - localhost:27017
+      options:
+        server_selection_timeout: 5
+        log_level: :error
