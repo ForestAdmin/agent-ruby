@@ -24,14 +24,20 @@ module.exports = {
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb; '+
-            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; ',
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rails/lib/forest_admin_rails/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/version.rb; ',
         successCmd:
             '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-*.gem );' +
             '( cd packages/forest_admin_datasource_active_record && gem build && gem push forest_admin_datasource_active_record-*.gem );' +
             '( cd packages/forest_admin_datasource_toolkit && gem build && gem push forest_admin_datasource_toolkit-*.gem );' +
             '( cd packages/forest_admin_test_toolkit && gem build && gem push forest_admin_test_toolkit-*.gem );' +
             '( cd packages/forest_admin_datasource_customizer && gem build && gem push forest_admin_datasource_customizer-*.gem );' +
-            '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-*.gem );' ,
+            '( cd packages/forest_admin_rails && gem build && gem push forest_admin_rails-*.gem );' +
+            '( cd packages/forest_admin_datasource_mongoid && gem build && gem push forest_admin_datasource_mongoid-*.gem );' +
+            '( cd packages/forest_admin_rpc_agent && gem build && gem push forest_admin_rpc_agent-*.gem );' +
+            '( cd packages/forest_admin_datasource_rpc && gem build && gem push forest_admin_datasource_rpc-*.gem );' ,
       },
     ],
     [
@@ -47,6 +53,9 @@ module.exports = {
           'packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb',
           'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb',
           'packages/forest_admin_rails/lib/forest_admin_rails/version.rb',
+          'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/version.rb',
+          'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/version.rb',
+          'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/version.rb',
           'package.json'
         ],
       },
