@@ -10,8 +10,8 @@ module ForestAdminRpcAgent
       include_context 'with caller'
       subject(:route) { described_class.new }
 
-      let(:datasource) { instance_double(Datasource) }
-      let(:collection) { instance_double(Collection) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
+      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
       let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
       let(:metas) { { 'meta_field' => 'value' } }
 

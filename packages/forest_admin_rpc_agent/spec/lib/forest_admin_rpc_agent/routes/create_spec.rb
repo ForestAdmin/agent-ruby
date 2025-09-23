@@ -17,7 +17,7 @@ module ForestAdminRpcAgent
         }
       end
       let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(Collection) }
+      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
       let(:create_result) { { id: 1, email: 'test@example.com', name: 'John Doe' } }
 
       before do

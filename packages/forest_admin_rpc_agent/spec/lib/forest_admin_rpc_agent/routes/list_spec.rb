@@ -18,8 +18,8 @@ module ForestAdminRpcAgent
           'projection' => projection_params
         }
       end
-      let(:datasource) { instance_double(Datasource) }
-      let(:collection) { instance_double(Collection) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
+      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
       let(:projection) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Projection) }
       let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
       let(:list_result) { [{ id: 1, email: 'test@example.com' }] }

@@ -7,7 +7,7 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:agent) { instance_double(ForestAdminRpcAgent::Agent) }
       let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
-      let(:datasource) { instance_double(Datasource) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
       let(:logger) { instance_double(Logger) }
 
       let(:collection_user) { instance_double(Collection, name: 'users', schema: { fields: ['id', 'email'] }) }

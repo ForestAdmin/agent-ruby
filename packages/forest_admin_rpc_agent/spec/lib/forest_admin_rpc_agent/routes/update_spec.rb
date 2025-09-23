@@ -18,8 +18,8 @@ module ForestAdminRpcAgent
           'data' => update_data
         }
       end
-      let(:datasource) { instance_double(Datasource) }
-      let(:collection) { instance_double(Collection) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
+      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
       let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
       let(:update_result) { nil }
 

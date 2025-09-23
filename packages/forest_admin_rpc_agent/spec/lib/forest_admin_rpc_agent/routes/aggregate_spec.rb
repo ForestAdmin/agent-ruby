@@ -22,8 +22,8 @@ module ForestAdminRpcAgent
         }
       end
 
-      let(:datasource) { instance_double(Datasource) }
-      let(:collection) { instance_double(Collection) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
+      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
       let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
       let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
       let(:aggregate_result) { [{ 'country' => 'France', 'total_amount' => 1000 }] }

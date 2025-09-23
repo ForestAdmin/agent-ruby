@@ -15,7 +15,7 @@ module ForestAdminRpcAgent
         }
       end
 
-      let(:datasource) { instance_double(Datasource) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
       let(:chart_result) { { countCurrent: 500, countPrevious: 300 } }
 
       before do
