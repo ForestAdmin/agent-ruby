@@ -73,7 +73,6 @@ module ForestAdminRpcAgent
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
         allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory)
           .to receive(:from_plain_object)
-          .with(filter_params)
           .and_return(filter)
 
         allow(collection).to receive(:update)

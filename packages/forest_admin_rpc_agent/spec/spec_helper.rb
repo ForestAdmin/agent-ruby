@@ -24,6 +24,9 @@ end
 
 RSpec.configure do |config|
   config.include ForestAdminTestToolkit::Factory::Caller
+  config.include ForestAdminTestToolkit::Factory::Collection
+  config.include ForestAdminTestToolkit::Factory::Datasource
+  config.include ForestAdminTestToolkit::Factory::Column
   config.before do
     agent_factory = ForestAdminRpcAgent::Agent.instance
     agent_factory.setup(
