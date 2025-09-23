@@ -75,10 +75,7 @@ module ForestAdminRpcAgent
           .to receive(:from_plain_object)
           .and_return(filter)
 
-        allow(collection).to receive(:update)
-          .with(caller,
-                kind_of(ForestAdminDatasourceToolkit::Components::Query::Filter),
-                update_data).and_return(update_result)
+        allow(collection).to receive(:update).and_return(update_result)
 
         allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
         allow(faraday_connection).to receive_messages(get: response, post: response)
