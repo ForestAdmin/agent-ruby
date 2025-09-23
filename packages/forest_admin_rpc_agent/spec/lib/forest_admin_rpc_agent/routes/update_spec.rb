@@ -24,6 +24,7 @@ module ForestAdminRpcAgent
       let(:update_result) { nil }
 
       before do
+        RSpec::Mocks.space.reset_all
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
         allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
