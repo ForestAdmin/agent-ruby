@@ -21,10 +21,14 @@ module ForestAdminRpcAgent
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
-        datasource = instance_double(ForestAdminDatasourceRpc::Datasource)
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [], charts: [chart_name], rpc_relations: [] }
+        )
+
+        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(@datasource)
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:render_chart).with(caller, chart_name).and_return(chart_result)
+        allow(@datasource).to receive(:render_chart).with(caller, chart_name).and_return(chart_result)
       end
 
       describe '#handle_request' do
