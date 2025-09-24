@@ -28,7 +28,12 @@ module ForestAdminRpcAgent
 
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(@datasource)
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(@datasource).to receive(:render_chart).with(caller, chart_name).and_return(chart_result)
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ForestAdminDatasourceRpc::Datasource)
+          .to receive(:render_chart)
+          .with(caller, chart_name)
+          .and_return(chart_result)
+        # rubocop:enable RSpec/AnyInstance
       end
 
       describe '#handle_request' do
