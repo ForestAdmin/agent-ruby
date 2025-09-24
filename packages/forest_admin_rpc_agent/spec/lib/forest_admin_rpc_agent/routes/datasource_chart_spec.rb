@@ -31,7 +31,6 @@ module ForestAdminRpcAgent
         # rubocop:disable RSpec/AnyInstance
         allow_any_instance_of(ForestAdminDatasourceRpc::Datasource)
           .to receive(:render_chart)
-          .with(caller, chart_name)
           .and_return(chart_result)
         # rubocop:enable RSpec/AnyInstance
       end
