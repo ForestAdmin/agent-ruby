@@ -20,22 +20,52 @@ module ForestAdminRpcAgent
         }
       end
 
-      let(:datasource) { instance_double(Datasource) }
-      let(:collection) { instance_double(Collection) }
       let(:chart_result) { { countCurrent: 10, countPrevious: nil } }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: chart_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: {
+              column_type: 'Number',
+              filter_operators: %w[present greater_than],
+              is_primary_key: true,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            email: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
-
-        allow(ForestAdminAgent::Utils::Id).to receive(:unpack_id)
-          .with(collection, record_id)
-          .and_return(unpacked_id)
-
-        allow(collection).to receive(:render_chart)
-          .with(caller, chart_name, unpacked_id)
-          .and_return(chart_result)
+        allow(Faraday).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive(:send).and_return(response)
       end
 
       describe '#handle_request' do

@@ -7,7 +7,7 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:agent) { instance_double(ForestAdminRpcAgent::Agent) }
       let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
-      let(:datasource) { instance_double(Datasource) }
+      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
       let(:logger) { instance_double(Logger) }
 
       let(:collection_user) { instance_double(Collection, name: 'users', schema: { fields: ['id', 'email'] }) }
@@ -27,9 +27,8 @@ module ForestAdminRpcAgent
       before do
         allow(ForestAdminRpcAgent::Agent).to receive(:instance).and_return(agent)
         allow(agent).to receive(:customizer).and_return(customizer)
-        allow(customizer).to receive(:schema).and_return(schema)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
-        allow(customizer).to receive(:datasource).with(logger).and_return(datasource)
+        allow(customizer).to receive_messages(schema: schema, datasource: datasource)
         allow(datasource).to receive(:collections).and_return(collections)
       end
 

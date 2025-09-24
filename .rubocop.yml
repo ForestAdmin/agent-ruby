@@ -10,6 +10,7 @@ AllCops:
     - 'packages/forest_admin_datasource_mongoid/spec/dummy/**/*'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/serializer/forest_serializer_override.rb'
+    - 'packages/forest_admin_rpc_agent/bin/**/*'
     - 'node_modules/semantic-release-rubygem/**/*'
     - 'packages/_examples/**/*'
 

@@ -38,16 +38,16 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
 
-#      - name: Install dependencies on main repo
-#        run: |
-#          gem install bundler
-#          bundle install
-#
-#      - name: Install dependencies on packages
-#        run: cd packages/${{ matrix.packages }} && bundle install && cd -
-#
-#      - name: Run RuboCop
-#        run: bundle exec rubocop
+      - name: Install dependencies on main repo
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Install dependencies on packages
+        run: cd packages/${{ matrix.packages }} && bundle install && cd -
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
 
   test:
     name: Test
@@ -78,35 +78,35 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby-version }}
 
-#      - name: Install dependencies on main repo
-#        run: |
-#          gem install bundler
-#          bundle install
-#
-#      - name: Wait for MongoDB
-#        if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
-#        run: |
-#          for i in {1..30}; do
-#            nc -z localhost 27017 && echo "MongoDB is up" && exit 0
-#            echo "Waiting for MongoDB..."
-#            sleep 1
-#          done
-#          exit 1
-#
-#      - name: Test
-#        run: |
-#          cd packages/${{ matrix.packages }} && \
-#          BUNDLE_GEMFILE=Gemfile-test bundle install && \
-#          BUNDLE_GEMFILE=Gemfile-test bundle exec rspec --color --format doc && \
-#          cd -
-#
-#      - name: Upload coverage
-#        if: ${{ matrix.ruby-version == '3.3' }}
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: ${{ matrix.ruby-version }}-${{ matrix.packages }}
-#          path: packages/${{ matrix.packages }}/coverage/*
-#          retention-days: 1
+      - name: Install dependencies on main repo
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Wait for MongoDB
+        if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
+        run: |
+          for i in {1..30}; do
+            nc -z localhost 27017 && echo "MongoDB is up" && exit 0
+            echo "Waiting for MongoDB..."
+            sleep 1
+          done
+          exit 1
+
+      - name: Test
+        run: |
+          cd packages/${{ matrix.packages }} && \
+          BUNDLE_GEMFILE=Gemfile-test bundle install && \
+          BUNDLE_GEMFILE=Gemfile-test bundle exec rspec --color --format doc && \
+          cd -
+
+      - name: Upload coverage
+        if: ${{ matrix.ruby-version == '3.3' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.ruby-version }}-${{ matrix.packages }}
+          path: packages/${{ matrix.packages }}/coverage/*
+          retention-days: 1
 
   coverage:
     name: Send Coverage
@@ -119,17 +119,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-#      - name: Download coverage reports
-#        uses: actions/download-artifact@v4
-#        with:
-#          path: reports
-#
-#      - name: Send coverage
-#        uses: qltysh/qlty-action/coverage@8d5c844f32f80364ccc135534671640466e7f610 #v1.1
-#        with:
-#          verbose: true
-#          oidc: true
-#          files: ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_rpc_agent/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_rpc/coverage.json
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+
+      - name: Send coverage
+        uses: qltysh/qlty-action/coverage@8d5c844f32f80364ccc135534671640466e7f610 #v1.1
+        with:
+          verbose: true
+          oidc: true
+          files: ${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_agent/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_active_record/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_customizer/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_toolkit/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_mongoid/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_rpc_agent/coverage.json,${{ github.workspace }}/reports/${{ matrix.ruby-version }}-forest_admin_datasource_rpc/coverage.json
 
   deploy:
     name: Release package

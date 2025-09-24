@@ -30,12 +30,15 @@ module ForestAdminDatasourceRpc
       context 'when server is not running' do
         let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: nil) }
 
-        it 'raise error' do
+        it 'returns empty datasource and logs error' do
           allow(rpc_client).to receive(:call_rpc).and_raise('server not running')
 
-          expect { described_class.build({ uri: 'http://localhost' }) }.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Failed to get schema from RPC agent. Please check the RPC agent is running.'
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource).to be_a(ForestAdminDatasourceToolkit::Datasource)
+          expect(ForestAdminRpcAgent::Facades::Container.logger).to have_received(:log).with(
+            'Error',
+            'Failed to get schema from RPC agent. Please check the RPC agent is running.'
           )
         end
       end
