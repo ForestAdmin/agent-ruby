@@ -8,7 +8,7 @@ module ForestAdminRpcAgent
 
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
-      let(:filter_params) { { 'field' => 'id', 'operator' => 'equals', 'value' => 1 } }
+      let(:filter_params) { {} }
       let(:params) do
         {
           'collection_name' => collection_name,
@@ -16,21 +16,35 @@ module ForestAdminRpcAgent
           'filter' => filter_params
         }
       end
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
-      let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
-      let(:delete_result) { nil }
+      let(:delete_result) { [] }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: delete_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
+      let(:collection) { @datasource.get_collection(collection_name) }
 
       before do
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: { column_type: 'Number', type: 'Column' },
+            email: { column_type: 'String', type: 'Column' }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
+
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
-
-        allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory).to receive(:from_plain_object)
-          .with(filter_params)
-          .and_return(filter)
-
-        allow(collection).to receive(:delete).with(caller, filter).and_return(delete_result)
+        allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive_messages(get: response, post: response)
       end
 
       describe '#handle_request' do

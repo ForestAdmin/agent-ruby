@@ -27,9 +27,8 @@ module ForestAdminRpcAgent
       before do
         allow(ForestAdminRpcAgent::Agent).to receive(:instance).and_return(agent)
         allow(agent).to receive(:customizer).and_return(customizer)
-        allow(customizer).to receive(:schema).and_return(schema)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
-        allow(customizer).to receive(:datasource).with(logger).and_return(datasource)
+        allow(customizer).to receive_messages(schema: schema, datasource: datasource)
         allow(datasource).to receive(:collections).and_return(collections)
       end
 

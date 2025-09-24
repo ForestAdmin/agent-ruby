@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'faraday'
 
 module ForestAdminRpcAgent
   module Routes
@@ -15,10 +16,12 @@ module ForestAdminRpcAgent
         }
       end
 
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
       let(:chart_result) { { countCurrent: 500, countPrevious: 300 } }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: chart_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
+        datasource = instance_double(ForestAdminDatasourceRpc::Datasource)
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
         allow(datasource).to receive(:render_chart).with(caller, chart_name).and_return(chart_result)

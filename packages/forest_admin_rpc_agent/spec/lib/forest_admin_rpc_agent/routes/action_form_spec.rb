@@ -144,11 +144,6 @@ module ForestAdminRpcAgent
           let(:elements) { [file_element] }
 
           before do
-            allow(ForestAdminAgent::Utils::Schema::ForestValueConverter)
-              .to receive(:make_data_uri)
-              .with(file_element.value)
-              .and_return('data:uri')
-
             allow(file_element).to receive(:value).and_return('data:uri')
           end
 

@@ -8,36 +8,63 @@ module ForestAdminRpcAgent
 
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
-      let(:filter_params) { { 'field' => 'email', 'operator' => 'equal', 'value' => 'test@example.com' } }
       let(:projection_params) { %w[id email] }
       let(:params) do
         {
           'collection_name' => collection_name,
           'caller' => caller.to_h,
-          'filter' => filter_params,
+          'filter' => {},
           'projection' => projection_params
         }
       end
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
-      let(:projection) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Projection) }
-      let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
-      let(:list_result) { [{ id: 1, email: 'test@example.com' }] }
+
+      let(:list_result) { [{ 'id' => 1, 'email' => 'test@example.com' }] }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: list_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: {
+              column_type: 'Number',
+              filter_operators: %w[present greater_than],
+              is_primary_key: true,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            email: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
 
-        allow(ForestAdminDatasourceToolkit::Components::Query::Projection).to receive(:new)
-          .with(projection_params)
-          .and_return(projection)
-
-        allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory).to receive(:from_plain_object)
-          .with(filter_params)
-          .and_return(filter)
-
-        allow(collection).to receive(:list).with(caller, filter, projection).and_return(list_result)
+        allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive_messages(get: response, post: response)
       end
 
       describe '#handle_request' do
