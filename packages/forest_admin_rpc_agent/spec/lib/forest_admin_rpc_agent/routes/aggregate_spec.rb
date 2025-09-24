@@ -9,7 +9,7 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
       let(:aggregation_params) do
-        { 'operation' => 'Sum', 'field' => 'amount', 'groups' => ['country'] }
+        { 'operation' => 'Sum', 'field' => 'amount', 'groups' => [{ field: 'country' }] }
       end
       let(:filter_params) { { 'field' => 'country', 'operator' => 'equal', 'value' => 'France' } }
       let(:params) do
@@ -21,31 +21,86 @@ module ForestAdminRpcAgent
           'limit' => 10
         }
       end
-
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
-      let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
-      let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
-      let(:aggregate_result) { [{ 'country' => 'France', 'total_amount' => 1000 }] }
+      let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
+      let(:aggregation) do
+        ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(
+          operation: aggregation_params['operation'],
+          field: aggregation_params['field'],
+          groups: aggregation_params['groups']
+        )
+      end
+      let(:aggregate_result) { [{ 'group' => { 'country' => 'France' }, 'value' => 1000 }] }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: aggregate_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
-        allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: {
+              column_type: 'Number',
+              filter_operators: %w[present greater_than],
+              is_primary_key: true,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            email: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            country: {
+              column_type: 'String',
+              filter_operators: %w[in present equal],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
 
-        allow(ForestAdminDatasourceToolkit::Components::Query::Aggregation).to receive(:new)
-          .with(
-            operation: aggregation_params['operation'],
-            field: aggregation_params['field'],
-            groups: aggregation_params['groups']
-          ).and_return(aggregation)
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ForestAdminDatasourceCustomizer::Decorators::LazyJoin::LazyJoinCollectionDecorator)
+          .to receive(:useless_join?)
+          .and_return(false)
+        # rubocop:enable RSpec/AnyInstance
 
-        allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory).to receive(:from_plain_object)
-          .with(filter_params)
+        allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory)
+          .to receive(:from_plain_object)
           .and_return(filter)
+        allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
 
-        allow(collection).to receive(:aggregate).with(caller, filter, aggregation,
-                                                      params['limit']).and_return(aggregate_result)
+        allow(ForestAdminDatasourceToolkit::Components::Query::Aggregation)
+          .to receive(:new)
+          .and_return(aggregation)
+
+        allow(Faraday).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive(:send).and_return(response)
       end
 
       describe '#handle_request' do

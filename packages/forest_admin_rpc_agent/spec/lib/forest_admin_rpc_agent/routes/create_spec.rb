@@ -9,6 +9,8 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
       let(:data) { { 'email' => 'test@example.com', 'name' => 'John Doe' } }
+      let(:create_result) { { 'id' => 1, 'email' => 'test@example.com', 'name' => 'John Doe' } }
+
       let(:params) do
         {
           'collection_name' => collection_name,
@@ -16,15 +18,69 @@ module ForestAdminRpcAgent
           'data' => data
         }
       end
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
-      let(:create_result) { { id: 1, email: 'test@example.com', name: 'John Doe' } }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: create_result) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: {
+              column_type: 'Number',
+              filter_operators: %w[present greater_than],
+              is_primary_key: true,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            email: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains equal],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            name: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains equal],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
+        # rubocop:disable RSpec/AnyInstance
+        allow_any_instance_of(ForestAdminDatasourceCustomizer::Decorators::Binary::BinaryCollectionDecorator)
+          .to receive(:convert_value).and_wrap_original do |m, to_backend, path, value|
+          m.call(to_backend, path.to_s, value)
+        end
+        # rubocop:enable RSpec/AnyInstance
+
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with(collection_name).and_return(collection)
-        allow(collection).to receive(:create).with(caller, data).and_return(create_result)
+        allow(Faraday).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive(:send).and_return(response)
       end
 
       describe '#handle_request' do

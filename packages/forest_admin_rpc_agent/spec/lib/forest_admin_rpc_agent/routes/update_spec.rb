@@ -31,8 +31,7 @@ module ForestAdminRpcAgent
           fields: {
             id: {
               column_type: 'Number',
-              filter_operators: %w[in present greater_than not_in less_than not_equal equal
-                                   missing blank],
+              filter_operators: %w[present greater_than],
               is_primary_key: true,
               is_read_only: false,
               is_sortable: true,
@@ -43,9 +42,7 @@ module ForestAdminRpcAgent
             },
             email: {
               column_type: 'String',
-              filter_operators: %w[in present i_contains contains ends_with greater_than not_in
-                                   i_ends_with i_starts_with less_than not_contains starts_with
-                                   not_equal equal i_like missing like blank],
+              filter_operators: %w[in present i_contains contains],
               is_primary_key: false,
               is_read_only: false,
               is_sortable: true,
@@ -68,14 +65,10 @@ module ForestAdminRpcAgent
         ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
         ForestAdminRpcAgent::Agent.instance.build
 
-        collection = @datasource.get_collection(collection_name)
-
         allow(ForestAdminDatasourceToolkit::Components::Caller).to receive(:new).and_return(caller)
         allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory)
           .to receive(:from_plain_object)
           .and_return(filter)
-
-        allow(collection).to receive(:update).and_return(update_result)
 
         allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
         allow(faraday_connection).to receive_messages(get: response, post: response)

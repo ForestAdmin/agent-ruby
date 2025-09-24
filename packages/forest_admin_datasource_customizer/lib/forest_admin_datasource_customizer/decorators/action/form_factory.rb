@@ -11,7 +11,7 @@ module ForestAdminDatasourceCustomizer
               elsif field[:type] == 'Layout'
                 build_layout_element(field)
               else
-                DynamicField.new(**field)
+                DynamicField.new(**field.transform_keys(&:to_sym))
               end
             when FormLayoutElement::RowElement
               field.fields = build_elements(field.fields)

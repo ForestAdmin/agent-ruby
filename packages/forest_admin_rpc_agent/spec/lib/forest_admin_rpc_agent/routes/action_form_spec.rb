@@ -10,14 +10,12 @@ module ForestAdminRpcAgent
       include_context 'with caller'
       subject(:route) { described_class.new }
 
-      let(:datasource) { instance_double(ForestAdminDatasourceRpc::Datasource) }
-      let(:collection) { instance_double(ForestAdminDatasourceRpc::Collection) }
-      let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }
+      let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
       let(:metas) { { 'meta_field' => 'value' } }
-
+      let(:collection_name) { 'orders' }
       let(:params) do
         {
-          'collection_name' => 'users',
+          'collection_name' => collection_name,
           'caller' => caller.to_h,
           'filter' => {},
           'metas' => metas,
@@ -63,17 +61,60 @@ module ForestAdminRpcAgent
           )
         ]
       end
-      let(:expected_response) { form_response.to_json }
+      let(:expected_response) { form_response.map(&:as_json).to_json }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: form_response.map(&:as_json)) }
+      let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:datasource).and_return(datasource)
-        allow(datasource).to receive(:get_collection).with('users').and_return(collection)
-        allow(FilterFactory).to receive(:from_plain_object).with({}).and_return(filter)
+        collection_schema = {
+          name: collection_name,
+          fields: {
+            id: {
+              column_type: 'Number',
+              filter_operators: %w[present greater_than],
+              is_primary_key: true,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            },
+            name: {
+              column_type: 'String',
+              filter_operators: %w[in present i_contains contains],
+              is_primary_key: false,
+              is_read_only: false,
+              is_sortable: true,
+              default_value: nil,
+              enum_values: [],
+              validations: [],
+              type: 'Column'
+            }
+          },
+          countable: true,
+          searchable: true,
+          charts: [],
+          segments: [],
+          actions: {}
+        }
+        @datasource = ForestAdminDatasourceRpc::Datasource.new(
+          {},
+          { collections: [collection_schema], charts: [], rpc_relations: [] }
+        )
+        ForestAdminRpcAgent::Agent.instance.add_datasource(@datasource)
+        ForestAdminRpcAgent::Agent.instance.build
 
-        allow(collection).to receive(:get_form).with(instance_of(ForestAdminDatasourceToolkit::Components::Caller),
-                                                     'some_action', { 'field' => 'value' }, filter, metas)
-                                               .and_return(form_response)
+        allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory)
+          .to receive(:from_plain_object)
+          .and_return(filter)
         allow(form_response).to receive(:to_json).and_return(expected_response)
+
+        collection = @datasource.get_collection(collection_name)
+        allow(collection).to receive(:get_form).and_return(form_response)
+
+        allow(Faraday).to receive(:new).and_return(faraday_connection)
+        allow(faraday_connection).to receive(:send).and_return(response)
       end
 
       describe '#handle_request' do
@@ -96,6 +137,7 @@ module ForestAdminRpcAgent
 
       # rubocop:disable Style/OpenStructUse
       # rubocop:disable RSpec/VerifiedDoubles
+      # rubocop:disable RSpec/MultipleMemoizedHelpers
       describe '#encode_file_element' do
         context 'when element is of type "File"' do
           let(:file_element) { OpenStruct.new(type: 'File', value: double('File')) }
@@ -128,6 +170,7 @@ module ForestAdminRpcAgent
       end
       # rubocop:enable Style/OpenStructUse
       # rubocop:enable RSpec/VerifiedDoubles
+      # rubocop:enable RSpec/MultipleMemoizedHelpers
     end
   end
 end
