@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.1...v1.0.2) (2025-09-29)
+
+
+### Bug Fixes
+
+* **rpc_agent:** include config directory in gem package ([#128](https://github.com/ForestAdmin/agent-ruby/issues/128)) ([297ea95](https://github.com/ForestAdmin/agent-ruby/commit/297ea957f3bc8e3a25a3327cd2ea3c682e35082a))
+
 ## [1.0.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0...v1.0.1) (2025-09-23)
 
 # 1.0.0 (2025-09-22)
