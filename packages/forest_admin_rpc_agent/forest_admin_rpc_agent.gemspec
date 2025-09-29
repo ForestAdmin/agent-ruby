@@ -20,7 +20,7 @@ admin work on any Ruby application."
   spec.metadata["changelog_uri"] = "https://github.com/ForestAdmin/agent-ruby/blob/main/CHANGELOG.md"
   spec.metadata["rubygems_mfa_required"] = "false"
   spec.files = Dir[
-    "lib/**/*.rb",
+    "{config,lib}/**/*",
     "bin/*",
     "*.gemspec",
     "README.md",
