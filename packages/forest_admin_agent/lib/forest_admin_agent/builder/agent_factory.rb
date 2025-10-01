@@ -1,12 +1,13 @@
 require 'dry-container'
 require 'filecache'
+require 'json'
 
 module ForestAdminAgent
   module Builder
     class AgentFactory
       include Singleton
+      include ForestAdminAgent::Utils::Schema
 
-      TTL_CONFIG = 3600
       TTL_SCHEMA = 7200
 
       attr_reader :customizer, :container, :has_env_secret
@@ -62,16 +63,50 @@ module ForestAdminAgent
       def send_schema(force: false)
         return unless @has_env_secret
 
-        schema = ForestAdminAgent::Utils::Schema::SchemaEmitter.get_serialized_schema(@container.resolve(:datasource))
-        schema_is_know = @container.key?(:schema_file_hash) &&
-                         @container.resolve(:schema_file_hash).get('value') == schema[:meta][:schemaFileHash]
+        schema_path = Facades::Container.cache(:schema_path)
 
-        if !schema_is_know || force
+        if Facades::Container.cache(:is_production)
+          unless schema_path && File.exist?(schema_path)
+            raise ForestException, "Can't load #{schema_path}. Providing a schema is mandatory in production."
+          end
+
+          schema = JSON.parse(File.read(schema_path), symbolize_names: true)
+        else
+          generated = SchemaEmitter.generate(@container.resolve(:datasource))
+          meta = SchemaEmitter.meta
+
+          schema = {
+            meta: meta,
+            collections: generated
+          }
+
+          File.write(schema_path, JSON.pretty_generate(schema))
+        end
+
+        if (append_schema_path = Facades::Container.cache(:append_schema_path))
+          begin
+            append_schema_file = JSON.parse(File.read(append_schema_path), symbolize_names: true)
+            schema[:collections] = schema[:collections] + append_schema_file[:collections]
+          rescue StandardError => e
+            raise "Can't load additional schema #{append_schema_path}: #{e.message}"
+          end
+        end
+
+        post_schema(schema, force)
+      end
+
+      private
+
+      def post_schema(schema, force)
+        api_map = SchemaEmitter.serialize(schema)
+        should_send = do_server_want_schema(api_map[:meta][:schemaFileHash])
+
+        if should_send || force
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-          client.post('/forest/apimaps', schema.to_json)
+          client.post('/forest/apimaps', api_map.to_json)
           schema_file_hash_cache = FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA)
           schema_file_hash_cache.get_or_set 'value' do
-            schema[:meta][:schemaFileHash]
+            api_map[:meta][:schemaFileHash]
           end
           @container.register(:schema_file_hash, schema_file_hash_cache)
           ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
@@ -81,7 +116,19 @@ module ForestAdminAgent
         end
       end
 
-      private
+      def do_server_want_schema(hash)
+        client = ForestAdminAgent::Http::ForestAdminApiRequester.new
+
+        begin
+          response = client.post('/forest/apimaps/hashcheck', { schemaFileHash: hash }.to_json)
+          body = JSON.parse(response.body)
+          body['sendSchema']
+        rescue JSON::ParserError
+          raise ForestException, "Invalid JSON response from ForestAdmin server #{response.body}"
+        rescue Faraday::Error => e
+          client.handle_response_error(e)
+        end
+      end
 
       def build_container
         @container = Dry::Container.new
