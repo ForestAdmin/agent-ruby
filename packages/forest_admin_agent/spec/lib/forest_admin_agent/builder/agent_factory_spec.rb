@@ -88,27 +88,11 @@ module ForestAdminAgent
         describe 'send_schema' do
           it 'do nothing if env_secret is nil' do
             described_class.instance.instance_variable_set(:@has_env_secret, false)
-            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:serialize)
             described_class.instance.build
 
-            expect(ForestAdminAgent::Utils::Schema::SchemaEmitter).not_to have_received(:get_serialized_schema)
+            expect(ForestAdminAgent::Utils::Schema::SchemaEmitter).not_to have_received(:serialize)
           end
-
-          # it 'send schema when schema hash is different' do
-          #   allow(described_class.instance).to receive(:has_env_secret).and_return(false)
-          #   allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:get_serialized_schema)
-          #   allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
-          #     .and_return(
-          #       {
-          #         meta: {
-          #           schemaFileHash: ''
-          #         }
-          #       }
-          #     )
-          #
-          #   described_class.instance.build
-          #   expect(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:post)
-          # end
         end
       end
     end

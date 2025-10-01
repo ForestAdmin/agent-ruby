@@ -37,6 +37,17 @@ module ForestAdminAgent
 
           @datasource.add_collection(collection_book)
           @datasource.add_collection(collection_person)
+
+          @schema_path = Facades::Container.cache(:schema_path)
+          generated = described_class.generate(@datasource)
+          meta = described_class.meta
+
+          @schema = {
+            meta: meta,
+            collections: generated
+          }
+
+          File.write(@schema_path, JSON.pretty_generate(@schema))
         end
 
         context 'when env is not production' do
@@ -50,83 +61,57 @@ module ForestAdminAgent
             end
           end
 
-          it 'generate serialized schema' do
-            schema = described_class.get_serialized_schema(@datasource)
+          it 'serialize schema' do
+            schema_serialized = described_class.serialize(@schema)
 
-            expect(schema).to include(:data, :included, :meta)
-            expect(schema[:data][0].keys).to eq(%i[id type attributes relationships])
-            expect(schema[:data][0][:attributes].keys).to eq(
+            expect(schema_serialized).to include(:data, :included, :meta)
+            expect(schema_serialized[:data][0].keys).to eq(%i[id type attributes relationships])
+            expect(schema_serialized[:data][0][:attributes].keys).to eq(
               %i[fields icon integration isReadOnly isSearchable isVirtual name onlyForRelationships paginationType]
             )
-            expect(schema[:data][0][:relationships].keys).to eq(%i[actions segments])
-            expect(schema[:data][0][:relationships][:actions].keys).to eq(%i[data])
-            expect(schema[:data][0][:relationships][:segments].keys).to eq(%i[data])
-          end
-
-          it 'generate the schema json' do
-            schema_path = Facades::Container.cache(:schema_path)
-            FileUtils.rm_f schema_path
-            described_class.get_serialized_schema(@datasource)
-
-            expect(File.exist?(schema_path)).to be true
+            expect(schema_serialized[:data][0][:relationships].keys).to eq(%i[actions segments])
+            expect(schema_serialized[:data][0][:relationships][:actions].keys).to eq(%i[data])
+            expect(schema_serialized[:data][0][:relationships][:segments].keys).to eq(%i[data])
           end
         end
 
-        context 'when env is production' do
-          before do
-            cache = ForestAdminAgent::Builder::AgentFactory.instance.container.resolve(:cache)
-            config = cache.get('config')
-            cache.clear
-            config[:is_production] = true
-            cache.get_or_set 'config' do
-              config
-            end
+        describe 'serialize' do
+          it 'adds schemaFileHash to meta' do
+            expected_hash = Digest::SHA1.hexdigest(@schema[:collections].to_json)
+            serialized = described_class.serialize(@schema)
+
+            expect(serialized[:meta][:schemaFileHash]).to eq(expected_hash)
+          end
+        end
+
+        describe 'meta' do
+          it 'returns correct liana info and ruby engine version' do
+            meta = described_class.meta
+
+            expect(meta[:liana]).to eq('agent-ruby')
+            expect(meta[:liana_version]).to eq(described_class::LIANA_VERSION)
+            expect(meta[:stack][:engine]).to eq('ruby')
+            expect(meta[:stack][:engine_version]).to eq(RUBY_VERSION)
+          end
+        end
+
+        describe 'generate' do
+          it 'returns collections sorted by name' do
+            ds = Datasource.new
+            col_b = Collection.new(ds, 'B')
+            col_a = Collection.new(ds, 'A')
+            ds.add_collection(col_b)
+            ds.add_collection(col_a)
+
+            generated = described_class.generate(ds)
+
+            expect(generated.map { |c| c[:name] }).to eq(%w[A B])
           end
 
-          it 'generate empty serialized schema when json does not exist' do
-            schema_path = Facades::Container.cache(:schema_path)
-            FileUtils.rm_f schema_path
-            schema = described_class.get_serialized_schema(@datasource)
-
-            expect(schema).to eq(
-              {
-                data: [],
-                included: [],
-                meta: {
-                  liana: described_class::LIANA_NAME,
-                  liana_version: described_class::LIANA_VERSION,
-                  stack: {
-                    engine: 'ruby',
-                    engine_version: RUBY_VERSION
-                  },
-                  schemaFileHash: Digest::SHA1.hexdigest('')
-                }
-              }
-            )
-          end
-
-          it 'generate serialized schema with the existing json' do
-            schema_path = Facades::Container.cache(:schema_path)
-            FileUtils.rm_f schema_path
-            json_schema = {
-              meta: {
-                liana: 'agent-ruby',
-                liana_version: 'beta',
-                stack: { engine: 'ruby', engine_version: '3.2.0' },
-                schemaFileHash: 'c3af464045ea4b3a2ddefd986a19b746680e1177'
-              },
-              collections: []
-            }
-            File.write(schema_path, JSON.pretty_generate(json_schema))
-            schema = described_class.get_serialized_schema(@datasource)
-
-            expect(schema).to eq(
-              {
-                data: [],
-                included: [],
-                meta: json_schema[:meta]
-              }
-            )
+          it 'returns an empty array when datasource has no collections' do
+            ds = Datasource.new
+            generated = described_class.generate(ds)
+            expect(generated).to eq([])
           end
         end
       end
