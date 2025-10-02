@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.1.0...v1.2.0) (2025-10-02)
+
+
+### Features
+
+* **rpc-install:** improve rpc agent customization file ([#132](https://github.com/ForestAdmin/agent-ruby/issues/132)) ([ed2999a](https://github.com/ForestAdmin/agent-ruby/commit/ed2999a197f7a1d0d503b7521b0a6706ee56ef32))
+
 # [1.1.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.2...v1.1.0) (2025-10-02)
 
 
