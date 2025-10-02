@@ -1,6 +1,6 @@
 {
   "name": "agent-ruby",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "The official agent Ruby for Forest.",
   "private": false,
   "repository": {

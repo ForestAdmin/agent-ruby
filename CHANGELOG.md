@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.2...v1.1.0) (2025-10-02)
+
+
+### Features
+
+* **active-record:** support timestamptz column type ([#130](https://github.com/ForestAdmin/agent-ruby/issues/130)) ([1c2e308](https://github.com/ForestAdmin/agent-ruby/commit/1c2e3080a248a06b1e228dacb5d6f18e8f222054))
+
 ## [1.0.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.1...v1.0.2) (2025-09-29)
 
 
