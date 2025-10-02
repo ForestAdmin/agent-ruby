@@ -7,6 +7,7 @@ module ForestAdminAgent
     class AgentFactory
       include Singleton
       include ForestAdminAgent::Utils::Schema
+      include ForestAdminDatasourceToolkit::Exceptions
 
       TTL_SCHEMA = 7200
 

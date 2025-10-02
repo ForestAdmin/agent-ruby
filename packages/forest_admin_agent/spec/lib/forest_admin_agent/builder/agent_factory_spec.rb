@@ -93,6 +93,128 @@ module ForestAdminAgent
 
             expect(ForestAdminAgent::Utils::Schema::SchemaEmitter).not_to have_received(:serialize)
           end
+
+          it 'raises error in production if schema file does not exist' do
+            instance = described_class.instance
+            instance.instance_variable_set(:@has_env_secret, true)
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
+            allow(File).to receive(:exist?).with('/path/to/schema.json').and_return(false)
+
+            expect { instance.send_schema }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+          end
+
+          it 'loads schema from file in production mode' do
+            instance = described_class.instance
+            instance.instance_variable_set(:@has_env_secret, true)
+            schema_content = { meta: {}, collections: [] }.to_json
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
+            allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
+            allow(File).to receive(:exist?).with('/path/to/schema.json').and_return(true)
+            allow(File).to receive(:read).with('/path/to/schema.json').and_return(schema_content)
+            allow(instance).to receive(:post_schema)
+
+            instance.send_schema
+
+            expect(instance).to have_received(:post_schema)
+          end
+
+          it 'generates and writes schema in non-production mode' do
+            instance = described_class.instance
+            instance.instance_variable_set(:@has_env_secret, true)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+            allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+            allow(File).to receive(:write)
+            allow(instance).to receive(:post_schema)
+
+            instance.send_schema
+
+            expect(File).to have_received(:write).with('/path/to/schema.json', anything)
+            expect(instance).to have_received(:post_schema)
+          end
+
+          it 'merges append_schema when provided' do
+            instance = described_class.instance
+            instance.instance_variable_set(:@has_env_secret, true)
+            append_schema = { collections: [{ name: 'Extra' }] }.to_json
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+            allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return('/path/to/append.json')
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [{ name: 'Main' }], meta: {})
+            allow(File).to receive(:write)
+            allow(File).to receive(:read).with('/path/to/append.json').and_return(append_schema)
+            allow(instance).to receive(:post_schema)
+
+            instance.send_schema
+
+            expect(instance).to have_received(:post_schema).with(hash_including(collections: [{ name: 'Main' }, { name: 'Extra' }]), anything)
+          end
+
+          it 'raises error if append_schema file cannot be loaded' do
+            instance = described_class.instance
+            instance.instance_variable_set(:@has_env_secret, true)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+            allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return('/path/to/append.json')
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+            allow(File).to receive(:write)
+            allow(File).to receive(:read).with('/path/to/append.json').and_raise(Errno::ENOENT)
+
+            expect { instance.send_schema }.to raise_error(/Can't load additional schema/)
+          end
+        end
+
+        describe 'remove_collection' do
+          it 'removes collections from customizer' do
+            instance = described_class.instance
+            allow(instance.customizer).to receive(:remove_collection)
+
+            instance.remove_collection(['Book'])
+
+            expect(instance.customizer).to have_received(:remove_collection).with(['Book'])
+          end
+        end
+
+        describe 'add_chart' do
+          it 'adds chart to customizer and returns self' do
+            instance = described_class.instance
+            allow(instance.customizer).to receive(:add_chart)
+            block = proc {}
+
+            result = instance.add_chart('MyChart', &block)
+
+            expect(instance.customizer).to have_received(:add_chart).with('MyChart')
+            expect(result).to eq(instance)
+          end
+        end
+
+        describe 'customize_collection' do
+          it 'customizes collection and returns self' do
+            instance = described_class.instance
+            allow(instance.customizer).to receive(:customize_collection)
+            handler = proc {}
+
+            result = instance.customize_collection('Book', &handler)
+
+            expect(instance.customizer).to have_received(:customize_collection).with('Book', handler)
+            expect(result).to eq(instance)
+          end
         end
       end
     end
