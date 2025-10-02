@@ -89,7 +89,13 @@ module ForestAdminRpcAgent
           module ForestAdminRpcAgent
             class CreateRpcAgent
               def self.setup!
-                # Initialize your agent here
+                # Add your datasources
+
+                @agent = ForestAdminRpcAgent::Agent.instance
+
+                # @agent.add_datasource(datasource)
+
+                @agent.build
               end
             end
           end
