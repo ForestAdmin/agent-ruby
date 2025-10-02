@@ -72,6 +72,7 @@ group :test do
 end
 
 gem 'rdoc', '6.10.0'
+gem 'httparty'
 
 gem 'forest_admin_agent', path: '../../forest_admin_agent'
 gem 'forest_admin_datasource_active_record', path: '../../forest_admin_datasource_active_record'
