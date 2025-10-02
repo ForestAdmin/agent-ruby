@@ -6,7 +6,6 @@ require 'time'
 module ForestAdminDatasourceRpc
   module Utils
     class RpcClient
-      
       # RpcClient handles HTTP communication with the RPC Agent.
       #
       # Error Handling:
@@ -63,9 +62,7 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_response(response)
-        unless response.success?
-          raise_appropriate_error(response)
-        end
+        raise_appropriate_error(response) unless response.success?
 
         response.body
       end
@@ -79,17 +76,7 @@ module ForestAdminDatasourceRpc
         exception_class = ERROR_STATUS_MAP[status]
 
         if exception_class
-          if exception_class.ancestors.include?(ForestAdminAgent::Http::Exceptions::HttpException)
-            # AuthenticationOpenIdClient takes (status, message, name)
-            # All other HttpException subclasses take (message, name) with hardcoded status
-            if exception_class == ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient
-              raise exception_class.new(status, message)
-            else
-              raise exception_class.new(message)
-            end
-          else
-            raise exception_class, message
-          end
+          raise exception_class, message
         elsif status >= 500
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                 "Server Error: #{message}"
