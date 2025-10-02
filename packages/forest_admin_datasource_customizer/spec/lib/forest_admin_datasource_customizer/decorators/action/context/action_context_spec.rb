@@ -143,7 +143,7 @@ module ForestAdminDatasourceCustomizer
               end
 
               it 'allows modifying filter with _filter=' do
-                new_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('id', Operators::EQUAL, 1))
+                new_filter = Filter.new
                 context._filter = new_filter
                 expect(context.filter).to eq(new_filter)
               end

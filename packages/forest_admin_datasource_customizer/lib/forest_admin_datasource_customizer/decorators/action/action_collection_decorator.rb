@@ -1,3 +1,5 @@
+require 'active_support/core_ext/object/deep_dup'
+
 module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
