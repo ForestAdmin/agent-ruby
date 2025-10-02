@@ -12,6 +12,7 @@ module ForestAdminDatasourceActiveRecord
         it { expect(dummy_class.get_column_type(User, columns['boolean_field'])).to eq 'Boolean' }
         it { expect(dummy_class.get_column_type(User, columns['date_field'])).to eq 'Dateonly' }
         it { expect(dummy_class.get_column_type(User, columns['datetime_field'])).to eq 'Date' }
+        it { expect(dummy_class.get_column_type(User, columns['timestamptz_field'])).to eq 'Date' }
         it { expect(dummy_class.get_column_type(User, columns['integer_field'])).to eq 'Number' }
         it { expect(dummy_class.get_column_type(User, columns['float_field'])).to eq 'Number' }
         it { expect(dummy_class.get_column_type(User, columns['decimal_field'])).to eq 'Number' }

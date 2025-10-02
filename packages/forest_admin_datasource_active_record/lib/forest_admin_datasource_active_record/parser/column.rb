@@ -6,6 +6,7 @@ module ForestAdminDatasourceActiveRecord
       TYPES = {
         boolean: 'Boolean',
         datetime: 'Date',
+        timestamptz: 'Date',
         date: 'Dateonly',
         integer: 'Number',
         float: 'Number',
