@@ -10,6 +10,14 @@ module ForestAdminDatasourceCustomizer
             @filter = filter
             @patch = patch
           end
+
+          def _filter=(value)
+            @filter = value
+          end
+
+          def _patch=(value)
+            @patch = value
+          end
         end
       end
     end

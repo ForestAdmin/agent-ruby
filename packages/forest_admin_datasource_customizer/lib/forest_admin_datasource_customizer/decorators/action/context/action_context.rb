@@ -15,6 +15,18 @@ module ForestAdminDatasourceCustomizer
             @change_field = change_field
           end
 
+          def _filter=(value)
+            @filter = value
+          end
+
+          def _used=(value)
+            @used = value
+          end
+
+          def _form_values=(value)
+            @form_values = value
+          end
+
           def field_changed?(field_name)
             @used << field_name
 

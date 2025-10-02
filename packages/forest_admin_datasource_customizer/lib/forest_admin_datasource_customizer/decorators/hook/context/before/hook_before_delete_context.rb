@@ -10,6 +10,10 @@ module ForestAdminDatasourceCustomizer
               super(collection, caller)
               @filter = filter
             end
+
+            def _filter=(value)
+              @filter = value
+            end
           end
         end
       end
