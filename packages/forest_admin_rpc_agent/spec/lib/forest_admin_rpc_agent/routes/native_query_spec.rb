@@ -4,6 +4,7 @@ require 'faraday'
 module ForestAdminRpcAgent
   module Routes
     include ForestAdminDatasourceRpc
+
     describe NativeQuery do
       let(:route) { described_class.new }
       let(:connection_name) { 'primary' }

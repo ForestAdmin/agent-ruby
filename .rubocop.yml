@@ -378,7 +378,7 @@ Layout/LineLength:
     - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/routes/sse.rb'
 
 RSpec/MultipleMemoizedHelpers:
-  Max: 10
+  Max: 15
 
 Security/Eval:
   Exclude:

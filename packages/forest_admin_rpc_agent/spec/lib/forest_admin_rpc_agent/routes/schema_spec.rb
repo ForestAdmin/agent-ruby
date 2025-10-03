@@ -34,7 +34,11 @@ module ForestAdminRpcAgent
         allow(ForestAdminRpcAgent::Agent).to receive(:instance).and_return(agent)
         allow(agent).to receive(:customizer).and_return(customizer)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
-        allow(customizer).to receive_messages(schema: schema, datasource: datasource, datasources: [datasource_with_connections])
+        allow(customizer).to receive_messages(
+          schema: schema,
+          datasource: datasource,
+          datasources: [datasource_with_connections]
+        )
         allow(datasource).to receive(:collections).and_return(collections)
       end
 
