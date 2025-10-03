@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.3.0...v1.4.0) (2025-10-03)
+
+
+### Features
+
+* **rpc:** support native query connections ([#134](https://github.com/ForestAdmin/agent-ruby/issues/134)) ([8012557](https://github.com/ForestAdmin/agent-ruby/commit/801255715c56e0f7532dde824c88ff4032c39adb))
+
 # [1.3.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.2...v1.3.0) (2025-10-03)
 
 
