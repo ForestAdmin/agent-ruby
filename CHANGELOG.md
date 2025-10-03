@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.1...v1.2.2) (2025-10-03)
+
+
+### Bug Fixes
+
+* **rpc:** forward business errors properly from rpc agent ([#133](https://github.com/ForestAdmin/agent-ruby/issues/133)) ([1b87de6](https://github.com/ForestAdmin/agent-ruby/commit/1b87de660b0825f5abfc5d0ace18c3cdeca4b399))
+
 ## [1.2.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.0...v1.2.1) (2025-10-03)
 
 
