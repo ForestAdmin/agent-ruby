@@ -4,6 +4,7 @@ module ForestAdminRpcAgent
       ALLOWED_TIME_DIFF = 300
       SIGNATURE_REUSE_WINDOW = 5
       @@used_signatures = {}
+      @@signatures_mutex = Mutex.new
 
       def initialize(app)
         @app = app
@@ -32,31 +33,43 @@ module ForestAdminRpcAgent
         return false unless Rack::Utils.secure_compare(signature, expected_signature)
 
         # check if this signature has already been used (replay attack)
-        if @@used_signatures.key?(signature)
-          last_used = @@used_signatures[signature]
-          return false if Time.now.utc.to_i - last_used > SIGNATURE_REUSE_WINDOW
-        end
-        @@used_signatures[signature] = Time.now.utc.to_i
+        # Reject if signature was used recently (within SIGNATURE_REUSE_WINDOW seconds)
+        # Use mutex to prevent race conditions in multi-threaded environments
+        now = current_time_in_seconds
 
-        cleanup_old_signatures
+        @@signatures_mutex.synchronize do
+          if @@used_signatures.key?(signature)
+            last_used = @@used_signatures[signature]
+            time_since_last_use = now - last_used
+            return false if time_since_last_use <= SIGNATURE_REUSE_WINDOW
+          end
+          @@used_signatures[signature] = now
+
+          cleanup_old_signatures
+        end
 
         true
       end
 
       def valid_timestamp?(timestamp)
         time = begin
-          Time.iso8601(timestamp)
-        rescue StandardError
+          Time.iso8601(timestamp).utc
+        rescue ArgumentError
           nil
         end
         return false if time.nil?
 
-        (Time.now.utc.to_i - time.to_i).abs <= ALLOWED_TIME_DIFF
+        (current_time_in_seconds - time.to_i).abs <= ALLOWED_TIME_DIFF
       end
 
       def cleanup_old_signatures
-        now = Time.now.utc.to_i
+        # Should be called within mutex synchronize block
+        now = current_time_in_seconds
         @@used_signatures.delete_if { |_signature, last_used| now - last_used > ALLOWED_TIME_DIFF }
+      end
+
+      def current_time_in_seconds
+        defined?(Time.current) ? Time.current.to_i : Time.now.utc.to_i
       end
 
       def auth_secret
