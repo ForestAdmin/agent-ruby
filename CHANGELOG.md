@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.2...v1.3.0) (2025-10-03)
+
+
+### Features
+
+* **apimap:** allow to merge another forestadmin schema to current ([#129](https://github.com/ForestAdmin/agent-ruby/issues/129)) ([6a01e83](https://github.com/ForestAdmin/agent-ruby/commit/6a01e83f88abafb580de9a5e8e4b8f892e6dacab))
+
 ## [1.2.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.1...v1.2.2) (2025-10-03)
 
 
