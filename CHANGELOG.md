@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.2.0...v1.2.1) (2025-10-03)
+
+
+### Bug Fixes
+
+* **context:** define setters to update context properties ([#131](https://github.com/ForestAdmin/agent-ruby/issues/131)) ([96053a3](https://github.com/ForestAdmin/agent-ruby/commit/96053a366bf158b000a971c5c284fd000c7a15e7))
+
 # [1.2.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.1.0...v1.2.0) (2025-10-02)
 
 
