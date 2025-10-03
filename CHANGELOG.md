@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.4.0...v1.4.1) (2025-10-03)
+
+
+### Bug Fixes
+
+* **rpc:** replay attack protection and add thread-safe authentication ([#136](https://github.com/ForestAdmin/agent-ruby/issues/136)) ([4d81c55](https://github.com/ForestAdmin/agent-ruby/commit/4d81c55b420b509416c52e87b7a1ffed32a56dce))
+
 # [1.4.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.3.0...v1.4.0) (2025-10-03)
 
 
