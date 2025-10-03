@@ -12,10 +12,19 @@ module ForestAdminRpcAgent
       def handle_request(_params)
         agent = ForestAdminRpcAgent::Agent.instance
         schema = agent.customizer.schema
-        schema[:collections] = agent.customizer.datasource(ForestAdminRpcAgent::Facades::Container.logger)
-                                    .collections
-                                    .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
-                                    .sort_by { |collection| collection[:name] }
+        datasource = agent.customizer.datasource(ForestAdminRpcAgent::Facades::Container.logger)
+
+        schema[:collections] = datasource.collections
+                                         .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
+                                         .sort_by { |collection| collection[:name] }
+
+        connections = []
+        agent.customizer.datasources.each do |root_datasource|
+          connections = connections.union(
+            root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
+          )
+        end
+        schema[:nativeQueryConnections] = connections
 
         schema.to_json
       end
