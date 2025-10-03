@@ -137,7 +137,6 @@ module ForestAdminRpcAgent
 
       # rubocop:disable Style/OpenStructUse
       # rubocop:disable RSpec/VerifiedDoubles
-      # rubocop:disable RSpec/MultipleMemoizedHelpers
       describe '#encode_file_element' do
         context 'when element is of type "File"' do
           let(:file_element) { OpenStruct.new(type: 'File', value: double('File')) }
@@ -165,7 +164,6 @@ module ForestAdminRpcAgent
       end
       # rubocop:enable Style/OpenStructUse
       # rubocop:enable RSpec/VerifiedDoubles
-      # rubocop:enable RSpec/MultipleMemoizedHelpers
     end
   end
 end
