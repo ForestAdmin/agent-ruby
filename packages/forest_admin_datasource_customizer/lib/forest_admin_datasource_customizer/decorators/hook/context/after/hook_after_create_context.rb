@@ -10,6 +10,10 @@ module ForestAdminDatasourceCustomizer
               super(collection, caller, data)
               @record = record
             end
+
+            def _record=(value)
+              @record = value
+            end
           end
         end
       end

@@ -11,6 +11,14 @@ module ForestAdminDatasourceCustomizer
               @filter = filter
               @projection = projection
             end
+
+            def _filter=(value)
+              @filter = value
+            end
+
+            def _projection=(value)
+              @projection = value
+            end
           end
         end
       end

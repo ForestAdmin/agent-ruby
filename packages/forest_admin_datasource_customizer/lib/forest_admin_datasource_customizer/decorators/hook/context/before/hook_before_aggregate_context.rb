@@ -12,6 +12,18 @@ module ForestAdminDatasourceCustomizer
               @aggregation = aggregation
               @limit = limit
             end
+
+            def _filter=(value)
+              @filter = value
+            end
+
+            def _aggregation=(value)
+              @aggregation = value
+            end
+
+            def _limit=(value)
+              @limit = value
+            end
           end
         end
       end

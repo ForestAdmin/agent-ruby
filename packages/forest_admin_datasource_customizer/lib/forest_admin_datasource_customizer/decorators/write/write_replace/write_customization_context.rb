@@ -11,6 +11,18 @@ module ForestAdminDatasourceCustomizer
             @record = record
             @filter = filter
           end
+
+          def _action=(value)
+            @action = value
+          end
+
+          def _record=(value)
+            @record = value
+          end
+
+          def _filter=(value)
+            @filter = value
+          end
         end
       end
     end

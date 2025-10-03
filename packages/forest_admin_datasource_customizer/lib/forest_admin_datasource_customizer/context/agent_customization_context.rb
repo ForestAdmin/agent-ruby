@@ -10,6 +10,10 @@ module ForestAdminDatasourceCustomizer
         @caller = caller
       end
 
+      def _caller=(value)
+        @caller = value
+      end
+
       def datasource
         RelaxedDataSource.new(@real_datasource, @caller)
       end

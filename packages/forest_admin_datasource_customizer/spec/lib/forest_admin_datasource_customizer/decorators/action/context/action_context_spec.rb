@@ -89,6 +89,97 @@ module ForestAdminDatasourceCustomizer
               expect(fields[1].watch_changes?).to be(false)
             end
           end
+
+          describe 'attribute access pattern' do
+            let(:form_values) { { 'title' => 'Foundation', 'year' => 1951 } }
+            let(:filter) { Filter.new }
+            let(:context) { described_class.new(@collection, caller, form_values, filter) }
+
+            describe 'getter methods' do
+              it 'provides read access to filter' do
+                expect(context.filter).to eq(filter)
+              end
+
+              it 'provides read access to form_values' do
+                expect(context.form_values).to eq(form_values)
+              end
+
+              it 'provides read access to used' do
+                expect(context.used).to eq([])
+              end
+            end
+
+            describe 'standard setter methods (without underscore)' do
+              it 'does not expose filter= setter' do
+                expect(context).not_to respond_to(:filter=)
+              end
+
+              it 'does not expose form_values= setter' do
+                expect(context).not_to respond_to(:form_values=)
+              end
+
+              it 'does not expose used= setter' do
+                expect(context).not_to respond_to(:used=)
+              end
+
+              it 'raises NoMethodError when attempting standard setters' do
+                expect { context.filter = Filter.new }.to raise_error(NoMethodError, /filter=/)
+                expect { context.form_values = {} }.to raise_error(NoMethodError, /form_values=/)
+                expect { context.used = [] }.to raise_error(NoMethodError, /used=/)
+              end
+            end
+
+            describe 'underscore-prefixed setter methods (advanced use)' do
+              it 'exposes _filter= for cautious modification' do
+                expect(context).to respond_to(:_filter=)
+              end
+
+              it 'exposes _form_values= for cautious modification' do
+                expect(context).to respond_to(:_form_values=)
+              end
+
+              it 'exposes _used= for cautious modification' do
+                expect(context).to respond_to(:_used=)
+              end
+
+              it 'allows modifying filter with _filter=' do
+                new_filter = Filter.new
+                context._filter = new_filter
+                expect(context.filter).to eq(new_filter)
+              end
+
+              it 'allows modifying form_values with _form_values=' do
+                new_values = { 'title' => 'Modified' }
+                context._form_values = new_values
+                expect(context.form_values).to eq(new_values)
+              end
+
+              it 'allows modifying used array with _used=' do
+                new_used = %w[field1 field2]
+                context._used = new_used
+                expect(context.used).to eq(new_used)
+              end
+            end
+
+            describe 'design pattern validation' do
+              it 'enforces read-by-default, write-with-caution pattern' do
+                # Getters are always available (safe)
+                expect(context).to respond_to(:filter)
+                expect(context).to respond_to(:form_values)
+                expect(context).to respond_to(:used)
+
+                # Standard setters don't exist (prevents accidental mutation)
+                expect(context).not_to respond_to(:filter=)
+                expect(context).not_to respond_to(:form_values=)
+                expect(context).not_to respond_to(:used=)
+
+                # Underscore setters exist (signals advanced/cautious use)
+                expect(context).to respond_to(:_filter=)
+                expect(context).to respond_to(:_form_values=)
+                expect(context).to respond_to(:_used=)
+              end
+            end
+          end
         end
       end
     end

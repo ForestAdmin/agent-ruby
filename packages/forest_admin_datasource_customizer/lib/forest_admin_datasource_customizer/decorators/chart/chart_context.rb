@@ -13,6 +13,10 @@ module ForestAdminDatasourceCustomizer
           @composite_record_id = record_id
         end
 
+        def _composite_record_id=(value)
+          @composite_record_id = value
+        end
+
         def record_id
           if @composite_record_id.size > 1
             raise Exceptions::ForestException,

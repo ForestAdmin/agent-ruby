@@ -10,6 +10,10 @@ module ForestAdminDatasourceCustomizer
               super(collection, caller, filter, aggregation, limit)
               @aggregate_result = aggregate_result
             end
+
+            def _aggregate_result=(value)
+              @aggregate_result = value
+            end
           end
         end
       end
