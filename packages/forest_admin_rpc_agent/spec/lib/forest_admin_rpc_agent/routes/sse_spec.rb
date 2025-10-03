@@ -11,7 +11,7 @@ module ForestAdminRpcAgent
       let(:timestamp) { Time.now.utc.iso8601 }
       let(:auth_secret) { 'test-secret' }
       let(:signature) { OpenSSL::HMAC.hexdigest('SHA256', auth_secret, timestamp) }
-      let(:logger) { instance_spy('Logger') }
+      let(:logger) { instance_double(Logger, log: nil) }
       let(:env) do
         {
           'REQUEST_METHOD' => 'GET',
@@ -124,7 +124,7 @@ module ForestAdminRpcAgent
 
         it 'uses custom heartbeat interval' do
           custom_route = described_class.new('rpc/sse', 'get', 'rpc_sse', heartbeat_interval: 3)
-          allow_any_instance_of(described_class).to receive(:sleep) do |instance, interval|
+          allow(custom_route).to receive(:sleep) do |interval|
             expect(interval).to eq(3)
             throw :stop
           end
@@ -144,7 +144,7 @@ module ForestAdminRpcAgent
           _status, _headers, body = handler.call(env)
 
           # Consume at least one chunk to trigger start logging
-          body.each { |_chunk| break }
+          body.first
 
           expect(logger).to have_received(:log).with('Debug', '[SSE] Starting stream')
         end
@@ -169,12 +169,14 @@ module ForestAdminRpcAgent
           route.register_rails(rails_router)
           handler = captured_handler.first
 
-          allow_any_instance_of(SseStreamer).to receive(:write).and_raise(IOError, 'Connection broken')
+          streamer_instance = instance_double(SseStreamer)
+          allow(SseStreamer).to receive(:new).and_return(streamer_instance)
+          allow(streamer_instance).to receive(:write).and_raise(IOError, 'Connection broken')
 
           _status, _headers, body = handler.call(env)
 
           # The error should be caught and logged
-          body.each { |_chunk| break }
+          body.first
 
           expect(logger).to have_received(:log).with('Debug', /Client disconnected/)
         end
@@ -183,7 +185,9 @@ module ForestAdminRpcAgent
           route.register_rails(rails_router)
           handler = captured_handler.first
 
-          allow_any_instance_of(SseStreamer).to receive(:write) do |_instance, data, event:|
+          streamer_instance = instance_double(SseStreamer)
+          allow(SseStreamer).to receive(:new).and_return(streamer_instance)
+          allow(streamer_instance).to receive(:write) do |_payload, event:|
             raise StandardError, 'Stop failed' if event == 'RpcServerStop'
 
             throw :stop if event == 'heartbeat'
@@ -191,7 +195,7 @@ module ForestAdminRpcAgent
 
           _status, _headers, body = handler.call(env)
 
-          body.each { |_chunk| break }
+          body.first
 
           expect(logger).to have_received(:log).with('Debug', /Error sending stop event/)
         end
