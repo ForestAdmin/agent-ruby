@@ -192,6 +192,45 @@ module ForestAdminRpcAgent
         end
       end
 
+      context 'when multiple requests with millisecond timestamps (rapid fire)' do
+        it 'allows multiple requests in the same second with different milliseconds' do
+          # Simulate 3 rapid requests within the same second but with different milliseconds
+          3.times do |i|
+            timestamp_ms = Time.now.utc.iso8601(3)
+            signature_ms = OpenSSL::HMAC.hexdigest('SHA256', secret, timestamp_ms)
+
+            test_env = {
+              'HTTP_X_SIGNATURE' => signature_ms,
+              'HTTP_X_TIMESTAMP' => timestamp_ms
+            }
+
+            status, = middleware.call(test_env)
+            expect(status).to eq(200), "Request #{i + 1} should succeed with millisecond timestamp"
+
+            # Simulate a tiny delay to ensure different milliseconds
+            sleep(0.002)
+          end
+        end
+
+        it 'blocks replay with same millisecond timestamp' do
+          # First request with millisecond precision
+          timestamp_ms = Time.now.utc.iso8601(3)
+          signature_ms = OpenSSL::HMAC.hexdigest('SHA256', secret, timestamp_ms)
+
+          env['HTTP_X_SIGNATURE'] = signature_ms
+          env['HTTP_X_TIMESTAMP'] = timestamp_ms
+
+          # First request - should pass
+          status, = middleware.call(env)
+          expect(status).to eq(200)
+
+          # Second request with exact same timestamp and signature - should be blocked
+          status, _headers, body = middleware.call(env)
+          expect(status).to eq(401)
+          expect(JSON.parse(body.first)).to eq({ 'error' => 'Unauthorized' })
+        end
+      end
+
       context 'with edge cases' do
         it 'handles malformed ISO8601 timestamp' do
           env['HTTP_X_SIGNATURE'] = signature

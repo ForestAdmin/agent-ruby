@@ -19,7 +19,7 @@ module ForestAdminDatasourceRpc
           allow(fake_client).to receive(:on_event)
           allow(fake_client).to receive(:on_error)
 
-          timestamp = '2025-01-01T12:00:00Z'
+          timestamp = '2025-01-01T12:00:00.000Z'
           signature = OpenSSL::HMAC.hexdigest('SHA256', secret, timestamp)
           # fix the timestamp to a specific value
           allow(Time).to receive(:now).and_return(Time.parse(timestamp))
