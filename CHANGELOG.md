@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.4.1...v1.5.0) (2025-10-06)
+
+
+### Features
+
+* **rpc_auth:** add millisecond precision to prevent false replay attack detection ([#138](https://github.com/ForestAdmin/agent-ruby/issues/138)) ([7de7c1b](https://github.com/ForestAdmin/agent-ruby/commit/7de7c1ba281f587b41d8d14d3e8dd38d525c2c76))
+
 ## [1.4.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.4.0...v1.4.1) (2025-10-03)
 
 
