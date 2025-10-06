@@ -17,7 +17,7 @@ module ForestAdminDatasourceRpc
       def start
         return if @closed
 
-        timestamp = Time.now.utc.iso8601
+        timestamp = Time.now.utc.iso8601(3)
         signature = generate_signature(timestamp)
 
         headers = {
