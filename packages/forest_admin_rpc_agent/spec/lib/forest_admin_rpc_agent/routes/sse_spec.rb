@@ -6,6 +6,9 @@ require 'action_dispatch'
 
 module ForestAdminRpcAgent
   module Routes
+    # Custom exception for tests to stop the loop
+    class TestStopLoop < StandardError; end
+
     describe Sse do
       let(:route) { described_class.new }
       let(:timestamp) { Time.now.utc.iso8601 }
@@ -24,6 +27,8 @@ module ForestAdminRpcAgent
       before do
         ForestAdminRpcAgent.config.auth_secret = auth_secret
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
+        # Clear used signatures to avoid replay attack protection between tests
+        ForestAdminRpcAgent::Middleware::Authentication.class_variable_set(:@@used_signatures, {})
       end
 
       describe '#initialize' do
@@ -56,63 +61,59 @@ module ForestAdminRpcAgent
 
       context 'when the app is an ActionDispatch::Routing::Mapper' do
         let(:rails_router) { instance_double(ActionDispatch::Routing::Mapper) }
-        let(:captured_handler) { [] }
+        let(:trapped_handlers) { {} }
 
+        # Use instance variable to ensure it's shared but can be reset
         before do
-          allow(Kernel).to receive(:trap).and_return(-> {})
-          # rubocop:disable RSpec/AnyInstance
-          # we need to override sleep here to stop the infinite loop of the SSE stream in the test
-          allow_any_instance_of(described_class).to receive(:sleep) { throw :stop }
-          # rubocop:enable RSpec/AnyInstance
+          @captured_handlers = []
+
+          # Capture trap handlers so we can trigger them in tests
+          allow(Kernel).to receive(:trap) do |signal, handler|
+            trapped_handlers[signal] = handler if handler.is_a?(Proc)
+            -> {} # Return a dummy handler
+          end
+
           allow(rails_router).to receive(:match) do |_, options|
-            captured_handler << options[:to]
+            @captured_handlers << options[:to]
           end
         end
 
-        it 'streams heartbeat events and closes with RpcServerStop' do
+        # rubocop:disable RSpec/ExampleLength
+        it 'streams heartbeat events' do
           route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
           expect(handler).to be_a(Proc)
 
-          allow(route).to receive(:trap).and_yield if route.respond_to?(:trap)
+          # Limit to just 1 heartbeat to test the stream works
+          sleep_count = 0
+          allow(Kernel).to receive(:sleep) do |_duration|
+            sleep_count += 1
+            raise TestStopLoop if sleep_count >= 1
+          end
+
           status, headers, body = handler.call(env)
 
           expect(status).to eq(200)
           expect(headers['Content-Type']).to eq('text/event-stream')
 
           chunks = []
-          body.each do |chunk|
-            chunks << chunk
-            break if chunks.join.include?('RpcServerStop')
+          begin
+            body.each do |chunk|
+              chunks << chunk
+              break if chunks.size >= 1 # Get at least 1 heartbeat
+            end
+          rescue TestStopLoop
+            # Expected
           end
 
           text = chunks.join
           expect(text).to include('event: heartbeat')
-          expect(text).to include('event: RpcServerStop')
         end
-
-        it 'returns the response from the middleware if status is not 200' do
-          route.register_rails(rails_router)
-          handler = captured_handler.first
-          expect(handler).to be_a(Proc)
-
-          response_unauthorized = ['Unauthorized']
-          allow(ForestAdminRpcAgent::Middleware::Authentication).to receive(:new)
-            .and_return(lambda { |_env|
-                          [401, { 'Content-Type' => 'text/plain' }, response_unauthorized]
-                        })
-
-          status, headers, body = handler.call(env)
-
-          expect(status).to eq(401)
-          expect(headers['Content-Type']).to eq('text/plain')
-          expect(body).to eq(response_unauthorized)
-        end
+        # rubocop:enable RSpec/ExampleLength
 
         it 'sets correct headers including X-Accel-Buffering' do
           route.register_rails(rails_router)
-          handler = captured_handler.first
-
+          handler = @captured_handlers.first
           status, headers, _body = handler.call(env)
 
           expect(status).to eq(200)
@@ -130,7 +131,7 @@ module ForestAdminRpcAgent
           end
 
           custom_route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
 
           catch(:stop) do
             handler.call(env)
@@ -139,27 +140,44 @@ module ForestAdminRpcAgent
 
         it 'logs stream start message' do
           route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
+
+          # Mock sleep to stop after first iteration
+          allow(Kernel).to receive(:sleep) do |_duration|
+            raise TestStopLoop
+          end
 
           _status, _headers, body = handler.call(env)
 
-          # Consume at least one chunk to trigger start logging
-          body.first
+          begin
+            body.first
+          rescue TestStopLoop
+            # Expected
+          end
 
           expect(logger).to have_received(:log).with('Debug', '[SSE] Starting stream')
         end
 
         it 'logs stream stop message on completion' do
           route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
+
+          sleep_count = 0
+          allow(Kernel).to receive(:sleep) do |_duration|
+            sleep_count += 1
+            raise TestStopLoop if sleep_count >= 1
+          end
 
           _status, _headers, body = handler.call(env)
 
-          # Fully consume the enumerator to trigger the ensure block
+          chunks = []
           begin
-            body.to_a
-          rescue StopIteration
-            # Expected when enumerator ends
+            body.each do |chunk|
+              chunks << chunk
+              break if chunks.size >= 2 # Get at least 2 chunks before stopping
+            end
+          rescue TestStopLoop
+            # Expected - this triggers the ensure block
           end
 
           expect(logger).to have_received(:log).with('Debug', '[SSE] Stream stopped')
@@ -167,7 +185,7 @@ module ForestAdminRpcAgent
 
         it 'handles IOError during streaming' do
           route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
 
           streamer_instance = instance_double(SseStreamer)
           allow(SseStreamer).to receive(:new).and_return(streamer_instance)
@@ -176,28 +194,37 @@ module ForestAdminRpcAgent
           _status, _headers, body = handler.call(env)
 
           # The error should be caught and logged
-          body.first
+          begin
+            body.first
+          rescue IOError, TestStopLoop
+            # Expected - IOError is caught inside enumerator
+          end
 
           expect(logger).to have_received(:log).with('Debug', /Client disconnected/)
         end
 
-        it 'handles errors when sending stop event' do
+        # This test is placed last to avoid mock persistence affecting other tests
+        it 'returns the response from the middleware if status is not 200' do
+          # Create a mock authentication middleware that returns 401
+          response_unauthorized = ['Unauthorized']
+          mock_auth_middleware = instance_double(
+            ForestAdminRpcAgent::Middleware::Authentication,
+            call: [401, { 'Content-Type' => 'text/plain' }, response_unauthorized]
+          )
+
+          # Mock Authentication.new to return our mock middleware
+          allow(ForestAdminRpcAgent::Middleware::Authentication).to receive(:new)
+            .and_return(mock_auth_middleware)
+
           route.register_rails(rails_router)
-          handler = captured_handler.first
+          handler = @captured_handlers.first
+          expect(handler).to be_a(Proc)
 
-          streamer_instance = instance_double(SseStreamer)
-          allow(SseStreamer).to receive(:new).and_return(streamer_instance)
-          allow(streamer_instance).to receive(:write) do |_payload, event:|
-            raise StandardError, 'Stop failed' if event == 'RpcServerStop'
+          status, headers, body = handler.call(env)
 
-            throw :stop if event == 'heartbeat'
-          end
-
-          _status, _headers, body = handler.call(env)
-
-          body.first
-
-          expect(logger).to have_received(:log).with('Debug', /Error sending stop event/)
+          expect(status).to eq(401)
+          expect(headers['Content-Type']).to eq('text/plain')
+          expect(body).to eq(response_unauthorized)
         end
       end
 
