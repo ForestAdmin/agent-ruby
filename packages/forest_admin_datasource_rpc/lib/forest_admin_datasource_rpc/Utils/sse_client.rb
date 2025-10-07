@@ -8,6 +8,9 @@ module ForestAdminDatasourceRpc
     class SseClient
       attr_reader :closed
 
+      MAX_BACKOFF_DELAY = 30 # seconds
+      INITIAL_BACKOFF_DELAY = 2 # seconds
+
       def initialize(uri, auth_secret, &on_rpc_stop)
         @uri = uri
         @auth_secret = auth_secret
@@ -15,45 +18,14 @@ module ForestAdminDatasourceRpc
         @client = nil
         @closed = false
         @connection_attempts = 0
+        @reconnect_thread = nil
+        @connecting = false
       end
 
       def start
         return if @closed
 
-        timestamp = Time.now.utc.iso8601(3)
-        signature = generate_signature(timestamp)
-
-        headers = {
-          'Accept' => 'text/event-stream',
-          'X_TIMESTAMP' => timestamp,
-          'X_SIGNATURE' => signature
-        }
-
-        @connection_attempts += 1
-        ForestAdminRpcAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[SSE Client] Connecting to #{@uri} (attempt ##{@connection_attempts})"
-        )
-
-        begin
-          @client = SSE::Client.new(@uri, headers: headers) do |client|
-            client.on_event do |event|
-              handle_event(event)
-            end
-
-            client.on_error do |err|
-              handle_error(err)
-            end
-          end
-
-          ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connected successfully')
-        rescue StandardError => e
-          ForestAdminRpcAgent::Facades::Container.logger&.log(
-            'Error',
-            "[SSE Client] Failed to connect: #{e.class} - #{e.message}"
-          )
-          raise
-        end
+        attempt_connection
       end
 
       def close
@@ -61,6 +33,12 @@ module ForestAdminDatasourceRpc
 
         @closed = true
         ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Closing connection')
+
+        # Stop reconnection thread if running
+        if @reconnect_thread&.alive?
+          @reconnect_thread.kill
+          @reconnect_thread = nil
+        end
 
         begin
           @client&.close
@@ -74,13 +52,133 @@ module ForestAdminDatasourceRpc
 
       private
 
+      def attempt_connection
+        return if @closed
+        return if @connecting
+
+        @connecting = true
+        @connection_attempts += 1
+        timestamp = Time.now.utc.iso8601(3)
+        signature = generate_signature(timestamp)
+
+        headers = {
+          'Accept' => 'text/event-stream',
+          'X_TIMESTAMP' => timestamp,
+          'X_SIGNATURE' => signature
+        }
+
+        ForestAdminRpcAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[SSE Client] Connecting to #{@uri} (attempt ##{@connection_attempts})"
+        )
+
+        begin
+          # Close existing client if any
+          begin
+            @client&.close
+          rescue StandardError
+            # Ignore close errors
+          end
+
+          @client = SSE::Client.new(@uri, headers: headers) do |client|
+            client.on_event do |event|
+              handle_event(event)
+            end
+
+            client.on_error do |err|
+              handle_error_with_reconnect(err)
+            end
+          end
+
+          ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connected successfully')
+        rescue StandardError => e
+          ForestAdminRpcAgent::Facades::Container.logger&.log(
+            'Error',
+            "[SSE Client] Failed to connect: #{e.class} - #{e.message}"
+          )
+          @connecting = false
+          schedule_reconnect
+        end
+      end
+
+      def handle_error_with_reconnect(err)
+        # Ignore errors when client is intentionally closed
+        return if @closed
+
+        is_auth_error = false
+        log_level = 'Warn'
+
+        error_message = case err
+                        when SSE::Errors::HTTPStatusError
+                          # Extract more details from HTTP errors
+                          status = err.respond_to?(:status) ? err.status : 'unknown'
+                          body = err.respond_to?(:body) && !err.body.to_s.strip.empty? ? err.body : 'empty response'
+                          is_auth_error = status.to_s =~ /^(401|403)$/
+
+                          # Auth errors during reconnection are expected (server shutdown or credentials expiring)
+                          log_level = 'Debug' if is_auth_error
+
+                          "HTTP #{status} - #{body}"
+                        when EOFError, IOError
+                          # Connection lost is expected when server stops
+                          log_level = 'Debug'
+                          "Connection lost: #{err.class}"
+                        when StandardError
+                          "#{err.class} - #{err.message}"
+                        else
+                          err.to_s
+                        end
+
+        ForestAdminRpcAgent::Facades::Container.logger&.log(log_level, "[SSE Client] Error: #{error_message}")
+
+        # Close client immediately to prevent ld-eventsource from reconnecting with stale credentials
+        begin
+          @client&.close
+        rescue StandardError
+          # Ignore close errors
+        end
+
+        # Reset connecting flag and schedule reconnection
+        @connecting = false
+
+        # For auth errors, increase attempt count to get longer backoff
+        @connection_attempts += 2 if is_auth_error
+
+        schedule_reconnect
+      end
+
+      def schedule_reconnect
+        return if @closed
+        return if @reconnect_thread&.alive?
+
+        @reconnect_thread = Thread.new do
+          delay = calculate_backoff_delay
+          ForestAdminRpcAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[SSE Client] Reconnecting in #{delay} seconds..."
+          )
+          sleep(delay)
+          attempt_connection unless @closed
+        end
+      end
+
+      def calculate_backoff_delay
+        # Exponential backoff: 1, 2, 4, 8, 16, 30, 30, ...
+        delay = INITIAL_BACKOFF_DELAY * (2**[@connection_attempts - 1, 0].max)
+        [delay, MAX_BACKOFF_DELAY].min
+      end
+
       def handle_event(event)
         type = event.type.to_s.strip
         data = event.data.to_s.strip
 
         case type
         when 'heartbeat'
-          # Heartbeat received - connection is alive
+          if @connecting
+            @connecting = false
+            @connection_attempts = 0
+            ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connection stable')
+          end
         when 'RpcServerStop'
           ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] RpcServerStop received')
           handle_rpc_stop
@@ -95,22 +193,6 @@ module ForestAdminDatasourceRpc
           'Error',
           "[SSE Client] Error handling event: #{e.class} - #{e.message}"
         )
-      end
-
-      def handle_error(err)
-        # Ignore errors when client is intentionally closed
-        return if @closed
-
-        error_message = case err
-                        when EOFError, IOError
-                          "Connection lost: #{err.class}"
-                        when StandardError
-                          "#{err.class} - #{err.message}"
-                        else
-                          err.to_s
-                        end
-
-        ForestAdminRpcAgent::Facades::Container.logger&.log('Warn', "[SSE Client] Error: #{error_message}")
       end
 
       def handle_rpc_stop

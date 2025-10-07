@@ -38,7 +38,11 @@ module ForestAdminRpcAgent
 
           stream(:keep_open) do |out|
             should_continue = true
-            stop_proc = proc { should_continue = false }
+            server_stopped = false
+            stop_proc = proc do
+              should_continue = false
+              server_stopped = true
+            end
             original_handler = trap('INT', stop_proc)
 
             begin
@@ -48,16 +52,21 @@ module ForestAdminRpcAgent
                 streamer.write('', event: 'heartbeat')
                 sleep route_instance.instance_variable_get(:@heartbeat_interval)
               end
+
+              # Send RpcServerStop only if server is stopping (not client disconnect)
+              if server_stopped
+                begin
+                  streamer.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
+                  ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] RpcServerStop event sent')
+                rescue StandardError => e
+                  ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Error sending stop event: #{e.message}")
+                end
+              end
             rescue IOError, Errno::EPIPE => e
-              # Client disconnected
+              # Client disconnected normally
               ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Client disconnected: #{e.message}")
             ensure
               trap('INT', original_handler)
-              begin
-                streamer&.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
-              rescue StandardError => e
-                ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Error sending stop event: #{e.message}")
-              end
               out.close if out.respond_to?(:close)
             end
           end
@@ -80,7 +89,11 @@ module ForestAdminRpcAgent
             }
 
             should_continue = true
-            stop_proc = proc { should_continue = false }
+            server_stopped = false
+            stop_proc = proc do
+              should_continue = false
+              server_stopped = true
+            end
             original_handler = trap('INT', stop_proc)
 
             body = Enumerator.new do |yielder|
@@ -93,19 +106,24 @@ module ForestAdminRpcAgent
                   stream.write('', event: 'heartbeat')
                   sleep route_instance.instance_variable_get(:@heartbeat_interval)
                 end
+
+                # Send RpcServerStop only if server is stopping (not client disconnect)
+                if server_stopped
+                  begin
+                    stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
+                    ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] RpcServerStop event sent')
+                  rescue StandardError => e
+                    ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Error sending stop event: #{e.message}")
+                  end
+                end
               rescue IOError, Errno::EPIPE => e
-                # Client disconnected
+                # Client disconnected normally
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Client disconnected: #{e.message}")
               rescue StandardError => e
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Error', "[SSE] Unexpected error: #{e.message}")
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Error', e.backtrace.join("\n"))
               ensure
                 trap('INT', original_handler)
-                begin
-                  stream.write({ event: 'RpcServerStop' }, event: 'RpcServerStop')
-                rescue StandardError => e
-                  ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Error sending stop event: #{e.message}")
-                end
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] Stream stopped')
               end
             end
