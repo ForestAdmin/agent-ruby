@@ -20,6 +20,8 @@ module ForestAdminDatasourceRpc
           expect(client.instance_variable_get(:@auth_secret)).to eq(secret)
           expect(client.instance_variable_get(:@closed)).to be false
           expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
+          expect(client.instance_variable_get(:@connecting)).to be false
+          expect(client.instance_variable_get(:@reconnect_thread)).to be_nil
         end
 
         it 'exposes closed status via attr_reader' do
@@ -116,14 +118,15 @@ module ForestAdminDatasourceRpc
           expect(logger).to have_received(:log).with('Debug', '[SSE Client] Connected successfully')
         end
 
-        it 'logs and re-raises connection errors' do
+        it 'logs connection errors and schedules reconnect' do
           allow(SSE::Client).to receive(:new).and_raise(StandardError, 'Connection failed')
+          allow(Thread).to receive(:new)
 
           client = described_class.new(uri, secret) { callback.call }
 
           expect do
             client.start
-          end.to raise_error(StandardError, 'Connection failed')
+          end.not_to raise_error
 
           expect(logger).to have_received(:log).with('Error', /Failed to connect.*StandardError/)
         end
@@ -188,6 +191,22 @@ module ForestAdminDatasourceRpc
 
           expect(client.closed).to be true
         end
+
+        it 'stops reconnection thread if running' do
+          fake_client = instance_double(SSE::Client, close: true)
+          fake_thread = instance_double(Thread, alive?: true, kill: nil)
+          allow(SSE::Client).to receive(:new).and_return(fake_client)
+          allow(fake_client).to receive(:on_event)
+          allow(fake_client).to receive(:on_error)
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.start
+          client.instance_variable_set(:@reconnect_thread, fake_thread)
+
+          client.close
+
+          expect(fake_thread).to have_received(:kill)
+        end
       end
 
       describe '#handle_event' do
@@ -208,6 +227,29 @@ module ForestAdminDatasourceRpc
 
           expect(callback).not_to have_received(:call)
           expect(logger).not_to have_received(:log).with('Debug', /heartbeat/i)
+        end
+
+        it 'resets connecting flag and connection attempts on first heartbeat' do
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@connecting, true)
+          client.instance_variable_set(:@connection_attempts, 3)
+
+          event = Struct.new(:type, :data).new('heartbeat', '')
+          client.send(:handle_event, event)
+
+          expect(client.instance_variable_get(:@connecting)).to be false
+          expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
+          expect(logger).to have_received(:log).with('Debug', '[SSE Client] Connection stable')
+        end
+
+        it 'does not log connection stable if not connecting' do
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@connecting, false)
+
+          event = Struct.new(:type, :data).new('heartbeat', '')
+          client.send(:handle_event, event)
+
+          expect(logger).not_to have_received(:log).with('Debug', '[SSE Client] Connection stable')
         end
 
         it 'logs unknown events' do
@@ -249,32 +291,36 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      describe '#handle_error' do
+      describe '#handle_error_with_reconnect' do
+        before do
+          allow(Thread).to receive(:new)
+        end
+
         it 'logs connection errors' do
           client = described_class.new(uri, secret) { callback.call }
 
           error = StandardError.new('Connection interrupted')
-          client.send(:handle_error, error)
+          client.send(:handle_error_with_reconnect, error)
 
           expect(logger).to have_received(:log).with('Warn', /Error: StandardError - Connection interrupted/)
         end
 
-        it 'identifies EOFError as connection lost' do
+        it 'identifies EOFError as connection lost and logs as Debug' do
           client = described_class.new(uri, secret) { callback.call }
 
           error = EOFError.new
-          client.send(:handle_error, error)
+          client.send(:handle_error_with_reconnect, error)
 
-          expect(logger).to have_received(:log).with('Warn', /Connection lost: EOFError/)
+          expect(logger).to have_received(:log).with('Debug', /Connection lost: EOFError/)
         end
 
-        it 'identifies IOError as connection lost' do
+        it 'identifies IOError as connection lost and logs as Debug' do
           client = described_class.new(uri, secret) { callback.call }
 
           error = IOError.new
-          client.send(:handle_error, error)
+          client.send(:handle_error_with_reconnect, error)
 
-          expect(logger).to have_received(:log).with('Warn', /Connection lost: IOError/)
+          expect(logger).to have_received(:log).with('Debug', /Connection lost: IOError/)
         end
 
         it 'does not log errors when client is closed' do
@@ -282,9 +328,120 @@ module ForestAdminDatasourceRpc
           client.close
 
           error = StandardError.new('Error after close')
-          client.send(:handle_error, error)
+          client.send(:handle_error_with_reconnect, error)
 
           expect(logger).not_to have_received(:log).with('Warn', anything)
+          expect(logger).not_to have_received(:log).with('Debug', /Error/)
+        end
+
+        it 'closes the client and schedules reconnect' do
+          fake_client = instance_double(SSE::Client, close: true)
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@client, fake_client)
+
+          error = StandardError.new('Connection error')
+          client.send(:handle_error_with_reconnect, error)
+
+          expect(fake_client).to have_received(:close)
+          expect(Thread).to have_received(:new)
+        end
+
+        it 'handles HTTP auth errors with Debug log level' do
+          auth_error = SSE::Errors::HTTPStatusError.new(nil)
+          allow(auth_error).to receive_messages(status: 401, body: 'Unauthorized')
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.send(:handle_error_with_reconnect, auth_error)
+
+          expect(logger).to have_received(:log).with('Debug', /HTTP 401/)
+        end
+      end
+
+      describe '#schedule_reconnect' do
+        it 'creates a new thread that waits and reconnects' do
+          fake_thread = instance_double(Thread, alive?: false)
+          client = described_class.new(uri, secret) { callback.call }
+
+          allow(Thread).to receive(:new).and_yield.and_return(fake_thread)
+          allow(client).to receive(:sleep)
+          allow(client).to receive(:attempt_connection)
+
+          client.send(:schedule_reconnect)
+
+          expect(Thread).to have_received(:new)
+        end
+
+        it 'does not create a new thread if one is already running' do
+          fake_thread = instance_double(Thread, alive?: true)
+          allow(Thread).to receive(:new).and_return(fake_thread)
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@reconnect_thread, fake_thread)
+
+          client.send(:schedule_reconnect)
+
+          expect(Thread).not_to have_received(:new)
+        end
+
+        it 'does not schedule reconnect if client is closed' do
+          allow(Thread).to receive(:new)
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.close
+
+          client.send(:schedule_reconnect)
+
+          expect(Thread).not_to have_received(:new)
+        end
+      end
+
+      describe '#calculate_backoff_delay' do
+        it 'calculates exponential backoff delay' do
+          client = described_class.new(uri, secret) { callback.call }
+
+          client.instance_variable_set(:@connection_attempts, 1)
+          expect(client.send(:calculate_backoff_delay)).to eq(2)
+
+          client.instance_variable_set(:@connection_attempts, 2)
+          expect(client.send(:calculate_backoff_delay)).to eq(4)
+
+          client.instance_variable_set(:@connection_attempts, 3)
+          expect(client.send(:calculate_backoff_delay)).to eq(8)
+
+          client.instance_variable_set(:@connection_attempts, 4)
+          expect(client.send(:calculate_backoff_delay)).to eq(16)
+        end
+
+        it 'caps delay at MAX_BACKOFF_DELAY' do
+          client = described_class.new(uri, secret) { callback.call }
+
+          client.instance_variable_set(:@connection_attempts, 10)
+          expect(client.send(:calculate_backoff_delay)).to eq(30)
+        end
+      end
+
+      describe '#attempt_connection' do
+        it 'does not attempt connection if already connecting' do
+          allow(SSE::Client).to receive(:new)
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@connecting, true)
+
+          client.send(:attempt_connection)
+
+          expect(SSE::Client).not_to have_received(:new)
+        end
+
+        it 'closes existing client before creating new connection' do
+          old_client = instance_double(SSE::Client, close: true)
+          allow(SSE::Client).to receive(:new).and_yield(instance_double(SSE::Client, on_event: nil, on_error: nil))
+
+          client = described_class.new(uri, secret) { callback.call }
+          client.instance_variable_set(:@client, old_client)
+
+          client.send(:attempt_connection)
+
+          expect(old_client).to have_received(:close)
         end
       end
 
