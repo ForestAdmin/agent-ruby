@@ -74,7 +74,7 @@ module ForestAdminDatasourceRpc
         end
 
         it 'increments connection attempts counter' do
-          fake_client = instance_double(SSE::Client)
+          fake_client = instance_double(SSE::Client, close: true)
           allow(SSE::Client).to receive(:new).and_yield(fake_client).and_return(fake_client)
           allow(fake_client).to receive(:on_event)
           allow(fake_client).to receive(:on_error)
@@ -87,8 +87,9 @@ module ForestAdminDatasourceRpc
 
           expect(client.instance_variable_get(:@connection_attempts)).to eq(1)
 
-          # Simulate reconnection
+          # Simulate reconnection - reset both closed and connecting flags
           client.instance_variable_set(:@closed, false)
+          client.instance_variable_set(:@connecting, false)
           client.start
 
           expect(client.instance_variable_get(:@connection_attempts)).to eq(2)
@@ -347,8 +348,17 @@ module ForestAdminDatasourceRpc
         end
 
         it 'handles HTTP auth errors with Debug log level' do
-          auth_error = SSE::Errors::HTTPStatusError.new(nil)
-          allow(auth_error).to receive_messages(status: 401, body: 'Unauthorized')
+          # rubocop:disable RSpec/VerifiedDoubles
+          # Using regular double to mock SSE::Errors::HTTPStatusError for case statement matching
+          auth_error = double(
+            'HTTPStatusError',
+            status: 401,
+            body: 'Unauthorized',
+            respond_to?: true
+          )
+          # rubocop:enable RSpec/VerifiedDoubles
+          # Make the case statement match this error as HTTPStatusError
+          allow(SSE::Errors::HTTPStatusError).to receive(:===).with(auth_error).and_return(true)
 
           client = described_class.new(uri, secret) { callback.call }
           client.send(:handle_error_with_reconnect, auth_error)
