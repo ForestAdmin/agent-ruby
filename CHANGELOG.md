@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.5.0...v1.6.0) (2025-10-08)
+
+
+### Features
+
+* **caller:** allow extra arguments ([#140](https://github.com/ForestAdmin/agent-ruby/issues/140)) ([b3510c0](https://github.com/ForestAdmin/agent-ruby/commit/b3510c02fcd9dd4456cad41e63370cfe25906d9c))
+
 # [1.5.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.4.1...v1.5.0) (2025-10-06)
 
 
