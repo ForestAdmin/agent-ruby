@@ -16,7 +16,8 @@ module ForestAdminDatasourceToolkit
         role: nil,
         request: {},
         project: nil,
-        environment: nil
+        environment: nil,
+        **_extra_args
       )
         @id = id
         @email = email
