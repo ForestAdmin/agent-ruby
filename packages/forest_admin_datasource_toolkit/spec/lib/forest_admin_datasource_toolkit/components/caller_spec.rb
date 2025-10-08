@@ -68,14 +68,14 @@ module ForestAdminDatasourceToolkit
             expect(caller.rendering_id).to eq(123)
           end
 
-          it 'stores extra keyword arguments as instance variables' do
-            expect(caller.instance_variable_get(:@renderingId)).to eq(456)
-            expect(caller.instance_variable_get(:@firstName)).to eq('Jane')
-            expect(caller.instance_variable_get(:@lastName)).to eq('Smith')
-            expect(caller.instance_variable_get(:@permissionLevel)).to eq('user')
-            expect(caller.instance_variable_get(:@roleId)).to eq(789)
-            expect(caller.instance_variable_get(:@role_id)).to eq(987)
-            expect(caller.instance_variable_get(:@iat)).to eq(1234567890)
+          it 'does not store extra keyword arguments as instance variables' do
+            expect(caller.instance_variable_get(:@renderingId)).to be_nil
+            expect(caller.instance_variable_get(:@firstName)).to be_nil
+            expect(caller.instance_variable_get(:@lastName)).to be_nil
+            expect(caller.instance_variable_get(:@permissionLevel)).to be_nil
+            expect(caller.instance_variable_get(:@roleId)).to be_nil
+            expect(caller.instance_variable_get(:@role_id)).to be_nil
+            expect(caller.instance_variable_get(:@iat)).to be_nil
           end
         end
 
@@ -141,7 +141,7 @@ module ForestAdminDatasourceToolkit
           end
         end
 
-        context 'when caller has extra keyword arguments' do
+        context 'when caller is initialized with extra keyword arguments' do
           let(:caller) do
             described_class.new(
               id: 1,
@@ -158,10 +158,10 @@ module ForestAdminDatasourceToolkit
             )
           end
 
-          it 'includes extra fields in the hash' do
+          it 'does not include extra fields in the hash' do
             hash = caller.to_h
-            expect(hash[:iat]).to eq(1234567890)
-            expect(hash[:custom_field]).to eq('custom_value')
+            expect(hash[:iat]).to be_nil
+            expect(hash[:custom_field]).to be_nil
           end
         end
       end
