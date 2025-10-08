@@ -49,22 +49,16 @@ module ForestAdminRails
                  state: exception.status
                }
              else
-               if exception.respond_to?(:name) && exception.name.present?
-                 {
-                   errors: [
-                     {
-                       name: exception.name,
-                       detail: get_error_message(exception),
-                       status: exception.try(:status),
-                       data: exception.try(:data)
-                     }
-                   ]
-                 }
-               else
-                 {
-                   error: exception.message
-                 }
-               end
+               {
+                 errors: [
+                   {
+                     name: exception.respond_to?(:name) ? exception.name : exception.class.name,
+                     detail: get_error_message(exception),
+                     status: exception.try(:status),
+                     data: exception.try(:data)
+                   }
+                 ]
+               }
              end
 
       unless ForestAdminAgent::Facades::Container.cache(:is_production)
