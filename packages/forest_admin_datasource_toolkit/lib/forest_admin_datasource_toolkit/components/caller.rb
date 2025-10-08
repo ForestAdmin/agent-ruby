@@ -16,7 +16,8 @@ module ForestAdminDatasourceToolkit
         role: nil,
         request: {},
         project: nil,
-        environment: nil
+        environment: nil,
+        **kwargs
       )
         @id = id
         @email = email
@@ -31,6 +32,11 @@ module ForestAdminDatasourceToolkit
         @request = request
         @project = project
         @environment = environment
+        
+        # Store any additional properties that were passed in
+        kwargs.each do |key, value|
+          instance_variable_set("@#{key}", value)
+        end
       end
 
       def to_h
