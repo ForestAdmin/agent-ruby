@@ -1,3 +1,10 @@
+## [1.6.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.6.0...v1.6.1) (2025-10-10)
+
+
+### Bug Fixes
+
+* **controller:** simplify forest_controller exception_handler ([#141](https://github.com/ForestAdmin/agent-ruby/issues/141)) ([3a41dd2](https://github.com/ForestAdmin/agent-ruby/commit/3a41dd2914163cb1d8b9c55486bef8bb1c136828))
+
 # [1.6.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.5.0...v1.6.0) (2025-10-08)
 
 
