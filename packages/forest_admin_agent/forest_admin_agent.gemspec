@@ -33,7 +33,7 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "activesupport", ">= 6.1"
+  spec.add_dependency "activesupport", ">= 7.2.0"
   spec.add_dependency "deepsort", "~> 0.4.5"
   spec.add_dependency "dry-container", "~> 0.11"
   spec.add_dependency "faraday", "~> 2.7"
@@ -45,6 +45,6 @@ admin work on any Ruby application."
   spec.add_dependency "mono_logger", "~> 1.1"
   spec.add_dependency "openid_connect", "~> 2.2"
   spec.add_dependency "rake", "~> 13.0"
-  spec.add_dependency "rack-cors", "~> 2.0"
+  spec.add_dependency "rack-cors", "~> 3.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end
