@@ -33,6 +33,6 @@ admin work on any Ruby application."
   spec.require_paths = ["lib"]
 
   spec.add_dependency "mongoid", ">= 9.0"
-  spec.add_dependency "activesupport", ">= 6.1"
+  spec.add_dependency "activesupport", ">= 7.2.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end

@@ -32,7 +32,7 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "activerecord", ">= 6.1"
-  spec.add_dependency "activesupport", ">= 6.1"
+  spec.add_dependency "activerecord", ">= 7.2.0"
+  spec.add_dependency "activesupport", ">= 7.2.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end
