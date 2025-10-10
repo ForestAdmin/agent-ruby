@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.6.1...v1.7.0) (2025-10-10)
+
+
+### Features
+
+* **config:** support FOREST_SERVER_URL environment variable ([#143](https://github.com/ForestAdmin/agent-ruby/issues/143)) ([5e3839a](https://github.com/ForestAdmin/agent-ruby/commit/5e3839a4a7224d70aa7ce804ba5de0df8083d45a))
+
 ## [1.6.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.6.0...v1.6.1) (2025-10-10)
 
 
