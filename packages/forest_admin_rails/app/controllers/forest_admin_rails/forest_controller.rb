@@ -65,7 +65,7 @@ module ForestAdminRails
         ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
       end
 
-      render json: data, status: exception.try(:status)
+      render json: data, status: exception.try(:status) || 500
     end
   end
 end

@@ -208,7 +208,7 @@ module ForestAdminRails
       end
 
       context 'when exception has no status' do
-        it 'returns errors format without crashing' do
+        it 'returns errors format with 500 status' do
           # rubocop:disable RSpec/VerifiedDoubles
           exception = double(
             'GenericError',
@@ -227,7 +227,7 @@ module ForestAdminRails
 
           controller.send(:exception_handler, exception)
 
-          expect(response_mock.status).to be_nil
+          expect(response_mock.status).to eq(500)
           json = JSON.parse(response_mock.body)
           expect(json['errors']).to be_an(Array)
           expect(json['errors'][0]['name']).to eq('StandardError')
