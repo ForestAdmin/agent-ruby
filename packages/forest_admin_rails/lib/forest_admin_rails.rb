@@ -15,7 +15,7 @@ module ForestAdminRails
   setting :debug, default: true
   setting :auth_secret
   setting :env_secret
-  setting :forest_server_url, default: 'https://api.forestadmin.com'
+  setting :forest_server_url, default: ENV.fetch('FOREST_SERVER_URL', 'https://api.forestadmin.com')
   setting :is_production, default: Rails.env.production?
   setting :prefix, default: nil
   setting :permission_expiration, default: 900
