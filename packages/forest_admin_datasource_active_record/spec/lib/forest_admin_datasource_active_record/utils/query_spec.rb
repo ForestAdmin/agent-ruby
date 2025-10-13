@@ -28,6 +28,69 @@ module ForestAdminDatasourceActiveRecord
           end
         end
       end
+
+      describe 'filter operators' do
+        context 'when using BLANK operator' do
+          context 'with a String field' do
+            it 'filters records where field is NULL or empty string' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::BLANK, nil)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to match(/"cars"\."brand" = '' OR "cars"\."brand" IS NULL/)
+            end
+          end
+
+          context 'with a non-String field' do
+            it 'filters records where field is NULL' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('year', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::BLANK, nil)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              expect(query_builder.query.to_sql).to include('"cars"."year" IS NULL')
+            end
+          end
+        end
+
+        context 'when using MISSING operator' do
+          it 'filters records where field is NULL' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MISSING, nil)
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            expect(query_builder.query.to_sql).to include('"cars"."brand" IS NULL')
+          end
+        end
+
+        context 'when using PRESENT operator' do
+          context 'with a String field' do
+            it 'filters records where field is NOT NULL and not empty string' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::PRESENT, nil)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to match(/NOT \(\("cars"\."brand" = '' OR "cars"\."brand" IS NULL\)\)/)
+            end
+          end
+
+          context 'with a non-String field' do
+            it 'filters records where field is NOT NULL' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('year', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::PRESENT, nil)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              expect(query_builder.query.to_sql).to include('"cars"."year" IS NOT NULL')
+            end
+          end
+        end
+      end
     end
   end
 end
