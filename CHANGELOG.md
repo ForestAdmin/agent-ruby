@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.7.0...v1.7.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* **actions:** use datasource instead of collection in build_field_schema ([413ef78](https://github.com/ForestAdmin/agent-ruby/commit/413ef7817c70585c9581c607924981812df0de7a))
+
 # [1.7.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.6.1...v1.7.0) (2025-10-10)
 
 
