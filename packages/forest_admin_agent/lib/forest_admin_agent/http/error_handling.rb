@@ -2,7 +2,7 @@ module ForestAdminAgent
   module Http
     module ErrorHandling
       def get_error_message(error)
-        if error.respond_to?(:ancestors) && error.ancestors.include?(ForestAdminAgent::Http::Exceptions::HttpException)
+        if error.class.respond_to?(:ancestors) && error.class.ancestors.include?(ForestAdminAgent::Http::Exceptions::HttpException)
           return error.message
         end
 
