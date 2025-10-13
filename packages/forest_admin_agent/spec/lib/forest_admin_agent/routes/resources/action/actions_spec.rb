@@ -181,6 +181,17 @@ module ForestAdminAgent
                 )
               end
             end
+
+            it 'uses datasource to build field schema' do
+              field = { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::STRING, label: 'firstname' }
+              allow(@action_collection).to receive(:get_form).and_return([field])
+              allow(ForestAdminAgent::Utils::Schema::GeneratorAction).to receive_messages(build_field_schema: {}, extract_fields_and_layout: { fields: [field], layout: [] })
+
+              action.handle_hook_request(args)
+
+              expect(ForestAdminAgent::Utils::Schema::GeneratorAction).to have_received(:build_field_schema)
+                .with(@datasource, field)
+            end
           end
         end
 

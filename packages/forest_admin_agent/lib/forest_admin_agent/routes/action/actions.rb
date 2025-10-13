@@ -102,7 +102,7 @@ module ForestAdminAgent
 
           {
             content: {
-              fields: form_elements[:fields].map { |f| Schema::GeneratorAction.build_field_schema(@collection, f) },
+              fields: form_elements[:fields].map { |f| Schema::GeneratorAction.build_field_schema(@datasource, f) },
               layout: Schema::GeneratorAction.build_layout(form_elements[:layout])
             }
           }
