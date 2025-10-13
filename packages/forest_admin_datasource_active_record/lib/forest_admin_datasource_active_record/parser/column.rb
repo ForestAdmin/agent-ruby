@@ -59,7 +59,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def operators_for_column_type(type)
-        result = [Operators::PRESENT, Operators::MISSING]
+        result = [Operators::PRESENT, Operators::BLANK, Operators::MISSING]
         equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
 
         if type.is_a? String

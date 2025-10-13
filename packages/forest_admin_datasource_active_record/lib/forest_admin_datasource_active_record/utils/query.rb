@@ -71,7 +71,23 @@ module ForestAdminDatasourceActiveRecord
 
         case condition_tree.operator
         when Operators::PRESENT
-          @query = query_aggregator(aggregator, @collection.model.where.not({ field => nil }))
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection,
+                                                                                          condition_tree.field)
+          @query = if field_schema.column_type == 'String'
+                     query_aggregator(aggregator, @collection.model.where.not({ field => [nil, ''] }))
+                   else
+                     query_aggregator(aggregator, @collection.model.where.not({ field => nil }))
+                   end
+        when Operators::BLANK
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection,
+                                                                                          condition_tree.field)
+          @query = if field_schema.column_type == 'String'
+                     query_aggregator(aggregator, @collection.model.where({ field => [nil, ''] }))
+                   else
+                     query_aggregator(aggregator, @collection.model.where({ field => nil }))
+                   end
+        when Operators::MISSING
+          @query = query_aggregator(aggregator, @collection.model.where({ field => nil }))
         when Operators::EQUAL, Operators::IN
           @query = query_aggregator(aggregator, @collection.model.where({ field => value }))
         when Operators::NOT_EQUAL, Operators::NOT_IN
