@@ -63,6 +63,12 @@ module ForestAdminAgent
         attributes_map.each do |attribute_name, attr_data|
           next if !should_include_attr?(attribute_name, attr_data)
           value = evaluate_attr_or_block(attribute_name, attr_data[:attr_or_block])
+          # Only include the attribute if it's not nil or if the key exists in the object
+          # This prevents setting all fields to null for included records
+          if value.nil?
+            # Check if the key actually exists in the object (for Hash objects)
+            next unless @object.is_a?(Hash) && @object.key?(attribute_name.to_s)
+          end
           attributes[format_name(attribute_name)] = value
         end
         attributes
@@ -138,9 +144,9 @@ module ForestAdminAgent
           end
 
           object = has_one_relationship(attribute_name, attr_data)
-          if object.nil? || object.empty?
-            data[formatted_attribute_name]['data'] = nil
-          else
+          # Only include 'data' key if the relationship object exists
+          # Omit 'data' key entirely when null instead of setting it to null
+          unless object.nil? || object.empty?
             relation = datasource.get_collection(@options[:class_name].gsub('::', '__'))
                                  .schema[:fields][attribute_name.to_s]
             options = @options.clone
