@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.7.1...v1.8.0) (2025-10-13)
+
+
+### Features
+
+* **sse:** implement Sinatra SSE + improvement on connection handling ([#135](https://github.com/ForestAdmin/agent-ruby/issues/135)) ([057b425](https://github.com/ForestAdmin/agent-ruby/commit/057b4255d8b47f33233b14764101da82e4a9df5f))
+
 ## [1.7.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.7.0...v1.7.1) (2025-10-13)
 
 
