@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.0...v1.8.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* **error handling:** retrieve the error message properly ([#146](https://github.com/ForestAdmin/agent-ruby/issues/146)) ([a696458](https://github.com/ForestAdmin/agent-ruby/commit/a6964587f48433d85c9d8c1124a72f2b9536cef1))
+
 # [1.8.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.7.1...v1.8.0) (2025-10-13)
 
 
