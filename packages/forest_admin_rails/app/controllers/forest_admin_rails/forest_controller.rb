@@ -61,7 +61,9 @@ module ForestAdminRails
                }
              end
 
-      unless ForestAdminAgent::Facades::Container.cache(:is_production)
+      if ForestAdminAgent::Facades::Container.cache(:is_production)
+        ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
+      else
         ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
       end
 
