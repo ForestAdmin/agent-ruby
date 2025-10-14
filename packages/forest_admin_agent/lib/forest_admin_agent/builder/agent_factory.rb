@@ -149,7 +149,7 @@ module ForestAdminAgent
       end
 
       def build_logger
-        @logger = Services::LoggerService.new(@options[:loggerLevel], @options[:logger])
+        @logger = Services::LoggerService.new(@options[:logger_level], @options[:logger])
         @container.register(:logger, @logger)
       end
 
