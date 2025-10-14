@@ -1,3 +1,10 @@
+## [1.8.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.2...v1.8.3) (2025-10-14)
+
+
+### Bug Fixes
+
+* rename loggerLevel to logger_level ([#151](https://github.com/ForestAdmin/agent-ruby/issues/151)) ([79aef9e](https://github.com/ForestAdmin/agent-ruby/commit/79aef9e766a5b79fcf9f6d758892e13c37642c8f))
+
 ## [1.8.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.1...v1.8.2) (2025-10-14)
 
 
