@@ -61,11 +61,7 @@ module ForestAdminRails
                }
              end
 
-      if ForestAdminAgent::Facades::Container.cache(:is_production)
-        ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
-      else
-        ForestAdminAgent::Facades::Container.logger.log('Debug', exception.full_message)
-      end
+      ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
 
       render json: data, status: exception.try(:status) || 500
     end
