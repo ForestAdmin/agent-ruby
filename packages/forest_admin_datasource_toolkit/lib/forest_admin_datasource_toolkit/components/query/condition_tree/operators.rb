@@ -7,6 +7,8 @@ module ForestAdminDatasourceToolkit
           NOT_EQUAL = 'not_equal'.freeze
           LESS_THAN = 'less_than'.freeze
           GREATER_THAN = 'greater_than'.freeze
+          LESS_THAN_OR_EQUAL = 'less_than_or_equal'.freeze
+          GREATER_THAN_OR_EQUAL = 'greater_than_or_equal'.freeze
           MATCH = 'match'.freeze
           LIKE = 'like'.freeze
           I_LIKE = 'i_like'.freeze

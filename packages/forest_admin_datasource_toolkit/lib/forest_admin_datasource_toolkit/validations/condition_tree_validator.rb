@@ -66,13 +66,20 @@ module ForestAdminDatasourceToolkit
 
       def self.throw_if_value_not_allowed_with_column_type(leaf, column_schema)
         # exclude some cases where the value is not related to the columnType of the field
+        # or where the operator accepts multiple column types (making the value type flexible)
         excluded_cases = [
           Operators::SHORTER_THAN,
           Operators::LONGER_THAN,
           Operators::AFTER_X_HOURS_AGO,
           Operators::BEFORE_X_HOURS_AGO,
           Operators::PREVIOUS_X_DAYS,
-          Operators::PREVIOUS_X_DAYS_TO_DATE
+          Operators::PREVIOUS_X_DAYS_TO_DATE,
+          # Comparison operators that work on multiple column types (String, Number, Date, etc.)
+          # The value type validation is already handled by throw_if_value_not_allowed_with_operator
+          Operators::GREATER_THAN,
+          Operators::LESS_THAN,
+          Operators::GREATER_THAN_OR_EQUAL,
+          Operators::LESS_THAN_OR_EQUAL
         ]
 
         return if excluded_cases.include?(leaf.operator)
