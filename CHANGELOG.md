@@ -1,3 +1,10 @@
+## [1.8.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.1...v1.8.2) (2025-10-14)
+
+
+### Bug Fixes
+
+* enable error logging in production mode ([#150](https://github.com/ForestAdmin/agent-ruby/issues/150)) ([34ca626](https://github.com/ForestAdmin/agent-ruby/commit/34ca62661e76ba5c4d954d3b70d38a627467a522))
+
 ## [1.8.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.0...v1.8.1) (2025-10-13)
 
 
