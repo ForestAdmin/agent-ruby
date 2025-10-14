@@ -20,7 +20,7 @@ module ForestAdminRpcAgent
   setting :prefix, default: nil
   setting :cache_dir, default: :'tmp/cache/forest_admin'
   setting :project_dir, default: Dir.pwd
-  setting :loggerLevel, default: 'info'
+  setting :logger_level, default: 'info'
   setting :logger, default: nil
   setting :customize_error_message, default: nil
 
