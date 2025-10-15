@@ -184,7 +184,6 @@ module ForestAdminAgent
                     'links' => { 'self' => '/forest/person/1' },
                     'relationships' => {
                       'passport' => {
-                        'data' => nil,
                         'links' => { 'related' => { 'href' => '/forest/person/1/relationships/passport' } }
                       }
                     }
@@ -221,7 +220,6 @@ module ForestAdminAgent
                     'links' => { 'self' => '/forest/passport/1' },
                     'relationships' => {
                       'person' => {
-                        'data' => nil,
                         'links' => {
                           'related' => {
                             'href' => '/forest/passport/1/relationships/person'
