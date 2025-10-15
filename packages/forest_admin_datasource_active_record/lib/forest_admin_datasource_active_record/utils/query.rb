@@ -71,22 +71,71 @@ module ForestAdminDatasourceActiveRecord
 
         case condition_tree.operator
         when Operators::PRESENT
-          @query = query_aggregator(aggregator, @collection.model.where.not({ field => nil }))
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection,
+                                                                                          condition_tree.field)
+          @query = if field_schema.column_type == 'String'
+                     query_aggregator(aggregator, @collection.model.where.not({ field => [nil, ''] }))
+                   else
+                     query_aggregator(aggregator, @collection.model.where.not({ field => nil }))
+                   end
+        when Operators::BLANK
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection,
+                                                                                          condition_tree.field)
+          @query = if field_schema.column_type == 'String'
+                     query_aggregator(aggregator, @collection.model.where({ field => [nil, ''] }))
+                   else
+                     query_aggregator(aggregator, @collection.model.where({ field => nil }))
+                   end
+        when Operators::MISSING
+          @query = query_aggregator(aggregator, @collection.model.where({ field => nil }))
         when Operators::EQUAL, Operators::IN
           @query = query_aggregator(aggregator, @collection.model.where({ field => value }))
         when Operators::NOT_EQUAL, Operators::NOT_IN
           @query = query_aggregator(aggregator, @collection.model.where.not({ field => value }))
         when Operators::GREATER_THAN
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].gt(value)))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gt))
         when Operators::LESS_THAN
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].lt(value)))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lt))
+        when Operators::GREATER_THAN_OR_EQUAL
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gteq))
+        when Operators::LESS_THAN_OR_EQUAL
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lteq))
+        when Operators::CONTAINS
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::I_CONTAINS
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}%", nil, true)))
         when Operators::NOT_CONTAINS
           @query = query_aggregator(aggregator,
                                     @collection.model.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::NOT_I_CONTAINS
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where.not(@arel_table[field.to_sym].matches("%#{value}%", nil,
+                                                                                                  true)))
+        when Operators::STARTS_WITH
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches("#{value}%")))
+        when Operators::I_STARTS_WITH
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("#{value}%", nil, true)))
+        when Operators::ENDS_WITH
+          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches("%#{value}")))
+        when Operators::I_ENDS_WITH
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}", nil, true)))
         when Operators::LIKE
           @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches(value)))
+        when Operators::I_LIKE
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches(value, nil, true)))
         when Operators::INCLUDES_ALL
           @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches_all(value)))
+        when Operators::SHORTER_THAN
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator, @collection.model.where(length_func.lt(value)))
+        when Operators::LONGER_THAN
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator, @collection.model.where(length_func.gt(value)))
         end
 
         @query
@@ -143,6 +192,20 @@ module ForestAdminDatasourceActiveRecord
         end
 
         field
+      end
+
+      def build_comparison_query(original_field, formatted_field, value, operator)
+        # When comparing a String field with a numeric value, compare the length of the string
+        # Otherwise, do a lexicographic comparison
+        if value.is_a?(Numeric)
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, original_field)
+          if field_schema.column_type == 'String'
+            length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[formatted_field.to_sym]])
+            return @collection.model.where(length_func.send(operator, value))
+          end
+        end
+
+        @collection.model.where(@arel_table[formatted_field.to_sym].send(operator, value))
       end
 
       def query_aggregator(aggregator, query)

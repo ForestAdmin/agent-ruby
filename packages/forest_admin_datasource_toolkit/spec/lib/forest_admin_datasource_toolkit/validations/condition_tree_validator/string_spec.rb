@@ -55,6 +55,118 @@ module ForestAdminDatasourceToolkit
 
           expect(described_class.validate(condition_tree, collection)).to be_nil
         end
+
+        it 'not raise an error when using GreaterThan operator with a numeric value on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::GREATER_THAN]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::GREATER_THAN, 42)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using LessThan operator with a numeric value on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::LESS_THAN]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::LESS_THAN, 42)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using GreaterThanOrEqual operator with a numeric value on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::GREATER_THAN_OR_EQUAL]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::GREATER_THAN_OR_EQUAL, 20)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using LessThanOrEqual operator with a numeric value on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::LESS_THAN_OR_EQUAL]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::LESS_THAN_OR_EQUAL, 30)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using GreaterThan operator with a string value on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::GREATER_THAN]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::GREATER_THAN, 'foo')
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using GreaterThan operator with zero on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::GREATER_THAN]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::GREATER_THAN, 0)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
+
+        it 'not raise an error when using GreaterThan operator with float on a string field' do
+          collection = build_collection({
+                                          schema: {
+                                            fields: {
+                                              'string_field' => ColumnSchema.new(
+                                                column_type: 'String',
+                                                filter_operators: [Operators::GREATER_THAN]
+                                              )
+                                            }
+                                          }
+                                        })
+          condition_tree = ConditionTreeLeaf.new('string_field', Operators::GREATER_THAN, 10.5)
+
+          expect(described_class.validate(condition_tree, collection)).to be_nil
+        end
       end
     end
   end
