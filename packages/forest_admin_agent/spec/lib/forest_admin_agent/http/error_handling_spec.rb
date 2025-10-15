@@ -96,27 +96,26 @@ module ForestAdminAgent
             # Mock ActiveRecord if not already loaded
             unless defined?(ActiveRecord)
               stub_const('ActiveRecord', Module.new)
-              stub_const('ActiveRecord::RecordInvalid', Class.new(StandardError))
+
+              # Create a RecordInvalid class that stores the record like the real one
+              record_invalid_class = Class.new(StandardError) do
+                attr_reader :record
+
+                def initialize(record = nil)
+                  @record = record
+                  super(record.to_s)
+                end
+              end
+              stub_const('ActiveRecord::RecordInvalid', record_invalid_class)
+
               stub_const('ActiveRecord::ActiveRecordError', Class.new(StandardError))
             end
           end
 
           context 'when error is ActiveRecord::RecordInvalid' do
-            let(:errors) do
-              errors_obj = Object.new
-              allow(errors_obj).to receive(:full_messages).and_return(['Name can\'t be blank', 'Email is invalid'])
-              errors_obj
-            end
-            let(:record) do
-              record_obj = Object.new
-              allow(record_obj).to receive(:errors).and_return(errors)
-              record_obj
-            end
-            let(:validation_error) do
-              error = ActiveRecord::RecordInvalid.new(record)
-              allow(error).to receive(:record).and_return(record)
-              error
-            end
+            let(:errors) { double.tap { |d| allow(d).to receive(:full_messages).and_return(['Name can\'t be blank', 'Email is invalid']) } }
+            let(:record) { double.tap { |d| allow(d).to receive(:errors).and_return(errors) } }
+            let(:validation_error) { ActiveRecord::RecordInvalid.new(record) }
 
             it 'returns the full validation error messages' do
               expect(handler.get_error_message(validation_error)).to eq('Name can\'t be blank, Email is invalid')
@@ -160,27 +159,26 @@ module ForestAdminAgent
             # Mock ActiveRecord if not already loaded
             unless defined?(ActiveRecord)
               stub_const('ActiveRecord', Module.new)
-              stub_const('ActiveRecord::RecordInvalid', Class.new(StandardError))
+
+              # Create a RecordInvalid class that stores the record like the real one
+              record_invalid_class = Class.new(StandardError) do
+                attr_reader :record
+
+                def initialize(record = nil)
+                  @record = record
+                  super(record.to_s)
+                end
+              end
+              stub_const('ActiveRecord::RecordInvalid', record_invalid_class)
+
               stub_const('ActiveRecord::ActiveRecordError', Class.new(StandardError))
             end
           end
 
           context 'when error is ActiveRecord::RecordInvalid' do
-            let(:errors) do
-              errors_obj = Object.new
-              allow(errors_obj).to receive(:full_messages).and_return(['Name can\'t be blank'])
-              errors_obj
-            end
-            let(:record) do
-              record_obj = Object.new
-              allow(record_obj).to receive(:errors).and_return(errors)
-              record_obj
-            end
-            let(:validation_error) do
-              error = ActiveRecord::RecordInvalid.new(record)
-              allow(error).to receive(:record).and_return(record)
-              error
-            end
+            let(:errors) { double.tap { |d| allow(d).to receive(:full_messages).and_return(['Name can\'t be blank']) } }
+            let(:record) { double.tap { |d| allow(d).to receive(:errors).and_return(errors) } }
+            let(:validation_error) { ActiveRecord::RecordInvalid.new(record) }
 
             it 'returns 400' do
               expect(handler.get_error_status(validation_error)).to eq(400)
