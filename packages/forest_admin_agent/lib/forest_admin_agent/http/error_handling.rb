@@ -16,9 +16,7 @@ module ForestAdminAgent
           return error.record.errors.full_messages.join(', ')
         end
 
-        if defined?(ActiveRecord) && error.is_a?(ActiveRecord::ActiveRecordError)
-          return error.message
-        end
+        return error.message if defined?(ActiveRecord) && error.is_a?(ActiveRecord::ActiveRecordError)
 
         'Unexpected error'
       end
@@ -28,7 +26,7 @@ module ForestAdminAgent
         return error.status if error.respond_to?(:status) && error.status
 
         # Handle ActiveRecord errors with 400 status
-        if defined?(ActiveRecord) && (error.is_a?(ActiveRecord::RecordInvalid)
+        if defined?(ActiveRecord) && (error.is_a?(ActiveRecord::RecordInvalid) || error.is_a?(ActiveRecord::ActiveRecordError))
           return 400
         end
 

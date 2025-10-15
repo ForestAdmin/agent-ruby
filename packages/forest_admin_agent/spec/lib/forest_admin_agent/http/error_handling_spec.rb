@@ -102,8 +102,15 @@ module ForestAdminAgent
           end
 
           context 'when error is ActiveRecord::RecordInvalid' do
+            let(:errors) do
+              errors_obj = Object.new
+              allow(errors_obj).to receive(:full_messages).and_return(['Name can\'t be blank', 'Email is invalid'])
+              errors_obj
+            end
             let(:record) do
-              double('record', errors: double('errors', full_messages: ['Name can\'t be blank', 'Email is invalid']))
+              record_obj = Object.new
+              allow(record_obj).to receive(:errors).and_return(errors)
+              record_obj
             end
             let(:validation_error) do
               error = ActiveRecord::RecordInvalid.new(record)
@@ -159,8 +166,15 @@ module ForestAdminAgent
           end
 
           context 'when error is ActiveRecord::RecordInvalid' do
+            let(:errors) do
+              errors_obj = Object.new
+              allow(errors_obj).to receive(:full_messages).and_return(['Name can\'t be blank'])
+              errors_obj
+            end
             let(:record) do
-              double('record', errors: double('errors', full_messages: ['Name can\'t be blank']))
+              record_obj = Object.new
+              allow(record_obj).to receive(:errors).and_return(errors)
+              record_obj
             end
             let(:validation_error) do
               error = ActiveRecord::RecordInvalid.new(record)
