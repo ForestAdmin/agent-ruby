@@ -51,6 +51,36 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields]['account_history'].class).to eq(Relations::ManyToManySchema)
         end
       end
+
+      describe 'delete' do
+        it 'uses delete_all for bulk deletion with a single SQL query' do
+          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+            condition_tree: ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new(
+              'brand',
+              ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL,
+              'Toyota'
+            )
+          )
+
+          query_double = instance_spy(ActiveRecord::Relation)
+          query_instance = instance_double(Utils::Query)
+          allow(Utils::Query).to receive(:new).and_return(query_instance)
+          allow(query_instance).to receive(:build).and_return(query_double)
+
+          collection.delete(nil, filter)
+
+          expect(query_double).to have_received(:delete_all)
+        end
+
+        it 'handles nil query gracefully' do
+          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new
+          query_instance = instance_double(Utils::Query)
+          allow(Utils::Query).to receive(:new).and_return(query_instance)
+          allow(query_instance).to receive(:build).and_return(nil)
+
+          expect { collection.delete(nil, filter) }.not_to raise_error
+        end
+      end
     end
 
     context 'with polymorphic support' do

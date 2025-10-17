@@ -40,8 +40,8 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def delete(_caller, filter)
-      entities = Utils::Query.new(self, nil, filter).build
-      entities&.each(&:destroy)
+      query = Utils::Query.new(self, nil, filter).build
+      query&.delete_all
     end
 
     private
