@@ -34,7 +34,8 @@ module ForestAdminAgent
             ),
             search: QueryStringParser.parse_search(@collection, args),
             search_extended: QueryStringParser.parse_search_extended(args),
-            sort: QueryStringParser.parse_sort(@collection, args)
+            sort: QueryStringParser.parse_sort(@collection, args),
+            segment: QueryStringParser.parse_segment(@collection, args)
           )
           projection = QueryStringParser.parse_projection(@collection, args)
           filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
