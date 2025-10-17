@@ -22,6 +22,11 @@ module ForestAdminRails
 
     def forest_response(data = {})
       if data[:content].is_a?(Hash)
+        # Handle streaming responses (NEW)
+        if data.dig(:content, :type) == 'Stream'
+          return handle_streaming_response(data)
+        end
+
         if data.dig(:content, :type) == 'File'
           return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
                                                     disposition: 'attachment'
@@ -37,6 +42,24 @@ module ForestAdminRails
         format.json { render json: data[:content], status: data[:status] || data[:content][:status] || 200 }
         format.csv { render plain: data[:content][:export], status: 200, filename: data[:filename] }
       end
+    end
+
+    private
+
+    # Handle streaming response (enumerator-based)
+    def handle_streaming_response(data)
+      enumerator = data[:content][:enumerator]
+      headers = data[:content][:headers] || {}
+
+      # Merge headers
+      response.headers.merge!(headers)
+
+      # Set response status
+      response.status = data[:status] || 200
+
+      # Stream the enumerator
+      # Rails will automatically use chunked transfer encoding
+      self.response_body = enumerator
     end
 
     def exception_handler(exception)

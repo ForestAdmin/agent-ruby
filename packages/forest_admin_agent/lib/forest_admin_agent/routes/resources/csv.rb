@@ -32,20 +32,37 @@ module ForestAdminAgent
                 )
               ]
             ),
-            page: QueryStringParser.parse_export_pagination(Facades::Container.config_from_cache[:limit_export_size]),
             search: QueryStringParser.parse_search(@collection, args),
-            search_extended: QueryStringParser.parse_search_extended(args)
+            search_extended: QueryStringParser.parse_search_extended(args),
+            sort: QueryStringParser.parse_sort(@collection, args)
           )
           projection = QueryStringParser.parse_projection(@collection, args)
-          records = @collection.list(@caller, filter, projection)
           filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
           filename += '.csv' unless /\.csv$/i.match?(filename)
 
+          # Generate timestamp for filename
+          now = Time.now.strftime('%Y%m%d_%H%M%S')
+          filename_with_timestamp = filename.gsub('.csv', "_export_#{now}.csv")
+
+          # Return streaming enumerator instead of full CSV string
           {
             content: {
-              export: CsvGenerator.generate(records, projection)
+              type: 'Stream',
+              enumerator: Utils::CsvGeneratorStream.stream(
+                @collection,
+                @caller,
+                filter,
+                projection,
+                Facades::Container.config_from_cache[:limit_export_size]
+              ),
+              headers: {
+                'Content-Type' => 'text/csv; charset=utf-8',
+                'Content-Disposition' => "attachment; filename=\"#{filename_with_timestamp}\"",
+                'Cache-Control' => 'no-cache',
+                'X-Accel-Buffering' => 'no'
+              }
             },
-            filename: filename
+            status: 200
           }
         end
       end

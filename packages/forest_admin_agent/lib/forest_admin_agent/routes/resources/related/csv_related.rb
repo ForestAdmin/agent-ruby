@@ -30,28 +30,39 @@ module ForestAdminAgent
                   @permissions.get_scope(@collection),
                   ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
                 ]
-              ),
-              page: QueryStringParser.parse_export_pagination(Facades::Container.config_from_cache[:limit_export_size])
+              )
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
-            id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
-            records = Collection.list_relation(
-              @collection,
-              id,
-              args[:params]['relation_name'],
-              @caller,
-              filter,
-              projection
-            )
 
             filename = args[:params][:filename] || "#{args[:params]["relation_name"]}.csv"
             filename += '.csv' unless /\.csv$/i.match?(filename)
 
+            # Generate timestamp for filename
+            now = Time.now.strftime('%Y%m%d_%H%M%S')
+            collection_name = args[:params]["collection_name"]
+            relation_name = args[:params]["relation_name"]
+            filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
+
+            # For related exports, we need to create a streaming-compatible approach
+            # We'll use the child collection's list method with proper filtering
             {
               content: {
-                export: CsvGenerator.generate(records, projection)
+                type: 'Stream',
+                enumerator: ForestAdminAgent::Utils::CsvGeneratorStream.stream(
+                  @child_collection,
+                  @caller,
+                  filter,
+                  projection,
+                  Facades::Container.config_from_cache[:limit_export_size]
+                ),
+                headers: {
+                  'Content-Type' => 'text/csv; charset=utf-8',
+                  'Content-Disposition' => "attachment; filename=\"#{filename_with_timestamp}\"",
+                  'Cache-Control' => 'no-cache',
+                  'X-Accel-Buffering' => 'no'
+                }
               },
-              filename: filename
+              status: 200
             }
           end
         end
