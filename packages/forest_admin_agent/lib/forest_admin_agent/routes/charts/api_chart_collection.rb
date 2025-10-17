@@ -33,6 +33,13 @@ module ForestAdminAgent
             proc { |args| handle_api_chart(args) }
           )
 
+          unless Facades::Container.cache(:is_production)
+            Facades::Container.logger.log(
+              'Debug',
+              "Chart #{@chart_name} was mounted at /forest/_charts/#{collection_name}/#{slug}"
+            )
+          end
+
           self
         end
 
