@@ -183,7 +183,7 @@ module ForestAdminDatasourceToolkit
               Exceptions::ValidationError,
               "🌳🌳🌳 The given operator 'contains' is not allowed with the columnType schema: 'Number'. " \
               'The allowed types are: ' \
-              '[blank,equal,missing,not_equal,present,in,not_in,includes_all,greater_than,less_than]'
+              '[blank,equal,missing,not_equal,present,in,not_in,includes_all,greater_than,less_than,greater_than_or_equal,less_than_or_equal]'
             )
           end
         end
@@ -203,7 +203,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given value has a wrong type for 'target': .\n Expects [\"Number\", \"Timeonly\"]"
+              "🌳🌳🌳 The given value has a wrong type for 'target': .\n Expects [\"String\", \"Number\", \"Date\", \"Timeonly\", \"Dateonly\"]"
             )
           end
         end
