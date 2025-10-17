@@ -1,3 +1,10 @@
+## [1.8.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.4...v1.8.5) (2025-10-17)
+
+
+### Bug Fixes
+
+* **logs:** remove spam logs about mounted charts ([#152](https://github.com/ForestAdmin/agent-ruby/issues/152)) ([888f073](https://github.com/ForestAdmin/agent-ruby/commit/888f073149df190449a1cbe235b22f6540772b96))
+
 ## [1.8.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.3...v1.8.4) (2025-10-17)
 
 
