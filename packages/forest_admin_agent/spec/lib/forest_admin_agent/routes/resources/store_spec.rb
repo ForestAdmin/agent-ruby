@@ -99,6 +99,60 @@ module ForestAdminAgent
                 }
             )
           end
+
+          it 'includes null attributes in the returned result' do
+            attributes = {
+              'title' => 'Harry potter and the goblet of fire',
+              'published_at' => nil,
+              'price' => nil
+            }
+            book = { 'id' => 1 }.merge(attributes)
+
+            datasource = Datasource.new
+            collection = build_collection(
+              name: 'book',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number',
+                    is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  ),
+                  'title' => ColumnSchema.new(column_type: 'String'),
+                  'published_at' => ColumnSchema.new(column_type: 'Date'),
+                  'price' => ColumnSchema.new(column_type: 'Number')
+                }
+              },
+              create: book,
+              list: [book]
+            )
+
+            datasource.add_collection(collection)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+            args[:params][:data] = { attributes: attributes, type: 'books' }
+
+            result = store.handle_request(args)
+            expect(collection).to have_received(:create) do |caller, data|
+              expect(caller).to be_instance_of(Components::Caller)
+              expect(data).to eq(attributes)
+            end
+            expect(result[:name]).to eq('book')
+            expect(result[:content]).to eq(
+              'data' =>
+                {
+                  'type' => 'book',
+                  'id' => '1',
+                  'attributes' => {
+                    'id' => 1,
+                    'title' => 'Harry potter and the goblet of fire',
+                    'published_at' => nil,
+                    'price' => nil
+                  },
+                  'links' => { 'self' => '/forest/book/1' }
+                }
+            )
+          end
         end
 
         describe 'with relation' do
@@ -184,7 +238,6 @@ module ForestAdminAgent
                     'links' => { 'self' => '/forest/person/1' },
                     'relationships' => {
                       'passport' => {
-                        'data' => nil,
                         'links' => { 'related' => { 'href' => '/forest/person/1/relationships/passport' } }
                       }
                     }
@@ -221,7 +274,6 @@ module ForestAdminAgent
                     'links' => { 'self' => '/forest/passport/1' },
                     'relationships' => {
                       'person' => {
-                        'data' => nil,
                         'links' => {
                           'related' => {
                             'href' => '/forest/passport/1/relationships/person'
