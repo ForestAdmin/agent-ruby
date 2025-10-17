@@ -31,7 +31,7 @@ module ForestAdminAgent
           )
 
           unless Facades::Container.cache(:is_production)
-            Facades::Container.logger.log('Info', "Chart #{@chart_name} was mounted at /forest/_charts/#{slug}")
+            Facades::Container.logger.log('Debug', "Chart #{@chart_name} was mounted at /forest/_charts/#{slug}")
           end
 
           self
