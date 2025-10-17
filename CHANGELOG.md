@@ -1,3 +1,10 @@
+## [1.8.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.3...v1.8.4) (2025-10-17)
+
+
+### Bug Fixes
+
+* **datasource_activerecord:** implement blank, present & missing filter operators with proper string handling ([#148](https://github.com/ForestAdmin/agent-ruby/issues/148)) ([d69b1dc](https://github.com/ForestAdmin/agent-ruby/commit/d69b1dc55a7316580135be1cf937f25aa6d04abe))
+
 ## [1.8.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.2...v1.8.3) (2025-10-14)
 
 
