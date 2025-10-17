@@ -31,12 +31,12 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def create(_caller, data)
-      Utils::ActiveRecordSerializer.new(@model.create(data)).to_hash(ProjectionFactory.all(self))
+      Utils::ActiveRecordSerializer.new(@model.create!(data)).to_hash(ProjectionFactory.all(self))
     end
 
     def update(_caller, filter, data)
       entity = Utils::Query.new(self, nil, filter).build.first
-      entity&.update(data)
+      entity&.update!(data)
     end
 
     def delete(_caller, filter)
