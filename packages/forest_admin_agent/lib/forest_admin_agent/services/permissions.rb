@@ -41,12 +41,13 @@ module ForestAdminAgent
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
 
-        is_allowed = collections_data.key?(collection.name.to_sym) && collections_data[collection.name.to_sym][action].include?(user_data[:roleId])
+        # First check
+        is_allowed = permission_allowed?(collections_data, collection, action, user_data)
 
-        # Refetch
+        # Refetch if not allowed
         unless is_allowed
           collections_data = get_collections_permissions_data(force_fetch: true)
-          is_allowed = collections_data[collection.name.to_sym][action].include?(user_data[:roleId])
+          is_allowed = permission_allowed?(collections_data, collection, action, user_data)
         end
 
         # still not allowed - throw forbidden message
@@ -170,6 +171,36 @@ module ForestAdminAgent
 
       private
 
+      def permission_allowed?(collections_data, collection, action, user_data)
+        collection_key = collection.name.to_sym
+
+        # Validate collection exists
+        unless collections_data.key?(collection_key)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "Collection '#{collection.name}' not found in permissions. " \
+            "Available: #{collections_data.keys.join(", ")}"
+          )
+          return false
+        end
+
+        # Validate action exists
+        collection_permissions = collections_data[collection_key]
+        role_ids = collection_permissions[action]
+
+        if role_ids.nil?
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "Action '#{action}' not found for collection '#{collection.name}'. " \
+            "Available: #{collection_permissions.compact.keys.join(", ")}"
+          )
+          return false
+        end
+
+        # Check user permission
+        role_ids.include?(user_data[:roleId])
+      end
+
       def get_collections_permissions_data(force_fetch: false)
         self.class.invalidate_cache('forest.collections') if force_fetch == true
 
@@ -252,12 +283,12 @@ module ForestAdminAgent
 
       def decode_crud_permissions(collection)
         {
-          browse: collection[:collection][:browseEnabled][:roles],
-          read: collection[:collection][:readEnabled][:roles],
-          edit: collection[:collection][:editEnabled][:roles],
-          add: collection[:collection][:addEnabled][:roles],
-          delete: collection[:collection][:deleteEnabled][:roles],
-          export: collection[:collection][:exportEnabled][:roles]
+          browse: collection.dig(:collection, :browseEnabled, :roles),
+          read: collection.dig(:collection, :readEnabled, :roles),
+          edit: collection.dig(:collection, :editEnabled, :roles),
+          add: collection.dig(:collection, :addEnabled, :roles),
+          delete: collection.dig(:collection, :deleteEnabled, :roles),
+          export: collection.dig(:collection, :exportEnabled, :roles)
         }
       end
 

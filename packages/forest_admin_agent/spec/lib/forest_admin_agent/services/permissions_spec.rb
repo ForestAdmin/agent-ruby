@@ -363,6 +363,231 @@ module ForestAdminAgent
                               @datasource.collections['Book'])
           end.to raise_error(ForbiddenError, "You don't have permission to browse this collection.")
         end
+
+        context 'when collection removed after first check (CRITICAL BUG FIX)' do
+          it 'does not crash and raises ForbiddenError' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1
+              }
+            )
+
+            # First fetch returns Book collection (user not allowed)
+            # Second fetch (refetch) returns without Book collection
+            allow(@permissions).to receive(:fetch).and_return(
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1000] },
+                      readEnabled: { roles: [1000] },
+                      editEnabled: { roles: [1000] },
+                      addEnabled: { roles: [1000] },
+                      deleteEnabled: { roles: [1000] },
+                      exportEnabled: { roles: [1000] }
+                    },
+                    actions: []
+                  }
+                }
+              },
+              {
+                collections: {} # Book collection removed!
+              }
+            )
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError, "You don't have permission to browse this collection.")
+          end
+
+          it 'logs debug message about missing collection after refetch' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1
+              }
+            )
+
+            allow(@permissions).to receive(:fetch).and_return(
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1000] },
+                      readEnabled: { roles: [1000] },
+                      editEnabled: { roles: [1000] },
+                      addEnabled: { roles: [1000] },
+                      deleteEnabled: { roles: [1000] },
+                      exportEnabled: { roles: [1000] }
+                    },
+                    actions: []
+                  }
+                }
+              },
+              {
+                collections: {}
+              }
+            )
+
+            # Allow any log calls but verify our specific one happens
+            allow(ForestAdminAgent::Facades::Container.logger).to receive(:log).and_call_original
+            expect(ForestAdminAgent::Facades::Container.logger).to receive(:log)
+              .with('Debug', /Collection 'Book' not found/).at_least(:once).and_call_original
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError)
+          end
+        end
+
+        context 'when action removed after first check' do
+          it 'does not crash and raises ForbiddenError' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1
+              }
+            )
+
+            # First fetch has edit action (user not allowed)
+            # Second fetch doesn't have edit action
+            allow(@permissions).to receive(:fetch).and_return(
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1] },
+                      readEnabled: { roles: [1] },
+                      editEnabled: { roles: [1000] },
+                      addEnabled: { roles: [1] },
+                      deleteEnabled: { roles: [1] },
+                      exportEnabled: { roles: [1] }
+                    },
+                    actions: []
+                  }
+                }
+              },
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1] },
+                      readEnabled: { roles: [1] },
+                      addEnabled: { roles: [1] },
+                      deleteEnabled: { roles: [1] },
+                      exportEnabled: { roles: [1] }
+                      # editEnabled removed!
+                    },
+                    actions: []
+                  }
+                }
+              }
+            )
+
+            expect do
+              @permissions.can?(:edit, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError, "You don't have permission to edit this collection.")
+          end
+
+          it 'logs debug message about missing action after refetch' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1
+              }
+            )
+
+            allow(@permissions).to receive(:fetch).and_return(
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1] },
+                      readEnabled: { roles: [1] },
+                      editEnabled: { roles: [1000] },
+                      addEnabled: { roles: [1] },
+                      deleteEnabled: { roles: [1] },
+                      exportEnabled: { roles: [1] }
+                    },
+                    actions: []
+                  }
+                }
+              },
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1] },
+                      readEnabled: { roles: [1] },
+                      addEnabled: { roles: [1] },
+                      deleteEnabled: { roles: [1] },
+                      exportEnabled: { roles: [1] }
+                    },
+                    actions: []
+                  }
+                }
+              }
+            )
+
+            # Allow any log calls but verify our specific one happens
+            allow(ForestAdminAgent::Facades::Container.logger).to receive(:log).and_call_original
+            expect(ForestAdminAgent::Facades::Container.logger).to receive(:log)
+              .with('Debug', /Action 'edit' not found/).at_least(:once).and_call_original
+
+            expect do
+              @permissions.can?(:edit, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError)
+          end
+        end
+
+        context 'when refetch grants permission (happy path)' do
+          it 'returns true after refetch' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1
+              }
+            )
+
+            # First fetch: user not allowed
+            # Second fetch: user now allowed
+            allow(@permissions).to receive(:fetch).and_return(
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1000] },
+                      readEnabled: { roles: [1000] },
+                      editEnabled: { roles: [1000] },
+                      addEnabled: { roles: [1000] },
+                      deleteEnabled: { roles: [1000] },
+                      exportEnabled: { roles: [1000] }
+                    },
+                    actions: []
+                  }
+                }
+              },
+              {
+                collections: {
+                  Book: {
+                    collection: {
+                      browseEnabled: { roles: [1] }, # User now allowed!
+                      readEnabled: { roles: [1] },
+                      editEnabled: { roles: [1] },
+                      addEnabled: { roles: [1] },
+                      deleteEnabled: { roles: [1] },
+                      exportEnabled: { roles: [1] }
+                    },
+                    actions: []
+                  }
+                }
+              }
+            )
+
+            expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
+          end
+        end
       end
 
       context 'when can_execute_query_segment? is called' do
