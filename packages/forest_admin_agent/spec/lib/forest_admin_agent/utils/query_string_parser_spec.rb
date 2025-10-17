@@ -287,19 +287,155 @@ module ForestAdminAgent
           expect(described_class.parse_pagination({})).to have_attributes(offset: 0, limit: 15)
         end
 
-        it 'raise an error when request provides invalid values' do
+        it 'accept valid pagination with plus sign' do
           args = {
             params: {
-              page: { size: -5, number: 'NaN' }
+              page: { size: '+50', number: '+1' }
             }
           }
 
-          expect do
-            described_class.parse_pagination(args)
-          end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
-          )
+          expect(described_class.parse_pagination(args)).to have_attributes(offset: 0, limit: 50)
+        end
+
+        context 'when both parameters are invalid' do
+          it 'raise an error when request provides invalid values' do
+            args = {
+              params: {
+                page: { size: -5, number: 'NaN' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
+            )
+          end
+        end
+
+        context 'when page size is invalid but page number is valid' do
+          it 'raise an error for string page size' do
+            args = {
+              params: {
+                page: { size: 'abc', number: '1' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: abc, skip: 1]'
+            )
+          end
+
+          it 'raise an error for negative page size' do
+            args = {
+              params: {
+                page: { size: '-50', number: '1' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: -50, skip: 1]'
+            )
+          end
+
+          it 'raise an error for zero page size' do
+            args = {
+              params: {
+                page: { size: '0', number: '1' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: 0, skip: 1]'
+            )
+          end
+
+          it 'raise an error for float page size' do
+            args = {
+              params: {
+                page: { size: '1.5', number: '1' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: 1.5, skip: 1]'
+            )
+          end
+        end
+
+        context 'when page number is invalid but page size is valid' do
+          it 'raise an error for string page number' do
+            args = {
+              params: {
+                page: { size: '50', number: 'invalid' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: 50, skip: invalid]'
+            )
+          end
+
+          it 'raise an error for negative page number' do
+            args = {
+              params: {
+                page: { size: '50', number: '-1' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: 50, skip: -1]'
+            )
+          end
+
+          it 'raise an error for float page number' do
+            args = {
+              params: {
+                page: { size: '50', number: '1.5' }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              '🌳🌳🌳 Invalid pagination [limit: 50, skip: 1.5]'
+            )
+          end
+
+          it 'raise an error for SQL injection attempt' do
+            args = {
+              params: {
+                page: { size: '50', number: "'; DROP TABLE users--" }
+              }
+            }
+
+            expect do
+              described_class.parse_pagination(args)
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "🌳🌳🌳 Invalid pagination [limit: 50, skip: '; DROP TABLE users--]"
+            )
+          end
         end
       end
 
