@@ -1,3 +1,10 @@
+## [1.8.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.5...v1.8.6) (2025-10-17)
+
+
+### Bug Fixes
+
+* pagination validation ([#156](https://github.com/ForestAdmin/agent-ruby/issues/156)) ([817e275](https://github.com/ForestAdmin/agent-ruby/commit/817e2751cb590a97c348d9b20ddb4e951cdd9b57))
+
 ## [1.8.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.4...v1.8.5) (2025-10-17)
 
 
