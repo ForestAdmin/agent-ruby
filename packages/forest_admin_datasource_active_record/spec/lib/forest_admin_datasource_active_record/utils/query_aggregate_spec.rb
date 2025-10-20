@@ -231,7 +231,7 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'created_at); DROP TABLE cars; --')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              /Invalid field name/
+              /Invalid field: .* does not exist in collection/
             )
           end
 
@@ -248,7 +248,24 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'field; DELETE FROM cars')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              /Invalid field name/
+              /Invalid field: .* does not exist in collection/
+            )
+          end
+
+          it 'blocks non-existent field names' do
+            aggregation = Aggregation.new(
+              operation: 'Count',
+              field: nil,
+              groups: [{ field: 'created_at', operation: 'day' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.send(:date_trunc_sql, 'day', 'non_existent_field')
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid field: 'non_existent_field' does not exist in collection/
             )
           end
 
