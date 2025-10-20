@@ -21,7 +21,8 @@ module ForestAdminDatasourceActiveRecord
         @aggregation.groups.each do |group|
           field = format_field(group[:field])
           if group[:operation]
-            date_trunc_expression = date_trunc_sql(group[:operation], field)
+            # Pass original field name for validation before SQL generation
+            date_trunc_expression = date_trunc_sql(group[:operation], field, group[:field])
             @select << "#{date_trunc_expression} AS \"#{group[:field]}\""
             group_fields << date_trunc_expression
           else
@@ -56,11 +57,31 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
+      # Whitelist of valid date truncation operations
+      VALID_DATE_OPERATIONS = %w[
+        second
+        minute
+        hour
+        day
+        week
+        month
+        quarter
+        year
+      ].freeze
+
       private
 
-      def date_trunc_sql(operation, field)
+      def date_trunc_sql(operation, field, original_field_name = nil)
         adapter_name = @collection.model.connection.adapter_name.downcase
-        operation = operation.downcase
+        operation = operation.to_s.downcase
+
+        unless VALID_DATE_OPERATIONS.include?(operation)
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                "Invalid date truncation operation: '#{operation}'. " \
+                "Allowed values: #{VALID_DATE_OPERATIONS.join(", ")}"
+        end
+
+        validate_field_exists!(original_field_name || field)
 
         case adapter_name
         when 'postgresql'
@@ -72,6 +93,14 @@ module ForestAdminDatasourceActiveRecord
         else
           raise ArgumentError, "Unsupported database adapter '#{adapter_name}' for date truncation"
         end
+      end
+
+      def validate_field_exists!(field)
+        ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, field)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        # Re-raise as ValidationError for consistency with other validation errors in this class
+        raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              "Invalid field '#{field}': #{e.message}"
       end
 
       # rubocop:disable Layout/LineLength

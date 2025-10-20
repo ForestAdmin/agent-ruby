@@ -101,7 +101,187 @@ module ForestAdminDatasourceActiveRecord
 
           expect do
             query_aggregate.get
-          end.to raise_error(ArgumentError, /Unsupported date truncation operation 'not_a_real_unit'/)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+            /Invalid date truncation operation: 'not_a_real_unit'/
+          )
+        end
+      end
+
+      describe 'SQL Injection Prevention' do
+        context 'with malicious operation parameter' do
+          it 'blocks SQL injection via DROP TABLE' do
+            aggregation = Aggregation.new(
+              operation: 'Sum',
+              field: 'nb_seats',
+              groups: [{ field: 'created_at', operation: "day'); DROP TABLE cars; --" }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.get
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid date truncation operation/
+            )
+          end
+
+          it 'blocks SQL injection via UNION SELECT' do
+            aggregation = Aggregation.new(
+              operation: 'Sum',
+              field: 'nb_seats',
+              groups: [{ field: 'created_at', operation: "day') UNION SELECT password FROM users; --" }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.get
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid date truncation operation/
+            )
+          end
+
+          it 'blocks SQL injection with semicolons' do
+            aggregation = Aggregation.new(
+              operation: 'Sum',
+              field: 'nb_seats',
+              groups: [{ field: 'created_at', operation: 'day; DELETE FROM cars' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.get
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid date truncation operation/
+            )
+          end
+
+          it 'blocks arbitrary SQL keywords' do
+            %w[DROP DELETE UPDATE INSERT SELECT].each do |keyword|
+              aggregation = Aggregation.new(
+                operation: 'Sum',
+                field: 'nb_seats',
+                groups: [{ field: 'created_at', operation: keyword }]
+              )
+
+              query_aggregate = described_class.new(collection, aggregation)
+
+              expect do
+                query_aggregate.get
+              end.to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                /Invalid date truncation operation/
+              )
+            end
+          end
+        end
+
+        context 'with valid operations' do
+          it 'accepts all whitelisted operations' do
+            %w[second minute hour day week month quarter year].each do |operation|
+              aggregation = Aggregation.new(
+                operation: 'Count',
+                field: nil,
+                groups: [{ field: 'created_at', operation: operation }]
+              )
+
+              query_aggregate = described_class.new(collection, aggregation)
+
+              expect do
+                query_aggregate.get
+              end.not_to raise_error
+            end
+          end
+
+          it 'accepts operations with different case' do
+            %w[DAY Day dAy].each do |operation|
+              aggregation = Aggregation.new(
+                operation: 'Count',
+                field: nil,
+                groups: [{ field: 'created_at', operation: operation }]
+              )
+
+              query_aggregate = described_class.new(collection, aggregation)
+
+              expect do
+                query_aggregate.get
+              end.not_to raise_error
+            end
+          end
+        end
+
+        context 'with malicious field names', :db_truncation do
+          it 'blocks SQL injection in field parameter' do
+            # Mock format_field to return malicious string
+            aggregation = Aggregation.new(
+              operation: 'Sum',
+              field: 'nb_seats',
+              groups: [{ field: 'created_at', operation: 'day' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            # Test the date_trunc_sql method directly with malicious field
+            expect do
+              query_aggregate.send(:date_trunc_sql, 'day', 'created_at); DROP TABLE cars; --')
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid field.*Column not found/
+            )
+          end
+
+          it 'blocks field names with semicolons' do
+            aggregation = Aggregation.new(
+              operation: 'Sum',
+              field: 'nb_seats',
+              groups: [{ field: 'created_at', operation: 'day' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.send(:date_trunc_sql, 'day', 'field; DELETE FROM cars')
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid field.*Column not found/
+            )
+          end
+
+          it 'blocks non-existent field names' do
+            aggregation = Aggregation.new(
+              operation: 'Count',
+              field: nil,
+              groups: [{ field: 'created_at', operation: 'day' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.send(:date_trunc_sql, 'day', 'non_existent_field')
+            end.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              /Invalid field.*Column not found/
+            )
+          end
+
+          it 'accepts valid field names with underscores' do
+            aggregation = Aggregation.new(
+              operation: 'Count',
+              field: nil,
+              groups: [{ field: 'created_at', operation: 'day' }]
+            )
+
+            query_aggregate = described_class.new(collection, aggregation)
+
+            expect do
+              query_aggregate.send(:date_trunc_sql, 'day', 'created_at')
+            end.not_to raise_error
+          end
         end
       end
     end
