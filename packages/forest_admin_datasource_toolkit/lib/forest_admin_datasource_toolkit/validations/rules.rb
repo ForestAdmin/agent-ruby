@@ -41,6 +41,7 @@ module ForestAdminDatasourceToolkit
             Operators::SHORTER_THAN,
             Operators::LIKE,
             Operators::I_LIKE,
+            Operators::MATCH,
             Operators::I_CONTAINS,
             Operators::I_ENDS_WITH,
             Operators::I_STARTS_WITH,

@@ -30,6 +30,30 @@ module ForestAdminDatasourceActiveRecord
       end
 
       describe 'filter operators' do
+        context 'when using CONTAINS operator' do
+          it 'filters records where field contains value (case sensitive)' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::CONTAINS, 'test')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"cars"."brand" LIKE \'%test%\'')
+          end
+        end
+
+        context 'when using I_CONTAINS operator' do
+          it 'filters records where field contains value (case insensitive)' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::I_CONTAINS, 'Test')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('LOWER("cars"."brand") LIKE \'%test%\'')
+          end
+        end
+
         context 'when using BLANK operator' do
           context 'with a String field' do
             it 'filters records where field is NULL or empty string' do

@@ -11,7 +11,7 @@ module ForestAdminAgent
 
       def self.from_plain_object(collection, filters)
         if leaf?(filters)
-          operator = filters[:operator].titleize.tr(' ', '_')
+          operator = filters[:operator].titleize.tr(' ', '_').downcase
           value = parse_value(collection, filters)
 
           return ConditionTreeLeaf.new(filters[:field], operator, value)

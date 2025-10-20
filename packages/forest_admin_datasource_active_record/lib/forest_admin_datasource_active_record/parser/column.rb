@@ -83,6 +83,28 @@ module ForestAdminDatasourceActiveRecord
         ]
 
         if type.is_a? String
+          orderables = [
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
+          ]
+          strings = [
+            Operators::CONTAINS,
+            Operators::I_CONTAINS,
+            Operators::NOT_CONTAINS,
+            Operators::NOT_I_CONTAINS,
+            Operators::STARTS_WITH,
+            Operators::I_STARTS_WITH,
+            Operators::ENDS_WITH,
+            Operators::I_ENDS_WITH,
+            Operators::LIKE,
+            Operators::I_LIKE,
+            Operators::MATCH,
+            Operators::SHORTER_THAN,
+            Operators::LONGER_THAN
+          ]
+
           result += equality if %w[Boolean Binary Enum Uuid].include?(type)
 
           result = result + equality + orderables if %w[Date Dateonly Number].include?(type)
