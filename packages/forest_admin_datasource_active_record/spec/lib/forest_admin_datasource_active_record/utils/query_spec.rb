@@ -30,6 +30,30 @@ module ForestAdminDatasourceActiveRecord
       end
 
       describe 'filter operators' do
+        context 'when using CONTAINS operator' do
+          it 'filters records where field contains value (case sensitive)' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::CONTAINS, 'test')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"cars"."brand" LIKE \'%test%\'')
+          end
+        end
+
+        context 'when using I_CONTAINS operator' do
+          it 'filters records where field contains value (case insensitive)' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::I_CONTAINS, 'Test')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('LOWER("cars"."brand") LIKE \'%test%\'')
+          end
+        end
+
         context 'when using BLANK operator' do
           context 'with a String field' do
             it 'filters records where field is NULL or empty string' do
@@ -88,6 +112,172 @@ module ForestAdminDatasourceActiveRecord
 
               expect(query_builder.query.to_sql).to include('"cars"."year" IS NOT NULL')
             end
+          end
+        end
+
+        context 'when using comparison operators on String fields' do
+          context 'with numeric value' do
+            it 'uses LENGTH() function for GREATER_THAN' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN, 10)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*>.*10/)
+            end
+
+            it 'uses LENGTH() function for LESS_THAN' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::LESS_THAN, 5)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*<.*5/)
+            end
+
+            it 'uses LENGTH() function for GREATER_THAN_OR_EQUAL' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN_OR_EQUAL, 15)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*>=.*15/)
+            end
+
+            it 'uses LENGTH() function for LESS_THAN_OR_EQUAL' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::LESS_THAN_OR_EQUAL, 20)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*<=.*20/)
+            end
+
+            it 'handles zero value correctly' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN, 0)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*>.*0/)
+            end
+
+            it 'handles float value correctly' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN, 10.5)
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).to include('LENGTH')
+              expect(sql).to match(/LENGTH.*"brand".*>.*10\.5/)
+            end
+          end
+
+          context 'with string value' do
+            it 'uses lexicographic comparison for GREATER_THAN' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN, 'Toyota')
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).not_to include('LENGTH')
+              expect(sql).to match(/"brand".*>.*'Toyota'/)
+            end
+
+            it 'uses lexicographic comparison for LESS_THAN' do
+              condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::LESS_THAN, 'BMW')
+              filter = Filter.new(condition_tree: condition_tree)
+              query_builder = described_class.new(collection, nil, filter)
+              query_builder.build
+
+              sql = query_builder.query.to_sql
+              expect(sql).not_to include('LENGTH')
+              expect(sql).to match(/"brand".*<.*'BMW'/)
+            end
+          end
+        end
+
+        context 'when using comparison operators on Number fields' do
+          it 'uses direct comparison without LENGTH() for GREATER_THAN' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('year', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::GREATER_THAN, 2000)
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).not_to include('LENGTH')
+            expect(sql).to match(/"year".*>.*2000/)
+          end
+
+          it 'uses direct comparison without LENGTH() for LESS_THAN' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('year', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::LESS_THAN, 2020)
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).not_to include('LENGTH')
+            expect(sql).to match(/"year".*<.*2020/)
+          end
+        end
+
+        context 'when using MATCH operator' do
+          it 'generates REGEXP clause with string value' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, 'Toyota|Honda')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('Toyota|Honda')
+          end
+
+          it 'extracts pattern from Regexp object' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, /^test.*/i)
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('^test.*')
+          end
+
+          it 'extracts pattern from JavaScript regex string' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, '/(foo|bar)/g')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('(foo|bar)')
+            expect(sql).not_to include('/g')
+          end
+
+          it 'handles case-insensitive JavaScript regex string' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, '/(test)/gi')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('(test)')
+            expect(sql).not_to include('/gi')
           end
         end
       end

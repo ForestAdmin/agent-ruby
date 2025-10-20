@@ -61,10 +61,49 @@ module ForestAdminDatasourceActiveRecord
       def operators_for_column_type(type)
         result = [Operators::PRESENT, Operators::BLANK, Operators::MISSING]
         equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
+        orderables = [
+          Operators::LESS_THAN,
+          Operators::GREATER_THAN,
+          Operators::LESS_THAN_OR_EQUAL,
+          Operators::GREATER_THAN_OR_EQUAL
+        ]
+        strings = [
+          Operators::LIKE,
+          Operators::I_LIKE,
+          Operators::CONTAINS,
+          Operators::I_CONTAINS,
+          Operators::NOT_CONTAINS,
+          Operators::NOT_I_CONTAINS,
+          Operators::STARTS_WITH,
+          Operators::I_STARTS_WITH,
+          Operators::ENDS_WITH,
+          Operators::I_ENDS_WITH,
+          Operators::SHORTER_THAN,
+          Operators::LONGER_THAN
+        ]
 
         if type.is_a? String
-          orderables = [Operators::LESS_THAN, Operators::GREATER_THAN]
-          strings = [Operators::LIKE, Operators::I_LIKE, Operators::NOT_CONTAINS]
+          orderables = [
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
+          ]
+          strings = [
+            Operators::CONTAINS,
+            Operators::I_CONTAINS,
+            Operators::NOT_CONTAINS,
+            Operators::NOT_I_CONTAINS,
+            Operators::STARTS_WITH,
+            Operators::I_STARTS_WITH,
+            Operators::ENDS_WITH,
+            Operators::I_ENDS_WITH,
+            Operators::LIKE,
+            Operators::I_LIKE,
+            Operators::MATCH,
+            Operators::SHORTER_THAN,
+            Operators::LONGER_THAN
+          ]
 
           result += equality if %w[Boolean Binary Enum Uuid].include?(type)
 
@@ -73,7 +112,7 @@ module ForestAdminDatasourceActiveRecord
           result = result + equality + orderables + strings if %w[String].include?(type)
         end
 
-        result = result + equality + ['Includes_All'] if type.is_a? Array
+        result += [Operators::EQUAL, Operators::NOT_EQUAL, Operators::INCLUDES_ALL] if type.is_a?(Array)
 
         result
       end
