@@ -89,48 +89,17 @@ module ForestAdminAgent
           end
         end
 
-        context 'when ActiveRecord is defined' do
+        context 'when error is a ValidationError' do
+          let(:validation_error) do
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('The query violates a unicity constraint')
+          end
+
           before do
             allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:customize_error_message).and_return(nil)
-
-            # Mock ActiveRecord if not already loaded
-            unless defined?(ActiveRecord)
-              stub_const('ActiveRecord', Module.new)
-
-              # Create a RecordInvalid class that stores the record like the real one
-              record_invalid_class = Class.new(StandardError) do
-                attr_reader :record
-
-                def initialize(record = nil)
-                  @record = record
-                  super(record.to_s)
-                end
-              end
-              stub_const('ActiveRecord::RecordInvalid', record_invalid_class)
-
-              stub_const('ActiveRecord::ActiveRecordError', Class.new(StandardError))
-            end
           end
 
-          context 'when error is ActiveRecord::RecordInvalid' do
-            let(:errors) { double.tap { |d| allow(d).to receive(:full_messages).and_return(['Name can\'t be blank', 'Email is invalid']) } }
-            let(:record) { double.tap { |d| allow(d).to receive(:errors).and_return(errors) } }
-            let(:validation_error) { ActiveRecord::RecordInvalid.new(record) }
-
-            it 'returns the full validation error messages' do
-              expect(handler.get_error_message(validation_error)).to eq('Name can\'t be blank, Email is invalid')
-            end
-          end
-
-          context 'when error is a general ActiveRecord::ActiveRecordError' do
-            let(:ar_error) do
-              error = ActiveRecord::ActiveRecordError.new('Database connection failed')
-              error
-            end
-
-            it 'returns the error message' do
-              expect(handler.get_error_message(ar_error)).to eq('Database connection failed')
-            end
+          it 'returns the validation error message' do
+            expect(handler.get_error_message(validation_error)).to eq('🌳🌳🌳 The query violates a unicity constraint')
           end
         end
       end
@@ -146,53 +115,21 @@ module ForestAdminAgent
           end
         end
 
+        context 'when error is a ValidationError' do
+          let(:validation_error) do
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('Invalid data')
+          end
+
+          it 'returns 400' do
+            expect(handler.get_error_status(validation_error)).to eq(400)
+          end
+        end
+
         context 'when error does not have a status method' do
           let(:standard_error) { StandardError.new('Standard error message') }
 
           it 'returns 500' do
             expect(handler.get_error_status(standard_error)).to eq(500)
-          end
-        end
-
-        context 'when ActiveRecord is defined' do
-          before do
-            # Mock ActiveRecord if not already loaded
-            unless defined?(ActiveRecord)
-              stub_const('ActiveRecord', Module.new)
-
-              # Create a RecordInvalid class that stores the record like the real one
-              record_invalid_class = Class.new(StandardError) do
-                attr_reader :record
-
-                def initialize(record = nil)
-                  @record = record
-                  super(record.to_s)
-                end
-              end
-              stub_const('ActiveRecord::RecordInvalid', record_invalid_class)
-
-              stub_const('ActiveRecord::ActiveRecordError', Class.new(StandardError))
-            end
-          end
-
-          context 'when error is ActiveRecord::RecordInvalid' do
-            let(:errors) { double.tap { |d| allow(d).to receive(:full_messages).and_return(['Name can\'t be blank']) } }
-            let(:record) { double.tap { |d| allow(d).to receive(:errors).and_return(errors) } }
-            let(:validation_error) { ActiveRecord::RecordInvalid.new(record) }
-
-            it 'returns 400' do
-              expect(handler.get_error_status(validation_error)).to eq(400)
-            end
-          end
-
-          context 'when error is a general ActiveRecord::ActiveRecordError' do
-            let(:ar_error) do
-              ActiveRecord::ActiveRecordError.new('Database connection failed')
-            end
-
-            it 'returns 400' do
-              expect(handler.get_error_status(ar_error)).to eq(400)
-            end
           end
         end
       end

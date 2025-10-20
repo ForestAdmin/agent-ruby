@@ -43,6 +43,39 @@ module ForestAdminDatasourceActiveRecord
           expect(dummy_class.get_enum_values(User, columns['enum_field'])).to eq(%w[draft published archived trashed])
         end
       end
+
+      describe 'operators_for_column_type' do
+        it 'includes Match operator for String type' do
+          operators = dummy_class.operators_for_column_type('String')
+          expect(operators).to include(ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH)
+        end
+
+        it 'includes all string operators for String type' do
+          operators = dummy_class.operators_for_column_type('String')
+          expect(operators).to include(
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_EQUAL,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::IN,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_IN,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::LIKE,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::I_LIKE,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::CONTAINS,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::STARTS_WITH,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::ENDS_WITH
+          )
+        end
+
+        it 'does not include Match operator for Number type' do
+          operators = dummy_class.operators_for_column_type('Number')
+          expect(operators).not_to include(ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH)
+        end
+
+        it 'does not include Match operator for Boolean type' do
+          operators = dummy_class.operators_for_column_type('Boolean')
+          expect(operators).not_to include(ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH)
+        end
+      end
     end
   end
 end

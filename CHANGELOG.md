@@ -1,3 +1,18 @@
+## [1.8.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.7...v1.8.8) (2025-10-20)
+
+
+### Bug Fixes
+
+* **error-handling:** CRUD errors throw 400 instead of 500 errors and error messages are sent to frontend ([#153](https://github.com/ForestAdmin/agent-ruby/issues/153)) ([1a1c8f3](https://github.com/ForestAdmin/agent-ruby/commit/1a1c8f314d39ebb90afc26402ce930f296b78bb6))
+* comparison operators ([#149](https://github.com/ForestAdmin/agent-ruby/issues/149)) ([56900a5](https://github.com/ForestAdmin/agent-ruby/commit/56900a590ae3d26002d63a95834c79abbee6fde5))
+
+## [1.8.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.6...v1.8.7) (2025-10-20)
+
+
+### Bug Fixes
+
+* **list:** removes null values in included records ([#147](https://github.com/ForestAdmin/agent-ruby/issues/147)) ([26cf793](https://github.com/ForestAdmin/agent-ruby/commit/26cf793fbff871a4b482c241d7419082c9e0c421))
+
 ## [1.8.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.5...v1.8.6) (2025-10-17)
 
 
