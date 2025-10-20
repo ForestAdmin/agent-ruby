@@ -108,8 +108,6 @@ module ForestAdminAgent
         when String
           # Truncate very long strings
           value.length > 10_000 ? "#{value[0...10_000]}..." : value
-        else
-          value.to_s
         end
       end
 

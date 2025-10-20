@@ -23,9 +23,7 @@ module ForestAdminRails
     def forest_response(data = {})
       if data[:content].is_a?(Hash)
         # Handle streaming responses (NEW)
-        if data.dig(:content, :type) == 'Stream'
-          return handle_streaming_response(data)
-        end
+        return handle_streaming_response(data) if data.dig(:content, :type) == 'Stream'
 
         if data.dig(:content, :type) == 'File'
           return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],

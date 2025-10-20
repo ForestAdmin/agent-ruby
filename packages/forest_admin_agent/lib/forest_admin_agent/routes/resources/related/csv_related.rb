@@ -34,9 +34,6 @@ module ForestAdminAgent
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
 
-            filename = args[:params][:filename] || "#{args[:params]["relation_name"]}.csv"
-            filename = "#{filename}.csv" unless /\.csv$/i.match?(filename)
-
             # Generate timestamp for filename
             now = Time.now.strftime('%Y%m%d_%H%M%S')
             collection_name = args[:params]['collection_name']
