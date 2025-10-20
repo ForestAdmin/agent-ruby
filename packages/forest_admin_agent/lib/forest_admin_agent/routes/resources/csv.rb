@@ -38,7 +38,7 @@ module ForestAdminAgent
             segment: QueryStringParser.parse_segment(@collection, args)
           )
           projection = QueryStringParser.parse_projection(@collection, args)
-          filename = args[:params][:filename] || "#{args[:params]["collection_name"]}.csv"
+          filename = args[:params][:filename] || args[:params]['collection_name']
           filename += '.csv' unless /\.csv$/i.match?(filename)
 
           # Generate timestamp for filename
