@@ -432,12 +432,13 @@ module ForestAdminAgent
 
             # Allow any log calls but verify our specific one happens
             allow(ForestAdminAgent::Facades::Container.logger).to receive(:log).and_call_original
-            expect(ForestAdminAgent::Facades::Container.logger).to receive(:log)
-              .with('Debug', /Collection 'Book' not found/).at_least(:once).and_call_original
 
             expect do
               @permissions.can?(:browse, @datasource.collections['Book'])
             end.to raise_error(ForbiddenError)
+
+            expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log)
+              .with('Debug', /Collection 'Book' not found/).at_least(:once)
           end
         end
 
@@ -532,12 +533,13 @@ module ForestAdminAgent
 
             # Allow any log calls but verify our specific one happens
             allow(ForestAdminAgent::Facades::Container.logger).to receive(:log).and_call_original
-            expect(ForestAdminAgent::Facades::Container.logger).to receive(:log)
-              .with('Debug', /Action 'edit' not found/).at_least(:once).and_call_original
 
             expect do
               @permissions.can?(:edit, @datasource.collections['Book'])
             end.to raise_error(ForbiddenError)
+
+            expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log)
+              .with('Debug', /Action 'edit' not found/).at_least(:once)
           end
         end
 
