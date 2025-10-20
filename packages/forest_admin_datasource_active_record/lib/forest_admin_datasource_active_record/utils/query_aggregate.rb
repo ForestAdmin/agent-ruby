@@ -56,11 +56,36 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
+      # Whitelist of valid date truncation operations
+      VALID_DATE_OPERATIONS = %w[
+        second
+        minute
+        hour
+        day
+        week
+        month
+        quarter
+        year
+      ].freeze
+
       private
 
       def date_trunc_sql(operation, field)
         adapter_name = @collection.model.connection.adapter_name.downcase
-        operation = operation.downcase
+        operation = operation.to_s.downcase
+
+        # Validate operation is in whitelist to prevent SQL injection
+        unless VALID_DATE_OPERATIONS.include?(operation)
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                "Invalid date truncation operation: '#{operation}'. " \
+                "Allowed values: #{VALID_DATE_OPERATIONS.join(", ")}"
+        end
+
+        # Validate field name to prevent SQL injection via field parameter
+        unless field.match?(/\A[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*\z/)
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                "Invalid field name: '#{field}'"
+        end
 
         case adapter_name
         when 'postgresql'
