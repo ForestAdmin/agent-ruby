@@ -282,20 +282,6 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'created_at')
             end.not_to raise_error
           end
-
-          it 'accepts valid field names with table prefix' do
-            aggregation = Aggregation.new(
-              operation: 'Count',
-              field: nil,
-              groups: [{ field: 'created_at', operation: 'day' }]
-            )
-
-            query_aggregate = described_class.new(collection, aggregation)
-
-            expect do
-              query_aggregate.send(:date_trunc_sql, 'day', 'cars.created_at')
-            end.not_to raise_error
-          end
         end
       end
     end

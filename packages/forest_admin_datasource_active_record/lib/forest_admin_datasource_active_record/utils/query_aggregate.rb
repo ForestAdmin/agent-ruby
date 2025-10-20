@@ -75,15 +75,12 @@ module ForestAdminDatasourceActiveRecord
         adapter_name = @collection.model.connection.adapter_name.downcase
         operation = operation.to_s.downcase
 
-        # Validate operation is in whitelist to prevent SQL injection
         unless VALID_DATE_OPERATIONS.include?(operation)
           raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                 "Invalid date truncation operation: '#{operation}'. " \
                 "Allowed values: #{VALID_DATE_OPERATIONS.join(", ")}"
         end
 
-        # Validate field exists in collection schema to prevent SQL injection
-        # Use original field name (with ':') if provided, otherwise use formatted field name
         validate_field_exists!(original_field_name || field)
 
         case adapter_name
@@ -99,20 +96,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def validate_field_exists!(field)
-        # Handle table-qualified fields (e.g., "cars.created_at") for backwards compatibility
-        # In production, date_trunc_sql receives original_field_name with ':' format,
-        # but direct calls (like from tests) may pass already-formatted '.' fields
-        field_name = if field.include?('.')
-                       field.split('.', 2)[1]
-                     else
-                       field
-                     end
-
-        # Use the canonical Collection.get_field_schema method which handles:
-        # - Simple fields: validates they exist in collection schema
-        # - Relation fields (with ':'): validates relation exists and recursively checks nested field
-        # Raises ForestException if field doesn't exist
-        ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, field_name)
+        ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, field)
       rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
         # Re-raise as ValidationError for consistency with other validation errors in this class
         raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
