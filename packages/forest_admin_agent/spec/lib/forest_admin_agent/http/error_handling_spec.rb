@@ -88,6 +88,50 @@ module ForestAdminAgent
             expect(handler.get_error_message(weird_error)).to eq('Unexpected error')
           end
         end
+
+        context 'when error is a ValidationError' do
+          let(:validation_error) do
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('The query violates a unicity constraint')
+          end
+
+          before do
+            allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:customize_error_message).and_return(nil)
+          end
+
+          it 'returns the validation error message' do
+            expect(handler.get_error_message(validation_error)).to eq('🌳🌳🌳 The query violates a unicity constraint')
+          end
+        end
+      end
+
+      describe '#get_error_status' do
+        context 'when error has a status method' do
+          let(:http_exception) do
+            ForestAdminAgent::Http::Exceptions::HttpException.new(422, 'Unprocessable entity')
+          end
+
+          it 'returns the error status' do
+            expect(handler.get_error_status(http_exception)).to eq(422)
+          end
+        end
+
+        context 'when error is a ValidationError' do
+          let(:validation_error) do
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('Invalid data')
+          end
+
+          it 'returns 400' do
+            expect(handler.get_error_status(validation_error)).to eq(400)
+          end
+        end
+
+        context 'when error does not have a status method' do
+          let(:standard_error) { StandardError.new('Standard error message') }
+
+          it 'returns 500' do
+            expect(handler.get_error_status(standard_error)).to eq(500)
+          end
+        end
       end
     end
   end

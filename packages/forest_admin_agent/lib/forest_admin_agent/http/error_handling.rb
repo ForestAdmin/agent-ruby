@@ -11,7 +11,17 @@ module ForestAdminAgent
           return message if message
         end
 
+        return error.message if error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+
         'Unexpected error'
+      end
+
+      def get_error_status(error)
+        return error.status if error.respond_to?(:status) && error.status
+
+        return 400 if error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+
+        500
       end
     end
   end
