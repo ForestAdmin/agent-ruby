@@ -78,7 +78,7 @@ module ForestAdminAgent
 
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
                 "Collection '#{collection.name}' has no primary keys. " \
-                "Actions with conditional permissions require a primary key to identify records."
+                'Actions with conditional permissions require a primary key to identify records.'
         end
 
         pk = pks[0]
