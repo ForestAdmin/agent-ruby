@@ -67,9 +67,13 @@ module ForestAdminDatasourceActiveRecord
 
         context 'when ActiveRecord::RecordInvalid is raised' do
           it 'raises ValidationError with the validation error message' do
+            record = instance_double(ActiveRecord::Base)
+            errors = instance_double(ActiveModel::Errors, full_messages: ['Name is required'])
+            allow(record).to receive(:errors).and_return(errors)
+
             expect do
               described_class.handle_errors(:create) do
-                raise ActiveRecord::RecordInvalid, double(errors: double(full_messages: ['Name is required']))
+                raise ActiveRecord::RecordInvalid, record
               end
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError
