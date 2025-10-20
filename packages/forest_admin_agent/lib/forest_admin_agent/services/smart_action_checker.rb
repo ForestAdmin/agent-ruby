@@ -37,7 +37,7 @@ module ForestAdminAgent
 
       def can_approve?
         if smart_action[:userApprovalEnabled].include?(role_id) &&
-           (condition_by_role_id(smart_action[:userApprovalConditions]).blank? || match_conditions(:userApprovalConditions)) &&
+           (condition_by_role_id(smart_action[:userApprovalConditions]).nil? || match_conditions(:userApprovalConditions)) &&
            (attributes[:signed_approval_request][:data][:attributes][:requester_id] != caller.id ||
              smart_action[:selfApprovalEnabled].include?(role_id))
           return true
@@ -48,17 +48,17 @@ module ForestAdminAgent
 
       def can_trigger?
         if smart_action[:triggerEnabled].include?(role_id) && !smart_action[:approvalRequired].include?(role_id)
-          if condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
+          if condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
-          if condition_by_role_id(smart_action[:approvalRequiredConditions]).blank? || match_conditions(:approvalRequiredConditions)
+          if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
             raise RequireApproval.new(
               'This action requires to be approved.',
               REQUIRE_APPROVAL_ERROR,
               smart_action[:userApprovalEnabled]
             )
-          elsif condition_by_role_id(smart_action[:triggerConditions]).blank? || match_conditions(:triggerConditions)
+          elsif condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true
           end
         end
