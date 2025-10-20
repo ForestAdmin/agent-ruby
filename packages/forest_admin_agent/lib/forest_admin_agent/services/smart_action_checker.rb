@@ -100,9 +100,17 @@ module ForestAdminAgent
 
         rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
         (rows.empty? ? 0 : rows[0]['value']) == attributes[:ids].count
-      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException
-        # Let ForestException propagate - these are actionable schema issues
-        raise
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        # Let primary key validation errors propagate - these are actionable schema issues
+        # Wrap other ForestExceptions (like invalid operators) in ConflictError
+        if e.message.include?('has no primary keys')
+          raise
+        else
+          raise ConflictError.new(
+            'The conditions to trigger this action cannot be verified. Please contact an administrator.',
+            INVALID_ACTION_CONDITION_ERROR
+          )
+        end
       rescue ArgumentError, TypeError => e
         # Catch specific errors from condition parsing/validation
         raise ConflictError.new(
