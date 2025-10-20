@@ -1,3 +1,11 @@
+## [1.8.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.8...v1.8.9) (2025-10-20)
+
+
+### Bug Fixes
+
+* permission check crash on refetch ([#157](https://github.com/ForestAdmin/agent-ruby/issues/157)) ([8c5d0bc](https://github.com/ForestAdmin/agent-ruby/commit/8c5d0bc87336d9033939e778b9086bf56a541326))
+* **security:** SQL injection vulnerability in date truncation ([#158](https://github.com/ForestAdmin/agent-ruby/issues/158)) ([8f52ecd](https://github.com/ForestAdmin/agent-ruby/commit/8f52ecd1c36e09f2dcf8797ebd222935213bb62b))
+
 ## [1.8.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.7...v1.8.8) (2025-10-20)
 
 
