@@ -68,9 +68,6 @@ module ForestAdminDatasourceActiveRecord
         year
       ].freeze
 
-      # Valid relation types for field access
-      VALID_RELATION_TYPES = %w[ManyToOne OneToOne].freeze
-
       private
 
       def date_trunc_sql(operation, field)
@@ -100,59 +97,18 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def validate_field_exists!(field)
-        if field.include?(':')
-          validate_relation_field(field)
-        elsif field.include?('.')
-          validate_table_qualified_field(field)
-        else
-          validate_simple_field(field)
-        end
-      end
+        # Handle table-qualified fields (e.g., "users.email") by extracting the field name
+        field_name = field.include?('.') ? field.split('.', 2)[1] : field
 
-      def validate_relation_field(field)
-        relation_name, field_name = field.split(':', 2)
-
-        unless @collection.schema[:fields].key?(relation_name)
-          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-                "Invalid field: relation '#{relation_name}' does not exist in collection '#{@collection.name}'"
-        end
-
-        relation = @collection.schema[:fields][relation_name]
-        unless VALID_RELATION_TYPES.include?(relation.type)
-          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-                "Invalid field: '#{relation_name}' is not a valid relation type for field access"
-        end
-
-        related_collection = @collection.datasource.get_collection(relation.foreign_collection)
-        return if related_collection.schema[:fields].key?(field_name)
-
+        # Use the canonical Collection.get_field_schema method which handles:
+        # - Simple fields: validates they exist in collection schema
+        # - Relation fields (with ':'): validates relation exists and recursively checks nested field
+        # Raises ForestException if field doesn't exist
+        ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, field_name)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        # Re-raise as ValidationError for consistency with other validation errors in this class
         raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              "Invalid field: '#{field_name}' does not exist in related collection '#{relation.foreign_collection}'"
-      end
-
-      def validate_table_qualified_field(field)
-        table_name, field_name = field.split('.', 2)
-
-        if @collection.model.table_name == table_name
-          return if @collection.schema[:fields].key?(field_name)
-
-          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-                "Invalid field: '#{field_name}' does not exist in collection '#{@collection.name}'"
-        end
-
-        # It's a joined table - validate it's from a valid relation
-        relation_field = @collection.schema[:fields].find { |_name, f| VALID_RELATION_TYPES.include?(f.type) }
-        return unless relation_field.nil?
-
-        raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              "Invalid field: table '#{table_name}' is not accessible from collection '#{@collection.name}'"
-      end
-
-      def validate_simple_field(field)
-        return if @collection.schema[:fields].key?(field)
-
-        raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              "Invalid field: '#{field}' does not exist in collection '#{@collection.name}'"
+              "Invalid field '#{field}': #{e.message}"
       end
 
       # rubocop:disable Layout/LineLength

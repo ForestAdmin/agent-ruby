@@ -231,7 +231,7 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'created_at); DROP TABLE cars; --')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              /Invalid field: .* does not exist in collection/
+              /Invalid field.*Column not found/
             )
           end
 
@@ -248,7 +248,7 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'field; DELETE FROM cars')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              /Invalid field: .* does not exist in collection/
+              /Invalid field.*Column not found/
             )
           end
 
@@ -265,7 +265,7 @@ module ForestAdminDatasourceActiveRecord
               query_aggregate.send(:date_trunc_sql, 'day', 'non_existent_field')
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              /Invalid field: 'non_existent_field' does not exist in collection/
+              /Invalid field.*Column not found/
             )
           end
 
