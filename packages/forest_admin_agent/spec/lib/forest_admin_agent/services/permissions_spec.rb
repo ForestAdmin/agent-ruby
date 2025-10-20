@@ -438,7 +438,7 @@ module ForestAdminAgent
             end.to raise_error(ForbiddenError)
 
             expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log)
-              .with('Debug', /Collection 'Book' not found/).at_least(:once)
+              .with('Warn', /Collection 'Book' not found/).at_least(:once)
           end
         end
 
@@ -539,7 +539,7 @@ module ForestAdminAgent
             end.to raise_error(ForbiddenError)
 
             expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log)
-              .with('Debug', /Action 'edit' not found/).at_least(:once)
+              .with('Warn', /Action 'edit' not found/).at_least(:once)
           end
         end
 
@@ -588,6 +588,100 @@ module ForestAdminAgent
             )
 
             expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
+          end
+        end
+
+        context 'when user_data is nil or incomplete' do
+          it 'raises ForbiddenError when user_data is nil' do
+            allow(@permissions).to receive_messages(get_user_data: nil, fetch: {
+                                                      collections: {
+                                                        Book: {
+                                                          collection: {
+                                                            browseEnabled: { roles: [1] },
+                                                            readEnabled: { roles: [1] },
+                                                            editEnabled: { roles: [1] },
+                                                            addEnabled: { roles: [1] },
+                                                            deleteEnabled: { roles: [1] },
+                                                            exportEnabled: { roles: [1] }
+                                                          },
+                                                          actions: []
+                                                        }
+                                                      }
+                                                    })
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError)
+          end
+
+          it 'raises ForbiddenError when roleId is missing' do
+            allow(@permissions).to receive_messages(get_user_data: { id: 1 }, fetch: {
+                                                      collections: {
+                                                        Book: {
+                                                          collection: {
+                                                            browseEnabled: { roles: [1] },
+                                                            readEnabled: { roles: [1] },
+                                                            editEnabled: { roles: [1] },
+                                                            addEnabled: { roles: [1] },
+                                                            deleteEnabled: { roles: [1] },
+                                                            exportEnabled: { roles: [1] }
+                                                          },
+                                                          actions: []
+                                                        }
+                                                      }
+                                                    })
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError)
+          end
+        end
+
+        context 'when roles array is nil' do
+          it 'raises ForbiddenError without crashing' do
+            allow(@permissions).to receive_messages(get_user_data: { id: 1, roleId: 1 }, fetch: {
+                                                      collections: {
+                                                        Book: {
+                                                          collection: {
+                                                            browseEnabled: { roles: nil }, # roles is nil, not the parent
+                                                            readEnabled: { roles: [1] },
+                                                            editEnabled: { roles: [1] },
+                                                            addEnabled: { roles: [1] },
+                                                            deleteEnabled: { roles: [1] },
+                                                            exportEnabled: { roles: [1] }
+                                                          },
+                                                          actions: []
+                                                        }
+                                                      }
+                                                    })
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError)
+          end
+        end
+
+        context 'when roles array is empty' do
+          it 'denies access when roles array is empty' do
+            allow(@permissions).to receive_messages(get_user_data: { id: 1, roleId: 1 }, fetch: {
+                                                      collections: {
+                                                        Book: {
+                                                          collection: {
+                                                            browseEnabled: { roles: [] }, # Empty array
+                                                            readEnabled: { roles: [1] },
+                                                            editEnabled: { roles: [1] },
+                                                            addEnabled: { roles: [1] },
+                                                            deleteEnabled: { roles: [1] },
+                                                            exportEnabled: { roles: [1] }
+                                                          },
+                                                          actions: []
+                                                        }
+                                                      }
+                                                    })
+
+            expect do
+              @permissions.can?(:browse, @datasource.collections['Book'])
+            end.to raise_error(ForbiddenError, "You don't have permission to browse this collection.")
           end
         end
       end

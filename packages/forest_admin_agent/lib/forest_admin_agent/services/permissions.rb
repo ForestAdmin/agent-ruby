@@ -112,10 +112,42 @@ module ForestAdminAgent
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
         action = find_action_from_endpoint(collection.name, request[:headers]['REQUEST_PATH'], request[:headers]['REQUEST_METHOD'])
+
+        collection_key = collection.name.to_sym
+
+        # Validate collection exists in permissions
+        unless collections_data.key?(collection_key)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action check: Collection '#{collection.name}' not found in permissions"
+          )
+          raise ForbiddenError, "Collection '#{collection.name}' not found in permissions"
+        end
+
+        # Validate actions exist for collection
+        collection_actions = collections_data[collection_key][:actions]
+        if collection_actions.nil?
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action check: No actions configured for collection '#{collection.name}'"
+          )
+          raise ForbiddenError, "No actions configured for collection '#{collection.name}'"
+        end
+
+        # Validate specific action exists
+        action_key = action['name'].to_sym
+        unless collection_actions.key?(action_key)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action '#{action["name"]}' not found in permissions for collection '#{collection.name}'"
+          )
+          raise ForbiddenError, "Smart action '#{action["name"]}' is not configured"
+        end
+
         smart_action_approval = SmartActionChecker.new(
           request[:params],
           collection,
-          collections_data[collection.name.to_sym][:actions][action['name'].to_sym],
+          collection_actions[action_key],
           caller,
           user_data[:roleId],
           filter
@@ -126,6 +158,8 @@ module ForestAdminAgent
           'Debug',
           "User #{user_data[:roleId]} is #{"not" unless is_allowed} allowed to perform #{action["name"]}"
         )
+
+        is_allowed
       end
 
       def get_scope(collection)
@@ -172,33 +206,73 @@ module ForestAdminAgent
       private
 
       def permission_allowed?(collections_data, collection, action, user_data)
-        collection_key = collection.name.to_sym
-
-        # Validate collection exists
-        unless collections_data.key?(collection_key)
+        # Validate user_data exists and has roleId
+        if user_data.nil? || !user_data.key?(:roleId)
           ForestAdminAgent::Facades::Container.logger.log(
-            'Debug',
-            "Collection '#{collection.name}' not found in permissions. " \
-            "Available: #{collections_data.keys.join(", ")}"
+            'Error',
+            "Invalid user data: user_data is #{user_data.nil? ? "nil" : "missing :roleId key"}. " \
+            'This indicates a session or authentication issue.'
           )
           return false
         end
 
-        # Validate action exists
+        collection_key = collection.name.to_sym
+
+        # Validate collection exists in permissions data
+        # (collection may have been removed from permissions during refetch)
+        unless collections_data.key?(collection_key)
+          available = collections_data.keys.join(', ')
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Collection '#{collection.name}' not found in permissions " \
+            "(user_id: #{user_data[:id]}, role_id: #{user_data[:roleId]}). " \
+            "Available: #{available.empty? ? "none" : available}. " \
+            'This may indicate a configuration mismatch or timing issue during permission refresh.'
+          )
+          return false
+        end
+
+        # Validate action exists in collection permissions
+        # (action may have been removed from collection during refetch)
         collection_permissions = collections_data[collection_key]
         role_ids = collection_permissions[action]
 
         if role_ids.nil?
+          available = collection_permissions.compact.keys.join(', ')
           ForestAdminAgent::Facades::Container.logger.log(
-            'Debug',
-            "Action '#{action}' not found for collection '#{collection.name}'. " \
-            "Available: #{collection_permissions.compact.keys.join(", ")}"
+            'Warn',
+            "Action '#{action}' not found for collection '#{collection.name}' " \
+            "(user_id: #{user_data[:id]}, role_id: #{user_data[:roleId]}). " \
+            "Available actions: #{available.empty? ? "none" : available}. " \
+            'This may indicate a permission schema change or misconfiguration.'
           )
           return false
         end
 
-        # Check user permission
-        role_ids.include?(user_data[:roleId])
+        # Handle case where roles array itself is nil (not just missing action)
+        unless role_ids.is_a?(Array)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Invalid permission data: roles for action '#{action}' in collection '#{collection.name}' " \
+            "is not an array (got #{role_ids.class}). This indicates data corruption."
+          )
+          return false
+        end
+
+        # Check if user's role is authorized for this action
+        has_permission = role_ids.include?(user_data[:roleId])
+
+        unless has_permission
+          # This is normal - log at Debug since it's expected behavior
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "Permission denied: User #{user_data[:id]} (role #{user_data[:roleId]}) " \
+            "lacks permission to #{action} collection '#{collection.name}'. " \
+            "Required roles: #{role_ids.join(", ")}"
+          )
+        end
+
+        has_permission
       end
 
       def get_collections_permissions_data(force_fetch: false)
@@ -282,13 +356,37 @@ module ForestAdminAgent
       end
 
       def decode_crud_permissions(collection)
+        # Validate structure exists
+        unless collection.is_a?(Hash) && collection.key?(:collection)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            'Invalid permissions data structure: missing :collection key. ' \
+            "Available keys: #{collection.is_a?(Hash) ? collection.keys.join(", ") : "N/A (not a hash)"}. " \
+            'This indicates an API contract violation or data corruption.'
+          )
+          raise ForestException, 'Invalid permission data structure received from Forest Admin API'
+        end
+
+        collection_data = collection[:collection]
+
+        unless collection_data.is_a?(Hash)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Invalid permissions data: :collection is not a hash (got #{collection_data.class}). " \
+            'This indicates an API contract violation or data corruption.'
+          )
+          raise ForestException, 'Invalid permission data structure: :collection must be a hash'
+        end
+
+        # Use dig to safely extract roles, allowing for missing permissions
+        # Missing permissions will result in nil values which are handled by permission_allowed?
         {
-          browse: collection.dig(:collection, :browseEnabled, :roles),
-          read: collection.dig(:collection, :readEnabled, :roles),
-          edit: collection.dig(:collection, :editEnabled, :roles),
-          add: collection.dig(:collection, :addEnabled, :roles),
-          delete: collection.dig(:collection, :deleteEnabled, :roles),
-          export: collection.dig(:collection, :exportEnabled, :roles)
+          browse: collection_data.dig(:browseEnabled, :roles),
+          read: collection_data.dig(:readEnabled, :roles),
+          edit: collection_data.dig(:editEnabled, :roles),
+          add: collection_data.dig(:addEnabled, :roles),
+          delete: collection_data.dig(:deleteEnabled, :roles),
+          export: collection_data.dig(:exportEnabled, :roles)
         }
       end
 
