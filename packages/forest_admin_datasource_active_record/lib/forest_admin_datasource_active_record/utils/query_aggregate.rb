@@ -21,7 +21,8 @@ module ForestAdminDatasourceActiveRecord
         @aggregation.groups.each do |group|
           field = format_field(group[:field])
           if group[:operation]
-            date_trunc_expression = date_trunc_sql(group[:operation], field)
+            # Pass original field name for validation before SQL generation
+            date_trunc_expression = date_trunc_sql(group[:operation], field, group[:field])
             @select << "#{date_trunc_expression} AS \"#{group[:field]}\""
             group_fields << date_trunc_expression
           else
@@ -70,7 +71,7 @@ module ForestAdminDatasourceActiveRecord
 
       private
 
-      def date_trunc_sql(operation, field)
+      def date_trunc_sql(operation, field, original_field_name = nil)
         adapter_name = @collection.model.connection.adapter_name.downcase
         operation = operation.to_s.downcase
 
@@ -82,7 +83,8 @@ module ForestAdminDatasourceActiveRecord
         end
 
         # Validate field exists in collection schema to prevent SQL injection
-        validate_field_exists!(field)
+        # Use original field name (with ':') if provided, otherwise use formatted field name
+        validate_field_exists!(original_field_name || field)
 
         case adapter_name
         when 'postgresql'
@@ -97,8 +99,14 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def validate_field_exists!(field)
-        # Handle table-qualified fields (e.g., "users.email") by extracting the field name
-        field_name = field.include?('.') ? field.split('.', 2)[1] : field
+        # Handle table-qualified fields (e.g., "cars.created_at") for backwards compatibility
+        # In production, date_trunc_sql receives original_field_name with ':' format,
+        # but direct calls (like from tests) may pass already-formatted '.' fields
+        field_name = if field.include?('.')
+                       field.split('.', 2)[1]
+                     else
+                       field
+                     end
 
         # Use the canonical Collection.get_field_schema method which handles:
         # - Simple fields: validates they exist in collection schema
