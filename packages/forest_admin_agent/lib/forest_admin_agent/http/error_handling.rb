@@ -17,13 +17,10 @@ module ForestAdminAgent
       end
 
       def get_error_status(error)
-        # Return existing status if present
         return error.status if error.respond_to?(:status) && error.status
 
-        # Handle ActiveRecord errors with 400 status
         return 400 if error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
 
-        # Default to 500 for unexpected errors
         500
       end
     end
