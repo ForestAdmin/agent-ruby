@@ -93,16 +93,79 @@ module ForestAdminDatasourceActiveRecord
         when Operators::NOT_EQUAL, Operators::NOT_IN
           @query = query_aggregator(aggregator, @collection.model.where.not({ field => value }))
         when Operators::GREATER_THAN
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].gt(value)))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gt))
+        when Operators::GREATER_THAN_OR_EQUAL
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gteq))
         when Operators::LESS_THAN
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].lt(value)))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lt))
+        when Operators::LESS_THAN_OR_EQUAL
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lteq))
+        when Operators::CONTAINS
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::I_CONTAINS
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(lower_field.matches("%#{value.to_s.downcase}%")))
         when Operators::NOT_CONTAINS
           @query = query_aggregator(aggregator,
                                     @collection.model.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
+        when Operators::NOT_I_CONTAINS
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where.not(lower_field.matches("%#{value.to_s.downcase}%")))
+        when Operators::STARTS_WITH
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("#{value}%")))
+        when Operators::I_STARTS_WITH
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(lower_field.matches("#{value.to_s.downcase}%")))
+        when Operators::ENDS_WITH
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}")))
+        when Operators::I_ENDS_WITH
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(lower_field.matches("%#{value.to_s.downcase}")))
         when Operators::LIKE
           @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches(value)))
+        when Operators::I_LIKE
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator,
+                                    @collection.model.where(lower_field.matches(value.to_s.downcase)))
+        when Operators::MATCH
+          # Match operator supports:
+          # - Regexp objects from pattern transformations: Regexp.new("pattern")
+          # - JavaScript regex strings from comparison transformations: "/(pattern)/g"
+          pattern = if value.is_a?(Regexp)
+                      value.source
+                    elsif (match = value.to_s.match(%r{^/(.+)/[gim]*$}))
+                      match[1]
+                    else
+                      value.to_s
+                    end
+
+          # Use database-specific regex syntax
+          adapter_name = @collection.model.connection.adapter_name.downcase
+          regex_clause = case adapter_name
+                         when 'postgresql'
+                           "#{@arel_table.name}.#{field} ~ ?"
+                         when 'mysql2', 'mysql', 'sqlite', 'sqlite3'
+                           "#{@arel_table.name}.#{field} REGEXP ?"
+                         else
+                           raise ArgumentError, "Match operator is not supported for database adapter '#{adapter_name}'"
+                         end
+
+          @query = query_aggregator(aggregator, @collection.model.where(regex_clause, pattern))
         when Operators::INCLUDES_ALL
           @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches_all(value)))
+        when Operators::SHORTER_THAN
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator, @collection.model.where(length_func.lt(value)))
+        when Operators::LONGER_THAN
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          @query = query_aggregator(aggregator, @collection.model.where(length_func.gt(value)))
         end
 
         @query
@@ -159,6 +222,20 @@ module ForestAdminDatasourceActiveRecord
         end
 
         field
+      end
+
+      def build_comparison_query(original_field, formatted_field, value, operator)
+        # When comparing a String field with a numeric value, compare the length of the string
+        # Otherwise, do a lexicographic comparison
+        if value.is_a?(Numeric)
+          field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, original_field)
+          if field_schema.column_type == 'String'
+            length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[formatted_field.to_sym]])
+            return @collection.model.where(length_func.send(operator, value))
+          end
+        end
+
+        @collection.model.where(@arel_table[formatted_field.to_sym].send(operator, value))
       end
 
       def query_aggregator(aggregator, query)

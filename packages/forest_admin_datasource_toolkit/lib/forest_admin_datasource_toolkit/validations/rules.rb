@@ -41,29 +41,49 @@ module ForestAdminDatasourceToolkit
             Operators::SHORTER_THAN,
             Operators::LIKE,
             Operators::I_LIKE,
+            Operators::MATCH,
             Operators::I_CONTAINS,
             Operators::I_ENDS_WITH,
-            Operators::I_STARTS_WITH
+            Operators::I_STARTS_WITH,
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
           ],
           PrimitiveType::NUMBER => [
             *Rules::BASE_OPERATORS,
             *Rules::ARRAY_OPERATORS,
             Operators::GREATER_THAN,
-            Operators::LESS_THAN
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN_OR_EQUAL,
+            Operators::LESS_THAN_OR_EQUAL
           ],
           PrimitiveType::DATE => [
             *Rules::BASE_OPERATORS,
             *Rules::BASE_DATEONLY_OPERATORS,
             Operators::BEFORE_X_HOURS_AGO,
-            Operators::AFTER_X_HOURS_AGO
+            Operators::AFTER_X_HOURS_AGO,
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
           ],
           PrimitiveType::TIMEONLY => [
             *Rules::BASE_OPERATORS,
             Operators::LESS_THAN,
-            Operators::GREATER_THAN
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
           ],
           PrimitiveType::JSON => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
-          PrimitiveType::DATEONLY => [*Rules::BASE_OPERATORS, *Rules::BASE_DATEONLY_OPERATORS],
+          PrimitiveType::DATEONLY => [
+            *Rules::BASE_OPERATORS,
+            *Rules::BASE_DATEONLY_OPERATORS,
+            Operators::LESS_THAN,
+            Operators::GREATER_THAN,
+            Operators::LESS_THAN_OR_EQUAL,
+            Operators::GREATER_THAN_OR_EQUAL
+          ],
           PrimitiveType::ENUM => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::UUID => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
           PrimitiveType::BOOLEAN => [*Rules::BASE_OPERATORS, *Rules::ARRAY_OPERATORS],
