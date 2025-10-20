@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.9...v1.9.0) (2025-10-20)
+
+
+### Features
+
+* **agent options:** allow to skip schema update ([#160](https://github.com/ForestAdmin/agent-ruby/issues/160)) ([80cf2bd](https://github.com/ForestAdmin/agent-ruby/commit/80cf2bdb470aa57fd9c9da769319bfa2b52c6315))
+
 ## [1.8.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.8...v1.8.9) (2025-10-20)
 
 
