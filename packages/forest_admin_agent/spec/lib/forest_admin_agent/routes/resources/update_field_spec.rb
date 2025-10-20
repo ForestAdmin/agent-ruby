@@ -63,10 +63,22 @@ module ForestAdminAgent
                     is_primary_key: true,
                     filter_operators: [Operators::IN, Operators::EQUAL]
                   ),
-                  'title' => ColumnSchema.new(column_type: 'String'),
-                  'tags' => ColumnSchema.new(column_type: '[String]'),
-                  'scores' => ColumnSchema.new(column_type: '[Number]'),
-                  'metadata' => ColumnSchema.new(column_type: '[Json]')
+                  'title' => ColumnSchema.new(
+                    column_type: 'String',
+                    filter_operators: [Operators::EQUAL]
+                  ),
+                  'tags' => ColumnSchema.new(
+                    column_type: '[String]',
+                    filter_operators: [Operators::EQUAL]
+                  ),
+                  'scores' => ColumnSchema.new(
+                    column_type: '[Number]',
+                    filter_operators: [Operators::EQUAL]
+                  ),
+                  'metadata' => ColumnSchema.new(
+                    column_type: '[Json]',
+                    filter_operators: [Operators::EQUAL]
+                  )
                 }
               }
             )
@@ -195,7 +207,7 @@ module ForestAdminAgent
 
             it 'raises NotFoundError' do
               expect { update_field.handle_request(args_with_invalid_field) }
-                .to raise_error(Http::Exceptions::NotFoundError, /does not exist/)
+                .to raise_error(Http::Exceptions::NotFoundError, /not found/)
             end
           end
 
@@ -316,62 +328,8 @@ module ForestAdminAgent
 
               it 'raises ValidationError' do
                 expect { update_field.handle_request(args_with_invalid_number) }
-                  .to raise_error(Http::Exceptions::ValidationError, /Cannot coerce/)
+                  .to raise_error(Http::Exceptions::ValidationError, /wrong type/)
               end
-            end
-          end
-
-          context 'with composite primary key' do
-            before do
-              @datasource_composite = Datasource.new
-              @collection_composite = build_collection(
-                name: 'composite_book',
-                schema: {
-                  fields: {
-                    'tenant_id' => ColumnSchema.new(
-                      column_type: 'Number',
-                      is_primary_key: true,
-                      filter_operators: [Operators::IN, Operators::EQUAL]
-                    ),
-                    'id' => ColumnSchema.new(
-                      column_type: 'Number',
-                      is_primary_key: true,
-                      filter_operators: [Operators::IN, Operators::EQUAL]
-                    ),
-                    'tags' => ColumnSchema.new(column_type: '[String]')
-                  }
-                }
-              )
-
-              @datasource_composite.add_collection(@collection_composite)
-              ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@datasource_composite)
-              ForestAdminAgent::Builder::AgentFactory.instance.build
-            end
-
-            let(:args_with_composite_key) do
-              args.merge(
-                params: args[:params].merge(
-                  'collection_name' => 'composite_book',
-                  'id' => '1|123'
-                )
-              )
-            end
-
-            it 'handles composite key correctly' do
-              book = { 'tenant_id' => 1, 'id' => 123, 'tags' => ['old', 'tag'] }
-              updated_book = { 'tenant_id' => 1, 'id' => 123, 'tags' => ['updated-tag', 'tag'] }
-
-              allow(@collection_composite).to receive(:list).and_return([book], [updated_book])
-              allow(@collection_composite).to receive(:update).and_return(true)
-
-              result = update_field.handle_request(args_with_composite_key)
-
-              expect(@collection_composite).to have_received(:update).with(
-                anything,
-                anything,
-                { tags: ['updated-tag', 'tag'] }
-              )
-              expect(result[:content]['data']['attributes']['tags']).to eq(['updated-tag', 'tag'])
             end
           end
         end

@@ -49,7 +49,7 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
-          @collection.update(@caller, filter, { field_name.to_sym => updated_array })
+          @collection.update(@caller, filter, { field_name => updated_array })
 
           records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
 
@@ -77,10 +77,10 @@ module ForestAdminAgent
 
         def validate_array_field!(field_schema, field_name)
           FieldValidator.validate(@collection, field_name)
-          return if field_schema[:column_type].to_s.start_with?('[')
+          return if field_schema.column_type.to_s.start_with?('[')
 
           raise Http::Exceptions::ValidationError,
-                "Field '#{field_name}' is not an array (type: #{field_schema[:column_type]})"
+                "Field '#{field_name}' is not an array (type: #{field_schema.column_type})"
         rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
           raise Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
 
@@ -112,19 +112,9 @@ module ForestAdminAgent
                 "Index #{array_index} out of bounds for array of length #{array.length}"
         end
 
-        def parse_value_from_body(params, field_schema)
+        def parse_value_from_body(params, _field_schema)
           body = params[:data] || {}
-          value = body.dig(:attributes, 'value') || body.dig(:attributes, :value)
-          element_type = extract_element_type(field_schema[:column_type])
-          FieldValidator.validate_value(field_schema[:column_type], ColumnSchema.new(column_type: element_type), value)
-          value
-        rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
-          raise Http::Exceptions::ValidationError, e.message
-        end
-
-        def extract_element_type(column_type)
-          type_str = column_type.to_s
-          type_str.start_with?('[') && type_str.end_with?(']') ? type_str[1..-2] : PrimitiveType::STRING
+          body.dig(:attributes, 'value') || body.dig(:attributes, :value)
         end
       end
     end
