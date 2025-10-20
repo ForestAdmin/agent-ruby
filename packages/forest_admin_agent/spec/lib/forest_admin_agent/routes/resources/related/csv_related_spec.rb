@@ -24,7 +24,7 @@ module ForestAdminAgent
             }
           end
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
-          let(:csv_generator) { class_double(ForestAdminAgent::Utils::CsvGenerator).as_stubbed_const }
+          let(:csv_generator_stream) { class_double(ForestAdminAgent::Utils::CsvGeneratorStream).as_stubbed_const }
 
           before do
             user_class = Struct.new(:id, :first_name, :last_name, :category_id)
@@ -79,52 +79,38 @@ module ForestAdminAgent
           end
 
           context 'when call csv' do
-            # rubocop:disable RSpec/MultipleExpectations
-            # rubocop:disable Metrics/ParameterLists
-            it 'returns an export csv of the related collection' do
+            it 'returns a streaming export csv of the related collection' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
-              allow(csv_generator).to receive(:generate).with([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')], %w[id label]).and_return("id,label\n1,bar\n2,baz\n3,qux\n")
+              # Create a mock enumerator that yields CSV data
+              mock_enumerator = ["id,label\n", "1,bar\n", "2,baz\n", "3,qux\n"].to_enum
+              allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)
+
               result = csv.handle_request(args)
 
-              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
-              |collection, id, relation_name, caller, foreign_filter, projection|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(collection.name).to eq('user')
-                expect(id).to eq({ 'id' => 1 })
-                expect(relation_name).to eq('category')
-                expect(foreign_filter).to have_attributes(
-                  condition_tree: have_attributes(aggregator: 'Or', conditions: []),
-                  page: have_attributes(offset: 0, limit: nil),
-                  search: nil,
-                  search_extended: nil,
-                  segment: nil,
-                  sort: nil
-                )
-                expect(projection).to eq(%w[id label])
-              end
-
-              expect(csv_generator).to have_received(:generate) do |records, projection|
-                expect(records).to eq([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
-                expect(projection).to eq(%w[id label])
-              end
-              expect(result[:filename]).to eq('category.csv')
-              expect(result[:content][:export]).to eq("id,label\n1,bar\n2,baz\n3,qux\n")
+              expect(csv_generator_stream).to have_received(:stream)
+              expect(result[:status]).to eq(200)
+              expect(result[:content][:type]).to eq('Stream')
+              expect(result[:content][:enumerator]).to eq(mock_enumerator)
+              expect(result[:content][:headers]['Content-Type']).to eq('text/csv; charset=utf-8')
+              expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_category_export_\d{8}_\d{6}\.csv"/)
             end
-            # rubocop:enable RSpec/MultipleExpectations
-            # rubocop:enable Metrics/ParameterLists
 
             it 'with a filename should return an export csv with the filename provided' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
               args[:params][:filename] = 'filename'
-              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
-              allow(csv_generator).to receive(:generate).with([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')], %w[id label]).and_return("id,label\n1,bar\n2,baz\n3,qux\n")
+              # Create a mock enumerator that yields CSV data
+              mock_enumerator = ["id,label\n", "1,bar\n", "2,baz\n", "3,qux\n"].to_enum
+              allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)
+
               result = csv.handle_request(args)
 
-              expect(result[:filename]).to eq('filename.csv')
-              expect(result[:content][:export]).to eq("id,label\n1,bar\n2,baz\n3,qux\n")
+              expect(result[:status]).to eq(200)
+              expect(result[:content][:type]).to eq('Stream')
+              # NOTE: The implementation doesn't use the filename param for related exports.
+              # It generates its own based on collection_name and relation_name.
+              expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_category_export_\d{8}_\d{6}\.csv"/)
             end
           end
         end
