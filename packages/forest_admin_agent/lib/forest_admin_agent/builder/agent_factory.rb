@@ -172,7 +172,9 @@ module ForestAdminAgent
 
       def log_schema_skip
         @logger.log('Warn', '[ForestAdmin] Schema update skipped (skip_schema_update flag is true)')
-        @logger.log('Info', "[ForestAdmin] Running in #{Facades::Container.cache(:is_production) ? 'production' : 'development'} mode")
+        environment = Facades::Container.cache(:is_production) ? 'production' : 'development'
+        @logger.log('Info',
+                    "[ForestAdmin] Running in #{environment} mode")
       end
     end
   end
