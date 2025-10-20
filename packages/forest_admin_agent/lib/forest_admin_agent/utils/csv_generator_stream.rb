@@ -15,46 +15,44 @@ module ForestAdminAgent
       # @return [Enumerator] Lazy enumerator that yields CSV rows
       def self.stream(collection, caller, filter, projection, limit_export_size = nil)
         Enumerator.new do |yielder|
-          begin
-            # Yield header row first (client receives immediately)
-            yielder << generate_header(projection)
+          # Yield header row first (client receives immediately)
+          yielder << generate_header(projection)
 
-            offset = 0
+          offset = 0
 
-            loop do
-              # Fetch batch of records
-              batch_filter = filter.override(
-                page: ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: offset, limit: CHUNK_SIZE)
-              )
-              records = collection.list(caller, batch_filter, projection)
-
-              # Break if no more records
-              break if records.empty?
-
-              # Convert each record to CSV row and yield immediately
-              records.each do |record|
-                yielder << generate_row(record, projection)
-              end
-
-              # Update offset
-              offset += CHUNK_SIZE
-
-              # Check if we've reached the export limit
-              break if limit_export_size && offset >= limit_export_size
-
-              # Check if this was a partial batch (last batch)
-              break if records.length < CHUNK_SIZE
-
-              # Periodic garbage collection to prevent memory creep
-              GC.start(full_mark: false) if (offset % 10_000).zero?
-            end
-          rescue IOError, Errno::EPIPE => e
-            # Client disconnected - clean up gracefully
-            Facades::Container.logger&.log(
-              'Info',
-              "CSV export interrupted at offset #{offset}: #{e.message}"
+          loop do
+            # Fetch batch of records
+            batch_filter = filter.override(
+              page: ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: offset, limit: CHUNK_SIZE)
             )
+            records = collection.list(caller, batch_filter, projection)
+
+            # Break if no more records
+            break if records.empty?
+
+            # Convert each record to CSV row and yield immediately
+            records.each do |record|
+              yielder << generate_row(record, projection)
+            end
+
+            # Update offset
+            offset += CHUNK_SIZE
+
+            # Check if we've reached the export limit
+            break if limit_export_size && offset >= limit_export_size
+
+            # Check if this was a partial batch (last batch)
+            break if records.length < CHUNK_SIZE
+
+            # Periodic garbage collection to prevent memory creep
+            GC.start(full_mark: false) if (offset % 10_000).zero?
           end
+        rescue IOError, Errno::EPIPE => e
+          # Client disconnected - clean up gracefully
+          Facades::Container.logger&.log(
+            'Info',
+            "CSV export interrupted at offset #{offset}: #{e.message}"
+          )
         end
       end
 
@@ -65,7 +63,7 @@ module ForestAdminAgent
         headers = projection.map do |field|
           # Handle relation fields (e.g., "user:name" -> "user")
           if field.include?(':')
-            "#{field.split(':').first}:#{field.split(':').last}"
+            "#{field.split(":").first}:#{field.split(":").last}"
           else
             field.to_s
           end

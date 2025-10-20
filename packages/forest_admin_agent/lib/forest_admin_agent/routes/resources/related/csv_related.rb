@@ -35,12 +35,12 @@ module ForestAdminAgent
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
 
             filename = args[:params][:filename] || "#{args[:params]["relation_name"]}.csv"
-            filename += '.csv' unless /\.csv$/i.match?(filename)
+            filename = "#{filename}.csv" unless /\.csv$/i.match?(filename)
 
             # Generate timestamp for filename
             now = Time.now.strftime('%Y%m%d_%H%M%S')
-            collection_name = args[:params]["collection_name"]
-            relation_name = args[:params]["relation_name"]
+            collection_name = args[:params]['collection_name']
+            relation_name = args[:params]['relation_name']
             filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
 
             # For related exports, we need to create a streaming-compatible approach
