@@ -40,6 +40,8 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
+      http_status = get_error_status(exception)
+
       data = case exception
              when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
                OpenIDConnect::Exception
@@ -54,7 +56,7 @@ module ForestAdminRails
                    {
                      name: exception.respond_to?(:name) ? exception.name : exception.class.name,
                      detail: get_error_message(exception),
-                     status: exception.try(:status),
+                     status: http_status,
                      data: exception.try(:data)
                    }
                  ]
@@ -65,7 +67,7 @@ module ForestAdminRails
         ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
       end
 
-      render json: data, status: exception.try(:status) || 500
+      render json: data, status: http_status
     end
   end
 end
