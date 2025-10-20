@@ -62,6 +62,11 @@ module ForestAdminAgent
       end
 
       def send_schema(force: false)
+        if should_skip_schema_update? && !force
+          log_schema_skip
+          return
+        end
+
         return unless @has_env_secret
 
         schema_path = Facades::Container.cache(:schema_path)
@@ -159,6 +164,17 @@ module ForestAdminAgent
         source = option.source
         cleaned_option = source&.strip if source
         cleaned_option&.delete_prefix(prefix)&.strip
+      end
+
+      def should_skip_schema_update?
+        Facades::Container.cache(:skip_schema_update) == true
+      end
+
+      def log_schema_skip
+        @logger.log('Warn', '[ForestAdmin] Schema update skipped (skip_schema_update flag is true)')
+        environment = Facades::Container.cache(:is_production) ? 'production' : 'development'
+        @logger.log('Info',
+                    "[ForestAdmin] Running in #{environment} mode")
       end
     end
   end
