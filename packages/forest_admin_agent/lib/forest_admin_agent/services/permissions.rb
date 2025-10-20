@@ -41,12 +41,13 @@ module ForestAdminAgent
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
 
-        is_allowed = collections_data.key?(collection.name.to_sym) && collections_data[collection.name.to_sym][action].include?(user_data[:roleId])
+        # First check
+        is_allowed = permission_allowed?(collections_data, collection, action, user_data)
 
-        # Refetch
+        # Refetch if not allowed
         unless is_allowed
           collections_data = get_collections_permissions_data(force_fetch: true)
-          is_allowed = collections_data[collection.name.to_sym][action].include?(user_data[:roleId])
+          is_allowed = permission_allowed?(collections_data, collection, action, user_data)
         end
 
         # still not allowed - throw forbidden message
@@ -111,10 +112,13 @@ module ForestAdminAgent
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
         action = find_action_from_endpoint(collection.name, request[:headers]['REQUEST_PATH'], request[:headers]['REQUEST_METHOD'])
+
+        collection_actions = validate_smart_action_permissions(collections_data, collection, action)
+
         smart_action_approval = SmartActionChecker.new(
           request[:params],
           collection,
-          collections_data[collection.name.to_sym][:actions][action['name'].to_sym],
+          collection_actions[action['name'].to_sym],
           caller,
           user_data[:roleId],
           filter
@@ -125,6 +129,8 @@ module ForestAdminAgent
           'Debug',
           "User #{user_data[:roleId]} is #{"not" unless is_allowed} allowed to perform #{action["name"]}"
         )
+
+        is_allowed
       end
 
       def get_scope(collection)
@@ -169,6 +175,18 @@ module ForestAdminAgent
       end
 
       private
+
+      def permission_allowed?(collections_data, collection, action, user_data)
+        return false unless user_data_valid?(user_data)
+
+        collection_key = collection.name.to_sym
+        return false unless collection_exists?(collections_data, collection_key, collection.name, user_data)
+
+        role_ids = get_role_ids_for_action(collections_data, collection_key, action, collection.name, user_data)
+        return false unless role_ids
+
+        check_user_permission(role_ids, user_data, action, collection.name)
+      end
 
       def get_collections_permissions_data(force_fetch: false)
         self.class.invalidate_cache('forest.collections') if force_fetch == true
@@ -251,13 +269,37 @@ module ForestAdminAgent
       end
 
       def decode_crud_permissions(collection)
+        # Validate structure exists
+        unless collection.is_a?(Hash) && collection.key?(:collection)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            'Invalid permissions data structure: missing :collection key. ' \
+            "Available keys: #{collection.is_a?(Hash) ? collection.keys.join(", ") : "N/A (not a hash)"}. " \
+            'This indicates an API contract violation or data corruption.'
+          )
+          raise ForestException, 'Invalid permission data structure received from Forest Admin API'
+        end
+
+        collection_data = collection[:collection]
+
+        unless collection_data.is_a?(Hash)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Invalid permissions data: :collection is not a hash (got #{collection_data.class}). " \
+            'This indicates an API contract violation or data corruption.'
+          )
+          raise ForestException, 'Invalid permission data structure: :collection must be a hash'
+        end
+
+        # Use dig to safely extract roles, allowing for missing permissions
+        # Missing permissions will result in nil values which are handled by permission_allowed?
         {
-          browse: collection[:collection][:browseEnabled][:roles],
-          read: collection[:collection][:readEnabled][:roles],
-          edit: collection[:collection][:editEnabled][:roles],
-          add: collection[:collection][:addEnabled][:roles],
-          delete: collection[:collection][:deleteEnabled][:roles],
-          export: collection[:collection][:exportEnabled][:roles]
+          browse: collection_data.dig(:browseEnabled, :roles),
+          read: collection_data.dig(:readEnabled, :roles),
+          edit: collection_data.dig(:editEnabled, :roles),
+          add: collection_data.dig(:addEnabled, :roles),
+          delete: collection_data.dig(:deleteEnabled, :roles),
+          export: collection_data.dig(:exportEnabled, :roles)
         }
       end
 
@@ -314,6 +356,106 @@ module ForestAdminAgent
         JSON.parse(response.body, symbolize_names: true)
       rescue StandardError => e
         forest_api.handle_response_error(e)
+      end
+
+      def user_data_valid?(user_data)
+        return true if user_data&.key?(:roleId)
+
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Error',
+          "Invalid user data: user_data is #{user_data.nil? ? "nil" : "missing :roleId key"}. " \
+          'This indicates a session or authentication issue.'
+        )
+        false
+      end
+
+      def collection_exists?(collections_data, collection_key, collection_name, user_data)
+        return true if collections_data.key?(collection_key)
+
+        available = collections_data.keys.join(', ')
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Warn',
+          "Collection '#{collection_name}' not found in permissions " \
+          "(user_id: #{user_data[:id]}, role_id: #{user_data[:roleId]}). " \
+          "Available: #{available.empty? ? "none" : available}. " \
+          'This may indicate a configuration mismatch or timing issue during permission refresh.'
+        )
+        false
+      end
+
+      def get_role_ids_for_action(collections_data, collection_key, action, collection_name, user_data)
+        collection_permissions = collections_data[collection_key]
+        role_ids = collection_permissions[action]
+
+        if role_ids.nil?
+          available = collection_permissions.compact.keys.join(', ')
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Action '#{action}' not found for collection '#{collection_name}' " \
+            "(user_id: #{user_data[:id]}, role_id: #{user_data[:roleId]}). " \
+            "Available actions: #{available.empty? ? "none" : available}. " \
+            'This may indicate a permission schema change or misconfiguration.'
+          )
+          return nil
+        end
+
+        unless role_ids.is_a?(Array)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Invalid permission data: roles for action '#{action}' in collection '#{collection_name}' " \
+            "is not an array (got #{role_ids.class}). This indicates data corruption."
+          )
+          return nil
+        end
+
+        role_ids
+      end
+
+      def check_user_permission(role_ids, user_data, action, collection_name)
+        has_permission = role_ids.include?(user_data[:roleId])
+
+        unless has_permission
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "Permission denied: User #{user_data[:id]} (role #{user_data[:roleId]}) " \
+            "lacks permission to #{action} collection '#{collection_name}'. " \
+            "Required roles: #{role_ids.join(", ")}"
+          )
+        end
+
+        has_permission
+      end
+
+      def validate_smart_action_permissions(collections_data, collection, action)
+        collection_key = collection.name.to_sym
+
+        unless collections_data.key?(collection_key)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action check: Collection '#{collection.name}' not found in permissions"
+          )
+          raise ForbiddenError, "Collection '#{collection.name}' not found in permissions"
+        end
+
+        collection_actions = collections_data[collection_key][:actions]
+        if collection_actions.nil?
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action check: No actions configured for collection '#{collection.name}'"
+          )
+          raise ForbiddenError, "No actions configured for collection '#{collection.name}'"
+        end
+
+        action_key = action['name'].to_sym
+        unless collection_actions.key?(action_key)
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "Smart action '#{action["name"]}' not found in permissions for collection '#{collection.name}'"
+          )
+          raise ForbiddenError, "Smart action '#{action["name"]}' is not configured"
+        end
+
+        collection_actions
       end
     end
   end
