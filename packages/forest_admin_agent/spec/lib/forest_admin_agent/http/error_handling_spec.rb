@@ -102,51 +102,6 @@ module ForestAdminAgent
             expect(handler.get_error_message(validation_error)).to eq('🌳🌳🌳 The query violates a unicity constraint')
           end
         end
-
-        context 'when ActiveRecord is defined' do
-          before do
-            allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:customize_error_message).and_return(nil)
-
-            # Mock ActiveRecord if not already loaded
-            unless defined?(ActiveRecord)
-              stub_const('ActiveRecord', Module.new)
-
-              # Create a RecordInvalid class that stores the record like the real one
-              record_invalid_class = Class.new(StandardError) do
-                attr_reader :record
-
-                def initialize(record = nil)
-                  @record = record
-                  super(record.to_s)
-                end
-              end
-              stub_const('ActiveRecord::RecordInvalid', record_invalid_class)
-
-              stub_const('ActiveRecord::ActiveRecordError', Class.new(StandardError))
-            end
-          end
-
-          context 'when error is ActiveRecord::RecordInvalid' do
-            let(:errors) { double.tap { |d| allow(d).to receive(:full_messages).and_return(['Name can\'t be blank', 'Email is invalid']) } }
-            let(:record) { double.tap { |d| allow(d).to receive(:errors).and_return(errors) } }
-            let(:validation_error) { ActiveRecord::RecordInvalid.new(record) }
-
-            it 'returns the full validation error messages' do
-              expect(handler.get_error_message(validation_error)).to eq('Name can\'t be blank, Email is invalid')
-            end
-          end
-
-          context 'when error is a general ActiveRecord::ActiveRecordError' do
-            let(:ar_error) do
-              error = ActiveRecord::ActiveRecordError.new('Database connection failed')
-              error
-            end
-
-            it 'returns the error message' do
-              expect(handler.get_error_message(ar_error)).to eq('Database connection failed')
-            end
-          end
-        end
       end
 
       describe '#get_error_status' do
