@@ -1,3 +1,10 @@
+## [1.8.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.6...v1.8.7) (2025-10-20)
+
+
+### Bug Fixes
+
+* **list:** removes null values in included records ([#147](https://github.com/ForestAdmin/agent-ruby/issues/147)) ([26cf793](https://github.com/ForestAdmin/agent-ruby/commit/26cf793fbff871a4b482c241d7419082c9e0c421))
+
 ## [1.8.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.5...v1.8.6) (2025-10-17)
 
 
