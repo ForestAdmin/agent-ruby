@@ -10,7 +10,8 @@ module ForestAdminAgent
         end
 
         def handle_request(_args = {})
-          if AgentFactory.instance.container.resolve(:cache).get('config')[:is_production]
+          config = AgentFactory.instance.container.resolve(:cache).get('config')
+          if config[:is_production] && !config[:skip_schema_update]
             AgentFactory.instance.send_schema(force: true)
           end
 

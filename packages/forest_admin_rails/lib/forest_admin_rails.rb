@@ -28,6 +28,7 @@ module ForestAdminRails
   setting :instant_cache_refresh, default: Rails.env.production?
   setting :limit_export_size, default: nil
   setting :append_schema_path, default: nil
+  setting :skip_schema_update, default: false
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

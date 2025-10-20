@@ -88,6 +88,7 @@ module ForestAdminAgent
         describe 'send_schema' do
           it 'do nothing if env_secret is nil' do
             described_class.instance.instance_variable_set(:@has_env_secret, false)
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive(:serialize)
             described_class.instance.build
 
@@ -97,6 +98,7 @@ module ForestAdminAgent
           it 'raises error in production if schema file does not exist' do
             instance = described_class.instance
             instance.instance_variable_set(:@has_env_secret, true)
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
             allow(File).to receive(:exist?).with('/path/to/schema.json').and_return(false)
@@ -109,6 +111,7 @@ module ForestAdminAgent
             instance.instance_variable_set(:@has_env_secret, true)
             schema_content = { meta: {}, collections: [] }.to_json
 
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
             allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
@@ -128,6 +131,7 @@ module ForestAdminAgent
             datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
             instance.container.register(:datasource, datasource)
 
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
@@ -149,6 +153,7 @@ module ForestAdminAgent
             datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
             instance.container.register(:datasource, datasource)
 
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return('/path/to/append.json')
@@ -169,6 +174,7 @@ module ForestAdminAgent
             datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
             instance.container.register(:datasource, datasource)
 
+            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
             allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return('/path/to/append.json')
@@ -177,6 +183,86 @@ module ForestAdminAgent
             allow(File).to receive(:read).with('/path/to/append.json').and_raise(Errno::ENOENT)
 
             expect { instance.send_schema }.to raise_error(/Can't load additional schema/)
+          end
+
+          context 'with skip_schema_update enabled' do
+            it 'does not send schema and logs skip message' do
+              instance = described_class.instance
+              instance.instance_variable_set(:@has_env_secret, true)
+              logger = instance_spy(Services::LoggerService)
+              instance.instance_variable_set(:@logger, logger)
+
+              allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(true)
+              allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+              allow(instance).to receive(:post_schema)
+
+              instance.send_schema
+
+              expect(logger).to have_received(:log).with('Warn', '[ForestAdmin] Schema update skipped (skip_schema_update flag is true)')
+              expect(instance).not_to have_received(:post_schema)
+            end
+
+            it 'logs the environment mode when skipping' do
+              instance = described_class.instance
+              instance.instance_variable_set(:@has_env_secret, true)
+              logger = instance_spy(Services::LoggerService)
+              instance.instance_variable_set(:@logger, logger)
+
+              allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(true)
+              allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
+
+              instance.send_schema
+
+              expect(logger).to have_received(:log).with('Info', '[ForestAdmin] Running in production mode')
+            end
+
+            it 'sends schema when force flag is true despite skip setting' do
+              instance = described_class.instance
+              instance.instance_variable_set(:@has_env_secret, true)
+              logger = instance_spy(Services::LoggerService)
+              instance.instance_variable_set(:@logger, logger)
+
+              datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+              instance.container.register(:datasource, datasource)
+
+              allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(true)
+              allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+              allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+              allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
+              allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+              allow(File).to receive(:write)
+              allow(instance).to receive(:post_schema)
+
+              instance.send_schema(force: true)
+
+              expect(logger).not_to have_received(:log).with('Warn', include('skipped'))
+              expect(instance).to have_received(:post_schema)
+            end
+          end
+
+          context 'with skip_schema_update disabled (default)' do
+            it 'sends schema normally' do
+              instance = described_class.instance
+              instance.instance_variable_set(:@has_env_secret, true)
+              logger = instance_spy(Services::LoggerService)
+              instance.instance_variable_set(:@logger, logger)
+
+              datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+              instance.container.register(:datasource, datasource)
+
+              allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
+              allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+              allow(Facades::Container).to receive(:cache).with(:is_production).and_return(false)
+              allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return(nil)
+              allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+              allow(File).to receive(:write)
+              allow(instance).to receive(:post_schema)
+
+              instance.send_schema
+
+              expect(logger).not_to have_received(:log).with('Warn', include('skipped'))
+              expect(instance).to have_received(:post_schema)
+            end
           end
         end
 
