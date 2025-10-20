@@ -43,7 +43,7 @@ module ForestAdminAgent
         end
       end
 
-      context 'when there is bad response from the server' do
+      context 'when server returns 502 status' do
         before do
           allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
             instance_double(Faraday::Response, status: 502, body: { 'response' => 'Bad Gateway' }.to_json)
@@ -52,7 +52,75 @@ module ForestAdminAgent
           allow(ip_whitelist).to receive(:forest_api).and_return(forest_api_requester)
         end
 
-        it 'is not enabled' do
+        it 'raises an error without parsing JSON' do
+          expect do
+            ip_whitelist.enabled?
+          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+        end
+      end
+
+      context 'when server returns 500 status' do
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
+            instance_double(Faraday::Response, status: 500, body: { 'error' => 'Internal Server Error' }.to_json)
+          )
+
+          allow(ip_whitelist).to receive(:forest_api).and_return(forest_api_requester)
+        end
+
+        it 'raises an error without parsing JSON' do
+          expect do
+            ip_whitelist.enabled?
+          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+        end
+      end
+
+      context 'when server returns 404 status' do
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
+            instance_double(Faraday::Response, status: 404, body: { 'error' => 'Not Found' }.to_json)
+          )
+
+          allow(ip_whitelist).to receive(:forest_api).and_return(forest_api_requester)
+        end
+
+        it 'raises an error without parsing JSON' do
+          expect do
+            ip_whitelist.enabled?
+          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+        end
+      end
+
+      context 'when API returns invalid JSON' do
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
+            instance_double(Faraday::Response,
+                            status: 200,
+                            body: 'not valid json {{{')
+          )
+
+          allow(ip_whitelist).to receive(:forest_api).and_return(forest_api_requester)
+        end
+
+        it 'raises an error' do
+          expect do
+            ip_whitelist.enabled?
+          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+        end
+      end
+
+      context 'when API returns empty response' do
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
+            instance_double(Faraday::Response,
+                            status: 200,
+                            body: '')
+          )
+
+          allow(ip_whitelist).to receive(:forest_api).and_return(forest_api_requester)
+        end
+
+        it 'raises an error' do
           expect do
             ip_whitelist.enabled?
           end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
