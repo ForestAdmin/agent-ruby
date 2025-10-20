@@ -76,22 +76,15 @@ module ForestAdminAgent
         end
 
         def validate_array_field!(field_schema, field_name)
-          begin
-            FieldValidator.validate(@collection, field_name)
-          rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
-            if e.message.include?('not found')
-              raise Http::Exceptions::NotFoundError, e.message
-            else
-              raise Http::Exceptions::ValidationError, e.message
-            end
-          end
+          FieldValidator.validate(@collection, field_name)
+          return if field_schema[:column_type].to_s.start_with?('[')
 
-          # Check if column type is an array
-          column_type = field_schema[:column_type]
-          unless column_type.to_s.start_with?('[')
-            raise Http::Exceptions::ValidationError,
-                  "Field '#{field_name}' is not an array (type: #{column_type})"
-          end
+          raise Http::Exceptions::ValidationError,
+                "Field '#{field_name}' is not an array (type: #{field_schema[:column_type]})"
+        rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
+          raise Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
+
+          raise Http::Exceptions::ValidationError, e.message
         end
 
         def fetch_record(record_id)
@@ -102,9 +95,7 @@ module ForestAdminAgent
           )
           records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
 
-          unless records&.any?
-            raise Http::Exceptions::NotFoundError, 'Record not found'
-          end
+          raise Http::Exceptions::NotFoundError, 'Record not found' unless records&.any?
 
           records[0]
         end
@@ -115,37 +106,25 @@ module ForestAdminAgent
                   "Field '#{field_name}' value is not an array (got: #{array.class})"
           end
 
-          if array_index >= array.length
-            raise Http::Exceptions::ValidationError,
-                  "Index #{array_index} out of bounds for array of length #{array.length}"
-          end
+          return unless array_index >= array.length
+
+          raise Http::Exceptions::ValidationError,
+                "Index #{array_index} out of bounds for array of length #{array.length}"
         end
 
         def parse_value_from_body(params, field_schema)
-          # Expected format: { data: { attributes: { value: <new_value> } } }
           body = params[:data] || {}
           value = body.dig(:attributes, 'value') || body.dig(:attributes, :value)
-
           element_type = extract_element_type(field_schema[:column_type])
-
-          element_schema = ColumnSchema.new(column_type: element_type)
-
-          FieldValidator.validate_value(field_schema[:column_type], element_schema, value)
-
+          FieldValidator.validate_value(field_schema[:column_type], ColumnSchema.new(column_type: element_type), value)
           value
         rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
           raise Http::Exceptions::ValidationError, e.message
         end
 
-        # Extract element type from array column type
-        # E.g., "[String]" → "String", "[Number]" → "Number"
         def extract_element_type(column_type)
           type_str = column_type.to_s
-          if type_str.start_with?('[') && type_str.end_with?(']')
-            type_str[1..-2]
-          else
-            PrimitiveType::STRING
-          end
+          type_str.start_with?('[') && type_str.end_with?(']') ? type_str[1..-2] : PrimitiveType::STRING
         end
       end
     end

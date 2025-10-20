@@ -142,7 +142,7 @@ module ForestAdminAgent
               allow(@datasource.get_collection('book')).to receive(:list).and_return([book], [updated_book])
               allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
 
-              result = update_field.handle_request(args_with_json)
+              update_field.handle_request(args_with_json)
 
               expect(@datasource.get_collection('book')).to have_received(:update).with(
                 anything,
@@ -160,18 +160,18 @@ module ForestAdminAgent
             end
 
             it 'updates last element in array' do
-              book = { 'id' => 1, 'tags' => ['first', 'second', 'last'] }
-              updated_book = { 'id' => 1, 'tags' => ['first', 'second', 'updated-tag'] }
+              book = { 'id' => 1, 'tags' => %w[first second last] }
+              updated_book = { 'id' => 1, 'tags' => %w[first second updated-tag] }
 
               allow(@datasource.get_collection('book')).to receive(:list).and_return([book], [updated_book])
               allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
 
-              result = update_field.handle_request(args_with_last_index)
+              update_field.handle_request(args_with_last_index)
 
               expect(@datasource.get_collection('book')).to have_received(:update).with(
                 anything,
                 anything,
-                { tags: ['first', 'second', 'updated-tag'] }
+                { tags: %w[first second updated-tag] }
               )
             end
           end
@@ -179,7 +179,7 @@ module ForestAdminAgent
           context 'with permission denied' do
             before do
               allow(permissions).to receive(:can?).with(:edit, @collection)
-                                                   .and_raise(Http::Exceptions::ForbiddenError.new('Permission denied'))
+                                .and_raise(Http::Exceptions::ForbiddenError.new('Permission denied'))
             end
 
             it 'raises ForbiddenError' do
@@ -272,7 +272,7 @@ module ForestAdminAgent
           end
 
           context 'with type coercion' do
-            context 'string to number' do
+            context 'when coercing string to number' do
               let(:args_with_string_number) do
                 args.merge(
                   params: args[:params].merge(
@@ -286,12 +286,12 @@ module ForestAdminAgent
                 book = { 'id' => 1, 'scores' => [10, 20] }
                 updated_book = { 'id' => 1, 'scores' => [99.0, 20] }
 
-                allow(@collection).to receive(:list).and_return([book], [updated_book])
-                allow(@collection).to receive(:update).and_return(true)
+                allow(@datasource.get_collection('book')).to receive(:list).and_return([book], [updated_book])
+                allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
 
-                result = update_field.handle_request(args_with_string_number)
+                update_field.handle_request(args_with_string_number)
 
-                expect(@collection).to have_received(:update).with(
+                expect(@datasource.get_collection('book')).to have_received(:update).with(
                   anything,
                   anything,
                   { scores: [99.0, 20] }
@@ -299,7 +299,7 @@ module ForestAdminAgent
               end
             end
 
-            context 'invalid number coercion' do
+            context 'when number coercion fails' do
               let(:args_with_invalid_number) do
                 args.merge(
                   params: args[:params].merge(
@@ -311,7 +311,7 @@ module ForestAdminAgent
 
               before do
                 book = { 'id' => 1, 'scores' => [10, 20] }
-                allow(@collection).to receive(:list).and_return([book])
+                allow(@datasource.get_collection('book')).to receive(:list).and_return([book])
               end
 
               it 'raises ValidationError' do
