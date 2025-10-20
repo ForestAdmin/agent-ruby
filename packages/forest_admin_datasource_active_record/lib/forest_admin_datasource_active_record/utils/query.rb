@@ -151,7 +151,7 @@ module ForestAdminDatasourceActiveRecord
           regex_clause = case adapter_name
                          when 'postgresql'
                            "#{@arel_table.name}.#{field} ~ ?"
-                         when 'mysql2', 'mysql'
+                         when 'mysql2', 'mysql', 'sqlite', 'sqlite3'
                            "#{@arel_table.name}.#{field} REGEXP ?"
                          else
                            raise ArgumentError, "Match operator is not supported for database adapter '#{adapter_name}'"

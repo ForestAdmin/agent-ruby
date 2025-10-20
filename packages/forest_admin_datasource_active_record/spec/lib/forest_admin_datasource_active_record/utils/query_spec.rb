@@ -232,6 +232,54 @@ module ForestAdminDatasourceActiveRecord
             expect(sql).to match(/"year".*<.*2020/)
           end
         end
+
+        context 'when using MATCH operator' do
+          it 'generates REGEXP clause with string value' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, 'Toyota|Honda')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('Toyota|Honda')
+          end
+
+          it 'extracts pattern from Regexp object' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, /^test.*/i)
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('^test.*')
+          end
+
+          it 'extracts pattern from JavaScript regex string' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, '/(foo|bar)/g')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('(foo|bar)')
+            expect(sql).not_to include('/g')
+          end
+
+          it 'handles case-insensitive JavaScript regex string' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, '/(test)/gi')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('REGEXP')
+            expect(sql).to include('(test)')
+            expect(sql).not_to include('/gi')
+          end
+        end
       end
     end
   end
