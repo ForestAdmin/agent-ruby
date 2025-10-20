@@ -67,7 +67,21 @@ module ForestAdminAgent
       end
 
       def match_conditions(condition_name)
-        pk = Schema.primary_keys(collection)[0]
+        pks = Schema.primary_keys(collection)
+
+        if pks.nil? || pks.empty?
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Missing primary keys for action with conditional permissions - Collection: #{collection.name}, " \
+            "Action: #{attributes[:smart_action_id]}"
+          )
+
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Collection '#{collection.name}' has no primary keys. " \
+                "Actions with conditional permissions require a primary key to identify records."
+        end
+
+        pk = pks[0]
         condition_filter = if attributes[:all_records]
                              Nodes::ConditionTreeLeaf.new(pk, 'NOT_EQUAL', attributes[:all_records_ids_excluded])
                            else
@@ -86,7 +100,22 @@ module ForestAdminAgent
 
         rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
         (rows.empty? ? 0 : rows[0]['value']) == attributes[:ids].count
-      rescue StandardError
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException
+        # Let ForestException propagate - these are actionable schema issues
+        raise
+      rescue ArgumentError, TypeError => e
+        # Catch specific errors from condition parsing/validation
+        raise ConflictError.new(
+          "Invalid action condition: #{e.message}. Please contact an administrator.",
+          INVALID_ACTION_CONDITION_ERROR
+        )
+      rescue StandardError => e
+        # Catch unexpected errors and log for debugging
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Error',
+          "Unexpected error in match_conditions: #{e.class} - #{e.message}"
+        )
+
         raise ConflictError.new(
           'The conditions to trigger this action cannot be verified. Please contact an administrator.',
           INVALID_ACTION_CONDITION_ERROR
