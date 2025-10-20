@@ -1,3 +1,24 @@
+## [1.8.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.5...v1.8.6) (2025-10-17)
+
+
+### Bug Fixes
+
+* pagination validation ([#156](https://github.com/ForestAdmin/agent-ruby/issues/156)) ([817e275](https://github.com/ForestAdmin/agent-ruby/commit/817e2751cb590a97c348d9b20ddb4e951cdd9b57))
+
+## [1.8.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.4...v1.8.5) (2025-10-17)
+
+
+### Bug Fixes
+
+* **logs:** remove spam logs about mounted charts ([#152](https://github.com/ForestAdmin/agent-ruby/issues/152)) ([888f073](https://github.com/ForestAdmin/agent-ruby/commit/888f073149df190449a1cbe235b22f6540772b96))
+
+## [1.8.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.3...v1.8.4) (2025-10-17)
+
+
+### Bug Fixes
+
+* **datasource_activerecord:** implement blank, present & missing filter operators with proper string handling ([#148](https://github.com/ForestAdmin/agent-ruby/issues/148)) ([d69b1dc](https://github.com/ForestAdmin/agent-ruby/commit/d69b1dc55a7316580135be1cf937f25aa6d04abe))
+
 ## [1.8.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.2...v1.8.3) (2025-10-14)
 
 

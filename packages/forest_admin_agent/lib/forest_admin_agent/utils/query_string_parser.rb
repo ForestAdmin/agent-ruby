@@ -65,7 +65,11 @@ module ForestAdminAgent
         page = args.dig(:params, :data, :attributes, :all_records_subset_query, :number) ||
                args.dig(:params, :page, :number) || DEFAULT_PAGE_TO_SKIP
 
-        unless !items_per_pages.to_s.match(/\A[+]?\d+\z/).nil? || !page.to_s.match(/\A[+]?\d+\z/).nil?
+        # Validate both parameters
+        page_valid = !page.to_s.match(/\A[+]?\d+\z/).nil? && page.to_i.positive?
+        limit_valid = !items_per_pages.to_s.match(/\A[+]?\d+\z/).nil? && items_per_pages.to_i.positive?
+
+        unless page_valid && limit_valid
           raise ForestException, "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
         end
 
