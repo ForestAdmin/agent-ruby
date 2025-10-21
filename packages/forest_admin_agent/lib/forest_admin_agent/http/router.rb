@@ -11,7 +11,7 @@ module ForestAdminAgent
       # Route computation is expensive because it:
       # - Iterates through all datasource collections and their schemas
       # - Instantiates multiple route handler objects (Actions, Charts, Resources, etc.)
-      # - Builds and merges individual route hashes from 19+ route handlers
+      # - Builds and merges individual route hashes from multiple route handlers
       #
       # Without caching, this computation would run repeatedly, causing significant
       # performance degradation.
@@ -117,8 +117,8 @@ module ForestAdminAgent
 
           all_routes.merge!(routes)
         rescue StandardError => e
-          # Provide specific context about which handler failed
-          raise StandardError, "Failed to load routes from '#{source[:name]}' handler: #{e.class} - #{e.message}"
+          # Provide specific context about which handler failed while preserving exception type
+          raise e.class, "Failed to load routes from '#{source[:name]}' handler: #{e.message}"
         end
 
         all_routes

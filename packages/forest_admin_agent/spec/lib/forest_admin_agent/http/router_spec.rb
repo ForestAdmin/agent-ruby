@@ -142,6 +142,39 @@ module ForestAdminAgent
             expect(all_routes).to have_key(chart_route_name)
           end
         end
+
+        context 'when route handler fails' do
+          it 'raises descriptive error when a route handler fails to instantiate' do
+            # Simulate Authentication.new raising an error
+            allow(ForestAdminAgent::Routes::Security::Authentication).to receive(:new)
+              .and_raise(StandardError, 'Database connection failed')
+
+            expect do
+              described_class.routes
+            end.to raise_error(StandardError, /Failed to load routes from 'authentication' handler: Database connection failed/)
+          end
+
+          it 'preserves original exception type in error message' do
+            # Simulate HealthCheck.new raising a specific exception type
+            allow(ForestAdminAgent::Routes::System::HealthCheck).to receive(:new)
+              .and_raise(ArgumentError, 'Invalid configuration')
+
+            expect do
+              described_class.routes
+            end.to raise_error(ArgumentError, /Failed to load routes from 'health_check' handler: Invalid configuration/)
+          end
+
+          it 'raises TypeError when a route handler returns non-Hash' do
+            # Simulate a handler returning nil instead of Hash
+            health_check_instance = instance_double(ForestAdminAgent::Routes::System::HealthCheck)
+            allow(health_check_instance).to receive(:routes).and_return(nil)
+            allow(ForestAdminAgent::Routes::System::HealthCheck).to receive(:new).and_return(health_check_instance)
+
+            expect do
+              described_class.routes
+            end.to raise_error(TypeError, /Route handler 'health_check' returned NilClass instead of Hash/)
+          end
+        end
       end
 
       describe '.actions_routes' do
