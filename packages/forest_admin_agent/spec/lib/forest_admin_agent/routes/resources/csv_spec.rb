@@ -23,7 +23,7 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
-        let(:csv_generator) { class_double(ForestAdminAgent::Utils::CsvGenerator).as_stubbed_const }
+        let(:csv_generator_stream) { class_double(ForestAdminAgent::Utils::CsvGeneratorStream).as_stubbed_const }
 
         before do
           user_class = Struct.new(:id, :first_name, :last_name)
@@ -60,30 +60,31 @@ module ForestAdminAgent
         end
 
         context 'when call csv' do
-          it 'returns an export csv' do
-            allow(csv_generator).to receive(:generate).with([User.new(1, 'foo', 'foo')], %w[id first_name last_name]).and_return("id,first_name,last_name\n1,foo,foo\n")
+          it 'returns a streaming export csv' do
+            # Create a mock enumerator that yields CSV data
+            mock_enumerator = ["id,first_name,last_name\n", "1,foo,foo\n"].to_enum
+            allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)
+
             result = csv.handle_request(args)
 
-            expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
-              expect(caller).to be_instance_of(Components::Caller)
-              expect(filter).to be_instance_of(Components::Query::Filter)
-              expect(projection).to eq(%w[id first_name last_name])
-            end
-
-            expect(csv_generator).to have_received(:generate) do |records, projection|
-              expect(records).to eq([User.new(1, 'foo', 'foo')])
-              expect(projection).to eq(%w[id first_name last_name])
-            end
-            expect(result[:filename]).to eq('user.csv')
-            expect(result[:content][:export]).to eq("id,first_name,last_name\n1,foo,foo\n")
+            expect(csv_generator_stream).to have_received(:stream)
+            expect(result[:status]).to eq(200)
+            expect(result[:content][:type]).to eq('Stream')
+            expect(result[:content][:enumerator]).to eq(mock_enumerator)
+            expect(result[:content][:headers]['Content-Type']).to eq('text/csv; charset=utf-8')
+            expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_export_\d{8}_\d{6}\.csv"/)
           end
 
           it 'with a filename should return an export csv with the filename provided' do
+            mock_enumerator = ["id,first_name,last_name\n", "1,foo,foo\n"].to_enum
+            allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)
+
             args[:params][:filename] = 'filename'
             result = csv.handle_request(args)
 
-            expect(result[:filename]).to eq('filename.csv')
-            expect(result[:content][:export]).to eq("id,first_name,last_name\n1,foo,foo\n")
+            expect(result[:status]).to eq(200)
+            expect(result[:content][:type]).to eq('Stream')
+            expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="filename_export_\d{8}_\d{6}\.csv"/)
           end
         end
       end
