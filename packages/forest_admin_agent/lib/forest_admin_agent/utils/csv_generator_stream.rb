@@ -16,8 +16,7 @@ module ForestAdminAgent
       def self.stream(header, filter, projection, list_records, limit_export_size = nil)
         Enumerator.new do |yielder|
           # Yield header row first (client receives immediately)
-          Facades::Container.logger&.log('Info', "CSV export header: #{header}")
-          header_array = JSON.parse(header)
+          header_array = parse_header(header, projection)
           yielder << "#{header_array.join(",")}\n"
 
           offset = 0
@@ -58,6 +57,26 @@ module ForestAdminAgent
         end
       end
 
+      # Parse header parameter into an array
+      # @param header [String, Array, nil] Header as JSON string, array, or nil
+      # @param projection [Projection] Field projection (fallback if header is invalid)
+      # @return [Array<String>] Header fields
+      def self.parse_header(header, projection)
+        case header
+        when Array
+          header
+        when String
+          return projection.to_a if header.empty?
+
+          JSON.parse(header)
+        else
+          projection.to_a
+        end
+      rescue JSON::ParserError
+        # Fallback to projection if JSON parsing fails
+        projection.to_a
+      end
+
       # Generate CSV row from record data
       # @param record [Hash] Record data
       # @param projection [Projection] Field projection
@@ -86,7 +105,7 @@ module ForestAdminAgent
         end
       end
 
-      private_class_method :generate_row, :format_value
+      private_class_method :parse_header, :generate_row, :format_value
     end
   end
 end

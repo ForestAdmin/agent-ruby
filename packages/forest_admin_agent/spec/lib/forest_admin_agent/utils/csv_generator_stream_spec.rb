@@ -14,6 +14,53 @@ module ForestAdminAgent
       end
 
       describe '.stream' do
+        context 'with header parameter variations' do
+          let(:records) { [{ 'id' => 1, 'first_name' => 'Luke', 'last_name' => 'Skywalker' }] }
+          let(:list_records) { ->(_batch_filter) { records } }
+
+          it 'handles header as JSON string' do
+            enumerator = described_class.stream('["id","first_name","last_name"]', filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+
+          it 'handles header as array' do
+            enumerator = described_class.stream(%w[id first_name last_name], filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+
+          it 'handles nil header by using projection' do
+            enumerator = described_class.stream(nil, filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+
+          it 'handles empty string header by using projection' do
+            enumerator = described_class.stream('', filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+
+          it 'handles malformed JSON header by using projection' do
+            enumerator = described_class.stream('{"not":"an","array"}', filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+
+          it 'handles invalid JSON by using projection' do
+            enumerator = described_class.stream('not valid json', filter, projection, list_records)
+            csv_output = enumerator.to_a.join
+
+            expect(csv_output).to start_with("id,first_name,last_name\n")
+          end
+        end
+
         it 'streams CSV data with header and records' do
           records = [
             { 'id' => 1, 'first_name' => 'Luke', 'last_name' => 'Skywalker' },
