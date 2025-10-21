@@ -103,6 +103,31 @@ module ForestAdminDatasourceToolkit
         end
       end
 
+      describe 'get_allowed_types_for_column_type' do
+        context 'with array of hash (embedded documents)' do
+          it 'returns JSON allowed types' do
+            column_type = [{ 'street' => 'String', 'city' => 'String', 'zip_code' => 'String' }]
+            allowed_types = described_class.get_allowed_types_for_column_type(column_type)
+            expect(allowed_types).to eq([PrimitiveType::JSON, nil])
+          end
+        end
+
+        context 'with hash (embedded document)' do
+          it 'returns JSON allowed types' do
+            column_type = { 'street' => 'String', 'city' => 'String' }
+            allowed_types = described_class.get_allowed_types_for_column_type(column_type)
+            expect(allowed_types).to eq([PrimitiveType::JSON, nil])
+          end
+        end
+
+        context 'with string primitive type' do
+          it 'returns String allowed types' do
+            allowed_types = described_class.get_allowed_types_for_column_type(PrimitiveType::STRING)
+            expect(allowed_types).to eq([PrimitiveType::STRING, nil])
+          end
+        end
+      end
+
       describe 'get_allowed_types_for_operator' do
         it 'includes String type for Match operator' do
           allowed_types = described_class.get_allowed_types_for_operator(Operators::MATCH)

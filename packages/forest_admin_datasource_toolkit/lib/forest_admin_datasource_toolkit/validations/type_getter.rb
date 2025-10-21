@@ -19,6 +19,12 @@ module ForestAdminDatasourceToolkit
 
         return PrimitiveTypes::BINARY if value.is_a?(buffer)
 
+        return PrimitiveTypes::JSON if value.is_a?(Hash) && type_context.is_a?(Array) && type_context.first.is_a?(Hash)
+
+        return PrimitiveTypes::JSON if value.is_a?(Hash) && type_context.is_a?(Hash)
+
+        return PrimitiveTypes::JSON if value.is_a?(Array)
+
         nil
       end
 
