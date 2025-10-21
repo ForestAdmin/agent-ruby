@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.10.0...v1.11.0) (2025-10-21)
+
+
+### Features
+
+* csv streaming ([#155](https://github.com/ForestAdmin/agent-ruby/issues/155)) ([a6f03af](https://github.com/ForestAdmin/agent-ruby/commit/a6f03af7a98468d6e8977347e627e8a56d4853e2))
+
 # [1.10.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.9.1...v1.10.0) (2025-10-21)
 
 
