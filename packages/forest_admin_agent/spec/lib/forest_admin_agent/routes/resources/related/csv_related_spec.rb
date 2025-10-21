@@ -112,6 +112,29 @@ module ForestAdminAgent
               # It generates its own based on collection_name and relation_name.
               expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_category_export_\d{8}_\d{6}\.csv"/)
             end
+
+            it 'passes a lambda to stream that calls list_relation with correct parameters' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:params]['header'] = '["id","label"]'
+
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation)
+                .and_return([Category.new(1, 'bar')])
+
+              captured_lambda = nil
+              allow(csv_generator_stream).to receive(:stream) do |_header, _filter, _projection, list_records, _limit|
+                captured_lambda = list_records
+                ["id,label\n"].to_enum
+              end
+
+              csv.handle_request(args)
+
+              mock_filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new
+              result = captured_lambda.call(mock_filter)
+
+              expect(result).to eq([Category.new(1, 'bar')])
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation)
+            end
           end
         end
       end
