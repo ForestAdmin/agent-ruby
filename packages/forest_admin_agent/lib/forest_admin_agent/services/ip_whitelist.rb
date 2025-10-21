@@ -87,7 +87,26 @@ module ForestAdminAgent
       def fetch_rules
         response = forest_api.get('/liana/v1/ip-whitelist-rules')
 
-        body = JSON.parse(response.body)
+        unless response.status == 200
+          ForestAdminAgent::Facades::Container.logger.log('Error', {
+                                                            error: "HTTP #{response.status}",
+                                                            status: response.status,
+                                                            response: response.body
+                                                          })
+          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+        end
+
+        begin
+          body = JSON.parse(response.body)
+        rescue JSON::ParserError => e
+          ForestAdminAgent::Facades::Container.logger.log('Error', {
+                                                            error: e.message,
+                                                            status: response.status,
+                                                            response: response.body
+                                                          })
+          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+        end
+
         ip_whitelist_data = body['data']['attributes']
 
         @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
