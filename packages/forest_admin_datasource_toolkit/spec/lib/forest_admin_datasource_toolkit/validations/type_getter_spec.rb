@@ -67,6 +67,30 @@ module ForestAdminDatasourceToolkit
           end
         end
 
+        context 'when the value is a hash with array of hash type_context (embedded documents)' do
+          it 'returns Json type' do
+            value = { 'street' => '19 street', 'city' => 'Springfield', 'zip_code' => '12345' }
+            type_context = [{ 'street' => 'String', 'city' => 'String', 'zip_code' => 'String' }]
+            expect(described_class.get(value, type_context)).to eq('Json')
+          end
+        end
+
+        context 'when the value is a hash with hash type_context (embedded document)' do
+          it 'returns Json type' do
+            value = { 'street' => '19 street', 'city' => 'Springfield' }
+            type_context = { 'street' => 'String', 'city' => 'String' }
+            expect(described_class.get(value, type_context)).to eq('Json')
+          end
+        end
+
+        context 'when the value is an array' do
+          it 'returns Json type' do
+            value = [{ 'street' => '19 street' }, { 'street' => 'test' }]
+            type_context = [{ 'street' => 'String' }]
+            expect(described_class.get(value, type_context)).to eq('Json')
+          end
+        end
+
         context 'when the value is a string' do
           context 'when the value is a json and the given context is a String' do
             it 'returns the expected type' do
