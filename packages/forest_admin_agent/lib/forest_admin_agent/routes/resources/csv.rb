@@ -47,15 +47,16 @@ module ForestAdminAgent
           filename_with_timestamp = filename.gsub('.csv', "_export_#{now}.csv")
 
           # Return streaming enumerator instead of full CSV string
+          list_records = ->(batch_filter) { @collection.list(@caller, batch_filter, projection) }
+
           {
             content: {
               type: 'Stream',
               enumerator: Utils::CsvGeneratorStream.stream(
-                @collection,
-                @caller,
                 header,
                 filter,
                 projection,
+                list_records,
                 Facades::Container.config_from_cache[:limit_export_size]
               ),
               headers: {

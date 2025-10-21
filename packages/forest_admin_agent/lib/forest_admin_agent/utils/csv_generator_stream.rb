@@ -7,14 +7,13 @@ module ForestAdminAgent
     class CsvGeneratorStream
       CHUNK_SIZE = 1000
 
-      # @param collection [ForestAdminDatasourceToolkit::Collection] The collection to export
-      # @param caller [ForestAdminDatasourceToolkit::Components::Caller] The authenticated caller
       # @param header [Array<String>] CSV header fields
       # @param filter [ForestAdminDatasourceToolkit::Components::Query::Filter] Query filter
       # @param projection [ForestAdminDatasourceToolkit::Components::Query::Projection] Fields to include
+      # @param list_records [Proc] A callable that fetches records: ->(batch_filter) { ... }
       # @param limit_export_size [Integer, nil] Maximum number of records to export
       # @return [Enumerator] Lazy enumerator that yields CSV rows
-      def self.stream(collection, caller, header, filter, projection, limit_export_size = nil)
+      def self.stream(header, filter, projection, list_records, limit_export_size = nil)
         Enumerator.new do |yielder|
           # Yield header row first (client receives immediately)
           Facades::Container.logger&.log('Info', "CSV export header: #{header}")
@@ -28,7 +27,7 @@ module ForestAdminAgent
             batch_filter = filter.override(
               page: ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: offset, limit: CHUNK_SIZE)
             )
-            records = collection.list(caller, batch_filter, projection)
+            records = list_records.call(batch_filter)
 
             # Break if no more records
             break if records.empty?

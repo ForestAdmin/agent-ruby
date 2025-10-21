@@ -34,24 +34,37 @@ module ForestAdminAgent
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
 
+            # Get the parent record ID
+            id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            relation_name = args[:params]['relation_name']
+
             # Generate timestamp for filename
             now = Time.now.strftime('%Y%m%d_%H%M%S')
             collection_name = args.dig(:params, 'collection_name')
-            relation_name = args.dig(:params, 'relation_name')
             header = args.dig(:params, 'header')
             filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
 
-            # For related exports, we need to create a streaming-compatible approach
-            # We'll use the child collection's list method with proper filtering
+            # Create a callable to fetch related records
+            list_records = lambda do |batch_filter|
+              ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
+                @collection,
+                id,
+                relation_name,
+                @caller,
+                batch_filter,
+                projection
+              )
+            end
+
+            # For related exports, use list_relation to fetch records
             {
               content: {
                 type: 'Stream',
                 enumerator: ForestAdminAgent::Utils::CsvGeneratorStream.stream(
-                  @child_collection,
-                  @caller,
                   header,
                   filter,
                   projection,
+                  list_records,
                   Facades::Container.config_from_cache[:limit_export_size]
                 ),
                 headers: {
