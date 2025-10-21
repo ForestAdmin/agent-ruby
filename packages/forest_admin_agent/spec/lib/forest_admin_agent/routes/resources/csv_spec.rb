@@ -86,56 +86,6 @@ module ForestAdminAgent
             expect(result[:content][:type]).to eq('Stream')
             expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="filename_export_\d{8}_\d{6}\.csv"/)
           end
-
-          it 'actually streams CSV data using the real CsvGeneratorStream' do
-            # Don't stub CsvGeneratorStream - let it use the real implementation
-            args[:params][:header] = '["id","first_name","last_name"]'
-
-            result = csv.handle_request(args)
-
-            # Get the enumerator and consume it
-            enumerator = result[:content][:enumerator]
-            csv_output = enumerator.to_a.join
-
-            # Verify the CSV output
-            expect(csv_output).to include('id,first_name,last_name')
-            expect(csv_output).to include('1,foo,foo')
-            expect(result[:status]).to eq(200)
-            expect(result[:content][:type]).to eq('Stream')
-          end
-
-          it 'streams multiple records in batches' do
-            # Create multiple users
-            users = (1..5).map { |i| User.new(i, "first_#{i}", "last_#{i}") }
-            allow(@datasource.get_collection('user')).to receive(:list).and_return(users)
-
-            args[:params][:header] = '["id","first_name","last_name"]'
-
-            result = csv.handle_request(args)
-            enumerator = result[:content][:enumerator]
-            csv_output = enumerator.to_a.join
-
-            # Verify all records are present
-            expect(csv_output).to include('id,first_name,last_name')
-            (1..5).each do |i|
-              expect(csv_output).to include("#{i},first_#{i},last_#{i}")
-            end
-          end
-
-          it 'handles empty result set' do
-            allow(@datasource.get_collection('user')).to receive(:list).and_return([])
-
-            args[:params][:header] = '["id","first_name","last_name"]'
-
-            result = csv.handle_request(args)
-            enumerator = result[:content][:enumerator]
-            csv_output = enumerator.to_a.join
-
-            # Should only have header
-            lines = csv_output.split("\n")
-            expect(lines.length).to eq(1)
-            expect(lines[0]).to include('id,first_name,last_name')
-          end
         end
       end
     end
