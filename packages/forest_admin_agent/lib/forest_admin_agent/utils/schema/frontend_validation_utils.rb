@@ -51,9 +51,9 @@ module ForestAdminAgent
         }.freeze
 
         def self.convert_validation_list(column)
-          return [] if column.validations.empty?
+          return [] if column.validation.empty?
 
-          rules = column.validations.map { |rule| simplify_rule(column.column_type, rule) }
+          rules = column.validation.map { |rule| simplify_rule(column.column_type, rule) }
           remove_duplicates_in_place(rules)
 
           rules.filter { |rule| rule.is_a?(Hash) && rule.key?(:operator) }

@@ -75,7 +75,9 @@ module ForestAdminAgent
             fields.reject { |field| field.type == 'Layout' }
           )
 
-          { content: context.collection.execute(context.caller, @action_name, data, filter_for_caller) }
+          result = context.collection.execute(context.caller, @action_name, data, filter_for_caller)
+
+          { content: ForestAdminAgent::Utils::ActionResult.parse(result) }
         end
 
         def handle_hook_request(args = {})

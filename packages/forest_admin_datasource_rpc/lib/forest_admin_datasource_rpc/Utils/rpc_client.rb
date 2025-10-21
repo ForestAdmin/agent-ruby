@@ -33,7 +33,7 @@ module ForestAdminDatasourceRpc
         @auth_secret = auth_secret
       end
 
-      def call_rpc(endpoint, method: :get, payload: nil, symbolize_keys: false)
+      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false)
         client = Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
@@ -49,6 +49,10 @@ module ForestAdminDatasourceRpc
           'X_TIMESTAMP' => timestamp,
           'X_SIGNATURE' => signature
         }
+
+        if caller
+          headers['forest_caller'] = caller.to_json
+        end
 
         response = client.send(method, endpoint, payload, headers)
 
