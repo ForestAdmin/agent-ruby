@@ -123,7 +123,7 @@ module ForestAdminDatasourceCustomizer
                                                                               foreign_collection: 'passport',
                                                                               origin_key: '__nonExisting__'
                                                                             })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column not found: 'passport.__nonExisting__'")
+              end.to raise_error(ForestException, "Column not found: 'passport.__nonExisting__'")
             end
           end
 
@@ -135,7 +135,7 @@ module ForestAdminDatasourceCustomizer
                                                                               foreign_collection: 'passport',
                                                                               origin_key: 'picture_id'
                                                                             })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column does not support the In operator: 'passport.picture_id'")
+              end.to raise_error(ForestException, "Column does not support the In operator: 'passport.picture_id'")
             end
           end
 
@@ -147,7 +147,7 @@ module ForestAdminDatasourceCustomizer
                                                                             origin_key: 'owner_id',
                                                                             origin_key_target: 'name'
                                                                           })
-            end.to raise_error(ForestException, "🌳🌳🌳 Types from 'passport.owner_id' and 'person.name' do not match.")
+            end.to raise_error(ForestException, "Types from 'passport.owner_id' and 'person.name' do not match.")
           end
 
           context 'when there is a given originKeyTarget' do
@@ -185,7 +185,7 @@ module ForestAdminDatasourceCustomizer
                                                                             origin_key: 'owner_id',
                                                                             origin_key_target: 'name'
                                                                           })
-            end.to raise_error(ForestException, "🌳🌳🌳 Types from 'passport.owner_id' and 'person.name' do not match.")
+            end.to raise_error(ForestException, "Types from 'passport.owner_id' and 'person.name' do not match.")
           end
 
           context 'when there is a given originKeyTarget' do
@@ -223,7 +223,7 @@ module ForestAdminDatasourceCustomizer
                                                                               foreign_collection: '__nonExisting__',
                                                                               foreign_key: 'owner_id'
                                                                             })
-              end.to raise_error(ForestException, '🌳🌳🌳 Collection __nonExisting__ not found.')
+              end.to raise_error(ForestException, 'Collection __nonExisting__ not found.')
             end
 
             it 'throws with a non existent fk' do
@@ -233,7 +233,7 @@ module ForestAdminDatasourceCustomizer
                                                                                 foreign_collection: 'person',
                                                                                 foreign_key: '__nonExisting__'
                                                                               })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column not found: 'passport.__nonExisting__'")
+              end.to raise_error(ForestException, "Column not found: 'passport.__nonExisting__'")
             end
           end
 
@@ -245,7 +245,7 @@ module ForestAdminDatasourceCustomizer
                                                                                 foreign_collection: 'person',
                                                                                 foreign_key: 'picture_id'
                                                                               })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column does not support the In operator: 'passport.picture_id'")
+              end.to raise_error(ForestException, "Column does not support the In operator: 'passport.picture_id'")
             end
           end
 
@@ -286,7 +286,7 @@ module ForestAdminDatasourceCustomizer
                                                                               origin_key: 'owner_id',
                                                                               through_collection: '__nonExisting__'
                                                                             })
-              end.to raise_error(ForestException, '🌳🌳🌳 Collection __nonExisting__ not found.')
+              end.to raise_error(ForestException, 'Collection __nonExisting__ not found.')
             end
 
             it 'throws with a non existent originKey' do
@@ -298,7 +298,7 @@ module ForestAdminDatasourceCustomizer
                                                                               origin_key: '__nonExisting__',
                                                                               through_collection: 'passport'
                                                                             })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column not found: 'passport.__nonExisting__'")
+              end.to raise_error(ForestException, "Column not found: 'passport.__nonExisting__'")
             end
 
             it 'throws with a non existent fk' do
@@ -310,7 +310,7 @@ module ForestAdminDatasourceCustomizer
                                                                               origin_key: 'owner_id',
                                                                               through_collection: 'passport'
                                                                             })
-              end.to raise_error(ForestException, "🌳🌳🌳 Column not found: 'passport.__nonExisting__'")
+              end.to raise_error(ForestException, "Column not found: 'passport.__nonExisting__'")
             end
           end
 
@@ -325,7 +325,7 @@ module ForestAdminDatasourceCustomizer
                                                                               through_collection: 'passport',
                                                                               origin_key_target: 'name'
                                                                             })
-              end.to raise_error(ForestException, "🌳🌳🌳 Types from 'passport.owner_id' and 'person.name' do not match.")
+              end.to raise_error(ForestException, "Types from 'passport.owner_id' and 'person.name' do not match.")
             end
           end
 

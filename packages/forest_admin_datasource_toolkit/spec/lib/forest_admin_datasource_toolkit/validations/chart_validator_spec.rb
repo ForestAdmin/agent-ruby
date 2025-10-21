@@ -8,7 +8,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.validate?(true, { key1: 1, key2: 2 }, 'key1,key2')
           end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                             "🌳🌳🌳 The result columns must be named 'key1,key2' instead of 'key1,key2'")
+                             "The result columns must be named 'key1,key2' instead of 'key1,key2'")
         end
       end
 

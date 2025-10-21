@@ -49,14 +49,14 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.validate(@collection_cars,
                                      '__not_defined')
-          end.to raise_error(ValidationError, "🌳🌳🌳 Column not found: 'cars.__not_defined'")
+          end.to raise_error(ValidationError, "Column not found: 'cars.__not_defined'")
         end
 
         it 'throws if the relation does not exists' do
           expect do
             described_class.validate(@collection_cars,
                                      '__not_defined:id')
-          end.to raise_error(ValidationError, "🌳🌳🌳 Relation not found: 'cars.__not_defined'")
+          end.to raise_error(ValidationError, "Relation not found: 'cars.__not_defined'")
         end
 
         it 'throws if the field is not of column type' do
@@ -64,7 +64,7 @@ module ForestAdminDatasourceToolkit
             described_class.validate(@collection_cars,
                                      'owner')
           end.to raise_error(ValidationError,
-                             "🌳🌳🌳 Unexpected field type: 'cars.owner' (found 'OneToOne' expected 'Column')")
+                             "Unexpected field type: 'cars.owner' (found 'OneToOne' expected 'Column')")
         end
 
         context 'when validating relationship fields' do
@@ -77,7 +77,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(@collection_cars,
                                        'id:address')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 Unexpected field type: 'cars.id' (found 'Column')")
+                               "Unexpected field type: 'cars.id' (found 'Column')")
           end
         end
 
@@ -109,7 +109,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('boolean', column,
                                              'not a boolean')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'boolean': not a boolean.\n Expects [\"Boolean\", nil]")
+                               "The given value has a wrong type for 'boolean': not a boolean.\n Expects [\"Boolean\", nil]")
           end
         end
 
@@ -133,7 +133,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('date', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::DATE),
                                              'definitely-not-a-date')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'date': definitely-not-a-date.\n Expects [\"Date\", nil]")
+                               "The given value has a wrong type for 'date': definitely-not-a-date.\n Expects [\"Date\", nil]")
           end
         end
 
@@ -149,7 +149,7 @@ module ForestAdminDatasourceToolkit
             expect do
               described_class.validate_value('enum',
                                              ColumnSchema.new(column_type: Concerns::PrimitiveTypes::ENUM, enum_values: %w[a b c]), 'd')
-            end.to raise_error(ValidationError, '🌳🌳🌳 The given enum value(s) d is not listed in ["a", "b", "c"]')
+            end.to raise_error(ValidationError, 'The given enum value(s) d is not listed in ["a", "b", "c"]')
           end
         end
 
@@ -196,7 +196,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('number', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER),
                                              '1')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'number': 1.\n Expects [\"Number\", nil]")
+                               "The given value has a wrong type for 'number': 1.\n Expects [\"Number\", nil]")
           end
         end
 
@@ -213,7 +213,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('point', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::POINT),
                                              'd,a')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'point': d,a.\n Expects [\"Point\", nil]")
+                               "The given value has a wrong type for 'point': d,a.\n Expects [\"Point\", nil]")
           end
         end
 
@@ -230,7 +230,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('string', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::STRING),
                                              1)
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'string': 1.\n Expects [\"String\", nil]")
+                               "The given value has a wrong type for 'string': 1.\n Expects [\"String\", nil]")
           end
         end
 
@@ -254,7 +254,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate_value('uuid', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::UUID),
                                              'not-a-valid-uuid')
             end.to raise_error(ValidationError,
-                               "🌳🌳🌳 The given value has a wrong type for 'uuid': not-a-valid-uuid.\n Expects [\"Uuid\", nil]")
+                               "The given value has a wrong type for 'uuid': not-a-valid-uuid.\n Expects [\"Uuid\", nil]")
           end
 
           context 'when it is an id' do
@@ -263,7 +263,7 @@ module ForestAdminDatasourceToolkit
                 described_class.validate_value_for_id('uuid', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::UUID),
                                                       nil)
               end.to raise_error(ValidationError,
-                                 "🌳🌳🌳 The given value has a wrong type for 'uuid': .\n Expects [\"Uuid\"]")
+                                 "The given value has a wrong type for 'uuid': .\n Expects [\"Uuid\"]")
             end
 
             it 'given non null value should not throw an error' do

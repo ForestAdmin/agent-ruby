@@ -38,7 +38,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an error if a chart already exists' do
               expect do
                 decorator.add_chart('my_chart')
-              end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Chart my_chart already exists.')
+              end.to raise_error(Exceptions::ForestException, 'Chart my_chart already exists.')
             end
 
             it 'schema should not be empty' do
@@ -61,7 +61,7 @@ module ForestAdminDatasourceCustomizer
           it 'raise an error when adding a duplicate' do
             expect do
               decorator.add_chart('my_chart')
-            end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Chart my_chart already exists.')
+            end.to raise_error(Exceptions::ForestException, 'Chart my_chart already exists.')
           end
         end
 
@@ -78,7 +78,7 @@ module ForestAdminDatasourceCustomizer
             expect(first_decorator.schema).to eq({ charts: ['my_chart'] })
             expect do
               second_decorator.schema
-            end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Chart my_chart is defined twice.')
+            end.to raise_error(Exceptions::ForestException, 'Chart my_chart is defined twice.')
           end
         end
       end

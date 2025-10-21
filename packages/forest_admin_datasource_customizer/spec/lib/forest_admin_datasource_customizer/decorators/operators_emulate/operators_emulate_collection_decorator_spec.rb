@@ -39,7 +39,7 @@ module ForestAdminDatasourceCustomizer
                 @decorated_book.emulate_field_operator('title', Operators::GREATER_THAN)
               end.to raise_error(
                 Exceptions::ForestException,
-                '🌳🌳🌳 Cannot override operators on collection book: ' \
+                'Cannot override operators on collection book: ' \
                 "the primary key columns must support 'Equal' and 'In' operators."
               )
             end
@@ -94,7 +94,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise if the field does not exists' do
               expect do
                 @decorated_book.emulate_field_operator('__dontExist', Operators::EQUAL)
-              end.to raise_error(Exceptions::ValidationError, "🌳🌳🌳 Column not found: 'book.__dontExist'")
+              end.to raise_error(Exceptions::ValidationError, "Column not found: 'book.__dontExist'")
             end
 
             it 'raise if the field is a relation' do
@@ -102,14 +102,14 @@ module ForestAdminDatasourceCustomizer
                 @decorated_book.emulate_field_operator('author', Operators::EQUAL)
               end.to raise_error(
                 Exceptions::ValidationError,
-                "🌳🌳🌳 Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')"
+                "Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')"
               )
             end
 
             it 'raise if the field is in a relation' do
               expect do
                 @decorated_book.emulate_field_operator('author:first_name', Operators::EQUAL)
-              end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Cannot replace operator for relation')
+              end.to raise_error(Exceptions::ForestException, 'Cannot replace operator for relation')
             end
 
             describe 'when implementing an operator from an unsupported one' do
@@ -125,7 +125,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_book.list(caller, filter, projection)
-                end.to raise_error(Exceptions::ForestException, "🌳🌳🌳 The given operator 'like' is not supported by the column: 'title'. The column is not filterable")
+                end.to raise_error(Exceptions::ForestException, "The given operator 'like' is not supported by the column: 'title'. The column is not filterable")
               end
             end
 
@@ -146,7 +146,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_book.list(caller, filter, projection)
-                end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Operator replacement cycle: book.title[starts_with] -> book.title[like]')
+                end.to raise_error(Exceptions::ForestException, 'Operator replacement cycle: book.title[starts_with] -> book.title[like]')
               end
             end
 

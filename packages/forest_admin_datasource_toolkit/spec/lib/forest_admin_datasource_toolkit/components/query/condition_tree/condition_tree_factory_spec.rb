@@ -21,7 +21,7 @@ module ForestAdminDatasourceToolkit
 
               expect do
                 condition_tree_factory.match_ids(collection, [[]])
-              end.to raise_error(ForestException, '🌳🌳🌳 Collection must have at least one primary key')
+              end.to raise_error(ForestException, 'Collection must have at least one primary key')
             end
 
             it 'raises an error when the collection does not support equal and in' do
@@ -30,7 +30,7 @@ module ForestAdminDatasourceToolkit
 
               expect do
                 condition_tree_factory.match_ids(collection, [[]])
-              end.to raise_error(ForestException, "🌳🌳🌳 Field 'id' must support operators: ['Equal', 'In']")
+              end.to raise_error(ForestException, "Field 'id' must support operators: ['Equal', 'In']")
             end
 
             it 'generates matchNone with simple PK' do
@@ -198,7 +198,7 @@ module ForestAdminDatasourceToolkit
             it 'raises an error when calling with badly formatted json' do
               expect do
                 condition_tree_factory.from_plain_object('this is not json')
-              end.to raise_error('🌳🌳🌳 Failed to instantiate condition tree from json')
+              end.to raise_error('Failed to instantiate condition tree from json')
             end
 
             it 'works with a simple case' do
