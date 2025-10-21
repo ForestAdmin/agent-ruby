@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.9.1...v1.10.0) (2025-10-21)
+
+
+### Features
+
+* **routes:** add new update field route to update unique hasMany relation ([#161](https://github.com/ForestAdmin/agent-ruby/issues/161)) ([053690e](https://github.com/ForestAdmin/agent-ruby/commit/053690e1b22b72b9e6b4a6e05348fecc96dbaffa))
+
 ## [1.9.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.9.0...v1.9.1) (2025-10-21)
 
 
