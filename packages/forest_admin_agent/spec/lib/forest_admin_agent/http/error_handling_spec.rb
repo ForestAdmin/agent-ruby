@@ -99,7 +99,7 @@ module ForestAdminAgent
           end
 
           it 'returns the validation error message' do
-            expect(handler.get_error_message(validation_error)).to eq('🌳🌳🌳 The query violates a unicity constraint')
+            expect(handler.get_error_message(validation_error)).to eq('The query violates a unicity constraint')
           end
         end
       end

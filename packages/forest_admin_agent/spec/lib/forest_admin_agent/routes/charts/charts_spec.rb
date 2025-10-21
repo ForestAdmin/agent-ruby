@@ -135,7 +135,7 @@ module ForestAdminAgent
           expect do
             chart.handle_request(args)
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 Invalid Chart type unknown_type'
+            ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Invalid Chart type unknown_type'
           )
         end
 
@@ -501,7 +501,7 @@ module ForestAdminAgent
               chart.handle_request(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Failed to generate leaderboard chart: parameters do not match pre-requisites'
+              'Failed to generate leaderboard chart: parameters do not match pre-requisites'
             )
           end
         end

@@ -10,7 +10,7 @@ module ForestAdminDatasourceToolkit
             described_class.new(operation: 'foo')
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Aggregate operation foo not allowed'
+            'Aggregate operation foo not allowed'
           )
         end
 

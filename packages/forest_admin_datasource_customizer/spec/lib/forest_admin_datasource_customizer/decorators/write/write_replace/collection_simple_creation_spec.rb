@@ -125,7 +125,7 @@ module ForestAdminDatasourceCustomizer
                 { 'price' => '456' }
               end
 
-              expect { @decorated_book.create(caller, { 'name' => 'a name', 'age' => 'an age' }) }.to raise_error(ForestException, '🌳🌳🌳 Conflict value on the field price. It received several values.')
+              expect { @decorated_book.create(caller, { 'name' => 'a name', 'age' => 'an age' }) }.to raise_error(ForestException, 'Conflict value on the field price. It received several values.')
             end
 
             it 'when handlers call themselves recursively' do
@@ -139,7 +139,7 @@ module ForestAdminDatasourceCustomizer
                 { 'name' => 'some name' }
               end
 
-              expect { @decorated_book.create(caller, { 'name' => 'a name' }) }.to raise_error(ForestException, '🌳🌳🌳 Conflict value on the field name. It received several values.')
+              expect { @decorated_book.create(caller, { 'name' => 'a name' }) }.to raise_error(ForestException, 'Conflict value on the field name. It received several values.')
             end
 
             it 'when the handler returns a unexpected type' do
@@ -147,7 +147,7 @@ module ForestAdminDatasourceCustomizer
                 'RETURN_SHOULD_FAIL'
               end
 
-              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, '🌳🌳🌳 The write handler of age should return an Hash or nothing.')
+              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, 'The write handler of age should return an Hash or nothing.')
             end
 
             it 'when the handler returns non existent fields' do
@@ -155,7 +155,7 @@ module ForestAdminDatasourceCustomizer
                 { 'author' => 'Asimov' }
               end
 
-              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, "🌳🌳🌳 Unknown field: 'author'")
+              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, "Unknown field: 'author'")
             end
 
             it 'when the handler returns non existent relations' do
@@ -163,7 +163,7 @@ module ForestAdminDatasourceCustomizer
                 { 'author' => { 'lastname' => 'Asimov' } }
               end
 
-              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, "🌳🌳🌳 Unknown field: 'author'")
+              expect { @decorated_book.create(caller, { 'age' => '10' }) }.to raise_error(ForestException, "Unknown field: 'author'")
             end
 
             it 'if the customer attemps to update the patch in the handler' do
@@ -188,7 +188,7 @@ module ForestAdminDatasourceCustomizer
                 { 'age' => [1.2] }
               end
 
-              expect { @decorated_book.create(caller, { 'name' => 'a name' }) }.to raise_error(ValidationError, "🌳🌳🌳 The given value has a wrong type for 'age': 1.2.\n Expects [\"String\", nil]")
+              expect { @decorated_book.create(caller, { 'name' => 'a name' }) }.to raise_error(ValidationError, "The given value has a wrong type for 'age': 1.2.\n Expects [\"String\", nil]")
             end
           end
         end

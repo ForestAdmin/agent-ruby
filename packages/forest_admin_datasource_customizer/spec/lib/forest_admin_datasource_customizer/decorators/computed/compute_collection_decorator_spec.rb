@@ -105,7 +105,7 @@ module ForestAdminDatasourceCustomizer
                 values: proc { |records| records }
               )
             )
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "🌳🌳🌳 Computed field 'newField' must have at least one dependency.")
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Computed field 'newField' must have at least one dependency.")
         end
 
         it 'registerComputed should throw if defining a field with polymorphic dependencies' do
@@ -120,7 +120,7 @@ module ForestAdminDatasourceCustomizer
             )
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Dependencies over a polymorphic relations(address.addressable) are forbidden'
+            'Dependencies over a polymorphic relations(address.addressable) are forbidden'
           )
         end
 
@@ -134,7 +134,7 @@ module ForestAdminDatasourceCustomizer
                 values: proc { |records| records }
               )
             )
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "🌳🌳🌳 Column not found: 'book.__nonExisting__'")
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "Column not found: 'book.__nonExisting__'")
         end
 
         it 'registerComputed should throw if defining a field with invalid dependencies' do
@@ -147,7 +147,7 @@ module ForestAdminDatasourceCustomizer
                 values: proc { |records| records }
               )
             )
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "🌳🌳🌳 Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
         end
 
         it 'throws when adding field with name including space' do

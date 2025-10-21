@@ -42,7 +42,7 @@ module ForestAdminDatasourceCustomizer
               @decorated_book.add_chart('child_chart') { { countCurrent: 2 } }
             end.to raise_error(
               Exceptions::ForestException,
-              '🌳🌳🌳 Chart child_chart already exists.'
+              'Chart child_chart already exists.'
             )
           end
         end

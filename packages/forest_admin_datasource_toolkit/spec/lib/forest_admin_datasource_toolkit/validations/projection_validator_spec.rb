@@ -32,7 +32,7 @@ module ForestAdminDatasourceToolkit
       it 'throws if the field does not exist on the collection' do
         expect do
           described_class.validate?(@collection, Projection.new(['__not_defined']))
-        end.to raise_error(ValidationError, "🌳🌳🌳 Column not found: 'owner.__not_defined'")
+        end.to raise_error(ValidationError, "Column not found: 'owner.__not_defined'")
       end
     end
   end

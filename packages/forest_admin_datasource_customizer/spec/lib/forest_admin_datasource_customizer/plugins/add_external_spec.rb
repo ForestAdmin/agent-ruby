@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
       it 'raises an error when options are missing required keys' do
         expect do
           plugin.run(nil, collection_customizer, { name: 'missing_schema' })
-        end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 The options parameter must contains the following keys: `name, schema, listRecords`')
+        end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, 'The options parameter must contains the following keys: `name, schema, listRecords`')
       end
     end
   end

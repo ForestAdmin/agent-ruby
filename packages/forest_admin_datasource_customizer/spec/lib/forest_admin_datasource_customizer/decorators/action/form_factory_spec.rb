@@ -252,12 +252,12 @@ module ForestAdminDatasourceCustomizer
 
             it 'raises an exception when there is no elements' do
               element.delete(:elements)
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "🌳🌳🌳 Using 'elements' in a 'Page' configuration is mandatory")
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Using 'elements' in a 'Page' configuration is mandatory")
             end
 
             it 'raises an error when element contains a Page' do
               element[:elements] = [element]
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "🌳🌳🌳 'Page' component cannot be used within 'elements'")
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "'Page' component cannot be used within 'elements'")
             end
           end
         end

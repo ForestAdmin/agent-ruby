@@ -292,7 +292,7 @@ module ForestAdminDatasourceCustomizer
         customizer.add_one_to_one_relation('myBookAuthor', 'book_person', { origin_key: 'person_id', origin_key_target: 'id' })
         customizer.replace_field_sorting('myBookAuthor', [])
 
-        expect { @datasource_customizer.datasource({}) }.to raise_error(Exceptions::ValidationError, "🌳🌳🌳 Unexpected field type: 'person.myBookAuthor' (found 'OneToOne' expected 'Column')")
+        expect { @datasource_customizer.datasource({}) }.to raise_error(Exceptions::ValidationError, "Unexpected field type: 'person.myBookAuthor' (found 'OneToOne' expected 'Column')")
       end
     end
 
@@ -332,7 +332,7 @@ module ForestAdminDatasourceCustomizer
       it 'throwns an exception when the plugin have options keys missing' do
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
         customizer.add_external_relation('tags', {})
-        expect { @datasource_customizer.datasource({}) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 The options parameter must contains the following keys: `name, schema, listRecords`')
+        expect { @datasource_customizer.datasource({}) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, 'The options parameter must contains the following keys: `name, schema, listRecords`')
       end
     end
 

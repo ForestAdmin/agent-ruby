@@ -36,7 +36,7 @@ module ForestAdminAgent
             described_class.parse_caller(args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Missing timezone'
+            'Missing timezone'
           )
         end
 
@@ -53,7 +53,7 @@ module ForestAdminAgent
             described_class.parse_caller(args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Invalid timezone: foo/timezone'
+            'Invalid timezone: foo/timezone'
           )
         end
 
@@ -309,7 +309,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: -5, skip: NaN]'
+              'Invalid pagination [limit: -5, skip: NaN]'
             )
           end
         end
@@ -326,7 +326,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: abc, skip: 1]'
+              'Invalid pagination [limit: abc, skip: 1]'
             )
           end
 
@@ -341,7 +341,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: -50, skip: 1]'
+              'Invalid pagination [limit: -50, skip: 1]'
             )
           end
 
@@ -356,7 +356,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: 0, skip: 1]'
+              'Invalid pagination [limit: 0, skip: 1]'
             )
           end
 
@@ -371,7 +371,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: 1.5, skip: 1]'
+              'Invalid pagination [limit: 1.5, skip: 1]'
             )
           end
         end
@@ -388,7 +388,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: 50, skip: invalid]'
+              'Invalid pagination [limit: 50, skip: invalid]'
             )
           end
 
@@ -403,7 +403,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: 50, skip: -1]'
+              'Invalid pagination [limit: 50, skip: -1]'
             )
           end
 
@@ -418,7 +418,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Invalid pagination [limit: 50, skip: 1.5]'
+              'Invalid pagination [limit: 50, skip: 1.5]'
             )
           end
 
@@ -433,7 +433,7 @@ module ForestAdminAgent
               described_class.parse_pagination(args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "🌳🌳🌳 Invalid pagination [limit: 50, skip: '; DROP TABLE users--]"
+              "Invalid pagination [limit: 50, skip: '; DROP TABLE users--]"
             )
           end
         end
@@ -501,7 +501,7 @@ module ForestAdminAgent
             described_class.parse_condition_tree(collection_category, args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
+            "The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
           )
         end
       end
@@ -553,7 +553,7 @@ module ForestAdminAgent
             described_class.parse_search(collection_category, args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            '🌳🌳🌳 Collection is not searchable'
+            'Collection is not searchable'
           )
         end
 
@@ -646,7 +646,7 @@ module ForestAdminAgent
             described_class.parse_sort(collection_user, args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Column not found: 'User.fieldThatDoNotExist'"
+            "Column not found: 'User.fieldThatDoNotExist'"
           )
         end
 
@@ -672,7 +672,7 @@ module ForestAdminAgent
               described_class.parse_sort(collection_user, args)
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              '🌳🌳🌳 Column not found: \'User.fieldThatDoesNotExist\''
+              'Column not found: \'User.fieldThatDoesNotExist\''
             )
           end
         end

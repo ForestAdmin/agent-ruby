@@ -88,7 +88,7 @@ module ForestAdminDatasourceMongoid
           stack = [{ prefix: nil, as_fields: [], as_models: ['author'] }]
           expect do
             described_class.add_virtual(Post, stack, projection)
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, '🌳🌳🌳 Fetching virtual parent_id deeper than 1 level is not supported.')
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Fetching virtual parent_id deeper than 1 level is not supported.')
         end
       end
     end

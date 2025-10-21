@@ -26,7 +26,7 @@ module ForestAdminDatasourceToolkit
             described_class.validate(condition_tree, collection)
           end.to raise_error(
             Exceptions::ValidationError,
-            '🌳🌳🌳 The given enum value(s) random is not listed in ["allowed_value"]'
+            'The given enum value(s) random is not listed in ["allowed_value"]'
           )
         end
 
@@ -48,7 +48,7 @@ module ForestAdminDatasourceToolkit
             described_class.validate(condition_tree, collection)
           end.to raise_error(
             Exceptions::ValidationError,
-            '🌳🌳🌳 The given enum value(s) random is not listed in ["allowed_value"]'
+            'The given enum value(s) random is not listed in ["allowed_value"]'
           )
         end
 

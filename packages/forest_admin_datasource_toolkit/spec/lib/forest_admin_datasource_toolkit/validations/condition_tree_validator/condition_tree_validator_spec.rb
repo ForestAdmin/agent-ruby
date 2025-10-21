@@ -15,7 +15,7 @@ module ForestAdminDatasourceToolkit
 
             expect do
               described_class.validate(condition_tree, collection)
-            end.to raise_error(Exceptions::ValidationError, '🌳🌳🌳 Unexpected condition tree type')
+            end.to raise_error(Exceptions::ValidationError, 'Unexpected condition tree type')
           end
         end
 
@@ -28,7 +28,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given aggregator 'and' is not supported. The supported values are: ['Or', 'And']"
+              "The given aggregator 'and' is not supported. The supported values are: ['Or', 'And']"
             )
           end
         end
@@ -42,7 +42,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given conditions 'nil' were expected to be an array"
+              "The given conditions 'nil' were expected to be an array"
             )
           end
         end
@@ -61,7 +61,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ForestException,
-              '🌳🌳🌳 Column not found collection.fieldDoesNotExistInSchema'
+              'Column not found collection.fieldDoesNotExistInSchema'
             )
           end
 
@@ -122,7 +122,7 @@ module ForestAdminDatasourceToolkit
                 described_class.validate(condition_tree, collection)
               end.to raise_error(
                 Exceptions::ForestException,
-                '🌳🌳🌳 Column not found collection.fieldDoesNotExistInSchema'
+                'Column not found collection.fieldDoesNotExistInSchema'
               )
             end
           end
@@ -181,7 +181,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given operator 'contains' is not allowed with the columnType schema: 'Number'. " \
+              "The given operator 'contains' is not allowed with the columnType schema: 'Number'. " \
               'The allowed types are: ' \
               '[blank,equal,missing,not_equal,present,in,not_in,includes_all,greater_than,less_than,greater_than_or_equal,less_than_or_equal]'
             )
@@ -203,7 +203,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given value has a wrong type for 'target': .\n Expects [\"String\", \"Number\", \"Date\", \"Timeonly\", \"Dateonly\"]"
+              "The given value has a wrong type for 'target': .\n Expects [\"String\", \"Number\", \"Date\", \"Timeonly\", \"Dateonly\"]"
             )
           end
         end
@@ -223,7 +223,7 @@ module ForestAdminDatasourceToolkit
               described_class.validate(condition_tree, collection)
             end.to raise_error(
               Exceptions::ValidationError,
-              "🌳🌳🌳 The given value has a wrong type for 'target': 1.\n Expects [\"String\", nil]"
+              "The given value has a wrong type for 'target': 1.\n Expects [\"String\", nil]"
             )
           end
         end
