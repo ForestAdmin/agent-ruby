@@ -36,8 +36,9 @@ module ForestAdminAgent
 
             # Generate timestamp for filename
             now = Time.now.strftime('%Y%m%d_%H%M%S')
-            collection_name = args[:params]['collection_name']
-            relation_name = args[:params]['relation_name']
+            collection_name = args.dig(:params, 'collection_name')
+            relation_name = args.dig(:params, 'relation_name')
+            header = args.dig(:params, 'header')
             filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
 
             # For related exports, we need to create a streaming-compatible approach
@@ -48,6 +49,7 @@ module ForestAdminAgent
                 enumerator: ForestAdminAgent::Utils::CsvGeneratorStream.stream(
                   @child_collection,
                   @caller,
+                  header,
                   filter,
                   projection,
                   Facades::Container.config_from_cache[:limit_export_size]

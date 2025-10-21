@@ -9,14 +9,15 @@ module ForestAdminAgent
 
       # @param collection [ForestAdminDatasourceToolkit::Collection] The collection to export
       # @param caller [ForestAdminDatasourceToolkit::Components::Caller] The authenticated caller
+      # @param header [Array<String>] CSV header fields
       # @param filter [ForestAdminDatasourceToolkit::Components::Query::Filter] Query filter
       # @param projection [ForestAdminDatasourceToolkit::Components::Query::Projection] Fields to include
       # @param limit_export_size [Integer, nil] Maximum number of records to export
       # @return [Enumerator] Lazy enumerator that yields CSV rows
-      def self.stream(collection, caller, filter, projection, limit_export_size = nil)
+      def self.stream(collection, caller, header, filter, projection, limit_export_size = nil)
         Enumerator.new do |yielder|
           # Yield header row first (client receives immediately)
-          yielder << generate_header(projection)
+          yielder << CSV.generate_line(header.split(','))
 
           offset = 0
 
@@ -56,35 +57,13 @@ module ForestAdminAgent
         end
       end
 
-      # Generate CSV header row from projection
-      # @param projection [Projection] Field projection
-      # @return [String] CSV header line
-      def self.generate_header(projection)
-        headers = projection.map do |field|
-          # Handle relation fields (e.g., "user:name" -> "user")
-          if field.include?(':')
-            "#{field.split(":").first}:#{field.split(":").last}"
-          else
-            field.to_s
-          end
-        end
-        CSV.generate_line(headers)
-      end
-
       # Generate CSV row from record data
       # @param record [Hash] Record data
       # @param projection [Projection] Field projection
       # @return [String] CSV data line
       def self.generate_row(record, projection)
         values = projection.map do |field|
-          value = if field.include?(':')
-                    # Handle relation fields
-                    relation_name = field.split(':').first
-                    relation_field = field.split(':').last
-                    record[relation_name]&.[](relation_field)
-                  else
-                    record[field]
-                  end
+          value = ForestAdminDatasourceToolkit::Utils::Record.field_value(record, field)
           format_value(value)
         end
         CSV.generate_line(values)
@@ -97,21 +76,16 @@ module ForestAdminAgent
         case value
         when nil
           ''
+        when Array, Hash
+          value.to_json
         when Date, DateTime, Time
           value.respond_to?(:iso8601) ? value.iso8601 : value.to_s
-        when TrueClass, FalseClass
+        else
           value.to_s
-        when Array, Hash
-          # Serialize complex types as JSON, truncate if too large
-          json = value.to_json
-          json.length > 10_000 ? "#{json[0...10_000]}..." : json
-        when String
-          # Truncate very long strings
-          value.length > 10_000 ? "#{value[0...10_000]}..." : value
         end
       end
 
-      private_class_method :generate_header, :generate_row, :format_value
+      private_class_method :generate_row, :format_value
     end
   end
 end

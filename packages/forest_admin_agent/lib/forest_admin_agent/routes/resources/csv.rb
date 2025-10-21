@@ -40,6 +40,7 @@ module ForestAdminAgent
           projection = QueryStringParser.parse_projection(@collection, args)
           filename = args[:params][:filename] || args[:params]['collection_name']
           filename += '.csv' unless /\.csv$/i.match?(filename)
+          header = args[:params][:header]
 
           # Generate timestamp for filename
           now = Time.now.strftime('%Y%m%d_%H%M%S')
@@ -52,6 +53,7 @@ module ForestAdminAgent
               enumerator: Utils::CsvGeneratorStream.stream(
                 @collection,
                 @caller,
+                header,
                 filter,
                 projection,
                 Facades::Container.config_from_cache[:limit_export_size]
