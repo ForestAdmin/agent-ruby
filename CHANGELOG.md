@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.9.0...v1.9.1) (2025-10-21)
+
+
+### Bug Fixes
+
+* error handling on ip-whitelist-rules call ([#162](https://github.com/ForestAdmin/agent-ruby/issues/162)) ([2837547](https://github.com/ForestAdmin/agent-ruby/commit/2837547012cb90cc591b3c92e9001f04a8b9aa5a))
+
 # [1.9.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.8.9...v1.9.0) (2025-10-20)
 
 
