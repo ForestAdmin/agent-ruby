@@ -199,18 +199,46 @@ module ForestAdminAgent
           described_class.reset_cached_routes!
         end
 
-        it 'handles concurrent access correctly' do
+        it 'prevents race condition during concurrent cache initialization' do
+          # Track how many times routes() is actually called
+          call_count = 0
+          call_mutex = Mutex.new
+
+          allow(described_class).to receive(:routes).and_wrap_original do |m|
+            # Add a small delay to increase chance of race condition
+            sleep(0.01)
+            call_mutex.synchronize { call_count += 1 }
+            m.call
+          end
+
+          # Simulate multiple threads accessing cached_routes simultaneously
+          threads = 20.times.map do
+            Thread.new { described_class.cached_routes }
+          end
+
+          results = threads.map(&:value)
+
+          # routes() should only be called ONCE even with concurrent access
+          expect(call_count).to eq(1), "Expected 1 call to routes() but got #{call_count}"
+
+          # All results should be the identical object (same object_id)
+          expect(results.map(&:object_id).uniq.size).to eq(1)
+        end
+
+        it 'handles concurrent access after cache is populated' do
+          # Pre-populate cache
+          first_result = described_class.cached_routes
+
           # Simulate multiple threads accessing cached_routes
-          threads = 5.times.map do
+          threads = 10.times.map do
             Thread.new { described_class.cached_routes }
           end
 
           results = threads.map(&:value)
 
           # All threads should get the same cached object
-          first_object_id = results.first.object_id
           results.each do |result|
-            expect(result.object_id).to eq(first_object_id)
+            expect(result.object_id).to eq(first_result.object_id)
           end
         end
 

@@ -3,42 +3,101 @@ module ForestAdminAgent
     class Router
       include ForestAdminAgent::Routes
 
-      # Return a frozen, memoized routes hash
-      # This avoids recomputing routes on every HTTP request
+      # Mutex for thread-safe cache operations
+      @mutex = Mutex.new
+
+      # Return a frozen, memoized routes hash to avoid expensive recomputation
+      #
+      # Route computation is expensive because it:
+      # - Iterates through all datasource collections and their schemas
+      # - Instantiates multiple route handler objects (Actions, Charts, Resources, etc.)
+      # - Builds and merges individual route hashes from 19+ route handlers
+      #
+      # Without caching, this computation would run repeatedly, causing significant
+      # performance degradation.
+      #
+      # Thread Safety: Uses Mutex to ensure thread-safe lazy initialization.
+      # Multiple threads calling this method concurrently will only compute routes once.
+      #
+      # @return [Hash] Frozen hash mapping route names to route configurations
       def self.cached_routes
-        @cached_routes ||= routes.freeze
+        return @cached_routes if @cached_routes
+
+        @mutex.synchronize do
+          # Double-check pattern: another thread may have initialized while waiting for lock
+          @cached_routes ||= begin
+            start_time = Time.now
+            computed_routes = routes
+            elapsed = ((Time.now - start_time) * 1000).round(2)
+
+            if defined?(Rails) && Rails.logger
+              Rails.logger.info("[ForestAdmin] Computed #{computed_routes.size} routes in #{elapsed}ms")
+            end
+
+            computed_routes.freeze
+          end
+        end
       end
 
-      # Reset cache (used on development reloads)
+      # Reset the route cache to force recomputation on next access
+      #
+      # This is called automatically in development mode by the Rails to_prepare
+      # callback to pick up code changes. Should not be called manually unless
+      # the datasource structure has been modified at runtime.
+      #
+      # Thread Safety: Uses Mutex to ensure thread-safe cache invalidation.
+      #
+      # @return [nil]
       def self.reset_cached_routes!
-        @cached_routes = nil
+        @mutex.synchronize do
+          @cached_routes = nil
+        end
       end
 
       def self.routes
-        [
-          actions_routes,
-          api_charts_routes,
-          System::HealthCheck.new.routes,
-          Security::Authentication.new.routes,
-          Security::ScopeInvalidation.new.routes,
-          Charts::Charts.new.routes,
-          Capabilities::Collections.new.routes,
-          Resources::NativeQuery.new.routes,
-          Resources::Count.new.routes,
-          Resources::Delete.new.routes,
-          Resources::Csv.new.routes,
-          Resources::List.new.routes,
-          Resources::Show.new.routes,
-          Resources::Store.new.routes,
-          Resources::Update.new.routes,
-          Resources::UpdateField.new.routes,
-          Resources::Related::CsvRelated.new.routes,
-          Resources::Related::ListRelated.new.routes,
-          Resources::Related::CountRelated.new.routes,
-          Resources::Related::AssociateRelated.new.routes,
-          Resources::Related::DissociateRelated.new.routes,
-          Resources::Related::UpdateRelated.new.routes
-        ].inject(&:merge)
+        route_sources = [
+          { name: 'actions', handler: -> { actions_routes } },
+          { name: 'api_charts', handler: -> { api_charts_routes } },
+          { name: 'health_check', handler: -> { System::HealthCheck.new.routes } },
+          { name: 'authentication', handler: -> { Security::Authentication.new.routes } },
+          { name: 'scope_invalidation', handler: -> { Security::ScopeInvalidation.new.routes } },
+          { name: 'charts', handler: -> { Charts::Charts.new.routes } },
+          { name: 'collections', handler: -> { Capabilities::Collections.new.routes } },
+          { name: 'native_query', handler: -> { Resources::NativeQuery.new.routes } },
+          { name: 'count', handler: -> { Resources::Count.new.routes } },
+          { name: 'delete', handler: -> { Resources::Delete.new.routes } },
+          { name: 'csv', handler: -> { Resources::Csv.new.routes } },
+          { name: 'list', handler: -> { Resources::List.new.routes } },
+          { name: 'show', handler: -> { Resources::Show.new.routes } },
+          { name: 'store', handler: -> { Resources::Store.new.routes } },
+          { name: 'update', handler: -> { Resources::Update.new.routes } },
+          { name: 'csv_related', handler: -> { Resources::Related::CsvRelated.new.routes } },
+          { name: 'list_related', handler: -> { Resources::Related::ListRelated.new.routes } },
+          { name: 'count_related', handler: -> { Resources::Related::CountRelated.new.routes } },
+          { name: 'associate_related', handler: -> { Resources::Related::AssociateRelated.new.routes } },
+          { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
+          { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
+          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } }
+        ]
+
+        all_routes = {}
+
+        route_sources.each do |source|
+          begin
+            routes = source[:handler].call
+
+            unless routes.is_a?(Hash)
+              raise TypeError, "Route handler '#{source[:name]}' returned #{routes.class} instead of Hash"
+            end
+
+            all_routes.merge!(routes)
+          rescue StandardError => e
+            # Provide specific context about which handler failed
+            raise StandardError, "Failed to load routes from '#{source[:name]}' handler: #{e.class} - #{e.message}"
+          end
+        end
+
+        all_routes
       end
 
       def self.actions_routes
