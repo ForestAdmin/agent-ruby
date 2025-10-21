@@ -28,14 +28,30 @@ module ForestAdminAgent
           build(args)
           query = args[:params][:query].strip
 
-          QueryValidator.valid?(query)
+          # SECURITY: Validate query BEFORE any string substitution to prevent injection
+          # via the record_id parameter
           unless args[:params][:connectionName]
             raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
           end
 
           @permissions.can_chart?(args[:params])
 
-          query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
+          # SECURITY FIX: Perform string substitution BEFORE validation to ensure
+          # the final query with substituted values is validated
+          if args[:params][:record_id]
+            # Validate that record_id contains only safe characters (numbers, letters, hyphens, underscores)
+            record_id = args[:params][:record_id].to_s
+            unless /\A[\w-]+\z/.match?(record_id)
+              raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                    'Invalid record_id format. Only alphanumeric characters, hyphens, and underscores are allowed.'
+            end
+
+            query.gsub!('?', record_id)
+          end
+
+          # Validate the final query with all substitutions applied
+          QueryValidator.valid?(query)
+
           self.type = args[:params][:type]
           result = execute_query(
             query,
