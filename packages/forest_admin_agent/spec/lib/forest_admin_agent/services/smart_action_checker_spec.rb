@@ -611,7 +611,7 @@ module ForestAdminAgent
             smart_action_checker.can_execute?
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
           )
         end
 
@@ -644,7 +644,7 @@ module ForestAdminAgent
             smart_action_checker.can_execute?
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
           )
         end
 
@@ -678,7 +678,7 @@ module ForestAdminAgent
             smart_action_checker.can_execute?
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
           )
         end
 
@@ -718,7 +718,7 @@ module ForestAdminAgent
             smart_action_checker.can_execute?
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
           )
         end
 
@@ -754,7 +754,7 @@ module ForestAdminAgent
             smart_action_checker.can_execute?
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "🌳🌳🌳 Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
           )
         end
       end
