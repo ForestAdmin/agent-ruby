@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.0...v1.11.1) (2025-10-21)
+
+
+### Bug Fixes
+
+* remove 🌳🌳🌳 from error messages ([#165](https://github.com/ForestAdmin/agent-ruby/issues/165)) ([339e38f](https://github.com/ForestAdmin/agent-ruby/commit/339e38f94d65fc0ca40a4c1d68349bac696fe746))
+
 # [1.11.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.10.0...v1.11.0) (2025-10-21)
 
 
