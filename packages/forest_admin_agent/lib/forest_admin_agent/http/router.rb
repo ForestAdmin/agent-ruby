@@ -30,9 +30,7 @@ module ForestAdminAgent
       #
       # @return [Hash] Frozen hash mapping route names to route configurations
       def self.cached_routes
-        if cache_disabled?
-          return routes.freeze
-        end
+        return routes.freeze if cache_disabled?
 
         return @cached_routes if @cached_routes
 
