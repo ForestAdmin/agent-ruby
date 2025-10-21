@@ -53,33 +53,45 @@ module ForestAdminAgent
               end
             end
             stub_const('Book', book_class)
+
+            collection_class = Class.new(Collection) do
+              attr_accessor :list_responses, :update_called
+
+              def list(_caller, _filter, _projection)
+                @list_responses ||= []
+                @list_responses.shift || []
+              end
+
+              def update(_caller, _filter, _patch)
+                @update_called = true
+              end
+            end
+
             @datasource = Datasource.new
-            @collection = build_collection(
-              name: 'book',
-              schema: {
-                fields: {
-                  'id' => ColumnSchema.new(
-                    column_type: 'Number',
-                    is_primary_key: true,
-                    filter_operators: [Operators::IN, Operators::EQUAL]
-                  ),
-                  'title' => ColumnSchema.new(
-                    column_type: 'String',
-                    filter_operators: [Operators::EQUAL]
-                  ),
-                  'tags' => ColumnSchema.new(
-                    column_type: '[String]',
-                    filter_operators: [Operators::EQUAL]
-                  ),
-                  'scores' => ColumnSchema.new(
-                    column_type: '[Number]',
-                    filter_operators: [Operators::EQUAL]
-                  ),
-                  'metadata' => ColumnSchema.new(
-                    column_type: '[Json]',
-                    filter_operators: [Operators::EQUAL]
-                  )
-                }
+            @collection = collection_class.new(@datasource, 'book')
+            @collection.add_fields(
+              {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number',
+                  is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                ),
+                'title' => ColumnSchema.new(
+                  column_type: 'String',
+                  filter_operators: [Operators::EQUAL]
+                ),
+                'tags' => ColumnSchema.new(
+                  column_type: '[String]',
+                  filter_operators: [Operators::EQUAL]
+                ),
+                'scores' => ColumnSchema.new(
+                  column_type: '[Number]',
+                  filter_operators: [Operators::EQUAL]
+                ),
+                'metadata' => ColumnSchema.new(
+                  column_type: '[Json]',
+                  filter_operators: [Operators::EQUAL]
+                )
               }
             )
 
@@ -94,16 +106,11 @@ module ForestAdminAgent
               book = { 'id' => 1, 'title' => 'Test Book', 'tags' => ['old-tag', 'keep-tag'] }
               updated_book = { 'id' => 1, 'title' => 'Test Book', 'tags' => ['updated-tag', 'keep-tag'] }
 
-              allow(@datasource.get_collection('book')).to receive(:list).and_return([book], [updated_book])
-              allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
+              @collection.list_responses = [[book], [updated_book]]
 
               result = update_field.handle_request(args)
 
-              expect(@datasource.get_collection('book')).to have_received(:update).with(
-                anything,
-                anything,
-                { tags: ['updated-tag', 'keep-tag'] }
-              )
+              expect(@collection.update_called).to be true
               expect(result[:name]).to eq('book')
               expect(result[:content]['data']['attributes']['tags']).to eq(['updated-tag', 'keep-tag'])
             end
@@ -131,7 +138,7 @@ module ForestAdminAgent
               expect(@datasource.get_collection('book')).to have_received(:update).with(
                 anything,
                 anything,
-                { scores: [99, 20, 30] }
+                { 'scores' => [99, 20, 30] }
               )
               expect(result[:content]['data']['attributes']['scores']).to eq([99, 20, 30])
             end
@@ -159,7 +166,7 @@ module ForestAdminAgent
               expect(@datasource.get_collection('book')).to have_received(:update).with(
                 anything,
                 anything,
-                { metadata: [{ 'key' => 'new', 'value' => 123 }, { 'key' => 'keep' }] }
+                { 'metadata' => [{ 'key' => 'new', 'value' => 123 }, { 'key' => 'keep' }] }
               )
             end
           end
@@ -183,14 +190,16 @@ module ForestAdminAgent
               expect(@datasource.get_collection('book')).to have_received(:update).with(
                 anything,
                 anything,
-                { tags: %w[first second updated-tag] }
+                { 'tags' => %w[first second updated-tag] }
               )
             end
           end
 
           context 'with permission denied' do
             before do
-              allow(permissions).to receive(:can?).with(:edit, @collection)
+              book = { 'id' => 1, 'tags' => ['test'] }
+              @collection.list_responses = [[book]]
+              allow(permissions).to receive(:can?).with(:edit, anything)
                                 .and_raise(Http::Exceptions::ForbiddenError.new('Permission denied'))
             end
 
@@ -306,7 +315,7 @@ module ForestAdminAgent
                 expect(@datasource.get_collection('book')).to have_received(:update).with(
                   anything,
                   anything,
-                  { scores: [99.0, 20] }
+                  { 'scores' => [99.0, 20] }
                 )
               end
             end

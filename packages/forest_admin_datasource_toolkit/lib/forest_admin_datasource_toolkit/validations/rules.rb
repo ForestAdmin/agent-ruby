@@ -107,7 +107,15 @@ module ForestAdminDatasourceToolkit
           PrimitiveType::POINT => [PrimitiveType::POINT, nil]
         }
 
-        primitive_type ? allowed_types[primitive_type] : allowed_types
+        return allowed_types unless primitive_type
+
+        # Handle array types like '[String]', '[Number]', etc.
+        if primitive_type.to_s.start_with?('[') && primitive_type.to_s.end_with?(']')
+          element_type = primitive_type.to_s[1..-2]
+          return allowed_types[element_type]
+        end
+
+        allowed_types[primitive_type]
       end
 
       def self.compute_allowed_types_for_operators

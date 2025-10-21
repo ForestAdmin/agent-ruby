@@ -112,9 +112,27 @@ module ForestAdminAgent
                 "Index #{array_index} out of bounds for array of length #{array.length}"
         end
 
-        def parse_value_from_body(params, _field_schema)
+        def parse_value_from_body(params, field_schema)
           body = params[:data] || {}
-          body.dig(:attributes, 'value') || body.dig(:attributes, :value)
+          value = body.dig(:attributes, 'value') || body.dig(:attributes, :value)
+
+          coerce_value(value, field_schema.column_type)
+        end
+
+        def coerce_value(value, column_type)
+          return value unless column_type.to_s.start_with?('[') && column_type.to_s.end_with?(']')
+
+          element_type = column_type.to_s[1..-2]
+
+          if element_type == 'Number' && value.is_a?(String)
+            begin
+              return Float(value)
+            rescue ArgumentError
+              raise Http::Exceptions::ValidationError, "Cannot coerce '#{value}' to Number - wrong type"
+            end
+          end
+
+          value
         end
       end
     end
