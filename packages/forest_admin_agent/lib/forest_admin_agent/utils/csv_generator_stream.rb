@@ -17,7 +17,9 @@ module ForestAdminAgent
       def self.stream(collection, caller, header, filter, projection, limit_export_size = nil)
         Enumerator.new do |yielder|
           # Yield header row first (client receives immediately)
-          yielder << CSV.generate_line(header.split(','))
+          Facades::Container.logger&.log('Info', "CSV export header: #{header}")
+          header_array = JSON.parse(header)
+          yielder << "#{header_array.join(",")}\n"
 
           offset = 0
 
