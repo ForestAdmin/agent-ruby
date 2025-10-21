@@ -3,6 +3,17 @@ module ForestAdminAgent
     class Router
       include ForestAdminAgent::Routes
 
+      # Return a frozen, memoized routes hash
+      # This avoids recomputing routes on every HTTP request
+      def self.cached_routes
+        @cached_routes ||= routes.freeze
+      end
+
+      # Reset cache (used on development reloads)
+      def self.reset_cached_routes!
+        @cached_routes = nil
+      end
+
       def self.routes
         [
           actions_routes,
