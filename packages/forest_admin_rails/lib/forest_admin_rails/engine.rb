@@ -38,13 +38,14 @@ module ForestAdminRails
     end
 
     def load_configuration
+      return unless defined?(::Rails::Server)
       return unless File.exist?(Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb'))
 
       # force eager loading models
       Rails.application.eager_load!
 
       begin
-        ForestAdminRails::CreateAgent.setup! if defined?(::Rails::Server)
+        ForestAdminRails::CreateAgent.setup!
       rescue StandardError => e
         logger = ActiveSupport::Logger.new($stdout)
         logger.warn 'An error has occurred during setup of the Forest Admin agent.'
