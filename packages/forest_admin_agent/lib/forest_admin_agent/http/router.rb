@@ -30,16 +30,13 @@ module ForestAdminAgent
       #
       # @return [Hash] Frozen hash mapping route names to route configurations
       def self.cached_routes
-        # Check if caching is disabled via configuration
         if cache_disabled?
-          # Return fresh routes on every call (no caching)
           return routes.freeze
         end
 
         return @cached_routes if @cached_routes
 
         @mutex.synchronize do
-          # Double-check pattern: another thread may have initialized while waiting for lock
           @cached_routes ||= begin
             start_time = Time.now
             computed_routes = routes
@@ -54,9 +51,6 @@ module ForestAdminAgent
         end
       end
 
-      # Check if route caching is disabled via configuration
-      #
-      # @return [Boolean] true if caching is disabled, false otherwise (default: false)
       def self.cache_disabled?
         config = ForestAdminAgent::Facades::Container.config_from_cache
         config&.dig(:disable_route_cache) == true
@@ -65,15 +59,6 @@ module ForestAdminAgent
         false
       end
 
-      # Reset the route cache to force recomputation on next access
-      #
-      # This is called automatically in development mode by the Rails to_prepare
-      # callback to pick up code changes. Should not be called manually unless
-      # the datasource structure has been modified at runtime.
-      #
-      # Thread Safety: Uses Mutex to ensure thread-safe cache invalidation.
-      #
-      # @return [nil]
       def self.reset_cached_routes!
         @mutex.synchronize do
           @cached_routes = nil

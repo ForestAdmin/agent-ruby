@@ -406,20 +406,20 @@ module ForestAdminAgent
         end
 
         it 'calls setup_routes only once per handler across multiple cached_routes calls' do
-          # Track setup_routes calls on Authentication
-          setup_routes_count = 0
-          setup_mutex = Mutex.new
+          # Track how many times Authentication is instantiated (which calls setup_routes)
+          instantiation_count = 0
+          instantiation_mutex = Mutex.new
 
-          allow_any_instance_of(ForestAdminAgent::Routes::Security::Authentication).to receive(:setup_routes).and_wrap_original do |m|
-            setup_mutex.synchronize { setup_routes_count += 1 }
+          allow(ForestAdminAgent::Routes::Security::Authentication).to receive(:new).and_wrap_original do |m|
+            instantiation_mutex.synchronize { instantiation_count += 1 }
             m.call
           end
 
           # Multiple calls to cached_routes
           5.times { described_class.cached_routes }
 
-          # setup_routes should only be called ONCE (during route computation)
-          expect(setup_routes_count).to eq(1), "Expected 1 setup_routes call but got #{setup_routes_count}"
+          # Authentication should only be instantiated ONCE (setup_routes is called in initialize)
+          expect(instantiation_count).to eq(1), "Expected 1 Authentication instantiation but got #{instantiation_count}"
         end
 
         it 'recomputes and calls setup_routes again after cache reset' do
