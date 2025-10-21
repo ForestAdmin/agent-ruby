@@ -16,11 +16,26 @@ module ForestAdminAgent
       # Without caching, this computation would run repeatedly, causing significant
       # performance degradation.
       #
+      # Caching is ENABLED by default in all environments for optimal performance.
+      # To disable caching (not recommended), set `disable_route_cache: true` in config:
+      #   ForestAdminAgent::Agent.new options do |builder|
+      #     builder.setup(
+      #       # ... other options
+      #       disable_route_cache: true  # Disables route caching
+      #     )
+      #   end
+      #
       # Thread Safety: Uses Mutex to ensure thread-safe lazy initialization.
       # Multiple threads calling this method concurrently will only compute routes once.
       #
       # @return [Hash] Frozen hash mapping route names to route configurations
       def self.cached_routes
+        # Check if caching is disabled via configuration
+        if cache_disabled?
+          # Return fresh routes on every call (no caching)
+          return routes.freeze
+        end
+
         return @cached_routes if @cached_routes
 
         @mutex.synchronize do
@@ -30,13 +45,24 @@ module ForestAdminAgent
             computed_routes = routes
             elapsed = ((Time.now - start_time) * 1000).round(2)
 
-            if defined?(Rails) && Rails.logger
-              Rails.logger.info("[ForestAdmin] Computed #{computed_routes.size} routes in #{elapsed}ms")
-            end
+            log_message = "[ForestAdmin] Computed #{computed_routes.size} routes " \
+                          "in #{elapsed}ms (caching enabled)"
+            ForestAdminAgent::Facades::Container.logger.log('Info', log_message)
 
             computed_routes.freeze
           end
         end
+      end
+
+      # Check if route caching is disabled via configuration
+      #
+      # @return [Boolean] true if caching is disabled, false otherwise (default: false)
+      def self.cache_disabled?
+        config = ForestAdminAgent::Facades::Container.config_from_cache
+        config&.dig(:disable_route_cache) == true
+      rescue StandardError
+        # If config is not available or an error occurs, default to caching enabled
+        false
       end
 
       # Reset the route cache to force recomputation on next access
@@ -83,18 +109,16 @@ module ForestAdminAgent
         all_routes = {}
 
         route_sources.each do |source|
-          begin
-            routes = source[:handler].call
+          routes = source[:handler].call
 
-            unless routes.is_a?(Hash)
-              raise TypeError, "Route handler '#{source[:name]}' returned #{routes.class} instead of Hash"
-            end
-
-            all_routes.merge!(routes)
-          rescue StandardError => e
-            # Provide specific context about which handler failed
-            raise StandardError, "Failed to load routes from '#{source[:name]}' handler: #{e.class} - #{e.message}"
+          unless routes.is_a?(Hash)
+            raise TypeError, "Route handler '#{source[:name]}' returned #{routes.class} instead of Hash"
           end
+
+          all_routes.merge!(routes)
+        rescue StandardError => e
+          # Provide specific context about which handler failed
+          raise StandardError, "Failed to load routes from '#{source[:name]}' handler: #{e.class} - #{e.message}"
         end
 
         all_routes

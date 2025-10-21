@@ -155,7 +155,7 @@ module ForestAdminAgent
 
           # Iterate through datasource collections and verify their actions have routes
           Facades::Container.datasource.collections.each_value do |collection|
-            collection.schema[:actions].each_key do |action_name|
+            collection.schema[:actions].each_key do |_action_name|
               # Check that a route exists for this action
               # The exact route name format might vary, but there should be a route for this action
               action_routes = routes.select { |_name, route| route[:uri].include?(collection.name) }
@@ -175,7 +175,7 @@ module ForestAdminAgent
           routes = described_class.api_charts_routes
 
           Facades::Container.datasource.collections.each_value do |collection|
-            collection.schema[:charts].each do |chart_name|
+            collection.schema[:charts].each do |_chart_name|
               # Check that routes related to this chart exist
               chart_routes = routes.select { |_name, route| route[:uri].include?(collection.name) }
               expect(chart_routes).not_to be_empty if collection.schema[:charts].any?
@@ -186,7 +186,7 @@ module ForestAdminAgent
         it 'builds routes for datasource charts' do
           routes = described_class.api_charts_routes
 
-          Facades::Container.datasource.schema[:charts].each do |chart_name|
+          Facades::Container.datasource.schema[:charts].each do |_chart_name|
             # Check that routes for datasource-level charts exist
             # These won't have a collection name in the URI
             expect(routes).not_to be_empty if Facades::Container.datasource.schema[:charts].any?
@@ -212,7 +212,7 @@ module ForestAdminAgent
           end
 
           # Simulate multiple threads accessing cached_routes simultaneously
-          threads = 20.times.map do
+          threads = Array.new(20) do
             Thread.new { described_class.cached_routes }
           end
 
@@ -230,7 +230,7 @@ module ForestAdminAgent
           first_result = described_class.cached_routes
 
           # Simulate multiple threads accessing cached_routes
-          threads = 10.times.map do
+          threads = Array.new(10) do
             Thread.new { described_class.cached_routes }
           end
 
@@ -256,6 +256,89 @@ module ForestAdminAgent
 
           # Routes should have the same structure (same keys)
           expect(new_keys).to eq(initial_keys)
+        end
+      end
+
+      describe 'configuration-driven caching' do
+        before do
+          described_class.reset_cached_routes!
+        end
+
+        after do
+          # Reset any config mocks
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_call_original
+          described_class.reset_cached_routes!
+        end
+
+        it 'enables caching by default when config is not set' do
+          # Mock config to return empty hash (no disable_route_cache setting)
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({})
+
+          expect(described_class.cache_disabled?).to be(false)
+        end
+
+        it 'enables caching by default when config is nil' do
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(nil)
+
+          expect(described_class.cache_disabled?).to be(false)
+        end
+
+        it 'disables caching when disable_route_cache is true' do
+          # Mock config to return disable_route_cache: true
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({ disable_route_cache: true })
+
+          expect(described_class.cache_disabled?).to be(true)
+        end
+
+        it 'enables caching when disable_route_cache is false' do
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({ disable_route_cache: false })
+
+          expect(described_class.cache_disabled?).to be(false)
+        end
+
+        it 'enables caching by default when config access fails' do
+          # Simulate config access error
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_raise(StandardError, 'Config not available')
+
+          expect(described_class.cache_disabled?).to be(false)
+        end
+
+        it 'returns fresh routes on every call when caching is disabled' do
+          # Mock config to disable caching
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({ disable_route_cache: true })
+
+          # First call
+          first_routes = described_class.cached_routes
+          first_object_id = first_routes.object_id
+
+          # Second call should return a NEW object (no caching)
+          second_routes = described_class.cached_routes
+          second_object_id = second_routes.object_id
+
+          expect(second_object_id).not_to eq(first_object_id)
+        end
+
+        it 'still returns frozen routes when caching is disabled' do
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({ disable_route_cache: true })
+
+          routes = described_class.cached_routes
+
+          expect(routes).to be_frozen
+        end
+
+        it 'uses memoized cache when caching is enabled' do
+          # Mock config to enable caching (default behavior)
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({ disable_route_cache: false })
+
+          # First call
+          first_routes = described_class.cached_routes
+          first_object_id = first_routes.object_id
+
+          # Second call should return the SAME object (memoized)
+          second_routes = described_class.cached_routes
+          second_object_id = second_routes.object_id
+
+          expect(second_object_id).to eq(first_object_id)
         end
       end
     end
