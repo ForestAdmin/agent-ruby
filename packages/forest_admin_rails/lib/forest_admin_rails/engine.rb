@@ -44,7 +44,7 @@ module ForestAdminRails
       Rails.application.eager_load!
 
       begin
-        ForestAdminRails::CreateAgent.setup!
+        ForestAdminRails::CreateAgent.setup! if defined?(::Rails::Server)
       rescue StandardError => e
         logger = ActiveSupport::Logger.new($stdout)
         logger.warn 'An error has occurred during setup of the Forest Admin agent.'
