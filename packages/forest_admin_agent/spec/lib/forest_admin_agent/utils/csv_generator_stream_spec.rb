@@ -15,7 +15,7 @@ module ForestAdminAgent
             { 'id' => 2, 'first_name' => 'Han', 'last_name' => 'Solo' }
           ]
 
-          list_records = ->(batch_filter) { records }
+          list_records = ->(_batch_filter) { records }
 
           enumerator = described_class.stream(header, filter, projection, list_records)
           csv_output = enumerator.to_a.join
@@ -127,7 +127,7 @@ module ForestAdminAgent
           csv_output = enumerator.to_a.join
 
           # JSON is embedded and escaped in CSV
-          expect(csv_output).to include('""key""')  # Escaped quotes in CSV
+          expect(csv_output).to include('""key""') # Escaped quotes in CSV
           expect(csv_output).to include('[1,2,3]')
         end
 
@@ -149,7 +149,7 @@ module ForestAdminAgent
         it 'streams in batches for large datasets' do
           # Simulate large dataset with multiple batches
           batch_size = CsvGeneratorStream::CHUNK_SIZE
-          total_records = batch_size * 2 + 500
+          total_records = (batch_size * 2) + 500
 
           call_count = 0
           list_records = lambda do |batch_filter|
@@ -159,7 +159,7 @@ module ForestAdminAgent
 
             if offset < total_records
               count = [limit, total_records - offset].min
-              (offset...offset + count).map { |i| { 'id' => i, 'first_name' => "first_#{i}", 'last_name' => "last_#{i}" } }
+              (offset...(offset + count)).map { |i| { 'id' => i, 'first_name' => "first_#{i}", 'last_name' => "last_#{i}" } }
             else
               []
             end
