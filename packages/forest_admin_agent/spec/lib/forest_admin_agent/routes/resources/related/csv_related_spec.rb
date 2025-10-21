@@ -112,6 +112,75 @@ module ForestAdminAgent
               # It generates its own based on collection_name and relation_name.
               expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_category_export_\d{8}_\d{6}\.csv"/)
             end
+
+            it 'actually streams related CSV data using the real CsvGeneratorStream' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:params]['header'] = '["id","label"]'
+
+              # Mock list_relation to return categories
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation)
+                .and_return([Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')])
+
+              result = csv.handle_request(args)
+
+              # Get the enumerator and consume it
+              enumerator = result[:content][:enumerator]
+              csv_output = enumerator.to_a.join
+
+              # Verify the CSV output
+              expect(csv_output).to include('id,label')
+              expect(csv_output).to include('1,bar')
+              expect(csv_output).to include('2,baz')
+              expect(csv_output).to include('3,qux')
+              expect(result[:status]).to eq(200)
+              expect(result[:content][:type]).to eq('Stream')
+            end
+
+            it 'handles empty related records' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:params]['header'] = '["id","label"]'
+
+              # Mock list_relation to return empty array
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation)
+                .and_return([])
+
+              result = csv.handle_request(args)
+              enumerator = result[:content][:enumerator]
+              csv_output = enumerator.to_a.join
+
+              # Should only have header
+              lines = csv_output.split("\n")
+              expect(lines.length).to eq(1)
+              expect(lines[0]).to include('id,label')
+            end
+
+            it 'streams large related datasets in batches' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:params]['header'] = '["id","label"]'
+
+              # Create many categories
+              categories = (1..10).map { |i| Category.new(i, "label_#{i}") }
+
+              # Mock list_relation to be called multiple times (simulating pagination)
+              call_count = 0
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation) do
+                call_count += 1
+                call_count == 1 ? categories : []
+              end
+
+              result = csv.handle_request(args)
+              enumerator = result[:content][:enumerator]
+              csv_output = enumerator.to_a.join
+
+              # Verify all records are present
+              expect(csv_output).to include('id,label')
+              (1..10).each do |i|
+                expect(csv_output).to include("#{i},label_#{i}")
+              end
+            end
           end
         end
       end
