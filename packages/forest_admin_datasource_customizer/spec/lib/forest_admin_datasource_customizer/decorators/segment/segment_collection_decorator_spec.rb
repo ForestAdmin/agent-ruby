@@ -88,7 +88,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_collection.refine_filter(caller, Filter.new(segment: 'segment_name'))
-                end.to raise_error(Exceptions::ForestException, '🌳🌳🌳 Column not found book.do not exists')
+                end.to raise_error(Exceptions::ForestException, 'Column not found book.do not exists')
               end
             end
           end

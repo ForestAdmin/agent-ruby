@@ -34,7 +34,7 @@ module ForestAdminDatasourceCustomizer
               @decorated_book.replace_field_writing('__dontExist') do
                 {}
               end
-            end.to raise_error(ForestException, "🌳🌳🌳 Column not found: 'book.__dontExist'")
+            end.to raise_error(ForestException, "Column not found: 'book.__dontExist'")
           end
 
           it 'marks fields as writable when handler is defined' do
@@ -55,7 +55,7 @@ module ForestAdminDatasourceCustomizer
 
             expect do
               @decorated_book.replace_field_writing('name')
-            end.to raise_error(ForestException, '🌳🌳🌳 A new writing method should be provided to replace field writing')
+            end.to raise_error(ForestException, 'A new writing method should be provided to replace field writing')
           end
         end
       end

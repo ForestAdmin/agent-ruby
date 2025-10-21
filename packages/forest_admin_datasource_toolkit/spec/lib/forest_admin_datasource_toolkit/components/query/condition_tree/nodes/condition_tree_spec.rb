@@ -42,7 +42,7 @@ module ForestAdminDatasourceToolkit
                 condition_tree_leaf = ConditionTreeLeaf.new('column1', Operators::TODAY)
                 expect do
                   condition_tree_leaf.inverse
-                end.to raise_error(ForestException, '🌳🌳🌳 Operator: today cannot be inverted.')
+                end.to raise_error(ForestException, 'Operator: today cannot be inverted.')
               end
             end
 
@@ -204,7 +204,7 @@ module ForestAdminDatasourceToolkit
               it 'throws' do
                 expect do
                   @condition_tree_branch.unnest
-                end.to raise_error(ForestException, '🌳🌳🌳 Cannot unnest condition tree.')
+                end.to raise_error(ForestException, 'Cannot unnest condition tree.')
               end
             end
 

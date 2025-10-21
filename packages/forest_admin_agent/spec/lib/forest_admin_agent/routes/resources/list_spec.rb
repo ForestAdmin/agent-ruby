@@ -140,7 +140,7 @@ module ForestAdminAgent
 
         it 'throws an error when the filter operator is not allowed' do
           args[:params][:filters] = JSON.generate({ field: 'id', operator: 'shorter_than', value: 7 })
-          expect { list.handle_request(args) }.to raise_error(ForestException, "🌳🌳🌳 The given operator 'shorter_than' is not supported by the column: 'id'. The column is not filterable")
+          expect { list.handle_request(args) }.to raise_error(ForestException, "The given operator 'shorter_than' is not supported by the column: 'id'. The column is not filterable")
         end
       end
     end

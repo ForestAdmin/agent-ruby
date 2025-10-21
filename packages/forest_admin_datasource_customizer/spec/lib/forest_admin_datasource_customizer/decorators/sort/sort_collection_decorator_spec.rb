@@ -94,15 +94,15 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'emulate_field_sorting() should throw if the field does not exists' do
-          expect { @decorated_book.emulate_field_sorting('__dontExist') }.to raise_error(ValidationError, "🌳🌳🌳 Column not found: 'book.__dontExist'")
+          expect { @decorated_book.emulate_field_sorting('__dontExist') }.to raise_error(ValidationError, "Column not found: 'book.__dontExist'")
         end
 
         it 'emulate_field_sorting() should throw if the field is not sortable' do
-          expect { @decorated_book.emulate_field_sorting('author') }.to raise_error(ValidationError, "🌳🌳🌳 Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
+          expect { @decorated_book.emulate_field_sorting('author') }.to raise_error(ValidationError, "Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
         end
 
         it 'replace_field_sorting() should throw if no equivalent_sort is provided' do
-          expect { @decorated_book.replace_field_sorting('author_id', nil) }.to raise_error(ForestException, '🌳🌳🌳 A new sorting method should be provided to replace field sorting')
+          expect { @decorated_book.replace_field_sorting('author_id', nil) }.to raise_error(ForestException, 'A new sorting method should be provided to replace field sorting')
         end
 
         context 'when emulating sort on book.title (no relations)' do

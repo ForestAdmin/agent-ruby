@@ -97,7 +97,7 @@ module ForestAdminDatasourceCustomizer
                 @datasource.rename_collection('library_book', 'book')
               end.to raise_error(
                 Exceptions::ForestException,
-                "🌳🌳🌳 The given new collection name 'book' is already defined"
+                "The given new collection name 'book' is already defined"
               )
             end
 
@@ -107,7 +107,7 @@ module ForestAdminDatasourceCustomizer
                 @datasource.rename_collection('book2', 'book3')
               end.to raise_error(
                 Exceptions::ForestException,
-                '🌳🌳🌳 Cannot rename a collection twice: book->book2->book3'
+                'Cannot rename a collection twice: book->book2->book3'
               )
             end
 
@@ -116,7 +116,7 @@ module ForestAdminDatasourceCustomizer
                 @datasource.rename_collection('doesNotExist', 'book')
               end.to raise_error(
                 Exceptions::ForestException,
-                '🌳🌳🌳 Collection doesNotExist not found.'
+                'Collection doesNotExist not found.'
               )
             end
 
@@ -169,7 +169,7 @@ module ForestAdminDatasourceCustomizer
                 @datasource.rename_collections('not a function')
               end.to raise_error(
                 ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                '🌳🌳🌳 Invalid argument for rename_collections, must be a function or a hash'
+                'Invalid argument for rename_collections, must be a function or a hash'
               )
             end
           end
@@ -300,7 +300,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an error when collection has polymorphic relation' do
               expect { @datasource.rename_collection('user', 'renamed_user') }.to raise_error(
                 Exceptions::ForestException,
-                "🌳🌳🌳 Cannot rename collection user because it's a target of a polymorphic relation 'address.addressable'"
+                "Cannot rename collection user because it's a target of a polymorphic relation 'address.addressable'"
               )
             end
           end

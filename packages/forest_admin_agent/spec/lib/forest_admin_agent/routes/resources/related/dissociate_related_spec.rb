@@ -234,7 +234,7 @@ module ForestAdminAgent
                 dissociate.handle_request(args)
               end.to raise_error(
                 ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                '🌳🌳🌳 Expected no empty id list'
+                'Expected no empty id list'
               )
             end
 

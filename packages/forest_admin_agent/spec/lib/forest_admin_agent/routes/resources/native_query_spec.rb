@@ -79,7 +79,7 @@ module ForestAdminAgent
           expect do
             native_query.handle_request(args)
           end.to raise_error(
-            ForestException, '🌳🌳🌳 Invalid Chart type unknown_type'
+            ForestException, 'Invalid Chart type unknown_type'
           )
         end
 
@@ -144,7 +144,7 @@ module ForestAdminAgent
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
-              "🌳🌳🌳 The result columns must be named 'value' instead of 'foo'"
+              "The result columns must be named 'value' instead of 'foo'"
             )
           end
         end
@@ -188,7 +188,7 @@ module ForestAdminAgent
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
-              "🌳🌳🌳 The result columns must be named 'value' instead of 'foo'"
+              "The result columns must be named 'value' instead of 'foo'"
             )
           end
         end
@@ -232,7 +232,7 @@ module ForestAdminAgent
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
-              "🌳🌳🌳 The result columns must be named 'key', 'value' instead of 'foo'"
+              "The result columns must be named 'key', 'value' instead of 'foo'"
             )
           end
         end
@@ -289,7 +289,7 @@ module ForestAdminAgent
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
-              "🌳🌳🌳 The result columns must be named 'key', 'value' instead of 'value', 'foo'"
+              "The result columns must be named 'key', 'value' instead of 'value', 'foo'"
             )
           end
         end
@@ -352,7 +352,7 @@ module ForestAdminAgent
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
-              "🌳🌳🌳 The result columns must be named 'key', 'value' instead of 'value', 'foo'"
+              "The result columns must be named 'key', 'value' instead of 'value', 'foo'"
             )
           end
         end

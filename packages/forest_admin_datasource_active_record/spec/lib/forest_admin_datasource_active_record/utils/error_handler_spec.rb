@@ -89,7 +89,7 @@ module ForestAdminDatasourceActiveRecord
               end
             end.to raise_error(
               ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-              '🌳🌳🌳 Something went wrong'
+              'Something went wrong'
             )
           end
         end

@@ -221,7 +221,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.get_field_schema(collection_person,
                                              'foo')
-          end.to raise_error(ForestException, '🌳🌳🌳 Column not found Person.foo')
+          end.to raise_error(ForestException, 'Column not found Person.foo')
         end
 
         it 'get_field_schema should work with simple column' do
@@ -233,14 +233,14 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.get_field_schema(collection_person,
                                              'unknown:foo')
-          end.to raise_error(ForestException, '🌳🌳🌳 Relation not found Person.unknown')
+          end.to raise_error(ForestException, 'Relation not found Person.unknown')
         end
 
         it 'get_field_schema should throw with invalid relation type' do
           expect do
             described_class.get_field_schema(collection_book,
                                              'myBookPersons:bookId')
-          end.to raise_error(ForestException, '🌳🌳🌳 Unexpected field type OneToMany: Book.myBookPersons')
+          end.to raise_error(ForestException, 'Unexpected field type OneToMany: Book.myBookPersons')
         end
 
         it 'get_field_schema should work with relation column' do
@@ -252,7 +252,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.get_through_target(collection_book,
                                                'myBookPersons')
-          end.to raise_error(ForestException, '🌳🌳🌳 Relation must be many to many')
+          end.to raise_error(ForestException, 'Relation must be many to many')
         end
 
         it 'get_through_target should work' do
@@ -263,7 +263,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.get_through_origin(collection_book,
                                                'myBookPersons')
-          end.to raise_error(ForestException, '🌳🌳🌳 Relation must be many to many')
+          end.to raise_error(ForestException, 'Relation must be many to many')
         end
 
         it 'get_through_origin should work' do

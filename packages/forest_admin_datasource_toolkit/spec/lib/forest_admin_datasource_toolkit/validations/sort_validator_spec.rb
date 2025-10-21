@@ -25,7 +25,7 @@ module ForestAdminDatasourceToolkit
 
       it('throws if the field does not exist on the collection') do
         expect { described_class.validate(collection_user, Sort.new([{ field: '__no__such__field', ascending: true }])) }.to raise_error(
-          ForestAdminDatasourceToolkit::Exceptions::ValidationError, "🌳🌳🌳 Column not found: 'User.__no__such__field'"
+          ForestAdminDatasourceToolkit::Exceptions::ValidationError, "Column not found: 'User.__no__such__field'"
         )
       end
 
@@ -36,7 +36,7 @@ module ForestAdminDatasourceToolkit
 
         it('throws if the ascending parameter is not boolean') do
           expect { described_class.validate(collection_user, Sort.new([{ field: 'id', ascending: 42 }])) }.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ValidationError, '🌳🌳🌳 Invalid sort_utils.ascending value: 42'
+            ForestAdminDatasourceToolkit::Exceptions::ValidationError, 'Invalid sort_utils.ascending value: 42'
           )
         end
       end

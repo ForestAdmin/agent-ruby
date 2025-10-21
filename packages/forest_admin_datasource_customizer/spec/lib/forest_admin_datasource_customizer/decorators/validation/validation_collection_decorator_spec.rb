@@ -60,19 +60,19 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'addValidation() should throw if the field does not exists' do
-          expect { @decorated_book.add_validation('__dontExist', { operator: Operators::PRESENT }) }.to raise_error(ValidationError, "🌳🌳🌳 Column not found: 'book.__dontExist'")
+          expect { @decorated_book.add_validation('__dontExist', { operator: Operators::PRESENT }) }.to raise_error(ValidationError, "Column not found: 'book.__dontExist'")
         end
 
         it 'addValidation() should throw if the field is readonly' do
-          expect { @decorated_book.add_validation('id', { operator: Operators::PRESENT }) }.to raise_error(ForestException, '🌳🌳🌳 Cannot add validators on a readonly field')
+          expect { @decorated_book.add_validation('id', { operator: Operators::PRESENT }) }.to raise_error(ForestException, 'Cannot add validators on a readonly field')
         end
 
         it 'addValidation() should throw if the field is a relation' do
-          expect { @decorated_book.add_validation('author', { operator: Operators::PRESENT }) }.to raise_error(ValidationError, "🌳🌳🌳 Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
+          expect { @decorated_book.add_validation('author', { operator: Operators::PRESENT }) }.to raise_error(ValidationError, "Unexpected field type: 'book.author' (found 'ManyToOne' expected 'Column')")
         end
 
         it 'addValidation() should throw if the field is in a relation' do
-          expect { @decorated_book.add_validation('author:first_name', { operator: Operators::PRESENT }) }.to raise_error(ForestException, '🌳🌳🌳 Cannot add validators on a relation, use the foreign key instead')
+          expect { @decorated_book.add_validation('author:first_name', { operator: Operators::PRESENT }) }.to raise_error(ForestException, 'Cannot add validators on a relation, use the foreign key instead')
         end
 
         context 'with field selection when validating' do
@@ -84,7 +84,7 @@ module ForestAdminDatasourceCustomizer
           it 'validates all fields when creating a record' do
             allow(@collection_book).to receive(:create).and_return(nil)
 
-            expect { @decorated_book.create(caller, [{ 'title' => 'longtitle', 'sub_title' => '' }]) }.to raise_error(ValidationError, '🌳🌳🌳 sub_title failed validation rule : longer_than(5)')
+            expect { @decorated_book.create(caller, [{ 'title' => 'longtitle', 'sub_title' => '' }]) }.to raise_error(ValidationError, 'sub_title failed validation rule : longer_than(5)')
           end
 
           it 'validates only changed fields when updating' do
@@ -129,13 +129,13 @@ module ForestAdminDatasourceCustomizer
           it 'rejects create that do not respect the rule' do
             allow(@collection_book).to receive(:create).and_return(nil)
 
-            expect { @decorated_book.create(caller, [{ 'title' => '1234' }]) }.to raise_error(ValidationError, '🌳🌳🌳 title failed validation rule : longer_than(5)')
+            expect { @decorated_book.create(caller, [{ 'title' => '1234' }]) }.to raise_error(ValidationError, 'title failed validation rule : longer_than(5)')
           end
 
           it 'rejects updates that do not respect the rule' do
             allow(@collection_book).to receive(:update).and_return(true)
 
-            expect { @decorated_book.update(caller, Filter.new, { 'title' => '1234' }) }.to raise_error(ValidationError, '🌳🌳🌳 title failed validation rule : longer_than(5)')
+            expect { @decorated_book.update(caller, Filter.new, { 'title' => '1234' }) }.to raise_error(ValidationError, 'title failed validation rule : longer_than(5)')
           end
         end
       end
