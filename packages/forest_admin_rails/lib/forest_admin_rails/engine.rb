@@ -38,6 +38,7 @@ module ForestAdminRails
     end
 
     def load_configuration
+      return unless defined?(::Rails::Server)
       return unless File.exist?(Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb'))
 
       # force eager loading models
