@@ -14,10 +14,7 @@ module ForestAdminAgent
       end
 
       def verify_code_and_generate_token(params)
-        unless params['state']
-          raise ForestAdminAgent::Error,
-                ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_MISSING
-        end
+        raise ForestAdminAgent::Http::Exceptions::MissingParameterError, 'state' unless params['state']
 
         if Facades::Container.cache(:debug)
           OpenIDConnect.http_config do |options|
@@ -40,14 +37,19 @@ module ForestAdminAgent
       def get_rendering_id_from_state(state)
         state = JSON.parse(state.tr("'", '"').gsub('=>', ':'))
         unless state.key? 'renderingId'
-          raise ForestAdminAgent::Error,
-                ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_RENDERING_ID
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError.new(
+            'Invalid state: missing renderingId',
+            details: { state: state }
+          )
         end
 
         begin
           Integer(state['renderingId'])
         rescue ArgumentError
-          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+          raise ForestAdminAgent::Http::Exceptions::ValidationFailedError.new(
+            'Invalid rendering ID: must be an integer',
+            details: { renderingId: state['renderingId'] }
+          )
         end
 
         state['renderingId'].to_i

@@ -4,6 +4,7 @@ require 'active_support/time'
 module ForestAdminAgent
   module Utils
     class ConditionTreeParser
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
@@ -26,7 +27,10 @@ module ForestAdminAgent
           return conditions.size == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
         end
 
-        raise ForestException, 'Failed to instantiate condition tree'
+        raise BadRequestError.new(
+          'Failed to instantiate condition tree: invalid filter format',
+          details: { filters: filters }
+        )
       end
 
       def self.parse_value(collection, leaf)
