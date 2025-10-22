@@ -4,12 +4,18 @@ module ForestAdminDatasourceActiveRecord
   include ForestAdminDatasourceToolkit::Schema
   include ForestAdminDatasourceToolkit::Components::Query
 
-  describe 'N+1 Query Prevention' do
+  describe 'N+1 Query Prevention', :db_truncation do
     let(:datasource) { Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }) }
     let(:caller) { nil }
     let(:filter) { Filter.new }
 
     before do
+      # Clean up all data first (in correct order due to foreign keys)
+      User.delete_all
+      Check.delete_all
+      Car.unscoped.delete_all
+      Category.delete_all
+
       # Create test data
       category = Category.create!(label: 'Test Category')
       @car1 = Car.unscoped.create!(reference: 'CAR1', category: category)
