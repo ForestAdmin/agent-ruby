@@ -38,7 +38,7 @@ module ForestAdminRails
     end
 
     def load_configuration
-      return unless defined?(::Rails::Server)
+      return unless running_web_server?
       return unless File.exist?(Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb'))
 
       # force eager loading models
@@ -54,6 +54,19 @@ module ForestAdminRails
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
       sse.run if ForestAdminRails.config[:instant_cache_refresh]
+    end
+
+    def running_web_server?
+      return true if defined?(::Rails::Server)
+
+      # check if a web server is running with the given command line arguments
+      server_commands = %w[puma unicorn thin passenger rackup]
+      return true if server_commands.any? { |cmd| ARGV.any? { |arg| arg.include?(cmd) } }
+
+      # check if running via common server executables
+      return true if $PROGRAM_NAME.match?(/puma|unicorn|thin|passenger/)
+
+      false
     end
 
     def load_cors
