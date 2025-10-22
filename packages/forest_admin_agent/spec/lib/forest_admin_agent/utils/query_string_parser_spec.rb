@@ -122,6 +122,39 @@ module ForestAdminAgent
               Projection.new(%w[id addressable:* addressable_id addressable_type])
             )
           end
+
+          it 'automatically adds type field when foreign key of polymorphic relation is requested' do
+            args = {
+              params: {
+                fields: { 'Address' => 'id,addressable_id' }
+              }
+            }
+            expect(described_class.parse_projection(collection, args)).to eq(
+              Projection.new(%w[id addressable_id addressable_type])
+            )
+          end
+
+          it 'does not duplicate type field if already requested' do
+            args = {
+              params: {
+                fields: { 'Address' => 'id,addressable_id,addressable_type' }
+              }
+            }
+            expect(described_class.parse_projection(collection, args)).to eq(
+              Projection.new(%w[id addressable_id addressable_type])
+            )
+          end
+
+          it 'automatically adds type field when polymorphic relation itself is requested' do
+            args = {
+              params: {
+                fields: { 'Address' => 'id,addressable', 'addressable' => 'id' }
+              }
+            }
+            expect(described_class.parse_projection(collection, args)).to eq(
+              Projection.new(%w[id addressable:* addressable_type])
+            )
+          end
         end
 
         context 'when request is well formed' do

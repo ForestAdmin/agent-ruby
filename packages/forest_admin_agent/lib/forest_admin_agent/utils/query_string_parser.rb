@@ -35,22 +35,44 @@ module ForestAdminAgent
 
         return ProjectionFactory.all(collection) unless fields != '' && !fields.nil?
 
-        fields = fields.split(',').map do |field_name|
-          column = collection.schema[:fields][field_name.strip]
-          if column.type == 'Column'
-            field_name.strip
-          elsif column.type == 'PolymorphicManyToOne'
-            "#{field_name.strip}:*"
-          else
-            "#{field_name.strip}:#{args[:params][:fields][field_name.strip]}"
-          end
-        end
+        requested_field_names = fields.split(',').map(&:strip)
+        add_polymorphic_type_fields(collection, requested_field_names)
+        projection_fields = build_projection_fields(collection, requested_field_names, args)
 
-        projection = Projection.new(fields)
+        projection = Projection.new(projection_fields)
         ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection)
 
         projection
       end
+
+      def self.add_polymorphic_type_fields(collection, requested_field_names)
+        polymorphic_relations = collection.schema[:fields].select { |_, field| field.type == 'PolymorphicManyToOne' }
+
+        polymorphic_relations.each do |relation_name, relation_field|
+          foreign_key = relation_field.foreign_key
+          type_field = relation_field.foreign_key_type_field
+
+          relation_requested = requested_field_names.include?(relation_name)
+          foreign_key_requested = requested_field_names.include?(foreign_key)
+          type_field_missing = !requested_field_names.include?(type_field)
+
+          requested_field_names << type_field if (relation_requested || foreign_key_requested) && type_field_missing
+        end
+      end
+
+      def self.build_projection_fields(collection, requested_field_names, args)
+        requested_field_names.map do |field_name|
+          column = collection.schema[:fields][field_name]
+          if column.type == 'Column'
+            field_name
+          elsif column.type == 'PolymorphicManyToOne'
+            "#{field_name}:*"
+          else
+            "#{field_name}:#{args[:params][:fields][field_name]}"
+          end
+        end
+      end
+      private_class_method :add_polymorphic_type_fields, :build_projection_fields
 
       def self.parse_projection_with_pks(collection, args)
         projection = parse_projection(collection, args)
