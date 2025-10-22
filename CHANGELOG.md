@@ -1,3 +1,11 @@
+## [1.11.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.1...v1.11.2) (2025-10-22)
+
+
+### Bug Fixes
+
+* **engine:** skip create agent setup when not running rails server ([#166](https://github.com/ForestAdmin/agent-ruby/issues/166)) ([81b5142](https://github.com/ForestAdmin/agent-ruby/commit/81b5142eca3a988d89e176bfc1df69350b6e0545))
+* **projection:** add polymorphic_type column if not requested ([#171](https://github.com/ForestAdmin/agent-ruby/issues/171)) ([3ee1251](https://github.com/ForestAdmin/agent-ruby/commit/3ee1251fdd521da93e05b908dcded5958c596e36))
+
 ## [1.11.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.0...v1.11.1) (2025-10-21)
 
 
