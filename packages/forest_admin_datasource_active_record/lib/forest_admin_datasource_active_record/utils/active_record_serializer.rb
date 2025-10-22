@@ -12,24 +12,42 @@ module ForestAdminDatasourceActiveRecord
 
         hash.merge! object.attributes
 
-        if with_associations
-          each_association_collection(object, projection) do |association_name, item|
-            hash[association_name] = hash_object(
-              item,
-              projection.relations[association_name],
-              with_associations: projection.relations.key?(association_name)
-            )
-          end
-        end
+        serialize_associations(object, projection, hash) if with_associations
 
         hash
       end
 
-      def each_association_collection(object, projection)
+      def serialize_associations(object, projection, hash)
         one_associations = %i[has_one belongs_to]
+        many_associations = %i[has_many has_and_belongs_to_many]
+
+        # Handle one-to-one and many-to-one associations
         object.class.reflect_on_all_associations
               .filter { |a| one_associations.include?(a.macro) && projection.relations.key?(a.name.to_s) }
-              .each { |association| yield(association.name.to_s, object.send(association.name.to_s)) }
+              .each do |association|
+                association_name = association.name.to_s
+                hash[association_name] = hash_object(
+                  object.send(association_name),
+                  projection.relations[association_name],
+                  with_associations: projection.relations.key?(association_name)
+                )
+              end
+
+        # Handle one-to-many and many-to-many associations
+        object.class.reflect_on_all_associations
+              .filter { |a| many_associations.include?(a.macro) && projection.relations.key?(a.name.to_s) }
+              .each do |association|
+                association_name = association.name.to_s
+                collection = object.send(association_name)
+                # Serialize the collection as an array
+                hash[association_name] = collection.map do |item|
+                  hash_object(
+                    item,
+                    projection.relations[association_name],
+                    with_associations: projection.relations.key?(association_name)
+                  )
+                end
+              end
       end
     end
   end
