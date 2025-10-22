@@ -179,14 +179,16 @@ module ForestAdminDatasourceActiveRecord
         end
 
         one_to_one_relations = %w[OneToOne PolymorphicOneToOne]
+        many_to_one_relations = %w[ManyToOne PolymorphicManyToOne]
+
         projection.relations.each do |relation_name, sub_projection|
           relation_schema = collection.schema[:fields][relation_name]
           if collection.model.table_name == @collection.model.table_name
-            @select << if one_to_one_relations.include?(relation_schema.type)
-                         "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
-                       else
-                         "#{collection.model.table_name}.#{relation_schema.foreign_key}"
-                       end
+            if one_to_one_relations.include?(relation_schema.type)
+              @select << "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
+            elsif many_to_one_relations.include?(relation_schema.type)
+              @select << "#{collection.model.table_name}.#{relation_schema.foreign_key}"
+            end
           end
 
           next if relation_schema.type == 'PolymorphicManyToOne'
