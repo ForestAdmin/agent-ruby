@@ -580,6 +580,215 @@ module ForestAdminAgent
         end.to raise_error(ConflictError,
                            'The conditions to trigger this action cannot be verified. Please contact an administrator.')
       end
+
+      context 'when collection has no primary keys' do
+        it 'raises clear error when collection has no primary keys' do
+          smart_action[:triggerEnabled] = [1]
+          smart_action[:triggerConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return([])
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect do
+            smart_action_checker.can_execute?
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+          )
+        end
+
+        it 'raises error when Schema.primary_keys returns nil' do
+          smart_action[:triggerEnabled] = [1]
+          smart_action[:triggerConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return(nil)
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect do
+            smart_action_checker.can_execute?
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+          )
+        end
+
+        it 'raises clear error when checking approval required conditions' do
+          smart_action[:triggerEnabled] = [1]
+          smart_action[:approvalRequired] = [1]
+          smart_action[:approvalRequiredConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return([])
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect do
+            smart_action_checker.can_execute?
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+          )
+        end
+
+        it 'raises clear error when checking user approval conditions' do
+          parameters[:data][:attributes][:signed_approval_request] = {
+            data: {
+              attributes: {
+                requester_id: 20
+              }
+            }
+          }
+          smart_action[:userApprovalEnabled] = [1]
+          smart_action[:userApprovalConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return(nil)
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect do
+            smart_action_checker.can_execute?
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+          )
+        end
+
+        it 'raises clear error when using all_records mode with exclusions' do
+          smart_action[:triggerEnabled] = [1]
+          smart_action[:triggerConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          parameters[:data][:attributes][:all_records] = true
+          parameters[:data][:attributes][:all_records_ids_excluded] = [5, 10]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return([])
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect do
+            smart_action_checker.can_execute?
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection 'Book' has no primary keys. Actions with conditional permissions require a primary key to identify records."
+          )
+        end
+      end
+
+      context 'when collection has composite primary keys' do
+        it 'uses first primary key for condition matching' do
+          smart_action[:triggerEnabled] = [1]
+          smart_action[:triggerConditions] = [
+            {
+              filter: {
+                aggregator: 'and',
+                conditions: [
+                  {
+                    field: 'id',
+                    value: 1,
+                    source: 'data',
+                    operator: 'equal'
+                  }
+                ]
+              },
+              'roleId' => 1
+            }
+          ]
+
+          collection = @datasource.get_collection('Book')
+          allow(ForestAdminDatasourceToolkit::Utils::Schema).to receive(:primary_keys).with(collection).and_return(['id', 'secondary_id'])
+          allow(collection).to receive(:aggregate).and_return([{ 'value' => 1, 'group' => [] }])
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+
+          expect(smart_action_checker).to be_can_execute
+        end
+      end
     end
   end
 end
