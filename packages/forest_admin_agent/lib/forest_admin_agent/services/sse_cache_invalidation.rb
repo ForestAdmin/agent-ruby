@@ -3,6 +3,7 @@ require 'ld-eventsource'
 module ForestAdminAgent
   module Services
     class SSECacheInvalidation
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       MESSAGE_CACHE_KEYS = {
@@ -38,7 +39,7 @@ module ForestAdminAgent
               )
             end
           end
-        rescue StandardError
+        rescue StandardError => e
           ForestAdminAgent::Facades::Container.logger.log(
             'Debug',
             'SSE connection to forestadmin server'
@@ -49,7 +50,11 @@ module ForestAdminAgent
             'SSE connection to forestadmin server closed unexpectedly, retrying.'
           )
 
-          raise ForestException, 'Failed to reach SSE data from ForestAdmin server.'
+          raise ServiceUnavailableError.new(
+            'Failed to reach SSE data from ForestAdmin server',
+            details: { error: e.message },
+            cause: e
+          )
         end
       end
     end

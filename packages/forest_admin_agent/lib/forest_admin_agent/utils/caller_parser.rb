@@ -5,6 +5,7 @@ require 'active_support/time'
 module ForestAdminAgent
   module Utils
     class CallerParser
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       def initialize(args)
@@ -37,8 +38,15 @@ module ForestAdminAgent
 
       def extract_timezone
         timezone = @args[:params]['timezone']
-        raise ForestException, 'Missing timezone' unless timezone
-        raise ForestException, "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
+
+        raise MissingParameterError, 'timezone' unless timezone
+
+        unless Time.find_zone(timezone)
+          raise BadRequestError.new(
+            'Invalid timezone',
+            details: { timezone: timezone }
+          )
+        end
 
         timezone
       end

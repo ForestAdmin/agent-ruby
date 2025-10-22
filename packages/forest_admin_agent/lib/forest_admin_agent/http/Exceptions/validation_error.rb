@@ -1,3 +1,5 @@
+require_relative 'http_exception'
+
 module ForestAdminAgent
   module Http
     module Exceptions

@@ -7,6 +7,7 @@ module ForestAdminAgent
       class NativeQuery < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
+        include ForestAdminAgent::Http::Exceptions
         include ForestAdminDatasourceToolkit::Exceptions
         include ForestAdminDatasourceToolkit::Components::Charts
         include ForestAdminAgent::Routes::QueryHandler
@@ -60,8 +61,10 @@ module ForestAdminAgent
         end
 
         def raise_error(result, key_names)
-          raise ForestException,
-                "The result columns must be named #{key_names} instead of '#{result.keys.join("', '")}'"
+          raise BadRequestError.new(
+            'Invalid native query result columns',
+            details: { expected: key_names, actual: result.keys.join(', ') }
+          )
         end
 
         def make_value(result)

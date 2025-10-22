@@ -3,6 +3,7 @@ require 'faraday'
 module ForestAdminAgent
   module Http
     class ForestAdminApiRequester
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       def initialize
@@ -28,29 +29,46 @@ module ForestAdminAgent
       end
 
       def handle_response_error(error)
+        # Re-raise if it's already a BusinessError
+        raise error if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
         raise error if error.is_a?(ForestException)
 
         if error.response[:message]&.include?('certificate')
-          raise ForestException,
-                'ForestAdmin server TLS certificate cannot be verified. Please check that your system time is set properly.'
+          raise InternalServerError.new(
+            'ForestAdmin server TLS certificate cannot be verified. Please check that your system time is set properly.',
+            details: { error: error.message },
+            cause: error
+          )
         end
 
         if error.response[:status].zero? || error.response[:status] == 502
-          raise ForestException, 'Failed to reach ForestAdmin server. Are you online?'
+          raise BadGatewayError.new(
+            'Failed to reach ForestAdmin server. Are you online?',
+            details: { status: error.response[:status] },
+            cause: error
+          )
         end
 
         if error.response[:status] == 404
-          raise ForestException,
-                'ForestAdmin server failed to find the project related to the envSecret you configured. Can you check that you copied it properly in the Forest initialization?'
+          raise NotFoundError.new(
+            'ForestAdmin server failed to find the project related to the envSecret you configured. Can you check that you copied it properly in the Forest initialization?',
+            details: { status: error.response[:status] }
+          )
         end
 
         if error.response[:status] == 503
-          raise ForestException,
-                'Forest is in maintenance for a few minutes. We are upgrading your experience in the forest. We just need a few more minutes to get it right.'
+          raise ServiceUnavailableError.new(
+            'Forest is in maintenance for a few minutes. We are upgrading your experience in the forest. We just need a few more minutes to get it right.',
+            details: { status: error.response[:status] },
+            cause: error
+          )
         end
 
-        raise ForestException,
-              'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.'
+        raise InternalServerError.new(
+          'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.',
+          details: { status: error.response[:status], message: error.message },
+          cause: error
+        )
       end
     end
   end

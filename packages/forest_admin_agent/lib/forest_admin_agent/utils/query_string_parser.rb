@@ -1,6 +1,7 @@
 module ForestAdminAgent
   module Utils
     class QueryStringParser
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components
       include ForestAdminDatasourceToolkit::Components::Query
@@ -92,7 +93,10 @@ module ForestAdminAgent
         limit_valid = !items_per_pages.to_s.match(/\A[+]?\d+\z/).nil? && items_per_pages.to_i.positive?
 
         unless page_valid && limit_valid
-          raise ForestException, "Invalid pagination [limit: #{items_per_pages}, skip: #{page}]"
+          raise BadRequestError.new(
+            'Invalid pagination parameters',
+            details: { limit: items_per_pages, page: page }
+          )
         end
 
         offset = (page.to_i - 1) * items_per_pages.to_i
@@ -107,7 +111,12 @@ module ForestAdminAgent
       def self.parse_search(collection, args)
         search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
 
-        raise ForestException, 'Collection is not searchable' if search && !collection.is_searchable?
+        if search && !collection.is_searchable?
+          raise BadRequestError.new(
+            'Collection is not searchable',
+            details: { collection: collection.name }
+          )
+        end
 
         search
       end
@@ -148,7 +157,12 @@ module ForestAdminAgent
 
         return unless segment
 
-        raise ForestException, "Invalid segment: #{segment}" unless collection.schema[:segments].include?(segment)
+        unless collection.schema[:segments].include?(segment)
+          raise BadRequestError.new(
+            'Invalid segment',
+            details: { segment: segment, available_segments: collection.schema[:segments] }
+          )
+        end
 
         segment
       end
