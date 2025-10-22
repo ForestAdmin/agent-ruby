@@ -13,17 +13,8 @@
 #   end
 #
 # When caching is ENABLED (default):
-#
-# Development Mode (Rails.env.development?):
-#   - Calls reset_cached_routes! on every code reload (to_prepare callback)
-#   - Ensures route changes are picked up automatically during development
-#   - Without this, code reloads would not refresh routes, causing stale route bugs
-#   - Trade-off: Routes recomputed on each code change, but this is acceptable for dev
-#
-# Production/Test Mode:
-#   - Precomputes routes once during after_initialize phase
-#   - Routes are computed after all Rails initialization is complete
-#   - No runtime recomputation - routes remain frozen for entire app lifetime
+#   - Routes are precomputed once during initialization
+#   - Routes remain frozen for the entire application lifetime
 #   - Maximum performance: expensive computation happens only once at startup
 #
 # When caching is DISABLED:
@@ -41,23 +32,8 @@ if defined?(ForestAdminAgent::Http::Router)
   if cache_disabled
     Rails.logger.warn('[ForestAdmin] Route caching is DISABLED - this will impact performance')
     Rails.logger.warn('[ForestAdmin] To enable caching, remove disable_route_cache: true from configuration')
-  end
-
-  # Skip cache lifecycle setup if caching is disabled
-  if cache_disabled
-    # Cache is disabled, no lifecycle setup needed
-  elsif Rails.env.development?
-    # Development: Reset cache on each code reload
-    Rails.application.config.to_prepare do
-      ForestAdminAgent::Http::Router.reset_cached_routes!
-    rescue StandardError => e
-      Rails.logger.warn(
-        "[ForestAdmin] Failed to reset route cache during development reload: #{e.class} - #{e.message}"
-      )
-      Rails.logger.warn('Routes will be recomputed on next request')
-    end
   else
-    # Production/Test: Precompute routes once after initialization
+    # Precompute routes once after initialization for all environments
     Rails.application.config.after_initialize do
       start_time = Time.now
       routes = ForestAdminAgent::Http::Router.cached_routes
