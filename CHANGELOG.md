@@ -1,3 +1,10 @@
+## [1.11.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.2...v1.11.3) (2025-10-22)
+
+
+### Bug Fixes
+
+* **engine:** prevent agent setup on non-server Rails commands ([#172](https://github.com/ForestAdmin/agent-ruby/issues/172)) ([2e9c701](https://github.com/ForestAdmin/agent-ruby/commit/2e9c701da0de19b60fbcfaaf9593b163e4a3dd1e))
+
 ## [1.11.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.1...v1.11.2) (2025-10-22)
 
 
