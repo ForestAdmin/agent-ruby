@@ -1,3 +1,11 @@
+## [1.11.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.3...v1.11.4) (2025-10-22)
+
+
+### Bug Fixes
+
+* add primary key validation for smart actions ([#167](https://github.com/ForestAdmin/agent-ruby/issues/167)) ([1ec00d9](https://github.com/ForestAdmin/agent-ruby/commit/1ec00d99395a7479110d034672ccb111be884dfd))
+* optimize queries for has-many relationships ([#170](https://github.com/ForestAdmin/agent-ruby/issues/170)) ([b931294](https://github.com/ForestAdmin/agent-ruby/commit/b931294ceb93bf02a16fdb37893fd127c077c1b1))
+
 ## [1.11.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.2...v1.11.3) (2025-10-22)
 
 
