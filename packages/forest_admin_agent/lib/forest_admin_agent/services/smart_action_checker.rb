@@ -105,16 +105,10 @@ module ForestAdminAgent
         # Wrap other ForestExceptions (like invalid operators) in ConflictError
         raise if e.message.include?('has no primary keys')
 
-        raise ConflictError.new(
-          'The conditions to trigger this action cannot be verified. Please contact an administrator.',
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise ConflictError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       rescue ArgumentError, TypeError => e
         # Catch specific errors from condition parsing/validation
-        raise ConflictError.new(
-          "Invalid action condition: #{e.message}. Please contact an administrator.",
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise ConflictError, "Invalid action condition: #{e.message}. Please contact an administrator."
       rescue StandardError => e
         # Catch unexpected errors and log for debugging
         ForestAdminAgent::Facades::Container.logger.log(
@@ -122,10 +116,7 @@ module ForestAdminAgent
           "Unexpected error in match_conditions: #{e.class} - #{e.message}"
         )
 
-        raise ConflictError.new(
-          'The conditions to trigger this action cannot be verified. Please contact an administrator.',
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise ConflictError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       end
 
       def condition_by_role_id(condition)
