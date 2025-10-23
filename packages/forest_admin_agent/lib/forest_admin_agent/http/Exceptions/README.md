@@ -28,13 +28,10 @@ The system provides error classes for all standard HTTP error codes:
 #### 4xx Client Errors
 
 - `BadRequestError` (400) - Invalid request data
-- `UnauthorizedError` (401) - Authentication failed
-- `PaymentRequiredError` (402) - Payment required
 - `ForbiddenError` (403) - Insufficient permissions
 - `NotFoundError` (404) - Resource not found
 - `ConflictError` (409) - Resource conflict
-- `ContentTooLargeError` (413) - Request payload too large
-- `UnprocessableEntityError` (422) - Validation failed
+- `UnprocessableError` (422) - Validation failed
 - `TooManyRequestsError` (429) - Rate limit exceeded
 
 #### 5xx Server Errors
@@ -101,7 +98,6 @@ raise ForestAdminAgent::Http::Exceptions::ValidationFailedError.new(
 
 ```ruby
 raise ForestAdminAgent::Http::Exceptions::ConflictError.new(
-  'Organization',
   'An organization with this name already exists',
   details: {
     organization_name: 'Acme Corp',
