@@ -98,8 +98,9 @@ module ForestAdminAgent
             allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:customize_error_message).and_return(nil)
           end
 
-          it 'returns the validation error message' do
-            expect(handler.get_error_message(validation_error)).to eq('The query violates a unicity constraint')
+          it 'returns the validation error message via translate_error' do
+            result = handler.translate_error(validation_error)
+            expect(result[:message]).to eq('The query violates a unicity constraint')
           end
         end
       end
@@ -120,8 +121,9 @@ module ForestAdminAgent
             ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('Invalid data')
           end
 
-          it 'returns 400' do
-            expect(handler.get_error_status(validation_error)).to eq(400)
+          it 'returns 400 via translate_error' do
+            result = handler.translate_error(validation_error)
+            expect(result[:status]).to eq(400)
           end
         end
 

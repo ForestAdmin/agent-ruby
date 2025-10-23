@@ -45,10 +45,10 @@ module ForestAdminAgent
         return error if error.is_a?(Exceptions::HttpError)
         return error if error.respond_to?(:status) && error.status
 
-        # Translate DatasourceToolkit ValidationError to Agent ValidationError
+        # Translate DatasourceToolkit ValidationError to Agent BadRequestError
         if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
            error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
-          return Exceptions::BadRequestError.new(error)
+          error = Exceptions::BadRequestError.new(error.message)
         end
 
         # Translate BusinessError to HttpError with appropriate status code

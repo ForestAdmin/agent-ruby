@@ -61,17 +61,11 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      # Translate BusinessError to HttpError if applicable
-      translated_error = translate_error(exception)
-
-      http_status = get_error_status(translated_error)
-      error_message = get_error_message(translated_error)
-      error_name = get_error_name(translated_error)
-      error_meta = get_error_meta(translated_error)
-      error_headers = get_error_headers(translated_error)
+      # Translate BusinessError to HttpError and get all error information
+      error_info = translate_error(exception)
 
       # Add custom headers to the response
-      response.headers.merge!(error_headers) if error_headers.any?
+      response.headers.merge!(error_info[:headers]) if error_info[:headers].any?
 
       data = case exception
              when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
@@ -85,10 +79,10 @@ module ForestAdminRails
                {
                  errors: [
                    {
-                     name: error_name,
-                     detail: error_message,
-                     status: http_status,
-                     meta: error_meta.presence,
+                     name: error_info[:name],
+                     detail: error_info[:message],
+                     status: error_info[:status],
+                     meta: error_info[:meta].presence,
                      data: exception.try(:data)
                    }.compact
                  ]
@@ -99,7 +93,7 @@ module ForestAdminRails
         ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
       end
 
-      render json: data, status: http_status
+      render json: data, status: error_info[:status]
     end
   end
 end

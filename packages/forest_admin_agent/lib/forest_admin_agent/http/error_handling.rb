@@ -35,11 +35,6 @@ module ForestAdminAgent
 
         return error.status if error.respond_to?(:status) && error.status
 
-        if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
-          http_error = ForestAdminAgent::Http::ErrorTranslator.translate(error)
-          return http_error.status if http_error
-        end
-
         500
       end
 
@@ -77,12 +72,27 @@ module ForestAdminAgent
       end
 
       # Translate any exception to its appropriate HTTP error representation
-      # This is just a convenient wrapper around ErrorTranslator.translate
+      # and return all error information needed for response
       # @param error [Exception] The error to translate
-      # @return [HttpError, HttpException, Exception] The translated error or the original error
+      # @return [Hash] Hash containing:
+      #   - :translated_error - The translated error (HttpError, HttpException, or original)
+      #   - :status - HTTP status code (Integer)
+      #   - :message - Error message for the user (String)
+      #   - :name - Error name (String)
+      #   - :meta - Error metadata/details (Hash)
+      #   - :headers - Custom headers to include in response (Hash)
       def translate_error(error)
-        # Delegate all translation logic to ErrorTranslator
-        ForestAdminAgent::Http::ErrorTranslator.translate(error)
+        # Delegate translation logic to ErrorTranslator
+        translated = ForestAdminAgent::Http::ErrorTranslator.translate(error)
+
+        {
+          translated_error: translated,
+          status: get_error_status(translated),
+          message: get_error_message(translated),
+          name: get_error_name(translated),
+          meta: get_error_meta(translated),
+          headers: get_error_headers(translated)
+        }
       end
     end
   end
