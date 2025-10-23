@@ -1,5 +1,7 @@
 module ForestAdminAgent
   module Services
+    include ForestAdminAgent::Http::Exceptions
+
     class CustomActionTriggerForbiddenError < ForbiddenError
       def initialize(message = 'Custom action trigger forbidden', details: {})
         super
@@ -13,7 +15,6 @@ module ForestAdminAgent
     end
 
     class SmartActionChecker
-      include ForestAdminAgent::Http::Exceptions
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit::Components::Query
