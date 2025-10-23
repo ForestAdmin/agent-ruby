@@ -3,31 +3,84 @@ module ForestAdminAgent
     class Router
       include ForestAdminAgent::Routes
 
+      # Mutex for thread-safe cache operations
+      @mutex = Mutex.new
+
+      def self.cached_routes
+        return routes.freeze if cache_disabled?
+
+        return @cached_routes if @cached_routes
+
+        @mutex.synchronize do
+          @cached_routes ||= begin
+            start_time = Time.now
+            computed_routes = routes
+            elapsed = ((Time.now - start_time) * 1000).round(2)
+
+            log_message = "[ForestAdmin] Computed #{computed_routes.size} routes " \
+                          "in #{elapsed}ms (caching enabled)"
+            ForestAdminAgent::Facades::Container.logger.log('Info', log_message)
+
+            computed_routes.freeze
+          end
+        end
+      end
+
+      def self.cache_disabled?
+        config = ForestAdminAgent::Facades::Container.config_from_cache
+        config&.dig(:disable_route_cache) == true
+      rescue StandardError
+        # If config is not available or an error occurs, default to caching enabled
+        false
+      end
+
+      def self.reset_cached_routes!
+        @mutex.synchronize do
+          @cached_routes = nil
+        end
+      end
+
       def self.routes
-        [
-          actions_routes,
-          api_charts_routes,
-          System::HealthCheck.new.routes,
-          Security::Authentication.new.routes,
-          Security::ScopeInvalidation.new.routes,
-          Charts::Charts.new.routes,
-          Capabilities::Collections.new.routes,
-          Resources::NativeQuery.new.routes,
-          Resources::Count.new.routes,
-          Resources::Delete.new.routes,
-          Resources::Csv.new.routes,
-          Resources::List.new.routes,
-          Resources::Show.new.routes,
-          Resources::Store.new.routes,
-          Resources::Update.new.routes,
-          Resources::UpdateField.new.routes,
-          Resources::Related::CsvRelated.new.routes,
-          Resources::Related::ListRelated.new.routes,
-          Resources::Related::CountRelated.new.routes,
-          Resources::Related::AssociateRelated.new.routes,
-          Resources::Related::DissociateRelated.new.routes,
-          Resources::Related::UpdateRelated.new.routes
-        ].inject(&:merge)
+        route_sources = [
+          { name: 'actions', handler: -> { actions_routes } },
+          { name: 'api_charts', handler: -> { api_charts_routes } },
+          { name: 'health_check', handler: -> { System::HealthCheck.new.routes } },
+          { name: 'authentication', handler: -> { Security::Authentication.new.routes } },
+          { name: 'scope_invalidation', handler: -> { Security::ScopeInvalidation.new.routes } },
+          { name: 'charts', handler: -> { Charts::Charts.new.routes } },
+          { name: 'collections', handler: -> { Capabilities::Collections.new.routes } },
+          { name: 'native_query', handler: -> { Resources::NativeQuery.new.routes } },
+          { name: 'count', handler: -> { Resources::Count.new.routes } },
+          { name: 'delete', handler: -> { Resources::Delete.new.routes } },
+          { name: 'csv', handler: -> { Resources::Csv.new.routes } },
+          { name: 'list', handler: -> { Resources::List.new.routes } },
+          { name: 'show', handler: -> { Resources::Show.new.routes } },
+          { name: 'store', handler: -> { Resources::Store.new.routes } },
+          { name: 'update', handler: -> { Resources::Update.new.routes } },
+          { name: 'csv_related', handler: -> { Resources::Related::CsvRelated.new.routes } },
+          { name: 'list_related', handler: -> { Resources::Related::ListRelated.new.routes } },
+          { name: 'count_related', handler: -> { Resources::Related::CountRelated.new.routes } },
+          { name: 'associate_related', handler: -> { Resources::Related::AssociateRelated.new.routes } },
+          { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
+          { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
+          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } }
+        ]
+
+        all_routes = {}
+
+        route_sources.each do |source|
+          routes = source[:handler].call
+
+          unless routes.is_a?(Hash)
+            raise TypeError, "Route handler '#{source[:name]}' returned #{routes.class} instead of Hash"
+          end
+
+          all_routes.merge!(routes)
+        rescue StandardError => e
+          raise e.class, "Failed to load routes from '#{source[:name]}' handler: #{e.message}"
+        end
+
+        all_routes
       end
 
       def self.actions_routes
