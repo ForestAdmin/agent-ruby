@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.0...v1.12.1) (2025-10-23)
+
+
+### Performance Improvements
+
+* add route caching to avoid recomputing routes on every request ([#163](https://github.com/ForestAdmin/agent-ruby/issues/163)) ([2b21410](https://github.com/ForestAdmin/agent-ruby/commit/2b214100056af48b5f028353903349d027a08a3c))
+
 # [1.12.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.4...v1.12.0) (2025-10-23)
 
 
