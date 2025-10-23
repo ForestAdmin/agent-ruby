@@ -27,10 +27,7 @@ module ForestAdminAgent
           return conditions.size == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
         end
 
-        raise BadRequestError.new(
-          'Failed to instantiate condition tree: invalid filter format',
-          details: { filters: filters }
-        )
+        raise BadRequestError, 'Failed to instantiate condition tree'
       end
 
       def self.parse_value(collection, leaf)

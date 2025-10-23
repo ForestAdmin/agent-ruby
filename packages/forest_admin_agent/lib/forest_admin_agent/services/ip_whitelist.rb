@@ -2,7 +2,7 @@ require 'ipaddress'
 
 module ForestAdminAgent
   module Services
-    class IpWhitelist # rubocop:disable Metrics/ClassLength
+    class IpWhitelist
       RULE_MATCH_IP = 0
       RULE_MATCH_RANGE = 1
       RULE_MATCH_SUBNET = 2
@@ -40,10 +40,7 @@ module ForestAdminAgent
         when RULE_MATCH_SUBNET
           ip_match_subnet?(ip, rule['range'])
         else
-          raise ForestAdminAgent::Http::Exceptions::InternalServerError.new(
-            'Invalid IP whitelist rule type',
-            details: { rule_type: rule['type'], rule: rule }
-          )
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError, 'Invalid rule type'
         end
       end
 
@@ -96,10 +93,8 @@ module ForestAdminAgent
                                                             status: response.status,
                                                             response: response.body
                                                           })
-          raise ForestAdminAgent::Http::Exceptions::InternalServerError.new(
-            'Failed to fetch IP whitelist rules',
-            details: { status: response.status, body: response.body }
-          )
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+                ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
         end
 
         begin
@@ -110,11 +105,8 @@ module ForestAdminAgent
                                                             status: response.status,
                                                             response: response.body
                                                           })
-          raise ForestAdminAgent::Http::Exceptions::InternalServerError.new(
-            'Failed to parse IP whitelist rules response',
-            details: { error: e.message, body: response.body },
-            cause: e
-          )
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+                ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
         end
 
         ip_whitelist_data = body['data']['attributes']
@@ -127,11 +119,8 @@ module ForestAdminAgent
                                                           status: response&.status,
                                                           response: response&.body
                                                         })
-        raise ForestAdminAgent::Http::Exceptions::InternalServerError.new(
-          'Unexpected error fetching IP whitelist rules',
-          details: { error: e.message, status: response&.status },
-          cause: e
-        )
+        raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+              ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
       end
     end
   end

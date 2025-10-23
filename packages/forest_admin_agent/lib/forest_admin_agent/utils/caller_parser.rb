@@ -39,14 +39,9 @@ module ForestAdminAgent
       def extract_timezone
         timezone = @args[:params]['timezone']
 
-        raise MissingParameterError, 'timezone' unless timezone
+        raise BadRequestError, 'Missing timezone' unless timezone
 
-        unless Time.find_zone(timezone)
-          raise BadRequestError.new(
-            'Invalid timezone',
-            details: { timezone: timezone }
-          )
-        end
+        raise BadRequestError, "Invalid timezone: #{timezone}" unless Time.find_zone(timezone)
 
         timezone
       end
