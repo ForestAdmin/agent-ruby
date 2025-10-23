@@ -1,3 +1,10 @@
+## [1.12.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.2...v1.12.3) (2025-10-23)
+
+
+### Bug Fixes
+
+* **collection:** related data query on non id foreign key ([#178](https://github.com/ForestAdmin/agent-ruby/issues/178)) ([b76ca4c](https://github.com/ForestAdmin/agent-ruby/commit/b76ca4c6ffc8ff0a7e190bbb246ad2de01aab2ef))
+
 ## [1.12.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.1...v1.12.2) (2025-10-23)
 
 
