@@ -14,6 +14,12 @@ module ForestAdminAgent
       end
     end
 
+    class CustomActionRequiresApprovalError < ForbiddenError
+      def initialize(message = 'Custom action requires approval', details: {})
+        super
+      end
+    end
+
     class SmartActionChecker
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Utils
@@ -21,8 +27,6 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
-
-      REQUIRE_APPROVAL_ERROR = 'CustomActionRequiresApprovalError'.freeze
 
       def initialize(parameters, collection, smart_action, caller, role_id, filter)
         @parameters = parameters
@@ -62,10 +66,9 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
-            raise RequireApproval.new(
+            raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',
-              REQUIRE_APPROVAL_ERROR,
-              smart_action[:userApprovalEnabled]
+              details: { user_approval_enabled: smart_action[:userApprovalEnabled] }
             )
           elsif condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true
