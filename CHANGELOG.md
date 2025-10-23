@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.4...v1.12.0) (2025-10-23)
+
+
+### Features
+
+* **cors:** allow to disable forest_admin_rails cors ([#176](https://github.com/ForestAdmin/agent-ruby/issues/176)) ([70700e8](https://github.com/ForestAdmin/agent-ruby/commit/70700e88770e438ae170f8d6dc1c1e39f412e27b))
+
 ## [1.11.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.11.3...v1.11.4) (2025-10-22)
 
 
