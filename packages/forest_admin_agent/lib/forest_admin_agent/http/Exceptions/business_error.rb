@@ -19,16 +19,8 @@ module ForestAdminAgent
       end
 
       # ====================
-      # Lowest level errors
+      # Specific error types
       # ====================
-      # Note: Some error classes (ForbiddenError, NotFoundError, ConflictError, UnprocessableError, ValidationError)
-      # are defined in their own files for backward compatibility with HttpException
-
-      class UnavailableForLegalReasonsError < BusinessError
-        def initialize(message = 'Unavailable for legal reasons', details: {})
-          super
-        end
-      end
 
       class BadRequestError < BusinessError
         def initialize(message = 'Bad request', details: {})
@@ -36,8 +28,44 @@ module ForestAdminAgent
         end
       end
 
+      class UnauthorizedError < BusinessError
+        def initialize(message = 'Unauthorized', details: {})
+          super
+        end
+      end
+
+      class PaymentRequiredError < BusinessError
+        def initialize(message = 'Payment required', details: {})
+          super
+        end
+      end
+
+      class ForbiddenError < BusinessError
+        def initialize(message = 'Forbidden', details: {})
+          super
+        end
+      end
+
+      class NotFoundError < BusinessError
+        def initialize(message, details: {})
+          super
+        end
+      end
+
+      class ConflictError < BusinessError
+        def initialize(message = 'Conflict', details: {})
+          super
+        end
+      end
+
       class ContentTooLargeError < BusinessError
         def initialize(message = 'Content too large', details: {})
+          super
+        end
+      end
+
+      class UnprocessableError < BusinessError
+        def initialize(message = 'Unprocessable entity', details: {})
           super
         end
       end
@@ -54,14 +82,23 @@ module ForestAdminAgent
         end
       end
 
-      class InternalServerError < BusinessError
-        def initialize(message = 'Internal server error', details: {}, cause: nil)
+      class TooManyRequestsError < BusinessError
+        attr_reader :retry_after
+
+        def initialize(message, retry_after, details: {})
+          super(message, details: details)
+          @retry_after = retry_after
+        end
+      end
+
+      class UnavailableForLegalReasonsError < BusinessError
+        def initialize(message = 'Unavailable for legal reasons', details: {})
           super
         end
       end
 
-      class PaymentRequiredError < BusinessError
-        def initialize(message = 'Payment required', details: {})
+      class InternalServerError < BusinessError
+        def initialize(message = 'Internal server error', details: {}, cause: nil)
           super
         end
       end
@@ -78,23 +115,18 @@ module ForestAdminAgent
         end
       end
 
-      class TooManyRequestsError < BusinessError
-        attr_reader :retry_after
-
-        def initialize(message, retry_after, details: {})
-          super(message, details: details)
-          @retry_after = retry_after
-        end
-      end
-
-      class UnauthorizedError < BusinessError
-        def initialize(message = 'Unauthorized', details: {})
+      # Specialized BadRequestError subclass
+      class ValidationFailedError < BadRequestError
+        def initialize(message = 'Validation failed', details: {})
           super
         end
       end
 
-      class ValidationFailedError < BadRequestError
-        def initialize(message = 'Validation failed', details: {})
+      # Legacy ValidationError - kept for backward compatibility with HttpException-based code
+      # This extends HttpException rather than BusinessError to maintain compatibility
+      # New code should use ValidationFailedError instead
+      class ValidationError < BusinessError
+        def initialize(message = 'Validation error', details: {})
           super
         end
       end
