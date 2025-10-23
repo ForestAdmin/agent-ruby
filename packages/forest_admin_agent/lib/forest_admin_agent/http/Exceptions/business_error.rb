@@ -98,12 +98,6 @@ module ForestAdminAgent
           super
         end
       end
-
-      class NotFoundError < BusinessError
-        def initialize(message, details: {})
-          super
-        end
-      end
     end
   end
 end

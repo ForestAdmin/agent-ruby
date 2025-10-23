@@ -60,6 +60,8 @@ module ForestAdminAgent
           ERROR_401.new(error)
         when Exceptions::PaymentRequiredError
           ERROR_402.new(error)
+        when Exceptions::NotFoundError
+          ERROR_404.new(error)
         when Exceptions::ContentTooLargeError
           ERROR_413.new(error)
         when Exceptions::FailedDependencyError
