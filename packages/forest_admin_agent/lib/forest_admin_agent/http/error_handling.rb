@@ -10,7 +10,6 @@ module ForestAdminAgent
       # @param error [Exception] The error to get the message for
       # @return [String] The error message to show to the user
       def get_error_message(error)
-        # Handle HttpError instances
         return error.user_message if error.is_a?(ForestAdminAgent::Http::Exceptions::HttpError)
 
         if error.class.respond_to?(:ancestors) && error.class.ancestors.include?(ForestAdminAgent::Http::Exceptions::HttpException)
@@ -18,12 +17,6 @@ module ForestAdminAgent
         end
 
         return error.message if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
-
-        # Handle DatasourceToolkit ValidationError
-        if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
-           error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
-          return error.message
-        end
 
         if defined?(ForestAdminAgent::Facades) &&
            (customizer = ForestAdminAgent::Facades::Container.cache(:customize_error_message))
@@ -45,12 +38,6 @@ module ForestAdminAgent
         if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
           http_error = ForestAdminAgent::Http::ErrorTranslator.translate(error)
           return http_error.status if http_error
-        end
-
-        # Handle DatasourceToolkit ValidationError
-        if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
-           error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
-          return 400
         end
 
         500
