@@ -1,5 +1,17 @@
 module ForestAdminAgent
   module Services
+    class CustomActionTriggerForbiddenError < ForbiddenError
+      def initialize(message = 'Custom action trigger forbidden', details: {})
+        super
+      end
+    end
+
+    class InvalidActionConditionError < ConflictError
+      def initialize(message = 'Invalid action condition', details: {})
+        super
+      end
+    end
+
     class SmartActionChecker
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminAgent::Utils
@@ -9,11 +21,7 @@ module ForestAdminAgent
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
 
-      TRIGGER_FORBIDDEN_ERROR = 'CustomActionTriggerForbiddenError'.freeze
-
       REQUIRE_APPROVAL_ERROR = 'CustomActionRequiresApprovalError'.freeze
-
-      INVALID_ACTION_CONDITION_ERROR = 'InvalidActionConditionError'.freeze
 
       def initialize(parameters, collection, smart_action, caller, role_id, filter)
         @parameters = parameters
@@ -43,7 +51,7 @@ module ForestAdminAgent
           return true
         end
 
-        raise ForbiddenError, 'You don\'t have the permission to trigger this action.'
+        raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def can_trigger?
@@ -63,7 +71,7 @@ module ForestAdminAgent
           end
         end
 
-        raise ForbiddenError, 'You don\'t have the permission to trigger this action.'
+        raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def match_conditions(condition_name)
@@ -105,10 +113,10 @@ module ForestAdminAgent
         # Wrap other ForestExceptions (like invalid operators) in ConflictError
         raise if e.message.include?('has no primary keys')
 
-        raise ConflictError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
+        raise InvalidActionConditionError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       rescue ArgumentError, TypeError => e
         # Catch specific errors from condition parsing/validation
-        raise ConflictError, "Invalid action condition: #{e.message}. Please contact an administrator."
+        raise InvalidActionConditionError, "Invalid action condition: #{e.message}. Please contact an administrator."
       rescue StandardError => e
         # Catch unexpected errors and log for debugging
         ForestAdminAgent::Facades::Container.logger.log(
@@ -116,7 +124,7 @@ module ForestAdminAgent
           "Unexpected error in match_conditions: #{e.class} - #{e.message}"
         )
 
-        raise ConflictError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
+        raise InvalidActionConditionError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       end
 
       def condition_by_role_id(condition)
