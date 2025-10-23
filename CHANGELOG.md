@@ -1,3 +1,10 @@
+## [1.12.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.1...v1.12.2) (2025-10-23)
+
+
+### Bug Fixes
+
+* move create_agent files to lib directory for consistency ([#180](https://github.com/ForestAdmin/agent-ruby/issues/180)) ([0a26cfd](https://github.com/ForestAdmin/agent-ruby/commit/0a26cfd351fb48efa61d543a77c3c1f30ec8126d))
+
 ## [1.12.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.0...v1.12.1) (2025-10-23)
 
 
