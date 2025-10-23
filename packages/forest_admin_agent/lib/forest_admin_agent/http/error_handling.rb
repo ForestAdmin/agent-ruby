@@ -2,7 +2,6 @@ require_relative 'error_translator'
 require_relative 'exceptions/business_error'
 require_relative 'exceptions/http_error'
 require_relative 'exceptions/http_exception'
-require_relative 'exceptions/validation_error'
 
 module ForestAdminAgent
   module Http

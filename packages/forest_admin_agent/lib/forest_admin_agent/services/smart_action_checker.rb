@@ -43,7 +43,7 @@ module ForestAdminAgent
           return true
         end
 
-        raise ForbiddenError.new('You don\'t have the permission to trigger this action.', TRIGGER_FORBIDDEN_ERROR)
+        raise ForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def can_trigger?
@@ -63,7 +63,7 @@ module ForestAdminAgent
           end
         end
 
-        raise ForbiddenError.new('You don\'t have the permission to trigger this action.', TRIGGER_FORBIDDEN_ERROR)
+        raise ForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def match_conditions(condition_name)

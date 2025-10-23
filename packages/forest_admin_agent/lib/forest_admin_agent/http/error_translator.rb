@@ -1,6 +1,5 @@
 require_relative 'exceptions/business_error'
 require_relative 'exceptions/http_error'
-require_relative 'exceptions/validation_error'
 
 module ForestAdminAgent
   module Http
@@ -54,16 +53,22 @@ module ForestAdminAgent
 
         # Translate BusinessError to HttpError with appropriate status code
         case error
-        when Exceptions::BadRequestError
+        when Exceptions::BadRequestError, Exceptions::ValidationError
           ERROR_400.new(error)
         when Exceptions::UnauthorizedError
           ERROR_401.new(error)
         when Exceptions::PaymentRequiredError
           ERROR_402.new(error)
+        when Exceptions::ForbiddenError
+          ERROR_403.new(error)
         when Exceptions::NotFoundError
           ERROR_404.new(error)
+        when Exceptions::ConflictError
+          ERROR_409.new(error)
         when Exceptions::ContentTooLargeError
           ERROR_413.new(error)
+        when Exceptions::UnprocessableError
+          ERROR_422.new(error)
         when Exceptions::FailedDependencyError
           ERROR_424.new(error)
         when Exceptions::TooEarlyError

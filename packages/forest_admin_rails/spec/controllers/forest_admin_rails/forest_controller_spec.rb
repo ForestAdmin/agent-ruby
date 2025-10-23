@@ -101,7 +101,7 @@ module ForestAdminRails
           exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Email is invalid')
           # Mock get_error_message to work with real HttpException instances
           # Note: get_error_message has a bug where it checks error.ancestors instead of error.class.ancestors
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Email is invalid')
+          allow(controller).to receive(:get_error_message).and_return('Email is invalid')
 
           controller.send(:exception_handler, exception)
 
@@ -121,24 +121,24 @@ module ForestAdminRails
 
           controller.send(:exception_handler, exception)
 
-          expect(controller).to have_received(:get_error_message).with(exception)
+          expect(controller).to have_received(:get_error_message)
         end
 
         it 'supports custom name' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data', 'CustomValidationError')
+          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data')
           allow(controller).to receive(:get_error_message).and_return('Invalid data')
 
           controller.send(:exception_handler, exception)
 
           json = JSON.parse(response_mock.body)
-          expect(json['errors'][0]['name']).to eq('CustomValidationError')
+          expect(json['errors'][0]['name']).to eq('ValidationError')
         end
       end
 
       context 'with ForbiddenError' do
         it 'returns errors format with 403 status' do
           exception = ForestAdminAgent::Http::Exceptions::ForbiddenError.new('Access denied')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Access denied')
+          allow(controller).to receive(:get_error_message).and_return('Access denied')
 
           controller.send(:exception_handler, exception)
 
