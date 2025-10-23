@@ -135,7 +135,7 @@ module ForestAdminDatasourceCustomizer
 
         expect do
           datasource_customizer.get_root_datasource_by_connection('unknown_connection')
-        end.to raise_error(NotFoundError, "Native query connection 'unknown_connection' is unknown.")
+        end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Native query connection 'unknown_connection' is unknown.")
       end
 
       it 'return the expected datasource' do
