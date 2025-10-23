@@ -65,7 +65,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
-            collection.schema[:fields].each do |field_name, field_schema|
+          collection.schema[:fields].each do |field_name, field_schema|
             next unless polymorphic_relations.include?(field_schema.type)
 
             reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)

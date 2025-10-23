@@ -20,14 +20,13 @@ module ForestAdminDatasourceCustomizer
 
     def get_collection(name)
       @datasources.each do |ds|
-        begin
-          return ds.get_collection(name)
-        rescue StandardError
-          # ignore et continue
-        end
+        return ds.get_collection(name)
+      rescue StandardError
+        # ignore et continue
       end
 
-      raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Collection '#{name}' not found. List of available collections: #{collections.keys.sort.join(', ')}"
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Collection '#{name}' not found. List of available collections: #{collections.keys.sort.join(", ")}"
     end
 
     def render_chart(caller_obj, name)
