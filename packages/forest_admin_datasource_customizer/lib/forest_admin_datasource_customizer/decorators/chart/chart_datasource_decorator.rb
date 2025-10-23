@@ -38,6 +38,7 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
+          @child_datasource.render_chart(caller, name)
           super
         end
       end

@@ -15,6 +15,10 @@ module ForestAdminDatasourceToolkit
         @child_datasource.collections.transform_values { |c| get_collection(c.name) }
       end
 
+      def live_query_connections
+        @child_datasource.live_query_connections
+      end
+
       def get_collection(name)
         collection = @child_datasource.get_collection(name)
         unless @decorators.key?(collection.name)
@@ -26,6 +30,10 @@ module ForestAdminDatasourceToolkit
 
       def render_chart(caller, name)
         @child_datasource.render_chart(caller, name)
+      end
+
+      def execute_native_query(connection_name, query, binds)
+        @child_datasource.execute_native_query(connection_name, query, binds)
       end
     end
   end
