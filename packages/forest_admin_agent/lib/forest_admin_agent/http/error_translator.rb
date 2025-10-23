@@ -1,5 +1,5 @@
-require_relative 'exceptions/business_error'
-require_relative 'exceptions/http_error'
+require_relative 'Exceptions/business_error'
+require_relative 'Exceptions/http_error'
 
 module ForestAdminAgent
   module Http
