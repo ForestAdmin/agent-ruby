@@ -42,7 +42,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { message: 'certificate' }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::InternalServerError,
             'ForestAdmin server TLS certificate cannot be verified. Please check that your system time is set properly.'
           )
         end
@@ -51,7 +51,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 0 }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::BadGatewayError,
             'Failed to reach ForestAdmin server. Are you online?'
           )
         end
@@ -60,7 +60,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 502 }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::BadGatewayError,
             'Failed to reach ForestAdmin server. Are you online?'
           )
         end
@@ -69,7 +69,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 404 }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::NotFoundError,
             'ForestAdmin server failed to find the project related to the envSecret you configured. Can you check that you copied it properly in the Forest initialization?'
           )
         end
@@ -78,7 +78,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 503 }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::ServiceUnavailableError,
             'Forest is in maintenance for a few minutes. We are upgrading your experience in the forest. We just need a few more minutes to get it right.'
           )
         end
@@ -87,7 +87,7 @@ module ForestAdminAgent
           expect do
             forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 500 }))
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminAgent::Http::Exceptions::InternalServerError,
             'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.'
           )
         end

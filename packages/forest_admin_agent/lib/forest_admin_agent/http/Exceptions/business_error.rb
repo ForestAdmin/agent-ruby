@@ -93,18 +93,14 @@ module ForestAdminAgent
         end
       end
 
-      # ===================================================
-      # Extending lowest level errors, but still low level
-      # ===================================================
-
-      class MissingParameterError < BadRequestError
-        def initialize(parameter_name, details: {})
-          super("Missing parameter #{parameter_name}", details: details)
+      class ValidationFailedError < BadRequestError
+        def initialize(message = 'Validation failed', details: {})
+          super
         end
       end
 
-      class ValidationFailedError < BadRequestError
-        def initialize(message = 'Validation failed', details: {})
+      class NotFoundError < BusinessError
+        def initialize(message, details: {})
           super
         end
       end

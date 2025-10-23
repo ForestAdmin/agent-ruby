@@ -61,10 +61,8 @@ module ForestAdminAgent
         end
 
         def raise_error(result, key_names)
-          raise BadRequestError.new(
-            'Invalid native query result columns',
-            details: { expected: key_names, actual: result.keys.join(', ') }
-          )
+          raise BadRequestError,
+                "The result columns must be named #{key_names} instead of '#{result.keys.join("', '")}'"
         end
 
         def make_value(result)

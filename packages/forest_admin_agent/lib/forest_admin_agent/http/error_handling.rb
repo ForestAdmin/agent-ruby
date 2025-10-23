@@ -20,6 +20,12 @@ module ForestAdminAgent
 
         return error.message if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
 
+        # Handle DatasourceToolkit ValidationError
+        if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
+           error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+          return error.message
+        end
+
         if defined?(ForestAdminAgent::Facades) &&
            (customizer = ForestAdminAgent::Facades::Container.cache(:customize_error_message))
           message = eval(customizer).call(error)
@@ -40,6 +46,12 @@ module ForestAdminAgent
         if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
           http_error = ForestAdminAgent::Http::ErrorTranslator.translate(error)
           return http_error.status if http_error
+        end
+
+        # Handle DatasourceToolkit ValidationError
+        if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
+           error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+          return 400
         end
 
         500

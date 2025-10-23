@@ -263,12 +263,7 @@ module ForestAdminAgent
 
         action = actions.find { |a| a['endpoint'] == endpoint && a['httpMethod'].casecmp(http_method).zero? }
 
-        if action.nil?
-          raise NotFoundError.new(
-            'Smart action not found',
-            details: { collection: collection_name, endpoint: endpoint, http_method: http_method }
-          )
-        end
+        raise BadRequestError, "The collection #{collection_name} does not have this smart action" if action.nil?
 
         action
       end

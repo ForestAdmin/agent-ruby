@@ -55,7 +55,7 @@ module ForestAdminAgent
         it 'raises an error without parsing JSON' do
           expect do
             ip_whitelist.enabled?
-          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
         end
       end
 
@@ -71,7 +71,7 @@ module ForestAdminAgent
         it 'raises an error without parsing JSON' do
           expect do
             ip_whitelist.enabled?
-          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
         end
       end
 
@@ -87,7 +87,7 @@ module ForestAdminAgent
         it 'raises an error without parsing JSON' do
           expect do
             ip_whitelist.enabled?
-          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
         end
       end
 
@@ -105,7 +105,7 @@ module ForestAdminAgent
         it 'raises an error' do
           expect do
             ip_whitelist.enabled?
-          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
         end
       end
 
@@ -123,7 +123,7 @@ module ForestAdminAgent
         it 'raises an error' do
           expect do
             ip_whitelist.enabled?
-          end.to raise_error(Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED)
         end
       end
 

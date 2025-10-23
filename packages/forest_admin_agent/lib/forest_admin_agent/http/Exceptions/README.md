@@ -66,7 +66,6 @@ The system provides error classes for all standard HTTP error codes:
 #### Extended Common Errors
 
 - `EntityNotFoundError` - Extends `NotFoundError` with entity name support
-- `MissingParameterError` - Extends `BadRequestError` for missing parameters
 - `ValidationFailedError` - Extends `BadRequestError` for validation errors
 
 ## Usage Examples

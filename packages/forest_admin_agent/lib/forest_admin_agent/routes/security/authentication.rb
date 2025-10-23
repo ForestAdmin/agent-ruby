@@ -79,12 +79,15 @@ module ForestAdminAgent
         protected
 
         def get_and_check_rendering_id(params)
-          raise MissingParameterError, 'renderingId' unless params['renderingId']
+          unless params['renderingId']
+            raise BadRequestError,
+                  ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID
+          end
 
           begin
             Integer(params['renderingId'])
           rescue ArgumentError
-            raise ValidationFailedError, 'Invalid rendering ID: must be an integer'
+            raise ValidationFailedError, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
           end
 
           params['renderingId'].to_i
