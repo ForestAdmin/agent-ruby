@@ -41,7 +41,7 @@ module ForestAdminDatasourceCustomizer
           datasource = rename_collection_decorator
         end
 
-        @composite_datasource.add_data_source(datasource);
+        @composite_datasource.add_data_source(datasource)
       })
 
       self

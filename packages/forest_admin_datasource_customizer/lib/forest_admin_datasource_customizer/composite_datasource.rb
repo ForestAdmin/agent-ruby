@@ -5,7 +5,7 @@ module ForestAdminDatasourceCustomizer
     end
 
     def live_query_connections
-      popo = @datasources.each_with_object({}) do |ds, acc|
+      @datasources.each_with_object({}) do |ds, acc|
         acc.merge!(ds.live_query_connections || {})
       end
     end
@@ -20,9 +20,7 @@ module ForestAdminDatasourceCustomizer
 
     def render_chart(caller_obj, name)
       @datasources.each do |ds|
-        if ds.schema[:charts].include?(name)
-          return ds.render_chart(caller_obj, name)
-        end
+        return ds.render_chart(caller_obj, name) if ds.schema[:charts].include?(name)
       end
 
       raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart '#{name}' is not defined in the dataSource."
@@ -46,17 +44,13 @@ module ForestAdminDatasourceCustomizer
       existing_names = collections.map { |c| c.respond_to?(:name) ? c.name : c.to_s }
       datasource.collections.each do |c|
         new_name = c.respond_to?(:name) ? c.name : c.to_s
-        if existing_names.include?(new_name)
-          raise ArgumentError, "Collection '#{new_name}' already exists"
-        end
+        raise ArgumentError, "Collection '#{new_name}' already exists" if existing_names.include?(new_name)
       end
 
       # 2) collisions de charts
       existing_charts = schema[:charts]
       (datasource.schema[:charts] || []).each do |chart|
-        if existing_charts.include?(chart)
-          raise ArgumentError, "Chart '#{chart}' is already defined in datasource."
-        end
+        raise ArgumentError, "Chart '#{chart}' is already defined in datasource." if existing_charts.include?(chart)
       end
 
       # 3) collisions de connexions natives
@@ -72,24 +66,3 @@ module ForestAdminDatasourceCustomizer
     end
   end
 end
-
-
-#   class CompositeDatasource
-
-#     # Renvoie la collection par son nom, sinon MissingCollectionError
-#     def get_collection(name)
-#       @data_sources.each do |ds|
-#         begin
-#           return ds.get_collection(name)
-#         rescue StandardError
-#           # ignore et continue
-#         end
-#       end
-
-#       available = collections.map { |c| c.respond_to?(:name) ? c.name : c.to_s }
-#       raise MissingCollectionError,
-#             "Collection '#{name}' not found. List of available collections: " \
-#             available.sort.join(', ')
-#     end
-#   end
-# end
