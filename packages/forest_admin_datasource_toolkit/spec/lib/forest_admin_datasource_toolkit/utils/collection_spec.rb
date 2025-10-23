@@ -271,15 +271,21 @@ module ForestAdminDatasourceToolkit
         end
 
         it 'get_value should work' do
-          allow(collection_person).to receive(:list).and_return({ 'id' => 1, 'name' => 'foo' })
+          allow(collection_person).to receive(:list).and_return([{ 'id' => 1, 'name' => 'foo' }])
 
           expect(described_class.get_value(collection_person, caller, [1], 'name')).to eq('foo')
         end
 
         it 'get_value should work with composite id' do
-          allow(collection_book).to receive(:list).and_return({ 'id' => 1, 'reference' => 'ref', 'title' => 'foo' })
+          allow(collection_book).to receive(:list).and_return([{ 'id' => 1, 'reference' => 'ref', 'title' => 'foo' }])
 
           expect(described_class.get_value(collection_book, caller, [1, 'ref'], 'reference')).to eq('ref')
+        end
+
+        it 'get_value should work with custom primary key field using hash id' do
+          allow(collection_person).to receive(:list).and_return([{ 'id' => 1, 'name' => 'John Doe' }])
+
+          expect(described_class.get_value(collection_person, caller, { 'id' => 1 }, 'name')).to eq('John Doe')
         end
 
         it 'list_relation should work with one to many relation' do

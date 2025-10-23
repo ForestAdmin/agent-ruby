@@ -87,13 +87,13 @@ module ForestAdminDatasourceToolkit
           return id[field]
         end
 
-        record = collection.list(
+        records = collection.list(
           caller,
           ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_ids(collection, [id])),
           Projection.new([field])
         )
 
-        record[field]
+        records.first&.[](field)
       end
 
       def self.get_through_target(collection, relation_name)
