@@ -28,18 +28,6 @@ module ForestAdminAgent
         end
       end
 
-      class UnauthorizedError < BusinessError
-        def initialize(message = 'Unauthorized', details: {})
-          super
-        end
-      end
-
-      class PaymentRequiredError < BusinessError
-        def initialize(message = 'Payment required', details: {})
-          super
-        end
-      end
-
       class ForbiddenError < BusinessError
         def initialize(message = 'Forbidden', details: {})
           super
@@ -58,26 +46,8 @@ module ForestAdminAgent
         end
       end
 
-      class ContentTooLargeError < BusinessError
-        def initialize(message = 'Content too large', details: {})
-          super
-        end
-      end
-
       class UnprocessableError < BusinessError
         def initialize(message = 'Unprocessable entity', details: {})
-          super
-        end
-      end
-
-      class FailedDependencyError < BusinessError
-        def initialize(message = 'Failed dependency', details: {})
-          super
-        end
-      end
-
-      class TooEarlyError < BusinessError
-        def initialize(message = 'Too early', details: {})
           super
         end
       end
@@ -88,12 +58,6 @@ module ForestAdminAgent
         def initialize(message, retry_after, details: {})
           super(message, details: details)
           @retry_after = retry_after
-        end
-      end
-
-      class UnavailableForLegalReasonsError < BusinessError
-        def initialize(message = 'Unavailable for legal reasons', details: {})
-          super
         end
       end
 

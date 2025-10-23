@@ -8,8 +8,6 @@ module ForestAdminAgent
     class ErrorTranslator
       # Create specific HTTP error classes for each status code
       ERROR_400 = Exceptions::HttpErrorFactory.create_for_business_error(400, 'Bad Request')
-      ERROR_401 = Exceptions::HttpErrorFactory.create_for_business_error(401, 'Unauthorized')
-      ERROR_402 = Exceptions::HttpErrorFactory.create_for_business_error(402, 'Payment Required')
       ERROR_403 = Exceptions::HttpErrorFactory.create_for_business_error(403, 'Forbidden')
       ERROR_404 = Exceptions::HttpErrorFactory.create_for_business_error(404, 'Not Found', {
                                                                            custom_headers: lambda { |_error|
@@ -17,16 +15,12 @@ module ForestAdminAgent
                                                                            }
                                                                          })
       ERROR_409 = Exceptions::HttpErrorFactory.create_for_business_error(409, 'Conflict')
-      ERROR_413 = Exceptions::HttpErrorFactory.create_for_business_error(413, 'Content too large')
       ERROR_422 = Exceptions::HttpErrorFactory.create_for_business_error(422, 'Unprocessable Entity')
-      ERROR_424 = Exceptions::HttpErrorFactory.create_for_business_error(424, 'Failed Dependency')
-      ERROR_425 = Exceptions::HttpErrorFactory.create_for_business_error(425, 'Too Early')
       ERROR_429 = Exceptions::HttpErrorFactory.create_for_business_error(429, 'Too Many Requests', {
                                                                            custom_headers: lambda { |error|
                                                                              { 'Retry-After' => error.retry_after.to_s }
                                                                            }
                                                                          })
-      ERROR_451 = Exceptions::HttpErrorFactory.create_for_business_error(451, 'Unavailable For Legal Reasons')
       ERROR_500 = Exceptions::HttpErrorFactory.create_for_business_error(500, 'Internal Server Error')
       ERROR_502 = Exceptions::HttpErrorFactory.create_for_business_error(502, 'Bad Gateway Error')
       ERROR_503 = Exceptions::HttpErrorFactory.create_for_business_error(503, 'Service Unavailable Error')
@@ -55,28 +49,16 @@ module ForestAdminAgent
         case error
         when Exceptions::BadRequestError, Exceptions::ValidationError
           ERROR_400.new(error)
-        when Exceptions::UnauthorizedError
-          ERROR_401.new(error)
-        when Exceptions::PaymentRequiredError
-          ERROR_402.new(error)
         when Exceptions::ForbiddenError
           ERROR_403.new(error)
         when Exceptions::NotFoundError
           ERROR_404.new(error)
         when Exceptions::ConflictError
           ERROR_409.new(error)
-        when Exceptions::ContentTooLargeError
-          ERROR_413.new(error)
         when Exceptions::UnprocessableError
           ERROR_422.new(error)
-        when Exceptions::FailedDependencyError
-          ERROR_424.new(error)
-        when Exceptions::TooEarlyError
-          ERROR_425.new(error)
         when Exceptions::TooManyRequestsError
           ERROR_429.new(error)
-        when Exceptions::UnavailableForLegalReasonsError
-          ERROR_451.new(error)
         when Exceptions::InternalServerError
           ERROR_500.new(error)
         when Exceptions::BadGatewayError
