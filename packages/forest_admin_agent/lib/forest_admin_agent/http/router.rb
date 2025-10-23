@@ -6,29 +6,6 @@ module ForestAdminAgent
       # Mutex for thread-safe cache operations
       @mutex = Mutex.new
 
-      # Return a frozen, memoized routes hash to avoid expensive recomputation
-      #
-      # Route computation is expensive because it:
-      # - Iterates through all datasource collections and their schemas
-      # - Instantiates multiple route handler objects (Actions, Charts, Resources, etc.)
-      # - Builds and merges individual route hashes from multiple route handlers
-      #
-      # Without caching, this computation would run repeatedly, causing significant
-      # performance degradation.
-      #
-      # Caching is ENABLED by default in all environments for optimal performance.
-      # To disable caching (not recommended), set `disable_route_cache: true` in config:
-      #   ForestAdminAgent::Agent.new options do |builder|
-      #     builder.setup(
-      #       # ... other options
-      #       disable_route_cache: true  # Disables route caching
-      #     )
-      #   end
-      #
-      # Thread Safety: Uses Mutex to ensure thread-safe lazy initialization.
-      # Multiple threads calling this method concurrently will only compute routes once.
-      #
-      # @return [Hash] Frozen hash mapping route names to route configurations
       def self.cached_routes
         return routes.freeze if cache_disabled?
 
@@ -100,7 +77,6 @@ module ForestAdminAgent
 
           all_routes.merge!(routes)
         rescue StandardError => e
-          # Provide specific context about which handler failed while preserving exception type
           raise e.class, "Failed to load routes from '#{source[:name]}' handler: #{e.message}"
         end
 
