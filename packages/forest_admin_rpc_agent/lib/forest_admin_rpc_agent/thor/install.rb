@@ -14,7 +14,7 @@ module ForestAdminRpcAgent
       method_option :app_file, type: :string, required: false, desc: 'Main file of the Sinatra application (ex: app.rb)'
 
       RAILS_CONFIG_PATH = 'config/initializers/forest_admin_rpc_agent.rb'.freeze
-      RAILS_AGENT_PATH  = 'app/lib/forest_admin_rpc_agent/create_rpc_agent.rb'.freeze
+      RAILS_AGENT_PATH  = 'lib/forest_admin_rpc_agent/create_rpc_agent.rb'.freeze
 
       SINATRA_CONFIG_PATH = 'config/forest_admin_rpc_agent.rb'.freeze
       SINATRA_AGENT_PATH  = 'config/create_rpc_agent.rb'.freeze

@@ -52,7 +52,7 @@ module ForestAdminRpcAgent
                 widget: 'FilePicker',
                 extensions: %w[png jpg],
                 max_size_mb: 20,
-                default_value: proc { File.new(File.dirname(__FILE__) + '/../../assets/images/tree.png') },
+                default_value: proc { File.new(File.dirname(__FILE__) + '/../../app/assets/images/tree.png') },
             }
             ]
           ) do |context, result_builder|

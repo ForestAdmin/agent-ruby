@@ -24,6 +24,10 @@ module ForestAdminRails
 
     extend ActiveSupport::Concern
 
+    initializer 'forest_admin_rails.add_autoload_paths', before: :set_autoload_paths do |app|
+      app.config.autoload_paths << Rails.root.join('lib')
+    end
+
     initializer 'forest_admin_rails.error_subscribe' do
       Rails.error.subscribe(ForestAdminErrorSubscriber.new)
     end
@@ -39,7 +43,28 @@ module ForestAdminRails
 
     def load_configuration
       return unless running_web_server?
-      return unless File.exist?(Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb'))
+
+      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
+      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+
+      # Check for old location and warn user
+      if File.exist?(old_path) && !File.exist?(new_path)
+        logger = ActiveSupport::Logger.new($stdout)
+        logger.warn <<~WARNING
+          ⚠️  DEPRECATION WARNING: create_agent.rb detected in old location!
+
+          The file 'app/lib/forest_admin_rails/create_agent.rb' should now be located at:
+          'lib/forest_admin_rails/create_agent.rb'
+
+          Please move your file to the new location:
+            mkdir -p lib/forest_admin_rails
+            mv app/lib/forest_admin_rails/create_agent.rb lib/forest_admin_rails/create_agent.rb
+
+          This will become a hard requirement in a future version.
+        WARNING
+      end
+
+      return unless File.exist?(new_path) || File.exist?(old_path)
 
       # force eager loading models
       Rails.application.eager_load!
