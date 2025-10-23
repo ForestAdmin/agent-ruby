@@ -1,4 +1,6 @@
 require 'spec_helper'
+require 'rails'
+require_relative '../../../lib/forest_admin_rails/engine'
 
 module ForestAdminRails
   # Mock CreateAgent class for testing
@@ -84,6 +86,54 @@ module ForestAdminRails
 
           expect(should_skip).to be false
         end
+      end
+    end
+  end
+
+  RSpec.describe 'Engine#load_cors' do
+    let(:engine_class) { ForestAdminRails::Engine }
+    let(:engine_instance) { engine_class.allocate }
+    # rubocop:disable RSpec/VerifiedDoubles
+    let(:config) { double('config') }
+    let(:middleware) { double('middleware') }
+    # rubocop:enable RSpec/VerifiedDoubles
+
+    before do
+      allow(engine_instance).to receive(:config).and_return(config)
+      allow(config).to receive(:middleware).and_return(middleware)
+      allow(middleware).to receive(:insert_before)
+    end
+
+    context 'when FOREST_CORS_DEACTIVATED is set' do
+      before do
+        stub_const('ENV', { 'FOREST_CORS_DEACTIVATED' => 'true' })
+      end
+
+      it 'does not load CORS middleware' do
+        engine_instance.load_cors
+        expect(middleware).not_to have_received(:insert_before)
+      end
+    end
+
+    context 'when FOREST_CORS_DEACTIVATED is not set' do
+      before do
+        stub_const('ENV', { 'CORS_ORIGINS' => nil })
+      end
+
+      it 'loads CORS middleware' do
+        engine_instance.load_cors
+        expect(middleware).to have_received(:insert_before).with(0, Rack::Cors)
+      end
+    end
+
+    context 'when FOREST_CORS_DEACTIVATED is an empty string' do
+      before do
+        stub_const('ENV', { 'FOREST_CORS_DEACTIVATED' => '' })
+      end
+
+      it 'does not load CORS middleware (empty string is truthy in Ruby)' do
+        engine_instance.load_cors
+        expect(middleware).not_to have_received(:insert_before)
       end
     end
   end
