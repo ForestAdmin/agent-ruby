@@ -14,7 +14,7 @@ module ForestAdminDatasourceCustomizer
 
         def collections
           @child_datasource.collections.to_h do |name, _collection|
-            [name, method(:get_collection).super_method.call(name)]
+            [get_collection_name(name), method(:get_collection).super_method.call(name)]
           end
         end
 
@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
 
         def rename_collection(current_name, new_name)
           # Check collection exists
-          get_collection(current_name)
+          collection = get_collection(current_name)
 
           return unless current_name != new_name
 
@@ -65,7 +65,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
-          get_collection(current_name).schema[:fields].each do |field_name, field_schema|
+            collection.schema[:fields].each do |field_name, field_schema|
             next unless polymorphic_relations.include?(field_schema.type)
 
             reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)

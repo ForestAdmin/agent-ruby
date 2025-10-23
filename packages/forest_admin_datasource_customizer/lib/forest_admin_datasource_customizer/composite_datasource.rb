@@ -18,6 +18,18 @@ module ForestAdminDatasourceCustomizer
       @datasources.reduce({}) { |acc, ds| acc.merge(ds.collections) }
     end
 
+    def get_collection(name)
+      @datasources.each do |ds|
+        begin
+          return ds.get_collection(name)
+        rescue StandardError
+          # ignore et continue
+        end
+      end
+
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Collection '#{name}' not found. List of available collections: #{collections.keys.sort.join(', ')}"
+    end
+
     def render_chart(caller_obj, name)
       @datasources.each do |ds|
         return ds.render_chart(caller_obj, name) if ds.schema[:charts].include?(name)
@@ -40,20 +52,17 @@ module ForestAdminDatasourceCustomizer
     end
 
     def add_data_source(datasource)
-      # 1) collisions de collections
       existing_names = collections.map { |c| c.respond_to?(:name) ? c.name : c.to_s }
       datasource.collections.each do |c|
         new_name = c.respond_to?(:name) ? c.name : c.to_s
         raise ArgumentError, "Collection '#{new_name}' already exists" if existing_names.include?(new_name)
       end
 
-      # 2) collisions de charts
       existing_charts = schema[:charts]
       (datasource.schema[:charts] || []).each do |chart|
         raise ArgumentError, "Chart '#{chart}' is already defined in datasource." if existing_charts.include?(chart)
       end
 
-      # 3) collisions de connexions natives
       existing_conns = live_query_connections
       (datasource.live_query_connections || {}).each_key do |conn_name|
         if existing_conns.key?(conn_name)
