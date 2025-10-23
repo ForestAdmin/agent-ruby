@@ -70,6 +70,8 @@ module ForestAdminRails
     end
 
     def load_cors
+      return if ENV['FOREST_CORS_DEACTIVATED']
+
       config.middleware.insert_before 0, Rack::Cors do
         allow do
           hostnames = [/\A.*\.forestadmin\.com\z/]
