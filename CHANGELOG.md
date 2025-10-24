@@ -1,3 +1,10 @@
+## [1.12.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.4...v1.12.5) (2025-10-24)
+
+
+### Bug Fixes
+
+* skip ForestAdmin initialization during rake tasks ([#184](https://github.com/ForestAdmin/agent-ruby/issues/184)) ([c9a1be7](https://github.com/ForestAdmin/agent-ruby/commit/c9a1be7ea0384216474da2f3dff2b9d931db338a))
+
 ## [1.12.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.3...v1.12.4) (2025-10-24)
 
 
