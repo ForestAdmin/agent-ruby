@@ -1,7 +1,7 @@
 module ForestAdminDatasourceToolkit
   module Validations
     class RecordValidator
-      include ForestAdminDatasourceToolkit::Exceptions
+      include ForestAdminAgent::Http::Exceptions
 
       def self.validate(collection, record_data)
         if !record_data || record_data.empty?

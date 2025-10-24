@@ -4,7 +4,7 @@ require 'ostruct'
 module ForestAdminDatasourceToolkit
   module Validations
     include ForestAdminDatasourceToolkit::Schema
-    include ForestAdminDatasourceToolkit::Exceptions
+    include ForestAdminAgent::Http::Exceptions
 
     describe RecordValidator do
       let(:datasource) { Datasource.new }
