@@ -32,7 +32,12 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "base64"
+  spec.add_dependency "bigdecimal"
+  spec.add_dependency "csv"
   spec.add_dependency "faraday", "~> 2.7"
   spec.add_dependency "ld-eventsource", "~> 2.2"
+  spec.add_dependency "mutex_m"
+  spec.add_dependency "ostruct"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end
