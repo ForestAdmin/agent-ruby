@@ -123,7 +123,7 @@ module ForestAdminAgent
               'timezone' => 'Europe/Paris'
             }
           }
-          expect { capabilities_collections.handle_request(args) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Collection unknown not found.')
+          expect { capabilities_collections.handle_request(args) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Collection 'unknown' not found. List of available collections: book, user")
         end
       end
     end
