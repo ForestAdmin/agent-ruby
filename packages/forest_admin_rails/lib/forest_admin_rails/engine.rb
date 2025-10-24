@@ -33,13 +33,13 @@ module ForestAdminRails
     end
 
     config.after_initialize do
-      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                         ForestAdminAgent::Http::Exceptions::BusinessError) do
-        agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
-        agent_factory.setup(ForestAdminRails.config)
-        load_configuration
-        load_cors
-      end
+      agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+      agent_factory.setup(ForestAdminRails.config)
+      load_configuration
+      load_cors
+    rescue ForestAdminDatasourceToolkit::Exceptions::ForestException,
+           ForestAdminAgent::Http::Exceptions::BusinessError => e
+      Rails.error.report(e, handled: true, severity: :warning, context: {})
     end
 
     def load_configuration
