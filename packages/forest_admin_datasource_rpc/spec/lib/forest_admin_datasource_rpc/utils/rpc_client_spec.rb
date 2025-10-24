@@ -226,7 +226,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises ForestException with server error message' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                ForestAdminAgent::Http::Exceptions::UnprocessableError,
                 /Server Error.*Something went wrong/
               )
             end
@@ -245,7 +245,7 @@ module ForestAdminDatasourceRpc
 
             it 'parses string error as message' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                ForestAdminAgent::Http::Exceptions::UnprocessableError,
                 /Internal Server Error/
               )
             end
@@ -283,7 +283,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises error with default message' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                ForestAdminAgent::Http::Exceptions::UnprocessableError,
                 /Server Error.*Unknown error/
               )
             end
