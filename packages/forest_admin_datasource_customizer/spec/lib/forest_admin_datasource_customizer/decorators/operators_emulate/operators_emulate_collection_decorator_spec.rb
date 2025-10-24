@@ -38,8 +38,8 @@ module ForestAdminDatasourceCustomizer
               expect do
                 @decorated_book.emulate_field_operator('title', Operators::GREATER_THAN)
               end.to raise_error(
-                Exceptions::ForestException,
-                'Cannot override operators on collection book: ' \
+                ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                'Cannot override operators on collection title: ' \
                 "the primary key columns must support 'Equal' and 'In' operators."
               )
             end
@@ -109,7 +109,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise if the field is in a relation' do
               expect do
                 @decorated_book.emulate_field_operator('author:first_name', Operators::EQUAL)
-              end.to raise_error(Exceptions::UnprocessableError, 'Cannot replace operator for relation')
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot replace operator for relation')
             end
 
             describe 'when implementing an operator from an unsupported one' do
@@ -125,7 +125,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_book.list(caller, filter, projection)
-                end.to raise_error(Exceptions::UnprocessableError, "The given operator 'like' is not supported by the column: 'title'. The column is not filterable")
+                end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "The given operator 'like' is not supported by the column: 'title'. The column is not filterable")
               end
             end
 
@@ -146,7 +146,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_book.list(caller, filter, projection)
-                end.to raise_error(Exceptions::UnprocessableError, 'Operator replacement cycle: book.title[starts_with] -> book.title[like]')
+                end.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Operator replacement cycle: book.title[starts_with] -> book.title[like]')
               end
             end
 

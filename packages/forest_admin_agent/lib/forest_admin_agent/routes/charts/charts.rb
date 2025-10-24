@@ -197,7 +197,7 @@ module ForestAdminAgent
             return LeaderboardChart.new(result).serialize
           end
 
-          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                 'Failed to generate leaderboard chart: parameters do not match pre-requisites'
         end
 

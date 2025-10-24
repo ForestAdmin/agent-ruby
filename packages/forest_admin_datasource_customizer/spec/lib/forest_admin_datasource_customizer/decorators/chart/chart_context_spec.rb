@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
         describe 'record_id' do
           it 'raise an error' do
             expect { @context.record_id }.to raise_error(
-              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              ForestAdminAgent::Http::Exceptions::UnprocessableError,
               "Collection is using a composite pk: use 'context.composite_record_id'."
             )
           end

@@ -23,7 +23,7 @@ module ForestAdminDatasourceCustomizer
 
           it 'raises an exception for an unknown widget type' do
             field = { widget: 'UnknownWidget' }
-            expect { described_class.build_widget(field) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError)
+            expect { described_class.build_widget(field) }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError)
           end
 
           context 'when widget is AddressAutocomplete' do
@@ -229,12 +229,12 @@ module ForestAdminDatasourceCustomizer
 
             it 'raises an exception when fields are missing' do
               element.delete(:fields)
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError)
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError)
             end
 
             it 'raises an exception when fields contain a layout element' do
               element[:fields] << { type: 'Layout' }
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError)
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError)
             end
           end
 
@@ -252,12 +252,12 @@ module ForestAdminDatasourceCustomizer
 
             it 'raises an exception when there is no elements' do
               element.delete(:elements)
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BadRequestError, "Using 'elements' in a 'Page' configuration is mandatory")
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, "Using 'elements' in a 'Page' configuration is mandatory")
             end
 
             it 'raises an error when element contains a Page' do
               element[:elements] = [element]
-              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BadRequestError, "'Page' component cannot be used within 'elements'")
+              expect { described_class.build_layout_element(element) }.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, "'Page' component cannot be used within 'elements'")
             end
           end
         end

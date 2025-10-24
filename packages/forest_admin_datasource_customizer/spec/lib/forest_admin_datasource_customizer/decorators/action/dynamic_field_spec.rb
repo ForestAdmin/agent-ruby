@@ -35,7 +35,7 @@ module ForestAdminDatasourceCustomizer
 
           expect do
             described_class.new(**plain_field)
-          end.to raise_error(Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined.")
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined.")
         end
 
         it 'raise an error if id and label are nil' do
@@ -43,7 +43,7 @@ module ForestAdminDatasourceCustomizer
 
           expect do
             described_class.new(**plain_field)
-          end.to raise_error(Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined.")
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined.")
         end
       end
     end

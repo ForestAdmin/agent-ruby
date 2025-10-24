@@ -105,7 +105,7 @@ module ForestAdminDatasourceCustomizer
                 values: proc { |records| records }
               )
             )
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BadRequestError, "Computed field'newField' must have at least one dependency.")
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, "Computed field 'newField' must have at least one dependency.")
         end
 
         it 'registerComputed should throw if defining a field with polymorphic dependencies' do
@@ -118,7 +118,7 @@ module ForestAdminDatasourceCustomizer
                 values: proc { |records| records }
               )
             )
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'Dependencies over a polymorphic relations(address.addressable) are forbidden')
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Dependencies over a polymorphic relations(address.addressable) are forbidden')
         end
 
         it 'registerComputed should throw if defining a field with missing dependencies' do

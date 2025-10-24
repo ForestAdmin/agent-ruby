@@ -79,7 +79,7 @@ module ForestAdminAgent
           expect do
             native_query.handle_request(args)
           end.to raise_error(
-            BadRequestError, 'Invalid Chart type unknown_type'
+            ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid Chart type unknown_type'
           )
         end
 

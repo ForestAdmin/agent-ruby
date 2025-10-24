@@ -102,7 +102,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'replace_field_sorting() should throw if no equivalent_sort is provided' do
-          expect { @decorated_book.replace_field_sorting('author_id', nil) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'A new sorting method should be provided to replace field sorting')
+          expect { @decorated_book.replace_field_sorting('author_id', nil) }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'A new sorting method should be provided to replace field sorting')
         end
 
         context 'when emulating sort on book.title (no relations)' do

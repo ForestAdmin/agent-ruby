@@ -105,27 +105,27 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'throws when hiding a field which does not exists' do
-          expect { @decorated_person.change_field_visibility('unknown', false) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::NotFoundError, "No such field 'unknown'")
+          expect { @decorated_person.change_field_visibility('unknown', false) }.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "No such field 'unknown'")
         end
 
         it 'raise when hiding a field referenced in a polymorphic relation' do
           expect do
             @decorated_comment.change_field_visibility('commentable_id', false)
           end.to raise_error(
-            ForestException,
+            ForestAdminAgent::Http::Exceptions::UnprocessableError,
             "Cannot remove field 'comment.commentable_id', because it's implied in a polymorphic relation 'comment.commentable'"
           )
 
           expect do
             @decorated_comment.change_field_visibility('commentable_type', false)
           end.to raise_error(
-            ForestException,
+            ForestAdminAgent::Http::Exceptions::UnprocessableError,
             "Cannot remove field 'comment.commentable_type', because it's implied in a polymorphic relation 'comment.commentable'"
           )
         end
 
         it 'throws when hiding the primary key' do
-          expect { @decorated_person.change_field_visibility('id', false) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'Cannot hide primary key')
+          expect { @decorated_person.change_field_visibility('id', false) }.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot hide primary key')
         end
 
         it 'the schema should be the same when doing nothing' do

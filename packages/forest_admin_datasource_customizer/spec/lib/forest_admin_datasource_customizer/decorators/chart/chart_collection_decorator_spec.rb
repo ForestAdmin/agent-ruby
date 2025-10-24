@@ -40,7 +40,7 @@ module ForestAdminDatasourceCustomizer
           it 'not let adding a chart with the same name' do
             expect do
               @decorated_book.add_chart('child_chart') { { countCurrent: 2 } }
-            end.to raise_error(Exceptions::ConflictError, 'Chart child_chart already exists.')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::ConflictError, 'Chart child_chart already exists.')
           end
         end
 

@@ -88,8 +88,9 @@ module ForestAdminAgent
             "Action: #{attributes[:smart_action_id]}"
           )
 
-          raise UnprocessableError, "Collection '#{collection.name}' has no primary keys. " \
-                                    'Actions with conditional permissions require a primary key to identify records.'
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                "Collection '#{collection.name}' has no primary keys. " \
+                'Actions with conditional permissions require a primary key to identify records.'
         end
 
         pk = pks[0]

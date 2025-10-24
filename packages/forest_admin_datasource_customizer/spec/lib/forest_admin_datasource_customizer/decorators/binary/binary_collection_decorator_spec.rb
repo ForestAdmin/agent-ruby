@@ -90,15 +90,15 @@ module ForestAdminDatasourceCustomizer
 
         describe 'set_binary_mode' do
           it 'raise an error when an invalid mode is provided' do
-            expect { @decorated_book.set_binary_mode('name', 'invalid') }.to raise_error(Exceptions::BadRequestError)
+            expect { @decorated_book.set_binary_mode('name', 'invalid') }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError)
           end
 
           it 'raise an error when the field does not exist' do
-            expect { @decorated_book.set_binary_mode('invalid', 'hex') }.to raise_error(Exceptions::BadRequestError)
+            expect { @decorated_book.set_binary_mode('invalid', 'hex') }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError)
           end
 
           it 'raise an error when the field is not a binary field' do
-            expect { @decorated_book.set_binary_mode('title', 'hex') }.to raise_error(Exceptions::BadRequestError)
+            expect { @decorated_book.set_binary_mode('title', 'hex') }.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError)
           end
         end
 
