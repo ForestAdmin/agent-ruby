@@ -12,7 +12,7 @@ module ForestAdminDatasourceMongoid
             projection = Projection.new(['myAuthor:firstname'])
             expect do
               described_class.lookup(Post, stack, projection, {})
-            end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, "Unexpected relation: 'myAuthor'")
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, "Unexpected relation: 'myAuthor'")
           end
 
           it 'does nothing with projection that only contains columns' do

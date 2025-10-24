@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
-  include ForestAdminDatasourceToolkit::Exceptions
+  include ForestAdminAgent::Http::Exceptions
   describe Datasource do
     let(:datasource) { described_class.new }
 
@@ -37,7 +37,7 @@ module ForestAdminDatasourceMongoid
       logger = instance_double(Logger, log: nil)
       allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
       expect { datasource.add_collection(Collection.new(datasource, Post, [{ prefix: nil, as_fields: [], as_models: [] }])) }
-        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ConflictError, 'Collection Post already defined in datasource')
+        .to raise_error(ForestAdminAgent::Http::Exceptions::ConflictError, 'Collection Post already defined in datasource')
     end
 
     describe 'with simple schema' do
@@ -82,7 +82,7 @@ module ForestAdminDatasourceMongoid
         stub_const('Dummy::Book', class_book)
         allow(ObjectSpace).to receive(:each_object).and_return([Dummy::Book])
 
-        expect { described_class.new }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::NotFoundError, "Collection' not found.")
+        expect { described_class.new }.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Collection' not found.")
       end
     end
   end
