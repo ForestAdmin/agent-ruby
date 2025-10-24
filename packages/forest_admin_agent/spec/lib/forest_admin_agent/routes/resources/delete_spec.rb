@@ -148,6 +148,246 @@ module ForestAdminAgent
               end
             end
           end
+
+          context 'with polymorphic relations' do
+            before do
+              address_class = Struct.new(:id, :street, :addressable_id, :addressable_type)
+              stub_const('Address', address_class)
+
+              datasource = Datasource.new
+
+              user_collection = build_collection(
+                name: 'user',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'first_name' => ColumnSchema.new(column_type: 'String'),
+                    'last_name' => ColumnSchema.new(column_type: 'String'),
+                    'address' => Relations::PolymorphicOneToOneSchema.new(
+                      foreign_collection: 'address',
+                      origin_key: 'addressable_id',
+                      origin_key_target: 'id',
+                      origin_type_field: 'addressable_type',
+                      origin_type_value: 'User'
+                    )
+                  }
+                },
+                delete: true
+              )
+
+              address_collection = build_collection(
+                name: 'address',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'street' => ColumnSchema.new(column_type: 'String'),
+                    'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'addressable_type' => ColumnSchema.new(column_type: 'String')
+                  }
+                },
+                update: true
+              )
+
+              allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+              datasource.add_collection(user_collection)
+              datasource.add_collection(address_collection)
+              ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+              ForestAdminAgent::Builder::AgentFactory.instance.build
+
+              @datasource = ForestAdminAgent::Facades::Container.datasource
+              allow(@datasource.get_collection('user')).to receive(:delete)
+              allow(@datasource.get_collection('address')).to receive(:update)
+            end
+
+            describe 'polymorphic relation cleanup with hash format primary keys' do
+              let(:params) do
+                {
+                  'collection_name' => 'user',
+                  'timezone' => 'Europe/Paris',
+                  data: {
+                    attributes: {
+                      ids: %w[1 2 3],
+                      collection_name: 'User',
+                      parent_collection_name: nil,
+                      parent_collection_id: nil,
+                      parent_association_name: nil,
+                      all_records: false,
+                      all_records_subset_query: {},
+                      all_records_ids_excluded: [],
+                      smart_action_id: nil
+                    },
+                    type: 'action-requests'
+                  }
+                }
+              end
+
+              it 'extracts origin_key_target values from hash format primary keys' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, patch|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  condition_tree = filter.condition_tree
+                  expect(condition_tree).to be_a(Nodes::ConditionTreeBranch)
+                  expect(condition_tree.aggregator).to eq('And')
+
+                  in_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'addressable_id' }
+                  expect(in_condition).not_to be_nil
+                  expect(in_condition.operator).to eq(Operators::IN)
+                  expect(in_condition.value).to eq([1, 2, 3])
+
+                  type_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'addressable_type' }
+                  expect(type_condition).not_to be_nil
+                  expect(type_condition.operator).to eq(Operators::EQUAL)
+                  expect(type_condition.value).to eq('User')
+
+                  expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+                end
+              end
+            end
+
+            describe 'polymorphic relation cleanup with single record' do
+              let(:params) do
+                {
+                  'collection_name' => 'user',
+                  'timezone' => 'Europe/Paris',
+                  'id' => 42
+                }
+              end
+
+              it 'handles single record deletion with hash format primary keys' do
+                delete.handle_request(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, patch|
+                  expect(caller).to be_instance_of(Components::Caller)
+
+                  condition_tree = filter.condition_tree
+                  expect(condition_tree).to be_a(Nodes::ConditionTreeBranch)
+                  expect(condition_tree.aggregator).to eq('And')
+
+                  in_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'addressable_id' }
+                  expect(in_condition).not_to be_nil
+                  expect(in_condition.operator).to eq(Operators::IN)
+                  expect(in_condition.value).to eq([42])
+
+                  expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+                end
+              end
+            end
+          end
+
+          context 'with composite primary keys and polymorphic relations' do
+            before do
+              composite_class = Struct.new(:key1, :key2, :name)
+              address_class = Struct.new(:id, :street, :owner_key1, :owner_type)
+              stub_const('CompositeModel', composite_class)
+              stub_const('CompositeAddress', address_class)
+
+              datasource = Datasource.new
+
+              composite_collection = build_collection(
+                name: 'composite_model',
+                schema: {
+                  fields: {
+                    'key1' => ColumnSchema.new(
+                      column_type: 'String',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'key2' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'name' => ColumnSchema.new(column_type: 'String'),
+                    'address' => Relations::PolymorphicOneToManySchema.new(
+                      foreign_collection: 'composite_address',
+                      origin_key: 'owner_key1',
+                      origin_key_target: 'key1',
+                      origin_type_field: 'owner_type',
+                      origin_type_value: 'CompositeModel'
+                    )
+                  }
+                },
+                delete: true
+              )
+
+              address_collection = build_collection(
+                name: 'composite_address',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'street' => ColumnSchema.new(column_type: 'String'),
+                    'owner_key1' => ColumnSchema.new(column_type: 'String'),
+                    'owner_type' => ColumnSchema.new(column_type: 'String')
+                  }
+                },
+                update: true
+              )
+
+              allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+              datasource.add_collection(composite_collection)
+              datasource.add_collection(address_collection)
+              ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+              ForestAdminAgent::Builder::AgentFactory.instance.build
+
+              @datasource = ForestAdminAgent::Facades::Container.datasource
+              allow(@datasource.get_collection('composite_model')).to receive(:delete)
+              allow(@datasource.get_collection('composite_address')).to receive(:update)
+            end
+
+            describe 'extracts correct field from composite primary keys' do
+              let(:params) do
+                {
+                  'collection_name' => 'composite_model',
+                  'timezone' => 'Europe/Paris',
+                  data: {
+                    attributes: {
+                      ids: ['abc|1', 'def|2', 'ghi|3'],
+                      collection_name: 'CompositeModel',
+                      parent_collection_name: nil,
+                      parent_collection_id: nil,
+                      parent_association_name: nil,
+                      all_records: false,
+                      all_records_subset_query: {},
+                      all_records_ids_excluded: [],
+                      smart_action_id: nil
+                    },
+                    type: 'action-requests'
+                  }
+                }
+              end
+
+              it 'extracts the correct primary key field for origin_key_target from composite keys' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('composite_address')).to have_received(:update) do |caller, filter, patch|
+                  expect(caller).to be_instance_of(Components::Caller)
+
+                  condition_tree = filter.condition_tree
+                  expect(condition_tree).to be_a(Nodes::ConditionTreeBranch)
+
+                  in_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'owner_key1' }
+                  expect(in_condition).not_to be_nil
+                  expect(in_condition.operator).to eq(Operators::IN)
+                  expect(in_condition.value).to eq(%w[abc def ghi])
+
+                  expect(patch).to eq({ 'owner_key1' => nil, 'owner_type' => nil })
+                end
+              end
+            end
+          end
         end
       end
     end

@@ -353,7 +353,7 @@ RSpec/ExampleLength:
 
 
 RSpec/MultipleExpectations:
-  Max: 10
+  Max: 15
 
 Layout/LineLength:
   Max: 120
