@@ -34,8 +34,8 @@ module ForestAdminAgent
       context 'when the handle response method is called' do
         it 'raises an exception when the error is a BusinessError' do
           expect do
-            forest_admin_api_requester.handle_response_error(ForestAdminDatasourceToolkit::Exceptions::BusinessError.new('test'))
-          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BusinessError)
+            forest_admin_api_requester.handle_response_error(ForestAdminAgent::Http::Exceptions::BusinessError.new('test'))
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BusinessError)
         end
 
         it 'raises an exception when the error message contains certificate' do

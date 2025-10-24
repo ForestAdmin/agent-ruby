@@ -22,7 +22,7 @@ module ForestAdminAgent
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         primary_key_values = packed_id.to_s.split('|')
         if (nb_pks = primary_keys.size) != (nb_values = primary_key_values.size)
-          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                 "Expected #{nb_pks} primary keys, found #{nb_values}"
         end
 

@@ -59,9 +59,7 @@ module ForestAdminDatasourceToolkit
       def self.get_field_schema(collection, field_name)
         fields = collection.schema[:fields]
         unless field_name.include?(':')
-          unless fields.key?(field_name)
-            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Column not found #{collection.name}.#{field_name}"
-          end
+          raise ForestException, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
 
           return fields[field_name]
         end
@@ -69,12 +67,10 @@ module ForestAdminDatasourceToolkit
         association_name = field_name.split(':')[0]
         relation_schema = fields[association_name]
 
-        unless relation_schema
-          raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Relation not found #{collection.name}.#{association_name}"
-        end
+        raise ForestException, "Relation not found #{collection.name}.#{association_name}" unless relation_schema
 
         if relation_schema.type != 'ManyToOne' && relation_schema.type != 'OneToOne'
-          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
+          raise ForestException, "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
         end
 
         get_field_schema(
@@ -102,9 +98,7 @@ module ForestAdminDatasourceToolkit
 
       def self.get_through_target(collection, relation_name)
         relation = collection.schema[:fields][relation_name]
-        unless relation.is_a?(ManyToManySchema)
-          raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Relation must be many to many'
-        end
+        raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
         through_collection = collection.datasource.get_collection(relation.through_collection)
         through_collection.schema[:fields].select do |field_name, field|
@@ -121,9 +115,7 @@ module ForestAdminDatasourceToolkit
 
       def self.get_through_origin(collection, relation_name)
         relation = collection.schema[:fields][relation_name]
-        unless relation.is_a?(ManyToManySchema)
-          raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Relation must be many to many'
-        end
+        raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
         through_collection = collection.datasource.get_collection(relation.through_collection)
         through_collection.schema[:fields].select do |field_name, field|

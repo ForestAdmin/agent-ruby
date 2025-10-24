@@ -31,8 +31,7 @@ module ForestAdminDatasourceToolkit
             def valid_operator(value)
               return if Operators.exist?(value)
 
-              raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
-                    "Invalid operators, the #{value} operator does not exist."
+              raise ForestException, "Invalid operators, the #{value} operator does not exist."
             end
 
             def inverse
@@ -45,8 +44,7 @@ module ForestAdminDatasourceToolkit
               when Operators::PRESENT
                 override(operator: Operators::BLANK)
               else
-                raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
-                      "Operator: #{@operator} cannot be inverted."
+                raise ForestException, "Operator: #{@operator} cannot be inverted."
               end
             end
 

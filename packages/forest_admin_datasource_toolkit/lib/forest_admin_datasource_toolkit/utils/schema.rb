@@ -25,13 +25,13 @@ module ForestAdminDatasourceToolkit
 
       def self.get_to_many_relation(collection, relation_name)
         unless collection.schema[:fields].key?(relation_name)
-          raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Relation #{relation_name} not found"
+          raise Exceptions::ForestException, "Relation #{relation_name} not found"
         end
 
         relation = collection.schema[:fields][relation_name]
 
         if relation.type != 'OneToMany' && relation.type != 'PolymorphicOneToMany' && relation.type != 'ManyToMany'
-          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+          raise Exceptions::ForestException,
                 "Relation #{relation_name} has invalid type should be one of OneToMany or ManyToMany."
         end
 

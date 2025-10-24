@@ -60,7 +60,7 @@ module ForestAdminDatasourceToolkit
             expect do
               described_class.validate(condition_tree, collection)
             end.to raise_error(
-              Exceptions::NotFoundError,
+              Exceptions::ForestException,
               'Column not found collection.fieldDoesNotExistInSchema'
             )
           end
@@ -121,7 +121,7 @@ module ForestAdminDatasourceToolkit
               expect do
                 described_class.validate(condition_tree, collection)
               end.to raise_error(
-                Exceptions::NotFoundError,
+                Exceptions::ForestException,
                 'Column not found collection.fieldDoesNotExistInSchema'
               )
             end

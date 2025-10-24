@@ -1,19 +1,16 @@
 module ForestAdminDatasourceToolkit
   module Validations
     class RecordValidator
-      include ForestAdminAgent::Http::Exceptions
+      include ForestAdminDatasourceToolkit::Exceptions
 
       def self.validate(collection, record_data)
-        if !record_data || record_data.empty?
-          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
-                'The record data is empty'
-        end
+        raise ForestException, 'The record data is empty' if !record_data || record_data.empty?
 
         record_data.each_key do |key|
           schema = collection.schema[:fields][key]
 
           if !schema
-            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Unknown field #{key}"
+            raise ForestException, "Unknown field #{key}"
           elsif schema.type == 'Column'
             FieldValidator.validate(collection, key, record_data[key])
           elsif ['OneToOne', 'ManyToOne'].include?(schema.type)
@@ -21,8 +18,7 @@ module ForestAdminDatasourceToolkit
             association = collection.datasource.get_collection(schema.foreign_collection)
             RecordValidator.validate(association, sub_record)
           else
-            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
-                  "Unexpected schema type '#{schema.type}' while traversing record"
+            raise ForestException, "Unexpected schema type '#{schema.type}' while traversing record"
           end
         end
       end

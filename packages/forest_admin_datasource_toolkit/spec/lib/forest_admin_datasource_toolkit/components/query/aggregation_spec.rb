@@ -9,7 +9,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.new(operation: 'foo')
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
             'Aggregate operation foo not allowed'
           )
         end

@@ -4,7 +4,7 @@ require 'ostruct'
 module ForestAdminDatasourceToolkit
   module Validations
     include ForestAdminDatasourceToolkit::Schema
-    include ForestAdminAgent::Http::Exceptions
+    include ForestAdminDatasourceToolkit::Exceptions
 
     describe RecordValidator do
       let(:datasource) { Datasource.new }
@@ -25,7 +25,7 @@ module ForestAdminDatasourceToolkit
           it 'throws an error' do
             expect do
               described_class.validate(@collection, { 'unknownField' => 'this field is not defined in the collection' })
-            end.to raise_error(Exceptions::NotFoundError, 'Unknown field unknownField')
+            end.to raise_error(ForestException, 'Unknown field unknownField')
           end
         end
 
@@ -41,7 +41,7 @@ module ForestAdminDatasourceToolkit
           it 'throws an error' do
             expect do
               described_class.validate(@collection, { 'name' => [100] })
-            end.to raise_error(Exceptions::BadRequestError, "The given value has a wrong type for 'name': 100.\n Expects [\"String\", nil]")
+            end.to raise_error(ForestException, "The given value has a wrong type for 'name': 100.\n Expects [\"String\", nil]")
           end
         end
       end
@@ -88,19 +88,19 @@ module ForestAdminDatasourceToolkit
         it 'throws an error when the record data doest not match the collection' do
           expect do
             described_class.validate(datasource.get_collection('book'), { 'relation' => { 'fieldNotExist' => 'a name' } })
-          end.to raise_error(Exceptions::NotFoundError, 'Unknown field fieldNotExist')
+          end.to raise_error(ForestException, 'Unknown field fieldNotExist')
         end
 
         it 'throws an error when the relation is an empty object' do
           expect do
             described_class.validate(datasource.get_collection('book'), { 'relation' => {} })
-          end.to raise_error(Exceptions::BadRequestError, 'The record data is empty')
+          end.to raise_error(ForestException, 'The record data is empty')
         end
 
         it 'throws an error when the relation is nil' do
           expect do
             described_class.validate(datasource.get_collection('book'), { 'relation' => nil })
-          end.to raise_error(Exceptions::BadRequestError, 'The record data is empty')
+          end.to raise_error(ForestException, 'The record data is empty')
         end
       end
 
@@ -141,7 +141,7 @@ module ForestAdminDatasourceToolkit
         it 'throws an error' do
           expect do
             described_class.validate(datasource.get_collection('book'), { 'relation' => { 'name' => 'a name' } })
-          end.to raise_error(Exceptions::UnprocessableError, "Unexpected schema type 'OneToMany' while traversing record")
+          end.to raise_error(ForestException, "Unexpected schema type 'OneToMany' while traversing record")
         end
       end
 
@@ -202,7 +202,7 @@ module ForestAdminDatasourceToolkit
         it 'throws an error' do
           expect do
             described_class.validate(@collection, { 'id' => '1' })
-          end.to raise_error(Exceptions::UnprocessableError)
+          end.to raise_error(ForestException)
         end
       end
     end

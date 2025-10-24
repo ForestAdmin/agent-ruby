@@ -111,7 +111,8 @@ module ForestAdminAgent
 
         rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
         (rows.empty? ? 0 : rows[0]['value']) == attributes[:ids].count
-      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException, BusinessError => e
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException,
+             ForestAdminAgent::Http::Exceptions::BusinessError => e
         # Let primary key validation errors propagate - these are actionable schema issues
         # Wrap other exceptions (like invalid operators) in ConflictError
         raise if e.message.include?('has no primary keys')

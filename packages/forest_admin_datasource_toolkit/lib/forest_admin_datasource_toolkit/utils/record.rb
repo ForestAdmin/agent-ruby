@@ -3,7 +3,7 @@ module ForestAdminDatasourceToolkit
     class Record
       def self.primary_keys(collection, record)
         Schema.primary_keys(collection).map do |pk|
-          record[pk] || raise(ForestAdminAgent::Http::Exceptions::NotFoundError, "Missing primary key: #{pk}")
+          record[pk] || raise(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Missing primary key: #{pk}")
         end
       end
 
