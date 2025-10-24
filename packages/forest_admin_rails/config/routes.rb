@@ -1,4 +1,6 @@
 ForestAdminRails::Engine.routes.draw do
+  next if defined?(Rake) && Rake.respond_to?(:application) && Rake.application&.top_level_tasks&.any?
+
   scope '/forest' do
     # Use cached_routes to avoid recomputing routes during Rails route initialization
     ForestAdminAgent::Http::Router.cached_routes.each do |name, agent_route|
