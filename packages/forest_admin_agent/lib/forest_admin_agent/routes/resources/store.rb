@@ -41,7 +41,7 @@ module ForestAdminAgent
             schema = @collection.schema[:fields][field]
             next unless %w[OneToOne PolymorphicOneToOne].include?(schema.type)
 
-            id = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)
+            primary_key_values = Utils::Id.unpack_id(@collection, value['data']['id'], with_key: true)
             foreign_collection = @datasource.get_collection(schema.foreign_collection)
             # Load the value that will be used as origin_key
             origin_value = record[schema.origin_key_target]
@@ -49,7 +49,7 @@ module ForestAdminAgent
             # update new relation (may update zero or one records).
             patch = { schema.origin_key => origin_value }
             patch[schema.origin_type_field] = @collection.name.gsub('__', '::') if schema.type == 'PolymorphicOneToOne'
-            condition_tree = ConditionTree::ConditionTreeFactory.match_records(foreign_collection, [id])
+            condition_tree = ConditionTree::ConditionTreeFactory.match_records(foreign_collection, [primary_key_values])
             filter = Filter.new(condition_tree: condition_tree)
             foreign_collection.update(@caller, filter, patch)
           end
