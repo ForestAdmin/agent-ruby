@@ -46,6 +46,7 @@ module ForestAdminAgent
 
       def build
         @container.register(:datasource, @customizer.datasource(@logger))
+        ForestAdminAgent::Http::Router.reset_cached_routes! unless Facades::Container.cache(:disable_route_cache)
         send_schema
       end
 
