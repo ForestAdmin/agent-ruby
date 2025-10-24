@@ -1,3 +1,10 @@
+## [1.12.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.3...v1.12.4) (2025-10-24)
+
+
+### Bug Fixes
+
+* ruby 3.4+ compatibility gems to gemspecs ([#183](https://github.com/ForestAdmin/agent-ruby/issues/183)) ([ea0b118](https://github.com/ForestAdmin/agent-ruby/commit/ea0b11861eeca8dc4b650d03166757c8599c1b49))
+
 ## [1.12.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.2...v1.12.3) (2025-10-23)
 
 
