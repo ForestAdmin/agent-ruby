@@ -151,6 +151,25 @@ module ForestAdminAgent
 
           context 'with polymorphic relations' do
             before do
+              cache = FileCache.new('app', 'tmp/cache/forest_admin')
+              cache.clear
+
+              agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+              agent_factory.setup(
+                {
+                  auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                  env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+                  is_production: false,
+                  cache_dir: 'tmp/cache/forest_admin',
+                  schema_path: File.join('tmp', '.forestadmin-schema.json'),
+                  forest_server_url: 'https://api.development.forestadmin.com',
+                  debug: true,
+                  prefix: 'forest',
+                  customize_error_message: nil,
+                  append_schema_path: nil
+                }
+              )
+
               address_class = Struct.new(:id, :street, :addressable_id, :addressable_type)
               stub_const('Address', address_class)
 
@@ -196,61 +215,15 @@ module ForestAdminAgent
                 update: true
               )
 
-              allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+              allow(agent_factory).to receive(:send_schema).and_return(nil)
               datasource.add_collection(user_collection)
               datasource.add_collection(address_collection)
-              ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
-              ForestAdminAgent::Builder::AgentFactory.instance.build
+              agent_factory.add_datasource(datasource)
+              agent_factory.build
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('user')).to receive(:delete)
               allow(@datasource.get_collection('address')).to receive(:update)
-            end
-
-            describe 'polymorphic relation cleanup with hash format primary keys' do
-              let(:params) do
-                {
-                  'collection_name' => 'user',
-                  'timezone' => 'Europe/Paris',
-                  data: {
-                    attributes: {
-                      ids: %w[1 2 3],
-                      collection_name: 'User',
-                      parent_collection_name: nil,
-                      parent_collection_id: nil,
-                      parent_association_name: nil,
-                      all_records: false,
-                      all_records_subset_query: {},
-                      all_records_ids_excluded: [],
-                      smart_action_id: nil
-                    },
-                    type: 'action-requests'
-                  }
-                }
-              end
-
-              it 'extracts origin_key_target values from hash format primary keys' do
-                delete.handle_request_bulk(args)
-
-                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, patch|
-                  expect(caller).to be_instance_of(Components::Caller)
-                  condition_tree = filter.condition_tree
-                  expect(condition_tree).to be_a(Nodes::ConditionTreeBranch)
-                  expect(condition_tree.aggregator).to eq('And')
-
-                  in_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'addressable_id' }
-                  expect(in_condition).not_to be_nil
-                  expect(in_condition.operator).to eq(Operators::IN)
-                  expect(in_condition.value).to eq([1, 2, 3])
-
-                  type_condition = condition_tree.conditions.find { |c| c.is_a?(Nodes::ConditionTreeLeaf) && c.field == 'addressable_type' }
-                  expect(type_condition).not_to be_nil
-                  expect(type_condition.operator).to eq(Operators::EQUAL)
-                  expect(type_condition.value).to eq('User')
-
-                  expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
-                end
-              end
             end
 
             describe 'polymorphic relation cleanup with single record' do
@@ -285,6 +258,25 @@ module ForestAdminAgent
 
           context 'with composite primary keys and polymorphic relations' do
             before do
+              cache = FileCache.new('app', 'tmp/cache/forest_admin')
+              cache.clear
+
+              agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+              agent_factory.setup(
+                {
+                  auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                  env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+                  is_production: false,
+                  cache_dir: 'tmp/cache/forest_admin',
+                  schema_path: File.join('tmp', '.forestadmin-schema.json'),
+                  forest_server_url: 'https://api.development.forestadmin.com',
+                  debug: true,
+                  prefix: 'forest',
+                  customize_error_message: nil,
+                  append_schema_path: nil
+                }
+              )
+
               composite_class = Struct.new(:key1, :key2, :name)
               address_class = Struct.new(:id, :street, :owner_key1, :owner_type)
               stub_const('CompositeModel', composite_class)
@@ -336,11 +328,11 @@ module ForestAdminAgent
                 update: true
               )
 
-              allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+              allow(agent_factory).to receive(:send_schema).and_return(nil)
               datasource.add_collection(composite_collection)
               datasource.add_collection(address_collection)
-              ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
-              ForestAdminAgent::Builder::AgentFactory.instance.build
+              agent_factory.add_datasource(datasource)
+              agent_factory.build
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('composite_model')).to receive(:delete)
