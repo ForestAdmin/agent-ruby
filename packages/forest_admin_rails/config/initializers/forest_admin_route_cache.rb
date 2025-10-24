@@ -6,6 +6,8 @@ if defined?(ForestAdminAgent::Http::Router)
     Rails.logger.warn('[ForestAdmin] To enable caching, remove disable_route_cache: true from configuration')
   else
     Rails.application.config.after_initialize do
+      next if defined?(Rake) && Rake.respond_to?(:application) && Rake.application&.top_level_tasks&.any?
+
       start_time = Time.now
       routes = ForestAdminAgent::Http::Router.cached_routes
       elapsed = ((Time.now - start_time) * 1000).round(2)
