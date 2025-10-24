@@ -21,7 +21,12 @@ admin work on any Rails application (Rails >= 6.1)."
     Dir["{app,config,lib}/**/*", "LICENSE", "Rakefile", "README.md"]
   end
 
+  spec.add_dependency "base64"
+  spec.add_dependency "bigdecimal"
+  spec.add_dependency "csv"
   spec.add_dependency "dry-configurable", "~> 1.1"
+  spec.add_dependency "mutex_m"
+  spec.add_dependency "ostruct"
   spec.add_dependency "rails", ">= 6.1"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end

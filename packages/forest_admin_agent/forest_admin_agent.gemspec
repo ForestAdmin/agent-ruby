@@ -34,7 +34,12 @@ admin work on any Ruby application."
   spec.require_paths = ["lib"]
 
   spec.add_dependency "activesupport", ">= 6.1"
+  spec.add_dependency "base64"
+  spec.add_dependency "bigdecimal"
+  spec.add_dependency "csv"
   spec.add_dependency "deepsort", "~> 0.4.5"
+  spec.add_dependency "mutex_m"
+  spec.add_dependency "ostruct"
   spec.add_dependency "dry-container", "~> 0.11"
   spec.add_dependency "faraday", "~> 2.7"
   spec.add_dependency "filecache", "~> 1.0"

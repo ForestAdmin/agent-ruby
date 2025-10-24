@@ -2,10 +2,6 @@ source "https://rubygems.org"
 
 gemspec
 
-# Ruby 3.4+ compatibility - these will be extracted from stdlib
-gem 'bigdecimal'
-gem 'mutex_m'
-
 group :development, :test do
   gem 'forest_admin_datasource_customizer'
   gem 'forest_admin_datasource_toolkit'
