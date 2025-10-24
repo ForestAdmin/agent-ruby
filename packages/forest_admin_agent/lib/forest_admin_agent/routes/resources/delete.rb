@@ -41,13 +41,10 @@ module ForestAdminAgent
           @collection.schema[:fields].each_value do |field_schema|
             next unless ['PolymorphicOneToOne', 'PolymorphicOneToMany'].include?(field_schema.type)
 
-            # Extract the values for origin_key_target from the primary key hashes
             origin_values = selection_ids[:ids].map do |pk_hash|
-              # pk_hash can be either a hash (from unpack_id with with_key: true) or array
               if pk_hash.is_a?(Hash)
                 pk_hash[field_schema.origin_key_target]
               else
-                # For array format, we need to find the index of origin_key_target in primary keys
                 pk_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(@collection)
                 index = pk_names.index(field_schema.origin_key_target)
                 pk_hash[index] if index
