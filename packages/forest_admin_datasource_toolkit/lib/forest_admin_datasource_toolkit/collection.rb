@@ -46,7 +46,9 @@ module ForestAdminDatasourceToolkit
     end
 
     def add_field(name, field)
-      raise Exceptions::ForestException, "Field #{name} already defined in collection" if @schema[:fields].key?(name)
+      if @schema[:fields].key?(name)
+        raise ForestAdminAgent::Http::Exceptions::ConflictError, "Field #{name} already defined in collection"
+      end
 
       schema[:fields][name] = field
     end
@@ -58,22 +60,23 @@ module ForestAdminDatasourceToolkit
     end
 
     def add_action(name, action)
-      raise Exceptions::ForestException, "Action #{name} already defined in collection" if @schema[:actions].key?(name)
+      if @schema[:actions].key?(name)
+        raise ForestAdminAgent::Http::Exceptions::ConflictError, "Action #{name} already defined in collection"
+      end
 
       schema[:actions][name] = action
     end
 
     def add_chart(name)
       if @schema[:charts].include?(name)
-        raise Exceptions::ForestException,
-              "Chart #{name} already defined in collection"
+        raise ForestAdminAgent::Http::Exceptions::ConflictError, "Chart #{name} already defined in collection"
       end
 
       schema[:charts] << name
     end
 
     def render_chart(_caller, name, _record_id)
-      raise Exceptions::ForestException, "Chart #{name} is not implemented."
+      raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Chart #{name} is not implemented."
     end
   end
 end

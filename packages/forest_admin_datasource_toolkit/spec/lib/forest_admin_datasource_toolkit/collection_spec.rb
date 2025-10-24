@@ -36,7 +36,7 @@ module ForestAdminDatasourceToolkit
           @collection.add_field('__duplicated__', @field)
           @collection.add_field('__duplicated__', @field)
         end.to raise_error(
-          ForestAdminDatasourceToolkit::Exceptions::ForestException,
+          ForestAdminDatasourceToolkit::Exceptions::ConflictError,
           'Field __duplicated__ already defined in collection'
         )
       end

@@ -23,8 +23,7 @@ module ForestAdminDatasourceCustomizer
           super(type: type)
 
           if id.nil? && label.nil?
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                  "A field must have an 'id' or a 'label' defined."
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined."
           end
 
           @label = label.nil? ? id : label

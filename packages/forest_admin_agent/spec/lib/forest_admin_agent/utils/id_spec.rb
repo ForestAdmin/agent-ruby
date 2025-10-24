@@ -52,7 +52,7 @@ module ForestAdminAgent
             expect do
               described_class.unpack_id(collection, '1|foo')
             end.to raise_error(
-              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
               'Expected 1 primary keys, found 2'
             )
           end
@@ -70,7 +70,7 @@ module ForestAdminAgent
             expect do
               described_class.unpack_id(collection, '1')
             end.to raise_error(
-              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
               'Expected 2 primary keys, found 1'
             )
           end
@@ -157,7 +157,7 @@ module ForestAdminAgent
           expect do
             described_class.pack_id(collection_foo, { 'id' => 1, 'foo' => 'bar' })
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
             'This collection has no primary key'
           )
         end

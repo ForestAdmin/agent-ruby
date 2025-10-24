@@ -15,7 +15,7 @@ module ForestAdminDatasourceCustomizer
 
           duplicate = @charts.keys.find { |name| child_schema[:charts].include?(name) }
 
-          raise(Exceptions::ForestException, "Chart #{duplicate} is defined twice.") if duplicate
+          raise ForestAdminAgent::Http::Exceptions::ConflictError, "Chart #{duplicate} is defined twice." if duplicate
 
           child_schema[:charts] = child_schema[:charts].union(@charts.keys)
 
@@ -23,7 +23,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_chart(name, &definition)
-          raise(Exceptions::ForestException, "Chart #{name} already exists.") if schema[:charts].include?(name)
+          if schema[:charts].include?(name)
+            raise ForestAdminAgent::Http::Exceptions::ConflictError, "Chart #{name} already exists."
+          end
 
           @charts[name] = definition
         end

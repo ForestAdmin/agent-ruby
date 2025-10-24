@@ -19,7 +19,7 @@ module ForestAdminDatasourceToolkit
         def validate(operation)
           return if %w[Count Sum Avg Max Min].include? operation
 
-          raise ForestException, "Aggregate operation #{operation} not allowed"
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Aggregate operation #{operation} not allowed"
         end
 
         def projection

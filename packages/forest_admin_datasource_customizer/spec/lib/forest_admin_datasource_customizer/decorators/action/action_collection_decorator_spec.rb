@@ -472,7 +472,7 @@ module ForestAdminDatasourceCustomizer
 
             expect do
               @decorated_book.add_action('make photocopy', action)
-            end.to raise_error(Exceptions::ForestException, "All field must have different 'id'. Conflict come from field 'id'")
+            end.to raise_error(Exceptions::ConflictError, "All field must have different 'id'. Conflict come from field 'id'")
           end
 
           it 'raise an error if multiple fields with same id are provided in row' do
@@ -492,7 +492,7 @@ module ForestAdminDatasourceCustomizer
 
             expect do
               @decorated_book.add_action('make photocopy', action)
-            end.to raise_error(Exceptions::ForestException, "All field must have different 'id'. Conflict come from field 'id'")
+            end.to raise_error(Exceptions::ConflictError, "All field must have different 'id'. Conflict come from field 'id'")
           end
 
           it 'raise an error if field (hash) is provided without id and label' do
@@ -505,7 +505,7 @@ module ForestAdminDatasourceCustomizer
 
             expect do
               @decorated_book.add_action('make photocopy', action)
-            end.to raise_error(Exceptions::ForestException, "A field must have an 'id' or a 'label' defined.")
+            end.to raise_error(Exceptions::BadRequestError, "A field must have an 'id' or a 'label' defined.")
           end
 
           it 'raise an error if form mix form elements and pages' do
@@ -525,7 +525,7 @@ module ForestAdminDatasourceCustomizer
 
             expect do
               @decorated_book.add_action('make photocopy', action)
-            end.to raise_error(Exceptions::ForestException, "You cannot mix pages and other form elements in smart action 'make photocopy' form")
+            end.to raise_error(Exceptions::BadRequestError, "You cannot mix pages and other form elements in smart action 'make photocopy' form")
           end
         end
       end

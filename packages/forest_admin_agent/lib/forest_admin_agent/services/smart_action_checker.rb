@@ -88,9 +88,8 @@ module ForestAdminAgent
             "Action: #{attributes[:smart_action_id]}"
           )
 
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "Collection '#{collection.name}' has no primary keys. " \
-                'Actions with conditional permissions require a primary key to identify records.'
+          raise UnprocessableError, "Collection '#{collection.name}' has no primary keys. " \
+                                    'Actions with conditional permissions require a primary key to identify records.'
         end
 
         pk = pks[0]
@@ -112,9 +111,9 @@ module ForestAdminAgent
 
         rows = collection.aggregate(caller, conditional_filter, Aggregation.new(operation: 'Count'))
         (rows.empty? ? 0 : rows[0]['value']) == attributes[:ids].count
-      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException, BusinessError => e
         # Let primary key validation errors propagate - these are actionable schema issues
-        # Wrap other ForestExceptions (like invalid operators) in ConflictError
+        # Wrap other exceptions (like invalid operators) in ConflictError
         raise if e.message.include?('has no primary keys')
 
         raise InvalidActionConditionError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'

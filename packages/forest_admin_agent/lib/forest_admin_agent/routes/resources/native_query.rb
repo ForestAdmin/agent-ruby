@@ -54,7 +54,7 @@ module ForestAdminAgent
         def type=(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Invalid Chart type #{type}"
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Invalid Chart type #{type}"
           end
 
           @type = type.downcase

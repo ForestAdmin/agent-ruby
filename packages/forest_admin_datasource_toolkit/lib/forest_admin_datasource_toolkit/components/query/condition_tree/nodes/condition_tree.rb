@@ -53,7 +53,7 @@ module ForestAdminDatasourceToolkit
                 false
               end
               unless every_leaf { |leaf| leaf.field.start_with?(prefix) }
-                raise ForestException, 'Cannot unnest condition tree.'
+                raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot unnest condition tree.'
               end
 
               replace_leafs { |leaf| leaf.override(field: leaf.field[(prefix.length + 1)..]) }

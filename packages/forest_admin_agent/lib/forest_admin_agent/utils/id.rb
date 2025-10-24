@@ -11,7 +11,9 @@ module ForestAdminAgent
       def self.pack_id(schema, record)
         pk_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(schema)
 
-        raise Exceptions::ForestException, 'This collection has no primary key' if pk_names.empty?
+        if pk_names.empty?
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'This collection has no primary key'
+        end
 
         pk_names.map { |pk| record[pk].to_s }.join('|')
       end
@@ -20,7 +22,8 @@ module ForestAdminAgent
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         primary_key_values = packed_id.to_s.split('|')
         if (nb_pks = primary_keys.size) != (nb_values = primary_key_values.size)
-          raise Exceptions::ForestException, "Expected #{nb_pks} primary keys, found #{nb_values}"
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                "Expected #{nb_pks} primary keys, found #{nb_values}"
         end
 
         result = primary_keys.map.with_index do |pk_name, index|

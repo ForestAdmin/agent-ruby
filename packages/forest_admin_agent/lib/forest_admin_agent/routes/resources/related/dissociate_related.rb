@@ -90,7 +90,7 @@ module ForestAdminAgent
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
 
             if selection_ids[:ids].empty? && !selection_ids[:are_excluded]
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Expected no empty id list'
+              raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Expected no empty id list'
             end
 
             Filter.new(

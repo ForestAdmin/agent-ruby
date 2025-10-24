@@ -72,10 +72,10 @@ module ForestAdminDatasourceCustomizer
           pages = is_page_component.call(form.first)
 
           form.each do |element|
-            if pages != is_page_component.call(element)
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "You cannot mix pages and other form elements in smart action '#{action_name}' form"
-            end
+            next unless pages != is_page_component.call(element)
+
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  "You cannot mix pages and other form elements in smart action '#{action_name}' form"
           end
         end
 

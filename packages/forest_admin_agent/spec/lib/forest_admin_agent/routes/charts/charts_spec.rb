@@ -135,7 +135,7 @@ module ForestAdminAgent
           expect do
             chart.handle_request(args)
           end.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Invalid Chart type unknown_type'
+            ForestAdminDatasourceToolkit::Exceptions::BadRequestError, 'Invalid Chart type unknown_type'
           )
         end
 
@@ -488,7 +488,7 @@ module ForestAdminAgent
             )
           end
 
-          it 'throw a ForestException when the request is not filled correctly' do
+          it 'throw a BadRequestError when the request is not filled correctly' do
             args[:params] = args[:params].merge({
                                                   relationshipFieldName: 'unknown_relation',
                                                   aggregator: 'Count',
@@ -500,7 +500,7 @@ module ForestAdminAgent
             expect do
               chart.handle_request(args)
             end.to raise_error(
-              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
               'Failed to generate leaderboard chart: parameters do not match pre-requisites'
             )
           end

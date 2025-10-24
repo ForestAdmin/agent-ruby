@@ -19,12 +19,14 @@ module ForestAdminDatasourceToolkit
           def self.match_ids(collection, ids)
             primary_key_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
 
-            raise ForestException, 'Collection must have at least one primary key' if primary_key_names.empty?
+            if primary_key_names.empty?
+              raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Collection must have at least one primary key'
+            end
 
             primary_key_names.each do |name|
               operators = collection.schema[:fields][name].filter_operators
               unless operators.include?(Operators::EQUAL) || operators.include?(Operators::IN)
-                raise ForestException, "Field '#{name}' must support operators: ['Equal', 'In']"
+                raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Field '#{name}' must support operators: ['Equal', 'In']"
               end
             end
 
@@ -55,7 +57,7 @@ module ForestAdminDatasourceToolkit
 
               branch.conditions.length == 1 ? branch.conditions[0] : branch
             else
-              raise ForestException, 'Failed to instantiate condition tree from json'
+              raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Failed to instantiate condition tree from json'
             end
           end
 

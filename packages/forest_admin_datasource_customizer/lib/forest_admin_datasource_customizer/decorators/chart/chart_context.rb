@@ -19,7 +19,7 @@ module ForestAdminDatasourceCustomizer
 
         def record_id
           if @composite_record_id.size > 1
-            raise Exceptions::ForestException,
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                   "Collection is using a composite pk: use 'context.composite_record_id'."
           end
 

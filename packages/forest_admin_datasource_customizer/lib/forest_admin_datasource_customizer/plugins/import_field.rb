@@ -6,7 +6,8 @@ module ForestAdminDatasourceCustomizer
 
       def run(datasource_customizer, collection_customizer = nil, options = {})
         if options[:name].nil? || options[:path].nil?
-          raise ForestException, 'The options parameter must contains the following keys: `name, path`'
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                'The options parameter must contains the following keys: `name, path`'
         end
 
         options[:readonly] = false unless options.key?(:readonly)
@@ -14,7 +15,8 @@ module ForestAdminDatasourceCustomizer
         result = options[:path].split(':').reduce({ collection: collection_customizer.name }) do |memo, field|
           collection = datasource_customizer.get_collection(memo[:collection])
           unless collection.schema[:fields].key?(field)
-            raise ForestException, "Field #{field} not found in collection #{collection.name}"
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+                  "Field #{field} not found in collection #{collection.name}"
           end
 
           to_one_relations = %w[ManyToOne OneToOne]
@@ -53,7 +55,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         if !options[:readonly] && schema.is_read_only
-          raise ForestException,
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                 "Readonly option should not be false because the field #{options[:path]} is not writable"
         end
 

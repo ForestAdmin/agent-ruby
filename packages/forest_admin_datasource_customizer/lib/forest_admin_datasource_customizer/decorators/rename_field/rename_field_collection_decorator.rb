@@ -16,7 +16,7 @@ module ForestAdminDatasourceCustomizer
 
         def rename_field(current_name, new_name)
           unless schema[:fields][current_name]
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "No such field '#{current_name}'"
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "No such field '#{current_name}'"
           end
 
           initial_name = current_name
@@ -27,8 +27,9 @@ module ForestAdminDatasourceCustomizer
             next unless field_schema.type == 'PolymorphicManyToOne' &&
                         [field_schema.foreign_key, field_schema.foreign_key_type_field].include?(current_name)
 
-            raise ForestException, "Cannot rename '#{name}.#{current_name}', because it's implied " \
-                                   "in a polymorphic relation '#{name}.#{field_name}'"
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  "Cannot rename '#{name}.#{current_name}', because it's implied " \
+                  "in a polymorphic relation '#{name}.#{field_name}'"
           end
 
           # Revert previous renaming (avoids conflicts and need to recurse on @to_child_collection).

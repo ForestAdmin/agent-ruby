@@ -13,7 +13,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         def add_chart(name, &definition)
-          raise(Exceptions::ForestException, "Chart #{name} already exists.") if schema[:charts].include?(name)
+          if schema[:charts].include?(name)
+            raise ForestAdminAgent::Http::Exceptions::ConflictError, "Chart #{name} already exists."
+          end
 
           @charts[name] = definition
           mark_schema_as_dirty

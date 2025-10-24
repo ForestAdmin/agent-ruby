@@ -20,7 +20,7 @@ module ForestAdminDatasourceCustomizer
 
         def replace_field_sorting(name, equivalent_sort)
           if equivalent_sort.nil?
-            raise ForestException, 'A new sorting method should be provided to replace field sorting'
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'A new sorting method should be provided to replace field sorting'
           end
 
           replace_or_emulate_field_sorting(name, equivalent_sort)

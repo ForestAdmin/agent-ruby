@@ -33,7 +33,7 @@ module ForestAdminDatasourceCustomizer
           expect(decorated_datasource.get_collection('new_name')).not_to be_nil
           expect do
             decorated_datasource.get_collection('foo')
-          end.to raise_error(Exceptions::ForestException)
+          end.to raise_error(Exceptions::BadRequestError)
         end
 
         context 'with ManyToMany relation' do
@@ -105,19 +105,13 @@ module ForestAdminDatasourceCustomizer
               @datasource.rename_collection('book', 'book2')
               expect do
                 @datasource.rename_collection('book2', 'book3')
-              end.to raise_error(
-                Exceptions::ForestException,
-                'Cannot rename a collection twice: book->book2->book3'
-              )
+              end.to raise_error(Exceptions::UnprocessableError, 'Cannot rename a collection twice: book->book2->book3')
             end
 
             it 'raise an error if the given old name does not exist' do
               expect do
                 @datasource.rename_collection('doesNotExist', 'book')
-              end.to raise_error(
-                Exceptions::ForestException,
-                'Collection doesNotExist not found.'
-              )
+              end.to raise_error(Exceptions::NotFoundError, 'Collection doesNotExist not found.')
             end
 
             it 'change the foreign collection when it is a many to many' do
@@ -167,10 +161,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an error if the argument is not a function or a hash' do
               expect do
                 @datasource.rename_collections('not a function')
-              end.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                'Invalid argument for rename_collections, must be a function or a hash'
-              )
+              end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BadRequestError, 'Invalid argument for rename_collections, must be a function or a hash')
             end
           end
         end

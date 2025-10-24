@@ -71,13 +71,13 @@ module ForestAdminDatasourceToolkit
       describe 'get_to_many_relation' do
         it 'raise an error when relation do not exist' do
           expect { described_class.get_to_many_relation(collection, 'foo') }.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Relation foo not found'
+            ForestAdminDatasourceToolkit::Exceptions::NotFoundError, 'Relation foo not found'
           )
         end
 
         it 'raise an error when the relation is not a to_many relation' do
           expect { described_class.get_to_many_relation(collection, 'author') }.to raise_error(
-            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
             'Relation author has invalid type should be one of OneToMany or ManyToMany.'
           )
         end

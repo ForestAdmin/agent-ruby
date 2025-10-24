@@ -17,10 +17,13 @@ module ForestAdminDatasourceCustomizer
 
           field = @child_collection.schema[:fields][name]
           if field.nil? || field.type != 'Column'
-            raise ForestException,
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                   'Cannot add validators on a relation, use the foreign key instead'
           end
-          raise ForestException, 'Cannot add validators on a readonly field' if field.is_read_only
+          if field.is_read_only
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  'Cannot add validators on a readonly field'
+          end
 
           @validation[name] ||= []
           @validation[name].push(validation)

@@ -17,7 +17,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         def get_collection(name)
-          raise ForestException, "Collection '#{name}' was removed." if @blacklist.include?(name)
+          if @blacklist.include?(name)
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Collection '#{name}' was removed."
+          end
 
           super
         end
@@ -57,7 +59,8 @@ module ForestAdminDatasourceCustomizer
 
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(collection, field_name)
 
-            raise ForestException, "Cannot remove #{collection.name} because it's a potential target of polymorphic relation #{field_schema.foreign_collection}.#{inverse}"
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  "Cannot remove #{collection.name} because it's a potential target of polymorphic relation #{field_schema.foreign_collection}.#{inverse}"
           end
         end
 

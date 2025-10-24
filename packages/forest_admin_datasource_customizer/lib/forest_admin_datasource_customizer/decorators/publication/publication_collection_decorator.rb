@@ -12,8 +12,8 @@ module ForestAdminDatasourceCustomizer
 
         def change_field_visibility(name, visible)
           field = child_collection.schema[:fields][name]
-          raise ForestException, "No such field '#{name}'" unless field
-          raise ForestException, 'Cannot hide primary key' if ForestAdminDatasourceToolkit::Utils::Schema.primary_key?(
+          raise ForestAdminAgent::Http::Exceptions::NotFoundError, "No such field '#{name}'" unless field
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot hide primary key' if ForestAdminDatasourceToolkit::Utils::Schema.primary_key?(
             child_collection, name
           )
 
@@ -21,8 +21,9 @@ module ForestAdminDatasourceCustomizer
             next unless field_schema.type == 'PolymorphicManyToOne' &&
                         [field_schema.foreign_key, field_schema.foreign_key_type_field].include?(name)
 
-            raise ForestException, "Cannot remove field '#{self.name}.#{name}', because it's implied " \
-                                   "in a polymorphic relation '#{self.name}.#{field_name}'"
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  "Cannot remove field '#{self.name}.#{name}', because it's implied " \
+                  "in a polymorphic relation '#{self.name}.#{field_name}'"
           end
           if visible
             @blacklist.delete(name)

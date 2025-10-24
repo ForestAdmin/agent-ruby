@@ -32,7 +32,7 @@ module ForestAdminDatasourceToolkit
           expect do
             described_class.primary_keys(collection,
                                          { 'notId' => 'foo' })
-          end.to raise_error(ForestException, 'Missing primary key: id')
+          end.to raise_error(Exceptions::BadRequestError, 'Missing primary key: id')
         end
       end
 

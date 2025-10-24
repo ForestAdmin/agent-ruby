@@ -78,11 +78,9 @@ module ForestAdminDatasourceRpc
         if exception_class
           raise exception_class, message
         elsif status >= 500
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "Server Error: #{message}"
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Server Error: #{message}"
         else
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "RPC request failed: #{status} - #{message}"
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "RPC request failed: #{status} - #{message}"
         end
       end
 

@@ -64,7 +64,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'addValidation() should throw if the field is readonly' do
-          expect { @decorated_book.add_validation('id', { operator: Operators::PRESENT }) }.to raise_error(ForestException, 'Cannot add validators on a readonly field')
+          expect { @decorated_book.add_validation('id', { operator: Operators::PRESENT }) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'Cannot add validators on a readonly field')
         end
 
         it 'addValidation() should throw if the field is a relation' do
@@ -72,7 +72,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'addValidation() should throw if the field is in a relation' do
-          expect { @decorated_book.add_validation('author:first_name', { operator: Operators::PRESENT }) }.to raise_error(ForestException, 'Cannot add validators on a relation, use the foreign key instead')
+          expect { @decorated_book.add_validation('author:first_name', { operator: Operators::PRESENT }) }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'Cannot add validators on a relation, use the foreign key instead')
         end
 
         context 'with field selection when validating' do

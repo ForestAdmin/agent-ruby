@@ -89,7 +89,7 @@ module ForestAdminDatasourceMongoid
           return lookup_projection(as, [*schema_stack, last_schema[name]], projection, options) if last_schema[name]
 
           # We should have handled all possible cases.
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Unexpected relation: '#{name}'"
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Unexpected relation: '#{name}'"
         end
       end
     end

@@ -175,7 +175,7 @@ module ForestAdminDatasourceMongoid
           when Operators::PRESENT
             { '$exists' => true, '$ne' => null }
           else
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Unsupported '#{operator}' operator"
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Unsupported '#{operator}' operator"
           end
         end
 

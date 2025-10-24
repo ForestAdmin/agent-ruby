@@ -24,7 +24,8 @@ module ForestAdminDatasourceCustomizer
 
           # Collection has been renamed, user is using the old name
           if @from_child_name.key?(name)
-            raise Exceptions::ForestException, "Collection '#{name}' has been renamed to '#{@from_child_name[name]}'"
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+                  "Collection '#{name}' has been renamed to '#{@from_child_name[name]}'"
           end
 
           # Collection has not been renamed
@@ -42,7 +43,8 @@ module ForestAdminDatasourceCustomizer
               rename_collection(old_name, new_name)
             end
           else
-            raise Exceptions::ForestException, 'Invalid argument for rename_collections, must be a function or a hash'
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                  'Invalid argument for rename_collections, must be a function or a hash'
           end
         end
 
@@ -54,13 +56,13 @@ module ForestAdminDatasourceCustomizer
 
           # Check new name is not already used
           if collections.any? { |name, _collection| name == new_name }
-            raise Exceptions::ForestException,
+            raise ForestAdminAgent::Http::Exceptions::ConflictError,
                   "The given new collection name '#{new_name}' is already defined"
           end
 
           # Check we don't rename a collection twice
           if @to_child_name[current_name]
-            raise Exceptions::ForestException,
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                   "Cannot rename a collection twice: #{@to_child_name[current_name]}->#{current_name}->#{new_name}"
           end
 
@@ -70,7 +72,7 @@ module ForestAdminDatasourceCustomizer
 
             reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)
 
-            raise Exceptions::ForestException,
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                   "Cannot rename collection #{current_name} because it's a target of a polymorphic relation " \
                   "'#{field_schema.foreign_collection}.#{reverse_relation_name}'"
           end

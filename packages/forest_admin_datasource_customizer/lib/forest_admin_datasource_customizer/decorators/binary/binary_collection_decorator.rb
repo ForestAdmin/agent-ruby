@@ -23,10 +23,11 @@ module ForestAdminDatasourceCustomizer
         def set_binary_mode(name, type)
           field = @child_collection.schema[:fields][name]
 
-          raise Exceptions::ForestException, 'Invalid binary mode' unless %w[datauri hex].include?(type)
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid binary mode' unless %w[datauri
+                                                                                                     hex].include?(type)
 
           unless field&.type == 'Column' && field&.column_type == 'Binary'
-            raise Exceptions::ForestException, 'Expected a binary field'
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Expected a binary field'
           end
 
           @use_hex_conversion[name] = (type == 'hex')

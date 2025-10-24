@@ -7,13 +7,12 @@ module ForestAdminDatasourceCustomizer
           case rule[attribute]
           when 'contains'
             unless rule[:value].include? options[attribute]
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                     "'#{attribute}' must have a value included in [#{rule[:value]}]"
             end
           when 'present'
             unless options.key? attribute
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    "key '#{attribute}' must be defined"
+              raise ForestAdminAgent::Http::Exceptions::BadRequestError, "key '#{attribute}' must be defined"
             end
           end
         end

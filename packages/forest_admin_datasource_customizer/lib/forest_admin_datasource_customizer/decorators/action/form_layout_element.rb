@@ -49,14 +49,16 @@ module ForestAdminDatasourceCustomizer
           private
 
           def validate_fields_presence!(options)
-            raise ForestException, "Using 'fields' in a 'Row' configuration is mandatory" unless options.key?(:fields)
+            return if options.key?(:fields)
+
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Using 'fields' in a 'Row' configuration is mandatory"
           end
 
           def validate_no_layout_subfields!(fields)
             fields.each do |field|
               if (field.is_a?(DynamicField) && field.type == 'Layout') ||
                  (field.is_a?(Hash) && field[:type] == 'Layout')
-                raise ForestException, "A 'Row' form element doesn't allow layout elements as subfields"
+                raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "A 'Row' form element doesn't allow layout elements as subfields"
               end
             end
           end
@@ -90,13 +92,13 @@ module ForestAdminDatasourceCustomizer
           def validate_elements_presence!(options)
             return if options.key?(:elements)
 
-            raise ForestException, "Using 'elements' in a 'Page' configuration is mandatory"
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Using 'elements' in a 'Page' configuration is mandatory"
           end
 
           def validate_no_page_elements!(elements)
             elements&.each do |element|
               if element[:component] == 'Page'
-                raise ForestException, "'Page' component cannot be used within 'elements'"
+                raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "'Page' component cannot be used within 'elements'"
               end
             end
           end

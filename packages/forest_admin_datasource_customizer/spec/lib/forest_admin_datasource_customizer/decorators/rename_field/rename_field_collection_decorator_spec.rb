@@ -121,7 +121,7 @@ module ForestAdminDatasourceCustomizer
         it 'raise an error when renaming a field which does not exists' do
           expect do
             @new_person.rename_field('unknown', 'somethingnew')
-          end.to raise_error(Exceptions::ForestException, "No such field 'unknown'")
+          end.to raise_error(Exceptions::NotFoundError, "No such field 'unknown'")
         end
 
         it 'raise if renaming a field referenced in a polymorphic relation' do
@@ -145,7 +145,7 @@ module ForestAdminDatasourceCustomizer
 
           expect do
             @new_person.rename_field('id', 'primaryKey')
-          end.to raise_error(Exceptions::ForestException, "No such field 'id'")
+          end.to raise_error(Exceptions::NotFoundError, "No such field 'id'")
         end
 
         it 'raise an error when renaming with a name including space' do

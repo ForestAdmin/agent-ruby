@@ -42,7 +42,7 @@ module ForestAdminDatasourceToolkit
         end
 
         def nest(prefix)
-          raise ForestException, "Filter can't be nested" unless nestable?
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Filter can't be nested" unless nestable?
 
           override(condition_tree: @condition_tree&.nest(prefix))
         end

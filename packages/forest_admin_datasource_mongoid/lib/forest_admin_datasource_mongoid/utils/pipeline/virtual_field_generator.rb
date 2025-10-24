@@ -51,9 +51,10 @@ module ForestAdminDatasourceMongoid
 
               # As this is a use case that never happens from the UI, and that can be worked around when
               # using the API, we decided to not implement it.
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                     'Fetching virtual parent_id deeper than 1 level is not supported.'
             end
+
             suffix = field[0...(field.length - parent_id_identifier.length)]
 
             return ConditionGenerator.tag_record_if_not_exist_by_value(suffix, '$_id')

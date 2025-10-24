@@ -64,7 +64,7 @@ module ForestAdminDatasourceCustomizer
           when 'UserDropdown'
             WidgetField::UserDropdownField.new(**field)
           else
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Unknow widget type: #{field[:widget]}"
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Unknow widget type: #{field[:widget]}"
           end
         end
 
@@ -79,8 +79,7 @@ module ForestAdminDatasourceCustomizer
           when 'Page'
             FormLayoutElement::PageElement.new(**field)
           else
-            raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                  "Unknow component type: #{field[:component]}"
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError, "Unknow component type: #{field[:component]}"
           end
         end
       end

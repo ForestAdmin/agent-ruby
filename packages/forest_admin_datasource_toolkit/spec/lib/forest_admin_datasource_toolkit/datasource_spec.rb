@@ -20,7 +20,7 @@ module ForestAdminDatasourceToolkit
       expect do
         @datasource.get_collection('__no_such_collection__')
       end.to raise_error(
-        ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        ForestAdminDatasourceToolkit::Exceptions::NotFoundError,
         'Collection __no_such_collection__ not found.'
       )
     end
@@ -29,7 +29,7 @@ module ForestAdminDatasourceToolkit
       expect do
         @datasource.render_chart({}, '__no_such_chart__')
       end.to raise_error(
-        ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        ForestAdminDatasourceToolkit::Exceptions::NotFoundError,
         'No chart named __no_such_chart__ exists on this datasource.'
       )
     end
@@ -38,7 +38,7 @@ module ForestAdminDatasourceToolkit
       expect do
         @datasource.add_collection(@collection)
       end.to raise_error(
-        ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        ForestAdminDatasourceToolkit::Exceptions::ConflictError,
         'Collection __collection__ already defined in datasource'
       )
     end
@@ -47,7 +47,7 @@ module ForestAdminDatasourceToolkit
       expect do
         @datasource.execute_native_query('_connection_name', '_query', '_binds')
       end.to raise_error(
-        ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
         'this datasource do not support native query.'
       )
     end
@@ -56,7 +56,7 @@ module ForestAdminDatasourceToolkit
       expect do
         @datasource.build_binding_symbol('_connection_name', '_binds')
       end.to raise_error(
-        ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
         'this datasource do not support native query.'
       )
     end

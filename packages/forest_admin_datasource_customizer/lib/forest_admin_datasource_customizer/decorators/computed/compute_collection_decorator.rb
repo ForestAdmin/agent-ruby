@@ -37,14 +37,14 @@ module ForestAdminDatasourceCustomizer
           # Check that all dependencies exist and are columns
           computed.dependencies.each do |field|
             if field.include?(':') && schema[:fields][field.partition(':')[0]].type == 'PolymorphicManyToOne'
-              raise ForestException,
+              raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                     "Dependencies over a polymorphic relations(#{self.name}.#{field.partition(":")[0]}) are forbidden"
             end
             FieldValidator.validate(self, field)
           end
 
           if computed.dependencies.length <= 0
-            raise ForestException,
+            raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                   "Computed field '#{name}' must have at least one dependency."
           end
 

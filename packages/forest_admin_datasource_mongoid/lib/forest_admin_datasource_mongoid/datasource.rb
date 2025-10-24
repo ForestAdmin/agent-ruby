@@ -71,23 +71,20 @@ module ForestAdminDatasourceMongoid
         name = prefix ? "#{prefix}.#{field}" : field
 
         if !field.include?('.') && prefix
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "asFields contains '#{name}', which can't be flattened further because " \
-                "asModels contains '#{prefix}', so it is already at the root of a collection."
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "asFields contains '#{name}', which can't be flattened further because " \
+                                                                        "asModels contains '#{prefix}', so it is already at the root of a collection."
         end
 
         unless field.include?('.')
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "asFields contains '${name}', which can't be flattened because it is already at  " \
-                'the root of the model.'
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "asFields contains '${name}', which can't be flattened because it is already at  " \
+                                                                        'the root of the model.'
         end
 
         next unless contains_intermediary_array(local_schema, field)
 
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "asFields contains '${name}', " \
-              "which can't be moved to the root of the model, because it is inside of an array. " \
-              'Either add all intermediary arrays to asModels, or remove it from asFields.'
+        raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "asFields contains '${name}', " \
+                                                                      "which can't be moved to the root of the model, because it is inside of an array. " \
+                                                                      'Either add all intermediary arrays to asModels, or remove it from asFields.'
       end
     end
 
@@ -99,10 +96,9 @@ module ForestAdminDatasourceMongoid
 
         next unless contains_intermediary_array(local_schema, field)
 
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "asModels contains '#{name}', " \
-              "which can't be transformed into a model, because it is inside of an array. " \
-              'Either add all intermediary arrays to asModels, or remove it from asModels.'
+        raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "asModels contains '#{name}', " \
+                                                                      "which can't be transformed into a model, because it is inside of an array. " \
+                                                                      'Either add all intermediary arrays to asModels, or remove it from asModels.'
       end
     end
 

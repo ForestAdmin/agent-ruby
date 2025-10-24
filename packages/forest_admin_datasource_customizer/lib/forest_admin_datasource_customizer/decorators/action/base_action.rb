@@ -41,9 +41,10 @@ module ForestAdminDatasourceCustomizer
               end
             else
               if used.include?(element.id)
-                raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                raise ForestAdminAgent::Http::Exceptions::ConflictError,
                       "All field must have different 'id'. Conflict come from field '#{element.id}'"
               end
+
               used << element.id
             end
           end

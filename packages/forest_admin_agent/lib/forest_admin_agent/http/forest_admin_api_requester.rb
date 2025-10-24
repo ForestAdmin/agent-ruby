@@ -4,7 +4,6 @@ module ForestAdminAgent
   module Http
     class ForestAdminApiRequester
       include ForestAdminAgent::Http::Exceptions
-      include ForestAdminDatasourceToolkit::Exceptions
 
       def initialize
         @headers = {
@@ -30,8 +29,7 @@ module ForestAdminAgent
 
       def handle_response_error(error)
         # Re-raise if it's already a BusinessError
-        raise error if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
-        raise error if error.is_a?(ForestException)
+        raise error if error.is_a?(BusinessError)
 
         if error.response[:message]&.include?('certificate')
           raise InternalServerError.new(

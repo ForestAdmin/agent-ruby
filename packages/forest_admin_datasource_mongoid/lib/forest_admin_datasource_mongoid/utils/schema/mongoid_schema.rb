@@ -21,7 +21,7 @@ module ForestAdminDatasourceMongoid
         end
 
         def schema_type
-          raise ForestException, 'Schema is not a leaf.' unless @is_leaf
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Schema is not a leaf.' unless @is_leaf
 
           @fields[:content]
         end
@@ -100,7 +100,9 @@ module ForestAdminDatasourceMongoid
           if child.is_a?(Hash)
             relation_name = @model.relations[prefix].class_name
 
-            raise ForestException, "Collection '#{relation_name}' not found." unless @models.key?(relation_name)
+            unless @models.key?(relation_name)
+              raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Collection '#{relation_name}' not found."
+            end
 
             # Traverse arrays
             if child.is_a?(Hash) && child['[]']
@@ -114,7 +116,7 @@ module ForestAdminDatasourceMongoid
 
             return MongoidSchema.new(@models[relation_name], child, is_array, is_leaf).get_sub_schema(suffix)
           elsif child.nil?
-            raise ForestException, "Field '#{prefix}' not found. Available fields are: #{list_fields}"
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Field '#{prefix}' not found. Available fields are: #{list_fields}"
           end
 
           # We ended up on a field => box it.
@@ -127,7 +129,7 @@ module ForestAdminDatasourceMongoid
         end
 
         def apply_stack(stack, skip_as_models: false)
-          raise ForestException, 'Stack can never be empty.' if stack.empty?
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Stack can never be empty.' if stack.empty?
 
           step = stack.pop
           sub_schema = get_sub_schema(step[:prefix])
@@ -176,8 +178,10 @@ module ForestAdminDatasourceMongoid
         # List leafs and arrays up to a certain level
         # Arrays are never traversed
         def list_fields(level = Float::INFINITY)
-          raise ForestException, 'Cannot list fields on a leaf schema.' if @is_leaf
-          raise ForestException, 'Level must be greater than 0.' if level.zero?
+          if @is_leaf
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot list fields on a leaf schema.'
+          end
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError, 'Level must be greater than 0.' if level.zero?
 
           return @fields.keys if level == 1
 

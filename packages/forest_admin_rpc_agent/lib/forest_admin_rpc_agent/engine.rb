@@ -7,7 +7,8 @@ module ForestAdminRpcAgent
     end
 
     config.after_initialize do
-      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
+      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                         ForestAdminAgent::Http::Exceptions::BusinessError) do
         agent = ForestAdminRpcAgent::Agent.instance
         agent.setup(ForestAdminRpcAgent.config)
 

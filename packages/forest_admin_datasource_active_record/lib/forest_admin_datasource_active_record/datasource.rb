@@ -41,7 +41,7 @@ module ForestAdminDatasourceActiveRecord
 
         ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
       rescue StandardError => e
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
               "Error when executing SQL query: '#{e.full_message}'"
       end
     end

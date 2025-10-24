@@ -159,18 +159,20 @@ module ForestAdminDatasourceCustomizer
 
           return unless key.column_type != target.column_type
 
-          raise ForestException,
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
                 "Types from '#{owner.name}.#{key_name}' and '#{target_owner.name}.#{target_name}' do not match."
         end
 
         def check_column(owner, name)
           column = owner.schema[:fields][name]
 
-          raise ForestException, "Column not found: '#{owner.name}.#{name}'" if !column || column.type != 'Column'
+          if !column || column.type != 'Column'
+            raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Column not found: '#{owner.name}.#{name}'"
+          end
 
           return if column.filter_operators.include?(Operators::IN)
 
-          raise ForestException, "Column does not support the In operator: '#{owner.name}.#{name}'"
+          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, "Column does not support the In operator: '#{owner.name}.#{name}'"
         end
 
         def rewrite_field(field)

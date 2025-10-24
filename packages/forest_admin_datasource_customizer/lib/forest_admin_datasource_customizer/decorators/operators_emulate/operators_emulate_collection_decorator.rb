@@ -25,17 +25,18 @@ module ForestAdminDatasourceCustomizer
             schema = child_collection.schema[:fields][pk]
             operators = schema.filter_operators
 
-            if !operators.include?(Operators::EQUAL) || !operators.include?(Operators::IN)
-              raise Exceptions::ForestException, "Cannot override operators on collection #{self.name}: " \
-                                                 "the primary key columns must support 'Equal' and 'In' operators."
-            end
+            next unless !operators.include?(Operators::EQUAL) || !operators.include?(Operators::IN)
+
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                  "Cannot override operators on collection #{name}: " \
+                  "the primary key columns must support 'Equal' and 'In' operators."
           end
 
           # Check that targeted field is valid
           field = child_collection.schema[:fields][name]
           Validations::FieldValidator.validate(self, name)
           unless field.is_a?(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
-            raise Exceptions::ForestException, 'Cannot replace operator for relation'
+            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Cannot replace operator for relation'
           end
 
           # Mark the field operator as replaced.
@@ -86,7 +87,8 @@ module ForestAdminDatasourceCustomizer
             replacement_id = "#{name}.#{leaf.field}[#{leaf.operator}]"
             sub_replacements = replacements.union([replacement_id])
             if replacements.include?(replacement_id)
-              raise Exceptions::ForestException, "Operator replacement cycle: #{sub_replacements.join(" -> ")}"
+              raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                    "Operator replacement cycle: #{sub_replacements.join(" -> ")}"
             end
 
             result = handler.call(leaf.value, Context::CollectionCustomizationContext.new(self, caller))

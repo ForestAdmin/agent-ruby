@@ -8,7 +8,8 @@ module ForestAdminDatasourceCustomizer
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection_customizer.collection)
 
         unless options.key?(:name) && options.key?(:schema) && options.key?(:listRecords)
-          raise ForestException, 'The options parameter must contains the following keys: `name, schema, listRecords`'
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                'The options parameter must contains the following keys: `name, schema, listRecords`'
         end
 
         collection_customizer.add_field(

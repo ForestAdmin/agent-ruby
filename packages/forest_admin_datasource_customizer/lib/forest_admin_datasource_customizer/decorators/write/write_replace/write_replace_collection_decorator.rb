@@ -13,7 +13,10 @@ module ForestAdminDatasourceCustomizer
           end
 
           def replace_field_writing(field_name, &definition)
-            raise ForestException, 'A new writing method should be provided to replace field writing' unless definition
+            unless definition
+              raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                    'A new writing method should be provided to replace field writing'
+            end
 
             ForestAdminDatasourceToolkit::Validations::FieldValidator.validate(self, field_name)
 
@@ -64,7 +67,8 @@ module ForestAdminDatasourceCustomizer
 
           def rewrite_key(context, key, used)
             if used.include?(key)
-              raise ForestException, "Conflict value on the field #{key}. It received several values."
+              raise ForestAdminAgent::Http::Exceptions::ConflictError,
+                    "Conflict value on the field #{key}. It received several values."
             end
 
             field_schema = schema.nil? ? nil : schema[:fields][key]
@@ -79,7 +83,8 @@ module ForestAdminDatasourceCustomizer
                             end
 
               if field_patch && !field_patch.is_a?(Hash)
-                raise ForestException, "The write handler of #{key} should return an Hash or nothing."
+                raise ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                      "The write handler of #{key} should return an Hash or nothing."
               end
 
               # Isolate change to our own value (which should not recurse) and the rest which should
@@ -101,7 +106,7 @@ module ForestAdminDatasourceCustomizer
 
               { key => relation.rewrite_patch(context.caller, context.action, context.record[key]) }
             else
-              raise ForestException, "Unknown field: '#{key}'"
+              raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Unknown field: '#{key}'"
             end
           end
 
@@ -118,7 +123,8 @@ module ForestAdminDatasourceCustomizer
                 elsif sub_value.is_a?(Hash)
                   acc[sub_key] = deep_merge(acc[sub_key], sub_value)
                 else
-                  raise ForestException, "Conflict value on the field #{sub_key}. It received several values."
+                  raise ForestAdminAgent::Http::Exceptions::ConflictError,
+                        "Conflict value on the field #{sub_key}. It received several values."
                 end
               end
             end
