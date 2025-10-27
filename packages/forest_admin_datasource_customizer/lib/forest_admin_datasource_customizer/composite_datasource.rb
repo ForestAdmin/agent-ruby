@@ -22,7 +22,7 @@ module ForestAdminDatasourceCustomizer
       @datasources.each do |ds|
         return ds.get_collection(name)
       rescue StandardError
-        # ignore et continue
+        # ignore and continue
       end
 
       raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
@@ -34,12 +34,13 @@ module ForestAdminDatasourceCustomizer
         return ds.render_chart(caller_obj, name) if ds.schema[:charts].include?(name)
       end
 
-      raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart '#{name}' is not defined in the dataSource."
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Chart '#{name}' is not defined in the dataSource."
     end
 
     def execute_native_query(connection_name, query, context_variables = {})
       unless live_query_connections.key?(connection_name)
-        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
               "Native query connection '#{name}' is unknown."
       end
 

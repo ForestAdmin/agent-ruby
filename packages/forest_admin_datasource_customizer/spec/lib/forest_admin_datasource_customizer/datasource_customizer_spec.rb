@@ -169,7 +169,7 @@ module ForestAdminDatasourceCustomizer
 
       expect do
         customizer.datasource(nil).render_chart(:caller, 'unknown_chart')
-      end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart 'unknown_chart' is not defined in the dataSource.")
+      end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Chart 'unknown_chart' is not defined in the dataSource.")
     end
 
     it 'calls run on the plugin with correct arguments' do
