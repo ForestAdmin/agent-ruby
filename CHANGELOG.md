@@ -1,3 +1,10 @@
+## [1.12.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.8...v1.12.9) (2025-10-27)
+
+
+### Bug Fixes
+
+* handle properly composite datasource ([#179](https://github.com/ForestAdmin/agent-ruby/issues/179)) ([b63f39a](https://github.com/ForestAdmin/agent-ruby/commit/b63f39ae38d7c088494b7abf9237d0597cce5be9))
+
 ## [1.12.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.7...v1.12.8) (2025-10-27)
 
 
