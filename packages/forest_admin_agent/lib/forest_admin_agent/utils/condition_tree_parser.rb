@@ -33,11 +33,20 @@ module ForestAdminAgent
         schema = Collection.get_field_schema(collection, leaf[:field])
 
         if leaf[:operator] == Operators::IN && leaf[:field].is_a?(String)
-          values = leaf[:value].split(',').map(&:strip)
+          # Handle both string values (comma-separated) and array values
+          values = if leaf[:value].is_a?(Array)
+                     leaf[:value]
+                   elsif leaf[:value].is_a?(String)
+                     leaf[:value].split(',').map(&:strip)
+                   else
+                     [leaf[:value]]
+                   end
 
           return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
 
-          return values.map(&:to_f).select { |item| item.is_a? Numeric } if schema.column_type == 'Number'
+          if schema.column_type == 'Number'
+            return values.map { |item| item.is_a?(Numeric) ? item : item.to_f }.select { |item| item.is_a? Numeric }
+          end
 
           return values
         end

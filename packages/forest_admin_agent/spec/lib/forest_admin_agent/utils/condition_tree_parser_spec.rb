@@ -86,6 +86,34 @@ module ForestAdminAgent
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
           .to have_attributes(field: filters[:field], operator: filters[:operator], value: [1, 2, 3])
       end
+
+      it 'works with "IN" on a string when value is already an array' do
+        filters = { field: 'label', operator: Operators::IN, value: %w[id1 id2 id3] }
+
+        expect(condition_tree_parser.from_plain_object(collection_category, filters))
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[id1 id2 id3])
+      end
+
+      it 'works with "IN" on a number when value is already an array of strings' do
+        filters = { field: 'id', operator: Operators::IN, value: %w[27 28 29] }
+
+        expect(condition_tree_parser.from_plain_object(collection_category, filters))
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: [27.0, 28.0, 29.0])
+      end
+
+      it 'works with "IN" on a number when value is already an array of numbers' do
+        filters = { field: 'id', operator: Operators::IN, value: [27, 28, 29] }
+
+        expect(condition_tree_parser.from_plain_object(collection_category, filters))
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: [27, 28, 29])
+      end
+
+      it 'works with "IN" on a boolean when value is already an array' do
+        filters = { field: 'active', operator: Operators::IN, value: %w[true 0 false yes no] }
+
+        expect(condition_tree_parser.from_plain_object(collection_category, filters))
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: [true, false, false, true, false])
+      end
     end
   end
 end
