@@ -3,9 +3,8 @@ module ForestAdminDatasourceCustomizer
     attr_reader :stack, :datasources
 
     def initialize(_db_config = {})
-      @composite_datasource = ForestAdminDatasourceToolkit::Datasource.new
+      @composite_datasource = ForestAdminDatasourceCustomizer::CompositeDatasource.new
       @stack = Decorators::DecoratorsStack.new(@composite_datasource)
-      @datasources = []
     end
 
     def schema
@@ -42,16 +41,8 @@ module ForestAdminDatasourceCustomizer
           datasource = rename_collection_decorator
         end
 
-        datasource.collections.each_value do |collection|
-          @composite_datasource.add_collection(collection)
-        end
-
-        datasource.schema[:charts].each do |chart|
-          @composite_datasource.add_chart(chart)
-        end
+        @composite_datasource.add_data_source(datasource)
       })
-
-      @datasources << datasource
 
       self
     end
@@ -79,30 +70,11 @@ module ForestAdminDatasourceCustomizer
       self
     end
 
-    def get_root_datasource_by_connection(name)
-      root_datasource = @datasources.find do |datasource|
-        datasource.live_query_connections.any? { |connection_name, _connection| connection_name == name }
-      end
-
-      unless root_datasource
-        raise ForestAdminAgent::Http::Exceptions::NotFoundError,
-              "Native query connection '#{name}' is unknown."
-      end
-
-      root_datasource
-    end
-
-    def render_chart(caller, name)
-      return @composite_datasource.render_chart(caller, name) if @composite_datasource.schema[:charts].any?(name)
-
-      raise ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart '#{name}' is not defined in the dataSource."
-    end
-
     def reload!(logger: nil)
       old_composite = @composite_datasource
 
       begin
-        new_composite = ForestAdminDatasourceToolkit::Datasource.new
+        new_composite = ForestAdminDatasourceCustomizer::CompositeDatasource.new
         @stack.reload!(new_composite, logger)
         @composite_datasource = new_composite
       rescue StandardError => e

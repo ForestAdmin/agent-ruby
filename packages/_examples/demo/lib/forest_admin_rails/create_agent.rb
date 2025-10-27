@@ -20,7 +20,9 @@ module ForestAdminRails
 
       @agent = ForestAdminAgent::Builder::AgentFactory.instance
                                                       .add_datasource(rpc_datasource)
-                                                      .add_datasource(datasource)
+                                                      .add_datasource(datasource, rename: {
+          'User' => 'Customer',
+        })
                                                       # .add_datasource(mongo_datasource)
 
       # @agent.add_chart('appointments') do |_context, result_builder|
@@ -31,6 +33,15 @@ module ForestAdminRails
     end
 
     def self.customize
+      @agent.add_chart('appointments') do |context, result_builder|
+        ds = context.datasource.get_collection('Customer')
+        puts ds
+        result_builder.value(784, 760)
+      end
+      @agent.customize_collection('Customer') do |collection|
+        collection.rename_field('lastname', 'last_name')
+      end
+      @agent.remove_collection('Customer')
     end
   end
 end

@@ -23,14 +23,11 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:datasource) { instance_double(ForestAdminDatasourceToolkit::Datasource) }
 
         before do
-          @root_datasource = Datasource.new
-          ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(@root_datasource)
-          customizer = instance_double(
-            ForestAdminDatasourceCustomizer::DatasourceCustomizer,
-            get_root_datasource_by_connection: @root_datasource
-          )
+          allow(ForestAdminAgent::Facades::Container).to receive(:datasource).and_return(datasource)
+          customizer = instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer)
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive_messages(
             send_schema: nil,
             customizer: customizer
@@ -92,7 +89,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ value: 10 }])
+            allow(datasource).to receive(:execute_native_query).and_return([{ value: 10 }])
             result = native_query.handle_request(args)
 
             expect(result).to match(
@@ -116,7 +113,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ value: 10, previous: 10 }])
+            allow(datasource).to receive(:execute_native_query).and_return([{ value: 10, previous: 10 }])
             result = native_query.handle_request(args)
 
             expect(result).to match(
@@ -140,7 +137,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
+            allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
@@ -158,7 +155,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [{ value: 200, objective: 750 }]
             )
             result = native_query.handle_request(args)
@@ -184,7 +181,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
+            allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
@@ -202,7 +199,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [{ key: 'pending', value: 10 }, { key: 'done', value: 100 }]
             )
             result = native_query.handle_request(args)
@@ -228,7 +225,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
+            allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
               ForestException,
@@ -247,7 +244,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [
                 { value: 10, key: '2022-01-01 00:00:00' },
                 { value: 15, key: '2022-02-01 00:00:00' }
@@ -280,7 +277,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [
                 { value: 10, foo: '2022-01-01 00:00:00' },
                 { value: 15, foo: '2022-02-01 00:00:00' }
@@ -308,7 +305,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [
                 { value: 10, key: 2022  },
                 { value: 15, key: 2023  }
@@ -343,7 +340,7 @@ module ForestAdminAgent
                 connectionName: 'primary'
               }
             )
-            allow(@root_datasource).to receive(:execute_native_query).and_return(
+            allow(datasource).to receive(:execute_native_query).and_return(
               [
                 { value: 10, foo: 2022  },
                 { value: 15, foo: 2023  }
@@ -369,10 +366,10 @@ module ForestAdminAgent
               }
             )
 
-            allow(@root_datasource).to receive_messages(execute_native_query: [{ value: 10, previous: 10 }], build_binding_symbol: '$1')
+            allow(datasource).to receive_messages(execute_native_query: [{ value: 10, previous: 10 }], build_binding_symbol: '$1')
             native_query.handle_request(args)
 
-            expect(@root_datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
+            expect(datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
               expect(connection_name).to eq('primary')
               expect(query).to eq('SELECT COUNT(*) AS value FROM customers WHERE id > $1;')
               expect(binds).to eq(['FOO'])
