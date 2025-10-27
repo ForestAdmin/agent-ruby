@@ -102,7 +102,7 @@ module ForestAdminAgent
 
       describe 'execute_query' do
         it 'raise an error when connectionName was unknown' do
-          allow(collection.datasource).to receive(:execute_native_query).and_raise(ForestAdminAgent::Http::Exceptions::NotFoundError,
+          allow(collection.datasource).to receive(:execute_native_query).and_raise(ForestAdminDatasourceToolkit::Exceptions::ForestException,
                                                                                    "Native query connection 'foo' is unknown.")
           expect do
             dummy_class.execute_query(
@@ -113,7 +113,7 @@ module ForestAdminAgent
               caller,
               {}
             )
-          end.to raise_error(NotFoundError, "Native query connection 'foo' is unknown.")
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Native query connection 'foo' is unknown.")
         end
 
         it 'work when passed in the querystring for list' do
