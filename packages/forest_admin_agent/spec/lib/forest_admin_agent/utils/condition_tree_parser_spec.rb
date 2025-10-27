@@ -32,15 +32,15 @@ module ForestAdminAgent
         expect do
           condition_tree_parser.from_plain_object(collection_category,
                                                   {})
-        end.to raise_error(ForestException, 'Failed to instantiate condition tree')
+        end.to raise_error(ForestException, /Failed to instantiate condition tree/)
       end
 
       it 'works with aggregator' do
         filters = {
           aggregator: 'And',
           conditions: [
-            { field: 'id', operator: Operators::LESS_THAN, value: 'something' },
-            { field: 'id', operator: Operators::GREATER_THAN, value: 'something' }
+            { field: 'id', operator: Operators::LESS_THAN, value: 10 },
+            { field: 'id', operator: Operators::GREATER_THAN, value: 5 }
           ]
         }
         result = condition_tree_parser.from_plain_object(collection_category, filters)
@@ -50,20 +50,20 @@ module ForestAdminAgent
             conditions: contain_exactly(have_attributes(
                                           field: filters[:conditions][0][:field],
                                           operator: filters[:conditions][0][:operator],
-                                          value: filters[:conditions][0][:value]
+                                          value: filters[:conditions][0][:value].to_f
                                         ), have_attributes(
                                              field: filters[:conditions][1][:field],
                                              operator: filters[:conditions][1][:operator],
-                                             value: filters[:conditions][1][:value]
+                                             value: filters[:conditions][1][:value].to_f
                                            ))
           )
       end
 
       it 'works with single condition without aggregator' do
-        filters = { field: 'id', operator: Operators::LESS_THAN, value: 'something' }
+        filters = { field: 'id', operator: Operators::LESS_THAN, value: 42 }
 
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
-          .to have_attributes(field: filters[:field], operator: filters[:operator], value: filters[:value])
+          .to have_attributes(field: filters[:field], operator: filters[:operator], value: filters[:value].to_f)
       end
 
       it 'works with "IN" on a string' do
