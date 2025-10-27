@@ -1,3 +1,10 @@
+## [1.12.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.7...v1.12.8) (2025-10-27)
+
+
+### Bug Fixes
+
+* **config:** add setting to disable route cache ([#189](https://github.com/ForestAdmin/agent-ruby/issues/189)) ([5acf768](https://github.com/ForestAdmin/agent-ruby/commit/5acf7686ca141c02facc2260181a45d13716e19c))
+
 ## [1.12.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.6...v1.12.7) (2025-10-27)
 
 
