@@ -32,6 +32,30 @@ module ForestAdminDatasourceActiveRecord
 
           expect(dummy_class.get_column_type(User, column)).to eq 'String'
         end
+
+        it 'returns array format for array columns' do
+          column = double( # rubocop:disable RSpec/VerifiedDoubles
+            'Column',
+            name: 'tags',
+            type: :string
+          )
+          allow(column).to receive(:respond_to?) { |method| method == :array }
+          allow(column).to receive(:array).and_return(true)
+
+          expect(dummy_class.get_column_type(User, column)).to eq ['String']
+        end
+
+        it 'returns array format with Number type for integer array columns' do
+          column = double( # rubocop:disable RSpec/VerifiedDoubles
+            'Column',
+            name: 'scores',
+            type: :integer
+          )
+          allow(column).to receive(:respond_to?) { |method| method == :array }
+          allow(column).to receive(:array).and_return(true)
+
+          expect(dummy_class.get_column_type(User, column)).to eq ['Number']
+        end
       end
 
       describe 'get_enum_values' do
@@ -74,6 +98,15 @@ module ForestAdminDatasourceActiveRecord
         it 'does not include Match operator for Boolean type' do
           operators = dummy_class.operators_for_column_type('Boolean')
           expect(operators).not_to include(ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH)
+        end
+
+        it 'includes array-specific operators for array types' do
+          operators = dummy_class.operators_for_column_type(['String'])
+          expect(operators).to include(
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_EQUAL,
+            ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::INCLUDES_ALL
+          )
         end
       end
     end

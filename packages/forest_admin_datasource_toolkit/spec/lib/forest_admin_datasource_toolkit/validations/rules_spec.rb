@@ -126,6 +126,22 @@ module ForestAdminDatasourceToolkit
             expect(allowed_types).to eq([PrimitiveType::STRING, nil])
           end
         end
+
+        context 'with array of string (array field type)' do
+          it 'returns String allowed types' do
+            column_type = ['String']
+            allowed_types = described_class.get_allowed_types_for_column_type(column_type)
+            expect(allowed_types).to eq([PrimitiveType::STRING, nil])
+          end
+        end
+
+        context 'with array of number (array field type)' do
+          it 'returns Number allowed types' do
+            column_type = ['Number']
+            allowed_types = described_class.get_allowed_types_for_column_type(column_type)
+            expect(allowed_types).to eq([PrimitiveType::NUMBER, nil])
+          end
+        end
       end
 
       describe 'get_allowed_types_for_operator' do

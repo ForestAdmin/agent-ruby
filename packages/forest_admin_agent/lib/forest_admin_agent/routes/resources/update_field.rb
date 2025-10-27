@@ -77,7 +77,7 @@ module ForestAdminAgent
 
         def validate_array_field!(field_schema, field_name)
           FieldValidator.validate(@collection, field_name)
-          return if field_schema.column_type.to_s.start_with?('[')
+          return if field_schema.column_type.is_a?(Array)
 
           raise Http::Exceptions::ValidationError,
                 "Field '#{field_name}' is not an array (type: #{field_schema.column_type})"
@@ -120,9 +120,9 @@ module ForestAdminAgent
         end
 
         def coerce_value(value, column_type)
-          return value unless column_type.to_s.start_with?('[') && column_type.to_s.end_with?(']')
+          return value unless column_type.is_a?(Array)
 
-          element_type = column_type.to_s[1..-2]
+          element_type = column_type.first
 
           if element_type == 'Number' && value.is_a?(String)
             begin
