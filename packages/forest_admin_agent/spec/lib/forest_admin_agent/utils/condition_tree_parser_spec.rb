@@ -17,9 +17,9 @@ module ForestAdminAgent
         collection_category.add_fields(
           {
             'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
-                                     filter_operators: [Operators::GREATER_THAN, Operators::LESS_THAN]),
-            'label' => ColumnSchema.new(column_type: 'String'),
-            'active' => ColumnSchema.new(column_type: PrimitiveType::BOOLEAN, filter_operators: [Operators::IN])
+                                     filter_operators: [Operators::GREATER_THAN, Operators::LESS_THAN, Operators::IN, Operators::NOT_IN]),
+            'label' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::IN, Operators::NOT_IN, Operators::INCLUDES_ALL]),
+            'active' => ColumnSchema.new(column_type: PrimitiveType::BOOLEAN, filter_operators: [Operators::IN, Operators::NOT_IN])
           }
         )
 
@@ -113,6 +113,52 @@ module ForestAdminAgent
 
         expect(condition_tree_parser.from_plain_object(collection_category, filters))
           .to have_attributes(field: filters[:field], operator: filters[:operator], value: [true, false, false, true, false])
+      end
+
+      context 'with NOT_IN operator' do
+        it 'works with "NOT_IN" on a string (comma-separated)' do
+          filters = { field: 'label', operator: Operators::NOT_IN, value: 'id1,id2,id3' }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[id1 id2 id3])
+        end
+
+        it 'works with "NOT_IN" on a string when value is already an array' do
+          filters = { field: 'label', operator: Operators::NOT_IN, value: %w[id1 id2 id3] }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[id1 id2 id3])
+        end
+
+        it 'works with "NOT_IN" on a number when value is already an array of strings' do
+          filters = { field: 'id', operator: Operators::NOT_IN, value: %w[27 28 29] }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: [27.0, 28.0, 29.0])
+        end
+
+        it 'works with "NOT_IN" on a boolean when value is already an array' do
+          filters = { field: 'active', operator: Operators::NOT_IN, value: ['true', 'false'] }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: [true, false])
+        end
+      end
+
+      context 'with INCLUDES_ALL operator' do
+        it 'works with "INCLUDES_ALL" on a string (comma-separated)' do
+          filters = { field: 'label', operator: Operators::INCLUDES_ALL, value: 'tag1,tag2,tag3' }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[tag1 tag2 tag3])
+        end
+
+        it 'works with "INCLUDES_ALL" on a string when value is already an array' do
+          filters = { field: 'label', operator: Operators::INCLUDES_ALL, value: %w[tag1 tag2 tag3] }
+
+          expect(condition_tree_parser.from_plain_object(collection_category, filters))
+            .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[tag1 tag2 tag3])
+        end
       end
     end
   end

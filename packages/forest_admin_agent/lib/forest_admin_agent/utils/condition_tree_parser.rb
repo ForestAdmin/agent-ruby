@@ -32,7 +32,9 @@ module ForestAdminAgent
       def self.parse_value(collection, leaf)
         schema = Collection.get_field_schema(collection, leaf[:field])
 
-        if leaf[:operator] == Operators::IN && leaf[:field].is_a?(String)
+        # Handle array operators: IN, NOT_IN, INCLUDES_ALL
+        array_operators = [Operators::IN, Operators::NOT_IN, Operators::INCLUDES_ALL]
+        if array_operators.include?(leaf[:operator]) && leaf[:field].is_a?(String)
           # Handle both string values (comma-separated) and array values
           values = if leaf[:value].is_a?(Array)
                      leaf[:value]
