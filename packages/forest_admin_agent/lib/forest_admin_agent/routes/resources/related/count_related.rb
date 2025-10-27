@@ -25,10 +25,10 @@ module ForestAdminAgent
 
             if @child_collection.is_countable?
               filter = Filter.new(condition_tree: @permissions.get_scope(@collection))
-              id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+              primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
               result = Collection.aggregate_relation(
                 @collection,
-                id,
+                primary_key_values,
                 args[:params]['relation_name'],
                 @caller,
                 filter,

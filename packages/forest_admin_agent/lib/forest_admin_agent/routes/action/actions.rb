@@ -159,9 +159,9 @@ module ForestAdminAgent
           unless attributes[:parent_association_name].nil?
             relation = attributes[:parent_association_name]
             parent = @datasource.get_collection(attributes[:parent_collection_name])
-            parent_id = Utils::Id.unpack_id(parent, attributes[:parent_collection_id])
+            parent_primary_key_values = Utils::Id.unpack_id(parent, attributes[:parent_collection_id])
 
-            filter = FilterFactory.make_foreign_filter(parent, parent_id, relation, @caller, filter)
+            filter = FilterFactory.make_foreign_filter(parent, parent_primary_key_values, relation, @caller, filter)
           end
 
           filter

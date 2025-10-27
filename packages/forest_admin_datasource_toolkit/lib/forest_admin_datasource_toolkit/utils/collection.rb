@@ -78,18 +78,18 @@ module ForestAdminDatasourceToolkit
         )
       end
 
-      def self.get_value(collection, caller, id, field)
-        if id.is_a? Array
+      def self.get_value(collection, caller, primary_key_values, field)
+        if primary_key_values.is_a? Array
           index = Schema.primary_keys(collection).index(field)
 
-          return id[index] if index
+          return primary_key_values[index] if index
         elsif Schema.primary_keys(collection).include?(field)
-          return id[field]
+          return primary_key_values[field]
         end
 
         records = collection.list(
           caller,
-          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_ids(collection, [id])),
+          ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.match_ids(collection, [primary_key_values])),
           Projection.new([field])
         )
 
@@ -130,7 +130,7 @@ module ForestAdminDatasourceToolkit
         nil
       end
 
-      def self.list_relation(collection, id, relation_name, caller, foreign_filter, projection)
+      def self.list_relation(collection, primary_key_values, relation_name, caller, foreign_filter, projection)
         relation = collection.schema[:fields][relation_name]
         foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
@@ -141,7 +141,7 @@ module ForestAdminDatasourceToolkit
             through_collection = collection.datasource.get_collection(relation.through_collection)
             records = through_collection.list(
               caller,
-              FilterFactory.make_through_filter(collection, id, relation_name, caller, foreign_filter),
+              FilterFactory.make_through_filter(collection, primary_key_values, relation_name, caller, foreign_filter),
               projection.nest(prefix: foreign_relation)
             )
 
@@ -151,12 +151,12 @@ module ForestAdminDatasourceToolkit
 
         foreign_collection.list(
           caller,
-          FilterFactory.make_foreign_filter(collection, id, relation_name, caller, foreign_filter),
+          FilterFactory.make_foreign_filter(collection, primary_key_values, relation_name, caller, foreign_filter),
           projection
         )
       end
 
-      def self.aggregate_relation(collection, id, relation_name, caller, foreign_filter, aggregation, limit = nil)
+      def self.aggregate_relation(collection, primary_key_values, relation_name, caller, foreign_filter, aggregation, limit = nil)
         relation = collection.schema[:fields][relation_name]
         foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
 
@@ -167,7 +167,7 @@ module ForestAdminDatasourceToolkit
 
             return through_collection.aggregate(
               caller,
-              FilterFactory.make_through_filter(collection, id, relation_name, caller, foreign_filter),
+              FilterFactory.make_through_filter(collection, primary_key_values, relation_name, caller, foreign_filter),
               aggregation,
               limit
             )
@@ -176,7 +176,7 @@ module ForestAdminDatasourceToolkit
 
         foreign_collection.aggregate(
           caller,
-          FilterFactory.make_foreign_filter(collection, id, relation_name, caller, foreign_filter),
+          FilterFactory.make_foreign_filter(collection, primary_key_values, relation_name, caller, foreign_filter),
           aggregation,
           limit
         )

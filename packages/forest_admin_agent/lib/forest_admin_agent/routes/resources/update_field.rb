@@ -25,7 +25,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           build(args)
 
-          record_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+          primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
           field_name = args[:params]['field_name']
           array_index = parse_index(args[:params]['index'])
 
@@ -34,7 +34,7 @@ module ForestAdminAgent
           field_schema = @collection.schema[:fields][field_name]
           validate_array_field!(field_schema, field_name)
 
-          record = fetch_record(record_id)
+          record = fetch_record(primary_key_values)
 
           array = record[field_name]
           validate_array_value!(array, field_name, array_index)
@@ -45,7 +45,7 @@ module ForestAdminAgent
           updated_array[array_index] = new_value
 
           scope = @permissions.get_scope(@collection)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [record_id])
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
@@ -87,9 +87,9 @@ module ForestAdminAgent
           raise Http::Exceptions::ValidationError, e.message
         end
 
-        def fetch_record(record_id)
+        def fetch_record(primary_key_values)
           scope = @permissions.get_scope(@collection)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [record_id])
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )

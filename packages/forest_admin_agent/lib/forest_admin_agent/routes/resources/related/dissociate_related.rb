@@ -22,7 +22,7 @@ module ForestAdminAgent
           def handle_request(args = {})
             build(args)
 
-            parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            parent_primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
             is_delete_mode = !args.dig(:params, :delete).nil?
 
             if is_delete_mode
@@ -35,11 +35,13 @@ module ForestAdminAgent
             relation = Schema.get_to_many_relation(@collection, args[:params]['relation_name'])
 
             if ['OneToMany', 'PolymorphicOneToMany'].include?(relation.type)
-              dissociate_or_delete_one_to_many(relation, args[:params]['relation_name'], parent_id, is_delete_mode,
-                                               filter)
+              dissociate_or_delete_one_to_many(
+                relation, args[:params]['relation_name'], parent_primary_key_values, is_delete_mode, filter
+              )
             else
-              dissociate_or_delete_many_to_many(relation, args[:params]['relation_name'], parent_id, is_delete_mode,
-                                                filter)
+              dissociate_or_delete_many_to_many(
+                relation, args[:params]['relation_name'], parent_primary_key_values, is_delete_mode, filter
+              )
             end
 
             { content: nil, status: 204 }
@@ -47,8 +49,10 @@ module ForestAdminAgent
 
           private
 
-          def dissociate_or_delete_one_to_many(relation, relation_name, parent_id, is_delete_mode, filter)
-            foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_id, relation_name, @caller, filter)
+          def dissociate_or_delete_one_to_many(relation, relation_name, parent_primary_key_values, is_delete_mode,
+                                               filter)
+            foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_primary_key_values, relation_name,
+                                                               @caller, filter)
 
             if is_delete_mode
               @child_collection.delete(@caller, foreign_filter)
@@ -62,13 +66,16 @@ module ForestAdminAgent
             end
           end
 
-          def dissociate_or_delete_many_to_many(relation, relation_name, parent_id, is_delete_mode, filter)
+          def dissociate_or_delete_many_to_many(relation, relation_name, parent_primary_key_values, is_delete_mode,
+                                                filter)
             through_collection = @datasource.get_collection(relation.through_collection)
 
             if is_delete_mode
               # Generate filters _BEFORE_ deleting stuff, otherwise things break.
-              foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_id, relation_name, @caller, filter)
-              through_filter = FilterFactory.make_through_filter(@collection, parent_id, relation_name, @caller, filter)
+              foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_primary_key_values, relation_name,
+                                                                 @caller, filter)
+              through_filter = FilterFactory.make_through_filter(@collection, parent_primary_key_values, relation_name,
+                                                                 @caller, filter)
 
               # Delete records from through collection
               through_collection.delete(@caller, through_filter)
@@ -78,7 +85,8 @@ module ForestAdminAgent
               # - the underlying database/api is not cascading deletes
               @child_collection.delete(@caller, foreign_filter)
             else
-              through_filter = FilterFactory.make_through_filter(@collection, parent_id, relation_name, @caller, filter)
+              through_filter = FilterFactory.make_through_filter(@collection, parent_primary_key_values, relation_name,
+                                                                 @caller, filter)
               through_collection.delete(@caller, through_filter)
             end
           end

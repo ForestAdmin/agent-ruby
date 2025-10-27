@@ -17,8 +17,8 @@ module ForestAdminAgent
           build(args)
           @permissions.can?(:read, @collection)
           scope = @permissions.get_scope(@collection)
-          id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [id])
+          primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
