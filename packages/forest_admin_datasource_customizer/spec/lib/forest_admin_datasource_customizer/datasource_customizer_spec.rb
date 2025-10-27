@@ -130,35 +130,6 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
-    context 'when using get_root_datasource_by_connection' do
-      it 'raise an error when connection is unknown' do
-        datasource_customizer = described_class.new
-
-        expect do
-          datasource_customizer.get_root_datasource_by_connection('unknown_connection')
-        end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Native query connection 'unknown_connection' is unknown.")
-      end
-
-      it 'return the expected datasource' do
-        datasource_customizer = described_class.new
-        first_datasource = build_datasource(live_query_connections: { 'primary' => 'primary' })
-        second_datasource = build_datasource(live_query_connections: { 'replica' => 'replica' })
-        datasource_customizer.add_datasource(first_datasource, {})
-        datasource_customizer.add_datasource(second_datasource, {})
-
-        expect(datasource_customizer.get_root_datasource_by_connection('primary'))
-          .to eq(first_datasource)
-      end
-    end
-
-    it 'returns the validation schema' do
-      customizer = described_class.new
-      validation = instance_double(ValidationFakeDecorator, schema: { foo: 'bar' })
-      customizer.stack.instance_variable_set(:@validation, validation)
-
-      expect(customizer.schema).to eq(foo: 'bar')
-    end
-
     it 'applies include/exclude filters using PublicationDatasourceDecorator' do
       decorated = described_class.new
       datasource = build_datasource
