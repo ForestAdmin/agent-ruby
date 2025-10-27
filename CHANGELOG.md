@@ -1,3 +1,10 @@
+## [1.12.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.5...v1.12.6) (2025-10-27)
+
+
+### Bug Fixes
+
+* **datasource:** list related has many without constraint ([#185](https://github.com/ForestAdmin/agent-ruby/issues/185)) ([2347dff](https://github.com/ForestAdmin/agent-ruby/commit/2347dffe75a2fd323aab1d65735bd88e9f46deec))
+
 ## [1.12.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.4...v1.12.5) (2025-10-24)
 
 
