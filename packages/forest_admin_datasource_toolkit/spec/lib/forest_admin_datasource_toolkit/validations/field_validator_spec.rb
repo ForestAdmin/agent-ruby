@@ -191,12 +191,19 @@ module ForestAdminDatasourceToolkit
             end.not_to raise_error
           end
 
+          it 'valid value type should not throw error (string number)' do
+            expect do
+              described_class.validate_value('number', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER),
+                                             '27')
+            end.not_to raise_error
+          end
+
           it 'invalid value type should throw error' do
             expect do
               described_class.validate_value('number', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER),
-                                             '1')
+                                             'not a number')
             end.to raise_error(ValidationError,
-                               "The given value has a wrong type for 'number': 1.\n Expects [\"Number\", nil]")
+                               "The given value has a wrong type for 'number': not a number.\n Expects [\"Number\", nil]")
           end
         end
 
