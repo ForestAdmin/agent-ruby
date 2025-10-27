@@ -51,7 +51,6 @@ module ForestAdminDatasourceToolkit
 
           return PrimitiveTypes::POINT if point?(value, type_context)
 
-          # Handle numeric strings when context is Number (similar to BigInt in TypeScript)
           return PrimitiveTypes::NUMBER if type_context == PrimitiveTypes::NUMBER && number?(value)
 
           PrimitiveTypes::STRING
