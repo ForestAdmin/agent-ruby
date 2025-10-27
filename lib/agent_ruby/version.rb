@@ -1,3 +1,3 @@
 module AgentRuby
-  VERSION = "1.12.6"
+  VERSION = "1.12.9"
 end

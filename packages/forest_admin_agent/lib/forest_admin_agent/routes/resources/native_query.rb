@@ -39,6 +39,7 @@ module ForestAdminAgent
           query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
           self.type = args[:params][:type]
           result = execute_query(
+            @datasource,
             query,
             args[:params][:connectionName],
             @permissions,

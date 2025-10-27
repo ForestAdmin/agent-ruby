@@ -79,7 +79,8 @@ module ForestAdminDatasourceCustomizer
 
         datasource = instance_double(ForestAdminDatasourceToolkit::Datasource,
                                      schema: { charts: [chart] },
-                                     collections: { 'dummy' => collection })
+                                     collections: { 'dummy' => collection },
+                                     live_query_connections: {})
 
         customizer = described_class.new
         customizer.add_datasource(datasource, {})
@@ -99,13 +100,13 @@ module ForestAdminDatasourceCustomizer
         customizer.instance_variable_set(:@stack, stack_spy)
 
         allow(stack_spy).to receive(:reload!) do |new_composite, _logger|
-          expect(new_composite).to be_a(ForestAdminDatasourceToolkit::Datasource)
+          expect(new_composite).to be_a(ForestAdminDatasourceCustomizer::CompositeDatasource)
         end
 
         allow(customizer).to receive(:datasource)
         customizer.reload!(logger: logger)
 
-        expect(stack_spy).to have_received(:reload!).with(instance_of(ForestAdminDatasourceToolkit::Datasource), logger)
+        expect(stack_spy).to have_received(:reload!).with(instance_of(ForestAdminDatasourceCustomizer::CompositeDatasource), logger)
         composite_after = customizer.instance_variable_get(:@composite_datasource)
         expect(composite_after).not_to eq(composite_before)
       end
@@ -165,6 +166,7 @@ module ForestAdminDatasourceCustomizer
 
       allow(ForestAdminDatasourceCustomizer::Decorators::Publication::PublicationDatasourceDecorator)
         .to receive(:new).and_return(publication_spy)
+      allow(publication_spy).to receive(:live_query_connections).and_return({})
 
       allow(publication_spy).to receive_messages(schema: { charts: [] }, collections: {})
       allow(publication_spy).to receive(:keep_collections_matching)
@@ -179,14 +181,16 @@ module ForestAdminDatasourceCustomizer
     it 'raises an error if the chart is not found in any datasource' do
       datasource = instance_double(ForestAdminDatasourceToolkit::Datasource,
                                    schema: { charts: [] },
-                                   render_chart: nil)
+                                   render_chart: nil,
+                                   collections: [],
+                                   live_query_connections: {})
 
       customizer = described_class.new
       customizer.add_datasource(datasource, {})
 
       expect do
-        customizer.render_chart(:caller, 'unknown_chart')
-      end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, "Chart 'unknown_chart' is not defined in the dataSource.")
+        customizer.datasource(nil).render_chart(:caller, 'unknown_chart')
+      end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, "Chart 'unknown_chart' is not defined in the dataSource.")
     end
 
     it 'calls run on the plugin with correct arguments' do

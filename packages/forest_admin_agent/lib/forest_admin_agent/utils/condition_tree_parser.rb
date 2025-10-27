@@ -12,7 +12,7 @@ module ForestAdminAgent
       def self.from_plain_object(collection, filters)
         if leaf?(filters)
           operator = filters[:operator].titleize.tr(' ', '_').downcase
-          value = parse_value(collection, filters)
+          value = parse_value(collection, filters.merge(operator: operator))
 
           return ConditionTreeLeaf.new(filters[:field], operator, value)
         end
@@ -31,18 +31,52 @@ module ForestAdminAgent
 
       def self.parse_value(collection, leaf)
         schema = Collection.get_field_schema(collection, leaf[:field])
+        expected_type = get_expected_type_for_condition(leaf, schema)
 
-        if leaf[:operator] == Operators::IN && leaf[:field].is_a?(String)
-          values = leaf[:value].split(',').map(&:strip)
+        cast_to_type(leaf[:value], expected_type)
+      end
 
-          return values.map { |item| !%w[false 0 no].include?(item) } if schema.column_type == 'Boolean'
+      def self.get_expected_type_for_condition(leaf, schema)
+        operators_expecting_number = [
+          Operators::SHORTER_THAN,
+          Operators::LONGER_THAN,
+          Operators::AFTER_X_HOURS_AGO,
+          Operators::BEFORE_X_HOURS_AGO,
+          Operators::PREVIOUS_X_DAYS,
+          Operators::PREVIOUS_X_DAYS_TO_DATE
+        ]
 
-          return values.map(&:to_f).select { |item| item.is_a? Numeric } if schema.column_type == 'Number'
+        return 'Number' if operators_expecting_number.include?(leaf[:operator])
 
-          return values
+        if [Operators::IN, Operators::NOT_IN, Operators::INCLUDES_ALL].include?(leaf[:operator])
+          return [schema.column_type]
         end
 
-        leaf[:value]
+        schema.column_type
+      end
+
+      def self.cast_to_type(value, expected_type)
+        return value if value.nil?
+
+        if expected_type.is_a?(Array)
+          items = value.is_a?(String) ? value.split(',').map(&:strip) : value
+          filter_fn = expected_type[0] == 'Number' ? ->(item) { item.is_a?(Numeric) } : ->(_) { true }
+
+          return value unless items.is_a?(Array)
+
+          return items.map { |item| cast_to_type(item, expected_type[0]) }.select(&filter_fn)
+        end
+
+        case expected_type
+        when 'String', 'Dateonly', 'Date'
+          value.to_s
+        when 'Number'
+          value.to_f
+        when 'Boolean'
+          !%w[false 0 no].include?(value.to_s)
+        else
+          value
+        end
       end
 
       def self.leaf?(filters)

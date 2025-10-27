@@ -51,6 +51,8 @@ module ForestAdminDatasourceToolkit
 
           return PrimitiveTypes::POINT if point?(value, type_context)
 
+          return PrimitiveTypes::NUMBER if type_context == PrimitiveTypes::NUMBER && number?(value)
+
           PrimitiveTypes::STRING
         end
 

@@ -226,6 +226,7 @@ Naming/PredicatePrefix:
 
 Metrics/ParameterLists:
   Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/query_handler.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/smart_action_checker.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/related/list_related_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/related/count_related_spec.rb'

@@ -6,21 +6,20 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Validations
 
-      def inject_context_variables(connection_name, query, permissions, caller, context_variables)
+      def inject_context_variables(datasource, connection_name, query, permissions, caller, context_variables)
         user = permissions.get_user_data(caller.id)
         team = permissions.get_team(caller.rendering_id)
         context_variables = ContextVariables.new(team, user, context_variables)
 
-        ContextVariablesInjector.inject_context_in_native_query(connection_name, query, context_variables)
+        ContextVariablesInjector.inject_context_in_native_query(datasource, connection_name, query, context_variables)
       end
 
-      def execute_query(query, connection_name, permissions, caller, context_variables)
-        root_datasource = AgentFactory.instance.customizer.get_root_datasource_by_connection(connection_name)
+      def execute_query(datasource, query, connection_name, permissions, caller, context_variables)
         query = query.strip
-        query, context_variables = inject_context_variables(connection_name, query, permissions, caller,
+        query, context_variables = inject_context_variables(datasource, connection_name, query, permissions, caller,
                                                             context_variables)
 
-        root_datasource.execute_native_query(
+        datasource.execute_native_query(
           connection_name,
           query,
           context_variables.values
@@ -39,6 +38,7 @@ module ForestAdminAgent
         permissions.can_execute_query_segment?(collection, args[:params][:segmentQuery], args[:params][:connectionName])
 
         ids = execute_query(
+          collection.datasource,
           args[:params][:segmentQuery],
           args[:params][:connectionName],
           permissions,
