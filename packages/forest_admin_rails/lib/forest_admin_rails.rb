@@ -29,6 +29,7 @@ module ForestAdminRails
   setting :limit_export_size, default: nil
   setting :append_schema_path, default: nil
   setting :skip_schema_update, default: false
+  setting :disable_route_cache, default: false
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine
