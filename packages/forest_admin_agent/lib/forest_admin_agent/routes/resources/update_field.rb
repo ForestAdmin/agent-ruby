@@ -68,23 +68,23 @@ module ForestAdminAgent
 
         def parse_index(index_param)
           index = Integer(index_param)
-          raise Http::Exceptions::ValidationError, 'Index must be non-negative' if index.negative?
+          raise Http::Exceptions::ValidationFailedError, 'Index must be non-negative' if index.negative?
 
           index
         rescue ArgumentError
-          raise Http::Exceptions::ValidationError, "Invalid index: #{index_param}"
+          raise Http::Exceptions::ValidationFailedError, "Invalid index: #{index_param}"
         end
 
         def validate_array_field!(field_schema, field_name)
           FieldValidator.validate(@collection, field_name)
           return if field_schema.column_type.to_s.start_with?('[')
 
-          raise Http::Exceptions::ValidationError,
+          raise Http::Exceptions::ValidationFailedError,
                 "Field '#{field_name}' is not an array (type: #{field_schema.column_type})"
         rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
           raise Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
 
-          raise Http::Exceptions::ValidationError, e.message
+          raise Http::Exceptions::ValidationFailedError, e.message
         end
 
         def fetch_record(primary_key_values)
@@ -108,7 +108,7 @@ module ForestAdminAgent
 
           return unless array_index >= array.length
 
-          raise Http::Exceptions::ValidationError,
+          raise Http::Exceptions::ValidationFailedError,
                 "Index #{array_index} out of bounds for array of length #{array.length}"
         end
 
@@ -128,7 +128,7 @@ module ForestAdminAgent
             begin
               return Float(value)
             rescue ArgumentError
-              raise Http::Exceptions::ValidationError, "Cannot coerce '#{value}' to Number - wrong type"
+              raise Http::Exceptions::ValidationFailedError, "Cannot coerce '#{value}' to Number - wrong type"
             end
           end
 

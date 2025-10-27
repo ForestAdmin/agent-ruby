@@ -42,8 +42,7 @@ module ForestAdminAgent
 
         def handle_authentication_callback(args = {})
           if args[:params].key?(:error)
-            raise AuthenticationOpenIdClient.new(args[:params][:error_description] || args[:params][:error],
-                                                 args[:params][:error])
+            raise AuthenticationOpenIdClient, args[:params][:error_description] || args[:params][:error]
           end
 
           if args.dig(:headers, 'action_dispatch.remote_ip')

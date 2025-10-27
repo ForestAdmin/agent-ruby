@@ -32,7 +32,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an ValidationError' do
               expect do
                 hook_context.raise_validation_error('message exception')
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, 'message exception')
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationFailedError, 'message exception')
             end
           end
         end

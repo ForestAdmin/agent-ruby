@@ -61,7 +61,7 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      # Translate BusinessError to HttpError and get all error information
+      # Translate BusinessError to HttpException and get all error information
       error_info = translate_error(exception)
 
       # Add custom headers to the response
@@ -73,7 +73,7 @@ module ForestAdminRails
                {
                  error: exception.message,
                  error_description: exception.response,
-                 state: exception.status
+                 state: error_info[:status]
                }
              else
                {

@@ -225,9 +225,9 @@ module ForestAdminAgent
               args.merge(params: args[:params].merge('field_name' => 'title'))
             end
 
-            it 'raises ValidationError' do
+            it 'raises ValidationFailedError' do
               expect { update_field.handle_request(args_with_non_array_field) }
-                .to raise_error(Http::Exceptions::ValidationError, /not an array/)
+                .to raise_error(Http::Exceptions::ValidationFailedError, /not an array/)
             end
           end
 
@@ -252,9 +252,9 @@ module ForestAdminAgent
               allow(@collection).to receive(:list).and_return([book])
             end
 
-            it 'raises ValidationError' do
+            it 'raises ValidationFailedError' do
               expect { update_field.handle_request(args_with_large_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /out of bounds/)
+                .to raise_error(Http::Exceptions::ValidationFailedError, /out of bounds/)
             end
           end
 
@@ -263,9 +263,9 @@ module ForestAdminAgent
               args.merge(params: args[:params].merge('index' => '-1'))
             end
 
-            it 'raises ValidationError' do
+            it 'raises ValidationFailedError' do
               expect { update_field.handle_request(args_with_negative_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /non-negative/)
+                .to raise_error(Http::Exceptions::ValidationFailedError, /non-negative/)
             end
           end
 
@@ -274,9 +274,9 @@ module ForestAdminAgent
               args.merge(params: args[:params].merge('index' => 'abc'))
             end
 
-            it 'raises ValidationError' do
+            it 'raises ValidationFailedError' do
               expect { update_field.handle_request(args_with_invalid_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /Invalid index/)
+                .to raise_error(Http::Exceptions::ValidationFailedError, /Invalid index/)
             end
           end
 
@@ -337,7 +337,7 @@ module ForestAdminAgent
 
               it 'raises ValidationError' do
                 expect { update_field.handle_request(args_with_invalid_number) }
-                  .to raise_error(Http::Exceptions::ValidationError, /wrong type/)
+                  .to raise_error(Http::Exceptions::ValidationFailedError, /wrong type/)
               end
             end
           end

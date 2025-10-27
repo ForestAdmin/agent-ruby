@@ -20,7 +20,7 @@ module ForestAdminDatasourceRpc
 
       # Map HTTP status codes to Forest Admin exception classes
       ERROR_STATUS_MAP = {
-        400 => ForestAdminAgent::Http::Exceptions::ValidationError,
+        400 => ForestAdminAgent::Http::Exceptions::BadRequestError,
         401 => ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
         403 => ForestAdminAgent::Http::Exceptions::ForbiddenError,
         404 => ForestAdminAgent::Http::Exceptions::NotFoundError,

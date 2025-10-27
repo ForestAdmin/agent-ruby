@@ -28,6 +28,24 @@ module ForestAdminAgent
         end
       end
 
+      class ValidationFailedError < BadRequestError
+        def initialize(message = 'Validation failed', details: {})
+          super
+        end
+      end
+
+      class UnauthorizedError < BusinessError
+        def initialize(message = 'Unauthorized', details: {})
+          super
+        end
+      end
+
+      class AuthenticationOpenIdClient < UnauthorizedError
+        def initialize(message = 'Authentication failed with OpenID Client', details: {})
+          super
+        end
+      end
+
       class ForbiddenError < BusinessError
         def initialize(message = 'Forbidden', details: {})
           super
@@ -75,22 +93,6 @@ module ForestAdminAgent
 
       class ServiceUnavailableError < BusinessError
         def initialize(message = 'Service unavailable error', details: {}, cause: nil)
-          super
-        end
-      end
-
-      # Specialized BadRequestError subclass
-      class ValidationFailedError < BadRequestError
-        def initialize(message = 'Validation failed', details: {})
-          super
-        end
-      end
-
-      # Legacy ValidationError - kept for backward compatibility with HttpException-based code
-      # This extends HttpException rather than BusinessError to maintain compatibility
-      # New code should use ValidationFailedError instead
-      class ValidationError < BusinessError
-        def initialize(message = 'Validation error', details: {})
           super
         end
       end

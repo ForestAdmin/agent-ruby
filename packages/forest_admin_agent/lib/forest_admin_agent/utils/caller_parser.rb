@@ -30,10 +30,7 @@ module ForestAdminAgent
       def validate_headers
         return if @args.dig(:headers, 'HTTP_AUTHORIZATION')
 
-        raise Http::Exceptions::HttpException.new(
-          401,
-          'You must be logged in to access at this resource.'
-        )
+        raise Http::Exceptions::UnauthorizedError, 'You must be logged in to access at this resource.'
       end
 
       def extract_timezone

@@ -11,14 +11,14 @@ module ForestAdminAgent
 
       subject(:handler) { test_class.new }
 
-      describe '#get_error_message' do
+      describe '#translate_error message' do
         context 'when error is an HttpException' do
           let(:http_exception) do
-            ForestAdminAgent::Http::Exceptions::HttpException.new(500, 'Custom HTTP error message')
+            ForestAdminAgent::Http::Exceptions::HttpException.new(StandardError.new('Custom HTTP error message'), 500)
           end
 
           it 'returns the error message from the HttpException' do
-            expect(handler.get_error_message(http_exception)).to eq('Custom HTTP error message')
+            expect(handler.translate_error(http_exception)[:message]).to eq('Custom HTTP error message')
           end
         end
 
@@ -30,7 +30,7 @@ module ForestAdminAgent
           end
 
           it 'returns "Unexpected error"' do
-            expect(handler.get_error_message(standard_error)).to eq('Unexpected error')
+            expect(handler.translate_error(standard_error)[:message]).to eq('Unexpected error')
           end
         end
 
@@ -43,7 +43,7 @@ module ForestAdminAgent
           end
 
           it 'returns the custom error message' do
-            expect(handler.get_error_message(custom_error)).to eq('Custom: Runtime error')
+            expect(handler.translate_error(custom_error)[:message]).to eq('Custom: Runtime error')
           end
         end
 
@@ -56,7 +56,7 @@ module ForestAdminAgent
           end
 
           it 'returns "Unexpected error"' do
-            expect(handler.get_error_message(custom_error)).to eq('Unexpected error')
+            expect(handler.translate_error(custom_error)[:message]).to eq('Unexpected error')
           end
         end
 
@@ -69,7 +69,7 @@ module ForestAdminAgent
           end
 
           it 'returns "Unexpected error"' do
-            expect(handler.get_error_message(custom_error)).to eq('Unexpected error')
+            expect(handler.translate_error(custom_error)[:message]).to eq('Unexpected error')
           end
         end
 
@@ -85,7 +85,7 @@ module ForestAdminAgent
           end
 
           it 'returns "Unexpected error"' do
-            expect(handler.get_error_message(weird_error)).to eq('Unexpected error')
+            expect(handler.translate_error(weird_error)[:message]).to eq('Unexpected error')
           end
         end
 
@@ -105,14 +105,14 @@ module ForestAdminAgent
         end
       end
 
-      describe '#get_error_status' do
+      describe '#translate_error status' do
         context 'when error has a status method' do
           let(:http_exception) do
-            ForestAdminAgent::Http::Exceptions::HttpException.new(422, 'Unprocessable entity')
+            ForestAdminAgent::Http::Exceptions::HttpException.new(StandardError.new('some error'), 422, 'Unprocessable entity')
           end
 
           it 'returns the error status' do
-            expect(handler.get_error_status(http_exception)).to eq(422)
+            expect(handler.translate_error(http_exception)[:status]).to eq(422)
           end
         end
 
@@ -131,7 +131,7 @@ module ForestAdminAgent
           let(:standard_error) { StandardError.new('Standard error message') }
 
           it 'returns 500' do
-            expect(handler.get_error_status(standard_error)).to eq(500)
+            expect(handler.translate_error(standard_error)[:status]).to eq(500)
           end
         end
       end
