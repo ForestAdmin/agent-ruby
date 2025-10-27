@@ -32,6 +32,38 @@ module ForestAdminDatasourceToolkit
 
           expect(described_class.validate(condition_tree, collection)).to be_nil
         end
+
+        it 'not raise an error when using not_equal operator with a string number' do
+          collection_with_not_equal = build_collection({
+                                                         schema: {
+                                                           fields: {
+                                                             'id' => ColumnSchema.new(
+                                                               column_type: 'Number',
+                                                               filter_operators: [Operators::NOT_EQUAL]
+                                                             )
+                                                           }
+                                                         }
+                                                       })
+          condition_tree = ConditionTreeLeaf.new('id', Operators::NOT_EQUAL, '27')
+
+          expect(described_class.validate(condition_tree, collection_with_not_equal)).to be_nil
+        end
+
+        it 'not raise an error when using equal operator with a string number' do
+          collection_with_equal = build_collection({
+                                                     schema: {
+                                                       fields: {
+                                                         'id' => ColumnSchema.new(
+                                                           column_type: 'Number',
+                                                           filter_operators: [Operators::EQUAL]
+                                                         )
+                                                       }
+                                                     }
+                                                   })
+          condition_tree = ConditionTreeLeaf.new('id', Operators::EQUAL, '42')
+
+          expect(described_class.validate(condition_tree, collection_with_equal)).to be_nil
+        end
       end
     end
   end

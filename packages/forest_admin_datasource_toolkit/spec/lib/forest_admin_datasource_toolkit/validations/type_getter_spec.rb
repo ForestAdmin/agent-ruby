@@ -128,6 +128,24 @@ module ForestAdminDatasourceToolkit
             end
           end
 
+          context 'when the value is a numeric string and the given context is a Number' do
+            it 'returns Number type' do
+              expect(described_class.get('27', 'Number')).to eq('Number')
+            end
+
+            it 'returns Number type for negative numbers' do
+              expect(described_class.get('-42', 'Number')).to eq('Number')
+            end
+
+            it 'returns Number type for decimal numbers' do
+              expect(described_class.get('3.14', 'Number')).to eq('Number')
+            end
+
+            it 'returns Number type for large integers' do
+              expect(described_class.get('9223372036854775807', 'Number')).to eq('Number')
+            end
+          end
+
           context 'when it is not an uuid or a number' do
             it 'returns the expected type' do
               expect(described_class.get('a string', 'String')).to eq('String')
