@@ -28,7 +28,15 @@ module ForestAdminDatasourceToolkit
               end
             end
 
-            match_fields(primary_key_names, ids)
+            normalized_ids = ids.map do |id|
+              if id.is_a?(Hash)
+                primary_key_names.map { |pk_name| id[pk_name] }
+              else
+                id
+              end
+            end
+
+            match_fields(primary_key_names, normalized_ids)
           end
 
           def self.intersect(trees = nil)

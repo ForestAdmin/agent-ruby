@@ -114,7 +114,7 @@ module ForestAdminDatasourceActiveRecord
                 ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
                   foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
-                  origin_key_target: association.association_primary_key
+                  origin_key_target: association_primary_key(association)
                 )
               )
             end
@@ -176,7 +176,7 @@ module ForestAdminDatasourceActiveRecord
                 ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(
                   foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
-                  origin_key_target: association.association_primary_key
+                  origin_key_target: association_primary_key(association)
                 )
               )
             end

@@ -39,6 +39,10 @@ module ForestAdminDatasourceActiveRecord
 
         types
       end
+
+      def association_primary_key(association)
+        association.options[:primary_key]&.to_s || association.association_primary_key
+      end
     end
   end
 end

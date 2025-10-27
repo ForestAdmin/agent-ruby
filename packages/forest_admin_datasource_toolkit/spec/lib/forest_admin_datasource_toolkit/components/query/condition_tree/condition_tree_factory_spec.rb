@@ -158,6 +158,75 @@ module ForestAdminDatasourceToolkit
                   )
                 )
             end
+
+            it 'supports hash format with simple PK (when called via match_ids)' do
+              collection = Collection.new(datasource, 'cars')
+              collection.add_fields({ 'id' => ColumnSchema.new(
+                column_type: PrimitiveType::NUMBER,
+                filter_operators: [Operators::EQUAL, Operators::IN],
+                is_primary_key: true
+              ) })
+
+              # Test with hash format (as returned by unpack_id with with_key: true)
+              expect(condition_tree_factory.match_ids(collection, [{ 'id' => 1 }]))
+                .to have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+            end
+
+            it 'supports hash format with composite PK (when called via match_ids)' do
+              collection = Collection.new(datasource, 'cars')
+              collection.add_fields(
+                {
+                  'col1' => ColumnSchema.new(
+                    column_type: PrimitiveType::NUMBER,
+                    filter_operators: [Operators::EQUAL, Operators::IN],
+                    is_primary_key: true
+                  ),
+                  'col2' => ColumnSchema.new(
+                    column_type: PrimitiveType::NUMBER,
+                    filter_operators: [Operators::EQUAL, Operators::IN],
+                    is_primary_key: true
+                  )
+                }
+              )
+
+              # Test with hash format (as returned by unpack_id with with_key: true)
+              expect(condition_tree_factory.match_ids(collection, [{ 'col1' => 1, 'col2' => 2 }]))
+                .to have_attributes(
+                  aggregator: 'And',
+                  conditions: contain_exactly(
+                    have_attributes(field: 'col1', operator: Operators::EQUAL, value: 1),
+                    have_attributes(field: 'col2', operator: Operators::EQUAL, value: 2)
+                  )
+                )
+            end
+
+            it 'supports hash format with multiple composite PKs' do
+              collection = Collection.new(datasource, 'cars')
+              collection.add_fields(
+                {
+                  'col1' => ColumnSchema.new(
+                    column_type: PrimitiveType::NUMBER,
+                    filter_operators: [Operators::EQUAL, Operators::IN],
+                    is_primary_key: true
+                  ),
+                  'col2' => ColumnSchema.new(
+                    column_type: PrimitiveType::NUMBER,
+                    filter_operators: [Operators::EQUAL, Operators::IN],
+                    is_primary_key: true
+                  )
+                }
+              )
+
+              # Test with hash format - multiple records with same col1 (factorization)
+              expect(condition_tree_factory.match_ids(collection, [{ 'col1' => 1, 'col2' => 1 }, { 'col1' => 1, 'col2' => 2 }]))
+                .to have_attributes(
+                  aggregator: 'And',
+                  conditions: contain_exactly(
+                    have_attributes(field: 'col1', operator: Operators::EQUAL, value: 1),
+                    have_attributes(field: 'col2', operator: Operators::IN, value: [1, 2])
+                  )
+                )
+            end
           end
 
           context 'when testing intersect' do

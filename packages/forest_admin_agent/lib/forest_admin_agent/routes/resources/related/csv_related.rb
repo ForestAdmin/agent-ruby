@@ -34,8 +34,8 @@ module ForestAdminAgent
             )
             projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
 
-            # Get the parent record ID
-            id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            # Get the parent record primary keys
+            primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
             relation_name = args[:params]['relation_name']
 
             # Generate timestamp for filename
@@ -48,7 +48,7 @@ module ForestAdminAgent
             list_records = lambda do |batch_filter|
               ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
                 @collection,
-                id,
+                primary_key_values,
                 relation_name,
                 @caller,
                 batch_filter,

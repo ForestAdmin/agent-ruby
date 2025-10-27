@@ -24,17 +24,18 @@ module ForestAdminAgent
             build(args)
             @permissions.can?(:edit, @collection)
 
-            parent_id = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
-            target_relation_id = Utils::Id.unpack_id(@child_collection, args[:params]['data'][0]['id'], with_key: true)
+            parent_primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            target_primary_key_values = Utils::Id.unpack_id(@child_collection, args[:params]['data'][0]['id'],
+                                                            with_key: true)
             relation = Schema.get_to_many_relation(@collection, args[:params]['relation_name'])
 
             case relation.type
             when 'OneToMany'
-              associate_one_to_many(relation, parent_id, target_relation_id)
+              associate_one_to_many(relation, parent_primary_key_values, target_primary_key_values)
             when 'ManyToMany'
-              associate_many_to_many(relation, parent_id, target_relation_id)
+              associate_many_to_many(relation, parent_primary_key_values, target_primary_key_values)
             when 'PolymorphicOneToMany'
-              associate_polymorphic_one_to_many(relation, parent_id, target_relation_id)
+              associate_polymorphic_one_to_many(relation, parent_primary_key_values, target_primary_key_values)
             end
 
             { content: nil, status: 204 }
@@ -42,9 +43,9 @@ module ForestAdminAgent
 
           private
 
-          def associate_one_to_many(relation, parent_id, target_relation_id)
+          def associate_one_to_many(relation, parent_primary_key_values, target_primary_key_values)
             id = Schema.primary_keys(@child_collection)[0]
-            value = Collection.get_value(@child_collection, @caller, target_relation_id, id)
+            value = Collection.get_value(@child_collection, @caller, target_primary_key_values, id)
             filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
@@ -53,14 +54,14 @@ module ForestAdminAgent
                 ]
               )
             )
-            value = Collection.get_value(@collection, @caller, parent_id, relation.origin_key_target)
+            value = Collection.get_value(@collection, @caller, parent_primary_key_values, relation.origin_key_target)
 
             @child_collection.update(@caller, filter, { relation.origin_key => value })
           end
 
-          def associate_polymorphic_one_to_many(relation, parent_id, target_relation_id)
+          def associate_polymorphic_one_to_many(relation, parent_primary_key_values, target_primary_key_values)
             id = Schema.primary_keys(@child_collection)[0]
-            value = Collection.get_value(@child_collection, @caller, target_relation_id, id)
+            value = Collection.get_value(@child_collection, @caller, target_primary_key_values, id)
             filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
@@ -70,7 +71,7 @@ module ForestAdminAgent
               )
             )
 
-            value = Collection.get_value(@collection, @caller, parent_id, relation.origin_key_target)
+            value = Collection.get_value(@collection, @caller, parent_primary_key_values, relation.origin_key_target)
 
             @child_collection.update(
               @caller,
@@ -79,11 +80,11 @@ module ForestAdminAgent
             )
           end
 
-          def associate_many_to_many(relation, parent_id, target_relation_id)
+          def associate_many_to_many(relation, parent_primary_key_values, target_primary_key_values)
             id = Schema.primary_keys(@child_collection)[0]
-            foreign_value = Collection.get_value(@child_collection, @caller, target_relation_id, id)
+            foreign_value = Collection.get_value(@child_collection, @caller, target_primary_key_values, id)
             id = Schema.primary_keys(@collection)[0]
-            origin_value = Collection.get_value(@collection, @caller, parent_id, id)
+            origin_value = Collection.get_value(@collection, @caller, parent_primary_key_values, id)
             record = { relation.origin_key => origin_value, relation.foreign_key => foreign_value }
 
             through_collection = @datasource.get_collection(relation.through_collection)
