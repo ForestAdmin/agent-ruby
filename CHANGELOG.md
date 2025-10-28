@@ -1,3 +1,10 @@
+## [1.12.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.9...v1.12.10) (2025-10-28)
+
+
+### Bug Fixes
+
+* **schema:** field type for array definition ([#191](https://github.com/ForestAdmin/agent-ruby/issues/191)) ([39ef7fb](https://github.com/ForestAdmin/agent-ruby/commit/39ef7fbe934df6ee58d47a91a1c3d5c08f18972d))
+
 ## [1.12.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.8...v1.12.9) (2025-10-27)
 
 
