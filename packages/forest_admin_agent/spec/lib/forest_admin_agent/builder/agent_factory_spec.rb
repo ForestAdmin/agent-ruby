@@ -290,6 +290,62 @@ module ForestAdminAgent
           end
         end
 
+        describe 'format_schema_json' do
+          it 'collapses single-element arrays onto one line' do
+            instance = described_class.instance
+            schema = {
+              collections: [
+                {
+                  name: 'Book',
+                  fields: [
+                    { field: 'tags', type: ['String'] },
+                    { field: 'scores', type: ['Number'] }
+                  ]
+                }
+              ]
+            }
+
+            result = instance.send(:format_schema_json, schema)
+
+            expect(result).to include('"type": ["String"]')
+            expect(result).to include('"type": ["Number"]')
+            expect(result).not_to match(/"type": \[\s+\n\s+"String"\s+\n\s+\]/)
+          end
+
+          it 'keeps multi-element arrays on multiple lines' do
+            instance = described_class.instance
+            schema = {
+              fields: [
+                { field: 'status', enums: %w[draft published archived] }
+              ]
+            }
+
+            result = instance.send(:format_schema_json, schema)
+
+            expect(result).to include('"enums": [')
+            expect(result).to include('"draft"')
+            expect(result).to include('"published"')
+            expect(result).to include('"archived"')
+            # Multi-element array should be on multiple lines
+            expect(result).to match(/"enums": \[\n/)
+          end
+
+          it 'preserves arrays of objects on multiple lines' do
+            instance = described_class.instance
+            schema = {
+              fields: [
+                { type: [{ street: 'String', city: 'String' }] }
+              ]
+            }
+
+            result = instance.send(:format_schema_json, schema)
+
+            # Object arrays should remain on multiple lines
+            expect(result).to match(/"type": \[\n/)
+            expect(result).to include('"street"')
+          end
+        end
+
         describe 'customize_collection' do
           it 'customizes collection and returns self' do
             instance = described_class.instance

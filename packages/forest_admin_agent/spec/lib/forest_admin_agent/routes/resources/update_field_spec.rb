@@ -81,15 +81,15 @@ module ForestAdminAgent
                   filter_operators: [Operators::EQUAL]
                 ),
                 'tags' => ColumnSchema.new(
-                  column_type: '[String]',
+                  column_type: ['String'],
                   filter_operators: [Operators::EQUAL]
                 ),
                 'scores' => ColumnSchema.new(
-                  column_type: '[Number]',
+                  column_type: ['Number'],
                   filter_operators: [Operators::EQUAL]
                 ),
                 'metadata' => ColumnSchema.new(
-                  column_type: '[Json]',
+                  column_type: ['Json'],
                   filter_operators: [Operators::EQUAL]
                 )
               }

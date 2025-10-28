@@ -86,7 +86,7 @@ module ForestAdminAgent
             collections: generated
           }
 
-          File.write(schema_path, JSON.pretty_generate(schema))
+          File.write(schema_path, format_schema_json(schema))
         end
 
         if (append_schema_path = Facades::Container.cache(:append_schema_path))
@@ -102,6 +102,20 @@ module ForestAdminAgent
       end
 
       private
+
+      def format_schema_json(schema)
+        # Custom JSON formatting that keeps single-element arrays on one line
+        json = JSON.pretty_generate(schema)
+
+        # Replace multiline arrays containing only ONE string with single-line format
+        # This matches patterns like:
+        # type: [
+        #   "String"
+        # ]
+        # and replaces them with: type: ["String"]
+        # Multi-element arrays (like enums) remain on multiple lines for readability
+        json.gsub(/:\s*\[\n\s*("(?:[^"\\]|\\.)*")\n\s*\]/, ': [\1]')
+      end
 
       def post_schema(schema, force)
         api_map = SchemaEmitter.serialize(schema)

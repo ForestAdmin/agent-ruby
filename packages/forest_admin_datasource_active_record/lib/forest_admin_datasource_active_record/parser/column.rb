@@ -39,7 +39,7 @@ module ForestAdminDatasourceActiveRecord
         end
 
         is_array = column.respond_to?(:array) && column.array == true
-        is_array ? "[#{type}]" : type
+        is_array ? [type] : type
       end
 
       def get_enum_values(model, column)
