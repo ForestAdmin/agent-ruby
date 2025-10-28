@@ -4,21 +4,15 @@ module ForestAdminAgent
   module Http
     module Exceptions
       class HttpException < StandardError
-        attr_reader :status, :custom_headers, :meta, :cause, :name
+        attr_reader :name, :status, :data, :custom_headers
 
-        def initialize(error, status, default_message = nil, _meta = nil, custom_headers_proc = nil)
-          super(error.message || default_message)
+        def initialize(status, name, message, data = {}, custom_headers = {})
+          super(message)
 
-          @name = error.class.name.split('::').last
           @status = status
-          @meta = error.respond_to?(:details) ? error.details : {}
-          @cause = error
-
-          @custom_headers = if custom_headers_proc.respond_to?(:call)
-                              custom_headers_proc.call(error)
-                            else
-                              {}
-                            end
+          @name = name
+          @data = data
+          @custom_headers = custom_headers
         end
       end
     end
