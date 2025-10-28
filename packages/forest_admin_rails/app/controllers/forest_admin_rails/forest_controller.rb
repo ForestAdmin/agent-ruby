@@ -2,7 +2,7 @@ require 'openid_connect'
 
 module ForestAdminRails
   class ForestController < ActionController::Base
-    include ForestAdminAgent::Http::ErrorHandling
+    include ForestAdminAgent::Http
 
     skip_forgery_protection
 
@@ -62,7 +62,7 @@ module ForestAdminRails
 
     def exception_handler(exception)
       # Translate BusinessError to HttpException and get all error information
-      http_exception = ForestAdminAgent::Http::ErrorTranslator.translate(exception)
+      http_exception = ErrorTranslator.translate(exception)
 
       # Add custom headers to the response
       response.headers.merge!(http_exception.custom_headers) if http_exception.custom_headers.any?
