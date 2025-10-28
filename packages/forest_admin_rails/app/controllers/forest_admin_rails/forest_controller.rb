@@ -65,7 +65,7 @@ module ForestAdminRails
       http_exception = ErrorTranslator.translate(exception)
 
       # Add custom headers to the response
-      response.headers.merge!(http_exception.custom_headers) if http_exception.custom_headers.any?
+      response.headers.merge!(http_exception.custom_headers || {})
 
       data = case exception
              when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
