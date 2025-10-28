@@ -130,6 +130,14 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    it 'returns the validation schema' do
+      customizer = described_class.new
+      validation = instance_double(ValidationFakeDecorator, schema: { foo: 'bar' })
+      customizer.stack.instance_variable_set(:@validation, validation)
+
+      expect(customizer.schema).to eq(foo: 'bar')
+    end
+
     it 'applies include/exclude filters using PublicationDatasourceDecorator' do
       decorated = described_class.new
       datasource = build_datasource

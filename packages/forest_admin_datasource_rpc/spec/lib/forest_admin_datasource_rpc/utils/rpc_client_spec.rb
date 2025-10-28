@@ -110,9 +110,9 @@ module ForestAdminDatasourceRpc
               )
             end
 
-            it 'raises BadRequestError with error message' do
+            it 'raises ValidationError with error message' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::BadRequestError,
+                ForestAdminAgent::Http::Exceptions::ValidationError,
                 /Invalid parameters/
               )
             end
@@ -264,7 +264,7 @@ module ForestAdminDatasourceRpc
 
             it 'extracts message correctly' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::BadRequestError,
+                ForestAdminAgent::Http::Exceptions::ValidationError,
                 /Custom error message/
               )
             end
