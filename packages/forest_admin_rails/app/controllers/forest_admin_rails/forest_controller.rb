@@ -61,10 +61,8 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      # Translate BusinessError to HttpException and get all error information
       http_exception = ErrorTranslator.translate(exception)
 
-      # Add custom headers to the response
       response.headers.merge!(http_exception.custom_headers || {})
 
       data = case exception
