@@ -86,7 +86,7 @@ module ForestAdminAgent
           begin
             Integer(params['renderingId'])
           rescue ArgumentError
-            raise ValidationFailedError, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+            raise ValidationError, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
           end
 
           params['renderingId'].to_i

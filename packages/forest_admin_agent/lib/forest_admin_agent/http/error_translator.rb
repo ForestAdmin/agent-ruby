@@ -41,7 +41,7 @@ module ForestAdminAgent
         error.status if error.respond_to?(:status) && error.status
 
         case error
-        when Exceptions::ValidationFailedError, Exceptions::BadRequestError
+        when Exceptions::ValidationError, Exceptions::BadRequestError
           400
         when Exceptions::UnauthorizedError
           401

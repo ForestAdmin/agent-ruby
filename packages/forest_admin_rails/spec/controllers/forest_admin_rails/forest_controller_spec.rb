@@ -96,9 +96,9 @@ module ForestAdminRails
         end
       end
 
-      context 'with ValidationFailedError' do
+      context 'with ValidationError' do
         it 'returns errors format with validation error details' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationFailedError.new('Email is invalid')
+          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Email is invalid')
           # Mock get_error_message to work with real HttpException instances
           # Note: get_error_message has a bug where it checks error.ancestors instead of error.class.ancestors
           controller.send(:exception_handler, exception)
@@ -107,18 +107,18 @@ module ForestAdminRails
           json = JSON.parse(response_mock.body)
           expect(json['errors']).to be_an(Array)
           expect(json['errors'].length).to eq(1)
-          expect(json['errors'][0]['name']).to eq('ValidationFailedError')
+          expect(json['errors'][0]['name']).to eq('ValidationError')
           expect(json['errors'][0]['detail']).to eq('Email is invalid')
           expect(json['errors'][0]['status']).to eq(400)
           expect(json['errors'][0]['data']).to be_nil
         end
 
         it 'supports custom name' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationFailedError.new('Invalid data')
+          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data')
           controller.send(:exception_handler, exception)
 
           json = JSON.parse(response_mock.body)
-          expect(json['errors'][0]['name']).to eq('ValidationFailedError')
+          expect(json['errors'][0]['name']).to eq('ValidationError')
         end
       end
 

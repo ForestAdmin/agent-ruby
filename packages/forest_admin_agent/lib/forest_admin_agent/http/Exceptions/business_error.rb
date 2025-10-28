@@ -4,11 +4,12 @@ module ForestAdminAgent
       # Parent class for all business errors
       # This is the base class that all specific error types inherit from
       class BusinessError < StandardError
-        attr_reader :details
+        attr_reader :details, :cause
 
-        def initialize(message = nil, details: {})
+        def initialize(message = nil, details: {}, cause: nil)
           super(message)
           @details = details || {}
+          @cause = cause
         end
 
         # Returns the name of the error class
@@ -27,7 +28,7 @@ module ForestAdminAgent
         end
       end
 
-      class ValidationFailedError < BadRequestError
+      class ValidationError < BadRequestError
         def initialize(message = 'Validation failed', details: {})
           super
         end
@@ -79,19 +80,19 @@ module ForestAdminAgent
       end
 
       class InternalServerError < BusinessError
-        def initialize(message = 'Internal server error', details: {})
+        def initialize(message = 'Internal server error', details: {}, cause: nil)
           super
         end
       end
 
       class BadGatewayError < BusinessError
-        def initialize(message = 'Bad gateway error', details: {})
+        def initialize(message = 'Bad gateway error', details: {}, cause: nil)
           super
         end
       end
 
       class ServiceUnavailableError < BusinessError
-        def initialize(message = 'Service unavailable error', details: {})
+        def initialize(message = 'Service unavailable error', details: {}, cause: nil)
           super
         end
       end

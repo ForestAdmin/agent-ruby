@@ -64,7 +64,7 @@ module ForestAdminAgent
             args = { params: { 'renderingId' => 'abc' } }
             expect do
               authentication.handle_authentication args
-            end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationFailedError,
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError,
                                ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID)
           end
 

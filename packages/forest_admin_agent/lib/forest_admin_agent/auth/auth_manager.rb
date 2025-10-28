@@ -49,7 +49,7 @@ module ForestAdminAgent
         begin
           Integer(state['renderingId'])
         rescue ArgumentError
-          raise ForestAdminAgent::Http::Exceptions::ValidationFailedError.new(
+          raise ForestAdminAgent::Http::Exceptions::ValidationError.new(
             ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID,
             details: { renderingId: state['renderingId'] }
           )
