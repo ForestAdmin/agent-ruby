@@ -82,11 +82,27 @@ module ForestAdminAgent
       end
 
       def can_execute_query_segment?(collection, query, connection_name)
-        hash_request = array_hash({ query: query, connectionName: connection_name })
-        is_allowed = get_segments(collection).include?(hash_request)
+        # Check if user has elevated permissions (Admin/Developer/Editor)
+        user_data = get_user_data(caller.id)
+        if %w[admin developer editor].include?(user_data&.dig(:permissionLevel))
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Debug',
+            "User #{caller.id} can retrieve SQL segment on rendering #{caller.rendering_id}"
+          )
+          return true
+        end
 
-        # Refetch
-        is_allowed ||= get_segments(collection, force_fetch: true).include?(hash_request)
+        # Get collection permissions
+        collection_permissions = get_collection_rendering_permissions(collection, force_fetch: false)
+
+        # Check permissions with both connection-specific and general segment validations
+        is_allowed = segment_permissions_valid?(collection_permissions, query, connection_name)
+
+        # Refetch if not allowed
+        unless is_allowed
+          collection_permissions = get_collection_rendering_permissions(collection, force_fetch: true)
+          is_allowed = segment_permissions_valid?(collection_permissions, query, connection_name)
+        end
 
         # still not allowed - throw forbidden message
         unless is_allowed
@@ -242,6 +258,7 @@ module ForestAdminAgent
           data[:team] = response[:team]
           data[:segments] = decode_segment_permissions(response[:collections])
           data[:charts] = decode_charts_permissions(response[:stats])
+          data[:collections] = decode_collections_permissions(response[:collections])
 
           data
         end
@@ -356,6 +373,19 @@ module ForestAdminAgent
         segments
       end
 
+      def decode_collections_permissions(raw_permissions)
+        collections = {}
+        raw_permissions.each do |collection_name, value|
+          collections[collection_name] = {
+            scope: value[:scope],
+            liveQuerySegments: value[:liveQuerySegments] || [],
+            segments: value[:segments] || []
+          }
+        end
+
+        collections
+      end
+
       def fetch(url)
         response = forest_api.get(url)
 
@@ -462,6 +492,18 @@ module ForestAdminAgent
         end
 
         collection_actions
+      end
+
+      def get_collection_rendering_permissions(collection, force_fetch: false)
+        rendering_data = get_rendering_data(caller.rendering_id, force_fetch: force_fetch)
+        rendering_data[:collections][collection.name.to_sym]
+      end
+
+      def segment_permissions_valid?(collection_permissions, query, connection_name)
+        return false if collection_permissions.nil?
+
+        # Check connection-specific live query segments
+        IsSegmentQueryAllowedOnConnection.allowed?(collection_permissions, query, connection_name)
       end
     end
   end
