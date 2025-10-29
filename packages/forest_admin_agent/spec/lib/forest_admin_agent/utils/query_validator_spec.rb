@@ -49,43 +49,43 @@ module ForestAdminAgent
       describe 'queries that raise exceptions' do
         it 'raises an error for an empty query' do
           query = '   '
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'Query cannot be empty.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'Query cannot be empty.')
         end
 
         it 'raises an error for non-SELECT queries' do
           query = 'DELETE FROM users;'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'Only SELECT queries are allowed.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'Only SELECT queries are allowed.')
         end
 
         it 'raises an error for multiple queries' do
           query = 'SELECT * FROM users; SELECT * FROM orders;'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'Only one query is allowed.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'Only one query is allowed.')
         end
 
         it 'raises an error for unbalanced parentheses outside WHERE clause' do
           query = 'SELECT (id, name FROM users WHERE (id > 1);'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'The query contains unbalanced parentheses.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'The query contains unbalanced parentheses.')
         end
 
         it 'raises an error for a semicolon not at the end of the query' do
           query = 'SELECT * FROM users; WHERE id > 1'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'Semicolon must only appear as the last character in the query.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'Semicolon must only appear as the last character in the query.')
         end
 
         it 'raises an error for forbidden keywords even inside subqueries' do
           query = 'SELECT * FROM users WHERE id IN (DROP TABLE users);'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'The query contains forbidden keyword: DROP.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'The query contains forbidden keyword: DROP.')
         end
 
         it 'raises an error for unbalanced parentheses in subqueries' do
           query = 'SELECT * FROM (SELECT id, name FROM users WHERE id > 1;'
-          expect { described_class.valid?(query) }.to raise_error(ForestException, 'The query contains unbalanced parentheses.')
+          expect { described_class.valid?(query) }.to raise_error(Http::Exceptions::BadRequestError, 'The query contains unbalanced parentheses.')
         end
 
         it 'raises an error for an OR-based injection' do
           query = "SELECT * FROM users WHERE username = 'admin' OR 1=1;"
           expect { described_class.valid?(query) }
-            .to raise_error(ForestException, 'The query contains a potential SQL injection pattern.')
+            .to raise_error(Http::Exceptions::BadRequestError, 'The query contains a potential SQL injection pattern.')
         end
       end
     end

@@ -42,8 +42,7 @@ module ForestAdminAgent
 
         def handle_authentication_callback(args = {})
           if args[:params].key?(:error)
-            raise AuthenticationOpenIdClient.new(args[:params][:error_description] || args[:params][:error],
-                                                 args[:params][:error])
+            raise AuthenticationOpenIdClient, args[:params][:error_description] || args[:params][:error]
           end
 
           if args.dig(:headers, 'action_dispatch.remote_ip')
@@ -80,14 +79,14 @@ module ForestAdminAgent
 
         def get_and_check_rendering_id(params)
           unless params['renderingId']
-            raise ForestAdminAgent::Error,
+            raise BadRequestError,
                   ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID
           end
 
           begin
             Integer(params['renderingId'])
           rescue ArgumentError
-            raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+            raise ValidationError, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
           end
 
           params['renderingId'].to_i

@@ -40,7 +40,7 @@ module ForestAdminAgent
         when RULE_MATCH_SUBNET
           ip_match_subnet?(ip, rule['range'])
         else
-          raise 'Invalid rule type'
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError, 'Invalid rule type'
         end
       end
 
@@ -93,7 +93,8 @@ module ForestAdminAgent
                                                             status: response.status,
                                                             response: response.body
                                                           })
-          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+                ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
         end
 
         begin
@@ -104,7 +105,8 @@ module ForestAdminAgent
                                                             status: response.status,
                                                             response: response.body
                                                           })
-          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+          raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+                ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
         end
 
         ip_whitelist_data = body['data']['attributes']
@@ -117,7 +119,8 @@ module ForestAdminAgent
                                                           status: response&.status,
                                                           response: response&.body
                                                         })
-        raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
+        raise ForestAdminAgent::Http::Exceptions::InternalServerError,
+              ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
       end
     end
   end

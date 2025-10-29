@@ -2,7 +2,7 @@ require 'openid_connect'
 
 module ForestAdminRails
   class ForestController < ActionController::Base
-    include ForestAdminAgent::Http::ErrorHandling
+    include ForestAdminAgent::Http
 
     skip_forgery_protection
 
@@ -61,7 +61,9 @@ module ForestAdminRails
     end
 
     def exception_handler(exception)
-      http_status = get_error_status(exception)
+      http_exception = ErrorTranslator.translate(exception)
+
+      response.headers.merge!(http_exception.custom_headers || {})
 
       data = case exception
              when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
@@ -69,17 +71,17 @@ module ForestAdminRails
                {
                  error: exception.message,
                  error_description: exception.response,
-                 state: exception.status
+                 state: http_exception.status
                }
              else
                {
                  errors: [
                    {
-                     name: exception.respond_to?(:name) ? exception.name : exception.class.name,
-                     detail: get_error_message(exception),
-                     status: http_status,
-                     data: exception.try(:data)
-                   }
+                     name: http_exception.name,
+                     detail: http_exception.message,
+                     status: http_exception.status,
+                     data: http_exception.data
+                   }.compact
                  ]
                }
              end
@@ -88,7 +90,7 @@ module ForestAdminRails
         ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
       end
 
-      render json: data, status: http_status
+      render json: data, status: http_exception.status
     end
   end
 end

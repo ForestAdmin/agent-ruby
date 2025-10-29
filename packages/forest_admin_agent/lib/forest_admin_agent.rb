@@ -1,4 +1,5 @@
 require_relative 'forest_admin_agent/version'
+require_relative 'forest_admin_agent/http/Exceptions/business_error'
 require 'zeitwerk'
 
 loader = Zeitwerk::Loader.for_gem

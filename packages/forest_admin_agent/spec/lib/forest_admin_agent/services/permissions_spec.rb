@@ -1035,7 +1035,7 @@ module ForestAdminAgent
 
           expect do
             @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
-          end.to raise_error(ForestException, 'The collection Book does not have this smart action')
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
         end
 
         it "throws when the forest schema doesn't have any actions" do
@@ -1068,7 +1068,7 @@ module ForestAdminAgent
 
           expect do
             @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
-          end.to raise_error(ForestException, 'The collection Book does not have this smart action')
+          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
         end
       end
     end

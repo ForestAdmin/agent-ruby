@@ -140,7 +140,7 @@ module ForestAdminAgent
             allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
-              ForestException,
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
               "The result columns must be named 'value' instead of 'foo'"
             )
           end
@@ -184,7 +184,7 @@ module ForestAdminAgent
             allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
-              ForestException,
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
               "The result columns must be named 'value' instead of 'foo'"
             )
           end
@@ -228,7 +228,7 @@ module ForestAdminAgent
             allow(datasource).to receive(:execute_native_query).and_return([{ foo: 10 }])
 
             expect { native_query.handle_request(args) }.to raise_error(
-              ForestException,
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
               "The result columns must be named 'key', 'value' instead of 'foo'"
             )
           end
@@ -285,7 +285,7 @@ module ForestAdminAgent
             )
 
             expect { native_query.handle_request(args) }.to raise_error(
-              ForestException,
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
               "The result columns must be named 'key', 'value' instead of 'value', 'foo'"
             )
           end
@@ -348,7 +348,7 @@ module ForestAdminAgent
             )
 
             expect { native_query.handle_request(args) }.to raise_error(
-              ForestException,
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
               "The result columns must be named 'key', 'value' instead of 'value', 'foo'"
             )
           end

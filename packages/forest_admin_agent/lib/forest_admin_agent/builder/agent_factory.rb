@@ -7,6 +7,7 @@ module ForestAdminAgent
     class AgentFactory
       include Singleton
       include ForestAdminAgent::Utils::Schema
+      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       TTL_SCHEMA = 7200
@@ -82,7 +83,10 @@ module ForestAdminAgent
 
         if Facades::Container.cache(:is_production)
           unless schema_path && File.exist?(schema_path)
-            raise ForestException, "Can't load #{schema_path}. Providing a schema is mandatory in production."
+            raise InternalServerError.new(
+              'Schema file not found in production',
+              details: { schema_path: schema_path }
+            )
           end
 
           schema = JSON.parse(File.read(schema_path), symbolize_names: true)
@@ -152,8 +156,12 @@ module ForestAdminAgent
           response = client.post('/forest/apimaps/hashcheck', { schemaFileHash: hash }.to_json)
           body = JSON.parse(response.body)
           body['sendSchema']
-        rescue JSON::ParserError
-          raise ForestException, "Invalid JSON response from ForestAdmin server #{response.body}"
+        rescue JSON::ParserError => e
+          raise InternalServerError.new(
+            'Invalid JSON response from ForestAdmin server',
+            details: { body: response.body },
+            cause: e
+          )
         rescue Faraday::Error => e
           client.handle_response_error(e)
         end

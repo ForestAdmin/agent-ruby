@@ -32,7 +32,7 @@ module ForestAdminAgent
         expect do
           condition_tree_parser.from_plain_object(collection_category,
                                                   {})
-        end.to raise_error(ForestException, /Failed to instantiate condition tree/)
+        end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Failed to instantiate condition tree')
       end
 
       it 'works with aggregator' do

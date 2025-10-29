@@ -101,8 +101,6 @@ module ForestAdminRails
           exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Email is invalid')
           # Mock get_error_message to work with real HttpException instances
           # Note: get_error_message has a bug where it checks error.ancestors instead of error.class.ancestors
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Email is invalid')
-
           controller.send(:exception_handler, exception)
 
           expect(response_mock.status).to eq(400)
@@ -115,31 +113,18 @@ module ForestAdminRails
           expect(json['errors'][0]['data']).to be_nil
         end
 
-        it 'calls get_error_message' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid input')
-          allow(controller).to receive(:get_error_message).and_return('Invalid input')
-
-          controller.send(:exception_handler, exception)
-
-          expect(controller).to have_received(:get_error_message).with(exception)
-        end
-
         it 'supports custom name' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data', 'CustomValidationError')
-          allow(controller).to receive(:get_error_message).and_return('Invalid data')
-
+          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data')
           controller.send(:exception_handler, exception)
 
           json = JSON.parse(response_mock.body)
-          expect(json['errors'][0]['name']).to eq('CustomValidationError')
+          expect(json['errors'][0]['name']).to eq('ValidationError')
         end
       end
 
       context 'with ForbiddenError' do
         it 'returns errors format with 403 status' do
           exception = ForestAdminAgent::Http::Exceptions::ForbiddenError.new('Access denied')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Access denied')
-
           controller.send(:exception_handler, exception)
 
           expect(response_mock.status).to eq(403)
@@ -153,8 +138,6 @@ module ForestAdminRails
       context 'with NotFoundError' do
         it 'returns errors format with 404 status' do
           exception = ForestAdminAgent::Http::Exceptions::NotFoundError.new('Resource not found')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Resource not found')
-
           controller.send(:exception_handler, exception)
 
           expect(response_mock.status).to eq(404)
@@ -162,21 +145,6 @@ module ForestAdminRails
           expect(json['errors'][0]['name']).to eq('NotFoundError')
           expect(json['errors'][0]['detail']).to eq('Resource not found')
           expect(json['errors'][0]['status']).to eq(404)
-        end
-      end
-
-      context 'with custom HttpException' do
-        it 'returns errors format with custom status and name' do
-          exception = ForestAdminAgent::Http::Exceptions::HttpException.new(418, 'I am a teapot', 'TeapotError')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('I am a teapot')
-
-          controller.send(:exception_handler, exception)
-
-          expect(response_mock.status).to eq(418)
-          json = JSON.parse(response_mock.body)
-          expect(json['errors'][0]['name']).to eq('TeapotError')
-          expect(json['errors'][0]['detail']).to eq('I am a teapot')
-          expect(json['errors'][0]['status']).to eq(418)
         end
       end
 
@@ -193,10 +161,11 @@ module ForestAdminRails
           allow(exception.class).to receive(:name).and_return('StandardError')
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Unexpected error')
 
           controller.send(:exception_handler, exception)
 
@@ -220,10 +189,11 @@ module ForestAdminRails
           allow(exception.class).to receive(:name).and_return('StandardError')
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Unexpected error')
 
           controller.send(:exception_handler, exception)
 
@@ -231,7 +201,7 @@ module ForestAdminRails
           json = JSON.parse(response_mock.body)
           expect(json['errors']).to be_an(Array)
           expect(json['errors'][0]['name']).to eq('StandardError')
-          expect(json['errors'][0]['status']).to be_nil
+          expect(json['errors'][0]['status']).to eq(500)
         end
       end
 
@@ -248,10 +218,11 @@ module ForestAdminRails
           allow(exception.class).to receive(:name).and_return('StandardError')
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Unexpected error')
 
           controller.send(:exception_handler, exception)
 
@@ -273,15 +244,16 @@ module ForestAdminRails
           allow(exception.class).to receive(:name).and_return('StandardError')
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error trace')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Unexpected error')
           allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(false)
 
           controller.send(:exception_handler, exception)
 
-          expect(logger).to have_received(:log).with('Debug', 'Full error trace')
+          expect(logger).to have_received(:log).with('Error', 'Full error trace')
         end
 
         it 'does not log exception in production mode' do
@@ -296,10 +268,11 @@ module ForestAdminRails
           allow(exception.class).to receive(:name).and_return('StandardError')
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error trace')
-          allow(controller).to receive(:get_error_message).with(exception).and_return('Unexpected error')
           allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(true)
 
           controller.send(:exception_handler, exception)

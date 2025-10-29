@@ -15,7 +15,7 @@ module ForestAdminAgent
 
       def verify_code_and_generate_token(params)
         unless params['state']
-          raise ForestAdminAgent::Error,
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
                 ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_MISSING
         end
 
@@ -40,14 +40,19 @@ module ForestAdminAgent
       def get_rendering_id_from_state(state)
         state = JSON.parse(state.tr("'", '"').gsub('=>', ':'))
         unless state.key? 'renderingId'
-          raise ForestAdminAgent::Error,
-                ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_RENDERING_ID
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError.new(
+            ForestAdminAgent::Utils::ErrorMessages::INVALID_STATE_RENDERING_ID,
+            details: { state: state }
+          )
         end
 
         begin
           Integer(state['renderingId'])
         rescue ArgumentError
-          raise ForestAdminAgent::Error, ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID
+          raise ForestAdminAgent::Http::Exceptions::ValidationError.new(
+            ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID,
+            details: { renderingId: state['renderingId'] }
+          )
         end
 
         state['renderingId'].to_i

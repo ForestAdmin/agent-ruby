@@ -18,7 +18,7 @@ module ForestAdminDatasourceActiveRecord
         raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, message
       rescue ActiveRecord::RecordInvalid => e
         raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, e.message
-      rescue StandardError => e # rubocop:disable Lint/DuplicateBranch
+      rescue StandardError => e
         raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, e.message
       end
 

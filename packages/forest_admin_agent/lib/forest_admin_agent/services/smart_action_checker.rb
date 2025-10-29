@@ -1,19 +1,32 @@
 module ForestAdminAgent
   module Services
+    include ForestAdminAgent::Http::Exceptions
+
+    class CustomActionTriggerForbiddenError < ForbiddenError
+      def initialize(message = 'Custom action trigger forbidden', details: {})
+        super
+      end
+    end
+
+    class InvalidActionConditionError < ConflictError
+      def initialize(message = 'Invalid action condition', details: {})
+        super
+      end
+    end
+
+    class CustomActionRequiresApprovalError < ForbiddenError
+      def initialize(message = 'Custom action requires approval', details: {})
+        super
+      end
+    end
+
     class SmartActionChecker
-      include ForestAdminAgent::Http::Exceptions
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
-
-      TRIGGER_FORBIDDEN_ERROR = 'CustomActionTriggerForbiddenError'.freeze
-
-      REQUIRE_APPROVAL_ERROR = 'CustomActionRequiresApprovalError'.freeze
-
-      INVALID_ACTION_CONDITION_ERROR = 'InvalidActionConditionError'.freeze
 
       def initialize(parameters, collection, smart_action, caller, role_id, filter)
         @parameters = parameters
@@ -43,7 +56,7 @@ module ForestAdminAgent
           return true
         end
 
-        raise ForbiddenError.new('You don\'t have the permission to trigger this action.', TRIGGER_FORBIDDEN_ERROR)
+        raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def can_trigger?
@@ -53,17 +66,16 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
-            raise RequireApproval.new(
+            raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',
-              REQUIRE_APPROVAL_ERROR,
-              smart_action[:userApprovalEnabled]
+              details: { user_approval_enabled: smart_action[:userApprovalEnabled] }
             )
           elsif condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true
           end
         end
 
-        raise ForbiddenError.new('You don\'t have the permission to trigger this action.', TRIGGER_FORBIDDEN_ERROR)
+        raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
       end
 
       def match_conditions(condition_name)
@@ -105,16 +117,10 @@ module ForestAdminAgent
         # Wrap other ForestExceptions (like invalid operators) in ConflictError
         raise if e.message.include?('has no primary keys')
 
-        raise ConflictError.new(
-          'The conditions to trigger this action cannot be verified. Please contact an administrator.',
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise InvalidActionConditionError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       rescue ArgumentError, TypeError => e
         # Catch specific errors from condition parsing/validation
-        raise ConflictError.new(
-          "Invalid action condition: #{e.message}. Please contact an administrator.",
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise InvalidActionConditionError, "Invalid action condition: #{e.message}. Please contact an administrator."
       rescue StandardError => e
         # Catch unexpected errors and log for debugging
         ForestAdminAgent::Facades::Container.logger.log(
@@ -122,10 +128,7 @@ module ForestAdminAgent
           "Unexpected error in match_conditions: #{e.class} - #{e.message}"
         )
 
-        raise ConflictError.new(
-          'The conditions to trigger this action cannot be verified. Please contact an administrator.',
-          INVALID_ACTION_CONDITION_ERROR
-        )
+        raise InvalidActionConditionError, 'The conditions to trigger this action cannot be verified. Please contact an administrator.'
       end
 
       def condition_by_role_id(condition)

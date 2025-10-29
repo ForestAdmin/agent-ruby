@@ -263,7 +263,7 @@ module ForestAdminAgent
 
         action = actions.find { |a| a['endpoint'] == endpoint && a['httpMethod'].casecmp(http_method).zero? }
 
-        raise ForestException, "The collection #{collection_name} does not have this smart action" if action.nil?
+        raise BadRequestError, "The collection #{collection_name} does not have this smart action" if action.nil?
 
         action
       end
@@ -277,7 +277,10 @@ module ForestAdminAgent
             "Available keys: #{collection.is_a?(Hash) ? collection.keys.join(", ") : "N/A (not a hash)"}. " \
             'This indicates an API contract violation or data corruption.'
           )
-          raise ForestException, 'Invalid permission data structure received from Forest Admin API'
+          raise InternalServerError.new(
+            'Invalid permission data structure received from Forest Admin API',
+            details: { received_keys: collection.is_a?(Hash) ? collection.keys : nil }
+          )
         end
 
         collection_data = collection[:collection]
@@ -288,7 +291,10 @@ module ForestAdminAgent
             "Invalid permissions data: :collection is not a hash (got #{collection_data.class}). " \
             'This indicates an API contract violation or data corruption.'
           )
-          raise ForestException, 'Invalid permission data structure: :collection must be a hash'
+          raise InternalServerError.new(
+            'Invalid permission data structure: :collection must be a hash',
+            details: { collection_data_class: collection_data.class }
+          )
         end
 
         # Use dig to safely extract roles, allowing for missing permissions

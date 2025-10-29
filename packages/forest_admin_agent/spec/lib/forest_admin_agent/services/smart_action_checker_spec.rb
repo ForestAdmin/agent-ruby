@@ -153,7 +153,7 @@ module ForestAdminAgent
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
-        end.to raise_error(RequireApproval, 'This action requires to be approved.')
+        end.to raise_error(CustomActionRequiresApprovalError, 'This action requires to be approved.')
       end
 
       it 'throws when the user try to trigger the action with approvalRequired and match approvalRequiredConditions' do
@@ -183,7 +183,7 @@ module ForestAdminAgent
                                                    QueryStringParser.parse_caller(args), 1, Filter.new)
         expect do
           smart_action_checker.can_execute?
-        end.to raise_error(RequireApproval, 'This action requires to be approved.')
+        end.to raise_error(CustomActionRequiresApprovalError, 'This action requires to be approved.')
       end
 
       it 'returns true when the user try to trigger the action with approvalRequired and triggerConditions and correct role into approvalRequired' do

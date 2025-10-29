@@ -2,7 +2,7 @@ module ForestAdminAgent
   module Utils
     module Schema
       class GeneratorActionFieldWidget
-        include ForestAdminDatasourceToolkit::Exceptions
+        include ForestAdminAgent::Http::Exceptions
 
         def self.build_widget_options(field)
           return if !ActionFields.widget?(field) || %w[Collection Enum EnumList].include?(field.type)
@@ -43,7 +43,10 @@ module ForestAdminAgent
 
           return build_address_autocomplete_widget_edit(field) if ActionFields.address_autocomplete_field?(field)
 
-          raise ForestException, "Unsupported widget type: #{field&.widget}"
+          raise InternalServerError.new(
+            "Unsupported widget type: #{field&.widget}",
+            details: { widget: field&.widget, field_type: field&.type }
+          )
         end
 
         class << self
