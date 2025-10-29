@@ -24,7 +24,7 @@ module ForestAdminRpcAgent
             root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
           )
         end
-        schema[:nativeQueryConnections] = connections
+        schema[:native_query_connections] = connections
 
         schema.to_json
       end

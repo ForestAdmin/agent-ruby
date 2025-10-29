@@ -19,7 +19,7 @@ module ForestAdminDatasourceRpc
       @charts = introspection[:charts]
       @rpc_relations = introspection[:rpc_relations]
 
-      native_query_connections = introspection[:nativeQueryConnections] || []
+      native_query_connections = introspection[:native_query_connections] || []
       @live_query_connections = native_query_connections.to_h { |conn| [conn[:name], conn[:name]] }
 
       @schema = { charts: @charts }
