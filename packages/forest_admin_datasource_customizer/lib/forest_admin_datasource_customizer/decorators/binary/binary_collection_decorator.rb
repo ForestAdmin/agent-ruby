@@ -91,6 +91,12 @@ module ForestAdminDatasourceCustomizer
           prefix, suffix = leaf.field.split(':')
           schema = @child_collection.schema[:fields][prefix]
 
+          unless schema
+            available_fields = @child_collection.schema[:fields].keys.join(', ')
+            raise Exceptions::ValidationError,
+                  "Field not found: '#{@child_collection.name}.#{prefix}'. Available fields: #{available_fields}"
+          end
+
           if schema.type != 'Column'
             condition_tree = @datasource.get_collection(schema.foreign_collection).convert_condition_tree_leaf(
               leaf.override(field: suffix)
@@ -133,6 +139,12 @@ module ForestAdminDatasourceCustomizer
         def convert_value(to_backend, path, value)
           prefix, suffix = path.split(':')
           field = @child_collection.schema[:fields][prefix]
+
+          unless field
+            available_fields = @child_collection.schema[:fields].keys.join(', ')
+            raise Exceptions::ValidationError,
+                  "Field not found: '#{@child_collection.name}.#{prefix}'. Available fields: #{available_fields}"
+          end
 
           return value if field.type == 'PolymorphicManyToOne'
 

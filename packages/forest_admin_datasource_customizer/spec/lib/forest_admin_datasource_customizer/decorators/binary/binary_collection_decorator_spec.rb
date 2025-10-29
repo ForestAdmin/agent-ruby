@@ -370,6 +370,118 @@ module ForestAdminDatasourceCustomizer
             )
           end
         end
+
+        describe 'error handling for non-existing fields' do
+          describe 'convert_value' do
+            it 'raises ValidationError when field does not exist' do
+              expect do
+                @decorated_book.convert_value(false, 'non_existing_field', 'some_value')
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.non_existing_field'\. Available fields: .+/
+              )
+            end
+
+            it 'raises ValidationError with list of available fields' do
+              error = nil
+              begin
+                @decorated_book.convert_value(false, 'non_existing_field', 'some_value')
+              rescue Exceptions::ValidationError => e
+                error = e
+              end
+
+              expect(error).not_to be_nil
+              expect(error.message).to include("Field not found: 'book.non_existing_field'")
+              expect(error.message).to include('Available fields:')
+              expect(error.message).to include('id')
+              expect(error.message).to include('title')
+              expect(error.message).to include('cover')
+              expect(error.message).to include('author')
+            end
+
+            it 'raises ValidationError when nested field does not exist' do
+              expect do
+                @decorated_favorite.convert_value(false, 'book:non_existing_field', 'some_value')
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.non_existing_field'\. Available fields: .+/
+              )
+            end
+          end
+
+          describe 'convert_condition_tree_leaf' do
+            it 'raises ValidationError when field does not exist in condition tree' do
+              leaf = Nodes::ConditionTreeLeaf.new('non_existing_field', Operators::EQUAL, 'value')
+
+              expect do
+                @decorated_book.convert_condition_tree_leaf(leaf)
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.non_existing_field'\. Available fields: .+/
+              )
+            end
+
+            it 'raises ValidationError with list of available fields in condition tree' do
+              leaf = Nodes::ConditionTreeLeaf.new('invalid_field', Operators::EQUAL, 'value')
+              error = nil
+
+              begin
+                @decorated_book.convert_condition_tree_leaf(leaf)
+              rescue Exceptions::ValidationError => e
+                error = e
+              end
+
+              expect(error).not_to be_nil
+              expect(error.message).to include("Field not found: 'book.invalid_field'")
+              expect(error.message).to include('Available fields:')
+              expect(error.message).to include('id')
+              expect(error.message).to include('title')
+              expect(error.message).to include('cover')
+              expect(error.message).to include('author')
+            end
+
+            it 'raises ValidationError when nested field does not exist in condition tree' do
+              leaf = Nodes::ConditionTreeLeaf.new('book:non_existing_field', Operators::EQUAL, 'value')
+
+              expect do
+                @decorated_favorite.convert_condition_tree_leaf(leaf)
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.non_existing_field'\. Available fields: .+/
+              )
+            end
+          end
+
+          describe 'list with invalid field in filter' do
+            it 'raises ValidationError when filtering on non-existing field' do
+              condition_tree = Nodes::ConditionTreeLeaf.new('invalid_field', Operators::EQUAL, 'value')
+              filter = Filter.new(condition_tree: condition_tree)
+              projection = Projection.new(['id'])
+
+              expect do
+                @decorated_book.list(caller, filter, projection)
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.invalid_field'\. Available fields: .+/
+              )
+            end
+          end
+
+          describe 'aggregate with invalid field in groups' do
+            it 'raises ValidationError when grouping on non-existing field' do
+              aggregation = Aggregation.new(operation: 'Count', field: 'title', groups: [{ field: 'invalid_field' }])
+              allow(@collection_book).to receive(:aggregate)
+                .and_return([{ 'value' => 1, 'group' => { 'invalid_field' => 'value' } }])
+
+              expect do
+                @decorated_book.aggregate(caller, Filter.new, aggregation)
+              end.to raise_error(
+                Exceptions::ValidationError,
+                /Field not found: 'book\.invalid_field'\. Available fields: .+/
+              )
+            end
+          end
+        end
       end
     end
   end
