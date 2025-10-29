@@ -1,3 +1,10 @@
+## [1.12.15](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.14...v1.12.15) (2025-10-29)
+
+
+### Bug Fixes
+
+* **routesCache:** set route context as stateless to avoid concurrency issues ([#196](https://github.com/ForestAdmin/agent-ruby/issues/196)) ([c0a834a](https://github.com/ForestAdmin/agent-ruby/commit/c0a834a8970dd754aa3c62146925228489d5dc18))
+
 ## [1.12.14](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.13...v1.12.14) (2025-10-29)
 
 
