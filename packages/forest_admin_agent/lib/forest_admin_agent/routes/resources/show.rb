@@ -23,8 +23,6 @@ module ForestAdminAgent
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
 
-          puts("collectionName: #{args[:params]["collection_name"]}, id: #{args[:params]["id"]}")
-
           projection = ProjectionFactory.all(context.collection)
 
           records = context.collection.list(context.caller, filter, projection)

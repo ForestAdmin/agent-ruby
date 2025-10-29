@@ -75,7 +75,7 @@ module ForestAdminAgent
           raise Http::Exceptions::ValidationError, "Invalid index: #{index_param}"
         end
 
-        def validate_array_field!(field_schema, field_name)
+        def validate_array_field!(field_schema, field_name, collection)
           FieldValidator.validate(collection, field_name)
           return if field_schema.column_type.is_a?(Array)
 
