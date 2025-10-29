@@ -1,3 +1,10 @@
+## [1.12.14](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.13...v1.12.14) (2025-10-29)
+
+
+### Bug Fixes
+
+* safely load id for many-to-one relationships ([#195](https://github.com/ForestAdmin/agent-ruby/issues/195)) ([ae8d4d7](https://github.com/ForestAdmin/agent-ruby/commit/ae8d4d7acb983d0ed61c5dd27ac23b5ea75c21cd))
+
 ## [1.12.13](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.12...v1.12.13) (2025-10-29)
 
 
