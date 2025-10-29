@@ -20,12 +20,12 @@ module ForestAdminDatasourceRpc
 
       # Map HTTP status codes to Forest Admin exception classes
       ERROR_STATUS_MAP = {
-        400 => ForestAdminAgent::Http::Exceptions::ValidationError,
-        401 => ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
-        403 => ForestAdminAgent::Http::Exceptions::ForbiddenError,
-        404 => ForestAdminAgent::Http::Exceptions::NotFoundError,
-        409 => ForestAdminAgent::Http::Exceptions::ConflictError,
-        422 => ForestAdminAgent::Http::Exceptions::UnprocessableError
+        400 => ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+        401 => ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient,
+        403 => ForestAdminDatasourceToolkit::Exceptions::ForbiddenError,
+        404 => ForestAdminDatasourceToolkit::Exceptions::NotFoundError,
+        409 => ForestAdminDatasourceToolkit::Exceptions::ConflictError,
+        422 => ForestAdminDatasourceToolkit::Exceptions::UnprocessableError
       }.freeze
 
       def initialize(api_url, auth_secret)

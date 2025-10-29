@@ -5,7 +5,7 @@ module ForestAdminAgent
     include ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-    include ForestAdminAgent::Http::Exceptions
+    include ForestAdminDatasourceToolkit::Exceptions
 
     describe QueryHandler do
       include_context 'with caller'

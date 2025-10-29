@@ -1,4 +1,3 @@
-require_relative 'Exceptions/business_error'
 require_relative 'Exceptions/http_exception'
 
 module ForestAdminAgent
@@ -33,35 +32,30 @@ module ForestAdminAgent
       # @param error [Exception] The error to get status for
       # @return [Integer] The HTTP status code
       def self.get_error_status(error)
-        if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
-           of_type?(error, ForestAdminDatasourceToolkit::Exceptions::ValidationError)
-          return 400
-        end
-
         error.status if error.respond_to?(:status) && error.status
 
         case error
-        when Exceptions::ValidationError, Exceptions::BadRequestError
+        when ForestAdminDatasourceToolkit::Exceptions::ValidationError, ForestAdminDatasourceToolkit::Exceptions::BadRequestError
           400
-        when Exceptions::UnauthorizedError
+        when ForestAdminDatasourceToolkit::Exceptions::UnauthorizedError
           401
-        when Exceptions::ForbiddenError
+        when ForestAdminDatasourceToolkit::Exceptions::ForbiddenError
           403
-        when Exceptions::NotFoundError
+        when ForestAdminDatasourceToolkit::Exceptions::NotFoundError
           404
-        when Exceptions::ConflictError
+        when ForestAdminDatasourceToolkit::Exceptions::ConflictError
           409
-        when Exceptions::UnprocessableError
+        when ForestAdminDatasourceToolkit::Exceptions::UnprocessableError
           422
-        when Exceptions::TooManyRequestsError
+        when ForestAdminDatasourceToolkit::Exceptions::TooManyRequestsError
           429
-        when Exceptions::InternalServerError
+        when ForestAdminDatasourceToolkit::Exceptions::InternalServerError
           500
-        when Exceptions::BadGatewayError
+        when ForestAdminDatasourceToolkit::Exceptions::BadGatewayError
           502
-        when Exceptions::ServiceUnavailableError
+        when ForestAdminDatasourceToolkit::Exceptions::ServiceUnavailableError
           503
-        when Exceptions::BusinessError
+        when ForestAdminDatasourceToolkit::Exceptions::BusinessError
           # default BusinessError → 422 (Unprocessable Entity)
           422
         else
@@ -82,7 +76,7 @@ module ForestAdminAgent
         end
 
         is_known_error = error.is_a?(Exceptions::HttpException) ||
-                         error.is_a?(Exceptions::BusinessError) ||
+                         error.is_a?(ForestAdminDatasourceToolkit::Exceptions::BusinessError) ||
                          (defined?(ForestAdminDatasourceToolkit::Exceptions::ForestException) &&
                           error.is_a?(ForestAdminDatasourceToolkit::Exceptions::ForestException))
 
@@ -95,7 +89,7 @@ module ForestAdminAgent
       # @param error [Exception] The error to get data from
       # @return [Hash, nil] The error metadata or nil
       def self.get_error_data(error)
-        return error.details if error.is_a?(Exceptions::BusinessError) &&
+        return error.details if error.is_a?(ForestAdminDatasourceToolkit::Exceptions::BusinessError) &&
                                 error.respond_to?(:details) &&
                                 !error.details.empty?
 
@@ -107,9 +101,9 @@ module ForestAdminAgent
       # @return [Proc, nil] A proc that generates custom headers
       def self.get_custom_headers(error)
         case error
-        when Exceptions::NotFoundError
+        when ForestAdminDatasourceToolkit::Exceptions::NotFoundError
           { 'x-error-type' => 'object-not-found' }
-        when Exceptions::TooManyRequestsError
+        when ForestAdminDatasourceToolkit::Exceptions::TooManyRequestsError
           { 'Retry-After' => error.retry_after.to_s }
         end
       end

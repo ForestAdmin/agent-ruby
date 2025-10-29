@@ -16,7 +16,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an UnprocessableError' do
               expect do
                 hook_context.raise_error('message exception')
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::UnprocessableError, 'message exception')
+              end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, 'message exception')
             end
           end
 
@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an ForbiddenError' do
               expect do
                 hook_context.raise_forbidden_error('message exception')
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError, 'message exception')
+              end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForbiddenError, 'message exception')
             end
           end
 
@@ -32,7 +32,7 @@ module ForestAdminDatasourceCustomizer
             it 'raise an ValidationError' do
               expect do
                 hook_context.raise_validation_error('message exception')
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, 'message exception')
+              end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, 'message exception')
             end
           end
         end

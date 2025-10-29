@@ -2,7 +2,7 @@ module ForestAdminAgent
   module Utils
     module Schema
       class GeneratorActionFieldWidget
-        include ForestAdminAgent::Http::Exceptions
+        include ForestAdminDatasourceToolkit::Exceptions
 
         def self.build_widget_options(field)
           return if !ActionFields.widget?(field) || %w[Collection Enum EnumList].include?(field.type)

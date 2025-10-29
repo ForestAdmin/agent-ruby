@@ -7,6 +7,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Exceptions
 
       describe UpdateField do
         include_context 'with caller'
@@ -200,12 +201,12 @@ module ForestAdminAgent
               book = { 'id' => 1, 'tags' => ['test'] }
               @collection.list_responses = [[book]]
               allow(permissions).to receive(:can?).with(:edit, anything)
-                                .and_raise(Http::Exceptions::ForbiddenError.new('Permission denied'))
+                                .and_raise(ForbiddenError.new('Permission denied'))
             end
 
             it 'raises ForbiddenError' do
               expect { update_field.handle_request(args) }
-                .to raise_error(Http::Exceptions::ForbiddenError)
+                .to raise_error(ForbiddenError)
             end
           end
 
@@ -216,7 +217,7 @@ module ForestAdminAgent
 
             it 'raises NotFoundError' do
               expect { update_field.handle_request(args_with_invalid_field) }
-                .to raise_error(Http::Exceptions::NotFoundError, /not found/)
+                .to raise_error(NotFoundError, /not found/)
             end
           end
 
@@ -227,7 +228,7 @@ module ForestAdminAgent
 
             it 'raises ValidationError' do
               expect { update_field.handle_request(args_with_non_array_field) }
-                .to raise_error(Http::Exceptions::ValidationError, /not an array/)
+                .to raise_error(ValidationError, /not an array/)
             end
           end
 
@@ -238,7 +239,7 @@ module ForestAdminAgent
 
             it 'raises NotFoundError' do
               expect { update_field.handle_request(args) }
-                .to raise_error(Http::Exceptions::NotFoundError, /not found/)
+                .to raise_error(NotFoundError, /not found/)
             end
           end
 
@@ -254,7 +255,7 @@ module ForestAdminAgent
 
             it 'raises ValidationError' do
               expect { update_field.handle_request(args_with_large_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /out of bounds/)
+                .to raise_error(ValidationError, /out of bounds/)
             end
           end
 
@@ -265,7 +266,7 @@ module ForestAdminAgent
 
             it 'raises ValidationError' do
               expect { update_field.handle_request(args_with_negative_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /non-negative/)
+                .to raise_error(ValidationError, /non-negative/)
             end
           end
 
@@ -276,7 +277,7 @@ module ForestAdminAgent
 
             it 'raises ValidationError' do
               expect { update_field.handle_request(args_with_invalid_index) }
-                .to raise_error(Http::Exceptions::ValidationError, /Invalid index/)
+                .to raise_error(ValidationError, /Invalid index/)
             end
           end
 
@@ -288,7 +289,7 @@ module ForestAdminAgent
 
             it 'raises UnprocessableError' do
               expect { update_field.handle_request(args) }
-                .to raise_error(Http::Exceptions::UnprocessableError, /not an array/)
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::UnprocessableError, /not an array/)
             end
           end
 
@@ -337,7 +338,7 @@ module ForestAdminAgent
 
               it 'raises ValidationError' do
                 expect { update_field.handle_request(args_with_invalid_number) }
-                  .to raise_error(Http::Exceptions::ValidationError, /wrong type/)
+                  .to raise_error(ValidationError, /wrong type/)
               end
             end
           end

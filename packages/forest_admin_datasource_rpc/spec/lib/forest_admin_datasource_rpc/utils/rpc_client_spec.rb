@@ -112,7 +112,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises ValidationError with error message' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ValidationError,
+                ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                 /Invalid parameters/
               )
             end
@@ -131,7 +131,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises AuthenticationOpenIdClient error' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+                ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient,
                 /Invalid credentials/
               )
             end
@@ -150,7 +150,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises ForbiddenError' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                ForestAdminDatasourceToolkit::Exceptions::ForbiddenError,
                 /Access denied/
               )
             end
@@ -169,7 +169,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises NotFoundError' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::NotFoundError,
+                ForestAdminDatasourceToolkit::Exceptions::NotFoundError,
                 /Resource not found/
               )
             end
@@ -188,7 +188,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises ConflictError' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ConflictError,
+                ForestAdminDatasourceToolkit::Exceptions::ConflictError,
                 /Duplicate record/
               )
             end
@@ -207,7 +207,7 @@ module ForestAdminDatasourceRpc
 
             it 'raises UnprocessableError' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::UnprocessableError,
+                ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
                 /Validation failed/
               )
             end
@@ -264,7 +264,7 @@ module ForestAdminDatasourceRpc
 
             it 'extracts message correctly' do
               expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ValidationError,
+                ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                 /Custom error message/
               )
             end

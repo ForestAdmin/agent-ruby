@@ -103,7 +103,7 @@ module ForestAdminAgent
             allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
             allow(File).to receive(:exist?).with('/path/to/schema.json').and_return(false)
 
-            expect { instance.send_schema }.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError)
+            expect { instance.send_schema }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::InternalServerError)
           end
 
           it 'loads schema from file in production mode' do

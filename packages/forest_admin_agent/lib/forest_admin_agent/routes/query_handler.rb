@@ -30,7 +30,8 @@ module ForestAdminAgent
         return unless args[:params][:segmentQuery]
 
         unless args[:params][:connectionName]
-          raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
+          raise ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
+                'Missing native query connection attribute'
         end
 
         QueryValidator.valid?(args[:params][:segmentQuery])

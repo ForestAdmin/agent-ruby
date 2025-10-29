@@ -7,7 +7,6 @@ module ForestAdminAgent
       class NativeQuery < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
-        include ForestAdminAgent::Http::Exceptions
         include ForestAdminDatasourceToolkit::Exceptions
         include ForestAdminDatasourceToolkit::Components::Charts
         include ForestAdminAgent::Routes::QueryHandler
@@ -31,7 +30,8 @@ module ForestAdminAgent
 
           QueryValidator.valid?(query)
           unless args[:params][:connectionName]
-            raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
+            raise ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
+                  'Missing native query connection attribute'
           end
 
           @permissions.can_chart?(args[:params])
@@ -62,7 +62,7 @@ module ForestAdminAgent
         end
 
         def raise_error(result, key_names)
-          raise BadRequestError,
+          raise ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
                 "The result columns must be named #{key_names} instead of '#{result.keys.join("', '")}'"
         end
 

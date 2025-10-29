@@ -27,7 +27,10 @@ module ForestAdminAgent
 
           records = @collection.list(@caller, filter, projection)
 
-          raise Http::Exceptions::NotFoundError, 'Record does not exists' unless records.size.positive?
+          unless records.size.positive?
+            raise ForestAdminDatasourceToolkit::Exceptions::NotFoundError,
+                  'Record does not exists'
+          end
 
           {
             name: args[:params]['collection_name'],

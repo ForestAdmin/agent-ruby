@@ -1,5 +1,5 @@
 require_relative 'forest_admin_agent/version'
-require_relative 'forest_admin_agent/http/Exceptions/business_error'
+require 'forest_admin_datasource_toolkit'
 require 'zeitwerk'
 
 loader = Zeitwerk::Loader.for_gem
@@ -8,6 +8,6 @@ loader.inflector.inflect('sse_cache_invalidation' => 'SSECacheInvalidation')
 loader.setup
 
 module ForestAdminAgent
-  class Error < StandardError; end
+  class Error < ForestAdminDatasourceToolkit::Exceptions::BusinessError; end
   # Your code goes here...
 end

@@ -68,23 +68,26 @@ module ForestAdminAgent
 
         def parse_index(index_param)
           index = Integer(index_param)
-          raise Http::Exceptions::ValidationError, 'Index must be non-negative' if index.negative?
+          if index.negative?
+            raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                  'Index must be non-negative'
+          end
 
           index
         rescue ArgumentError
-          raise Http::Exceptions::ValidationError, "Invalid index: #{index_param}"
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, "Invalid index: #{index_param}"
         end
 
         def validate_array_field!(field_schema, field_name)
           FieldValidator.validate(@collection, field_name)
           return if field_schema.column_type.is_a?(Array)
 
-          raise Http::Exceptions::ValidationError,
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                 "Field '#{field_name}' is not an array (type: #{field_schema.column_type})"
         rescue ForestAdminDatasourceToolkit::Exceptions::ValidationError => e
-          raise Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
+          raise ForestAdminDatasourceToolkit::Exceptions::NotFoundError, e.message if e.message.include?('not found')
 
-          raise Http::Exceptions::ValidationError, e.message
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, e.message
         end
 
         def fetch_record(primary_key_values)
@@ -95,20 +98,20 @@ module ForestAdminAgent
           )
           records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
 
-          raise Http::Exceptions::NotFoundError, 'Record not found' unless records&.any?
+          raise ForestAdminDatasourceToolkit::Exceptions::NotFoundError, 'Record not found' unless records&.any?
 
           records[0]
         end
 
         def validate_array_value!(array, field_name, array_index)
           unless array.is_a?(Array)
-            raise Http::Exceptions::UnprocessableError,
+            raise ForestAdminDatasourceToolkit::Exceptions::UnprocessableError,
                   "Field '#{field_name}' value is not an array (got: #{array.class})"
           end
 
           return unless array_index >= array.length
 
-          raise Http::Exceptions::ValidationError,
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                 "Index #{array_index} out of bounds for array of length #{array.length}"
         end
 
@@ -128,7 +131,8 @@ module ForestAdminAgent
             begin
               return Float(value)
             rescue ArgumentError
-              raise Http::Exceptions::ValidationError, "Cannot coerce '#{value}' to Number - wrong type"
+              raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                    "Cannot coerce '#{value}' to Number - wrong type"
             end
           end
 

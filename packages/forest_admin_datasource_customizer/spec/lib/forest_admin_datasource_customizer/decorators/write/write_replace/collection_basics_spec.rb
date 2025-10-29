@@ -34,7 +34,7 @@ module ForestAdminDatasourceCustomizer
               @decorated_book.replace_field_writing('__dontExist') do
                 {}
               end
-            end.to raise_error(ForestException, "Column not found: 'book.__dontExist'")
+            end.to raise_error(ValidationError, "Column not found: 'book.__dontExist'")
           end
 
           it 'marks fields as writable when handler is defined' do
