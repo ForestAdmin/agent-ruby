@@ -32,7 +32,7 @@ module ForestAdminAgent
       # Get the HTTP status code for an error
       # @param error [Exception] The error to get status for
       # @return [Integer] The HTTP status code
-      def self.get_error_status(error) # rubocop:disable Metrics/MethodLength
+      def self.get_error_status(error)
         if defined?(ForestAdminDatasourceToolkit::Exceptions::ValidationError) &&
            of_type?(error, ForestAdminDatasourceToolkit::Exceptions::ValidationError)
           return 400
@@ -61,10 +61,10 @@ module ForestAdminAgent
           502
         when Exceptions::ServiceUnavailableError
           503
-        when Exceptions::BusinessError # rubocop:disable Lint/DuplicateBranch
+        when Exceptions::BusinessError
           # default BusinessError → 422 (Unprocessable Entity)
           422
-        else # rubocop:disable Lint/DuplicateBranch
+        else
           # Unknown errors → 500 (Internal Server Error)
           500
         end
@@ -77,7 +77,7 @@ module ForestAdminAgent
         # Try custom error message customizer first
         if defined?(ForestAdminAgent::Facades) &&
            (customizer = ForestAdminAgent::Facades::Container.cache(:customize_error_message))
-          custom_message = eval(customizer).call(error) # rubocop:disable Security/Eval
+          custom_message = eval(customizer).call(error)
           return custom_message if custom_message
         end
 
