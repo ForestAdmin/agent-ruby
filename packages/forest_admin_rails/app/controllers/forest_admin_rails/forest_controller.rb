@@ -66,7 +66,7 @@ module ForestAdminRails
       response.headers.merge!(http_exception.custom_headers || {})
 
       data = case exception
-             when ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+             when ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient,
                OpenIDConnect::Exception
                {
                  error: exception.message,

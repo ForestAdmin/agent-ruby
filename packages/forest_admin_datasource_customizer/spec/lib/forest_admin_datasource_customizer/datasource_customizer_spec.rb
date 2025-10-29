@@ -2,7 +2,7 @@ require 'spec_helper'
 
 module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceToolkit::Schema
-  include ForestAdminAgent::Http::Exceptions
+  include ForestAdminDatasourceToolkit::Exceptions
 
   describe DatasourceCustomizer do
     let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }

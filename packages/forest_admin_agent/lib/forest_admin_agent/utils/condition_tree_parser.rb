@@ -4,7 +4,7 @@ require 'active_support/time'
 module ForestAdminAgent
   module Utils
     class ConditionTreeParser
-      include ForestAdminAgent::Http::Exceptions
+      include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes

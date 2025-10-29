@@ -3,7 +3,6 @@ require 'faraday'
 module ForestAdminAgent
   module Http
     class ForestAdminApiRequester
-      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       def initialize
@@ -30,7 +29,7 @@ module ForestAdminAgent
 
       def handle_response_error(error)
         # Re-raise if it's already a BusinessError
-        raise error if error.is_a?(ForestAdminAgent::Http::Exceptions::BusinessError)
+        raise error if error.is_a?(BusinessError)
         raise error if error.is_a?(ForestException)
 
         if error.response[:message]&.include?('certificate')

@@ -5,7 +5,7 @@ module ForestAdminAgent
     module Security
       class Authentication < AbstractRoute
         include ForestAdminAgent::Builder
-        include ForestAdminAgent::Http::Exceptions
+        include ForestAdminDatasourceToolkit::Exceptions
 
         def setup_routes
           add_route(

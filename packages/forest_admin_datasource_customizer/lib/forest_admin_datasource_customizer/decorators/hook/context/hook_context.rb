@@ -3,7 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Hook
       module Context
         class HookContext < ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext
-          include ForestAdminAgent::Http::Exceptions
+          include ForestAdminDatasourceToolkit::Exceptions
           def raise_validation_error(message)
             raise ValidationError, message
           end

@@ -2,7 +2,7 @@ require 'spec_helper'
 
 module ForestAdminAgent
   module Services
-    include ForestAdminAgent::Http::Exceptions
+    include ForestAdminDatasourceToolkit::Exceptions
     include ForestAdminAgent::Utils
     include ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema

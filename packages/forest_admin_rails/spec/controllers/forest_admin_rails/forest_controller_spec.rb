@@ -28,7 +28,7 @@ module ForestAdminRails
     describe '#exception_handler' do
       context 'when exception is AuthenticationOpenIdClient' do
         it 'returns OpenID error format with real exception' do
-          exception = ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient.new('Auth failed')
+          exception = ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient.new('Auth failed')
           # Define response as singleton method for this instance
           exception.define_singleton_method(:response) { 'Invalid token' }
 
@@ -55,7 +55,7 @@ module ForestAdminRails
           allow(exception).to receive(:full_message).and_return('Full error trace')
 
           # Make the case/when work by stubbing the === method
-          allow(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).to receive(:===).with(exception).and_return(true)
+          allow(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).to receive(:===).with(exception).and_return(true)
           allow(OpenIDConnect::Exception).to receive(:===).with(exception).and_return(false)
 
           controller.send(:exception_handler, exception)
@@ -83,7 +83,7 @@ module ForestAdminRails
           allow(exception).to receive(:full_message).and_return('Full error trace')
 
           # Make the case/when work by stubbing the === method
-          allow(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).to receive(:===).with(exception).and_return(false)
+          allow(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).to receive(:===).with(exception).and_return(false)
           allow(OpenIDConnect::Exception).to receive(:===).with(exception).and_return(true)
 
           controller.send(:exception_handler, exception)
@@ -98,7 +98,7 @@ module ForestAdminRails
 
       context 'with ValidationError' do
         it 'returns errors format with validation error details' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Email is invalid')
+          exception = ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('Email is invalid')
           # Mock get_error_message to work with real HttpException instances
           # Note: get_error_message has a bug where it checks error.ancestors instead of error.class.ancestors
           controller.send(:exception_handler, exception)
@@ -114,7 +114,7 @@ module ForestAdminRails
         end
 
         it 'supports custom name' do
-          exception = ForestAdminAgent::Http::Exceptions::ValidationError.new('Invalid data')
+          exception = ForestAdminDatasourceToolkit::Exceptions::ValidationError.new('Invalid data')
           controller.send(:exception_handler, exception)
 
           json = JSON.parse(response_mock.body)
@@ -124,7 +124,7 @@ module ForestAdminRails
 
       context 'with ForbiddenError' do
         it 'returns errors format with 403 status' do
-          exception = ForestAdminAgent::Http::Exceptions::ForbiddenError.new('Access denied')
+          exception = ForestAdminDatasourceToolkit::Exceptions::ForbiddenError.new('Access denied')
           controller.send(:exception_handler, exception)
 
           expect(response_mock.status).to eq(403)
@@ -137,7 +137,7 @@ module ForestAdminRails
 
       context 'with NotFoundError' do
         it 'returns errors format with 404 status' do
-          exception = ForestAdminAgent::Http::Exceptions::NotFoundError.new('Resource not found')
+          exception = ForestAdminDatasourceToolkit::Exceptions::NotFoundError.new('Resource not found')
           controller.send(:exception_handler, exception)
 
           expect(response_mock.status).to eq(404)
@@ -162,8 +162,8 @@ module ForestAdminRails
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::BusinessError).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
 
@@ -190,8 +190,8 @@ module ForestAdminRails
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::BusinessError).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
 
@@ -219,8 +219,8 @@ module ForestAdminRails
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::BusinessError).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error')
 
@@ -245,8 +245,8 @@ module ForestAdminRails
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::BusinessError).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error trace')
           allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(false)
@@ -269,8 +269,8 @@ module ForestAdminRails
           allow(exception).to receive(:try).with(:status).and_return(nil)
           allow(exception).to receive(:try).with(:data).and_return(nil)
           allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::BusinessError).and_return(false)
+          allow(exception).to receive(:is_a?).with(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient).and_return(false)
           allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
           allow(exception).to receive(:full_message).and_return('Full error trace')
           allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(true)

@@ -1,5 +1,3 @@
-require_relative 'business_error'
-
 module ForestAdminAgent
   module Http
     module Exceptions

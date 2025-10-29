@@ -56,7 +56,7 @@ module ForestAdminAgent
             args = { params: {} }
             expect do
               authentication.handle_authentication args
-            end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError,
+            end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::BadRequestError,
                                ForestAdminAgent::Utils::ErrorMessages::MISSING_RENDERING_ID)
           end
 
@@ -64,7 +64,7 @@ module ForestAdminAgent
             args = { params: { 'renderingId' => 'abc' } }
             expect do
               authentication.handle_authentication args
-            end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError,
+            end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
                                ForestAdminAgent::Utils::ErrorMessages::INVALID_RENDERING_ID)
           end
 
@@ -93,7 +93,7 @@ module ForestAdminAgent
 
             expect do
               authentication.handle_authentication_callback args
-            end.to raise_error(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient)
+            end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::AuthenticationOpenIdClient)
           end
         end
 

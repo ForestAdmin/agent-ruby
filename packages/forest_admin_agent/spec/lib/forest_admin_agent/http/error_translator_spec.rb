@@ -107,7 +107,7 @@ module ForestAdminAgent
 
         context 'when error is a BusinessError' do
           let(:business_error) do
-            ForestAdminAgent::Http::Exceptions::BadRequestError.new('Bad request error')
+            ForestAdminDatasourceToolkit::Exceptions::BadRequestError.new('Bad request error')
           end
 
           it 'returns the business error message' do
@@ -132,7 +132,7 @@ module ForestAdminAgent
 
         context 'when error is a BadRequestError' do
           let(:bad_request_error) do
-            ForestAdminAgent::Http::Exceptions::BadRequestError.new('Bad request')
+            ForestAdminDatasourceToolkit::Exceptions::BadRequestError.new('Bad request')
           end
 
           it 'returns 400' do
@@ -143,7 +143,7 @@ module ForestAdminAgent
 
         context 'when error is a ForbiddenError' do
           let(:forbidden_error) do
-            ForestAdminAgent::Http::Exceptions::ForbiddenError.new('Forbidden')
+            ForestAdminDatasourceToolkit::Exceptions::ForbiddenError.new('Forbidden')
           end
 
           it 'returns 403' do
@@ -154,7 +154,7 @@ module ForestAdminAgent
 
         context 'when error is a NotFoundError' do
           let(:not_found_error) do
-            ForestAdminAgent::Http::Exceptions::NotFoundError.new('Not found')
+            ForestAdminDatasourceToolkit::Exceptions::NotFoundError.new('Not found')
           end
 
           it 'returns 404' do
@@ -165,7 +165,7 @@ module ForestAdminAgent
 
         context 'when error is an UnprocessableError' do
           let(:unprocessable_error) do
-            ForestAdminAgent::Http::Exceptions::UnprocessableError.new('Unprocessable')
+            ForestAdminDatasourceToolkit::Exceptions::UnprocessableError.new('Unprocessable')
           end
 
           it 'returns 422' do
