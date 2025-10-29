@@ -1,3 +1,10 @@
+## [1.12.12](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.11...v1.12.12) (2025-10-29)
+
+
+### Bug Fixes
+
+* **routesCaching:** ensure routes for plugin customizations are mounted and cached ([#190](https://github.com/ForestAdmin/agent-ruby/issues/190)) ([1491f25](https://github.com/ForestAdmin/agent-ruby/commit/1491f253eecf1674742916ae40e786c5acf2ec52))
+
 ## [1.12.11](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.10...v1.12.11) (2025-10-29)
 
 
