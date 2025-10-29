@@ -19,25 +19,25 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can?(:browse, @collection)
-          @permissions.can?(:export, @collection)
+          context = build(args)
+          context.permissions.can?(:browse, context.collection)
+          context.permissions.can?(:export, context.collection)
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
-                @permissions.get_scope(@collection),
-                parse_query_segment(@collection, args, @permissions, @caller),
+                context.permissions.get_scope(context.collection),
+                parse_query_segment(context.collection, args, context.permissions, context.caller),
                 QueryStringParser.parse_condition_tree(
-                  @collection, args
+                  context.collection, args
                 )
               ]
             ),
-            search: QueryStringParser.parse_search(@collection, args),
+            search: QueryStringParser.parse_search(context.collection, args),
             search_extended: QueryStringParser.parse_search_extended(args),
-            sort: QueryStringParser.parse_sort(@collection, args),
-            segment: QueryStringParser.parse_segment(@collection, args)
+            sort: QueryStringParser.parse_sort(context.collection, args),
+            segment: QueryStringParser.parse_segment(context.collection, args)
           )
-          projection = QueryStringParser.parse_projection(@collection, args)
+          projection = QueryStringParser.parse_projection(context.collection, args)
           filename = args[:params][:filename] || args[:params]['collection_name']
           filename += '.csv' unless /\.csv$/i.match?(filename)
           header = args[:params][:header]
@@ -47,7 +47,7 @@ module ForestAdminAgent
           filename_with_timestamp = filename.gsub('.csv', "_export_#{now}.csv")
 
           # Return streaming enumerator instead of full CSV string
-          list_records = ->(batch_filter) { @collection.list(@caller, batch_filter, projection) }
+          list_records = ->(batch_filter) { context.collection.list(context.caller, batch_filter, projection) }
 
           {
             content: {

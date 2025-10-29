@@ -7,7 +7,6 @@ module ForestAdminAgent
       class ApiChartDatasource < AbstractAuthenticatedRoute
         def initialize(chart_name)
           @chart_name = chart_name
-          @datasource = ForestAdminAgent::Facades::Container.datasource
 
           super()
         end
@@ -38,12 +37,13 @@ module ForestAdminAgent
         end
 
         def handle_api_chart(args = {})
-          @caller = Utils::QueryStringParser.parse_caller(args)
+          caller = Utils::QueryStringParser.parse_caller(args)
+          datasource = ForestAdminAgent::Facades::Container.datasource
 
           {
             content: Serializer::ForestChartSerializer.serialize(
-              @datasource.render_chart(
-                @caller,
+              datasource.render_chart(
+                caller,
                 @chart_name
               )
             )
@@ -51,11 +51,12 @@ module ForestAdminAgent
         end
 
         def handle_smart_chart(args = {})
-          @caller = Utils::QueryStringParser.parse_caller(args)
+          caller = Utils::QueryStringParser.parse_caller(args)
+          datasource = ForestAdminAgent::Facades::Container.datasource
 
           {
-            content: @datasource.render_chart(
-              @caller,
+            content: datasource.render_chart(
+              caller,
               @chart_name
             )
           }

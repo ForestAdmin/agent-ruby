@@ -14,18 +14,18 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can?(:read, @collection)
-          scope = @permissions.get_scope(@collection)
-          primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
+          context = build(args)
+          context.permissions.can?(:read, context.collection)
+          scope = context.permissions.get_scope(context.collection)
+          primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(context.collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
 
-          projection = ProjectionFactory.all(@collection)
+          projection = ProjectionFactory.all(context.collection)
 
-          records = @collection.list(@caller, filter, projection)
+          records = context.collection.list(context.caller, filter, projection)
 
           raise Http::Exceptions::NotFoundError, 'Record does not exists' unless records.size.positive?
 
@@ -33,7 +33,7 @@ module ForestAdminAgent
             name: args[:params]['collection_name'],
             content: JSONAPI::Serializer.serialize(
               records[0],
-              class_name: @collection.name,
+              class_name: context.collection.name,
               is_collection: false,
               serializer: Serializer::ForestSerializer,
               include: projection.relations(only_keys: true)

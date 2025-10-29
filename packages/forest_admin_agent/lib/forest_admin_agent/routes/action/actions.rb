@@ -14,14 +14,14 @@ module ForestAdminAgent
 
         def initialize(collection, action)
           @action_name = action
-          @collection = collection
+          @route_collection = collection
           super()
         end
 
         def setup_routes
-          action_index = @collection.schema[:actions].keys.index(@action_name)
+          action_index = @route_collection.schema[:actions].keys.index(@action_name)
           slug = ForestAdminAgent::Utils::Schema::GeneratorAction.get_action_slug(@action_name)
-          route_name = "forest_action_#{@collection.name}_#{action_index}_#{slug}"
+          route_name = "forest_action_#{@route_collection.name}_#{action_index}_#{slug}"
           path = "/_actions/:collection_name/#{action_index}/#{slug}"
 
           add_route(route_name, 'post', path, proc { |args| handle_request(args) })
@@ -47,12 +47,12 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
+          context = build(args)
           args = middleware_custom_action_approval_request_data(args)
-          filter_for_caller = get_record_selection(args)
-          get_record_selection(args, include_user_scope: false)
+          filter_for_caller = get_record_selection(args, context)
+          get_record_selection(args, context, include_user_scope: false)
 
-          @permissions.can_smart_action?(args, @collection, filter_for_caller)
+          context.permissions.can_smart_action?(args, context.collection, filter_for_caller)
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
@@ -60,8 +60,8 @@ module ForestAdminAgent
           # better send invalid data to the getForm() customer handler than to the execute() one.
           unsafe_data = Schema::ForestValueConverter.make_form_data_unsafe(raw_data)
 
-          fields = @collection.get_form(
-            @caller,
+          fields = context.collection.get_form(
+            context.caller,
             @action_name,
             unsafe_data,
             filter_for_caller,
@@ -70,24 +70,27 @@ module ForestAdminAgent
 
           # Now that we have the field list, we can parse the data again.
           data = Schema::ForestValueConverter.make_form_data(
-            @datasource,
+            context.datasource,
             raw_data,
             fields.reject { |field| field.type == 'Layout' }
           )
 
-          { content: @collection.execute(@caller, @action_name, data, filter_for_caller) }
+          { content: context.collection.execute(context.caller, @action_name, data, filter_for_caller) }
         end
 
         def handle_hook_request(args = {})
-          build(args)
+          context = build(args)
           forest_fields = args.dig(:params, :data, :attributes, :fields)
-          data = (Schema::ForestValueConverter.make_form_data_from_fields(@datasource, forest_fields) if forest_fields)
-          filter = get_record_selection(args)
+          data = (if forest_fields
+                    Schema::ForestValueConverter.make_form_data_from_fields(context.datasource,
+                                                                            forest_fields)
+                  end)
+          filter = get_record_selection(args, context)
           search_values = {}
           forest_fields&.each { |field| search_values[field['field']] = field['searchValue'] }
 
-          form = @collection.get_form(
-            @caller,
+          form = context.collection.get_form(
+            context.caller,
             @action_name,
             data,
             filter,
@@ -102,7 +105,9 @@ module ForestAdminAgent
 
           {
             content: {
-              fields: form_elements[:fields].map { |f| Schema::GeneratorAction.build_field_schema(@datasource, f) },
+              fields: form_elements[:fields].map do |f|
+                Schema::GeneratorAction.build_field_schema(context.datasource, f)
+              end,
               layout: Schema::GeneratorAction.build_layout(form_elements[:layout])
             }
           }
@@ -129,26 +134,26 @@ module ForestAdminAgent
           )[0])
         end
 
-        def get_record_selection(args, include_user_scope: true)
+        def get_record_selection(args, context, include_user_scope: true)
           attributes = args.dig(:params, :data, :attributes)
 
           # Match user filter + search + scope? + segment
-          scope = include_user_scope ? @permissions.get_scope(@collection) : nil
+          scope = include_user_scope ? context.permissions.get_scope(context.collection) : nil
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
                 scope,
                 ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  @collection, args
+                  context.collection, args
                 )
               ]
             )
           )
 
           # Restrict the filter to the selected records for single or bulk actions
-          if @collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL
-            selection_ids = Utils::Id.parse_selection_ids(@collection, args[:params])
-            selected_ids = ConditionTreeFactory.match_ids(@collection, selection_ids[:ids])
+          if context.collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL
+            selection_ids = Utils::Id.parse_selection_ids(context.collection, args[:params])
+            selected_ids = ConditionTreeFactory.match_ids(context.collection, selection_ids[:ids])
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
             filter = filter.override(
               condition_tree: ConditionTreeFactory.intersect([filter.condition_tree, selected_ids])
@@ -158,10 +163,11 @@ module ForestAdminAgent
           # Restrict the filter further for the "related data" page
           unless attributes[:parent_association_name].nil?
             relation = attributes[:parent_association_name]
-            parent = @datasource.get_collection(attributes[:parent_collection_name])
+            parent = context.datasource.get_collection(attributes[:parent_collection_name])
             parent_primary_key_values = Utils::Id.unpack_id(parent, attributes[:parent_collection_id])
 
-            filter = FilterFactory.make_foreign_filter(parent, parent_primary_key_values, relation, @caller, filter)
+            filter = FilterFactory.make_foreign_filter(parent, parent_primary_key_values, relation, context.caller,
+                                                       filter)
           end
 
           filter

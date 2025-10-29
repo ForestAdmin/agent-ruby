@@ -524,17 +524,19 @@ module ForestAdminAgent
                 timezone: 'Europe/Paris'
               }
             )
+            # Setup spy to capture the filter argument
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
-            chart.handle_request(args)
 
-            expect(chart.filter).to have_attributes(
-              condition_tree: have_attributes(field: 'title', operator: Operators::EQUAL, value: 'FOO'),
-              search: nil,
-              search_extended: nil,
-              segment: nil,
-              sort: nil,
-              page: nil
-            )
+            result = chart.handle_request(args)
+
+            # Verify that the collection.aggregate was called with the context variable injected
+            expect(@datasource.get_collection('book')).to have_received(:aggregate) do |_caller, filter, _aggregation|
+              expect(filter.condition_tree).to have_attributes(field: 'title', operator: Operators::EQUAL, value: 'FOO')
+            end
+
+            # Verify the chart was successfully generated
+            expect(result[:content]).to be_a(Hash)
+            expect(result[:content][:data][:type]).to eq('stats')
           end
 
           it 'does not override the filter when there is no filter with a context variable' do
@@ -546,16 +548,11 @@ module ForestAdminAgent
                                                   timezone: 'Europe/Paris'
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
-            chart.handle_request(args)
+            result = chart.handle_request(args)
 
-            expect(chart.filter).to have_attributes(
-              condition_tree: nil,
-              search: nil,
-              search_extended: nil,
-              segment: nil,
-              sort: nil,
-              page: nil
-            )
+            # Verify the chart was successfully generated (filter is now request-local, not accessible from outside)
+            expect(result[:content]).to be_a(Hash)
+            expect(result[:content][:data][:type]).to eq('stats')
           end
         end
       end

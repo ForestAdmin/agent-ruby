@@ -2,7 +2,7 @@ require 'json'
 module ForestAdminAgent
   module Routes
     module Capabilities
-      class Collections < AbstractAuthenticatedRoute
+      class Collections < AbstractRoute
         include ForestAdminDatasourceToolkit::Schema
 
         def setup_routes
@@ -15,13 +15,13 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          @datasource = ForestAdminAgent::Facades::Container.datasource
+          datasource = ForestAdminAgent::Facades::Container.datasource
           collections = args[:params]['collectionNames'] || []
 
-          connections = @datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
+          connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
 
           result = collections.map do |collection_name|
-            collection = @datasource.get_collection(collection_name)
+            collection = datasource.get_collection(collection_name)
             {
               name: collection.name,
               fields: collection.schema[:fields].select { |_, field| field.is_a?(ColumnSchema) }.map do |name, field|

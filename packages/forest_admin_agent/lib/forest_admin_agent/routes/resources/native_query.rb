@@ -26,7 +26,7 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
+          context = build(args)
           query = args[:params][:query].strip
 
           QueryValidator.valid?(query)
@@ -34,31 +34,31 @@ module ForestAdminAgent
             raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
           end
 
-          @permissions.can_chart?(args[:params])
+          context.permissions.can_chart?(args[:params])
 
           query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
-          self.type = args[:params][:type]
+          type = validate_and_get_type(args[:params][:type])
           result = execute_query(
-            @datasource,
+            context.datasource,
             query,
             args[:params][:connectionName],
-            @permissions,
-            @caller,
+            context.permissions,
+            context.caller,
             args[:params][:contextVariables]
           )
 
-          { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}", result)) }
+          { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{type}", result)) }
         end
 
         private
 
-        def type=(type)
+        def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Invalid Chart type #{type}"
           end
 
-          @type = type.downcase
+          type.downcase
         end
 
         def raise_error(result, key_names)

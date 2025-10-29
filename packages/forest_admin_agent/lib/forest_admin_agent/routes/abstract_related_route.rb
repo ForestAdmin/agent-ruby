@@ -2,14 +2,16 @@ module ForestAdminAgent
   module Routes
     class AbstractRelatedRoute < AbstractAuthenticatedRoute
       def build(args = {})
-        super
+        context = super
 
-        relation = @collection.schema[:fields][args[:params]['relation_name']]
-        @child_collection = if relation.type == 'PolymorphicManyToOne'
-                              @datasource.get_collection(args[:params]['data']['type'])
-                            else
-                              @datasource.get_collection(relation.foreign_collection)
-                            end
+        relation = context.collection.schema[:fields][args[:params]['relation_name']]
+        context.child_collection = if relation.type == 'PolymorphicManyToOne'
+                                     context.datasource.get_collection(args[:params]['data']['type'])
+                                   else
+                                     context.datasource.get_collection(relation.foreign_collection)
+                                   end
+
+        context
       end
     end
   end

@@ -11,8 +11,6 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceToolkit::Components::Charts
 
-        attr_reader :filter
-
         FORMAT = {
           Day: '%d/%m/%Y',
           Week: 'W%V-%G',
@@ -28,97 +26,97 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can_chart?(args[:params])
-          @args = args
-          self.type = args[:params][:type]
-          @filter = Filter.new(
+          context = build(args)
+          context.permissions.can_chart?(args[:params])
+          type = validate_and_get_type(args[:params][:type])
+          filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
-                @permissions.get_scope(@collection),
+                context.permissions.get_scope(context.collection),
                 ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  @collection, args
+                  context.collection, args
                 )
               ]
             )
           )
 
-          inject_context_variables
+          filter = inject_context_variables(filter, context, args)
 
-          { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{@type}")) }
+          { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{type}", context, filter, args)) }
         end
 
         private
 
-        def type=(type)
+        def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Invalid Chart type #{type}"
           end
 
-          @type = type.downcase
+          type.downcase
         end
 
-        def inject_context_variables
-          user = @permissions.get_user_data(@caller.id)
-          team = @permissions.get_team(@caller.rendering_id)
+        def inject_context_variables(filter, context, args)
+          user = context.permissions.get_user_data(context.caller.id)
+          team = context.permissions.get_team(context.caller.rendering_id)
 
           context_variables = ForestAdminAgent::Utils::ContextVariables.new(team, user,
-                                                                            @args[:params][:contextVariables])
-          return unless @args[:params][:filter]
+                                                                            args[:params][:contextVariables])
+          return filter unless args[:params][:filter]
 
-          @filter = @filter.override(condition_tree: ContextVariablesInjector.inject_context_in_filter(
-            @filter.condition_tree, context_variables
+          filter.override(condition_tree: ContextVariablesInjector.inject_context_in_filter(
+            filter.condition_tree, context_variables
           ))
         end
 
-        def make_value
-          value = compute_value(@filter)
+        def make_value(context, filter, args)
+          value = compute_value(context, filter, args)
           previous_value = nil
-          is_and_aggregator = @filter.condition_tree&.try(:aggregator) == 'And'
-          with_count_previous = @filter.condition_tree&.some_leaf(&:use_interval_operator)
+          is_and_aggregator = filter.condition_tree&.try(:aggregator) == 'And'
+          with_count_previous = filter.condition_tree&.some_leaf(&:use_interval_operator)
 
           if with_count_previous && !is_and_aggregator
-            previous_value = compute_value(FilterFactory.get_previous_period_filter(@filter, @caller.timezone))
+            previous_filter = FilterFactory.get_previous_period_filter(filter, context.caller.timezone)
+            previous_value = compute_value(context, previous_filter, args)
           end
 
           ValueChart.new(value, previous_value).serialize
         end
 
-        def make_objective
-          ObjectiveChart.new(compute_value(@filter)).serialize
+        def make_objective(context, filter, args)
+          ObjectiveChart.new(compute_value(context, filter, args)).serialize
         end
 
-        def make_pie
-          group_field = @args[:params][:groupByFieldName]
+        def make_pie(context, filter, args)
+          group_field = args[:params][:groupByFieldName]
           aggregation = Aggregation.new(
-            operation: @args[:params][:aggregator],
-            field: @args[:params][:aggregateFieldName],
+            operation: args[:params][:aggregator],
+            field: args[:params][:aggregateFieldName],
             groups: group_field ? [{ field: group_field }] : []
           )
 
-          result = @collection.aggregate(@caller, @filter, aggregation)
+          result = context.collection.aggregate(context.caller, filter, aggregation)
 
           PieChart.new(result.map { |row| { key: row['group'][group_field], value: row['value'] } }).serialize
         end
 
-        def make_line
-          group_by_field_name = @args[:params][:groupByFieldName]
-          time_range = @args[:params][:timeRange]
-          filter_only_with_values = @filter.override(
+        def make_line(context, filter, args)
+          group_by_field_name = args[:params][:groupByFieldName]
+          time_range = args[:params][:timeRange]
+          filter_only_with_values = filter.override(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
               [
-                @filter.condition_tree,
+                filter.condition_tree,
                 ConditionTree::Nodes::ConditionTreeLeaf.new(group_by_field_name, ConditionTree::Operators::PRESENT)
               ]
             )
           )
-          rows = @collection.aggregate(
-            @caller,
+          rows = context.collection.aggregate(
+            context.caller,
             filter_only_with_values,
             Aggregation.new(
-              operation: @args[:params][:aggregator],
-              field: @args[:params][:aggregateFieldName],
+              operation: args[:params][:aggregator],
+              field: args[:params][:aggregateFieldName],
               groups: [{ field: group_by_field_name, operation: time_range }]
             )
           )
@@ -140,51 +138,51 @@ module ForestAdminAgent
           LineChart.new(result).serialize
         end
 
-        def make_leaderboard
-          field = @collection.schema[:fields][@args[:params][:relationshipFieldName]]
+        def make_leaderboard(context, filter, args)
+          field = context.collection.schema[:fields][args[:params][:relationshipFieldName]]
 
           if field && field.type == 'OneToMany'
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(
-              @collection,
-              @args[:params][:relationshipFieldName]
+              context.collection,
+              args[:params][:relationshipFieldName]
             )
             if inverse
               collection = field.foreign_collection
-              filter = @filter.nest(inverse)
+              leaderboard_filter = filter.nest(inverse)
               aggregation = Aggregation.new(
-                operation: @args[:params][:aggregator],
-                field: @args[:params][:aggregateFieldName],
-                groups: [{ field: "#{inverse}:#{@args[:params][:labelFieldName]}" }]
+                operation: args[:params][:aggregator],
+                field: args[:params][:aggregateFieldName],
+                groups: [{ field: "#{inverse}:#{args[:params][:labelFieldName]}" }]
               )
             end
           end
 
           if field && field.type == 'ManyToMany'
             origin = ForestAdminDatasourceToolkit::Utils::Collection.get_through_origin(
-              @collection,
-              @args[:params][:relationshipFieldName]
+              context.collection,
+              args[:params][:relationshipFieldName]
             )
             target = ForestAdminDatasourceToolkit::Utils::Collection.get_through_target(
-              @collection,
-              @args[:params][:relationshipFieldName]
+              context.collection,
+              args[:params][:relationshipFieldName]
             )
             if origin && target
               collection = field.through_collection
-              filter = @filter.nest(origin)
+              leaderboard_filter = filter.nest(origin)
               aggregation = Aggregation.new(
-                operation: @args[:params][:aggregator],
-                field: @args[:params][:aggregateFieldName] ? "#{target}:#{@args[:params][:aggregateFieldName]}" : nil,
-                groups: [{ field: "#{origin}:#{@args[:params][:labelFieldName]}" }]
+                operation: args[:params][:aggregator],
+                field: args[:params][:aggregateFieldName] ? "#{target}:#{args[:params][:aggregateFieldName]}" : nil,
+                groups: [{ field: "#{origin}:#{args[:params][:labelFieldName]}" }]
               )
             end
           end
 
-          if collection && filter && aggregation
-            rows = @datasource.get_collection(collection).aggregate(
-              @caller,
-              filter,
+          if collection && leaderboard_filter && aggregation
+            rows = context.datasource.get_collection(collection).aggregate(
+              context.caller,
+              leaderboard_filter,
               aggregation,
-              @args[:params][:limit]
+              args[:params][:limit]
             )
 
             result = rows.map do |row|
@@ -201,10 +199,10 @@ module ForestAdminAgent
                 'Failed to generate leaderboard chart: parameters do not match pre-requisites'
         end
 
-        def compute_value(filter)
-          aggregation = Aggregation.new(operation: @args[:params][:aggregator],
-                                        field: @args[:params][:aggregateFieldName])
-          result = @collection.aggregate(@caller, filter, aggregation)
+        def compute_value(context, filter, args)
+          aggregation = Aggregation.new(operation: args[:params][:aggregator],
+                                        field: args[:params][:aggregateFieldName])
+          result = context.collection.aggregate(context.caller, filter, aggregation)
 
           result[0]['value'] || 0
         end

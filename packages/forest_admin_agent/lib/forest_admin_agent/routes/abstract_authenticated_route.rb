@@ -5,16 +5,18 @@ module ForestAdminAgent
         if args.dig(:headers, 'action_dispatch.remote_ip')
           Facades::Whitelist.check_ip(args[:headers]['action_dispatch.remote_ip'].to_s)
         end
-        @caller = Utils::QueryStringParser.parse_caller(args)
-        @permissions = ForestAdminAgent::Services::Permissions.new(@caller)
-        super
+
+        context = super
+        context.caller = Utils::QueryStringParser.parse_caller(args)
+        context.permissions = ForestAdminAgent::Services::Permissions.new(context.caller)
+        context
       end
 
-      def format_attributes(args)
+      def format_attributes(args, collection)
         record = args[:params][:data][:attributes] || {}
 
         args[:params][:data][:relationships]&.map do |field, value|
-          schema = @collection.schema[:fields][field]
+          schema = collection.schema[:fields][field]
 
           record[schema.foreign_key] = value.dig('data', 'id') if schema.type == 'ManyToOne'
         end
