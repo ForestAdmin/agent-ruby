@@ -16,7 +16,7 @@ module ForestAdminAgent
         args[:params][:data][:relationships]&.map do |field, value|
           schema = @collection.schema[:fields][field]
 
-          record[schema.foreign_key] = value['data']['id'] if schema.type == 'ManyToOne'
+          record[schema.foreign_key] = value.dig('data', 'id') if schema.type == 'ManyToOne'
         end
 
         record || {}
