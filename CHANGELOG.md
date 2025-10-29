@@ -1,3 +1,10 @@
+## [1.12.11](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.10...v1.12.11) (2025-10-29)
+
+
+### Bug Fixes
+
+* **errorMessage:** better field handling ([#192](https://github.com/ForestAdmin/agent-ruby/issues/192)) ([b898b36](https://github.com/ForestAdmin/agent-ruby/commit/b898b36fbd6130f937a2b9b26bdb87434572e9d4))
+
 ## [1.12.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.9...v1.12.10) (2025-10-28)
 
 
