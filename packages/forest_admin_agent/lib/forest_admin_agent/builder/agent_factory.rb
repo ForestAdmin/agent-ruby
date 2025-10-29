@@ -10,7 +10,7 @@ module ForestAdminAgent
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
-      TTL_SCHEMA = 10
+      TTL_SCHEMA = 7200
 
       attr_reader :customizer, :container, :has_env_secret
 
