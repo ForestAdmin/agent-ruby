@@ -1,3 +1,10 @@
+## [1.12.13](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.12...v1.12.13) (2025-10-29)
+
+
+### Bug Fixes
+
+* better error handling ([#173](https://github.com/ForestAdmin/agent-ruby/issues/173)) ([42c9174](https://github.com/ForestAdmin/agent-ruby/commit/42c9174dda231f4d0803c7f0ee161538041b0dde))
+
 ## [1.12.12](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.11...v1.12.12) (2025-10-29)
 
 
