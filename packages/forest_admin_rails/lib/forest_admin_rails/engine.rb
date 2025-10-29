@@ -44,41 +44,64 @@ module ForestAdminRails
     def load_configuration
       return unless running_web_server?
 
-      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
-      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
-
-      # Check for old location and warn user
-      if File.exist?(old_path) && !File.exist?(new_path)
-        logger = ActiveSupport::Logger.new($stdout)
-        logger.warn <<~WARNING
-          ⚠️  DEPRECATION WARNING: create_agent.rb detected in old location!
-
-          The file 'app/lib/forest_admin_rails/create_agent.rb' should now be located at:
-          'lib/forest_admin_rails/create_agent.rb'
-
-          Please move your file to the new location:
-            mkdir -p lib/forest_admin_rails
-            mv app/lib/forest_admin_rails/create_agent.rb lib/forest_admin_rails/create_agent.rb
-
-          This will become a hard requirement in a future version.
-        WARNING
-      end
-
-      return unless File.exist?(new_path) || File.exist?(old_path)
+      check_create_agent_location
+      return unless create_agent_file_exists?
 
       # force eager loading models
       Rails.application.eager_load!
 
-      begin
-        ForestAdminRails::CreateAgent.setup!
-      rescue StandardError => e
-        logger = ActiveSupport::Logger.new($stdout)
-        logger.warn 'An error has occurred during setup of the Forest Admin agent.'
-        raise e.message
-      end
+      setup_agent_and_cache_routes
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
       sse.run if ForestAdminRails.config[:instant_cache_refresh]
+    end
+
+    def check_create_agent_location
+      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
+      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+
+      return unless File.exist?(old_path) && !File.exist?(new_path)
+
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.warn <<~WARNING
+        ⚠️  DEPRECATION WARNING: create_agent.rb detected in old location!
+
+        The file 'app/lib/forest_admin_rails/create_agent.rb' should now be located at:
+        'lib/forest_admin_rails/create_agent.rb'
+
+        Please move your file to the new location:
+          mkdir -p lib/forest_admin_rails
+          mv app/lib/forest_admin_rails/create_agent.rb lib/forest_admin_rails/create_agent.rb
+
+        This will become a hard requirement in a future version.
+      WARNING
+    end
+
+    def create_agent_file_exists?
+      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
+      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+
+      File.exist?(new_path) || File.exist?(old_path)
+    end
+
+    def setup_agent_and_cache_routes
+      ForestAdminRails::CreateAgent.setup!
+      precache_routes
+    rescue StandardError => e
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.warn 'An error has occurred during setup of the Forest Admin agent.'
+      raise e.message
+    end
+
+    def precache_routes
+      return if ForestAdminAgent::Http::Router.cache_disabled?
+
+      start_time = Time.now
+      routes = ForestAdminAgent::Http::Router.cached_routes
+      elapsed = ((Time.now - start_time) * 1000).round(2)
+
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.info("[ForestAdmin] Successfully pre-cached #{routes.size} routes in #{elapsed}ms")
     end
 
     def running_web_server?

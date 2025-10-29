@@ -46,6 +46,10 @@ module ForestAdminAgent
 
       def build
         @container.register(:datasource, @customizer.datasource(@logger))
+
+        # Reset route cache to ensure routes are computed with all customizations
+        ForestAdminAgent::Http::Router.reset_cached_routes!
+
         send_schema
       end
 
@@ -58,6 +62,11 @@ module ForestAdminAgent
         end
 
         @container.register(:datasource, @customizer.datasource(@logger), replace: true)
+
+        # Reset route cache before sending schema to ensure routes are recomputed with all customizations
+        ForestAdminAgent::Http::Router.reset_cached_routes!
+        @logger.log('Info', 'route cache cleared due to agent reload')
+
         send_schema
       end
 
