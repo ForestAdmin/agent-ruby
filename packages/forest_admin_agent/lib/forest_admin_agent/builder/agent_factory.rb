@@ -10,7 +10,7 @@ module ForestAdminAgent
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
-      TTL_SCHEMA = 7200
+      TTL_SCHEMA = 10
 
       attr_reader :customizer, :container, :has_env_secret
 
@@ -172,16 +172,12 @@ module ForestAdminAgent
       end
 
       def build_cache
-        @container.register(:cache, FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA))
-        return unless @has_env_secret
-
-        cache = @container.resolve(:cache)
-
         @options[:customize_error_message] =
           clean_option_value(@options[:customize_error_message], 'config.customize_error_message =')
         @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
 
-        cache.set('config', @options.to_h)
+        # store config in container without TTL (FileCache is only used for schema_file_hash)
+        @container.register(:config, @options.to_h)
       end
 
       def build_logger
