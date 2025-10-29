@@ -41,7 +41,7 @@ module ForestAdminDatasourceToolkit
           it 'throws an error' do
             expect do
               described_class.validate(@collection, { 'name' => [100] })
-            end.to raise_error(ForestException, "The given value has a wrong type for 'name': 100.\n Expects [\"String\", nil]")
+            end.to raise_error(ValidationError, "The given value has a wrong type for 'name': 100.\n Expects [\"String\", nil]")
           end
         end
       end

@@ -12,6 +12,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+      include ForestAdminDatasourceToolkit::Exceptions
 
       describe Actions do
         include_context 'with caller'
@@ -106,7 +107,7 @@ module ForestAdminAgent
               args[:params][:data][:attributes][:requester_id] = 'requester_id'
               allow(@action_collection).to receive(:execute)
 
-              expect { action.handle_request(args) }.to raise_error(Http::Exceptions::UnprocessableError)
+              expect { action.handle_request(args) }.to raise_error(UnprocessableError)
             end
           end
 

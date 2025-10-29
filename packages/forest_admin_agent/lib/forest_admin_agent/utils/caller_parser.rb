@@ -5,7 +5,6 @@ require 'active_support/time'
 module ForestAdminAgent
   module Utils
     class CallerParser
-      include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
 
       def initialize(args)
@@ -30,7 +29,7 @@ module ForestAdminAgent
       def validate_headers
         return if @args.dig(:headers, 'HTTP_AUTHORIZATION')
 
-        raise Http::Exceptions::UnauthorizedError, 'You must be logged in to access at this resource.'
+        raise UnauthorizedError, 'You must be logged in to access at this resource.'
       end
 
       def extract_timezone
