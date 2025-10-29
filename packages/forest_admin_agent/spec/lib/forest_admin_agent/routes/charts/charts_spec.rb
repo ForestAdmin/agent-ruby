@@ -546,16 +546,11 @@ module ForestAdminAgent
                                                   timezone: 'Europe/Paris'
                                                 })
             allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
-            chart.handle_request(args)
+            result = chart.handle_request(args)
 
-            expect(chart.filter).to have_attributes(
-              condition_tree: nil,
-              search: nil,
-              search_extended: nil,
-              segment: nil,
-              sort: nil,
-              page: nil
-            )
+            # Verify the chart was successfully generated (filter is now request-local, not accessible from outside)
+            expect(result[:content]).to be_a(Hash)
+            expect(result[:content][:data][:type]).to eq('stats')
           end
         end
       end
