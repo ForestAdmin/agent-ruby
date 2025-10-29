@@ -26,7 +26,7 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
+          context = build(args)
           query = args[:params][:query].strip
 
           QueryValidator.valid?(query)
@@ -34,16 +34,16 @@ module ForestAdminAgent
             raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
           end
 
-          @permissions.can_chart?(args[:params])
+          context.permissions.can_chart?(args[:params])
 
           query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
           self.type = args[:params][:type]
           result = execute_query(
-            @datasource,
+            context.datasource,
             query,
             args[:params][:connectionName],
-            @permissions,
-            @caller,
+            context.permissions,
+            context.caller,
             args[:params][:contextVariables]
           )
 

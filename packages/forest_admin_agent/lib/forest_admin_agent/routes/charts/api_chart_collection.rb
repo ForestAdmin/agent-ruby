@@ -9,14 +9,14 @@ module ForestAdminAgent
 
         def initialize(collection, chart_name)
           @chart_name = chart_name
-          @collection = collection
+          @route_collection = collection
 
           super()
         end
 
         def setup_routes
           # Mount both GET and POST, respectively for smart and api charts.
-          collection_name = @collection.name
+          collection_name = @route_collection.name
           slug = @chart_name.parameterize
 
           add_route(
@@ -44,25 +44,25 @@ module ForestAdminAgent
         end
 
         def handle_api_chart(args)
-          build(args)
+          context = build(args)
           {
             content: Serializer::ForestChartSerializer.serialize(
-              @collection.render_chart(
-                @caller,
+              context.collection.render_chart(
+                context.caller,
                 @chart_name,
-                Id.unpack_id(@collection, args[:params]['record_id'])
+                Id.unpack_id(context.collection, args[:params]['record_id'])
               )
             )
           }
         end
 
         def handle_smart_chart(args)
-          build(args)
+          context = build(args)
           {
-            content: @collection.render_chart(
-              @caller,
+            content: context.collection.render_chart(
+              context.caller,
               @chart_name,
-              Id.unpack_id(@collection, args[:params]['record_id'])
+              Id.unpack_id(context.collection, args[:params]['record_id'])
             )
           }
         end

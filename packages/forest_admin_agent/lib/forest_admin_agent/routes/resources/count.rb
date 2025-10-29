@@ -15,24 +15,24 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can?(:browse, @collection)
+          context = build(args)
+          context.permissions.can?(:browse, context.collection)
 
-          if @collection.is_countable?
+          if context.collection.is_countable?
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [
-                  @permissions.get_scope(@collection),
-                  parse_query_segment(@collection, args, @permissions, @caller),
-                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@collection, args)
+                  context.permissions.get_scope(context.collection),
+                  parse_query_segment(context.collection, args, context.permissions, context.caller),
+                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.collection, args)
                 ]
               ),
-              search: QueryStringParser.parse_search(@collection, args),
+              search: QueryStringParser.parse_search(context.collection, args),
               search_extended: QueryStringParser.parse_search_extended(args),
-              segment: QueryStringParser.parse_segment(@collection, args)
+              segment: QueryStringParser.parse_segment(context.collection, args)
             )
             aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
-            result = @collection.aggregate(@caller, filter, aggregation)
+            result = context.collection.aggregate(context.caller, filter, aggregation)
 
             return {
               name: args[:params]['collection_name'],

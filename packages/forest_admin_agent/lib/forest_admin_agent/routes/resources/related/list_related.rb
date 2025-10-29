@@ -21,36 +21,37 @@ module ForestAdminAgent
           end
 
           def handle_request(args = {})
-            build(args)
-            @permissions.can?(:browse, @collection)
+            context = build(args)
+            context.permissions.can?(:browse, context.collection)
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [
-                  @permissions.get_scope(@collection),
-                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
+                  context.permissions.get_scope(context.collection),
+                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.child_collection, args)
                 ]
               ),
               page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
-              sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(@child_collection, args)
+              sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(context.child_collection, args)
             )
-            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
-            primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(context.child_collection,
+                                                                                              args)
+            primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             records = Collection.list_relation(
-              @collection,
+              context.collection,
               primary_key_values,
               args[:params]['relation_name'],
-              @caller,
+              context.caller,
               filter,
               projection
             )
 
             {
-              name: @child_collection.name,
+              name: context.child_collection.name,
               content: JSONAPI::Serializer.serialize(
                 records,
                 is_collection: true,
-                class_name: @child_collection.name,
+                class_name: context.child_collection.name,
                 serializer: Serializer::ForestSerializer,
                 include: projection.relations.keys
               )

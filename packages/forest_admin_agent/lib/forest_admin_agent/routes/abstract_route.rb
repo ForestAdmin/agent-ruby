@@ -7,10 +7,14 @@ module ForestAdminAgent
       end
 
       def build(args)
-        @datasource = ForestAdminAgent::Facades::Container.datasource
-        return unless args[:params]['collection_name']
+        context = RequestContext.new
+        context.datasource = ForestAdminAgent::Facades::Container.datasource
 
-        @collection = @datasource.get_collection(args[:params]['collection_name'])
+        if args[:params]['collection_name']
+          context.collection = context.datasource.get_collection(args[:params]['collection_name'])
+        end
+
+        context
       end
 
       def routes

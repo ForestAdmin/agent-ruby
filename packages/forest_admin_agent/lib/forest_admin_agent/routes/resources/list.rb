@@ -15,45 +15,45 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can?(:browse, @collection)
+          context = build(args)
+          context.permissions.can?(:browse, context.collection)
 
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
-                @permissions.get_scope(@collection),
-                QueryStringParser.parse_condition_tree(@collection, args),
-                parse_query_segment(@collection, args, @permissions, @caller)
+                context.permissions.get_scope(context.collection),
+                QueryStringParser.parse_condition_tree(context.collection, args),
+                parse_query_segment(context.collection, args, context.permissions, context.caller)
               ]
             ),
             page: QueryStringParser.parse_pagination(args),
-            search: QueryStringParser.parse_search(@collection, args),
+            search: QueryStringParser.parse_search(context.collection, args),
             search_extended: QueryStringParser.parse_search_extended(args),
-            sort: QueryStringParser.parse_sort(@collection, args),
-            segment: QueryStringParser.parse_segment(@collection, args)
+            sort: QueryStringParser.parse_sort(context.collection, args),
+            segment: QueryStringParser.parse_segment(context.collection, args)
           )
 
-          projection = QueryStringParser.parse_projection_with_pks(@collection, args)
-          records = @collection.list(@caller, filter, projection)
+          projection = QueryStringParser.parse_projection_with_pks(context.collection, args)
+          records = context.collection.list(context.caller, filter, projection)
 
           {
             name: args[:params]['collection_name'],
             content: JSONAPI::Serializer.serialize(
               records,
-              class_name: @collection.name,
+              class_name: context.collection.name,
               is_collection: true,
               serializer: Serializer::ForestSerializer,
               include: projection.relations(only_keys: true),
-              meta: handle_search_decorator(args[:params]['search'], records)
+              meta: handle_search_decorator(args[:params]['search'], records, context.collection)
             )
           }
         end
 
-        def handle_search_decorator(search_value, records)
+        def handle_search_decorator(search_value, records, collection)
           decorator = { decorators: [] }
           unless search_value.nil?
             records.each_with_index do |entry, index|
-              decorator[:decorators][index] = { id: Utils::Id.pack_id(@collection, entry), search: [] }
+              decorator[:decorators][index] = { id: Utils::Id.pack_id(collection, entry), search: [] }
               # attributes method is defined on ActiveRecord::Base model
               attributes = entry.respond_to?(:attributes) ? entry.attributes : entry
 

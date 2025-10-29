@@ -28,16 +28,16 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          @permissions.can_chart?(args[:params])
+          @context = build(args)
+          @context.permissions.can_chart?(args[:params])
           @args = args
           self.type = args[:params][:type]
           @filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
-                @permissions.get_scope(@collection),
+                @context.permissions.get_scope(@context.collection),
                 ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  @collection, args
+                  @context.collection, args
                 )
               ]
             )
@@ -60,8 +60,8 @@ module ForestAdminAgent
         end
 
         def inject_context_variables
-          user = @permissions.get_user_data(@caller.id)
-          team = @permissions.get_team(@caller.rendering_id)
+          user = @context.permissions.get_user_data(@context.caller.id)
+          team = @context.permissions.get_team(@context.caller.rendering_id)
 
           context_variables = ForestAdminAgent::Utils::ContextVariables.new(team, user,
                                                                             @args[:params][:contextVariables])
@@ -79,7 +79,7 @@ module ForestAdminAgent
           with_count_previous = @filter.condition_tree&.some_leaf(&:use_interval_operator)
 
           if with_count_previous && !is_and_aggregator
-            previous_value = compute_value(FilterFactory.get_previous_period_filter(@filter, @caller.timezone))
+            previous_value = compute_value(FilterFactory.get_previous_period_filter(@filter, @context.caller.timezone))
           end
 
           ValueChart.new(value, previous_value).serialize
@@ -97,7 +97,7 @@ module ForestAdminAgent
             groups: group_field ? [{ field: group_field }] : []
           )
 
-          result = @collection.aggregate(@caller, @filter, aggregation)
+          result = @context.collection.aggregate(@context.caller, @filter, aggregation)
 
           PieChart.new(result.map { |row| { key: row['group'][group_field], value: row['value'] } }).serialize
         end
@@ -113,8 +113,8 @@ module ForestAdminAgent
               ]
             )
           )
-          rows = @collection.aggregate(
-            @caller,
+          rows = @context.collection.aggregate(
+            @context.caller,
             filter_only_with_values,
             Aggregation.new(
               operation: @args[:params][:aggregator],
@@ -141,11 +141,11 @@ module ForestAdminAgent
         end
 
         def make_leaderboard
-          field = @collection.schema[:fields][@args[:params][:relationshipFieldName]]
+          field = @context.collection.schema[:fields][@args[:params][:relationshipFieldName]]
 
           if field && field.type == 'OneToMany'
             inverse = ForestAdminDatasourceToolkit::Utils::Collection.get_inverse_relation(
-              @collection,
+              @context.collection,
               @args[:params][:relationshipFieldName]
             )
             if inverse
@@ -161,11 +161,11 @@ module ForestAdminAgent
 
           if field && field.type == 'ManyToMany'
             origin = ForestAdminDatasourceToolkit::Utils::Collection.get_through_origin(
-              @collection,
+              @context.collection,
               @args[:params][:relationshipFieldName]
             )
             target = ForestAdminDatasourceToolkit::Utils::Collection.get_through_target(
-              @collection,
+              @context.collection,
               @args[:params][:relationshipFieldName]
             )
             if origin && target
@@ -180,8 +180,8 @@ module ForestAdminAgent
           end
 
           if collection && filter && aggregation
-            rows = @datasource.get_collection(collection).aggregate(
-              @caller,
+            rows = @context.datasource.get_collection(collection).aggregate(
+              @context.caller,
               filter,
               aggregation,
               @args[:params][:limit]
@@ -204,7 +204,7 @@ module ForestAdminAgent
         def compute_value(filter)
           aggregation = Aggregation.new(operation: @args[:params][:aggregator],
                                         field: @args[:params][:aggregateFieldName])
-          result = @collection.aggregate(@caller, filter, aggregation)
+          result = @context.collection.aggregate(@context.caller, filter, aggregation)
 
           result[0]['value'] || 0
         end

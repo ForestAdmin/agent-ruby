@@ -20,22 +20,23 @@ module ForestAdminAgent
           end
 
           def handle_request(args = {})
-            build(args)
-            @permissions.can?(:browse, @collection)
-            @permissions.can?(:export, @collection)
+            context = build(args)
+            context.permissions.can?(:browse, context.collection)
+            context.permissions.can?(:export, context.collection)
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [
-                  @permissions.get_scope(@collection),
-                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(@child_collection, args)
+                  context.permissions.get_scope(context.collection),
+                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.child_collection, args)
                 ]
               )
             )
-            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(@child_collection, args)
+            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(context.child_collection,
+                                                                                              args)
 
             # Get the parent record primary keys
-            primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             relation_name = args[:params]['relation_name']
 
             # Generate timestamp for filename
@@ -47,10 +48,10 @@ module ForestAdminAgent
             # Create a callable to fetch related records
             list_records = lambda do |batch_filter|
               ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
-                @collection,
+                context.collection,
                 primary_key_values,
                 relation_name,
-                @caller,
+                context.caller,
                 batch_filter,
                 projection
               )

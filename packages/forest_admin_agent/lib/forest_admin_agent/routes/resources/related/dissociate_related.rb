@@ -20,28 +20,33 @@ module ForestAdminAgent
           end
 
           def handle_request(args = {})
-            build(args)
+            context = build(args)
 
-            parent_primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             is_delete_mode = !args.dig(:params, :delete).nil?
 
             if is_delete_mode
-              @permissions.can?(:delete, @child_collection)
+              context.permissions.can?(:delete, context.child_collection)
             else
-              @permissions.can?(:edit, @collection)
+              context.permissions.can?(:edit, context.collection)
             end
 
-            filter = get_base_foreign_filter(args)
-            relation = Schema.get_to_many_relation(@collection, args[:params]['relation_name'])
+            filter = get_base_foreign_filter(args, context)
+            relation = Schema.get_to_many_relation(context.collection, args[:params]['relation_name'])
+
+            relation_name = args[:params]['relation_name']
+            options = {
+              relation: relation,
+              relation_name: relation_name,
+              parent_pk_values: parent_primary_key_values,
+              is_delete_mode: is_delete_mode,
+              filter: filter
+            }
 
             if ['OneToMany', 'PolymorphicOneToMany'].include?(relation.type)
-              dissociate_or_delete_one_to_many(
-                relation, args[:params]['relation_name'], parent_primary_key_values, is_delete_mode, filter
-              )
+              dissociate_or_delete_one_to_many(options, context)
             else
-              dissociate_or_delete_many_to_many(
-                relation, args[:params]['relation_name'], parent_primary_key_values, is_delete_mode, filter
-              )
+              dissociate_or_delete_many_to_many(options, context)
             end
 
             { content: nil, status: 204 }
@@ -49,51 +54,69 @@ module ForestAdminAgent
 
           private
 
-          def dissociate_or_delete_one_to_many(relation, relation_name, parent_primary_key_values, is_delete_mode,
-                                               filter)
-            foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_primary_key_values, relation_name,
-                                                               @caller, filter)
+          def dissociate_or_delete_one_to_many(options, context)
+            foreign_filter = FilterFactory.make_foreign_filter(
+              context.collection,
+              options[:parent_pk_values],
+              options[:relation_name],
+              context.caller,
+              options[:filter]
+            )
 
-            if is_delete_mode
-              @child_collection.delete(@caller, foreign_filter)
+            if options[:is_delete_mode]
+              context.child_collection.delete(context.caller, foreign_filter)
             else
-              patch = if relation.type == 'PolymorphicOneToMany'
-                        { relation.origin_key => nil, relation.origin_type_field => nil }
+              patch = if options[:relation].type == 'PolymorphicOneToMany'
+                        { options[:relation].origin_key => nil, options[:relation].origin_type_field => nil }
                       else
-                        { relation.origin_key => nil }
+                        { options[:relation].origin_key => nil }
                       end
-              @child_collection.update(@caller, foreign_filter, patch)
+              context.child_collection.update(context.caller, foreign_filter, patch)
             end
           end
 
-          def dissociate_or_delete_many_to_many(relation, relation_name, parent_primary_key_values, is_delete_mode,
-                                                filter)
-            through_collection = @datasource.get_collection(relation.through_collection)
+          def dissociate_or_delete_many_to_many(options, context)
+            through_collection = context.datasource.get_collection(options[:relation].through_collection)
 
-            if is_delete_mode
+            if options[:is_delete_mode]
               # Generate filters _BEFORE_ deleting stuff, otherwise things break.
-              foreign_filter = FilterFactory.make_foreign_filter(@collection, parent_primary_key_values, relation_name,
-                                                                 @caller, filter)
-              through_filter = FilterFactory.make_through_filter(@collection, parent_primary_key_values, relation_name,
-                                                                 @caller, filter)
+              foreign_filter = FilterFactory.make_foreign_filter(
+                context.collection,
+                options[:parent_pk_values],
+                options[:relation_name],
+                context.caller,
+                options[:filter]
+              )
+              through_filter = FilterFactory.make_through_filter(
+                context.collection,
+                options[:parent_pk_values],
+                options[:relation_name],
+                context.caller,
+                options[:filter]
+              )
 
               # Delete records from through collection
-              through_collection.delete(@caller, through_filter)
+              through_collection.delete(context.caller, through_filter)
 
               # Let the datasource crash when:
               # - the records in the foreignCollection are linked to other records in the origin collection
               # - the underlying database/api is not cascading deletes
-              @child_collection.delete(@caller, foreign_filter)
+              context.child_collection.delete(context.caller, foreign_filter)
             else
-              through_filter = FilterFactory.make_through_filter(@collection, parent_primary_key_values, relation_name,
-                                                                 @caller, filter)
-              through_collection.delete(@caller, through_filter)
+              through_filter = FilterFactory.make_through_filter(
+                context.collection,
+                options[:parent_pk_values],
+                options[:relation_name],
+                context.caller,
+                options[:filter]
+              )
+              through_collection.delete(context.caller, through_filter)
             end
           end
 
-          def get_base_foreign_filter(args)
-            selection_ids = Utils::Id.parse_selection_ids(@child_collection, args[:params])
-            selected_ids = ConditionTree::ConditionTreeFactory.match_ids(@child_collection, selection_ids[:ids])
+          def get_base_foreign_filter(args, context)
+            selection_ids = Utils::Id.parse_selection_ids(context.child_collection, args[:params])
+            selected_ids = ConditionTree::ConditionTreeFactory.match_ids(context.child_collection, selection_ids[:ids])
 
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
 
@@ -104,8 +127,8 @@ module ForestAdminAgent
             Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  @permissions.get_scope(@child_collection),
-                  Utils::QueryStringParser.parse_condition_tree(@child_collection, args),
+                  context.permissions.get_scope(context.child_collection),
+                  Utils::QueryStringParser.parse_condition_tree(context.child_collection, args),
                   selected_ids
                 ]
               )

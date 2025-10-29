@@ -23,18 +23,18 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
+          context = build(args)
 
-          primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+          primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
           field_name = args[:params]['field_name']
           array_index = parse_index(args[:params]['index'])
 
-          @permissions.can?(:edit, @collection)
+          context.permissions.can?(:edit, context.collection)
 
-          field_schema = @collection.schema[:fields][field_name]
-          validate_array_field!(field_schema, field_name)
+          field_schema = context.collection.schema[:fields][field_name]
+          validate_array_field!(field_schema, field_name, context.collection)
 
-          record = fetch_record(primary_key_values)
+          record = fetch_record(primary_key_values, context)
 
           array = record[field_name]
           validate_array_value!(array, field_name, array_index)
@@ -44,21 +44,21 @@ module ForestAdminAgent
           updated_array = array.dup
           updated_array[array_index] = new_value
 
-          scope = @permissions.get_scope(@collection)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
+          scope = context.permissions.get_scope(context.collection)
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(context.collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
-          @collection.update(@caller, filter, { field_name => updated_array })
+          context.collection.update(context.caller, filter, { field_name => updated_array })
 
-          records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
+          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
 
           {
             name: args[:params]['collection_name'],
             content: JSONAPI::Serializer.serialize(
               records[0],
               is_collection: false,
-              class_name: @collection.name,
+              class_name: context.collection.name,
               serializer: Serializer::ForestSerializer
             )
           }
@@ -76,7 +76,7 @@ module ForestAdminAgent
         end
 
         def validate_array_field!(field_schema, field_name)
-          FieldValidator.validate(@collection, field_name)
+          FieldValidator.validate(collection, field_name)
           return if field_schema.column_type.is_a?(Array)
 
           raise Http::Exceptions::ValidationError,
@@ -87,13 +87,13 @@ module ForestAdminAgent
           raise Http::Exceptions::ValidationError, e.message
         end
 
-        def fetch_record(primary_key_values)
-          scope = @permissions.get_scope(@collection)
-          condition_tree = ConditionTree::ConditionTreeFactory.match_records(@collection, [primary_key_values])
+        def fetch_record(primary_key_values, context)
+          scope = context.permissions.get_scope(context.collection)
+          condition_tree = ConditionTree::ConditionTreeFactory.match_records(context.collection, [primary_key_values])
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
-          records = @collection.list(@caller, filter, ProjectionFactory.all(@collection))
+          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
 
           raise Http::Exceptions::NotFoundError, 'Record not found' unless records&.any?
 

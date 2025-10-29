@@ -20,23 +20,23 @@ module ForestAdminAgent
           end
 
           def handle_request(args = {})
-            build(args)
-            @permissions.can?(:browse, @collection)
+            context = build(args)
+            context.permissions.can?(:browse, context.collection)
 
-            if @child_collection.is_countable?
-              filter = Filter.new(condition_tree: @permissions.get_scope(@collection))
-              primary_key_values = Utils::Id.unpack_id(@collection, args[:params]['id'], with_key: true)
+            if context.child_collection.is_countable?
+              filter = Filter.new(condition_tree: context.permissions.get_scope(context.collection))
+              primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
               result = Collection.aggregate_relation(
-                @collection,
+                context.collection,
                 primary_key_values,
                 args[:params]['relation_name'],
-                @caller,
+                context.caller,
                 filter,
                 Aggregation.new(operation: 'Count')
               )
 
               return {
-                name: @child_collection.name,
+                name: context.child_collection.name,
                 content: {
                   count: result.empty? ? 0 : result[0]['value']
                 }
@@ -44,7 +44,7 @@ module ForestAdminAgent
             end
 
             {
-              name: @child_collection.name,
+              name: context.child_collection.name,
               content: {
                 count: 'deactivated'
               }
