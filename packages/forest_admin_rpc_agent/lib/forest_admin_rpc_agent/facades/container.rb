@@ -16,13 +16,14 @@ module ForestAdminRpcAgent
       end
 
       def self.config_from_cache
-        instance.resolve(:cache).get('config')
+        instance.resolve(:config)
       end
 
       def self.cache(key)
-        raise "Key #{key} not found in container" unless config_from_cache.key?(key)
+        config = config_from_cache
+        raise "Key #{key} not found in config" unless config.key?(key)
 
-        config_from_cache[key]
+        config[key]
       end
     end
   end
