@@ -41,16 +41,13 @@ module ForestAdminAgent
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
 
-        # First check
         is_allowed = permission_allowed?(collections_data, collection, action, user_data)
 
-        # Refetch if not allowed
         unless is_allowed
           collections_data = get_collections_permissions_data(force_fetch: true)
           is_allowed = permission_allowed?(collections_data, collection, action, user_data)
         end
 
-        # still not allowed - throw forbidden message
         raise ForbiddenError, "You don't have permission to #{action} this collection." unless is_allowed
 
         is_allowed
@@ -61,10 +58,8 @@ module ForestAdminAgent
         hash_request = "#{attributes[:type]}:#{array_hash(attributes)}"
         is_allowed = get_chart_data(caller.rendering_id).include?(hash_request)
 
-        # Refetch
         is_allowed ||= get_chart_data(caller.rendering_id, force_fetch: true).include?(hash_request)
 
-        # still not allowed - throw forbidden message
         unless is_allowed
           ForestAdminAgent::Facades::Container.logger.log(
             'Debug',
@@ -82,7 +77,6 @@ module ForestAdminAgent
       end
 
       def can_execute_query_segment?(collection, query, connection_name)
-        # Check if user has elevated permissions (Admin/Developer/Editor)
         user_data = get_user_data(caller.id)
         if %w[admin developer editor].include?(user_data&.dig(:permissionLevel))
           ForestAdminAgent::Facades::Container.logger.log(
@@ -92,19 +86,15 @@ module ForestAdminAgent
           return true
         end
 
-        # Get collection permissions
         collection_permissions = get_collection_rendering_permissions(collection, force_fetch: false)
 
-        # Check permissions with both connection-specific and general segment validations
         is_allowed = segment_permissions_valid?(collection_permissions, query, connection_name)
 
-        # Refetch if not allowed
         unless is_allowed
           collection_permissions = get_collection_rendering_permissions(collection, force_fetch: true)
           is_allowed = segment_permissions_valid?(collection_permissions, query, connection_name)
         end
 
-        # still not allowed - throw forbidden message
         unless is_allowed
           ForestAdminAgent::Facades::Container.logger.log(
             'Debug',
@@ -232,7 +222,6 @@ module ForestAdminAgent
         parameters.delete(:collection)
         parameters.delete(:contextVariables)
         parameters.delete(:record_id)
-        # rails
         parameters.delete(:route_alias)
         parameters.delete(:controller)
         parameters.delete(:action)
@@ -286,7 +275,6 @@ module ForestAdminAgent
       end
 
       def decode_crud_permissions(collection)
-        # Validate structure exists
         unless collection.is_a?(Hash) && collection.key?(:collection)
           ForestAdminAgent::Facades::Container.logger.log(
             'Error',
@@ -314,8 +302,6 @@ module ForestAdminAgent
           )
         end
 
-        # Use dig to safely extract roles, allowing for missing permissions
-        # Missing permissions will result in nil values which are handled by permission_allowed?
         {
           browse: collection_data.dig(:browseEnabled, :roles),
           read: collection_data.dig(:readEnabled, :roles),
@@ -502,7 +488,6 @@ module ForestAdminAgent
       def segment_permissions_valid?(collection_permissions, query, connection_name)
         return false if collection_permissions.nil?
 
-        # Check connection-specific live query segments
         IsSegmentQueryAllowedOnConnection.allowed?(collection_permissions, query, connection_name)
       end
     end
