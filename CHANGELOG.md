@@ -1,3 +1,10 @@
+## [1.12.16](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.15...v1.12.16) (2025-10-30)
+
+
+### Bug Fixes
+
+* **auth:** store config in container without TTL to prevent expiration ([#198](https://github.com/ForestAdmin/agent-ruby/issues/198)) ([7ffd20c](https://github.com/ForestAdmin/agent-ruby/commit/7ffd20ccb67a94db4dba6c543ac2da96aaa6c0b4))
+
 ## [1.12.15](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.14...v1.12.15) (2025-10-29)
 
 
