@@ -752,8 +752,16 @@ module ForestAdminAgent
         end
 
         it "raise error when user doesn't have the right access" do
+          allow(@permissions).to receive(:get_user_data).and_return(
+            {
+              id: 1,
+              roleId: 1,
+              permissionLevel: 'user'
+            }
+          )
+
           expect do
-            @permissions.can?(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'foo'))
+            @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'foo')
           end.to raise_error(ForbiddenError, "You don't have permission to use this query segment.")
         end
 
