@@ -1,5 +1,4 @@
 require 'dry-container'
-require 'filecache'
 require 'json'
 
 module ForestAdminAgent
@@ -9,8 +8,6 @@ module ForestAdminAgent
       include ForestAdminAgent::Utils::Schema
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
-
-      TTL_SCHEMA = 7200
 
       attr_reader :customizer, :container, :has_env_secret
 
@@ -137,11 +134,6 @@ module ForestAdminAgent
         if should_send || force
           client = ForestAdminAgent::Http::ForestAdminApiRequester.new
           client.post('/forest/apimaps', api_map.to_json)
-          schema_file_hash_cache = FileCache.new('app', @options[:cache_dir].to_s, TTL_SCHEMA)
-          schema_file_hash_cache.get_or_set 'value' do
-            api_map[:meta][:schemaFileHash]
-          end
-          @container.register(:schema_file_hash, schema_file_hash_cache)
           ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
         else
           @container.resolve(:logger)
@@ -176,7 +168,6 @@ module ForestAdminAgent
           clean_option_value(@options[:customize_error_message], 'config.customize_error_message =')
         @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
 
-        # store config in container without TTL (FileCache is only used for schema_file_hash)
         @container.register(:config, @options.to_h)
       end
 
