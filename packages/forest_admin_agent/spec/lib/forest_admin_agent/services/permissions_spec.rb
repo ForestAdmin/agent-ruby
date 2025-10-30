@@ -756,6 +756,243 @@ module ForestAdminAgent
             @permissions.can?(@permissions.can_execute_query_segment?(@datasource.collections['Book'], query, 'foo'))
           end.to raise_error(ForbiddenError, "You don't have permission to use this query segment.")
         end
+
+        context 'with elevated permissions' do
+          it 'returns true immediately for admin users without checking segments' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'admin'
+              }
+            )
+
+            # Should not call get_collection_rendering_permissions
+            allow(@permissions).to receive(:get_collection_rendering_permissions).and_call_original
+
+            result = @permissions.can_execute_query_segment?(@datasource.collections['Book'], 'any query', 'any_connection')
+            expect(result).to be true
+            expect(@permissions).not_to have_received(:get_collection_rendering_permissions)
+          end
+
+          it 'returns true immediately for developer users without checking segments' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'developer'
+              }
+            )
+
+            allow(@permissions).to receive(:get_collection_rendering_permissions).and_call_original
+
+            result = @permissions.can_execute_query_segment?(@datasource.collections['Book'], 'any query', 'any_connection')
+            expect(result).to be true
+            expect(@permissions).not_to have_received(:get_collection_rendering_permissions)
+          end
+
+          it 'returns true immediately for editor users without checking segments' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'editor'
+              }
+            )
+
+            allow(@permissions).to receive(:get_collection_rendering_permissions).and_call_original
+
+            result = @permissions.can_execute_query_segment?(@datasource.collections['Book'], 'any query', 'any_connection')
+            expect(result).to be true
+            expect(@permissions).not_to have_received(:get_collection_rendering_permissions)
+          end
+
+          it 'logs debug message for admin users' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'admin'
+              }
+            )
+
+            allow(ForestAdminAgent::Facades::Container.logger).to receive(:log).and_call_original
+
+            @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)
+
+            expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log)
+              .with('Debug', /User 1 can retrieve SQL segment on rendering 114/).at_least(:once)
+          end
+
+          it 'checks permissions normally for non-elevated users' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'user'
+              }
+            )
+
+            # Should call get_collection_rendering_permissions
+            allow(@permissions).to receive(:get_collection_rendering_permissions).and_call_original
+
+            @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)
+            expect(@permissions).to have_received(:get_collection_rendering_permissions)
+          end
+        end
+
+        context 'with permission refetch logic' do
+          it 'refetches permissions when initially not allowed' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'user'
+              }
+            )
+
+            # First call returns no matching segments
+            # Second call (refetch) returns matching segments
+            allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => []
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              ),
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => [{ query: query, connectionName: connection_name }]
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              )
+            )
+
+            result = @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)
+            expect(result).to be true
+          end
+
+          it 'raises error when refetch still denies permission' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'user'
+              }
+            )
+
+            # Both calls return no matching segments
+            allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => []
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              ),
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => []
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              )
+            )
+
+            expect do
+              @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)
+            end.to raise_error(ForbiddenError, "You don't have permission to use this query segment.")
+          end
+
+          it 'calls get_collection_rendering_permissions twice when refetch is needed' do
+            allow(@permissions).to receive(:get_user_data).and_return(
+              {
+                id: 1,
+                roleId: 1,
+                permissionLevel: 'user'
+              }
+            )
+
+            allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => []
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              ),
+              instance_double(
+                Faraday::Response,
+                status: 200,
+                body: {
+                  'collections' => {
+                    'Book' => {
+                      'scope' => nil,
+                      'segments' => [],
+                      'liveQuerySegments' => []
+                    }
+                  },
+                  'stats' => [],
+                  'team' => {}
+                }.to_json
+              )
+            )
+
+            # Spy on get_collection_rendering_permissions to verify it's called twice
+            allow(@permissions).to receive(:get_collection_rendering_permissions).and_call_original
+
+            expect do
+              @permissions.can_execute_query_segment?(@datasource.collections['Book'], query, connection_name)
+            end.to raise_error(ForbiddenError)
+
+            expect(@permissions).to have_received(:get_collection_rendering_permissions)
+              .with(@datasource.collections['Book'], force_fetch: false)
+            expect(@permissions).to have_received(:get_collection_rendering_permissions)
+              .with(@datasource.collections['Book'], force_fetch: true)
+          end
+        end
       end
 
       context 'when can_chart is called' do
