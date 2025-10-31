@@ -4,10 +4,7 @@ module ForestAdminAgent
       # Check if a segment query is allowed on a specific connection
       # This handles both single queries and UNION queries for multi-segment operations
       def self.allowed?(collection_permissions, segment_query, connection_name)
-        return false if collection_permissions.nil? ||
-                        collection_permissions[:liveQuerySegments].nil? ||
-                        connection_name.nil? ||
-                        connection_name.empty?
+        return false if connection_name.nil? || connection_name.empty?
 
         # Get all queries for the specified connection
         queries = collection_permissions[:liveQuerySegments]

@@ -247,7 +247,7 @@ module ForestAdminAgent
           data[:team] = response[:team]
           data[:segments] = decode_segment_permissions(response[:collections])
           data[:charts] = decode_charts_permissions(response[:stats])
-          data[:collections] = decode_collections_permissions(response[:collections])
+          data[:liveQuerySegments] = decode_live_query_segments_permissions(response[:collections])
 
           data
         end
@@ -359,13 +359,11 @@ module ForestAdminAgent
         segments
       end
 
-      def decode_collections_permissions(raw_permissions)
+      def decode_live_query_segments_permissions(raw_permissions)
         collections = {}
         raw_permissions.each do |collection_name, value|
           collections[collection_name] = {
-            scope: value[:scope],
-            liveQuerySegments: value[:liveQuerySegments] || [],
-            segments: value[:segments] || []
+            liveQuerySegments: value[:liveQuerySegments] || []
           }
         end
 
@@ -482,12 +480,10 @@ module ForestAdminAgent
 
       def get_collection_rendering_permissions(collection, force_fetch: false)
         rendering_data = get_rendering_data(caller.rendering_id, force_fetch: force_fetch)
-        rendering_data[:collections][collection.name.to_sym]
+        rendering_data[:liveQuerySegments][collection.name.to_sym]
       end
 
       def segment_permissions_valid?(collection_permissions, query, connection_name)
-        return false if collection_permissions.nil?
-
         IsSegmentQueryAllowedOnConnection.allowed?(collection_permissions, query, connection_name)
       end
     end
