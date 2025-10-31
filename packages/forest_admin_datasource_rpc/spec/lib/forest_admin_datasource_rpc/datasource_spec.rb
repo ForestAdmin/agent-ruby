@@ -31,7 +31,7 @@ module ForestAdminDatasourceRpc
       it 'stores native query connections' do
         datasource_with_connections = described_class.new(
           { uri: 'http://localhost' },
-          introspection.merge(nativeQueryConnections: [{ name: 'primary' }, { name: 'secondary' }])
+          introspection.merge(native_query_connections: [{ name: 'primary' }, { name: 'secondary' }])
         )
         expect(datasource_with_connections.live_query_connections).to eq({ 'primary' => 'primary', 'secondary' => 'secondary' })
       end
@@ -46,9 +46,10 @@ module ForestAdminDatasourceRpc
         datasource.render_chart(caller, 'my_chart')
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
-          expect(url).to eq('forest/rpc/datasource-chart')
+          expect(url).to eq('forest/rpc-datasource-chart')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
-          expect(options[:payload]).to eq({ caller: caller.to_h, chart: 'my_chart' })
+          expect(options[:payload]).to eq({ chart: 'my_chart' })
         end
       end
     end
@@ -61,7 +62,7 @@ module ForestAdminDatasourceRpc
         datasource.execute_native_query('primary', query, binds)
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
-          expect(url).to eq('forest/rpc/native-query')
+          expect(url).to eq('forest/rpc-native-query')
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq({ connection_name: 'primary', query: query, binds: binds })
         end

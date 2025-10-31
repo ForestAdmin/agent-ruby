@@ -28,7 +28,7 @@ module ForestAdminDatasourceMongoid
               is_sortable: get_column_type(field) != 'Json',
               default_value: default_value,
               enum_values: [],
-              validations: get_validations(model, field)
+              validation: get_validations(model, field)
             )
 
             if !field.is_a?(Hash) && field.foreign_key? && field.type != Array && !field.association.polymorphic?
@@ -50,7 +50,7 @@ module ForestAdminDatasourceMongoid
             is_sortable: get_column_type(parent_id) != 'Json',
             default_value: parent_id.object_id_field? ? nil : get_default_value(parent_id),
             enum_values: [],
-            validations: [{ operator: 'Present' }]
+            validation: [{ operator: 'Present' }]
           )
 
           model_name = model.name.gsub('::', '__')

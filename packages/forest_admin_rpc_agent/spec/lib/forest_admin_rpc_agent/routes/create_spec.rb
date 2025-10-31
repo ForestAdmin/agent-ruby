@@ -9,7 +9,7 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
       let(:data) { { 'email' => 'test@example.com', 'name' => 'John Doe' } }
-      let(:create_result) { { 'id' => 1, 'email' => 'test@example.com', 'name' => 'John Doe' } }
+      let(:create_result) { [{ 'id' => 1, 'email' => 'test@example.com', 'name' => 'John Doe' }] }
 
       let(:params) do
         {
@@ -33,7 +33,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             email: {
@@ -44,7 +44,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             name: {
@@ -55,7 +55,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             }
           },

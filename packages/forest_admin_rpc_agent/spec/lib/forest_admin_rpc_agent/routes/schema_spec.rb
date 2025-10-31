@@ -24,7 +24,7 @@ module ForestAdminRpcAgent
             { fields: ['id', 'total'], name: 'orders' },
             { fields: ['id', 'email'], name: 'users' }
           ],
-          nativeQueryConnections: [
+          native_query_connections: [
             { name: 'primary' }
           ]
         }.to_json

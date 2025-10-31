@@ -44,7 +44,7 @@ module ForestAdminAgent
               # This may sound counter-intuitive: it is so that the user don't have two fields which
               # allow updating the same foreign key in the detail-view form (fk + many to one)
               isReadOnly: is_foreign_key || column.is_read_only,
-              isRequired: column.validations.any? { |v| v[:operator] == 'Present' },
+              isRequired: column.validation.any? { |v| v[:operator] == 'Present' },
               isSortable: column.is_sortable,
               isVirtual: false,
               reference: nil,
@@ -144,7 +144,7 @@ module ForestAdminAgent
                 defaultValue: key_field.default_value,
                 isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
-                isRequired: key_field.validations.any? { |v| v[:operator] == 'Present' },
+                isRequired: key_field.validation.any? { |v| v[:operator] == 'Present' },
                 isReadOnly: key_field.is_read_only,
                 isSortable: key_field.is_sortable,
                 validations: FrontendValidationUtils.convert_validation_list(key_field),

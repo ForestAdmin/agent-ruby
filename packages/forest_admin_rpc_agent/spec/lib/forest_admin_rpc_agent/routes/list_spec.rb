@@ -34,7 +34,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             email: {
@@ -45,7 +45,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             }
           },

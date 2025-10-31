@@ -9,7 +9,7 @@ module ForestAdminDatasourceRpc
     def initialize(datasource, name, options, schema)
       super(datasource, name)
       @options = options
-      @client = RpcClient.new(@options[:uri], ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
+      @client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
       @rpc_collection_uri = "/forest/rpc/#{name}"
       @base_params = { collection_name: name }
 
@@ -30,6 +30,8 @@ module ForestAdminDatasourceRpc
         field_name = field_name.to_s
         type = schema[:type]
         schema.delete(:type)
+        # remove these
+        schema.delete(:allow_null)
         case type
         when 'Column'
           add_field(field_name, ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(**schema))
@@ -55,8 +57,7 @@ module ForestAdminDatasourceRpc
     end
 
     def list(caller, filter, projection)
-      params = build_params(caller: caller.to_h, filter: filter.to_h, projection: projection,
-                            timezone: caller.timezone)
+      params = build_params(filter: filter.to_h, projection: projection)
       url = "#{@rpc_collection_uri}/list"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -64,11 +65,11 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     def create(caller, data)
-      params = build_params(caller: caller.to_h, timezone: caller.timezone, data: data)
+      params = build_params(data: [data])
       url = "#{@rpc_collection_uri}/create"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -76,11 +77,12 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      res = @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      res.first
     end
 
     def update(caller, filter, data)
-      params = build_params(caller: caller.to_h, filter: filter.to_h, data: data, timezone: caller.timezone)
+      params = build_params(filter: filter.to_h, patch: data)
       url = "#{@rpc_collection_uri}/update"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -88,11 +90,11 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     def delete(caller, filter)
-      params = build_params(caller: caller.to_h, filter: filter.to_h, timezone: caller.timezone)
+      params = build_params(filter: filter.to_h)
       url = "#{@rpc_collection_uri}/delete"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -100,12 +102,11 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' deletion call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     def aggregate(caller, filter, aggregation, limit = nil)
-      params = build_params(caller: caller.to_h, filter: filter.to_h, aggregation: aggregation.to_h, limit: limit,
-                            timezone: caller.timezone)
+      params = build_params(filter: filter.to_h, aggregation: aggregation.to_h, limit: limit)
       url = "#{@rpc_collection_uri}/aggregate"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -113,18 +114,12 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' aggregate call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     def execute(caller, name, data, filter = nil)
       data = encode_form_data(data)
-      params = build_params(
-        caller: caller.to_h,
-        timezone: caller.timezone,
-        action: name,
-        filter: filter&.to_h,
-        data: data
-      )
+      params = build_params(action: name, filter: filter&.to_h, data: data)
       url = "#{@rpc_collection_uri}/action-execute"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -132,15 +127,14 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)
       params = build_params(action: name)
       if caller
         data = encode_form_data(data)
-        params = params.merge({ caller: caller.to_h, timezone: caller.timezone, filter: filter&.to_h, metas: metas,
-                                data: data })
+        params = params.merge({ filter: filter&.to_h, metas: metas, data: data })
       end
       url = "#{@rpc_collection_uri}/action-form"
 
@@ -149,14 +143,14 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action form #{name} call to the Rpc agent on #{url}."
       )
 
-      result = @client.call_rpc(url, method: :post, payload: params, symbolize_keys: true)
-      FormFactory.build_elements(result).map do |field|
+      result = @client.call_rpc(url, caller: caller, method: :post, payload: params, symbolize_keys: true)
+      result.map do |field|
         Actions::ActionFieldFactory.build(field.to_h)
       end
     end
 
     def render_chart(caller, name, record_id)
-      params = build_params(caller: caller.to_h, name: name, record_id: record_id)
+      params = build_params(chart: name, record_id: record_id)
       url = "#{@rpc_collection_uri}/chart"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
@@ -164,7 +158,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params)
     end
 
     private

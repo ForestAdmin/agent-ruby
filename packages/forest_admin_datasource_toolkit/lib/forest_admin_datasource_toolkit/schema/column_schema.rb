@@ -5,7 +5,7 @@ module ForestAdminDatasourceToolkit
 
       attr_accessor :is_read_only,
                     :is_sortable,
-                    :validations,
+                    :validation,
                     :filter_operators,
                     :column_type
 
@@ -17,7 +17,7 @@ module ForestAdminDatasourceToolkit
         is_sortable: false,
         default_value: nil,
         enum_values: [],
-        validations: []
+        validation: []
       )
         @column_type = column_type
         @filter_operators = filter_operators
@@ -26,7 +26,7 @@ module ForestAdminDatasourceToolkit
         @is_sortable = is_sortable
         @default_value = default_value
         @enum_values = enum_values
-        @validations = validations
+        @validation = validation
         @type = 'Column'
       end
     end

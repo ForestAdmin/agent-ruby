@@ -88,7 +88,7 @@ module ForestAdminDatasourceCustomizer
 
           it 'execute and return default response' do
             result = @decorated_book.execute(caller, 'make photocopy', {}, Filter.new)
-            expect(result).to eq({ headers: {}, type: 'Success', success: 'Success', refresh: { relationships: [] }, html: nil })
+            expect(result).to eq({ response_headers: {}, type: 'Success', message: 'Success', invalidated: [], html: nil })
           end
 
           it 'generate empty form' do

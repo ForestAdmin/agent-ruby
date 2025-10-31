@@ -119,7 +119,7 @@ module ForestAdminAgent
                 'HS256'
               )
               args[:params][:data][:attributes][:signed_approval_request] = signed_request
-              allow(@action_collection).to receive(:execute)
+              allow(@action_collection).to receive(:execute).and_return({})
               action.handle_request(args)
 
               expect(permissions).to have_received(:can_smart_action?) do |args, _collection, _filter_for_caller|
@@ -147,7 +147,7 @@ module ForestAdminAgent
           describe 'handle_request' do
             it 'delegate to collection with good params' do
               args[:params][:data][:attributes][:values] = { 'firstname' => 'John' }
-              allow(@action_collection).to receive(:execute)
+              allow(@action_collection).to receive(:execute).and_return({})
               action.handle_request(args)
               expect(@action_collection).to have_received(:execute) do |caller, action, data, filter|
                 expect(caller).to be_instance_of(Components::Caller)
@@ -214,7 +214,7 @@ module ForestAdminAgent
             it 'delegate to collection with good params' do
               args[:params][:data][:attributes][:values] = { 'firstname' => 'John' }
               args[:params][:data][:attributes][:ids] = %w[123e4567-e89b-12d3-a456-426614174000 123e4567-e89b-12d3-a456-426614174001]
-              allow(@action_collection).to receive(:execute)
+              allow(@action_collection).to receive(:execute).and_return({})
               action.handle_request(args)
               expect(@action_collection).to have_received(:execute) do |caller, action, data, filter|
                 expect(caller).to be_instance_of(Components::Caller)
@@ -246,7 +246,7 @@ module ForestAdminAgent
           describe 'handle_request' do
             it 'ignore record selection' do
               args[:params][:data][:attributes][:all_records] = true
-              allow(@action_collection).to receive(:execute)
+              allow(@action_collection).to receive(:execute).and_return({})
               action.handle_request(args)
 
               expect(@action_collection).to have_received(:execute) do |caller, action, data, filter|

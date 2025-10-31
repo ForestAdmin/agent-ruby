@@ -12,7 +12,7 @@ module ForestAdminDatasourceToolkit
         it { expect(column.is_sortable).to be false }
         it { expect(column.filter_operators).to eq [] }
         it { expect(column.enum_values).to eq [] }
-        it { expect(column.validations).to eq [] }
+        it { expect(column.validation).to eq [] }
         it { expect(column.column_type).to eq 'String' }
       end
 
@@ -21,14 +21,14 @@ module ForestAdminDatasourceToolkit
           column.is_read_only = true
           column.is_sortable = false
           column.filter_operators = ['Equal']
-          column.validations = ['validation_foo']
+          column.validation = ['validation_foo']
           column.column_type = 'Number'
         end
 
         it { expect(column.is_read_only).to be true }
         it { expect(column.is_sortable).to be false }
         it { expect(column.filter_operators).to eq ['Equal'] }
-        it { expect(column.validations).to eq ['validation_foo'] }
+        it { expect(column.validation).to eq ['validation_foo'] }
         it { expect(column.column_type).to eq 'Number' }
       end
     end

@@ -5,7 +5,7 @@ module ForestAdminRpcAgent
     class Sse
       DEFAULT_HEARTBEAT_INTERVAL = 1
 
-      def initialize(url = 'rpc/sse', method = 'get', name = 'rpc_sse', heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL)
+      def initialize(url = 'rpc-sse', method = 'get', name = 'rpc_sse', heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL)
         @url = url
         @method = method
         @name = name

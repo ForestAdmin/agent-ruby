@@ -40,7 +40,7 @@ module ForestAdminDatasourceCustomizer
             if schema.type == 'Column'
               new_schema = schema.dup
               new_schema.column_type = replace_column_type(schema.column_type)
-              new_schema.validations = replace_validation(name, schema)
+              new_schema.validation = replace_validation(name, schema)
               fields[name] = new_schema
             else
               fields[name] = schema
@@ -203,8 +203,8 @@ module ForestAdminDatasourceCustomizer
         def replace_validation(name, column_schema)
           if column_schema.column_type == 'Binary'
             validations = []
-            min_length = (column_schema.validations.find { |v| v[:operator] == Operators::LONGER_THAN } || {})[:value]
-            max_length = (column_schema.validations.find { |v| v[:operator] == Operators::SHORTER_THAN } || {})[:value]
+            min_length = (column_schema.validation.find { |v| v[:operator] == Operators::LONGER_THAN } || {})[:value]
+            max_length = (column_schema.validation.find { |v| v[:operator] == Operators::SHORTER_THAN } || {})[:value]
 
             if should_use_hex(name)
               validations << { operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }
@@ -214,14 +214,14 @@ module ForestAdminDatasourceCustomizer
               validations << { operator: Operators::MATCH, value: '/^data:.*;base64,.*/' }
             end
 
-            if column_schema.validations.find { |v| v[:operator] == Operators::PRESENT }
+            if column_schema.validation.find { |v| v[:operator] == Operators::PRESENT }
               validations << { operator: Operators::PRESENT }
             end
 
             return validations
           end
 
-          column_schema.validations
+          column_schema.validation
         end
       end
     end

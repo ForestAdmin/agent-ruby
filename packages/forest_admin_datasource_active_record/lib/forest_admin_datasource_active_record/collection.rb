@@ -67,7 +67,7 @@ module ForestAdminDatasourceActiveRecord
           default_value: column.default,
           enum_values: get_enum_values(@model, column),
           # validations: get_validations(column)
-          validations: []
+          validation: []
         )
 
         add_field(column_name, field)

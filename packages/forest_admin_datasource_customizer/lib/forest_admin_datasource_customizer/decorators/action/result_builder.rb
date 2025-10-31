@@ -14,40 +14,37 @@ module ForestAdminDatasourceCustomizer
 
         def success(message: 'Success', options: {})
           {
-            headers: @headers,
+            response_headers: @headers,
             type: 'Success',
-            success: message,
-            refresh: { relationships: options.key?(:invalidated) ? options[:invalidated] : [] },
+            message: message,
+            invalidated: options.key?(:invalidated) ? options[:invalidated] : [],
             html: options.key?(:html) ? options[:html] : nil
           }
         end
 
         def error(message: 'Error', options: {})
           {
-            headers: @headers,
+            response_headers: @headers,
             type: 'Error',
-            status: 400,
-            error: message,
+            message: message,
             html: options.key?(:html) ? options[:html] : nil
           }
         end
 
         def webhook(url:, method: 'POST', headers: {}, body: {})
           {
-            headers: @headers,
+            response_headers: @headers,
             type: 'Webhook',
-            webhook: {
-              body: body,
-              headers: headers,
-              method: method,
-              url: url
-            }
+            body: body,
+            headers: headers,
+            method: method,
+            url: url
           }
         end
 
         def file(content:, name: 'file', mime_type: 'application/octet-stream')
           {
-            headers: @headers,
+            response_headers: @headers,
             type: 'File',
             name: name,
             mime_type: mime_type,
@@ -57,9 +54,9 @@ module ForestAdminDatasourceCustomizer
 
         def redirect_to(path:)
           {
-            headers: @headers,
+            response_headers: @headers,
             type: 'Redirect',
-            redirect_to: path
+            path: path
           }
         end
       end

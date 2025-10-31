@@ -4,7 +4,7 @@ module ForestAdminRpcAgent
   module Routes
     class NativeQuery < BaseRoute
       def initialize
-        super('rpc/native-query', 'post', 'rpc_native_query')
+        super('rpc-native-query', 'post', 'rpc_native_query')
       end
 
       def handle_request(args)

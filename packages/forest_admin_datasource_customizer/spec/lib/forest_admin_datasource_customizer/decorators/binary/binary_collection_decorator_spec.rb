@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
                 'id' => build_column(
                   is_primary_key: true,
                   column_type: 'Binary',
-                  validations: [
+                  validation: [
                     { operator: Operators::LONGER_THAN, value: 15 },
                     { operator: Operators::SHORTER_THAN, value: 17 },
                     { operator: Operators::PRESENT },
@@ -105,14 +105,14 @@ module ForestAdminDatasourceCustomizer
         describe 'schema' do
           it 'do not modified the favorite collection schema' do
             expect(@collection_favorite.schema[:fields]['id'].column_type).to eq(@decorated_favorite.schema[:fields]['id'].column_type)
-            expect(@collection_favorite.schema[:fields]['id'].validations).to eq(@decorated_favorite.schema[:fields]['id'].validations)
+            expect(@collection_favorite.schema[:fields]['id'].validation).to eq(@decorated_favorite.schema[:fields]['id'].validation)
           end
 
           it 'rewrite book primary key as an hex string' do
             expect(@decorated_book.schema[:fields]['id']).to have_attributes(
               is_primary_key: true,
               column_type: 'String',
-              validations: [
+              validation: [
                 { operator: Operators::MATCH, value: '/^[0-9a-f]+$/' },
                 { operator: Operators::LONGER_THAN, value: 31 },
                 { operator: Operators::SHORTER_THAN, value: 33 },
@@ -124,7 +124,7 @@ module ForestAdminDatasourceCustomizer
           it 'rewrite book cover as datauri' do
             expect(@decorated_book.schema[:fields]['cover']).to have_attributes(
               column_type: 'String',
-              validations: [{ operator: Operators::MATCH, value: '/^data:.*;base64,.*/' }]
+              validation: [{ operator: Operators::MATCH, value: '/^data:.*;base64,.*/' }]
             )
           end
 
@@ -139,7 +139,7 @@ module ForestAdminDatasourceCustomizer
 
             expect(@decorated_book.schema[:fields]['cover']).to have_attributes(
               column_type: 'String',
-              validations: [{ operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }]
+              validation: [{ operator: Operators::MATCH, value: '/^[0-9a-f]+$/' }]
             )
           end
         end

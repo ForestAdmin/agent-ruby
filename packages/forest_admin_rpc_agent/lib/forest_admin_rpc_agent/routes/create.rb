@@ -16,7 +16,7 @@ module ForestAdminRpcAgent
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
 
-        collection.create(caller, args[:params]['data']).to_json
+        [collection.create(caller, args[:params]['data'])].to_json
       end
     end
   end

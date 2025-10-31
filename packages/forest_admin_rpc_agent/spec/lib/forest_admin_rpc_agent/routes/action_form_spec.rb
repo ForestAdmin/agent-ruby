@@ -77,7 +77,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             name: {
@@ -88,7 +88,7 @@ module ForestAdminRpcAgent
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             }
           },

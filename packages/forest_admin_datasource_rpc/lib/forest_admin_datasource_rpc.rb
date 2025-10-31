@@ -10,7 +10,7 @@ module ForestAdminDatasourceRpc
 
   def self.build(options)
     uri = options[:uri]
-    auth_secret = ForestAdminRpcAgent::Facades::Container.cache(:auth_secret)
+    auth_secret = options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret)
     ForestAdminRpcAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
     begin
@@ -28,7 +28,7 @@ module ForestAdminDatasourceRpc
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      sse = Utils::SseClient.new("#{uri}/forest/rpc/sse", auth_secret) do
+      sse = Utils::SseClient.new("#{uri}/forest/sse", auth_secret) do
         ForestAdminRpcAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
         new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
 

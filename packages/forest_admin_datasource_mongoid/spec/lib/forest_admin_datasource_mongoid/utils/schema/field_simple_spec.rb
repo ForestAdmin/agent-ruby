@@ -20,7 +20,7 @@ module ForestAdminDatasourceMongoid
           it 'builds the validation with present operator' do
             fields_schema = described_class.build_fields_schema(model, stack)
 
-            expect(fields_schema['a_field'].validations).to eq [{ operator: 'present' }]
+            expect(fields_schema['a_field'].validation).to eq [{ operator: 'present' }]
           end
         end
 
@@ -35,7 +35,7 @@ module ForestAdminDatasourceMongoid
           it 'does not add a validation' do
             fields_schema = described_class.build_fields_schema(model, stack)
 
-            expect(fields_schema['a_field'].validations).to be_empty
+            expect(fields_schema['a_field'].validation).to be_empty
           end
         end
 

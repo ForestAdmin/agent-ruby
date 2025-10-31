@@ -13,7 +13,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             name: {
@@ -25,7 +25,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             siren: {
@@ -37,7 +37,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             created_at: {
@@ -52,7 +52,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             updated_at: {
@@ -67,7 +67,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             products: {
@@ -94,7 +94,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             label: {
@@ -106,7 +106,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             quantity: {
@@ -117,7 +117,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             manufacturer_id: {
@@ -128,7 +128,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             next_restocking_date: {
@@ -143,7 +143,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             created_at: {
@@ -158,7 +158,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             updated_at: {
@@ -173,7 +173,7 @@ RSpec.shared_context 'with introspection' do
               is_sortable: true,
               default_value: nil,
               enum_values: [],
-              validations: [],
+              validation: [],
               type: 'Column'
             },
             manufacturer: {
