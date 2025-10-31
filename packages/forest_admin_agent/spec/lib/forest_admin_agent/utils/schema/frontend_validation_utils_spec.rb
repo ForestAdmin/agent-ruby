@@ -15,12 +15,12 @@ module ForestAdminAgent
           end
 
           it 'works with empty validation' do
-            column = build_column(validations: [])
+            column = build_column(validation: [])
             expect(frontend_validation_utils.convert_validation_list(column)).to be_empty
           end
 
           it 'works with supported handlers (strings)' do
-            column = build_numeric_primary_key(validations: [
+            column = build_numeric_primary_key(validation: [
                                                  { operator: Operators::PRESENT },
                                                  { operator: Operators::LESS_THAN, value: 34 },
                                                  { operator: Operators::GREATER_THAN, value: 60 }
@@ -33,7 +33,7 @@ module ForestAdminAgent
           end
 
           it 'works with supported handlers (date)' do
-            column = build_column(column_type: 'Date', validations: [
+            column = build_column(column_type: 'Date', validation: [
                                     { operator: Operators::BEFORE, value: '2010-01-01T00:00:00Z' },
                                     { operator: Operators::AFTER, value: '2010-01-01T00:00:00Z' }
                                   ])
@@ -44,7 +44,7 @@ module ForestAdminAgent
           end
 
           it 'works with supported handlers (string)' do
-            column = build_column(column_type: 'Number', validations: [
+            column = build_column(column_type: 'Number', validation: [
                                     { operator: Operators::LONGER_THAN, value: 34 },
                                     { operator: Operators::SHORTER_THAN, value: 60 },
                                     { operator: Operators::CONTAINS, value: 'abc' },
@@ -59,7 +59,7 @@ module ForestAdminAgent
           end
 
           it 'works with supported handlers (fake enum)' do
-            column = build_column(column_type: 'String', validations: [
+            column = build_column(column_type: 'String', validation: [
                                     { operator: Operators::IN, value: %w[a b c] }
                                   ])
             expect(frontend_validation_utils.convert_validation_list(column)).to eq([
@@ -68,7 +68,7 @@ module ForestAdminAgent
           end
 
           it 'works with duplication' do
-            column = build_numeric_primary_key(validations: [
+            column = build_numeric_primary_key(validation: [
                                                  { operator: Operators::PRESENT },
                                                  { operator: Operators::PRESENT },
                                                  { operator: Operators::LESS_THAN, value: 34 },
@@ -88,7 +88,7 @@ module ForestAdminAgent
           end
 
           it 'works with rule expansion (not in with null)' do
-            column = build_column(column_type: 'String', validations: [
+            column = build_column(column_type: 'String', validation: [
                                     { operator: Operators::NOT_IN, value: ['a', 'b', nil] }
                                   ])
             expect(frontend_validation_utils.convert_validation_list(column)).to eq([
@@ -97,14 +97,14 @@ module ForestAdminAgent
           end
 
           it 'skips validation which cannot be translated (depends on current time)' do
-            column = build_column(column_type: 'Date', validations: [
+            column = build_column(column_type: 'Date', validation: [
                                     { operator: Operators::PREVIOUS_QUARTER }
                                   ])
             expect(frontend_validation_utils.convert_validation_list(column)).to be_empty
           end
 
           it 'skips validation which cannot be translated (fake enum with null)' do
-            column = build_column(column_type: 'String', validations: [
+            column = build_column(column_type: 'String', validation: [
                                     { operator: Operators::IN, value: ['a', 'b', nil] }
                                   ])
             expect(frontend_validation_utils.convert_validation_list(column)).to eq([
