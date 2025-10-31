@@ -175,7 +175,12 @@ module ForestAdminDatasourceMongoid
             email_column = model.fields['email']
             result = collection.get_validations(model, email_column)
 
-            expect(result).to include({ operator: Operators::CONTAINS, value: "/^[a-zA-Z0-9.!\\\#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/" })
+            # Transform the regex the same way parse_format_validator does
+            regex = URI::MailTo::EMAIL_REGEXP.source
+            regex = regex.sub('\\A', '^').sub('\\Z', '$').sub('\\z', '$').gsub(/\n+|\s+/, '')
+            expected_value = "/#{regex}/"
+
+            expect(result).to include({ operator: Operators::CONTAINS, value: expected_value })
           end
         end
 
