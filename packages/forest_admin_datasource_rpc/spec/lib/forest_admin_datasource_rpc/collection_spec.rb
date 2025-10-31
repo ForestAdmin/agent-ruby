@@ -32,7 +32,7 @@ module ForestAdminDatasourceRpc
             {
               collection_name: 'Product',
               filter: Filter.new.to_h,
-              projection: [],
+              projection: []
             }
           )
         end
@@ -72,7 +72,7 @@ module ForestAdminDatasourceRpc
                 sort: [{ field: 'id', ascending: true }],
                 page: { offset: 2, limit: 10 }
               },
-              projection: %w[id label quantity],
+              projection: %w[id label quantity]
             }
           )
         end
@@ -91,7 +91,7 @@ module ForestAdminDatasourceRpc
           expect(options[:payload]).to eq(
             {
               collection_name: 'Product',
-              data: [data],
+              data: [data]
             }
           )
         end
@@ -112,7 +112,7 @@ module ForestAdminDatasourceRpc
             {
               collection_name: 'Product',
               filter: filter.to_h,
-              patch: data,
+              patch: data
             }
           )
         end
@@ -131,7 +131,7 @@ module ForestAdminDatasourceRpc
           expect(options[:payload]).to eq(
             {
               collection_name: 'Product',
-              filter: filter.to_h,
+              filter: filter.to_h
             }
           )
         end
@@ -151,7 +151,7 @@ module ForestAdminDatasourceRpc
               collection_name: 'Product',
               filter: Filter.new.to_h,
               aggregation: { operation: 'Count', groups: [], field: nil },
-              limit: nil,
+              limit: nil
             }
           )
         end
@@ -203,7 +203,7 @@ module ForestAdminDatasourceRpc
                 'label' => 'foo',
                 'product picture' => 'data:image/jpeg;base64,/9j/4AAQSkZJRpCLD4n/AP/Z'
               },
-              filter: nil,
+              filter: nil
             }
           )
         end
@@ -224,7 +224,7 @@ module ForestAdminDatasourceRpc
               action: 'my_action',
               data: {},
               filter: nil,
-              metas: nil,
+              metas: nil
             }
           )
         end
