@@ -26,7 +26,6 @@ module ForestAdminDatasourceRpc
     end
 
     def render_chart(caller, name)
-      # TODO refactor composite DS
       client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
       url = 'forest/rpc-datasource-chart'
 
@@ -47,7 +46,8 @@ module ForestAdminDatasourceRpc
         "Forwarding native query for connection '#{connection_name}' to the Rpc agent on #{url}."
       )
 
-      result = client.call_rpc(url, method: :post, payload: { connection_name: connection_name, query: query, binds: binds })
+      result = client.call_rpc(url, method: :post,
+                                    payload: { connection_name: connection_name, query: query, binds: binds })
       ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
     end
   end

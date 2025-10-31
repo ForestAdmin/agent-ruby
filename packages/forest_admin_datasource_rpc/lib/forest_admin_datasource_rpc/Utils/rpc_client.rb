@@ -50,9 +50,7 @@ module ForestAdminDatasourceRpc
           'X_SIGNATURE' => signature
         }
 
-        if caller
-          headers['forest_caller'] = caller.to_json
-        end
+        headers['forest_caller'] = caller.to_json if caller
 
         response = client.send(method, endpoint, payload, headers)
 

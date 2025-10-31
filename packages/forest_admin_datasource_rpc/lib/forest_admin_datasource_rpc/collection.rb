@@ -119,7 +119,7 @@ module ForestAdminDatasourceRpc
 
     def execute(caller, name, data, filter = nil)
       data = encode_form_data(data)
-      params = build_params( action: name, filter: filter&.to_h, data: data )
+      params = build_params(action: name, filter: filter&.to_h, data: data)
       url = "#{@rpc_collection_uri}/action-execute"
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
