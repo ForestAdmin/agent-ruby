@@ -19,6 +19,7 @@ module ForestAdminRpcAgent
   setting :is_production, default: false
   setting :prefix, default: nil
   setting :cache_dir, default: :'tmp/cache/forest_admin'
+  setting :permission_expiration, default: 900 # 15 minutes cache for permissions
   setting :project_dir, default: Dir.pwd
   setting :logger_level, default: 'info'
   setting :logger, default: nil
