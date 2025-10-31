@@ -26,14 +26,13 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/list')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               filter: Filter.new.to_h,
               projection: [],
-              timezone: 'Europe/Paris'
             }
           )
         end
@@ -57,25 +56,11 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/list')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
               collection_name: 'Product',
-              caller: {
-                id: 1,
-                email: 'sarah.connor@skynet.com',
-                first_name: 'sarah',
-                last_name: 'connor',
-                team: 'survivor',
-                rendering_id: 1,
-                tags: [],
-                timezone: 'Europe/Paris',
-                permission_level: 'admin',
-                role: 'dev',
-                request: { ip: '127.0.0.1' },
-                project: 'terminator',
-                environment: 'Development'
-              },
               filter: {
                 condition_tree: { aggregator: 'And', conditions: [
                   { field: 'quantity', operator: 'greater_than', value: 10 },
@@ -88,7 +73,6 @@ module ForestAdminDatasourceRpc
                 page: { offset: 2, limit: 10 }
               },
               projection: %w[id label quantity],
-              timezone: 'Europe/Paris'
             }
           )
         end
@@ -102,13 +86,12 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/create')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
-              data: data,
-              timezone: 'Europe/Paris'
+              data: [data],
             }
           )
         end
@@ -123,14 +106,13 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/update')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               filter: filter.to_h,
-              data: data,
-              timezone: 'Europe/Paris'
+              patch: data,
             }
           )
         end
@@ -144,13 +126,12 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/delete')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               filter: filter.to_h,
-              timezone: 'Europe/Paris'
             }
           )
         end
@@ -163,15 +144,14 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/aggregate')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               filter: Filter.new.to_h,
               aggregation: { operation: 'Count', groups: [], field: nil },
               limit: nil,
-              timezone: 'Europe/Paris'
             }
           )
         end
@@ -184,12 +164,12 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/chart')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
-              name: 'my_chart',
+              chart: 'my_chart',
               record_id: 1
             }
           )
@@ -212,10 +192,10 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/action-execute')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               action: 'my_action',
               data: {
@@ -224,7 +204,6 @@ module ForestAdminDatasourceRpc
                 'product picture' => 'data:image/jpeg;base64,/9j/4AAQSkZJRpCLD4n/AP/Z'
               },
               filter: nil,
-              timezone: 'Europe/Paris'
             }
           )
         end
@@ -237,16 +216,15 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |url, options|
           expect(url).to eq('/forest/rpc/Product/action-form')
+          expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)
           expect(options[:payload]).to eq(
             {
-              caller: caller.to_h,
               collection_name: 'Product',
               action: 'my_action',
               data: {},
               filter: nil,
               metas: nil,
-              timezone: 'Europe/Paris'
             }
           )
         end
