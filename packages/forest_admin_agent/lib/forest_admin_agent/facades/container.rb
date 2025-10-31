@@ -2,7 +2,12 @@ module ForestAdminAgent
   module Facades
     class Container
       def self.instance
-        ForestAdminAgent::Builder::AgentFactory.instance.container
+        # Try RpcAgent first (for RPC slaves), fallback to AgentFactory (for masters)
+        if defined?(ForestAdminRpcAgent::Agent) && ForestAdminRpcAgent::Agent.instance.container
+          ForestAdminRpcAgent::Agent.instance.container
+        else
+          ForestAdminAgent::Builder::AgentFactory.instance.container
+        end
       end
 
       def self.datasource
@@ -21,7 +26,7 @@ module ForestAdminAgent
 
       def self.cache(key)
         config = config_from_cache
-        raise "Key #{key} not found in config" unless config.key?(key)
+        return nil unless config&.key?(key)
 
         config[key]
       end

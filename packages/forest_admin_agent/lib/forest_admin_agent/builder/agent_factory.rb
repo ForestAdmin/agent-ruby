@@ -96,7 +96,7 @@ module ForestAdminAgent
             collections: generated
           }
 
-          File.write(schema_path, format_schema_json(schema))
+          File.write(schema_path, format_schema_json(schema)) if schema_path
         end
 
         if (append_schema_path = Facades::Container.cache(:append_schema_path))

@@ -19,10 +19,13 @@ module ForestAdminRpcAgent
                                          .sort_by { |collection| collection[:name] }
 
         connections = []
-        agent.customizer.datasources.each do |root_datasource|
-          connections = connections.union(
-            root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
-          )
+        datasources = agent.customizer.respond_to?(:datasources) ? agent.customizer.datasources : []
+        if datasources && datasources.any?
+          datasources.each do |root_datasource|
+            connections = connections.union(
+              root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
+            )
+          end
         end
         schema[:nativeQueryConnections] = connections
 
