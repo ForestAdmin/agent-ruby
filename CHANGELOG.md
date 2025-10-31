@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.16...v1.13.0) (2025-10-31)
+
+
+### Features
+
+* **nativeQueries:** support for union queries ([#199](https://github.com/ForestAdmin/agent-ruby/issues/199)) ([6408a39](https://github.com/ForestAdmin/agent-ruby/commit/6408a39bb37632719d02893829d0744dfdccf426))
+
 ## [1.12.16](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.15...v1.12.16) (2025-10-30)
 
 
