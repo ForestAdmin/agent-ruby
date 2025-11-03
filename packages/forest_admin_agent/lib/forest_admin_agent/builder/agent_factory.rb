@@ -149,8 +149,6 @@ module ForestAdminAgent
           body = JSON.parse(response.body)
           body['sendSchema']
         rescue JSON::ParserError => e
-          # Extract first 500 chars of response for better error visibility
-          body_preview = response.body.to_s[0..500]
           http_status = begin
             response.status
           rescue StandardError
@@ -159,7 +157,7 @@ module ForestAdminAgent
 
           raise InternalServerError.new(
             "Invalid JSON response from ForestAdmin server (HTTP #{http_status}). " \
-            "Expected JSON but received: #{body_preview}",
+            "Expected JSON but received: #{response.body}",
             details: { body: response.body, status: http_status },
             cause: e
           )
