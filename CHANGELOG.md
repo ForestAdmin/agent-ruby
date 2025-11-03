@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.0...v1.13.1) (2025-11-03)
+
+
+### Bug Fixes
+
+* **rpcAgent:** circular dependency on install command ([#200](https://github.com/ForestAdmin/agent-ruby/issues/200)) ([57f8828](https://github.com/ForestAdmin/agent-ruby/commit/57f88282991fd4b24e4ba81119f9fd9225cd8768))
+
 # [1.13.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.12.16...v1.13.0) (2025-10-31)
 
 
