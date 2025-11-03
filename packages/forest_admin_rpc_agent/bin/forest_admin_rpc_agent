@@ -3,6 +3,13 @@
 
 require "rubygems"
 
+# Try to use bundler/setup if we're in a Bundler context (development or app with Gemfile)
+begin
+  require "bundler/setup"
+rescue LoadError
+  # No bundler available, continue with global gems
+end
+
 require_relative '../lib/forest_admin_rpc_agent/thor/install'
 
 ForestAdminRpcAgent::Thor::Install.start(ARGV)
