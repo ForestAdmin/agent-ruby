@@ -36,11 +36,12 @@ module ForestAdminRails
     end
 
     def self.customize
-      @agent.add_chart('appointments') do |context, result_builder|
-        ds = context.datasource.get_collection('Customer')
-        puts ds
-        result_builder.value(784, 760)
-      end
+      # Chart 'appointments' is already defined in the RPC datasource (warehouse)
+      # @agent.add_chart('appointments') do |context, result_builder|
+      #   ds = context.datasource.get_collection('Customer')
+      #   puts ds
+      #   result_builder.value(784, 760)
+      # end
       @agent.customize_collection('Customer') do |collection|
         collection.rename_field('lastname', 'last_name')
       end
