@@ -40,7 +40,7 @@ module ForestAdminDatasourceCustomizer
         def refine_schema(child_schema)
           @validation.each do |name, rules|
             field = child_schema[:fields][name]
-            field.validations = (field.validations || []).concat(rules)
+            field.validation = (field.validation || []).concat(rules)
             child_schema[:fields][name] = field
           end
 

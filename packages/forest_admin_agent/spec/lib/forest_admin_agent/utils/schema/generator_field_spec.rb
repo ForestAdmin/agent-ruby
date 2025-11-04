@@ -18,7 +18,7 @@ module ForestAdminAgent
                 filter_operators: %w[Equal NotEqual Present],
                 is_sortable: true,
                 is_read_only: true,
-                validations: [{ operator: Operators::PRESENT }]
+                validation: [{ operator: Operators::PRESENT }]
               ),
               'origin_key' => ColumnSchema.new(
                 column_type: 'Number',

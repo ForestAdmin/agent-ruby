@@ -14,10 +14,10 @@ module ForestAdminDatasourceCustomizer
         it 'return a result with header' do
           expect(result_builder.set_header('header_key', 'header_value').success).to eq(
             {
-              headers: { 'header_key' => 'header_value' },
+              response_headers: { 'header_key' => 'header_value' },
               type: 'Success',
-              success: 'Success',
-              refresh: { relationships: [] },
+              message: 'Success',
+              invalidated: [],
               html: nil
             }
           )
@@ -26,20 +26,20 @@ module ForestAdminDatasourceCustomizer
         it 'return a success result' do
           expect(result_builder.success).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Success',
-              success: 'Success',
-              refresh: { relationships: [] },
+              message: 'Success',
+              invalidated: [],
               html: nil
             }
           )
 
           expect(result_builder.success(message: 'foo', options: { html: '<div>That worked!</div>' })).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Success',
-              success: 'foo',
-              refresh: { relationships: [] },
+              message: 'foo',
+              invalidated: [],
               html: '<div>That worked!</div>'
             }
           )
@@ -48,20 +48,18 @@ module ForestAdminDatasourceCustomizer
         it 'return an error result' do
           expect(result_builder.error).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Error',
-              error: 'Error',
-              status: 400,
+              message: 'Error',
               html: nil
             }
           )
 
           expect(result_builder.error(message: 'foo', options: { html: '<div>That worked!</div>' })).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Error',
-              error: 'foo',
-              status: 400,
+              message: 'foo',
               html: '<div>That worked!</div>'
             }
           )
@@ -70,7 +68,7 @@ module ForestAdminDatasourceCustomizer
         it 'return a file result' do
           expect(result_builder.file(content: 'col1,col2,col3', name: 'test.csv', mime_type: 'text/csv')).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'File',
               name: 'test.csv',
               mime_type: 'text/csv',
@@ -82,14 +80,12 @@ module ForestAdminDatasourceCustomizer
         it 'return a webhook result' do
           expect(result_builder.webhook(url: 'http://someurl')).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Webhook',
-              webhook: {
-                body: {},
-                headers: {},
-                method: 'POST',
-                url: 'http://someurl'
-              }
+              body: {},
+              headers: {},
+              method: 'POST',
+              url: 'http://someurl'
             }
           )
         end
@@ -97,9 +93,9 @@ module ForestAdminDatasourceCustomizer
         it 'return a redirect result' do
           expect(result_builder.redirect_to(path: '/mypath')).to eq(
             {
-              headers: {},
+              response_headers: {},
               type: 'Redirect',
-              redirect_to: '/mypath'
+              path: '/mypath'
             }
           )
         end
