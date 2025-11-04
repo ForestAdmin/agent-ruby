@@ -1,3 +1,10 @@
+## [1.13.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.1...v1.13.2) (2025-11-04)
+
+
+### Bug Fixes
+
+* **rpc:** handle multi stack connection ([#177](https://github.com/ForestAdmin/agent-ruby/issues/177)) ([77938fc](https://github.com/ForestAdmin/agent-ruby/commit/77938fc03a26c0946cd60bf0b1dc0b48c44f0379))
+
 ## [1.13.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.0...v1.13.1) (2025-11-03)
 
 
