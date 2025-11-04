@@ -16,7 +16,10 @@ module ForestAdminRails
       )
       mongo_datasource = ForestAdminDatasourceMongoid::Datasource.new(options: { flatten_mode: 'none' })
 
-      rpc_datasource = ForestAdminDatasourceRpc.build({uri: 'http://0.0.0.0:5000'})
+      rpc_datasource = ForestAdminDatasourceRpc.build({
+        uri: 'http://0.0.0.0:5000',
+        auth_secret: ENV['FOREST_AUTH_SECRET']
+      })
 
       @agent = ForestAdminAgent::Builder::AgentFactory.instance
                                                       .add_datasource(rpc_datasource)

@@ -9,11 +9,11 @@ module ForestAdminDatasourceRpc
     def initialize(datasource, name, options, schema)
       super(datasource, name)
       @options = options
-      @client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
+      @client = RpcClient.new(@options[:uri], @options[:auth_secret])
       @rpc_collection_uri = "/forest/rpc/#{name}"
       @base_params = { collection_name: name }
 
-      ForestAdminRpcAgent::Facades::Container.logger.log('Debug', "Create Rpc collection #{name}.")
+      ForestAdminAgent::Facades::Container.logger.log('Debug', "Create Rpc collection #{name}.")
 
       enable_count if schema[:countable]
       enable_search if schema[:searchable]
@@ -60,7 +60,7 @@ module ForestAdminDatasourceRpc
       params = build_params(filter: filter.to_h, projection: projection)
       url = "#{@rpc_collection_uri}/list"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
@@ -72,7 +72,7 @@ module ForestAdminDatasourceRpc
       params = build_params(data: [data])
       url = "#{@rpc_collection_uri}/create"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
@@ -85,7 +85,7 @@ module ForestAdminDatasourceRpc
       params = build_params(filter: filter.to_h, patch: data)
       url = "#{@rpc_collection_uri}/update"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
@@ -97,7 +97,7 @@ module ForestAdminDatasourceRpc
       params = build_params(filter: filter.to_h)
       url = "#{@rpc_collection_uri}/delete"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' deletion call to the Rpc agent on #{url}."
       )
@@ -109,7 +109,7 @@ module ForestAdminDatasourceRpc
       params = build_params(filter: filter.to_h, aggregation: aggregation.to_h, limit: limit)
       url = "#{@rpc_collection_uri}/aggregate"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' aggregate call to the Rpc agent on #{url}."
       )
@@ -122,7 +122,7 @@ module ForestAdminDatasourceRpc
       params = build_params(action: name, filter: filter&.to_h, data: data)
       url = "#{@rpc_collection_uri}/action-execute"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
@@ -138,7 +138,7 @@ module ForestAdminDatasourceRpc
       end
       url = "#{@rpc_collection_uri}/action-form"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' action form #{name} call to the Rpc agent on #{url}."
       )
@@ -153,7 +153,7 @@ module ForestAdminDatasourceRpc
       params = build_params(chart: name, record_id: record_id)
       url = "#{@rpc_collection_uri}/chart"
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
