@@ -66,6 +66,61 @@ module ForestAdminDatasourceActiveRecord
           expect(datasource.get_collection('User').schema[:fields].keys).to include('address')
           expect(datasource.get_collection('Address').schema[:fields].keys).to include('addressable')
         end
+
+        # rubocop:disable RSpec/ExampleLength
+        it 'handles polymorphic associations with missing foreign key columns' do
+          # This test reproduces issue #202: Server crashing on startup when missing columns for foreign keys
+          # When a model declares a polymorphic belongs_to but the foreign key columns don't exist in the database
+          # (e.g., pending migration), the agent should not crash
+
+          # First, add the polymorphic columns to the Address model temporarily for this test
+          ActiveRecord::Migration.suppress_messages do
+            unless Address.column_names.include?('commentable_id')
+              ActiveRecord::Migration.add_column :addresses, :commentable_id, :integer
+            end
+            unless Address.column_names.include?('commentable_type')
+              ActiveRecord::Migration.add_column :addresses, :commentable_type, :string
+            end
+            Address.reset_column_information
+          end
+
+          stub_const('ModelWithMissingFkColumns', Class.new(ApplicationRecord) do
+            self.table_name = 'addresses'
+            self.abstract_class = true
+
+            # Declaring a polymorphic association
+            belongs_to :commentable, polymorphic: true
+          end)
+
+          # Temporarily remove the columns from the model's column cache to simulate missing columns
+          # This simulates the scenario where the model has associations declared but the migration hasn't run yet
+          excluded_columns = %w[commentable_id commentable_type]
+          allow(ModelWithMissingFkColumns).to receive_messages(
+            columns_hash: Address.columns_hash.except(*excluded_columns),
+            columns: Address.columns.reject { |c| excluded_columns.include?(c.name) }
+          )
+
+          # Should not raise an error even though commentable_id and commentable_type are not in columns_hash
+          expect do
+            described_class.new(datasource, ModelWithMissingFkColumns)
+          end.not_to raise_error
+
+          collection = described_class.new(datasource, ModelWithMissingFkColumns)
+          # The foreign key columns should not be in the schema since they're not in columns_hash
+          expect(collection.schema[:fields].keys).not_to include('commentable_id', 'commentable_type')
+
+          # Clean up
+          ActiveRecord::Migration.suppress_messages do
+            if Address.column_names.include?('commentable_id')
+              ActiveRecord::Migration.remove_column :addresses, :commentable_id
+            end
+            if Address.column_names.include?('commentable_type')
+              ActiveRecord::Migration.remove_column :addresses, :commentable_type
+            end
+            Address.reset_column_information
+          end
+        end
+        # rubocop:enable RSpec/ExampleLength
       end
     end
 
