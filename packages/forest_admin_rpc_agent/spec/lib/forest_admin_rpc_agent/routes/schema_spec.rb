@@ -39,7 +39,10 @@ module ForestAdminRpcAgent
           datasource: datasource,
           datasources: [datasource_with_connections]
         )
-        allow(datasource).to receive(:collections).and_return(collections)
+        allow(datasource).to receive_messages(
+          collections: collections,
+          live_query_connections: { 'primary' => 'primary' }
+        )
       end
 
       describe '#handle_request' do

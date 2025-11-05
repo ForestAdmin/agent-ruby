@@ -34,7 +34,7 @@ module ForestAdminRpcAgent
       describe '#initialize' do
         it 'sets default values' do
           route = described_class.new
-          expect(route.instance_variable_get(:@url)).to eq('rpc-sse')
+          expect(route.instance_variable_get(:@url)).to eq('sse')
           expect(route.instance_variable_get(:@method)).to eq('get')
           expect(route.instance_variable_get(:@name)).to eq('rpc_sse')
           expect(route.instance_variable_get(:@heartbeat_interval)).to eq(1)
@@ -257,7 +257,7 @@ module ForestAdminRpcAgent
           routes = sinatra_app.registered_routes
           expect(routes.length).to eq(1)
           expect(routes.first[:method]).to eq(:get)
-          expect(routes.first[:path]).to eq('/rpc-sse')
+          expect(routes.first[:path]).to eq('/sse')
           expect(routes.first[:block]).to be_a(Proc)
         end
 
