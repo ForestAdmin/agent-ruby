@@ -16,8 +16,7 @@ module ForestAdminRpcAgent
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
 
-        primary_key_values = ForestAdminAgent::Utils::Id.unpack_id(collection, args[:params]['record_id'].first)
-        collection.render_chart(caller, chart_name, primary_key_values)
+        collection.render_chart(caller, chart_name, args[:params]['record_id']).to_json
       end
     end
   end
