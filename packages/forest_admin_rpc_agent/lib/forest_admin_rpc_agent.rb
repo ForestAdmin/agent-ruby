@@ -23,6 +23,7 @@ module ForestAdminRpcAgent
   setting :logger_level, default: 'info'
   setting :logger, default: nil
   setting :customize_error_message, default: nil
+  setting :disable_route_cache, default: false
 
   begin
     require 'thor'
