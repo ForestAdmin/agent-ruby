@@ -15,7 +15,7 @@ module ForestAdminRpcAgent
         {
           'collection_name' => collection_name,
           'caller' => caller.to_h,
-          'name' => chart_name,
+          'chart' => chart_name,
           'record_id' => record_id
         }
       end
