@@ -132,8 +132,11 @@ module ForestAdminDatasourceActiveRecord
                   foreign_key_targets: foreign_collections
                 )
               )
-              schema[:fields][association.foreign_key].is_read_only = true
-              schema[:fields][association.foreign_type].is_read_only = true
+
+              warn_missing_polymorphic_columns(association)
+
+              schema[:fields][association.foreign_key]&.is_read_only = true
+              schema[:fields][association.foreign_type]&.is_read_only = true
             else
               add_field(
                 association.name.to_s,
@@ -195,6 +198,22 @@ module ForestAdminDatasourceActiveRecord
           )
         end
       end
+    end
+
+    def warn_missing_polymorphic_columns(association)
+      missing_columns = []
+      missing_columns << association.foreign_key unless schema[:fields][association.foreign_key]
+      missing_columns << association.foreign_type unless schema[:fields][association.foreign_type]
+
+      return unless missing_columns.any?
+
+      logger = ActiveSupport::Logger.new($stdout)
+      columns_list = missing_columns.join(', ')
+      logger.warn(
+        "[ForestAdmin] ⚠️  Missing columns for polymorphic association '#{association.name}' " \
+        "in model '#{@model.name}': #{columns_list}. " \
+        'This may indicate pending migrations. Run `rails db:migrate:status` to check.'
+      )
     end
   end
 end
