@@ -1,3 +1,10 @@
+## [1.13.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.2...v1.13.3) (2025-11-05)
+
+
+### Bug Fixes
+
+* prevent NoMethodError on polymorphic associations with pending migrations ([#203](https://github.com/ForestAdmin/agent-ruby/issues/203)) ([bbe89c9](https://github.com/ForestAdmin/agent-ruby/commit/bbe89c93bf98cbea8a257277c5df84450b3ecaca))
+
 ## [1.13.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.1...v1.13.2) (2025-11-04)
 
 
