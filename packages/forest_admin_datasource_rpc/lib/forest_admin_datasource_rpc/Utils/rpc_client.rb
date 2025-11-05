@@ -38,7 +38,7 @@ module ForestAdminDatasourceRpc
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
           faraday.adapter Faraday.default_adapter
-          faraday.ssl.verify = !ForestAdminRpcAgent::Facades::Container.cache(:debug)
+          faraday.ssl.verify = !ForestAdminAgent::Facades::Container.cache(:debug)
         end
 
         timestamp = Time.now.utc.iso8601(3)

@@ -5,7 +5,7 @@ module ForestAdminDatasourceRpc
     def initialize(options, introspection)
       super()
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Info',
         "Building Rpc Datasource with #{introspection[:collections].length} " \
         "collections and #{introspection[:charts].length} charts."
@@ -26,10 +26,10 @@ module ForestAdminDatasourceRpc
     end
 
     def render_chart(caller, name)
-      client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
+      client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret))
       url = 'forest/rpc-datasource-chart'
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding datasource chart '#{name}' call to the Rpc agent on #{url}."
       )
@@ -38,10 +38,10 @@ module ForestAdminDatasourceRpc
     end
 
     def execute_native_query(connection_name, query, binds)
-      client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminRpcAgent::Facades::Container.cache(:auth_secret))
+      client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret))
       url = 'forest/rpc-native-query'
 
-      ForestAdminRpcAgent::Facades::Container.logger.log(
+      ForestAdminAgent::Facades::Container.logger.log(
         'Debug',
         "Forwarding native query for connection '#{connection_name}' to the Rpc agent on #{url}."
       )

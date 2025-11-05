@@ -33,8 +33,7 @@ module ForestAdminRpcAgent
 
           if status == 200
             params = request.query_parameters.merge(request.request_parameters)
-
-            [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params })]]
+            [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params, caller: headers[:caller] })]]
           else
             [status, headers, response]
           end

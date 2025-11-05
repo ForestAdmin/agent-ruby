@@ -1,3 +1,5 @@
+require 'json'
+
 module ForestAdminRpcAgent
   module Middleware
     class Authentication
@@ -19,7 +21,16 @@ module ForestAdminRpcAgent
           return [401, { 'Content-Type' => 'application/json' }, [{ error: 'Unauthorized' }.to_json]]
         end
 
-        @app.call(env)
+        status, headers, response = @app.call(env)
+
+        if request.get_header('HTTP_FOREST_CALLER')
+          caller = ForestAdminDatasourceToolkit::Components::Caller.new(
+            **(JSON.parse(request.get_header('HTTP_FOREST_CALLER')).symbolize_keys)
+          )
+          headers = headers.merge({ caller: caller })
+        end
+
+        [status, headers, response]
       end
 
       private

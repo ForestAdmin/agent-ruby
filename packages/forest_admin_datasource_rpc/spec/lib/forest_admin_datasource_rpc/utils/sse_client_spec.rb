@@ -9,7 +9,7 @@ module ForestAdminDatasourceRpc
       let(:callback) { instance_double(Proc, call: nil) }
 
       before do
-        allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
       end
 
       describe '#initialize' do

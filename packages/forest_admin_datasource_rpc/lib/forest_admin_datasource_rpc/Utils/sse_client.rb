@@ -32,7 +32,7 @@ module ForestAdminDatasourceRpc
         return if @closed
 
         @closed = true
-        ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Closing connection')
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Closing connection')
 
         # Stop reconnection thread if running
         if @reconnect_thread&.alive?
@@ -43,11 +43,11 @@ module ForestAdminDatasourceRpc
         begin
           @client&.close
         rescue StandardError => e
-          ForestAdminRpcAgent::Facades::Container.logger&.log('Debug',
-                                                              "[SSE Client] Error during close: #{e.message}")
+          ForestAdminAgent::Facades::Container.logger&.log('Debug',
+                                                           "[SSE Client] Error during close: #{e.message}")
         end
 
-        ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connection closed')
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connection closed')
       end
 
       private
@@ -67,7 +67,7 @@ module ForestAdminDatasourceRpc
           'X_SIGNATURE' => signature
         }
 
-        ForestAdminRpcAgent::Facades::Container.logger&.log(
+        ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
           "[SSE Client] Connecting to #{@uri} (attempt ##{@connection_attempts})"
         )
@@ -90,9 +90,9 @@ module ForestAdminDatasourceRpc
             end
           end
 
-          ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connected successfully')
+          ForestAdminAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connected successfully')
         rescue StandardError => e
-          ForestAdminRpcAgent::Facades::Container.logger&.log(
+          ForestAdminAgent::Facades::Container.logger&.log(
             'Error',
             "[SSE Client] Failed to connect: #{e.class} - #{e.message}"
           )
@@ -129,7 +129,7 @@ module ForestAdminDatasourceRpc
                           err.to_s
                         end
 
-        ForestAdminRpcAgent::Facades::Container.logger&.log(log_level, "[SSE Client] Error: #{error_message}")
+        ForestAdminAgent::Facades::Container.logger&.log(log_level, "[SSE Client] Error: #{error_message}")
 
         # Close client immediately to prevent ld-eventsource from reconnecting with stale credentials
         begin
@@ -153,7 +153,7 @@ module ForestAdminDatasourceRpc
 
         @reconnect_thread = Thread.new do
           delay = calculate_backoff_delay
-          ForestAdminRpcAgent::Facades::Container.logger&.log(
+          ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
             "[SSE Client] Reconnecting in #{delay} seconds..."
           )
@@ -177,19 +177,19 @@ module ForestAdminDatasourceRpc
           if @connecting
             @connecting = false
             @connection_attempts = 0
-            ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connection stable')
+            ForestAdminAgent::Facades::Container.logger&.log('Debug', '[SSE Client] Connection stable')
           end
         when 'RpcServerStop'
-          ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE Client] RpcServerStop received')
+          ForestAdminAgent::Facades::Container.logger&.log('Debug', '[SSE Client] RpcServerStop received')
           handle_rpc_stop
         else
-          ForestAdminRpcAgent::Facades::Container.logger&.log(
+          ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
             "[SSE Client] Unknown event: #{type} with payload: #{data}"
           )
         end
       rescue StandardError => e
-        ForestAdminRpcAgent::Facades::Container.logger&.log(
+        ForestAdminAgent::Facades::Container.logger&.log(
           'Error',
           "[SSE Client] Error handling event: #{e.class} - #{e.message}"
         )
@@ -198,7 +198,7 @@ module ForestAdminDatasourceRpc
       def handle_rpc_stop
         @on_rpc_stop&.call
       rescue StandardError => e
-        ForestAdminRpcAgent::Facades::Container.logger&.log(
+        ForestAdminAgent::Facades::Container.logger&.log(
           'Error',
           "[SSE Client] Error in RPC stop callback: #{e.class} - #{e.message}"
         )
