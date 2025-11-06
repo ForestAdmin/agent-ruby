@@ -108,7 +108,6 @@ module ForestAdminRpcAgent
         allow(ForestAdminDatasourceToolkit::Components::Query::FilterFactory)
           .to receive(:from_plain_object)
           .and_return(filter)
-        allow(form_response).to receive(:to_json).and_return(expected_response)
 
         collection = @datasource.get_collection(collection_name)
         allow(collection).to receive(:get_form).and_return(form_response)
@@ -121,16 +120,16 @@ module ForestAdminRpcAgent
         context 'when collection_name is provided' do
           it 'executes the action on the collection and returns the form response' do
             response = route.handle_request(args)
-            expect(response).to eq(expected_response)
+            expect(response).to eq(form_response)
           end
         end
 
         context 'when collection_name is missing' do
           let(:params) { {} }
 
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             response = route.handle_request(args)
-            expect(response).to eq('{}')
+            expect(response).to eq({})
           end
         end
       end

@@ -27,7 +27,7 @@ module ForestAdminRpcAgent
           native_query_connections: [
             { name: 'primary' }
           ]
-        }.to_json
+        }
       end
 
       before do
@@ -39,11 +39,14 @@ module ForestAdminRpcAgent
           datasource: datasource,
           datasources: [datasource_with_connections]
         )
-        allow(datasource).to receive(:collections).and_return(collections)
+        allow(datasource).to receive_messages(
+          collections: collections,
+          live_query_connections: { 'primary' => 'primary' }
+        )
       end
 
       describe '#handle_request' do
-        it 'returns the schema with sorted collections as JSON' do
+        it 'returns the schema with sorted collections' do
           result = route.handle_request({})
           expect(result).to eq(expected_schema)
         end

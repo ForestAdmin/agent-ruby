@@ -12,19 +12,15 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return '{}' unless args[:params]['collection_name']
+        return {} unless args[:params]['collection_name']
 
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
-
-        caller = ForestAdminDatasourceToolkit::Components::Caller.new(
-          **args[:params]['caller'].to_h.transform_keys(&:to_sym)
-        )
         filter = FilterFactory.from_plain_object(args[:params]['filter'])
         data = args[:params]['data']
         action = args[:params]['action']
 
-        collection.execute(caller, action, data, filter).to_json
+        collection.execute(args[:caller], action, data, filter)
       end
     end
   end

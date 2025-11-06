@@ -18,15 +18,10 @@ module ForestAdminRpcAgent
                                          .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
                                          .sort_by { |collection| collection[:name] }
 
-        connections = []
-        agent.customizer.datasources.each do |root_datasource|
-          connections = connections.union(
-            root_datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
-          )
-        end
+        connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
         schema[:native_query_connections] = connections
 
-        schema.to_json
+        schema
       end
     end
   end

@@ -42,6 +42,16 @@ RSpec.configure do |config|
         customize_error_message: nil
       }
     )
+
+    # Mock the logger for RPC datasource initialization
+    logger = instance_double(ForestAdminAgent::Services::LoggerService)
+    allow(logger).to receive(:log)
+    allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+    # Mock cache method to return auth_secret
+    allow(ForestAdminAgent::Facades::Container).to receive(:cache) do |key|
+      key == :auth_secret ? 'test_auth_secret' : nil
+    end
   end
 
   # rspec-expectations config goes here. You can use an alternate

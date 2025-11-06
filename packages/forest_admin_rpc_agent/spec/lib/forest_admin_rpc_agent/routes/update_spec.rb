@@ -17,7 +17,7 @@ module ForestAdminRpcAgent
           'collection_name' => collection_name,
           'caller' => caller.to_h,
           'filter' => filter_params,
-          'data' => update_data
+          'patch' => update_data
         }
       end
       let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
@@ -77,15 +77,15 @@ module ForestAdminRpcAgent
       describe '#handle_request' do
         context 'when collection_name is provided' do
           it 'updates the collection and returns the result as JSON' do
-            result = route.handle_request(params: params)
-            expect(result).to eq('[]')
+            result = route.handle_request(params: params, caller: caller)
+            expect(result).to eq([])
           end
         end
 
         context 'when collection_name is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: {})
-            expect(result).to eq('{}')
+            expect(result).to eq({})
           end
         end
       end

@@ -8,7 +8,7 @@ module ForestAdminRpcAgent
 
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
-      let(:data) { { 'email' => 'test@example.com', 'name' => 'John Doe' } }
+      let(:data) { [{ 'email' => 'test@example.com', 'name' => 'John Doe' }] }
       let(:create_result) { [{ 'id' => 1, 'email' => 'test@example.com', 'name' => 'John Doe' }] }
 
       let(:params) do
@@ -85,16 +85,16 @@ module ForestAdminRpcAgent
 
       describe '#handle_request' do
         context 'when collection_name is provided' do
-          it 'creates a new record and returns it as JSON' do
-            result = route.handle_request(params: params)
-            expect(result).to eq(create_result.to_json)
+          it 'creates a new record and returns it' do
+            result = route.handle_request(params: params, caller: caller)
+            expect(result).to eq(create_result)
           end
         end
 
         context 'when collection_name is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: {})
-            expect(result).to eq('{}')
+            expect(result).to eq({})
           end
         end
       end

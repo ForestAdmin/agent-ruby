@@ -10,7 +10,7 @@ ForestAdminRails::Engine.routes.draw do
             via: agent_route[:method],
             as: name,
             route_alias: name,
-            constraints: { id: /[a-zA-Z0-9\.]*+/ }
+            constraints: { id: /[a-zA-Z0-9\.\-]*+/ }
     end
   rescue StandardError => e
     if defined?(Rails) && Rails.logger

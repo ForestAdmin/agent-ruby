@@ -11,7 +11,7 @@ module ForestAdminDatasourceRpc
     describe 'build' do
       before do
         logger = instance_double(Logger, log: nil)
-        allow(ForestAdminRpcAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
+        allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
         allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
       end
 
@@ -36,9 +36,9 @@ module ForestAdminDatasourceRpc
           datasource = described_class.build({ uri: 'http://localhost' })
 
           expect(datasource).to be_a(ForestAdminDatasourceToolkit::Datasource)
-          expect(ForestAdminRpcAgent::Facades::Container.logger).to have_received(:log).with(
+          expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log).with(
             'Error',
-            'Failed to get schema from RPC agent. Please check the RPC agent is running.'
+            a_string_matching(%r{Failed to get schema from RPC agent at http://localhost.*server not running})
           )
         end
       end

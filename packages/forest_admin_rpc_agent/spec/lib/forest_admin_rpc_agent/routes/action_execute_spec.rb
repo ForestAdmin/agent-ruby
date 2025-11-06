@@ -78,16 +78,16 @@ module ForestAdminRpcAgent
         context 'when collection_name is provided' do
           it 'executes the action on the collection and returns the response' do
             response = route.handle_request(args)
-            expect(response).to eq(expected_response.to_json)
+            expect(response).to eq(expected_response)
           end
         end
 
         context 'when collection_name is missing' do
           let(:params) { {} }
 
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             response = route.handle_request(args)
-            expect(response).to eq('{}')
+            expect(response).to eq({})
           end
         end
       end

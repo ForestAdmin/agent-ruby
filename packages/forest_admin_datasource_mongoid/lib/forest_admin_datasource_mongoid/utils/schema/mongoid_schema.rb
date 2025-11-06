@@ -81,7 +81,6 @@ module ForestAdminDatasourceMongoid
             sub_prefix = prefix ? "#{prefix}.#{field}" : field
             sub_fields = schema.list_paths_matching(handle, sub_prefix)
             sub_fields.map { |sub_field| "#{field}.#{sub_field}" }
-            # debugger
             handle.call(sub_prefix, schema) ? [sub_prefix, *sub_fields] : sub_fields
           end
         end
