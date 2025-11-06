@@ -86,7 +86,7 @@ module ForestAdminRpcAgent
       describe '#handle_request' do
         context 'when collection_name is provided' do
           it 'creates a new record and returns it' do
-            result = route.handle_request(params: params)
+            result = route.handle_request(params: params, caller: caller)
             expect(result).to eq(create_result)
           end
         end
