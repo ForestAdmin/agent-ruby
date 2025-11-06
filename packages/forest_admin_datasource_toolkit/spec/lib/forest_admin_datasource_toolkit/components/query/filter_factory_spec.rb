@@ -131,6 +131,16 @@ module ForestAdminDatasourceToolkit
                   foreign_collection: 'Review',
                   through_collection: 'BookReview'
                 ),
+                'users' => ManyToManySchema.new(
+                  origin_key: 'memberable_id',
+                  origin_key_target: 'id',
+                  foreign_key: 'user_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'User',
+                  through_collection: 'Member',
+                  origin_type_field: 'memberable_type',
+                  origin_type_value: 'Book'
+                ),
                 'bookReviews' => OneToManySchema.new(
                   origin_key: 'book_id',
                   origin_key_target: 'id',
@@ -176,14 +186,42 @@ module ForestAdminDatasourceToolkit
             return collection
           end
 
+          let(:collection_user) do
+            collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'User')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true)
+              }
+            )
+
+            return collection
+          end
+
+          let(:collection_member) do
+            collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'Member')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                'memberable_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                'memberable_type' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                'user_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::PRESENT])
+              }
+            )
+
+            return collection
+          end
+
           before do
             datasource.add_collection(collection_book)
             datasource.add_collection(collection_review)
             datasource.add_collection(collection_book_review)
+            datasource.add_collection(collection_user)
+            datasource.add_collection(collection_member)
 
             allow(collection_review).to receive(:list).and_return([{ 'id' => 1 }, { 'id' => 2 }])
             allow(collection_book_review).to receive(:list).and_return([{ 'id' => 123, 'review_id' => 1 },
                                                                         { 'id' => 124, 'review_id' => 2 }])
+            allow(collection_user).to receive(:list).and_return([{ 'id' => 10 }, { 'id' => 20 }])
           end
 
           it 'nests the provided filter many to many' do
@@ -234,6 +272,26 @@ module ForestAdminDatasourceToolkit
               ).to_h
             )
           end
+
+          it 'makes two queries with polymorphic type filter [polymorphic many to many]' do
+            # Mock collection_member.list to return user_ids when called by make_foreign_filter
+            allow(collection_member).to receive(:list).and_return([{ 'user_id' => 10 }, { 'user_id' => 20 }])
+
+            base_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::EQUAL, 1),
+                                     segment: 'someSegment')
+            filter = described_class.make_through_filter(collection_book, [1], 'users', caller, base_filter)
+
+            expect(filter.condition_tree.to_h).to eq(
+              ConditionTreeBranch.new(
+                'And',
+                [
+                  ConditionTreeLeaf.new('memberable_id', Operators::EQUAL, 1),
+                  ConditionTreeLeaf.new('user_id', Operators::IN, [10, 20]),
+                  ConditionTreeLeaf.new('memberable_type', Operators::EQUAL, 'Book')
+                ]
+              ).to_h
+            )
+          end
         end
 
         context 'when call make_foreign_filter' do
@@ -264,6 +322,16 @@ module ForestAdminDatasourceToolkit
                           foreign_collection: 'Review',
                           origin_key_target: 'id',
                           origin_type_field: 'reviewable_type',
+                          origin_type_value: 'Book'
+                        ),
+                        'users' => ManyToManySchema.new(
+                          origin_key: 'memberable_id',
+                          origin_key_target: 'id',
+                          foreign_key: 'user_id',
+                          foreign_key_target: 'id',
+                          foreign_collection: 'User',
+                          through_collection: 'Member',
+                          origin_type_field: 'memberable_type',
                           origin_type_value: 'Book'
                         )
                       }
@@ -301,6 +369,29 @@ module ForestAdminDatasourceToolkit
                           foreign_key_target: 'id',
                           foreign_collection: 'Review'
                         )
+                      }
+                    }
+                  }
+                ),
+                build_collection(
+                  {
+                    name: 'User',
+                    schema: {
+                      fields: {
+                        'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true)
+                      }
+                    }
+                  }
+                ),
+                build_collection(
+                  {
+                    name: 'Member',
+                    schema: {
+                      fields: {
+                        'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                        'memberable_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER),
+                        'memberable_type' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                        'user_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER)
                       }
                     }
                   }
@@ -380,6 +471,45 @@ module ForestAdminDatasourceToolkit
                   { field: 'some_field', operator: 'equal', value: 1 },
                   { field: 'book_id', operator: 'equal', value: 1 },
                   { field: 'reviewable_type', operator: 'equal', value: 'Book' }
+                ]
+              }
+            )
+            expect(filter.segment).to eq('some-segment')
+          end
+
+          it 'query the through collection with polymorphic type filter [polymorphic many to many]' do
+            book = @datasource.get_collection('Book')
+            member = @datasource.get_collection('Member')
+            allow(member).to receive(:list).and_return([{ 'user_id' => 10 }, { 'user_id' => 20 }])
+
+            base_filter = Filter.new(
+              condition_tree: ConditionTreeLeaf.new('some_field', Operators::EQUAL, 1),
+              segment: 'some-segment'
+            )
+
+            filter = described_class.make_foreign_filter(book, [1], 'users', caller, base_filter)
+
+            # Verify that the Member (through collection) is queried with the polymorphic type condition
+            expect(member).to have_received(:list) do |_caller, through_filter|
+              expect(through_filter.condition_tree.to_h).to eq(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'memberable_id', operator: 'equal', value: 1 },
+                    { field: 'user_id', operator: 'present', value: nil },
+                    { field: 'memberable_type', operator: 'equal', value: 'Book' }
+                  ]
+                }
+              )
+            end
+
+            # Verify that the final filter includes the user IDs
+            expect(filter.condition_tree.to_h).to eq(
+              {
+                aggregator: 'And',
+                conditions: [
+                  { field: 'some_field', operator: 'equal', value: 1 },
+                  { field: 'id', operator: 'in', value: [10, 20] }
                 ]
               }
             )
