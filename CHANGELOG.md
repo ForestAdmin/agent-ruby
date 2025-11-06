@@ -1,3 +1,10 @@
+## [1.13.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.3...v1.13.4) (2025-11-06)
+
+
+### Bug Fixes
+
+* **rpc:** parse rpc caller + routes + cache ([#204](https://github.com/ForestAdmin/agent-ruby/issues/204)) ([51d7ae7](https://github.com/ForestAdmin/agent-ruby/commit/51d7ae72b8a4a81a568c71f910890ad8951b4579))
+
 ## [1.13.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.2...v1.13.3) (2025-11-05)
 
 
