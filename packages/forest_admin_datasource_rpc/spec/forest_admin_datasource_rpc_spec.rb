@@ -38,7 +38,7 @@ module ForestAdminDatasourceRpc
           expect(datasource).to be_a(ForestAdminDatasourceToolkit::Datasource)
           expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log).with(
             'Error',
-            'Failed to get schema from RPC agent. Please check the RPC agent is running.'
+            a_string_matching(%r{Failed to get schema from RPC agent at http://localhost.*server not running})
           )
         end
       end
