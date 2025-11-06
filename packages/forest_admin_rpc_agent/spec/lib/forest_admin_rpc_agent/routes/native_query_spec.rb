@@ -30,7 +30,7 @@ module ForestAdminRpcAgent
         context 'when connection_name and query are provided' do
           it 'executes the native query and returns the result' do
             result = route.handle_request(params: params)
-            expect(result).to eq(query_result.to_json)
+            expect(result).to eq(query_result)
             expect(datasource).to have_received(:execute_native_query).with(connection_name, query, binds)
           end
         end
@@ -44,17 +44,17 @@ module ForestAdminRpcAgent
         end
 
         context 'when connection_name is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: { 'query' => query })
-            expect(result).to eq('{}')
+            expect(result).to eq({})
             expect(datasource).not_to have_received(:execute_native_query)
           end
         end
 
         context 'when query is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: { 'connection_name' => connection_name })
-            expect(result).to eq('{}')
+            expect(result).to eq({})
             expect(datasource).not_to have_received(:execute_native_query)
           end
         end

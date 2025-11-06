@@ -85,16 +85,16 @@ module ForestAdminRpcAgent
 
       describe '#handle_request' do
         context 'when collection_name is provided' do
-          it 'creates a new record and returns it as JSON' do
+          it 'creates a new record and returns it' do
             result = route.handle_request(params: params)
-            expect(result).to eq(create_result.to_json)
+            expect(result).to eq(create_result)
           end
         end
 
         context 'when collection_name is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: {})
-            expect(result).to eq('{}')
+            expect(result).to eq({})
           end
         end
       end

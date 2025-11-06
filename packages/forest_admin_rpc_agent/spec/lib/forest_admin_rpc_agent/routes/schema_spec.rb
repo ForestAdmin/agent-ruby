@@ -27,7 +27,7 @@ module ForestAdminRpcAgent
           native_query_connections: [
             { name: 'primary' }
           ]
-        }.to_json
+        }
       end
 
       before do
@@ -46,7 +46,7 @@ module ForestAdminRpcAgent
       end
 
       describe '#handle_request' do
-        it 'returns the schema with sorted collections as JSON' do
+        it 'returns the schema with sorted collections' do
           result = route.handle_request({})
           expect(result).to eq(expected_schema)
         end

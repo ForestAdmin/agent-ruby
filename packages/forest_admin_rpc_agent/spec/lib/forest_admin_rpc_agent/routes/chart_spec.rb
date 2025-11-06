@@ -77,9 +77,9 @@ module ForestAdminRpcAgent
         end
 
         context 'when collection_name is missing' do
-          it 'returns an empty JSON object' do
+          it 'returns an empty hash' do
             result = route.handle_request(params: {})
-            expect(result).to eq('{}')
+            expect(result).to eq({})
           end
         end
       end

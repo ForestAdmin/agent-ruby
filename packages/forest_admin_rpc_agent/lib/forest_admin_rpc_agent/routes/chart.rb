@@ -10,13 +10,13 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return '{}' unless args[:params]['collection_name']
+        return {} unless args[:params]['collection_name']
 
         chart_name = args[:params]['chart']
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
 
-        collection.render_chart(caller, chart_name, args[:params]['record_id']).to_json
+        collection.render_chart(caller, chart_name, args[:params]['record_id'])
       end
     end
   end

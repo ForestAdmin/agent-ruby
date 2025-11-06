@@ -8,12 +8,12 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return '{}' unless args[:params]['collection_name']
+        return {} unless args[:params]['collection_name']
 
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
 
-        [collection.create(args[:caller], args[:params]['data'].first)].to_json
+        [collection.create(args[:caller], args[:params]['data'].first)]
       end
     end
   end

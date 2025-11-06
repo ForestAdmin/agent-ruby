@@ -12,7 +12,7 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return '{}' unless args[:params]['collection_name']
+        return {} unless args[:params]['collection_name']
 
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = datasource.get_collection(args[:params]['collection_name'])
@@ -22,8 +22,7 @@ module ForestAdminRpcAgent
         action = args[:params]['action']
 
         form = collection.get_form(args[:caller], action, data, filter, metas)
-        form = encode_file_element(form)
-        form.to_json
+        encode_file_element(form)
       end
 
       def encode_file_element(elements)

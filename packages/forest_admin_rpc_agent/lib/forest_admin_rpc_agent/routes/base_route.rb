@@ -20,7 +20,8 @@ module ForestAdminRpcAgent
 
       def register_sinatra(app)
         app.send(@method.to_sym, @url) do
-          handle_request(params)
+          result = handle_request(params)
+          serialize_response(result)
         end
       end
 
@@ -33,7 +34,8 @@ module ForestAdminRpcAgent
 
           if status == 200
             params = request.query_parameters.merge(request.request_parameters)
-            [200, { 'Content-Type' => 'application/json' }, [handle_request({ params: params, caller: headers[:caller] })]]
+            result = handle_request({ params: params, caller: headers[:caller] })
+            [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
           else
             [status, headers, response]
           end
@@ -45,6 +47,14 @@ module ForestAdminRpcAgent
                      via: @method,
                      as: @name,
                      route_alias: @name
+      end
+
+      private
+
+      def serialize_response(result)
+        return result if result.is_a?(String) && (result.start_with?('{', '['))
+
+        result.to_json
       end
     end
   end
