@@ -8,7 +8,7 @@ module ForestAdminRpcAgent
 
       let(:route) { described_class.new }
       let(:collection_name) { 'users' }
-      let(:data) { { 'email' => 'test@example.com', 'name' => 'John Doe' } }
+      let(:data) { [{ 'email' => 'test@example.com', 'name' => 'John Doe' }] }
       let(:create_result) { [{ 'id' => 1, 'email' => 'test@example.com', 'name' => 'John Doe' }] }
 
       let(:params) do

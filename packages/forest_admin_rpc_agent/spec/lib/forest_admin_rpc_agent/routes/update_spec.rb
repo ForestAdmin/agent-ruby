@@ -17,7 +17,7 @@ module ForestAdminRpcAgent
           'collection_name' => collection_name,
           'caller' => caller.to_h,
           'filter' => filter_params,
-          'data' => update_data
+          'patch' => update_data
         }
       end
       let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
