@@ -52,6 +52,15 @@ module ForestAdminRpcAgent
         route_classes.each do |route_name|
           route_class = ForestAdminRpcAgent::Routes.const_get(route_name)
 
+          # Skip if it's not a class or if it doesn't look like a route
+          unless route_class.is_a?(Class)
+            log_to_available_logger(
+              'Warn',
+              "Skipping constant: #{route_name} (not a class)"
+            )
+            next
+          end
+
           begin
             route_instance = route_class.new
 
@@ -64,6 +73,13 @@ module ForestAdminRpcAgent
             end
 
             route_instances << route_instance
+          rescue ArgumentError => e
+            # Skip classes that require constructor arguments (not routes)
+            log_to_available_logger(
+              'Warn',
+              "Skipping constant: #{route_name} (requires constructor arguments: #{e.message})"
+            )
+            next
           rescue StandardError => e
             raise e.class, "Failed to instantiate route '#{route_name}': #{e.message}"
           end

@@ -25,6 +25,26 @@ module ForestAdminRpcAgent
           routes = described_class.route_instances
           expect(routes).to all(respond_to(:registered))
         end
+
+        it 'handles classes that require constructor arguments gracefully' do
+          # Simulate a non-route class in the Routes namespace
+          stub_const('ForestAdminRpcAgent::Routes::NotARoute', Class.new do
+            def initialize(required_arg)
+              @required_arg = required_arg
+            end
+          end)
+
+          expect { described_class.route_instances }.not_to raise_error
+          routes = described_class.route_instances
+          expect(routes.none? { |r| r.class.name.include?('NotARoute') }).to be true
+        end
+
+        it 'handles non-class constants gracefully' do
+          # Simulate a module or other constant in the Routes namespace
+          stub_const('ForestAdminRpcAgent::Routes::SomeModule', Module.new)
+
+          expect { described_class.route_instances }.not_to raise_error
+        end
       end
 
       describe '.cached_route_instances' do
