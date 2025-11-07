@@ -89,12 +89,15 @@ module ForestAdminDatasourceToolkit
             )
           else
             through_collection = collection.datasource.get_collection(relation.through_collection)
-            through_tree = ConditionTreeFactory.intersect(
-              [
-                Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
-                Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
-              ]
-            )
+            conditions = [
+              Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+              Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
+            ]
+
+            # add polymorphic type condition if the through association is polymorphic
+            add_polymorphic_condition(conditions, relation)
+
+            through_tree = ConditionTreeFactory.intersect(conditions)
             records = through_collection.list(
               caller,
               Filter.new(condition_tree: through_tree),
@@ -141,12 +144,16 @@ module ForestAdminDatasourceToolkit
           if foreign_relation && base_foreign_filter.nestable?
             foreign_key = collection.datasource.get_collection(relation.through_collection).schema[:fields][relation.foreign_key]
             base_through_filter = base_foreign_filter.nest(foreign_relation)
-            condition_tree = ConditionTreeFactory.intersect(
-              [
-                Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
-                base_through_filter.condition_tree
-              ]
-            )
+
+            conditions = [
+              Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+              base_through_filter.condition_tree
+            ]
+
+            # add polymorphic type condition if the through association is polymorphic
+            add_polymorphic_condition(conditions, relation)
+
+            condition_tree = ConditionTreeFactory.intersect(conditions)
 
             if foreign_key.type == 'Column' && foreign_key.filter_operators.include?(Operators::PRESENT)
               present = Nodes::ConditionTreeLeaf.new(relation.foreign_key, Operators::PRESENT)
@@ -165,20 +172,33 @@ module ForestAdminDatasourceToolkit
             Projection.new([relation.foreign_key_target])
           )
 
-          Filter.new(
-            condition_tree: ConditionTreeFactory.intersect(
-              [
-                # only children of parent
-                Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
+          conditions = [
+            # only children of parent
+            Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::EQUAL, origin_value),
 
-                # only the children which match the conditions in baseForeignFilter
-                Nodes::ConditionTreeLeaf.new(
-                  relation.foreign_key,
-                  Operators::IN,
-                  records.map { |r| r[relation.foreign_key_target] }
-                )
-              ]
+            # only the children which match the conditions in baseForeignFilter
+            Nodes::ConditionTreeLeaf.new(
+              relation.foreign_key,
+              Operators::IN,
+              records.map { |r| r[relation.foreign_key_target] }
             )
+          ]
+
+          # add polymorphic type condition if the through association is polymorphic
+          add_polymorphic_condition(conditions, relation)
+
+          Filter.new(condition_tree: ConditionTreeFactory.intersect(conditions))
+        end
+
+        def self.add_polymorphic_condition(conditions, relation)
+          return conditions unless relation.respond_to?(:origin_type_field) &&
+                                   relation.origin_type_field &&
+                                   relation.origin_type_value
+
+          conditions << Nodes::ConditionTreeLeaf.new(
+            relation.origin_type_field,
+            Operators::EQUAL,
+            relation.origin_type_value
           )
         end
       end
