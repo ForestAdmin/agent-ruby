@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.4...v1.14.0) (2025-11-07)
+
+
+### Features
+
+* add caching routes for rpc agent ([#207](https://github.com/ForestAdmin/agent-ruby/issues/207)) ([c142370](https://github.com/ForestAdmin/agent-ruby/commit/c142370ba7303289bb697dbbb7b063d149f23b5c))
+
 ## [1.13.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.3...v1.13.4) (2025-11-06)
 
 
