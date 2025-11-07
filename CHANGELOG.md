@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.0...v1.14.1) (2025-11-07)
+
+
+### Bug Fixes
+
+* add polymorphic type filter for has_many :through associations ([#206](https://github.com/ForestAdmin/agent-ruby/issues/206)) ([2e83084](https://github.com/ForestAdmin/agent-ruby/commit/2e830843761e91695e33ce5dadb88b7e1851af1b))
+
 # [1.14.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.13.4...v1.14.0) (2025-11-07)
 
 
