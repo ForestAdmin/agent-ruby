@@ -1,6 +1,7 @@
 module ForestAdminDatasourceCustomizer
   class CollectionCustomizer
     include ForestAdminDatasourceToolkit::Validations
+    include DSL::CollectionHelpers
     attr_reader :datasource_customizer, :stack, :name
 
     def initialize(datasource_customizer, stack, name)
