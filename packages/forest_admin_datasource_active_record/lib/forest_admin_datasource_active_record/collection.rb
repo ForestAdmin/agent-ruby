@@ -208,6 +208,12 @@ module ForestAdminDatasourceActiveRecord
             )
           )
         end
+      rescue StandardError => e
+        logger = ActiveSupport::Logger.new($stdout)
+        logger.warn(
+          "[ForestAdmin] Unable to process association '#{association.name}' " \
+          "in model '#{@model.name}': #{e.message}. Skipping this association."
+        )
       end
     end
     # rubocop:enable Metrics/BlockNesting

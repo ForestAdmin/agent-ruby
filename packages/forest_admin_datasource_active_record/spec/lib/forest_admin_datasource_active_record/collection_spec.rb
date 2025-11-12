@@ -50,6 +50,44 @@ module ForestAdminDatasourceActiveRecord
 
           expect(collection.schema[:fields]['account_history'].class).to eq(Relations::ManyToManySchema)
         end
+
+        it 'skips association when foreign_key raises an error' do
+          stub_const('ModelWithBrokenAssociation', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.abstract_class = true
+
+            belongs_to :broken_relation, class_name: 'User'
+          end)
+
+          association = ModelWithBrokenAssociation.reflect_on_association(:broken_relation)
+          allow(association).to receive(:foreign_key).and_raise(StandardError.new('undefined method for nil'))
+
+          expect do
+            described_class.new(datasource, ModelWithBrokenAssociation)
+          end.not_to raise_error
+
+          collection = described_class.new(datasource, ModelWithBrokenAssociation)
+          expect(collection.schema[:fields].keys).not_to include('broken_relation')
+        end
+
+        it 'skips association when inverse_of raises an error' do
+          stub_const('ModelWithBrokenInverse', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.abstract_class = true
+
+            has_many :broken_has_many, class_name: 'User'
+          end)
+
+          association = ModelWithBrokenInverse.reflect_on_association(:broken_has_many)
+          allow(association).to receive(:inverse_of).and_raise(StandardError.new('inverse_of failed'))
+
+          expect do
+            described_class.new(datasource, ModelWithBrokenInverse)
+          end.not_to raise_error
+
+          collection = described_class.new(datasource, ModelWithBrokenInverse)
+          expect(collection.schema[:fields].keys).not_to include('broken_has_many')
+        end
       end
     end
 

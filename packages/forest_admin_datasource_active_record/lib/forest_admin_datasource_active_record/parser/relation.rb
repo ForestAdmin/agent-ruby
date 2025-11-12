@@ -15,6 +15,8 @@ module ForestAdminDatasourceActiveRecord
       def polymorphic?(association)
         (association.options.key?(:polymorphic) && association.options[:polymorphic]) ||
           association.inverse_of&.polymorphic?
+      rescue StandardError
+        false
       end
 
       def get_class(association)
