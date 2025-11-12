@@ -1,3 +1,10 @@
+## [1.14.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.1...v1.14.2) (2025-11-12)
+
+
+### Bug Fixes
+
+* handle errors gracefully when processing active record associations ([#209](https://github.com/ForestAdmin/agent-ruby/issues/209)) ([ee146a4](https://github.com/ForestAdmin/agent-ruby/commit/ee146a4a34916d6e2ee7ae3d2244d4b43acae71a))
+
 ## [1.14.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.0...v1.14.1) (2025-11-07)
 
 
