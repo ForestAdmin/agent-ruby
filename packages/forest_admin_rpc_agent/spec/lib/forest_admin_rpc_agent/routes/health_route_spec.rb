@@ -20,12 +20,12 @@ module ForestAdminRpcAgent
       end
 
       describe '#handle_request' do
-        it 'returns a hash with status 204 and nil content' do
+        it 'returns a hash with error null and running message' do
           result = route.handle_request({})
 
           expect(result).to be_a(Hash)
-          expect(result[:status]).to eq(204)
-          expect(result[:content]).to be_nil
+          expect(result[:error]).to be_nil
+          expect(result[:message]).to eq('Agent is running')
         end
       end
     end

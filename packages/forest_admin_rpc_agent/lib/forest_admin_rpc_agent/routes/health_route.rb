@@ -6,7 +6,7 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(_params)
-        { content: nil, status: 204 }
+        { error: nil, message: 'Agent is running' }
       end
     end
   end

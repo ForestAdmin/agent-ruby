@@ -14,7 +14,7 @@ module ForestAdminRpcAgent
     # Test health route class that implements handle_request
     class TestHealthRoute < BaseRoute
       def handle_request(_params)
-        { status: 204, content: nil }
+        { error: nil, message: 'Agent is running' }
       end
     end
 

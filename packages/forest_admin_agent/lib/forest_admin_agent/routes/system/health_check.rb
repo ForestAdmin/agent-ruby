@@ -10,7 +10,7 @@ module ForestAdminAgent
         end
 
         def handle_request(_args = {})
-          { content: nil, status: 204 }
+          { content: { error: nil, message: 'Agent is running' }, status: 200 }
         end
       end
     end

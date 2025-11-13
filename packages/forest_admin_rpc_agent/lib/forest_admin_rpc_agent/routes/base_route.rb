@@ -39,7 +39,7 @@ module ForestAdminRpcAgent
           if @url == '/'
             params = request.query_parameters.merge(request.request_parameters)
             result = handle_request({ params: params, caller: nil })
-            [result[:status], {}, ['']]
+            [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
           else
             auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
             status, headers, response = auth_middleware.call(request.env)
