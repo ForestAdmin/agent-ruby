@@ -1,3 +1,10 @@
+## [1.14.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.2...v1.14.3) (2025-11-14)
+
+
+### Bug Fixes
+
+* **rpc_route:** align health check with forest_admin_agent behavior ([#210](https://github.com/ForestAdmin/agent-ruby/issues/210)) ([1e2746a](https://github.com/ForestAdmin/agent-ruby/commit/1e2746ae2ddfdcee7c8140bb559a93b45c77d709))
+
 ## [1.14.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.1...v1.14.2) (2025-11-12)
 
 
