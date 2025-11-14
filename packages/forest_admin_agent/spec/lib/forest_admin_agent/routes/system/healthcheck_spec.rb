@@ -8,10 +8,10 @@ module ForestAdminAgent
         subject(:healthcheck) { described_class.new }
 
         context 'when testing the HealthCheck class' do
-          it 'returns an empty content and a 204 status' do
+          it 'returns agent running message with 200 status' do
             result = healthcheck.handle_request
-            expect(result[:content]).to be_nil
-            expect(result[:status]).to eq 204
+            expect(result[:content]).to eq({ error: nil, message: 'Agent is running' })
+            expect(result[:status]).to eq 200
           end
 
           it 'adds the route forest' do

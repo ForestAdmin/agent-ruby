@@ -4,8 +4,22 @@ require 'action_dispatch'
 
 module ForestAdminRpcAgent
   module Routes
+    # Test route class that implements handle_request
+    class TestRoute < BaseRoute
+      def handle_request(_params)
+        { test: 'data' }
+      end
+    end
+
+    # Test health route class that implements handle_request
+    class TestHealthRoute < BaseRoute
+      def handle_request(_params)
+        { error: nil, message: 'Agent is running' }
+      end
+    end
+
     describe BaseRoute do
-      subject(:route) { described_class.new('/test', 'get', 'test_route') }
+      subject(:route) { TestRoute.new('/test', 'get', 'test_route') }
 
       describe '#initialize' do
         it 'sets the correct attributes' do
@@ -73,6 +87,38 @@ module ForestAdminRpcAgent
             as: 'test_route',
             route_alias: 'test_route'
           )
+        end
+
+        context 'when the route is a health check (root path)' do
+          subject(:health_route) { TestHealthRoute.new('/', 'get', 'health') }
+
+          it 'registers the route with / path' do
+            health_route.send(:register_rails, rails_router)
+
+            expect(rails_router).to have_received(:match).with(
+              '/',
+              defaults: { format: 'json' },
+              to: kind_of(Proc),
+              via: 'get',
+              as: 'health',
+              route_alias: 'health'
+            )
+          end
+        end
+
+        context 'when the route is not a health check' do
+          it 'registers the route with authentication' do
+            route.send(:register_rails, rails_router)
+
+            expect(rails_router).to have_received(:match).with(
+              '/test',
+              defaults: { format: 'json' },
+              to: kind_of(Proc),
+              via: 'get',
+              as: 'test_route',
+              route_alias: 'test_route'
+            )
+          end
         end
       end
     end

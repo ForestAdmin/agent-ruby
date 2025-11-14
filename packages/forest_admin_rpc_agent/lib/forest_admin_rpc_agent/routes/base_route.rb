@@ -21,7 +21,13 @@ module ForestAdminRpcAgent
       def register_sinatra(app)
         app.send(@method.to_sym, @url) do
           result = handle_request(params)
-          serialize_response(result)
+
+          if result.is_a?(Hash) && result.key?(:status)
+            status result[:status]
+            result[:content] ? serialize_response(result[:content]) : ''
+          else
+            serialize_response(result)
+          end
         end
       end
 
@@ -29,15 +35,22 @@ module ForestAdminRpcAgent
         handler = proc do |hash|
           request = ActionDispatch::Request.new(hash)
 
-          auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
-          status, headers, response = auth_middleware.call(request.env)
-
-          if status == 200
+          # Skip authentication for health check (root path)
+          if @url == '/'
             params = request.query_parameters.merge(request.request_parameters)
-            result = handle_request({ params: params, caller: headers[:caller] })
+            result = handle_request({ params: params, caller: nil })
             [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
           else
-            [status, headers, response]
+            auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
+            status, headers, response = auth_middleware.call(request.env)
+
+            if status == 200
+              params = request.query_parameters.merge(request.request_parameters)
+              result = handle_request({ params: params, caller: headers[:caller] })
+              [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+            else
+              [status, headers, response]
+            end
           end
         end
 
