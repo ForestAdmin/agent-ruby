@@ -240,6 +240,9 @@ module ForestAdminDatasourceCustomizer
 
         def re_project_relation_in_place(caller, records, name, projection)
           field_schema = schema[:fields][name]
+
+          return if field_schema.type == 'PolymorphicManyToOne'
+
           association = datasource.get_collection(field_schema.foreign_collection)
 
           if !@relations[name]
