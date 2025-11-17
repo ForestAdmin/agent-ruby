@@ -290,6 +290,31 @@ module ForestAdminAgent
           end
         end
 
+        describe 'chart (DSL method)' do
+          it 'provides a fluent DSL for creating charts' do
+            instance = described_class.instance
+            allow(instance.customizer).to receive(:add_chart)
+
+            result = instance.chart :appointments do
+              value 784, 760
+            end
+
+            expect(instance.customizer).to have_received(:add_chart).with('appointments')
+            expect(result).to eq(instance)
+          end
+
+          it 'converts symbol names to strings' do
+            instance = described_class.instance
+            allow(instance.customizer).to receive(:add_chart)
+
+            instance.chart :my_chart do
+              value 123
+            end
+
+            expect(instance.customizer).to have_received(:add_chart).with('my_chart')
+          end
+        end
+
         describe 'format_schema_json' do
           it 'collapses single-element arrays onto one line' do
             instance = described_class.instance
