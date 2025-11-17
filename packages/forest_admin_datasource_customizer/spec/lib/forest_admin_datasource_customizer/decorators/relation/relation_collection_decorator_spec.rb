@@ -63,6 +63,22 @@ module ForestAdminDatasourceCustomizer
             }
           ]
         end
+        let(:address_records) do
+          [
+            {
+              'id' => 401,
+              'street' => '123 Main St',
+              'addressable_id' => 201,
+              'addressable_type' => 'person'
+            },
+            {
+              'id' => 402,
+              'street' => '456 Oak Ave',
+              'addressable_id' => 202,
+              'addressable_type' => 'person'
+            }
+          ]
+        end
 
         before do
           datasource = Datasource.new
@@ -102,13 +118,40 @@ module ForestAdminDatasourceCustomizer
             aggregation.apply(passport_records, caller.timezone, limit)
           end
 
+          collection_address = build_collection(
+            name: 'address',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
+                'street' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                'addressable_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::IN]),
+                'addressable_type' => ColumnSchema.new(column_type: PrimitiveType::STRING)
+              }
+            },
+            datasource: datasource
+          )
+
+          allow(collection_address).to receive(:list) do |_caller, filter, projection|
+            result = ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(address_records, :to_s)
+            result = filter.condition_tree.apply(result, collection_address, 'Europe/Paris') if filter&.condition_tree
+
+            projection.apply(result)
+          end
+
           collection_person = build_collection(
             name: 'person',
             schema: {
               fields: {
                 'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
                 'other_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::IN]),
-                'name' => ColumnSchema.new(column_type: PrimitiveType::STRING, filter_operators: [Operators::IN])
+                'name' => ColumnSchema.new(column_type: PrimitiveType::STRING, filter_operators: [Operators::IN]),
+                'address' => Relations::PolymorphicOneToOneSchema.new(
+                  origin_key: 'addressable_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'address',
+                  origin_type_field: 'addressable_type',
+                  origin_type_value: 'person'
+                )
               }
             },
             datasource: datasource
@@ -153,6 +196,7 @@ module ForestAdminDatasourceCustomizer
 
           datasource.add_collection(collection_picture)
           datasource.add_collection(collection_passport)
+          datasource.add_collection(collection_address)
           datasource.add_collection(collection_person)
           datasource.add_collection(collection_comment)
 
@@ -653,7 +697,7 @@ module ForestAdminDatasourceCustomizer
           end
 
           context 'with polymorphic relations' do
-            it 'handles polymorphic relations without error' do
+            it 'handles PolymorphicManyToOne without error' do
               records = @datasource_decorator.get_collection('comment').list(
                 caller,
                 Filter.new,
@@ -664,6 +708,18 @@ module ForestAdminDatasourceCustomizer
                                       { 'id' => 301, 'text' => 'Great!', 'commentable' => { 'commentable_id' => 101 } },
                                       { 'id' => 302, 'text' => 'Nice', 'commentable' => { 'commentable_id' => 201 } }
                                     ])
+            end
+
+            it 'handles PolymorphicOneToOne without error' do
+              records = @datasource_decorator.get_collection('person').list(
+                caller,
+                Filter.new,
+                Projection.new(%w[id name address:street])
+              )
+
+              expect(records.length).to eq(3)
+              expect(records.first).to have_key('id')
+              expect(records.first).to have_key('name')
             end
           end
         end
