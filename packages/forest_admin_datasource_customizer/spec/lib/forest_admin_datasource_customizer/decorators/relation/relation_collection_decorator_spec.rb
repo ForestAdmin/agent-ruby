@@ -45,6 +45,24 @@ module ForestAdminDatasourceCustomizer
             { 'id' => 203, 'other_id' => 203, 'name' => 'Joseph P. Rodriguez' }
           ]
         end
+        let(:comment_records) do
+          [
+            {
+              'id' => 301,
+              'text' => 'Great!',
+              'commentable_id' => 101,
+              'commentable_type' => 'passport',
+              'commentable' => { 'commentable_id' => 101, 'commentable_type' => 'passport' }
+            },
+            {
+              'id' => 302,
+              'text' => 'Nice',
+              'commentable_id' => 201,
+              'commentable_type' => 'person',
+              'commentable' => { 'commentable_id' => 201, 'commentable_type' => 'person' }
+            }
+          ]
+        end
 
         before do
           datasource = Datasource.new
@@ -107,9 +125,36 @@ module ForestAdminDatasourceCustomizer
             aggregation.apply(person_records, caller.timezone, limit)
           end
 
+          collection_comment = build_collection(
+            name: 'comment',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true, filter_operators: [Operators::EQUAL, Operators::IN]),
+                'text' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                'commentable_id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, filter_operators: [Operators::IN]),
+                'commentable_type' => ColumnSchema.new(column_type: PrimitiveType::STRING),
+                'commentable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'commentable_type',
+                  foreign_key: 'commentable_id',
+                  foreign_key_targets: { 'passport' => 'id', 'person' => 'id' },
+                  foreign_collections: %w[passport person]
+                )
+              }
+            },
+            datasource: datasource
+          )
+
+          allow(collection_comment).to receive(:list) do |_caller, filter, projection|
+            result = ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(comment_records, :to_s)
+            result = filter.condition_tree.apply(result, collection_comment, 'Europe/Paris') if filter&.condition_tree
+
+            projection.apply(result)
+          end
+
           datasource.add_collection(collection_picture)
           datasource.add_collection(collection_passport)
           datasource.add_collection(collection_person)
+          datasource.add_collection(collection_comment)
 
           @datasource_decorator = DatasourceDecorator.new(datasource, relation_collection_decorator)
         end
@@ -604,6 +649,21 @@ module ForestAdminDatasourceCustomizer
                                        { value: 1, group: { 'passport:picture:filename' => 'pic1.jpg' } }
                                      ])
               end
+            end
+          end
+
+          context 'with polymorphic relations' do
+            it 'handles polymorphic relations without error' do
+              records = @datasource_decorator.get_collection('comment').list(
+                caller,
+                Filter.new,
+                Projection.new(%w[id text commentable:commentable_id])
+              )
+
+              expect(records).to eq([
+                                      { 'id' => 301, 'text' => 'Great!', 'commentable' => { 'commentable_id' => 101 } },
+                                      { 'id' => 302, 'text' => 'Nice', 'commentable' => { 'commentable_id' => 201 } }
+                                    ])
             end
           end
         end
