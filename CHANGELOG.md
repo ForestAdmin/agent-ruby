@@ -1,3 +1,10 @@
+## [1.14.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.3...v1.14.4) (2025-11-25)
+
+
+### Bug Fixes
+
+* prevent error accessing foreign_collection on polymorphic relations ([#211](https://github.com/ForestAdmin/agent-ruby/issues/211)) ([3d98753](https://github.com/ForestAdmin/agent-ruby/commit/3d98753a7fbf42bdf97869e652e57a62828a3ebe))
+
 ## [1.14.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.2...v1.14.3) (2025-11-14)
 
 
