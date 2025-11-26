@@ -3,11 +3,8 @@
 
 module ForestAdminRpcAgent
   class CreateRpcAgent
-    include ForestAdminDatasourceToolkit::Components::Query
-    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-    include ForestAdminDatasourceCustomizer::Decorators::Action
-    include ForestAdminDatasourceCustomizer::Decorators::Action::Types
-    include ForestAdminDatasourceCustomizer::Decorators::Action::Context
+    # Single include brings all commonly-used Forest Admin types
+    include ForestAdmin::Types
 
     def self.setup!
       datasource = ForestAdminDatasourceActiveRecord::Datasource.new(Rails.env.to_sym)
@@ -18,10 +15,10 @@ module ForestAdminRpcAgent
         collection.add_chart('groupByManufacturer') do |context, result_builder|
           aggregation = Aggregation.new(operation: 'Count', field: 'manufacturer:id')
           filter = Filter.new(
-            condition_tree: Nodes::ConditionTreeBranch.new(
+            condition_tree: ConditionTreeBranch.new(
               'And',
               [
-                Nodes::ConditionTreeLeaf.new('manufacturer:id', Operators::PRESENT),
+                ConditionTreeLeaf.new('manufacturer:id', Operators::PRESENT),
               ]
             )
           )
