@@ -4,6 +4,7 @@ require 'forest_admin_rails/engine'
 require 'zeitwerk'
 require 'rails/railtie'
 require 'forest_admin_agent'
+require_relative 'forest_admin/types'
 
 loader = Zeitwerk::Loader.for_gem
 loader.ignore("#{__dir__}/generators")
