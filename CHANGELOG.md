@@ -1,3 +1,10 @@
+## [1.15.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.0...v1.15.1) (2025-11-26)
+
+
+### Bug Fixes
+
+* auto-create virtual models for HABTM join tables with id column ([#213](https://github.com/ForestAdmin/agent-ruby/issues/213)) ([bd523e8](https://github.com/ForestAdmin/agent-ruby/commit/bd523e884b5a526186acfed7cd6839b1af7e5ce6))
+
 # [1.15.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.4...v1.15.0) (2025-11-26)
 
 
