@@ -1,5 +1,10 @@
 # frozen_string_literal: true
 
+# Ensure dependencies are fully loaded before referencing their constants
+require 'forest_admin_datasource_toolkit'
+require 'forest_admin_datasource_customizer'
+require 'forest_admin_agent'
+
 # ForestAdmin::Types provides a convenient way to access commonly-used classes
 # from ForestAdmin packages without requiring multiple includes.
 #
