@@ -196,6 +196,7 @@ module ForestAdminDatasourceActiveRecord
             end
           end
         when :has_and_belongs_to_many
+          through_collection_name = resolve_habtm_through_collection(association)
           add_field(
             association.name.to_s,
             ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
@@ -204,7 +205,7 @@ module ForestAdminDatasourceActiveRecord
               origin_key_target: association.join_foreign_key,
               foreign_key: association.association_foreign_key,
               foreign_key_target: association.association_primary_key,
-              through_collection: association.join_table.classify
+              through_collection: through_collection_name
             )
           )
         end
@@ -217,6 +218,62 @@ module ForestAdminDatasourceActiveRecord
       end
     end
     # rubocop:enable Metrics/BlockNesting
+
+    def resolve_habtm_through_collection(association)
+      join_table = association.join_table.to_s
+      through_model_name = association.join_table.classify
+
+      # Check if the join table exists and has an 'id' column
+      if ActiveRecord::Base.connection.table_exists?(join_table)
+        columns = ActiveRecord::Base.connection.columns(join_table)
+        has_id_column = columns.any? { |col| col.name == 'id' }
+
+        if has_id_column
+          begin
+            through_model_name.constantize
+          rescue NameError
+            create_virtual_habtm_model(association, through_model_name)
+          end
+        end
+      end
+
+      format_model_name(through_model_name)
+    end
+
+    def create_virtual_habtm_model(association, model_name)
+      parent_module = @model.name.deconstantize
+
+      # Create the model class dynamically and assign to constant
+      klass = if parent_module.empty?
+                # Create in global namespace
+                Object.const_set(model_name, Class.new(ActiveRecord::Base))
+              else
+                # Create in parent module namespace
+                parent_module_obj = parent_module.constantize
+                parent_module_obj.const_set(model_name.demodulize, Class.new(ActiveRecord::Base))
+              end
+
+      klass.table_name = association.join_table
+
+      # Mark this as a virtual through collection so datasource doesn't try to add it again
+      klass.const_set(:VIRTUAL_THROUGH_COLLECTION, true)
+
+      # add associations
+      klass.belongs_to association.active_record.name.demodulize.underscore.to_sym,
+                       class_name: association.active_record.name,
+                       foreign_key: association.join_foreign_key
+      klass.belongs_to association.name.to_s.singularize.to_sym,
+                       class_name: association.klass.name,
+                       foreign_key: association.association_foreign_key
+
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.info(
+        "[ForestAdmin] Created virtual model '#{model_name}' for HABTM join table '#{association.join_table}' " \
+        'with id column. This allows proper handling of the many-to-many relationship.'
+      )
+
+      klass
+    end
 
     def warn_missing_polymorphic_columns(association)
       missing_columns = []

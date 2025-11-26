@@ -88,6 +88,56 @@ module ForestAdminDatasourceActiveRecord
           collection = described_class.new(datasource, ModelWithBrokenInverse)
           expect(collection.schema[:fields].keys).not_to include('broken_has_many')
         end
+
+        context 'when has_and_belongs_to_many with id column in join table' do
+          it 'creates virtual model and adds relation' do
+            collection = described_class.new(datasource, Author)
+
+            expect(collection.schema[:fields].keys).to include('books')
+            expect(collection.schema[:fields]['books'].class).to eq(Relations::ManyToManySchema)
+          end
+
+          it 'creates virtual model with correct through_collection name' do
+            collection = described_class.new(datasource, Author)
+
+            books_relation = collection.schema[:fields]['books']
+            expect(books_relation.through_collection).to eq('AuthorsBook')
+          end
+
+          it 'virtual model is constantizable' do
+            described_class.new(datasource, Author)
+
+            expect { 'AuthorsBook'.constantize }.not_to raise_error
+            expect(AuthorsBook.table_name).to eq('authors_books')
+          end
+
+          it 'virtual model has belongs_to associations' do
+            described_class.new(datasource, Author)
+
+            author_association = AuthorsBook.reflect_on_association(:author)
+            book_association = AuthorsBook.reflect_on_association(:book)
+
+            expect(author_association).not_to be_nil
+            expect(author_association.macro).to eq(:belongs_to)
+            expect(author_association.class_name).to eq('Author')
+
+            expect(book_association).not_to be_nil
+            expect(book_association.macro).to eq(:belongs_to)
+            expect(book_association.class_name).to eq('Book')
+          end
+
+          it 'does not recreate virtual model if already exists' do
+            # First creation
+            described_class.new(datasource, Author)
+            first_class_object_id = AuthorsBook.object_id
+
+            # Second creation should reuse existing model
+            described_class.new(datasource, Book)
+            second_class_object_id = AuthorsBook.object_id
+
+            expect(first_class_object_id).to eq(second_class_object_id)
+          end
+        end
       end
     end
 
