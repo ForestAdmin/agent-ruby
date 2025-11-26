@@ -1,10 +1,5 @@
 module ForestAdminRails
   class CreateAgent
-    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
-    include ForestAdminDatasourceCustomizer::Decorators::Action
-    include ForestAdminDatasourceCustomizer::Decorators::Action::Types
-    include ForestAdminDatasourceCustomizer::Decorators::Computed
-
     def self.setup!
       datasource = ForestAdminDatasourceActiveRecord::Datasource.new(
         Rails.env.to_sym,
@@ -25,23 +20,20 @@ module ForestAdminRails
         })
                                                       # .add_datasource(mongo_datasource)
 
-      # @agent.add_chart('appointments') do |_context, result_builder|
-      #   result_builder.objective(235, 300)
-      # end
       customize
       @agent.build
     end
 
     def self.customize
-      @agent.add_chart('appointments') do |context, result_builder|
-        ds = context.datasource.get_collection('Customer')
-        puts ds
-        result_builder.value(784, 760)
+      # Add a chart at the datasource level (new DSL syntax)
+      @agent.chart :appointments do
+        value 784, 760
       end
-      @agent.customize_collection('Customer') do |collection|
+
+      # Customize the Customer collection (new DSL syntax)
+      @agent.collection :Customer do |collection|
+        # Rename fields
         collection.rename_field('lastname', 'last_name')
-      end
-      @agent.remove_collection('Customer')
     end
   end
 end
