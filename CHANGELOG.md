@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.4...v1.15.0) (2025-11-26)
+
+
+### Features
+
+* export Forest Admin types as a single module ([#212](https://github.com/ForestAdmin/agent-ruby/issues/212)) ([b1b771e](https://github.com/ForestAdmin/agent-ruby/commit/b1b771e30003f9796b992a0d56822cf2d283c6b7))
+
 ## [1.14.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.14.3...v1.14.4) (2025-11-25)
 
 
