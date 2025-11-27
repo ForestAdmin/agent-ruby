@@ -10,7 +10,7 @@ module ForestAdminDatasourceCustomizer
     #     field :age, type: :number
     #     field :photo, type: :file
     #
-    #     section do
+    #     page do
     #       field :address, type: :string
     #       field :city, type: :string
     #     end
@@ -50,23 +50,30 @@ module ForestAdminDatasourceCustomizer
         @fields << field_def
       end
 
-      # Add a section/page layout to group fields
-      # @param component [String] layout component type
+      # Add a page layout to group fields
       # @param block [Proc] block containing nested fields
-      def section(component: 'Page', &block)
-        section_builder = FormBuilder.new
-        section_builder.instance_eval(&block)
+      def page(&block)
+        page_builder = FormBuilder.new
+        page_builder.instance_eval(&block)
 
         @fields << {
           type: 'Layout',
-          component: component,
-          elements: section_builder.fields
+          component: 'Page',
+          elements: page_builder.fields
         }
       end
 
-      # Alias for section with Row component
+      # Add a row layout to arrange fields horizontally
+      # @param block [Proc] block containing nested fields
       def row(&block)
-        section(component: 'Row', &block)
+        row_builder = FormBuilder.new
+        row_builder.instance_eval(&block)
+
+        @fields << {
+          type: 'Layout',
+          component: 'Row',
+          fields: row_builder.fields
+        }
       end
 
       # Add a separator

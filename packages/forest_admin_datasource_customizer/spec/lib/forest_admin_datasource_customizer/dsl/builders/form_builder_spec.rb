@@ -99,31 +99,21 @@ module ForestAdminDatasourceCustomizer
         end
       end
 
-      describe '#section' do
-        it 'creates a section with nested fields' do
+      describe '#page' do
+        it 'creates a page with nested fields' do
           builder = described_class.new
-          builder.section do
+          builder.page do
             field :address, type: :string
             field :city, type: :string
             field :zip, type: :string
           end
 
           expect(builder.fields.length).to eq(1)
-          section = builder.fields[0]
-          expect(section[:type]).to eq('Layout')
-          expect(section[:component]).to eq('Page')
-          expect(section[:elements].length).to eq(3)
-          expect(section[:elements][0][:label]).to eq('address')
-        end
-
-        it 'accepts custom component' do
-          builder = described_class.new
-          builder.section(component: 'CustomComponent') do
-            field :field1, type: :string
-          end
-
-          section = builder.fields[0]
-          expect(section[:component]).to eq('CustomComponent')
+          page = builder.fields[0]
+          expect(page[:type]).to eq('Layout')
+          expect(page[:component]).to eq('Page')
+          expect(page[:elements].length).to eq(3)
+          expect(page[:elements][0][:label]).to eq('address')
         end
       end
 
@@ -139,7 +129,7 @@ module ForestAdminDatasourceCustomizer
           row = builder.fields[0]
           expect(row[:type]).to eq('Layout')
           expect(row[:component]).to eq('Row')
-          expect(row[:elements].length).to eq(2)
+          expect(row[:fields].length).to eq(2)
         end
       end
 
@@ -178,7 +168,7 @@ module ForestAdminDatasourceCustomizer
             field :email, type: :string, widget: 'TextInput'
             field :age, type: :number
             separator
-            section do
+            page do
               field :address, type: :string
               field :city, type: :string
               row { field :state, type: :string; field :zip, type: :string }
