@@ -108,7 +108,7 @@ module ForestAdminDatasourceCustomizer
               field :country, type: :string, widget: 'Dropdown',
                               options: [{ label: 'US', value: 'us' }]
 
-              section do
+              page do
                 field :address, type: :string
                 field :city, type: :string
               end
