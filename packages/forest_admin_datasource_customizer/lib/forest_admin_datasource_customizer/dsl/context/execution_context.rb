@@ -105,15 +105,6 @@ module ForestAdminDatasourceCustomizer
       def redirect(path)
         @result = @result_builder.redirect_to(path: path)
       end
-
-      # Set a response header
-      # @param key [String] header name
-      # @param value [String] header value
-      # @return [ExecutionContext] self for chaining
-      def set_header(key, value)
-        @result_builder.set_header(key, value)
-        self
-      end
     end
   end
 end

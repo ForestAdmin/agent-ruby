@@ -202,26 +202,6 @@ module ForestAdminDatasourceCustomizer
           expect(result).to eq(expected_result)
         end
       end
-
-      describe '#set_header' do
-        it 'sets a response header and returns self' do
-          allow(result_builder).to receive(:set_header).with('Content-Type', 'application/json')
-
-          result = execution_context.set_header('Content-Type', 'application/json')
-          expect(result).to eq(execution_context)
-        end
-
-        it 'allows chaining' do
-          allow(result_builder).to receive(:set_header).with('X-Custom-1', 'value1')
-          allow(result_builder).to receive(:set_header).with('X-Custom-2', 'value2')
-
-          execution_context
-            .set_header('X-Custom-1', 'value1')
-            .set_header('X-Custom-2', 'value2')
-          expect(result_builder).to have_received(:set_header).with('X-Custom-1', 'value1')
-          expect(result_builder).to have_received(:set_header).with('X-Custom-2', 'value2')
-        end
-      end
     end
   end
 end
