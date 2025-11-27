@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative 'chart_builder'
+require_relative '../builders/chart_builder'
 
 module ForestAdminDatasourceCustomizer
   module DSL
