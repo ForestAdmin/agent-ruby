@@ -34,6 +34,7 @@ module ForestAdminRails
       @agent.collection :Customer do |collection|
         # Rename fields
         collection.rename_field('lastname', 'last_name')
+      end
     end
   end
 end
