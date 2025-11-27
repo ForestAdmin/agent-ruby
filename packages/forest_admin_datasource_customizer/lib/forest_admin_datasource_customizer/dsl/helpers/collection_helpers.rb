@@ -220,24 +220,6 @@ module ForestAdminDatasourceCustomizer
         remove_field(*field_names.map(&:to_s))
       end
 
-      # Disable search on this collection
-      def disable_search
-        replace_search { |_query, _context| nil }
-      end
-
-      # Enable search with custom logic
-      #
-      # @example
-      #   enable_search do |query, context|
-      #     # Custom search logic
-      #     query
-      #   end
-      #
-      # @param block [Proc] search handler
-      def enable_search(&block)
-        replace_search(&block)
-      end
-
       # Add a chart at the collection level with a cleaner syntax
       #
       # @example Simple value chart

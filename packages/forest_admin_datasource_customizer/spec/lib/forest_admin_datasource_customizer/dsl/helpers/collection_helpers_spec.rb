@@ -326,24 +326,6 @@ module ForestAdminDatasourceCustomizer
         end
       end
 
-      describe '#disable_search' do
-        it 'calls replace_search with a block' do
-          # Just verify the method exists and doesn't error
-          expect { collection_customizer.disable_search }.not_to raise_error
-        end
-      end
-
-      describe '#enable_search' do
-        it 'calls replace_search with custom block' do
-          # Just verify the method exists and doesn't error
-          expect do
-            collection_customizer.enable_search do |query, _context|
-              query
-            end
-          end.not_to raise_error
-        end
-      end
-
       describe '#chart' do
         it 'creates a chart with the DSL syntax' do
           allow(collection_customizer).to receive(:add_chart).with('total_records')
