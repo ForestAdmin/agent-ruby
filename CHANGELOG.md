@@ -1,3 +1,10 @@
+## [1.15.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.1...v1.15.2) (2025-11-28)
+
+
+### Bug Fixes
+
+* ignore forest_admin directory in zeitwerk loader ([#214](https://github.com/ForestAdmin/agent-ruby/issues/214)) ([59606c7](https://github.com/ForestAdmin/agent-ruby/commit/59606c7f702a0055f0c8b297281fc0b153343fa3))
+
 ## [1.15.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.0...v1.15.1) (2025-11-26)
 
 
