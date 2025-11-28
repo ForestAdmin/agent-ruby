@@ -8,6 +8,7 @@ require_relative 'forest_admin/types'
 
 loader = Zeitwerk::Loader.for_gem
 loader.ignore("#{__dir__}/generators")
+loader.ignore("#{__dir__}/forest_admin")
 loader.setup
 
 module ForestAdminRails
