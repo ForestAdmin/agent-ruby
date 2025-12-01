@@ -105,7 +105,7 @@ module ForestAdminDatasourceCustomizer
       # @param operation [String, Symbol] operation name (:create, :update, :delete, :list, :aggregate)
       # @param block [Proc] hook handler
       def before(operation, &block)
-        add_hook('before', operation.to_s, &block)
+        add_hook('Before', operation.to_s.capitalize, &block)
       end
 
       # Add an after hook for an operation
@@ -118,7 +118,7 @@ module ForestAdminDatasourceCustomizer
       # @param operation [String, Symbol] operation name (:create, :update, :delete, :list, :aggregate)
       # @param block [Proc] hook handler
       def after(operation, &block)
-        add_hook('after', operation.to_s, &block)
+        add_hook('After', operation.to_s.capitalize, &block)
       end
 
       # ActiveRecord-style belongs_to relation

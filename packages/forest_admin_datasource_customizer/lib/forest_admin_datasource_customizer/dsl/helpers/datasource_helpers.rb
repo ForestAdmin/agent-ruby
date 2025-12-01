@@ -40,7 +40,7 @@ module ForestAdminDatasourceCustomizer
       # @param name [String, Symbol] collection name
       # @param block [Proc] customization block
       def collection(name, &block)
-        customize_collection(name.to_s, block)
+        customize_collection(name.to_s, &block)
       end
 
       # Hide/remove collections from Forest Admin
