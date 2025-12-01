@@ -379,7 +379,7 @@ module ForestAdminAgent
 
             result = instance.customize_collection('Book', &handler)
 
-            expect(instance.customizer).to have_received(:customize_collection).with('Book', handler)
+            expect(instance.customizer).to have_received(:customize_collection).with('Book')
             expect(result).to eq(instance)
           end
         end
