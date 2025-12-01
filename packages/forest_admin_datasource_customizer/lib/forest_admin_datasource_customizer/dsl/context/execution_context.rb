@@ -26,7 +26,21 @@ module ForestAdminDatasourceCustomizer
       # @param key [String, Symbol] the field name
       # @return [Object] the form field value
       def form_value(key)
-        @context.form_value(key.to_s)
+        @context.get_form_value(key.to_s)
+      end
+
+      # Get a single record (for single actions)
+      # @param fields [Array<String>] fields to retrieve
+      # @return [Hash] the record
+      def record(fields = [])
+        @context.get_record(fields)
+      end
+
+      # Get multiple records (for bulk actions)
+      # @param fields [Array<String>] fields to retrieve
+      # @return [Array<Hash>] the records
+      def records(fields = [])
+        @context.get_records(fields)
       end
 
       # Access the datasource for querying other collections

@@ -175,19 +175,19 @@ module ForestAdminDatasourceCustomizer
 
       describe '#before and #after hooks' do
         it 'creates before hooks' do
-          allow(collection_customizer).to receive(:add_hook).with('before', 'create')
+          allow(collection_customizer).to receive(:add_hook).with('Before', 'Create')
 
           collection_customizer.before(:create) { |_context| nil }
 
-          expect(collection_customizer).to have_received(:add_hook).with('before', 'create')
+          expect(collection_customizer).to have_received(:add_hook).with('Before', 'Create')
         end
 
         it 'creates after hooks' do
-          allow(collection_customizer).to receive(:add_hook).with('after', 'update')
+          allow(collection_customizer).to receive(:add_hook).with('After', 'Update')
 
           collection_customizer.after(:update) { |_context| nil }
 
-          expect(collection_customizer).to have_received(:add_hook).with('after', 'update')
+          expect(collection_customizer).to have_received(:add_hook).with('After', 'Update')
         end
       end
 

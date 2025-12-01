@@ -33,21 +33,21 @@ module ForestAdminDatasourceCustomizer
 
       describe '#collection' do
         it 'customizes a collection with symbol name' do
-          allow(datasource_customizer).to receive(:customize_collection).with('users', anything)
+          allow(datasource_customizer).to receive(:customize_collection).with('users')
 
           datasource_customizer.collection :users do |c|
             # customization
           end
 
-          expect(datasource_customizer).to have_received(:customize_collection).with('users', anything)
+          expect(datasource_customizer).to have_received(:customize_collection).with('users')
         end
 
         it 'passes the block to customize_collection' do
           block_called = false
           collection_spy = instance_double('CollectionCustomizer')
-          allow(datasource_customizer).to receive(:customize_collection) do |_name, block|
+          allow(datasource_customizer).to receive(:customize_collection) do |_name, &handle|
             block_called = true
-            block.call(collection_spy)
+            handle&.call(collection_spy)
           end
 
           datasource_customizer.collection :users do |c|

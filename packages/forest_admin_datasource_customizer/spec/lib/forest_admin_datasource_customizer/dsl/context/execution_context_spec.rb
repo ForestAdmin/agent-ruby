@@ -12,19 +12,59 @@ module ForestAdminDatasourceCustomizer
       let(:execution_context) { described_class.new(context, result_builder) }
 
       describe '#form_value' do
-        it 'delegates to context with string key' do
-          allow(context).to receive(:form_value).with('email').and_return('test@example.com')
+        it 'delegates to context.get_form_value with string key' do
+          allow(context).to receive(:get_form_value).with('email').and_return('test@example.com')
 
           result = execution_context.form_value(:email)
-          expect(context).to have_received(:form_value).with('email')
+          expect(context).to have_received(:get_form_value).with('email')
           expect(result).to eq('test@example.com')
         end
 
         it 'converts symbol to string' do
-          allow(context).to receive(:form_value).with('field_name').and_return('value')
+          allow(context).to receive(:get_form_value).with('field_name').and_return('value')
 
           execution_context.form_value(:field_name)
-          expect(context).to have_received(:form_value).with('field_name')
+          expect(context).to have_received(:get_form_value).with('field_name')
+        end
+      end
+
+      describe '#record' do
+        it 'delegates to context.get_record' do
+          record_data = { 'id' => 1, 'name' => 'Test' }
+          allow(context).to receive(:get_record).with(['id', 'name']).and_return(record_data)
+
+          result = execution_context.record(['id', 'name'])
+          expect(context).to have_received(:get_record).with(['id', 'name'])
+          expect(result).to eq(record_data)
+        end
+
+        it 'works with empty fields array' do
+          record_data = { 'id' => 1 }
+          allow(context).to receive(:get_record).with([]).and_return(record_data)
+
+          result = execution_context.record([])
+          expect(context).to have_received(:get_record).with([])
+          expect(result).to eq(record_data)
+        end
+      end
+
+      describe '#records' do
+        it 'delegates to context.get_records' do
+          records_data = [{ 'id' => 1 }, { 'id' => 2 }]
+          allow(context).to receive(:get_records).with(['id']).and_return(records_data)
+
+          result = execution_context.records(['id'])
+          expect(context).to have_received(:get_records).with(['id'])
+          expect(result).to eq(records_data)
+        end
+
+        it 'works with empty fields array' do
+          records_data = [{ 'id' => 1 }]
+          allow(context).to receive(:get_records).with([]).and_return(records_data)
+
+          result = execution_context.records([])
+          expect(context).to have_received(:get_records).with([])
+          expect(result).to eq(records_data)
         end
       end
 
