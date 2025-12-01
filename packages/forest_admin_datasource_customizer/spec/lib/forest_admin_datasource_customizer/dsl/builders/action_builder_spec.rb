@@ -165,7 +165,7 @@ module ForestAdminDatasourceCustomizer
           context = instance_spy("ActionContext")
           result_builder = instance_spy("ResultBuilder")
 
-          allow(context).to receive(:form_value).with('email').and_return('test@example.com')
+          allow(context).to receive(:get_form_value).with('email').and_return('test@example.com')
           allow(result_builder).to receive(:success).with(
             message: 'Email: test@example.com',
             options: {}
