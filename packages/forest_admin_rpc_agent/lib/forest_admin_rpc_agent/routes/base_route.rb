@@ -62,6 +62,16 @@ module ForestAdminRpcAgent
                      route_alias: @name
       end
 
+      protected
+
+      def get_collection_safe(datasource, collection_name)
+        datasource.get_collection(collection_name)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        raise ForestAdminAgent::Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
+
+        raise
+      end
+
       private
 
       def serialize_response(result)

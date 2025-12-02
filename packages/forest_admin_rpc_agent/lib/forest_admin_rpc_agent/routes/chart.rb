@@ -14,7 +14,7 @@ module ForestAdminRpcAgent
 
         chart_name = args[:params]['chart']
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
-        collection = datasource.get_collection(args[:params]['collection_name'])
+        collection = get_collection_safe(datasource, args[:params]['collection_name'])
 
         collection.render_chart(caller, chart_name, args[:params]['record_id'])
       end

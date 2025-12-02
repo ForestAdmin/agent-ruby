@@ -86,7 +86,7 @@ module ForestAdminRails
                }
              end
 
-      unless ForestAdminAgent::Facades::Container.cache(:is_production)
+      unless ForestAdminAgent::Facades::Container.cache(:is_production) || http_exception.status < 500
         ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
       end
 
