@@ -38,7 +38,7 @@ module ForestAdminAgent
           return 400
         end
 
-        error.status if error.respond_to?(:status) && error.status
+        return error.status if error.respond_to?(:status) && error.status
 
         case error
         when Exceptions::ValidationError, Exceptions::BadRequestError
