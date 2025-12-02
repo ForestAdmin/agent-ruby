@@ -92,6 +92,8 @@ module ForestAdminDatasourceCustomizer
       # @param name [String] segment name
       # @param block [Proc] block returning condition tree
       def segment(name, &block)
+        raise ArgumentError, 'Block is required for segment' unless block
+
         add_segment(name, &block)
       end
 
@@ -105,6 +107,8 @@ module ForestAdminDatasourceCustomizer
       # @param operation [String, Symbol] operation name (:create, :update, :delete, :list, :aggregate)
       # @param block [Proc] hook handler
       def before(operation, &block)
+        raise ArgumentError, 'Block is required for before hook' unless block
+
         add_hook('Before', operation.to_s.capitalize, &block)
       end
 
@@ -118,6 +122,8 @@ module ForestAdminDatasourceCustomizer
       # @param operation [String, Symbol] operation name (:create, :update, :delete, :list, :aggregate)
       # @param block [Proc] hook handler
       def after(operation, &block)
+        raise ArgumentError, 'Block is required for after hook' unless block
+
         add_hook('After', operation.to_s.capitalize, &block)
       end
 
@@ -130,6 +136,8 @@ module ForestAdminDatasourceCustomizer
       # @param collection [String, Symbol] target collection name (defaults to pluralized name)
       # @param foreign_key [String, Symbol] foreign key field
       def belongs_to(name, collection: nil, foreign_key: nil)
+        raise ArgumentError, 'Relation name is required for belongs_to' if name.nil? || name.to_s.empty?
+
         collection_name = collection&.to_s || "#{name}s"
         foreign_key_name = foreign_key&.to_s || "#{name}_id"
 
@@ -151,6 +159,8 @@ module ForestAdminDatasourceCustomizer
       # @param foreign_key [String, Symbol] foreign key field (for many-to-many)
       # @param through [String, Symbol] through collection (for many-to-many)
       def has_many(name, collection: nil, origin_key: nil, foreign_key: nil, through: nil)
+        raise ArgumentError, 'Relation name is required for has_many' if name.nil? || name.to_s.empty?
+
         collection_name = collection&.to_s || name.to_s
 
         if through
@@ -183,6 +193,8 @@ module ForestAdminDatasourceCustomizer
       # @param collection [String, Symbol] target collection name (defaults to pluralized name)
       # @param origin_key [String, Symbol] origin key field
       def has_one(name, collection: nil, origin_key: nil)
+        raise ArgumentError, 'Relation name is required for has_one' if name.nil? || name.to_s.empty?
+
         collection_name = collection&.to_s || "#{name}s"
 
         add_one_to_one_relation(
@@ -202,6 +214,9 @@ module ForestAdminDatasourceCustomizer
       # @param operator [String, Symbol] validation operator
       # @param value [Object] validation value (optional)
       def validates(field_name, operator, value = nil)
+        raise ArgumentError, 'Field name is required for validates' if field_name.nil? || field_name.to_s.empty?
+        raise ArgumentError, 'Operator is required for validates' if operator.nil? || operator.to_s.empty?
+
         # Convert snake_case to PascalCase
         operator_str = operator.to_s
                                .split('_')
@@ -217,6 +232,8 @@ module ForestAdminDatasourceCustomizer
       #
       # @param field_names [Array<String, Symbol>] fields to hide
       def hide_fields(*field_names)
+        raise ArgumentError, 'At least one field name is required for hide_fields' if field_names.empty?
+
         remove_field(*field_names.map(&:to_s))
       end
 
@@ -244,6 +261,8 @@ module ForestAdminDatasourceCustomizer
       # @param name [String, Symbol] chart name
       # @param block [Proc] chart definition block
       def chart(name, &block)
+        raise ArgumentError, 'Block is required for chart' unless block
+
         add_chart(name.to_s) do |context, result_builder|
           builder = DSL::ChartBuilder.new(context, result_builder)
           builder.instance_eval(&block)

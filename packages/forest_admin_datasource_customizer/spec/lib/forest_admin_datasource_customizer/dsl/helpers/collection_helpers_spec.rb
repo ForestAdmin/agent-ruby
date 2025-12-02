@@ -171,6 +171,12 @@ module ForestAdminDatasourceCustomizer
 
           expect(collection_customizer).to have_received(:add_segment).with('Active')
         end
+
+        it 'raises error without block' do
+          expect do
+            collection_customizer.segment 'Invalid'
+          end.to raise_error(ArgumentError, 'Block is required for segment')
+        end
       end
 
       describe '#before and #after hooks' do
@@ -188,6 +194,18 @@ module ForestAdminDatasourceCustomizer
           collection_customizer.after(:update) { |_context| nil }
 
           expect(collection_customizer).to have_received(:add_hook).with('After', 'Update')
+        end
+
+        it 'raises error when before hook has no block' do
+          expect do
+            collection_customizer.before(:create)
+          end.to raise_error(ArgumentError, 'Block is required for before hook')
+        end
+
+        it 'raises error when after hook has no block' do
+          expect do
+            collection_customizer.after(:update)
+          end.to raise_error(ArgumentError, 'Block is required for after hook')
         end
       end
 
@@ -222,6 +240,18 @@ module ForestAdminDatasourceCustomizer
             'people',
             { foreign_key: 'writer_id' }
           )
+        end
+
+        it 'raises error when name is nil' do
+          expect do
+            collection_customizer.belongs_to nil, foreign_key: :author_id
+          end.to raise_error(ArgumentError, 'Relation name is required for belongs_to')
+        end
+
+        it 'raises error when name is empty' do
+          expect do
+            collection_customizer.belongs_to '', foreign_key: :author_id
+          end.to raise_error(ArgumentError, 'Relation name is required for belongs_to')
         end
       end
 
@@ -262,6 +292,18 @@ module ForestAdminDatasourceCustomizer
             { origin_key: 'book_id', foreign_key: 'author_id' }
           )
         end
+
+        it 'raises error when name is nil' do
+          expect do
+            collection_customizer.has_many nil, origin_key: :author_id
+          end.to raise_error(ArgumentError, 'Relation name is required for has_many')
+        end
+
+        it 'raises error when name is empty' do
+          expect do
+            collection_customizer.has_many '', origin_key: :author_id
+          end.to raise_error(ArgumentError, 'Relation name is required for has_many')
+        end
       end
 
       describe '#has_one' do
@@ -279,6 +321,18 @@ module ForestAdminDatasourceCustomizer
             'profiles',
             { origin_key: 'user_id' }
           )
+        end
+
+        it 'raises error when name is nil' do
+          expect do
+            collection_customizer.has_one nil, origin_key: :user_id
+          end.to raise_error(ArgumentError, 'Relation name is required for has_one')
+        end
+
+        it 'raises error when name is empty' do
+          expect do
+            collection_customizer.has_one '', origin_key: :user_id
+          end.to raise_error(ArgumentError, 'Relation name is required for has_one')
         end
       end
 
@@ -314,6 +368,30 @@ module ForestAdminDatasourceCustomizer
             18
           )
         end
+
+        it 'raises error when field_name is nil' do
+          expect do
+            collection_customizer.validates nil, :email
+          end.to raise_error(ArgumentError, 'Field name is required for validates')
+        end
+
+        it 'raises error when field_name is empty' do
+          expect do
+            collection_customizer.validates '', :email
+          end.to raise_error(ArgumentError, 'Field name is required for validates')
+        end
+
+        it 'raises error when operator is nil' do
+          expect do
+            collection_customizer.validates :email, nil
+          end.to raise_error(ArgumentError, 'Operator is required for validates')
+        end
+
+        it 'raises error when operator is empty' do
+          expect do
+            collection_customizer.validates :email, ''
+          end.to raise_error(ArgumentError, 'Operator is required for validates')
+        end
       end
 
       describe '#hide_fields' do
@@ -323,6 +401,12 @@ module ForestAdminDatasourceCustomizer
           collection_customizer.hide_fields :internal, :secret
 
           expect(collection_customizer).to have_received(:remove_field).with('internal', 'secret')
+        end
+
+        it 'raises error when no fields are provided' do
+          expect do
+            collection_customizer.hide_fields
+          end.to raise_error(ArgumentError, 'At least one field name is required for hide_fields')
         end
       end
 
@@ -378,6 +462,12 @@ module ForestAdminDatasourceCustomizer
           end
 
           expect(chart_block).not_to be_nil
+        end
+
+        it 'raises error without block' do
+          expect do
+            collection_customizer.chart :invalid
+          end.to raise_error(ArgumentError, 'Block is required for chart')
         end
       end
     end
