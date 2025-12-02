@@ -102,6 +102,16 @@ module ForestAdminAgent
               expect(projection).to eq(%w[id first_name last_name])
             end
           end
+
+          it 'raises NotFoundError when collection does not exist' do
+            args[:params]['collection_name'] = 'non_existent_collection'
+            args[:params]['id'] = 1
+
+            expect { show.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::NotFoundError,
+              "Collection 'non_existent_collection' not found. List of available collections: user"
+            )
+          end
         end
       end
     end
