@@ -8,6 +8,7 @@ module ForestAdminAgent
       include ForestAdminAgent::Utils::Schema
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminDatasourceToolkit::Exceptions
+      include ForestAdminDatasourceCustomizer::DSL::DatasourceHelpers
 
       attr_reader :customizer, :container, :has_env_secret
 
@@ -37,7 +38,7 @@ module ForestAdminAgent
       end
 
       def customize_collection(name, &handle)
-        @customizer.customize_collection(name, handle)
+        @customizer.customize_collection(name, &handle)
 
         self
       end

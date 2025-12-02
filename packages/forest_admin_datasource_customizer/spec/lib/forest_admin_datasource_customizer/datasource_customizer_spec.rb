@@ -190,9 +190,10 @@ module ForestAdminDatasourceCustomizer
       customizer.stack.apply_queued_customizations({})
 
       received_name = nil
-      handle = ->(collection) { received_name = collection.name }
 
-      customizer.customize_collection('collection', handle)
+      customizer.customize_collection('collection') do |collection|
+        received_name = collection.name
+      end
 
       expect(received_name).to eq('collection')
     end

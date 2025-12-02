@@ -1,5 +1,6 @@
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
+    include DSL::DatasourceHelpers
     attr_reader :stack, :datasources
 
     def initialize(_db_config = {})
@@ -60,8 +61,8 @@ module ForestAdminDatasourceCustomizer
       push_customization { plugin.new.run(self, nil, options) }
     end
 
-    def customize_collection(name, handle)
-      handle.call(get_collection(name))
+    def customize_collection(name)
+      yield(get_collection(name))
     end
 
     def remove_collection(*names)
