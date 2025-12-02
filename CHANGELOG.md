@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.2...v1.16.0) (2025-12-02)
+
+
+### Features
+
+* add DSL for easier agent customization ([#208](https://github.com/ForestAdmin/agent-ruby/issues/208)) ([93e08d8](https://github.com/ForestAdmin/agent-ruby/commit/93e08d805a574bd8b46267c95734d4d9557fc838))
+
 ## [1.15.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.1...v1.15.2) (2025-11-28)
 
 
