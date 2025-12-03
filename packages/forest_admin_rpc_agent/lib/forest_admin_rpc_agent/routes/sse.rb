@@ -39,11 +39,14 @@ module ForestAdminRpcAgent
           stream(:keep_open) do |out|
             should_continue = true
             server_stopped = false
-            stop_proc = proc do
+            received_signal = nil
+            stop_proc = proc do |sig|
               should_continue = false
               server_stopped = true
+              received_signal = sig
             end
-            original_handler = trap('INT', stop_proc)
+            original_int_handler = trap('INT', stop_proc)
+            original_term_handler = trap('TERM', stop_proc)
 
             begin
               streamer = SseStreamer.new(out)
@@ -66,8 +69,12 @@ module ForestAdminRpcAgent
               # Client disconnected normally
               ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', "[SSE] Client disconnected: #{e.message}")
             ensure
-              trap('INT', original_handler)
+              trap('INT', original_int_handler)
+              trap('TERM', original_term_handler)
               out.close if out.respond_to?(:close)
+
+              # Re-send the signal to allow proper server shutdown
+              Process.kill(received_signal, Process.pid) if received_signal
             end
           end
         end
@@ -90,11 +97,14 @@ module ForestAdminRpcAgent
 
             should_continue = true
             server_stopped = false
-            stop_proc = proc do
+            received_signal = nil
+            stop_proc = proc do |sig|
               should_continue = false
               server_stopped = true
+              received_signal = sig
             end
-            original_handler = trap('INT', stop_proc)
+            original_int_handler = trap('INT', stop_proc)
+            original_term_handler = trap('TERM', stop_proc)
 
             body = Enumerator.new do |yielder|
               stream = SseStreamer.new(yielder)
@@ -123,8 +133,12 @@ module ForestAdminRpcAgent
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Error', "[SSE] Unexpected error: #{e.message}")
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Error', e.backtrace.join("\n"))
               ensure
-                trap('INT', original_handler)
+                trap('INT', original_int_handler)
+                trap('TERM', original_term_handler)
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] Stream stopped')
+
+                # Re-send the signal to allow proper server shutdown
+                Process.kill(received_signal, Process.pid) if received_signal
               end
             end
 

@@ -2,7 +2,7 @@ module ForestAdminDatasourceRpc
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     include ForestAdminDatasourceRpc::Utils
 
-    def initialize(options, introspection)
+    def initialize(options, introspection, sse_client = nil)
       super()
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -18,6 +18,8 @@ module ForestAdminDatasourceRpc
       @options = options
       @charts = introspection[:charts]
       @rpc_relations = introspection[:rpc_relations]
+      @sse_client = sse_client
+      @cleaned_up = false
 
       native_query_connections = introspection[:native_query_connections] || []
       @live_query_connections = native_query_connections.to_h { |conn| [conn[:name], conn[:name]] }
@@ -49,6 +51,23 @@ module ForestAdminDatasourceRpc
       result = client.call_rpc(url, method: :post,
                                     payload: { connection_name: connection_name, query: query, binds: binds })
       ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
+    end
+
+    def cleanup
+      return if @cleaned_up
+
+      @cleaned_up = true
+
+      if @sse_client
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Closing SSE connection...')
+        @sse_client.close
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] SSE connection closed')
+      end
+    rescue StandardError => e
+      ForestAdminAgent::Facades::Container.logger&.log(
+        'Error',
+        "[RPCDatasource] Error during cleanup: #{e.class} - #{e.message}"
+      )
     end
   end
 end
