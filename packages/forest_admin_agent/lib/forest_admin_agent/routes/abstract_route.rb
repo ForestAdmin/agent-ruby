@@ -11,7 +11,13 @@ module ForestAdminAgent
         context.datasource = ForestAdminAgent::Facades::Container.datasource
 
         if args[:params]['collection_name']
-          context.collection = context.datasource.get_collection(args[:params]['collection_name'])
+          begin
+            context.collection = context.datasource.get_collection(args[:params]['collection_name'])
+          rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+            raise Http::Exceptions::NotFoundError, e.message if e.message.include?('not found')
+
+            raise
+          end
         end
 
         context

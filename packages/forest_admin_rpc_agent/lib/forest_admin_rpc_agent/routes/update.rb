@@ -13,7 +13,7 @@ module ForestAdminRpcAgent
         return {} unless args[:params]['collection_name']
 
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
-        collection = datasource.get_collection(args[:params]['collection_name'])
+        collection = get_collection_safe(datasource, args[:params]['collection_name'])
         filter = FilterFactory.from_plain_object(args[:params]['filter'])
 
         collection.update(args[:caller], filter, args[:params]['patch'])
