@@ -33,29 +33,9 @@ module ForestAdminRpcAgent
 
       def register_rails(router)
         handler = proc do |hash|
-          request = ActionDispatch::Request.new(hash)
-
-          begin
-            # Skip authentication for health check (root path)
-            if @url == '/'
-              params = request.query_parameters.merge(request.request_parameters)
-              result = handle_request({ params: params, caller: nil })
-              [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
-            else
-              auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
-              status, headers, response = auth_middleware.call(request.env)
-
-              if status == 200
-                params = request.query_parameters.merge(request.request_parameters)
-                result = handle_request({ params: params, caller: headers[:caller] })
-                [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
-              else
-                [status, headers, response]
-              end
-            end
-          rescue StandardError => e
-            handle_rails_exception(e)
-          end
+          handle_rails_request(hash)
+        rescue StandardError => e
+          handle_rails_exception(e)
         end
 
         router.match @url,
@@ -77,6 +57,28 @@ module ForestAdminRpcAgent
       end
 
       private
+
+      def handle_rails_request(hash)
+        request = ActionDispatch::Request.new(hash)
+
+        # Skip authentication for health check (root path)
+        if @url == '/'
+          params = request.query_parameters.merge(request.request_parameters)
+          result = handle_request({ params: params, caller: nil })
+          [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+        else
+          auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
+          status, headers, response = auth_middleware.call(request.env)
+
+          if status == 200
+            params = request.query_parameters.merge(request.request_parameters)
+            result = handle_request({ params: params, caller: headers[:caller] })
+            [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+          else
+            [status, headers, response]
+          end
+        end
+      end
 
       def serialize_response(result)
         return result if result.is_a?(String) && (result.start_with?('{', '['))
