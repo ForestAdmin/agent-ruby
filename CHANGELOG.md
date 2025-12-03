@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.0...v1.16.1) (2025-12-03)
+
+
+### Bug Fixes
+
+* improve error handling for non-existent collections with proper HTTP 404 ([#215](https://github.com/ForestAdmin/agent-ruby/issues/215)) ([4be7b2b](https://github.com/ForestAdmin/agent-ruby/commit/4be7b2bab3407cd3a532ba1968527c551839efb7))
+
 # [1.16.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.15.2...v1.16.0) (2025-12-02)
 
 
