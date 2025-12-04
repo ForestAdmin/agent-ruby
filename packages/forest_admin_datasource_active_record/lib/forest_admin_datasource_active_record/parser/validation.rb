@@ -19,7 +19,7 @@ module ForestAdminDatasourceActiveRecord
             when ActiveModel::Validations::NumericalityValidator
               validations = parse_numericality_validator(validator, validations)
             when ActiveModel::Validations::LengthValidator
-              validations = parse_length_validator(validator, validations)
+              validations = parse_length_validator(column, validator, validations)
             when ActiveModel::Validations::FormatValidator
               validations = parse_format_validator(validator, validations)
             end
@@ -36,11 +36,15 @@ module ForestAdminDatasourceActiveRecord
             parsed_validations << { operator: Operators::GREATER_THAN, value: value }
           when :less_than, :less_than_or_equal_to
             parsed_validations << { operator: Operators::LESS_THAN, value: value }
+          when :allow_nil
+            parsed_validations << { operator: Operators::PRESENT } unless value
           end
         end
+
+        parsed_validations
       end
 
-      def parse_length_validator(validator, parsed_validations)
+      def parse_length_validator(column, validator, parsed_validations)
         return unless get_column_type(@model, column) == 'String'
 
         validator.options.each do |option, value|
@@ -54,6 +58,8 @@ module ForestAdminDatasourceActiveRecord
             parsed_validations << { operator: Operators::SHORTER_THAN, value: value }
           end
         end
+
+        parsed_validations
       end
 
       def parse_format_validator(validator, parsed_validations)
