@@ -132,14 +132,28 @@ module ForestAdminRpcAgent
           subject(:not_found_route) { TestNotFoundRoute.new('/not-found', 'get', 'not_found_route') }
 
           it 'returns a JSON error response with 404 status' do
-            handler_proc = nil
+            captured = {}
 
-            # Capture the handler proc that's passed to match
-            allow(rails_router).to receive(:match) do |_url, **opts|
-              handler_proc = opts[:to]
+            # Use a local double that's more flexible for capturing arguments
+            # rubocop:disable RSpec/VerifiedDoubles
+            test_router = double('test_router')
+            # rubocop:enable RSpec/VerifiedDoubles
+            allow(test_router).to receive(:match) do |*args, **kwargs|
+              # In Ruby 3.x, keyword arguments might be separate from positional args
+              # Try to find :to in either kwargs or in a hash argument
+              if kwargs.key?(:to)
+                captured[:handler] = kwargs[:to]
+              else
+                # Check if any arg is a hash containing :to
+                hash_arg = args.find { |arg| arg.is_a?(Hash) && arg.key?(:to) }
+                captured[:handler] = hash_arg[:to] if hash_arg
+              end
             end
 
-            not_found_route.send(:register_rails, rails_router)
+            not_found_route.send(:register_rails, test_router)
+
+            handler_proc = captured[:handler]
+            expect(handler_proc).not_to be_nil, "Handler proc was not captured"
 
             # Call the handler with a mock request
             mock_env = {}
