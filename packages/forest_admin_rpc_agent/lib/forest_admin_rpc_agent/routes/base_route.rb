@@ -33,9 +33,11 @@ module ForestAdminRpcAgent
 
       def register_rails(router)
         handler = proc do |hash|
-          handle_rails_request(hash)
-        rescue StandardError => e
-          handle_rails_exception(e)
+          begin
+            handle_rails_request(hash)
+          rescue StandardError => e
+            handle_rails_exception(e)
+          end
         end
 
         router.match @url,
