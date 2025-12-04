@@ -37,7 +37,7 @@ module ForestAdminRpcAgent
           expect(route.instance_variable_get(:@url)).to eq('sse')
           expect(route.instance_variable_get(:@method)).to eq('get')
           expect(route.instance_variable_get(:@name)).to eq('rpc_sse')
-          expect(route.instance_variable_get(:@heartbeat_interval)).to eq(1)
+          expect(route.instance_variable_get(:@heartbeat_interval)).to eq(10)
         end
 
         it 'accepts custom heartbeat_interval' do

@@ -3,7 +3,7 @@ require 'jsonapi-serializers'
 module ForestAdminRpcAgent
   module Routes
     class Sse
-      DEFAULT_HEARTBEAT_INTERVAL = 1
+      DEFAULT_HEARTBEAT_INTERVAL = 10
 
       def initialize(url = 'sse', method = 'get', name = 'rpc_sse', heartbeat_interval: DEFAULT_HEARTBEAT_INTERVAL)
         @url = url
