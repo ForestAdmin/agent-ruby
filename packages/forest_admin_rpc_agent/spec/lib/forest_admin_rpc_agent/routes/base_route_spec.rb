@@ -18,13 +18,6 @@ module ForestAdminRpcAgent
       end
     end
 
-    # Test route that raises a NotFoundError
-    class TestNotFoundRoute < BaseRoute
-      def handle_request(_params)
-        raise ForestAdminAgent::Http::Exceptions::NotFoundError, 'Resource not found'
-      end
-    end
-
     describe BaseRoute do
       subject(:route) { TestRoute.new('/test', 'get', 'test_route') }
 
@@ -128,50 +121,38 @@ module ForestAdminRpcAgent
           end
         end
 
-        context 'when the route raises a NotFoundError' do
-          subject(:not_found_route) { TestNotFoundRoute.new('/not-found', 'get', 'not_found_route') }
+      end
 
-          it 'returns a JSON error response with 404 status' do
-            captured = {}
+      describe '#handle_rails_exception' do
+        it 'returns JSON error response with correct structure for NotFoundError' do
+          error = ForestAdminAgent::Http::Exceptions::NotFoundError.new('Resource not found')
 
-            # Use a local double that's more flexible for capturing arguments
-            # rubocop:disable RSpec/VerifiedDoubles
-            test_router = double('test_router')
-            # rubocop:enable RSpec/VerifiedDoubles
-            allow(test_router).to receive(:match) do |*args, **kwargs|
-              # In Ruby 3.x, keyword arguments might be separate from positional args
-              # Try to find :to in either kwargs or in a hash argument
-              if kwargs.key?(:to)
-                captured[:handler] = kwargs[:to]
-              else
-                # Check if any arg is a hash containing :to
-                hash_arg = args.find { |arg| arg.is_a?(Hash) && arg.key?(:to) }
-                captured[:handler] = hash_arg[:to] if hash_arg
-              end
-            end
+          status, headers, body = route.send(:handle_rails_exception, error)
 
-            not_found_route.send(:register_rails, test_router)
+          expect(status).to eq(404)
+          expect(headers['Content-Type']).to eq('application/json')
+          expect(headers['x-error-type']).to eq('object-not-found')
 
-            handler_proc = captured[:handler]
-            expect(handler_proc).not_to be_nil, "Handler proc was not captured"
+          parsed_body = JSON.parse(body[0])
+          expect(parsed_body).to have_key('errors')
+          expect(parsed_body['errors']).to be_an(Array)
+          expect(parsed_body['errors'][0]['name']).to eq('NotFoundError')
+          expect(parsed_body['errors'][0]['detail']).to eq('Resource not found')
+          expect(parsed_body['errors'][0]['status']).to eq(404)
+        end
 
-            # Call the handler with a mock request
-            mock_env = {}
-            allow(middleware).to receive(:call).and_return([200, { caller: 'test' }, ['OK']])
+        it 'returns JSON error response for other exceptions' do
+          error = ForestAdminAgent::Http::Exceptions::UnprocessableError.new('Invalid data')
 
-            status, headers, body = handler_proc.call(mock_env)
+          status, headers, body = route.send(:handle_rails_exception, error)
 
-            expect(status).to eq(404)
-            expect(headers['Content-Type']).to eq('application/json')
-            expect(headers['x-error-type']).to eq('object-not-found')
+          expect(status).to eq(422)
+          expect(headers['Content-Type']).to eq('application/json')
 
-            parsed_body = JSON.parse(body[0])
-            expect(parsed_body).to have_key('errors')
-            expect(parsed_body['errors']).to be_an(Array)
-            expect(parsed_body['errors'][0]['name']).to eq('NotFoundError')
-            expect(parsed_body['errors'][0]['detail']).to eq('Resource not found')
-            expect(parsed_body['errors'][0]['status']).to eq(404)
-          end
+          parsed_body = JSON.parse(body[0])
+          expect(parsed_body['errors'][0]['name']).to eq('UnprocessableError')
+          expect(parsed_body['errors'][0]['detail']).to eq('Invalid data')
+          expect(parsed_body['errors'][0]['status']).to eq(422)
         end
       end
     end
