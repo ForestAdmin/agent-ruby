@@ -55,7 +55,44 @@ module ForestAdminDatasourceRpc
       end
       sse.start
 
-      ForestAdminDatasourceRpc::Datasource.new(options, schema)
+      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, sse)
+
+      # Setup cleanup hooks for proper SSE client shutdown
+      setup_cleanup_hooks(datasource)
+
+      datasource
+    end
+  end
+
+  def self.setup_cleanup_hooks(datasource)
+    # Register cleanup handler for graceful shutdown
+    at_exit do
+      datasource.cleanup
+    rescue StandardError => e
+      # Silently ignore errors during exit cleanup to prevent test pollution
+      warn "[RPCDatasource] Error during at_exit cleanup: #{e.message}" if $VERBOSE
+    end
+
+    # Handle SIGINT (Ctrl+C)
+    Signal.trap('INT') do
+      begin
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Received SIGINT, cleaning up...')
+      rescue StandardError
+        # Logger might not be available
+      end
+      datasource.cleanup
+      exit(0)
+    end
+
+    # Handle SIGTERM (default kill signal)
+    Signal.trap('TERM') do
+      begin
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Received SIGTERM, cleaning up...')
+      rescue StandardError
+        # Logger might not be available
+      end
+      datasource.cleanup
+      exit(0)
     end
   end
 end
