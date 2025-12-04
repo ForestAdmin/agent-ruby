@@ -120,6 +120,40 @@ module ForestAdminRpcAgent
             )
           end
         end
+
+      end
+
+      describe '#handle_rails_exception' do
+        it 'returns JSON error response with correct structure for NotFoundError' do
+          error = ForestAdminAgent::Http::Exceptions::NotFoundError.new('Resource not found')
+
+          status, headers, body = route.send(:handle_rails_exception, error)
+
+          expect(status).to eq(404)
+          expect(headers['Content-Type']).to eq('application/json')
+          expect(headers['x-error-type']).to eq('object-not-found')
+
+          parsed_body = JSON.parse(body[0])
+          expect(parsed_body).to have_key('errors')
+          expect(parsed_body['errors']).to be_an(Array)
+          expect(parsed_body['errors'][0]['name']).to eq('NotFoundError')
+          expect(parsed_body['errors'][0]['detail']).to eq('Resource not found')
+          expect(parsed_body['errors'][0]['status']).to eq(404)
+        end
+
+        it 'returns JSON error response for other exceptions' do
+          error = ForestAdminAgent::Http::Exceptions::UnprocessableError.new('Invalid data')
+
+          status, headers, body = route.send(:handle_rails_exception, error)
+
+          expect(status).to eq(422)
+          expect(headers['Content-Type']).to eq('application/json')
+
+          parsed_body = JSON.parse(body[0])
+          expect(parsed_body['errors'][0]['name']).to eq('UnprocessableError')
+          expect(parsed_body['errors'][0]['detail']).to eq('Invalid data')
+          expect(parsed_body['errors'][0]['status']).to eq(422)
+        end
       end
     end
   end
