@@ -37,11 +37,13 @@ module ForestAdminRpcAgent
                   'X-Accel-Buffering' => 'no'
 
           stream(:keep_open) do |out|
-            should_continue = true
+            # Register this connection; any previous connection will be terminated
+            connection = ForestAdminRpcAgent::SseConnectionManager.register_connection
+
             server_stopped = false
             received_signal = nil
             stop_proc = proc do |sig|
-              should_continue = false
+              connection.terminate
               server_stopped = true
               received_signal = sig
             end
@@ -51,7 +53,7 @@ module ForestAdminRpcAgent
             begin
               streamer = SseStreamer.new(out)
 
-              while should_continue
+              while connection.active?
                 streamer.write('', event: 'heartbeat')
                 sleep route_instance.instance_variable_get(:@heartbeat_interval)
               end
@@ -71,6 +73,7 @@ module ForestAdminRpcAgent
             ensure
               trap('INT', original_int_handler)
               trap('TERM', original_term_handler)
+              ForestAdminRpcAgent::SseConnectionManager.unregister_connection(connection)
               out.close if out.respond_to?(:close)
 
               # Re-send the signal to allow proper server shutdown
@@ -95,11 +98,13 @@ module ForestAdminRpcAgent
               'X-Accel-Buffering' => 'no'
             }
 
-            should_continue = true
+            # Register this connection; any previous connection will be terminated
+            connection = ForestAdminRpcAgent::SseConnectionManager.register_connection
+
             server_stopped = false
             received_signal = nil
             stop_proc = proc do |sig|
-              should_continue = false
+              connection.terminate
               server_stopped = true
               received_signal = sig
             end
@@ -112,7 +117,7 @@ module ForestAdminRpcAgent
               begin
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] Starting stream')
 
-                while should_continue
+                while connection.active?
                   stream.write('', event: 'heartbeat')
                   sleep route_instance.instance_variable_get(:@heartbeat_interval)
                 end
@@ -135,6 +140,7 @@ module ForestAdminRpcAgent
               ensure
                 trap('INT', original_int_handler)
                 trap('TERM', original_term_handler)
+                ForestAdminRpcAgent::SseConnectionManager.unregister_connection(connection)
                 ForestAdminRpcAgent::Facades::Container.logger&.log('Debug', '[SSE] Stream stopped')
 
                 # Re-send the signal to allow proper server shutdown

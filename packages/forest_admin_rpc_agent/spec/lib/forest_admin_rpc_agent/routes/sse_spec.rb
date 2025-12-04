@@ -29,6 +29,12 @@ module ForestAdminRpcAgent
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
         # Clear used signatures to avoid replay attack protection between tests
         ForestAdminRpcAgent::Middleware::Authentication.class_variable_set(:@@used_signatures, {})
+        # Reset connection manager between tests
+        ForestAdminRpcAgent::SseConnectionManager.reset!
+      end
+
+      after do
+        ForestAdminRpcAgent::SseConnectionManager.reset!
       end
 
       describe '#initialize' do
@@ -268,6 +274,88 @@ module ForestAdminRpcAgent
           routes = sinatra_app.registered_routes
           expect(routes.first[:method]).to eq(:post)
           expect(routes.first[:path]).to eq('/custom/path')
+        end
+      end
+
+      describe 'connection manager integration' do
+        let(:rails_router) { instance_double(ActionDispatch::Routing::Mapper) }
+
+        before do
+          @captured_handlers = []
+
+          allow(Kernel).to receive(:trap) do |_signal, _handler|
+            -> {} # Return a dummy handler
+          end
+
+          allow(rails_router).to receive(:match) do |_, options|
+            @captured_handlers << options[:to]
+          end
+        end
+
+        it 'registers connection with connection manager' do
+          route.register_rails(rails_router)
+          handler = @captured_handlers.first
+
+          allow(Kernel).to receive(:sleep) do |_duration|
+            raise TestStopLoop
+          end
+
+          # Connection is registered when handler.call is invoked
+          _status, _headers, body = handler.call(env)
+
+          # Connection should be registered after handler.call but before enumeration
+          registered_connection = ForestAdminRpcAgent::SseConnectionManager.current_connection
+          expect(registered_connection).not_to be_nil
+          expect(registered_connection).to be_a(ForestAdminRpcAgent::SseConnectionManager::Connection)
+
+          begin
+            body.first
+          rescue TestStopLoop
+            # Expected
+          end
+        end
+
+        it 'terminates previous connection when new request arrives' do
+          route.register_rails(rails_router)
+          handler = @captured_handlers.first
+
+          allow(Kernel).to receive(:sleep) do |_duration|
+            raise TestStopLoop
+          end
+
+          # First request - don't iterate the body so connection stays registered
+          _status, _headers, _first_body = handler.call(env)
+          first_connection = ForestAdminRpcAgent::SseConnectionManager.current_connection
+          expect(first_connection.active?).to be true
+
+          # Clear signatures for second request
+          ForestAdminRpcAgent::Middleware::Authentication.class_variable_set(:@@used_signatures, {})
+
+          # Second request - should terminate first connection immediately upon registration
+          _status, _headers, _second_body = handler.call(env)
+          second_connection = ForestAdminRpcAgent::SseConnectionManager.current_connection
+
+          # First connection should now be terminated by second request's registration
+          expect(first_connection.active?).to be false
+          expect(second_connection.active?).to be true
+          expect(second_connection).not_to eq(first_connection)
+        end
+
+        it 'uses connection.active? as loop condition' do
+          # This test verifies the loop stops when connection is terminated
+          # by testing the connection manager behavior directly
+          connection = ForestAdminRpcAgent::SseConnectionManager.register_connection
+
+          iterations = 0
+          while connection.active? && iterations < 5
+            iterations += 1
+            # Simulate new connection arriving after 2 iterations
+            ForestAdminRpcAgent::SseConnectionManager.register_connection if iterations == 2
+          end
+
+          # Loop should have stopped after 2 iterations when connection was terminated
+          expect(iterations).to eq(2)
+          expect(connection.active?).to be false
         end
       end
     end
