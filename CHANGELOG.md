@@ -1,3 +1,10 @@
+## [1.16.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.3...v1.16.4) (2025-12-04)
+
+
+### Bug Fixes
+
+* handle field validations ([#220](https://github.com/ForestAdmin/agent-ruby/issues/220)) ([82f9711](https://github.com/ForestAdmin/agent-ruby/commit/82f971110ae8d7a9a58d5e48a655b37efbb0f008))
+
 ## [1.16.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.2...v1.16.3) (2025-12-04)
 
 
