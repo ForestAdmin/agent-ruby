@@ -1,3 +1,10 @@
+## [1.16.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.1...v1.16.2) (2025-12-04)
+
+
+### Bug Fixes
+
+* handle polymorphic many-to-one relations in create and update operations ([#217](https://github.com/ForestAdmin/agent-ruby/issues/217)) ([e2d2016](https://github.com/ForestAdmin/agent-ruby/commit/e2d20167cee0ce993d8861f98f4f22652ade3b41))
+
 ## [1.16.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.0...v1.16.1) (2025-12-03)
 
 
