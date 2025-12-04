@@ -1,3 +1,10 @@
+## [1.16.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.2...v1.16.3) (2025-12-04)
+
+
+### Bug Fixes
+
+* **rpc:** properly cleanup SSE connections and handle shutdown signals ([#218](https://github.com/ForestAdmin/agent-ruby/issues/218)) ([a5b306c](https://github.com/ForestAdmin/agent-ruby/commit/a5b306c1852f384e4b2a38eae216b24ef903a830))
+
 ## [1.16.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.1...v1.16.2) (2025-12-04)
 
 
