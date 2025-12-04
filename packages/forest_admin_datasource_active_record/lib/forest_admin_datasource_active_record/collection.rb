@@ -2,6 +2,7 @@ module ForestAdminDatasourceActiveRecord
   class Collection < ForestAdminDatasourceToolkit::Collection
     include Parser::Column
     include Parser::Relation
+    include Parser::Validation
     include ForestAdminDatasourceToolkit::Components::Query
 
     attr_reader :model
@@ -66,8 +67,7 @@ module ForestAdminDatasourceActiveRecord
           is_sortable: true,
           default_value: column.default,
           enum_values: get_enum_values(@model, column),
-          # validations: get_validations(column)
-          validation: []
+          validation: get_validations(column)
         )
 
         add_field(column_name, field)

@@ -36,8 +36,12 @@ module ForestAdminDatasourceActiveRecord
             parsed_validations << { operator: Operators::GREATER_THAN, value: value }
           when :less_than, :less_than_or_equal_to
             parsed_validations << { operator: Operators::LESS_THAN, value: value }
+          when :allow_nil
+            parsed_validations << { operator: Operators::PRESENT } unless value
           end
         end
+
+        parsed_validations
       end
 
       def parse_length_validator(validator, parsed_validations)
@@ -54,6 +58,8 @@ module ForestAdminDatasourceActiveRecord
             parsed_validations << { operator: Operators::SHORTER_THAN, value: value }
           end
         end
+
+        parsed_validations
       end
 
       def parse_format_validator(validator, parsed_validations)
