@@ -135,8 +135,8 @@ module ForestAdminRpcAgent
             handler_proc = nil
 
             # Capture the handler proc that's passed to match
-            allow(rails_router).to receive(:match) do |_url, **options, &_block|
-              handler_proc = options[:to]
+            allow(rails_router).to receive(:match) do |_url, **opts|
+              handler_proc = opts[:to]
             end
 
             not_found_route.send(:register_rails, rails_router)
