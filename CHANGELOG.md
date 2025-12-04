@@ -1,3 +1,10 @@
+## [1.16.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.4...v1.16.5) (2025-12-04)
+
+
+### Bug Fixes
+
+* **rpc:** ensure single SSE connection to master ([#222](https://github.com/ForestAdmin/agent-ruby/issues/222)) ([c7b65e9](https://github.com/ForestAdmin/agent-ruby/commit/c7b65e9cad3157bf2335a30e407b3035620b0c1a))
+
 ## [1.16.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.3...v1.16.4) (2025-12-04)
 
 
