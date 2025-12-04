@@ -285,6 +285,66 @@ module ForestAdminAgent
               )
             end
           end
+
+          describe 'with polymorphic many to one relation' do
+            it 'call create with polymorphic foreign key and type' do
+              collection_company = build_collection(
+                name: 'company',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'name' => ColumnSchema.new(column_type: 'String')
+                  }
+                }
+              )
+
+              collection_member = build_collection(
+                name: 'member',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
+                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
+                      foreign_collections: ['company'],
+                      foreign_key: 'memberable_id',
+                      foreign_key_type_field: 'memberable_type',
+                      foreign_key_targets: { 'company' => 'id' }
+                    )
+                  }
+                }
+              )
+
+              @datasource.add_collection(collection_company)
+              @datasource.add_collection(collection_member)
+
+              args[:params][:data] = {
+                attributes: {},
+                relationships: { 'memberable' => { 'data' => { 'type' => 'Company', 'id' => 3 } } },
+                type: 'Member'
+              }
+              args[:params]['collection_name'] = 'member'
+              allow(@datasource.get_collection('member')).to receive_messages(
+                create: { 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Company' },
+                list: [{ 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Company' }]
+              )
+
+              result = store.handle_request(args)
+              expect(@datasource.get_collection('member')).to have_received(:create) do |caller, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(data).to eq({ 'memberable_id' => 3, 'memberable_type' => 'Company' })
+              end
+              expect(result[:name]).to eq('member')
+            end
+          end
         end
       end
     end
