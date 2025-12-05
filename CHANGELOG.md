@@ -1,3 +1,10 @@
+## [1.16.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.5...v1.16.6) (2025-12-05)
+
+
+### Bug Fixes
+
+* prevent routes loading when agent not instantiated ([#224](https://github.com/ForestAdmin/agent-ruby/issues/224)) ([b9b1e42](https://github.com/ForestAdmin/agent-ruby/commit/b9b1e4211759e44d1d39da2b6d96ee66a3571416))
+
 ## [1.16.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.4...v1.16.5) (2025-12-04)
 
 
