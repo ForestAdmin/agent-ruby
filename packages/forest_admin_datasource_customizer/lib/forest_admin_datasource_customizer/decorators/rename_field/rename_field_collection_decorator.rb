@@ -201,6 +201,9 @@ module ForestAdminDatasourceCustomizer
             field = from_child_collection[child_field] || child_field
             field_schema = schema[:fields][field]
 
+            # Skip fields that don't exist in the schema (e.g., virtual attributes)
+            next unless field_schema
+
             # Perform the mapping, recurse for relation
             if field_schema.type == 'Column' || value.nil? || field_schema.type == 'PolymorphicManyToOne' ||
                field_schema.type == 'PolymorphicOneToOne'

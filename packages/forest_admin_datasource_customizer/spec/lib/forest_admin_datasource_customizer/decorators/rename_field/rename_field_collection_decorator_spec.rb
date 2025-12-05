@@ -374,6 +374,39 @@ module ForestAdminDatasourceCustomizer
             expect(person_fields['my_book_person'].origin_key_target).to eq('new_person_id')
           end
         end
+
+        describe 'handling virtual attributes' do
+          it 'ignores fields that do not exist in schema during list with renamed field' do
+            @new_person.rename_field('id', 'new_id')
+            projection = Projection.new(%w[new_id])
+
+            # Simulate a record with a virtual attribute that's not in the schema
+            record_with_virtual = { 'id' => 1, 'virtual_attribute' => 'some_value' }
+
+            allow(@collection_person).to receive(:list).and_return([record_with_virtual])
+
+            # Should not raise an error and should ignore the virtual attribute
+            records = @new_person.list(caller, Filter.new, projection)
+
+            expect(records.first).not_to have_key('virtual_attribute')
+            expect(records.first['new_id']).to eq(1)
+            expect(records.first).not_to have_key('id')
+          end
+
+          it 'ignores fields that do not exist in schema during record transformation' do
+            @new_person.rename_field('id', 'new_id')
+
+            # Record with virtual attribute from child collection
+            child_record = { 'id' => 1, 'virtual_attribute' => 'some_value' }
+
+            # Transform record from child collection
+            result = @new_person.send(:record_from_child_collection, child_record)
+
+            # Virtual attribute should be filtered out
+            expect(result).not_to have_key('virtual_attribute')
+            expect(result['new_id']).to eq(1)
+          end
+        end
       end
     end
   end
