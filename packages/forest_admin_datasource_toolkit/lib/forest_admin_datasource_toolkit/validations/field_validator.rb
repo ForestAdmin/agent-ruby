@@ -50,6 +50,8 @@ module ForestAdminDatasourceToolkit
       end
 
       def self.validate_value(field, schema, value, allowed_types = nil)
+        return if template_string?(value)
+
         allowed_types ||= Rules.get_allowed_types_for_column_type(schema.column_type)
 
         # TODO: FIXME: handle complex type from ColumnType
@@ -66,6 +68,10 @@ module ForestAdminDatasourceToolkit
         return unless value && schema.column_type == PrimitiveType::ENUM
 
         check_enum_value(schema, value)
+      end
+
+      def self.template_string?(value)
+        value.is_a?(String) && value.match?(/\{\{.+\}\}/)
       end
 
       def self.validate_name(collection_name, name)

@@ -281,6 +281,43 @@ module ForestAdminDatasourceToolkit
             end
           end
         end
+
+        context 'with template strings (context variables)' do
+          it 'skips validation for template string on uuid field' do
+            expect do
+              described_class.validate_value('id', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::UUID),
+                                             '{{collection_financing.selectedRecord.id}}')
+            end.not_to raise_error
+          end
+
+          it 'skips validation for template string on number field' do
+            expect do
+              described_class.validate_value('count', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER),
+                                             '{{currentUser.team.id}}')
+            end.not_to raise_error
+          end
+
+          it 'skips validation for template string on date field' do
+            expect do
+              described_class.validate_value('date', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::DATE),
+                                             '{{currentUser.createdAt}}')
+            end.not_to raise_error
+          end
+
+          it 'does not skip validation for strings that look similar but are not template strings' do
+            expect do
+              described_class.validate_value('uuid', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::UUID),
+                                             '{not-a-template}')
+            end.to raise_error(ValidationError)
+          end
+
+          it 'does not skip validation for partial template strings' do
+            expect do
+              described_class.validate_value('uuid', ColumnSchema.new(column_type: Concerns::PrimitiveTypes::UUID),
+                                             '{{incomplete')
+            end.to raise_error(ValidationError)
+          end
+        end
       end
     end
   end
