@@ -43,6 +43,12 @@ module ForestAdminAgent
         self
       end
 
+      def use(plugin, options = {})
+        @customizer.use(plugin, options)
+
+        self
+      end
+
       def build
         @container.register(:datasource, @customizer.datasource(@logger))
 
