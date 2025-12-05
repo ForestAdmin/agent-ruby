@@ -1,3 +1,10 @@
+## [1.16.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.6...v1.16.7) (2025-12-05)
+
+
+### Bug Fixes
+
+* **activerecord:** ignore attribue fields ([#223](https://github.com/ForestAdmin/agent-ruby/issues/223)) ([be16f2a](https://github.com/ForestAdmin/agent-ruby/commit/be16f2acd5ac392dc136b3105733b41bbb9f603a))
+
 ## [1.16.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.5...v1.16.6) (2025-12-05)
 
 
