@@ -1,3 +1,10 @@
+## [1.16.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.7...v1.16.8) (2025-12-05)
+
+
+### Bug Fixes
+
+* agent use plugin ([#225](https://github.com/ForestAdmin/agent-ruby/issues/225)) ([cb70a92](https://github.com/ForestAdmin/agent-ruby/commit/cb70a9257daae80c48760180f58a5abd29e999f7))
+
 ## [1.16.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.6...v1.16.7) (2025-12-05)
 
 
