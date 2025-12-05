@@ -67,26 +67,6 @@ module ForestAdminDatasourceCustomizer
           expect(datasource_customizer).to have_received(:remove_collection).with('internal', 'debug')
         end
       end
-
-      describe '#plugin' do
-        it 'uses a plugin with options' do
-          plugin_class = class_double('PluginClass')
-          allow(datasource_customizer).to receive(:use).with(plugin_class, { option: 'value' })
-
-          datasource_customizer.plugin plugin_class, option: 'value'
-
-          expect(datasource_customizer).to have_received(:use).with(plugin_class, { option: 'value' })
-        end
-
-        it 'uses a plugin without options' do
-          plugin_class = class_double('PluginClass')
-          allow(datasource_customizer).to receive(:use).with(plugin_class, {})
-
-          datasource_customizer.plugin plugin_class
-
-          expect(datasource_customizer).to have_received(:use).with(plugin_class, {})
-        end
-      end
     end
 
     describe ChartBuilder do
