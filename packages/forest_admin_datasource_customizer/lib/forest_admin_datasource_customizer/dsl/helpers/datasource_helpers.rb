@@ -52,18 +52,6 @@ module ForestAdminDatasourceCustomizer
       def hide_collections(*names)
         remove_collection(*names.map(&:to_s))
       end
-
-      # Use a plugin with the datasource
-      # (Keeps existing syntax as it's already clean)
-      #
-      # @example
-      #   plugin MyCustomPlugin, option1: 'value'
-      #
-      # @param plugin_class [Class] plugin class
-      # @param options [Hash] plugin options
-      def plugin(plugin_class, options = {})
-        use(plugin_class, options)
-      end
     end
   end
 end
