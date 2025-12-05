@@ -371,6 +371,100 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe 'projection optimization' do
+          let(:filter) { Filter.new }
+
+          it 'only converts fields present in projection for list' do
+            # Record with binary fields, but projection only includes 'id'
+            projection = Projection.new(%w[id])
+            record_with_only_id = { 'id' => BinaryHelper.hex_to_bin('30303030') }
+
+            allow(@collection_book).to receive(:list).and_return([record_with_only_id])
+
+            records = @decorated_book.list(caller, filter, projection)
+
+            # Only 'id' should be present and converted (to hex)
+            expect(records).to eq(
+              [
+                {
+                  'id' => '30303030'
+                }
+              ]
+            )
+          end
+
+          it 'does not convert fields not in projection but keeps them' do
+            # Projection only includes 'id' and 'title', but record has binary 'cover'
+            projection = Projection.new(%w[id title])
+            record = {
+              'id' => BinaryHelper.hex_to_bin('30303030'),
+              'title' => 'Foundation',
+              'cover' => Base64.strict_decode64('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==')
+            }
+
+            allow(@collection_book).to receive(:list).and_return([record])
+
+            records = @decorated_book.list(caller, filter, projection)
+
+            # 'id' should be converted, 'title' passed through, 'cover' not converted (left as binary)
+            expect(records.first['id']).to eq('30303030')
+            expect(records.first['title']).to eq('Foundation')
+            # 'cover' is not in projection, so it's not converted (stays as binary)
+            expect(records.first['cover']).to eq(Base64.strict_decode64('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='))
+          end
+
+          it 'converts nested fields when they are in projection' do
+            projection = Projection.new(%w[id author:picture])
+            allow(@collection_book).to receive(:list).and_return([book_record])
+
+            records = @decorated_book.list(caller, filter, projection)
+
+            expect(records.first['author']['picture']).to eq('data:application/octet-stream;base64,MDAwMA==')
+            expect(records.first['id']).to eq('30303030')
+          end
+        end
+
+        describe 'handling virtual attributes' do
+          let(:filter) { Filter.new }
+          let(:projection) { Projection.new(%w[id cover]) }
+
+          it 'ignores fields that do not exist in schema during list' do
+            # Simulate a record with a virtual attribute that's not in the schema
+            record_with_virtual = book_record.merge('virtual_attribute' => 'some_value')
+
+            allow(@collection_book).to receive(:list).and_return([record_with_virtual])
+
+            # Should not raise an error and should ignore the virtual attribute
+            records = @decorated_book.list(caller, filter, projection)
+
+            expect(records.first).not_to have_key('virtual_attribute')
+            expect(records.first['id']).to eq('30303030')
+          end
+
+          it 'ignores fields that do not exist in schema during create' do
+            # Record to create with a virtual attribute
+            record_with_virtual = { 'id' => '3030', 'cover' => 'data:application/octet-stream;base64,aGVsbG8=',
+                                    'virtual_attribute' => 'some_value' }
+
+            # Mock the child collection to return a record with the virtual attribute
+            allow(@collection_book).to receive(:create)
+              .and_return(
+                {
+                  'id' => BinaryHelper.hex_to_bin('3030'),
+                  'cover' => Base64.strict_decode64('aGVsbG8='),
+                  'virtual_attribute' => 'some_value'
+                }
+              )
+
+            result = @decorated_book.create(caller, record_with_virtual)
+
+            # Virtual attribute should be filtered out
+            expect(result).not_to have_key('virtual_attribute')
+            expect(result['id']).to eq('3030')
+            expect(result['cover']).to eq('data:application/octet-stream;base64,aGVsbG8=')
+          end
+        end
+
         describe 'error handling for non-existing fields' do
           describe 'convert_value' do
             it 'raises ValidationError when field does not exist' do

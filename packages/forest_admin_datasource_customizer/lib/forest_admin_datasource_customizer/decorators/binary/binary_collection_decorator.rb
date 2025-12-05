@@ -68,7 +68,7 @@ module ForestAdminDatasourceCustomizer
 
         def list(caller, filter, projection)
           records = super
-          records.map! { |record| convert_record(false, record) }
+          records.map! { |record| convert_record(false, record, projection) }
 
           records
         end
@@ -126,17 +126,43 @@ module ForestAdminDatasourceCustomizer
           Utils::Schema.primary_key?(@child_collection, name) || Utils::Schema.foreign_key?(@child_collection, name)
         end
 
-        def convert_record(to_backend, record)
-          if record
-            record = record.to_h do |path, value|
-              [path, convert_value(to_backend, path, value)]
+        def convert_record(to_backend, record, projection = nil)
+          return record unless record
+
+          result = {}
+          record.each do |path, value|
+            # Skip fields that don't exist in the schema (e.g., virtual attributes)
+            prefix = path.split(':').first
+            next unless @child_collection.schema[:fields][prefix]
+
+            if projection.nil?
+              result[path] = convert_value(to_backend, path, value, nil)
+            else
+              sub_projection = extract_sub_projection(projection, path)
+              result[path] = if sub_projection
+                               convert_value(to_backend, path, value, sub_projection)
+                             else
+                               value
+                             end
             end
           end
 
-          record
+          result
         end
 
-        def convert_value(to_backend, path, value)
+        def extract_sub_projection(projection, path)
+          # Check if the field is directly in the projection
+          return Projection.new([path]) if projection.include?(path)
+
+          # Check if any field in the projection starts with "path:"
+          sub_fields = projection.select { |p| p.start_with?("#{path}:") }
+          return nil if sub_fields.empty?
+
+          # Extract the sub-projection by removing the prefix
+          Projection.new(sub_fields.map { |p| p[(path.length + 1)..] })
+        end
+
+        def convert_value(to_backend, path, value, projection = nil)
           prefix, suffix = path.split(':')
           field = @child_collection.schema[:fields][prefix]
 
@@ -151,9 +177,13 @@ module ForestAdminDatasourceCustomizer
           if field.type != 'Column'
             foreign_collection = @datasource.get_collection(field.foreign_collection)
 
-            return suffix ? foreign_collection.convert_value(to_backend, suffix,
-                                                             value) : foreign_collection.convert_record(to_backend,
-                                                                                                        value)
+            result = if suffix
+                       foreign_collection.convert_value(to_backend, suffix, value, projection)
+                     else
+                       foreign_collection.convert_record(to_backend, value, projection)
+                     end
+
+            return result
           end
 
           binary_mode = should_use_hex(path)
