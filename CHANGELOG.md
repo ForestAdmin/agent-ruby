@@ -1,3 +1,10 @@
+## [1.16.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.8...v1.16.9) (2025-12-08)
+
+
+### Bug Fixes
+
+* delay value validation when templating ([#226](https://github.com/ForestAdmin/agent-ruby/issues/226)) ([3df4ee9](https://github.com/ForestAdmin/agent-ruby/commit/3df4ee949fd5eef6245d77a37b8e719ca19c6b8b))
+
 ## [1.16.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.7...v1.16.8) (2025-12-05)
 
 
