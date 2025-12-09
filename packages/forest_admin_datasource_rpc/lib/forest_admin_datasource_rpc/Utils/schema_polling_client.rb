@@ -10,6 +10,8 @@ module ForestAdminDatasourceRpc
       attr_reader :closed
 
       DEFAULT_POLLING_INTERVAL = 600 # seconds (10 minutes)
+      MIN_POLLING_INTERVAL = 1 # seconds (minimum safe interval)
+      MAX_POLLING_INTERVAL = 3600 # seconds (1 hour max)
 
       def initialize(uri, auth_secret, options = {}, &on_schema_change)
         @uri = uri
@@ -21,6 +23,9 @@ module ForestAdminDatasourceRpc
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
+
+        # Validate polling interval
+        validate_polling_interval!
 
         # HTTP client with reasonable timeouts
         @http_client = Faraday.new do |conn|
@@ -46,7 +51,10 @@ module ForestAdminDatasourceRpc
           end
         end
 
-        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Polling started')
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Info',
+          "[Schema Polling] Polling started (interval: #{@polling_interval}s)"
+        )
       end
 
       def stop
@@ -177,6 +185,16 @@ module ForestAdminDatasourceRpc
 
       def generate_signature(timestamp)
         OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
+      end
+
+      def validate_polling_interval!
+        if @polling_interval < MIN_POLLING_INTERVAL
+          raise ArgumentError,
+                "Schema polling interval too short: #{@polling_interval}s (minimum: #{MIN_POLLING_INTERVAL}s)"
+        elsif @polling_interval > MAX_POLLING_INTERVAL
+          raise ArgumentError,
+                "Schema polling interval too long: #{@polling_interval}s (maximum: #{MAX_POLLING_INTERVAL}s)"
+        end
       end
     end
   end

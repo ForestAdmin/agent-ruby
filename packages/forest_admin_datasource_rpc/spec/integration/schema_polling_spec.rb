@@ -163,7 +163,7 @@ module ForestAdminDatasourceRpc
         end
 
         it 'continues polling after errors' do
-          client = Utils::SchemaPollingClient.new(uri, auth_secret, polling_interval: 0.1) { |schema| callback.call(schema) }
+          client = Utils::SchemaPollingClient.new(uri, auth_secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
@@ -180,7 +180,7 @@ module ForestAdminDatasourceRpc
           end
 
           client.start
-          sleep(0.3) # Wait for 2-3 polls
+          sleep(1.5) # Wait for 2 polls
           client.stop
 
           # Should have logged error and then success

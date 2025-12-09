@@ -8,6 +8,19 @@ loader.setup
 module ForestAdminDatasourceRpc
   class Error < StandardError; end
 
+  # Build a RPC datasource with schema polling enabled.
+  #
+  # @param options [Hash] Configuration options
+  # @option options [String] :uri The URI of the RPC agent
+  # @option options [String] :auth_secret The authentication secret (optional, will use cache if not provided)
+  # @option options [Integer] :schema_polling_interval Polling interval in seconds (optional)
+  #   - Default: 600 seconds (10 minutes)
+  #   - Can be overridden with ENV['SCHEMA_POLLING_INTERVAL']
+  #   - Valid range: 1-3600 seconds
+  #   - Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default
+  #   - Example: SCHEMA_POLLING_INTERVAL=30 for development (30 seconds)
+  #
+  # @return [ForestAdminDatasourceRpc::Datasource] The configured datasource with schema polling
   def self.build(options)
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
@@ -44,8 +57,17 @@ module ForestAdminDatasourceRpc
       ForestAdminDatasourceToolkit::Datasource.new
     else
       # Create schema polling client with configurable polling interval
+      # Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default (600)
+      polling_interval = if options[:schema_polling_interval]
+                           options[:schema_polling_interval]
+                         elsif ENV['SCHEMA_POLLING_INTERVAL']
+                           ENV['SCHEMA_POLLING_INTERVAL'].to_i
+                         else
+                           600 # 10 minutes by default
+                         end
+
       polling_options = {
-        polling_interval: options[:schema_polling_interval] || 600 # 10 minutes by default
+        polling_interval: polling_interval
       }
 
       schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |new_schema|
