@@ -217,7 +217,7 @@ module ForestAdminDatasourceActiveRecord
 
         context 'with malicious field names', :db_truncation do
           it 'blocks SQL injection in field parameter' do
-            # Mock format_field to return malicious string
+            # Test date_trunc_sql with malicious string to ensure SQL injection is blocked
             aggregation = Aggregation.new(
               operation: 'Sum',
               field: 'nb_seats',

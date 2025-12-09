@@ -280,6 +280,106 @@ module ForestAdminDatasourceActiveRecord
             expect(sql).not_to include('/gi')
           end
         end
+
+        context 'when filtering on related fields' do
+          # Car belongs_to Category, so we can filter cars by category:label
+          it 'uses the related table for CONTAINS on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::CONTAINS, 'sedan')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"categories"."label" LIKE \'%sedan%\'')
+            expect(sql).not_to include('"cars"."categories.label"')
+            expect(sql).not_to include('"cars"."category:label"')
+          end
+
+          it 'uses the related table for I_CONTAINS on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::I_CONTAINS, 'Sedan')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('LOWER("categories"."label") LIKE \'%sedan%\'')
+            expect(sql).not_to include('"cars"."categories.label"')
+          end
+
+          it 'uses the related table for STARTS_WITH on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::STARTS_WITH, 'SUV')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"categories"."label" LIKE \'SUV%\'')
+          end
+
+          it 'uses the related table for ENDS_WITH on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::ENDS_WITH, 'car')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"categories"."label" LIKE \'%car\'')
+          end
+
+          it 'uses the related table for EQUAL on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::EQUAL, 'sedan')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('"categories"."label" = \'sedan\'')
+          end
+
+          it 'uses the related table for MATCH on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, 'sedan|suv')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('categories.label REGEXP')
+            expect(sql).to include('sedan|suv')
+            expect(sql).not_to include('cars.categories.label')
+          end
+
+          it 'adds join for related table when filtering on relation field' do
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('category:label', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::CONTAINS, 'test')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            # The query should include the category relation
+            expect(query_builder.query.includes_values).to include(:category)
+          end
+        end
+      end
+
+      describe 'sorting on related fields' do
+        it 'uses the related table name for sorting' do
+          sort = [{ field: 'category:label', ascending: true }]
+          filter = Filter.new(sort: sort)
+          query_builder = described_class.new(collection, nil, filter)
+          query_builder.build
+
+          sql = query_builder.query.to_sql
+          expect(sql).to include('ORDER BY "categories"."label" ASC')
+          expect(sql).not_to include('ORDER BY "cars"')
+        end
+
+        it 'adds join for related table when sorting on relation field' do
+          sort = [{ field: 'category:label', ascending: false }]
+          filter = Filter.new(sort: sort)
+          query_builder = described_class.new(collection, nil, filter)
+          query_builder.build
+
+          expect(query_builder.query.includes_values).to include(:category)
+        end
       end
     end
   end
