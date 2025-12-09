@@ -94,9 +94,31 @@ module ForestAdminRpcAgent
     def build_rpc_schema_from_datasource(datasource)
       schema = customizer.schema
 
-      schema[:collections] = datasource.collections
-                                       .map { |_name, collection| serialize_collection_schema(collection) }
-                                       .sort_by { |c| c[:name] }
+      schema = agent.customizer.schema
+      rpc_collections = agent.rpc_collections || []
+
+      rpc_relations = {}
+      collections = []
+
+      datasource.collections.each do |_name, collection|
+        if rpc_collections.include?(collection.name)
+          # RPC collection → extract relations to non-RPC collections
+          relations = {}
+          collection.schema[:fields].each do |field_name, field|
+            next if field.type == 'Column'
+            next if rpc_collections.include?(field.foreign_collection)
+
+            relations[field_name] = field
+          end
+          rpc_relations[collection.name] = relations unless relations.empty?
+        else
+          # Normal collection → include in schema
+          collections << collection.schema.merge({ name: collection.name })
+        end
+      end
+
+      schema[:collections] = collections.sort_by { |c| c[:name] }
+      schema[:rpc_relations] = rpc_relations
 
       schema[:native_query_connections] = datasource.live_query_connections.keys
                                                     .map { |connection_name| { name: connection_name } }
