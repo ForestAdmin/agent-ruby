@@ -18,12 +18,53 @@ module ForestAdminDatasourceRpc
       include_examples 'with introspection'
 
       context 'when server is running' do
+        let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
         let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+
+        before do
+          allow(Utils::SseClient).to receive(:new).and_return(sse_client)
+        end
 
         it 'build datasource' do
           datasource = described_class.build({ uri: 'http://localhost' })
 
           expect(datasource).to be_a(ForestAdminDatasourceRpc::Datasource)
+        end
+
+        it 'calls RPC client to get schema from /forest/rpc-schema' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(rpc_client).to have_received(:call_rpc).with('/forest/rpc-schema', method: :get, symbolize_keys: true)
+        end
+
+        it 'creates datasource with collections from introspection' do
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.collections.keys).to include('Product', 'Manufacturer')
+        end
+
+        it 'creates datasource with charts from introspection' do
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.schema[:charts]).to eq(['appointments'])
+        end
+
+        it 'handles introspection with native_query_connections' do
+          introspection_with_connections = introspection.merge(
+            native_query_connections: [{ name: 'primary' }, { name: 'secondary' }]
+          )
+          allow(rpc_client).to receive(:call_rpc).and_return(introspection_with_connections)
+
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.live_query_connections).to eq({ 'primary' => 'primary', 'secondary' => 'secondary' })
+        end
+
+        it 'initializes SSE client for schema updates' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SseClient).to have_received(:new).with('http://localhost/forest/sse', 'secret')
+          expect(sse_client).to have_received(:start)
         end
       end
 
