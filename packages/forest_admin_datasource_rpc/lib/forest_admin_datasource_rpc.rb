@@ -48,34 +48,21 @@ module ForestAdminDatasourceRpc
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      # Create health check client with configurable polling interval and failure threshold
-      health_check_options = {
-        polling_interval: options[:health_check_interval] || 30,
-        failure_threshold: options[:health_check_failure_threshold] || 3
+      # Create schema polling client with configurable polling interval
+      polling_options = {
+        polling_interval: options[:schema_polling_interval] || 600 # 10 minutes by default
       }
 
-      health_check = Utils::HealthCheckClient.new("#{uri}/forest/health", auth_secret, health_check_options) do
-        ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server appears down, checking schema...')
-        begin
-          new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
-
-          if last_hash_schema == Digest::SHA1.hexdigest(new_schema.to_h.to_s)
-            ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed')
-          else
-            ForestAdminAgent::Builder::AgentFactory.instance.reload!
-          end
-        rescue StandardError => e
-          ForestAdminAgent::Facades::Container.logger.log(
-            'Warn',
-            "[RPCDatasource] Failed to check schema after server down: #{e.class} - #{e.message}"
-          )
-        end
+      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |new_schema|
+        # Callback receives the new schema directly from polling
+        ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
+        ForestAdminAgent::Builder::AgentFactory.instance.reload!
       end
-      health_check.start
+      schema_polling.start
 
-      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, health_check)
+      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
 
-      # Setup cleanup hooks for proper health check client shutdown
+      # Setup cleanup hooks for proper schema polling client shutdown
       setup_cleanup_hooks(datasource)
 
       datasource
