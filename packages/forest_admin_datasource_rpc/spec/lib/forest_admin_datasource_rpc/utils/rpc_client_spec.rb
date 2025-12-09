@@ -6,7 +6,8 @@ module ForestAdminDatasourceRpc
       subject(:rpc_client) { described_class.new('http://localhost', 'secret') }
 
       context 'when the forest admin api is called' do
-        let(:response) { instance_double(Faraday::Response, status: 200, body: {}, success?: true) }
+        let(:response_headers) { {} }
+        let(:response) { instance_double(Faraday::Response, status: 200, body: {}, success?: true, headers: response_headers) }
         let(:faraday_connection) { instance_double(Faraday::Connection, send: response) }
         let(:timestamp) { '2025-04-01T14:07:02Z' }
 
@@ -15,7 +16,7 @@ module ForestAdminDatasourceRpc
           allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
         end
 
-        it 'returns a response on the get method' do
+        it 'returns a Response object on the get method' do
           result = rpc_client.call_rpc('/rpc/test', method: :get)
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -31,10 +32,11 @@ module ForestAdminDatasourceRpc
             )
           end
 
-          expect(result).to eq({})
+          expect(result).to be_a(RpcClient::Response)
+          expect(result.body).to eq({})
         end
 
-        it 'returns a response on the get method with payload' do
+        it 'returns a Response object on the get method with payload' do
           result = rpc_client.call_rpc('/rpc/test', method: :get, payload: { foo: 'arg' })
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -50,10 +52,11 @@ module ForestAdminDatasourceRpc
             )
           end
 
-          expect(result).to eq({})
+          expect(result).to be_a(RpcClient::Response)
+          expect(result.body).to eq({})
         end
 
-        it 'returns a response on the post method' do
+        it 'returns a Response object on the post method' do
           result = rpc_client.call_rpc('/rpc/test', method: :post)
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -69,10 +72,11 @@ module ForestAdminDatasourceRpc
             )
           end
 
-          expect(result).to eq({})
+          expect(result).to be_a(RpcClient::Response)
+          expect(result.body).to eq({})
         end
 
-        it 'returns a response on the post method with payload' do
+        it 'returns a Response object on the post method with payload' do
           result = rpc_client.call_rpc('/rpc/test', method: :post, payload: { foo: 'arg' })
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -88,7 +92,66 @@ module ForestAdminDatasourceRpc
             )
           end
 
-          expect(result).to eq({})
+          expect(result).to be_a(RpcClient::Response)
+          expect(result.body).to eq({})
+        end
+
+        context 'with If-None-Match header' do
+          it 'sends If-None-Match header when if_none_match is provided' do
+            rpc_client.call_rpc('/rpc/test', method: :get, if_none_match: 'abc123')
+
+            expect(faraday_connection).to have_received(:send) do |_method, _endpoint, _payload, headers|
+              expect(headers['If-None-Match']).to eq('"abc123"')
+            end
+          end
+
+          it 'does not send If-None-Match header when if_none_match is nil' do
+            rpc_client.call_rpc('/rpc/test', method: :get)
+
+            expect(faraday_connection).to have_received(:send) do |_method, _endpoint, _payload, headers|
+              expect(headers).not_to have_key('If-None-Match')
+            end
+          end
+        end
+
+        context 'with ETag in response' do
+          let(:response_headers) { { 'ETag' => '"etag123"' } }
+
+          it 'extracts ETag from response headers and strips quotes' do
+            result = rpc_client.call_rpc('/rpc/test', method: :get)
+
+            expect(result.etag).to eq('etag123')
+          end
+        end
+
+        context 'with lowercase etag header' do
+          let(:response_headers) { { 'etag' => '"lowercase-etag"' } }
+
+          it 'extracts etag from lowercase header' do
+            result = rpc_client.call_rpc('/rpc/test', method: :get)
+
+            expect(result.etag).to eq('lowercase-etag')
+          end
+        end
+
+        context 'without ETag in response' do
+          let(:response_headers) { {} }
+
+          it 'returns nil for etag' do
+            result = rpc_client.call_rpc('/rpc/test', method: :get)
+
+            expect(result.etag).to be_nil
+          end
+        end
+
+        context 'with 304 Not Modified response' do
+          let(:response) { instance_double(Faraday::Response, status: 304, success?: false, headers: response_headers) }
+
+          it 'returns NotModified' do
+            result = rpc_client.call_rpc('/rpc/test', method: :get, if_none_match: 'abc123')
+
+            expect(result).to eq(RpcClient::NotModified)
+          end
         end
 
         context 'when request fails with error responses' do

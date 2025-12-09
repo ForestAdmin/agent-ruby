@@ -20,10 +20,12 @@ module ForestAdminRpcAgent
 
       def register_sinatra(app)
         app.send(@method.to_sym, @url) do
-          result = handle_request(params)
+          result = handle_request({ params: params, request: request })
 
           if result.is_a?(Hash) && result.key?(:status)
             status result[:status]
+            # Set custom headers if provided
+            result[:headers]&.each { |key, value| headers[key] = value }
             result[:content] ? serialize_response(result[:content]) : ''
           else
             serialize_response(result)
@@ -38,16 +40,16 @@ module ForestAdminRpcAgent
           # Skip authentication for health check (root path)
           if @url == '/'
             params = request.query_parameters.merge(request.request_parameters)
-            result = handle_request({ params: params, caller: nil })
-            [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+            result = handle_request({ params: params, caller: nil, request: request })
+            build_rails_response(result)
           else
             auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
             status, headers, response = auth_middleware.call(request.env)
 
             if status == 200
               params = request.query_parameters.merge(request.request_parameters)
-              result = handle_request({ params: params, caller: headers[:caller] })
-              [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+              result = handle_request({ params: params, caller: headers[:caller], request: request })
+              build_rails_response(result)
             else
               [status, headers, response]
             end
@@ -60,6 +62,17 @@ module ForestAdminRpcAgent
                      via: @method,
                      as: @name,
                      route_alias: @name
+      end
+
+      def build_rails_response(result)
+        if result.is_a?(Hash) && result.key?(:status)
+          response_headers = { 'Content-Type' => 'application/json' }
+          response_headers.merge!(result[:headers]) if result[:headers]
+          body = result[:content] ? serialize_response(result[:content]) : ''
+          [result[:status], response_headers, [body]]
+        else
+          [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
+        end
       end
 
       protected

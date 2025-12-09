@@ -19,7 +19,8 @@ module ForestAdminDatasourceRpc
 
       context 'when server is running' do
         let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:response) { Utils::RpcClient::Response.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: response) }
 
         before do
           allow(Utils::SseClient).to receive(:new).and_return(sse_client)

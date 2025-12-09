@@ -13,10 +13,15 @@ module ForestAdminDatasourceRpc
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
+    schema = nil
+    cached_etag = nil
+
     begin
       rpc_client = Utils::RpcClient.new(uri, auth_secret)
-      schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
-      last_hash_schema = Digest::SHA1.hexdigest(schema.to_h.to_s)
+      response = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
+      schema = response.body
+      # Use the ETag header for conditional requests
+      cached_etag = response.etag
     rescue Faraday::ConnectionFailed => e
       ForestAdminAgent::Facades::Container.logger.log(
         'Error',
@@ -45,11 +50,21 @@ module ForestAdminDatasourceRpc
     else
       sse = Utils::SseClient.new("#{uri}/forest/sse", auth_secret) do
         ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
-        new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
 
-        if last_hash_schema == Digest::SHA1.hexdigest(new_schema.to_h.to_s)
-          ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed')
+        # Send If-None-Match header to check if schema has changed (304 optimization)
+        result = rpc_client.call_rpc(
+          '/forest/rpc-schema',
+          method: :get,
+          symbolize_keys: true,
+          if_none_match: cached_etag
+        )
+
+        # If we get NotModified, schema hasn't changed
+        if result == Utils::RpcClient::NotModified
+          ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed (304)')
         else
+          # Schema has changed, update the cached ETag and reload
+          cached_etag = result.etag
           ForestAdminAgent::Builder::AgentFactory.instance.reload!
         end
       end
