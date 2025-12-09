@@ -37,8 +37,8 @@ module ForestAdminDatasourceActiveRecord
 
       def apply_sort(sort)
         sort.each do |sort_clause|
-          field = format_field(sort_clause[:field])
-          @query = @query.order(field => sort_clause[:ascending] ? :asc : :desc)
+          resolved = resolve_field(sort_clause[:field])
+          @query = @query.order(resolved[:formatted] => sort_clause[:ascending] ? :asc : :desc)
         end
 
         @query
@@ -65,7 +65,9 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def compute_main_operator(condition_tree, aggregator)
-        field = format_field(condition_tree.field)
+        resolved = resolve_field(condition_tree.field)
+        field = resolved[:formatted]
+        arel_attr = resolved[:arel_attr]
         value = condition_tree.value
         aggregator = aggregator.to_sym
 
@@ -93,45 +95,45 @@ module ForestAdminDatasourceActiveRecord
         when Operators::NOT_EQUAL, Operators::NOT_IN
           @query = query_aggregator(aggregator, @collection.model.where.not({ field => value }))
         when Operators::GREATER_THAN
-          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gt))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, arel_attr, value, :gt))
         when Operators::GREATER_THAN_OR_EQUAL
-          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :gteq))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, arel_attr, value, :gteq))
         when Operators::LESS_THAN
-          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lt))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, arel_attr, value, :lt))
         when Operators::LESS_THAN_OR_EQUAL
-          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, field, value, :lteq))
+          @query = query_aggregator(aggregator, build_comparison_query(condition_tree.field, arel_attr, value, :lteq))
         when Operators::CONTAINS
           @query = query_aggregator(aggregator,
-                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}%")))
+                                    @collection.model.where(arel_attr.matches("%#{value}%")))
         when Operators::I_CONTAINS
-          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [arel_attr])
           @query = query_aggregator(aggregator,
                                     @collection.model.where(lower_field.matches("%#{value.to_s.downcase}%")))
         when Operators::NOT_CONTAINS
           @query = query_aggregator(aggregator,
-                                    @collection.model.where.not(@arel_table[field.to_sym].matches("%#{value}%")))
+                                    @collection.model.where.not(arel_attr.matches("%#{value}%")))
         when Operators::NOT_I_CONTAINS
-          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [arel_attr])
           @query = query_aggregator(aggregator,
                                     @collection.model.where.not(lower_field.matches("%#{value.to_s.downcase}%")))
         when Operators::STARTS_WITH
           @query = query_aggregator(aggregator,
-                                    @collection.model.where(@arel_table[field.to_sym].matches("#{value}%")))
+                                    @collection.model.where(arel_attr.matches("#{value}%")))
         when Operators::I_STARTS_WITH
-          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [arel_attr])
           @query = query_aggregator(aggregator,
                                     @collection.model.where(lower_field.matches("#{value.to_s.downcase}%")))
         when Operators::ENDS_WITH
           @query = query_aggregator(aggregator,
-                                    @collection.model.where(@arel_table[field.to_sym].matches("%#{value}")))
+                                    @collection.model.where(arel_attr.matches("%#{value}")))
         when Operators::I_ENDS_WITH
-          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [arel_attr])
           @query = query_aggregator(aggregator,
                                     @collection.model.where(lower_field.matches("%#{value.to_s.downcase}")))
         when Operators::LIKE
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(arel_attr.matches(value)))
         when Operators::I_LIKE
-          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [@arel_table[field.to_sym]])
+          lower_field = Arel::Nodes::NamedFunction.new('LOWER', [arel_attr])
           @query = query_aggregator(aggregator,
                                     @collection.model.where(lower_field.matches(value.to_s.downcase)))
         when Operators::MATCH
@@ -148,23 +150,24 @@ module ForestAdminDatasourceActiveRecord
 
           # Use database-specific regex syntax
           adapter_name = @collection.model.connection.adapter_name.downcase
+          table_and_column = "#{arel_attr.relation.name}.#{arel_attr.name}"
           regex_clause = case adapter_name
                          when 'postgresql'
-                           "#{@arel_table.name}.#{field} ~ ?"
+                           "#{table_and_column} ~ ?"
                          when 'mysql2', 'mysql', 'sqlite', 'sqlite3'
-                           "#{@arel_table.name}.#{field} REGEXP ?"
+                           "#{table_and_column} REGEXP ?"
                          else
                            raise ArgumentError, "Match operator is not supported for database adapter '#{adapter_name}'"
                          end
 
           @query = query_aggregator(aggregator, @collection.model.where(regex_clause, pattern))
         when Operators::INCLUDES_ALL
-          @query = query_aggregator(aggregator, @collection.model.where(@arel_table[field.to_sym].matches_all(value)))
+          @query = query_aggregator(aggregator, @collection.model.where(arel_attr.matches_all(value)))
         when Operators::SHORTER_THAN
-          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [arel_attr])
           @query = query_aggregator(aggregator, @collection.model.where(length_func.lt(value)))
         when Operators::LONGER_THAN
-          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[field.to_sym]])
+          length_func = Arel::Nodes::NamedFunction.new('LENGTH', [arel_attr])
           @query = query_aggregator(aggregator, @collection.model.where(length_func.gt(value)))
         end
 
@@ -213,35 +216,43 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
-      def format_field(field)
-        if field.include?(':')
-          relation_name, field = field.split(':')
+      def resolve_field(original_field)
+        if original_field.include?(':')
+          relation_name, column_name = original_field.split(':')
           relation = @collection.schema[:fields][relation_name]
-          table_name = @collection.datasource.get_collection(relation.foreign_collection).model.table_name
+          related_collection = @collection.datasource.get_collection(relation.foreign_collection)
           add_join_relation(relation_name)
 
-          return "#{table_name}.#{field}"
+          {
+            formatted: "#{related_collection.model.table_name}.#{column_name}",
+            arel_attr: related_collection.model.arel_table[column_name.to_sym]
+          }
+        else
+          {
+            formatted: original_field,
+            arel_attr: @arel_table[original_field.to_sym]
+          }
         end
-
-        field
       end
 
-      def build_comparison_query(original_field, formatted_field, value, operator)
+      def build_comparison_query(original_field, arel_attr, value, operator)
         # When comparing a String field with a numeric value, compare the length of the string
         # Otherwise, do a lexicographic comparison
         if value.is_a?(Numeric)
           field_schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@collection, original_field)
           if field_schema.column_type == 'String'
-            length_func = Arel::Nodes::NamedFunction.new('LENGTH', [@arel_table[formatted_field.to_sym]])
+            length_func = Arel::Nodes::NamedFunction.new('LENGTH', [arel_attr])
             return @collection.model.where(length_func.send(operator, value))
           end
         end
 
-        @collection.model.where(@arel_table[formatted_field.to_sym].send(operator, value))
+        @collection.model.where(arel_attr.send(operator, value))
       end
 
       def query_aggregator(aggregator, query)
         if !@query.respond_to?(:where_clause) || @query.where_clause.empty?
+          # Preserve includes from @query when replacing with new query
+          query = query.includes(@query.includes_values) if @query.includes_values.any?
           query
         else
           @query.send(aggregator, query)

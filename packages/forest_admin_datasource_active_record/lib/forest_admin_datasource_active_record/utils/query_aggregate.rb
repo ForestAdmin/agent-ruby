@@ -10,7 +10,7 @@ module ForestAdminDatasourceActiveRecord
         @aggregation = aggregation
         @limit = limit
         @operation = aggregation.operation.downcase
-        @field = aggregation.field.nil? ? '*' : format_field(aggregation.field)
+        @field = aggregation.field.nil? ? '*' : resolve_field(aggregation.field)[:formatted]
       end
 
       def get
@@ -19,7 +19,7 @@ module ForestAdminDatasourceActiveRecord
 
         group_fields = []
         @aggregation.groups.each do |group|
-          field = format_field(group[:field])
+          field = resolve_field(group[:field])[:formatted]
           if group[:operation]
             # Pass original field name for validation before SQL generation
             date_trunc_expression = date_trunc_sql(group[:operation], field, group[:field])
