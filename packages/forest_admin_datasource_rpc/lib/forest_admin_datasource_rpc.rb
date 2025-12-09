@@ -48,27 +48,34 @@ module ForestAdminDatasourceRpc
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      sse = Utils::SseClient.new("#{uri}/forest/sse", auth_secret) do
-        ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
+      # Create health check client with configurable polling interval and failure threshold
+      health_check_options = {
+        polling_interval: options[:health_check_interval] || 30,
+        failure_threshold: options[:health_check_failure_threshold] || 3
+      }
 
-        # Send If-None-Match header to check if schema has changed (304 optimization)
-        result = rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: cached_etag)
+      health_check = Utils::HealthCheckClient.new("#{uri}/forest/health", auth_secret, health_check_options) do
+        ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server appears down, checking schema...')
+        begin
+          new_schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
 
-        # If we get NotModified, schema hasn't changed
-        if result == Utils::RpcClient::NotModified
-          ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed (304)')
-        else
-          # Schema has changed, update the cached ETag and schema, then reload
-          cached_etag = result.etag
-          ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema changed, reloading agent...')
-          ForestAdminAgent::Builder::AgentFactory.instance.reload!
+          if last_hash_schema == Digest::SHA1.hexdigest(new_schema.to_h.to_s)
+            ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed')
+          else
+            ForestAdminAgent::Builder::AgentFactory.instance.reload!
+          end
+        rescue StandardError => e
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "[RPCDatasource] Failed to check schema after server down: #{e.class} - #{e.message}"
+          )
         end
       end
-      sse.start
+      health_check.start
 
-      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, sse)
+      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, health_check)
 
-      # Setup cleanup hooks for proper SSE client shutdown
+      # Setup cleanup hooks for proper health check client shutdown
       setup_cleanup_hooks(datasource)
 
       datasource
