@@ -1,3 +1,10 @@
+## [1.16.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.9...v1.16.10) (2025-12-09)
+
+
+### Bug Fixes
+
+* extended search ([#227](https://github.com/ForestAdmin/agent-ruby/issues/227)) ([a7bc6ee](https://github.com/ForestAdmin/agent-ruby/commit/a7bc6ee14d3e885d7c483601fbf53e597a969f0e))
+
 ## [1.16.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.8...v1.16.9) (2025-12-08)
 
 

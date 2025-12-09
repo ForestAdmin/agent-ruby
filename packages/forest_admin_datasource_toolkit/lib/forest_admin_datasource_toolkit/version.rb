@@ -1,3 +1,3 @@
 module ForestAdminDatasourceToolkit
-  VERSION = "1.16.9"
+  VERSION = "1.16.10"
 end
