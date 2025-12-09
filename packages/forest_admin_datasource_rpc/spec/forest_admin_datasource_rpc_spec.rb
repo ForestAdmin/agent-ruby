@@ -85,6 +85,67 @@ module ForestAdminDatasourceRpc
           )
         end
       end
+
+      context 'schema polling interval configuration' do
+        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil) }
+
+        before do
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
+        end
+
+        it 'uses default interval (600s) when no config provided' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 600 },
+            any_args
+          )
+        end
+
+        it 'uses options[:schema_polling_interval] when provided' do
+          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 120 },
+            any_args
+          )
+        end
+
+        it 'uses ENV["SCHEMA_POLLING_INTERVAL"] when set' do
+          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 30 },
+            any_args
+          )
+        ensure
+          ENV.delete('SCHEMA_POLLING_INTERVAL')
+        end
+
+        it 'prioritizes options[:schema_polling_interval] over ENV' do
+          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+
+          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 120 },
+            any_args
+          )
+        ensure
+          ENV.delete('SCHEMA_POLLING_INTERVAL')
+        end
+      end
     end
   end
 end

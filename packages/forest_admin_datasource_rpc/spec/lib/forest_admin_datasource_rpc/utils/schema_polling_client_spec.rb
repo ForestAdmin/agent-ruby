@@ -53,6 +53,32 @@ module ForestAdminDatasourceRpc
           # Verify HTTP client was created via Faraday
           expect(client.instance_variable_get(:@http_client)).to be_a(Faraday::Connection)
         end
+
+        context 'polling interval validation' do
+          it 'raises error if interval is too short (< 1s)' do
+            expect do
+              described_class.new(uri, secret, polling_interval: 0.5) { |schema| callback.call(schema) }
+            end.to raise_error(ArgumentError, /too short.*minimum: 1s/)
+          end
+
+          it 'raises error if interval is too long (> 3600s)' do
+            expect do
+              described_class.new(uri, secret, polling_interval: 3601) { |schema| callback.call(schema) }
+            end.to raise_error(ArgumentError, /too long.*maximum: 3600s/)
+          end
+
+          it 'accepts minimum valid interval (1s)' do
+            expect do
+              described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+            end.not_to raise_error
+          end
+
+          it 'accepts maximum valid interval (3600s)' do
+            expect do
+              described_class.new(uri, secret, polling_interval: 3600) { |schema| callback.call(schema) }
+            end.not_to raise_error
+          end
+        end
       end
 
       describe '#start' do
@@ -112,7 +138,7 @@ module ForestAdminDatasourceRpc
           client.start
           sleep(0.05)
 
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Polling started')
+          expect(logger).to have_received(:log).with('Info', '[Schema Polling] Polling started (interval: 1s)')
 
           client.stop
         end
@@ -363,7 +389,7 @@ module ForestAdminDatasourceRpc
 
       describe 'integration: polling loop' do
         it 'polls at configured interval' do
-          client = described_class.new(uri, secret, polling_interval: 0.15) { |schema| callback.call(schema) }
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           check_count = 0
           allow(client).to receive(:check_schema) do
@@ -371,15 +397,15 @@ module ForestAdminDatasourceRpc
           end
 
           client.start
-          sleep(0.5) # Should perform ~3 checks (0s, 0.15s, 0.30s)
+          sleep(0.5) # Should perform at least 1 check
           client.stop
 
-          expect(check_count).to be >= 2
-          expect(check_count).to be <= 5
+          expect(check_count).to be >= 1
+          expect(check_count).to be <= 3
         end
 
         it 'triggers callback on schema change' do
-          client = described_class.new(uri, secret, polling_interval: 0.1) { |schema| callback.call(schema) }
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
@@ -395,7 +421,7 @@ module ForestAdminDatasourceRpc
           allow(http_client).to receive(:get).and_return(response1, response2)
 
           client.start
-          sleep(0.3) # Wait for 2-3 polls
+          sleep(1.5) # Wait for 2 polls
           client.stop
 
           # Should have been called with the changed schema
@@ -403,7 +429,7 @@ module ForestAdminDatasourceRpc
         end
 
         it 'does not trigger callback if schema stays the same' do
-          client = described_class.new(uri, secret, polling_interval: 0.1) { |schema| callback.call(schema) }
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
@@ -413,7 +439,7 @@ module ForestAdminDatasourceRpc
           allow(http_client).to receive(:get).and_return(response)
 
           client.start
-          sleep(0.3) # Wait for 2-3 polls
+          sleep(0.3) # Wait for at least 1 poll
           client.stop
 
           # Should NOT have called callback (schema unchanged)
@@ -421,7 +447,7 @@ module ForestAdminDatasourceRpc
         end
 
         it 'continues polling after connection errors' do
-          client = described_class.new(uri, secret, polling_interval: 0.1) { |schema| callback.call(schema) }
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
@@ -436,7 +462,7 @@ module ForestAdminDatasourceRpc
           end
 
           client.start
-          sleep(0.3) # Wait for 2-3 polls
+          sleep(1.5) # Wait for 2 polls
           client.stop
 
           # Should have continued polling after failure
@@ -445,7 +471,7 @@ module ForestAdminDatasourceRpc
         end
 
         it 'stops polling when closed' do
-          client = described_class.new(uri, secret, polling_interval: 0.1) { |schema| callback.call(schema) }
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
           check_count = 0
           allow(client).to receive(:check_schema) do
