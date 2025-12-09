@@ -2,7 +2,7 @@ module ForestAdminDatasourceRpc
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     include ForestAdminDatasourceRpc::Utils
 
-    def initialize(options, introspection, sse_client = nil)
+    def initialize(options, introspection, health_check_client = nil)
       super()
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -18,7 +18,7 @@ module ForestAdminDatasourceRpc
       @options = options
       @charts = introspection[:charts]
       @rpc_relations = introspection[:rpc_relations]
-      @sse_client = sse_client
+      @health_check_client = health_check_client
       @cleaned_up = false
 
       native_query_connections = introspection[:native_query_connections] || []
@@ -58,10 +58,10 @@ module ForestAdminDatasourceRpc
 
       @cleaned_up = true
 
-      if @sse_client
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Closing SSE connection...')
-        @sse_client.close
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] SSE connection closed')
+      if @health_check_client
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Stopping health check...')
+        @health_check_client.stop
+        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Health check stopped')
       end
     rescue StandardError => e
       ForestAdminAgent::Facades::Container.logger&.log(
