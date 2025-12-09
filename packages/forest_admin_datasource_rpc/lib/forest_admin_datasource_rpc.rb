@@ -26,10 +26,15 @@ module ForestAdminDatasourceRpc
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
+    schema = nil
+    cached_etag = nil
+
     begin
       rpc_client = Utils::RpcClient.new(uri, auth_secret)
-      schema = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
-      last_hash_schema = Digest::SHA1.hexdigest(schema.to_h.to_s)
+      response = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
+      schema = response.body
+      # Use the ETag header for conditional requests
+      cached_etag = response.etag
     rescue Faraday::ConnectionFailed => e
       ForestAdminAgent::Facades::Container.logger.log(
         'Error',
@@ -67,7 +72,8 @@ module ForestAdminDatasourceRpc
                          end
 
       polling_options = {
-        polling_interval: polling_interval
+        polling_interval: polling_interval,
+        initial_etag: cached_etag # Pass initial ETag from first schema fetch
       }
 
       schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |new_schema|

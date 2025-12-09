@@ -18,7 +18,8 @@ module ForestAdminDatasourceRpc
       include_examples 'with introspection'
 
       context 'when server is running' do
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:response) { Utils::RpcClient::Response.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: response) }
 
         it 'build datasource' do
           datasource = described_class.build({ uri: 'http://localhost' })

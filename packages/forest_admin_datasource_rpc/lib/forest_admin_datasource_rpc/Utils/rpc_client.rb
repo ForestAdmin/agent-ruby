@@ -28,12 +28,18 @@ module ForestAdminDatasourceRpc
         422 => ForestAdminAgent::Http::Exceptions::UnprocessableError
       }.freeze
 
+      HTTP_NOT_MODIFIED = 304
+
+      # Special return value to indicate schema has not changed (HTTP 304)
+      NotModified = Class.new
+
       def initialize(api_url, auth_secret)
         @api_url = api_url
         @auth_secret = auth_secret
       end
 
-      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false)
+      # rubocop:disable Metrics/ParameterLists
+      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
         client = Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
@@ -51,11 +57,13 @@ module ForestAdminDatasourceRpc
         }
 
         headers['forest_caller'] = caller.to_json if caller
+        headers['If-None-Match'] = %("#{if_none_match}") if if_none_match
 
         response = client.send(method, endpoint, payload, headers)
 
-        handle_response(response)
+        handle_response(response, _symbolize_keys: symbolize_keys)
       end
+      # rubocop:enable Metrics/ParameterLists
 
       private
 
@@ -63,10 +71,36 @@ module ForestAdminDatasourceRpc
         OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
       end
 
-      def handle_response(response)
-        raise_appropriate_error(response) unless response.success?
+      # Response wrapper for successful responses that includes headers
+      class Response
+        attr_reader :body, :etag
 
-        response.body
+        def initialize(body, etag = nil)
+          @body = body
+          @etag = etag
+        end
+      end
+
+      def handle_response(response, _symbolize_keys: false)
+        # For successful responses, return the body with ETag if present
+        if response.success?
+          etag = extract_etag(response)
+          return Response.new(response.body, etag)
+        end
+
+        # Handle 304 Not Modified - schema has not changed (not an error)
+        return NotModified if response.status == HTTP_NOT_MODIFIED
+
+        # For other non-success responses, raise appropriate error
+        raise_appropriate_error(response)
+      end
+
+      def extract_etag(response)
+        etag = response.headers['ETag'] || response.headers['etag']
+        return nil unless etag
+
+        # Strip quotes from ETag value
+        etag.gsub(/\A"?|"?\z/, '')
       end
 
       def raise_appropriate_error(response)
