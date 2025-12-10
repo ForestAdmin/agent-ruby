@@ -75,8 +75,8 @@ module ForestAdminAgent
           raise UnauthorizedError, 'Invalid authorization header format' unless valid_format
 
           oauth_provider.verify_access_token(parts[1])
-        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidTokenError,
-               ForestAdminAgent::Mcp::OAuthProvider::UnsupportedTokenTypeError => e
+        rescue ForestAdminAgent::Mcp::InvalidTokenError,
+               ForestAdminAgent::Mcp::UnsupportedTokenTypeError => e
           raise UnauthorizedError, e.message
         end
 

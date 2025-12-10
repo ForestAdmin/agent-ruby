@@ -27,7 +27,7 @@ module ForestAdminAgent
           else
             raise BadRequestError, "Unsupported grant_type: #{grant_type}"
           end
-        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidTokenError => e
+        rescue ForestAdminAgent::Mcp::InvalidTokenError => e
           {
             content: {
               error: 'invalid_grant',
@@ -35,7 +35,7 @@ module ForestAdminAgent
             },
             status: 400
           }
-        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidClientError => e
+        rescue ForestAdminAgent::Mcp::InvalidClientError => e
           {
             content: {
               error: 'invalid_client',
@@ -43,7 +43,7 @@ module ForestAdminAgent
             },
             status: 401
           }
-        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidRequestError => e
+        rescue ForestAdminAgent::Mcp::InvalidRequestError => e
           {
             content: {
               error: 'invalid_request',
@@ -51,7 +51,7 @@ module ForestAdminAgent
             },
             status: 400
           }
-        rescue ForestAdminAgent::Mcp::OAuthProvider::UnsupportedTokenTypeError => e
+        rescue ForestAdminAgent::Mcp::UnsupportedTokenTypeError => e
           {
             content: {
               error: 'unsupported_token_type',

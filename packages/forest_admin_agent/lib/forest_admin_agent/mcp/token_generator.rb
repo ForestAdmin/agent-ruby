@@ -15,7 +15,7 @@ module ForestAdminAgent
         unless response.success?
           error_body = parse_error_body(response)
           error_msg = error_body['error_description'] || error_body['error'] || 'Failed to exchange token'
-          raise OAuthProvider::InvalidRequestError, error_msg
+          raise InvalidRequestError, error_msg
         end
 
         result = JSON.parse(response.body)
@@ -78,7 +78,7 @@ module ForestAdminAgent
           { 'forest-token' => access_token }
         )
 
-        raise OAuthProvider::InvalidRequestError, 'Failed to fetch user info' unless response.success?
+        raise InvalidRequestError, 'Failed to fetch user info' unless response.success?
 
         data = JSON.parse(response.body)
         attrs = data.dig('data', 'attributes') || {}
