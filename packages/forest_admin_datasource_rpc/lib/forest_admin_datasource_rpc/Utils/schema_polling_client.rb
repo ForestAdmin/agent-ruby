@@ -6,6 +6,8 @@ require 'digest'
 
 module ForestAdminDatasourceRpc
   module Utils
+    # Handles HTTP polling for schema changes with ETag support
+    # rubocop:disable Metrics/ClassLength
     class SchemaPollingClient
       attr_reader :closed
 
@@ -102,81 +104,115 @@ module ForestAdminDatasourceRpc
 
       def check_schema
         @connection_attempts += 1
-        timestamp = Time.now.utc.iso8601(3)
-        signature = generate_signature(timestamp)
-
-        headers = {
-          'X_TIMESTAMP' => timestamp,
-          'X_SIGNATURE' => signature
-        }
-
-        # Add If-None-Match header if we have a cached ETag (enables 304 optimization)
-        headers['If-None-Match'] = quote_etag(@last_etag) if @last_etag
-
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Fetching schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})" +
-            (@last_etag ? " [ETag: #{@last_etag}]" : '')
-        )
+        headers = build_request_headers
+        log_fetch_attempt
 
         response = @http_client.get("#{@uri}/forest/rpc-schema", nil, headers)
 
-        if response.status == 304
-          # 304 Not Modified - schema hasn't changed (ETag optimization)
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            '[Schema Polling] Schema unchanged (304 Not Modified)'
-          )
-          @connection_attempts = 0
-        elsif response.success?
-          # 200 OK - parse schema and update ETag
-          schema = JSON.parse(response.body, symbolize_names: true)
-          new_hash = Digest::SHA1.hexdigest(schema.to_h.to_s)
-          new_etag = unquote_etag(response.headers['etag'] || response.headers['ETag'])
-
-          # Update stored ETag if present
-          @last_etag = new_etag if new_etag
-
-          if @last_schema_hash.nil?
-            # First poll - just store the hash
-            @last_schema_hash = new_hash
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              "[Schema Polling] Initial schema hash stored (ETag: #{@last_etag})"
-            )
-            @connection_attempts = 0
-          elsif @last_schema_hash != new_hash
-            # Schema changed - trigger callback
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Info',
-              "[Schema Polling] Schema changed detected (ETag: #{@last_etag}), triggering reload callback"
-            )
-            @last_schema_hash = new_hash
-            @connection_attempts = 0
-            trigger_schema_change_callback(schema)
-          else
-            # Schema unchanged (same hash but 200 response, shouldn't happen with ETag)
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              '[Schema Polling] Schema unchanged (same hash)'
-            )
-            @connection_attempts = 0
-          end
-        else
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Warn',
-            "[Schema Polling] HTTP #{response.status}: #{response.body}"
-          )
-        end
+        handle_response(response)
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
+        log_connection_error(e)
+      rescue JSON::ParserError => e
+        log_json_error(e)
+      end
+
+      def build_request_headers
+        timestamp = Time.now.utc.iso8601(3)
+        headers = {
+          'X_TIMESTAMP' => timestamp,
+          'X_SIGNATURE' => generate_signature(timestamp)
+        }
+        headers['If-None-Match'] = quote_etag(@last_etag) if @last_etag
+        headers
+      end
+
+      def log_fetch_attempt
+        message = "[Schema Polling] Fetching schema from #{@uri}/forest/rpc-schema " \
+                  "(attempt ##{@connection_attempts})"
+        message += " [ETag: #{@last_etag}]" if @last_etag
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', message)
+      end
+
+      def handle_response(response)
+        case response.status
+        when 304
+          handle_not_modified_response
+        when 200..299
+          handle_success_response(response)
+        else
+          handle_error_response(response)
+        end
+      end
+
+      def handle_not_modified_response
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          '[Schema Polling] Schema unchanged (304 Not Modified)'
+        )
+        @connection_attempts = 0
+      end
+
+      def handle_success_response(response)
+        schema = JSON.parse(response.body, symbolize_names: true)
+        new_hash = Digest::SHA1.hexdigest(schema.to_h.to_s)
+        new_etag = unquote_etag(response.headers['etag'] || response.headers['ETag'])
+
+        @last_etag = new_etag if new_etag
+
+        if @last_schema_hash.nil?
+          handle_first_poll(new_hash)
+        elsif @last_schema_hash != new_hash
+          handle_schema_change(new_hash, schema)
+        else
+          handle_unchanged_schema
+        end
+      end
+
+      def handle_first_poll(new_hash)
+        @last_schema_hash = new_hash
+        @connection_attempts = 0
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[Schema Polling] Initial schema hash stored (ETag: #{@last_etag})"
+        )
+      end
+
+      def handle_schema_change(new_hash, schema)
+        @last_schema_hash = new_hash
+        @connection_attempts = 0
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Info',
+          "[Schema Polling] Schema changed detected (ETag: #{@last_etag}), triggering reload callback"
+        )
+        trigger_schema_change_callback(schema)
+      end
+
+      def handle_unchanged_schema
+        @connection_attempts = 0
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          '[Schema Polling] Schema unchanged (same hash)'
+        )
+      end
+
+      def handle_error_response(response)
         ForestAdminAgent::Facades::Container.logger&.log(
           'Warn',
-          "[Schema Polling] Connection error: #{e.class} - #{e.message}"
+          "[Schema Polling] HTTP #{response.status}: #{response.body}"
         )
-      rescue JSON::ParserError => e
+      end
+
+      def log_connection_error(error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Warn',
+          "[Schema Polling] Connection error: #{error.class} - #{error.message}"
+        )
+      end
+
+      def log_json_error(error)
         ForestAdminAgent::Facades::Container.logger&.log(
           'Error',
-          "[Schema Polling] Invalid JSON response: #{e.message}"
+          "[Schema Polling] Invalid JSON response: #{error.message}"
         )
       end
 
@@ -228,5 +264,6 @@ module ForestAdminDatasourceRpc
         etag.gsub(/\A"?|"?\z/, '')
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
