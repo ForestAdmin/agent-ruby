@@ -51,10 +51,12 @@ module ForestAdminAgent
                 }
               },
               collection: {
-                data: extra[:collection_name] ? {
-                  id: extra[:collection_name],
-                  type: 'collections'
-                } : nil
+                data: if extra[:collection_name]
+                        {
+                          id: extra[:collection_name],
+                          type: 'collections'
+                        }
+                      end
               }
             }
           }
@@ -62,12 +64,12 @@ module ForestAdminAgent
 
         response = client.post('/api/activity-logs-requests', payload.to_json)
 
-        unless response.success?
-          Facades::Container.logger.log(
-            'Warn',
-            "[MCP] Failed to create activity log: #{response.body}"
-          )
-        end
+        return if response.success?
+
+        Facades::Container.logger.log(
+          'Warn',
+          "[MCP] Failed to create activity log: #{response.body}"
+        )
       end
     end
   end

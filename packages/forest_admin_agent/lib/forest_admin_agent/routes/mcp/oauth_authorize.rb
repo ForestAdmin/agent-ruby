@@ -32,9 +32,7 @@ module ForestAdminAgent
 
           # Validate client exists
           client = oauth_provider.get_client(client_id)
-          unless client
-            return error_redirect(redirect_uri, 'invalid_client', 'Client not found', state)
-          end
+          return error_redirect(redirect_uri, 'invalid_client', 'Client not found', state) unless client
 
           # Build authorization URL and redirect
           authorize_url = oauth_provider.authorize_url(
@@ -56,11 +54,9 @@ module ForestAdminAgent
             status: 302
           }
         rescue StandardError => e
-          if redirect_uri
-            error_redirect(redirect_uri, 'server_error', e.message, state)
-          else
-            raise
-          end
+          raise unless redirect_uri
+
+          error_redirect(redirect_uri, 'server_error', e.message, state)
         end
 
         private

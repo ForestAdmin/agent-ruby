@@ -12,9 +12,7 @@ module ForestAdminAgent
           now = Time.now.to_i
 
           # Return cached schema if still valid (less than 24 hours old)
-          if @schema_cache && (now - @schema_cache[:fetched_at]) < ONE_DAY_SECONDS
-            return @schema_cache[:schema]
-          end
+          return @schema_cache[:schema] if @schema_cache && (now - @schema_cache[:fetched_at]) < ONE_DAY_SECONDS
 
           env_secret = Facades::Container.cache(:env_secret)
           raise 'FOREST_ENV_SECRET is not set' unless env_secret
@@ -26,9 +24,7 @@ module ForestAdminAgent
 
           response = client.get('/liana/forest-schema')
 
-          unless response.success?
-            raise "Failed to fetch forest schema: #{response.body}"
-          end
+          raise "Failed to fetch forest schema: #{response.body}" unless response.success?
 
           data = JSON.parse(response.body)
           collections = deserialize_collections(data)
@@ -77,9 +73,9 @@ module ForestAdminAgent
             attrs = collection_data['attributes'] || {}
             field_relationships = collection_data.dig('relationships', 'fields', 'data') || []
 
-            fields = field_relationships.map do |field_ref|
+            fields = field_relationships.filter_map do |field_ref|
               fields_by_id[field_ref['id']]
-            end.compact
+            end
 
             {
               name: attrs['name'],

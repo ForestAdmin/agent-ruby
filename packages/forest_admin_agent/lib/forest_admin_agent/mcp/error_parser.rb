@@ -13,10 +13,10 @@ module ForestAdminAgent
         # Try to parse as JSON
         begin
           parsed = JSON.parse(error_string)
-          return extract_from_json(parsed)
+          extract_from_json(parsed)
         rescue JSON::ParserError
           # Not JSON, return as-is
-          return error_string
+          error_string
         end
       end
 
@@ -24,13 +24,11 @@ module ForestAdminAgent
         # Handle JSON:API error format
         if parsed.is_a?(Hash) && parsed['errors'].is_a?(Array)
           errors = parsed['errors']
-          return errors.map { |e| e['detail'] || e['title'] || e['name'] }.compact.join(', ')
+          return errors.filter_map { |e| e['detail'] || e['title'] || e['name'] }.join(', ')
         end
 
         # Handle simple error object
-        if parsed.is_a?(Hash)
-          return parsed['detail'] || parsed['message'] || parsed['error'] || parsed.to_s
-        end
+        return parsed['detail'] || parsed['message'] || parsed['error'] || parsed.to_s if parsed.is_a?(Hash)
 
         parsed.to_s
       end

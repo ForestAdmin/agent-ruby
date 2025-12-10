@@ -34,13 +34,9 @@ module ForestAdminAgent
         def build_list_payload(params)
           payload = {}
 
-          if params[:filters]
-            payload[:filters] = params[:filters]
-          end
+          payload[:filters] = params[:filters] if params[:filters]
 
-          if params[:search]
-            payload[:search] = params[:search]
-          end
+          payload[:search] = params[:search] if params[:search]
 
           if params[:sort]
             payload[:sort] = [
@@ -68,9 +64,7 @@ module ForestAdminAgent
 
           return body if body.is_a?(String) && !body.empty?
 
-          if body.is_a?(Hash)
-            return body['error'] || body['message'] || body.to_json
-          end
+          return body['error'] || body['message'] || body.to_json if body.is_a?(Hash)
 
           "Request failed with status #{response.status}"
         end

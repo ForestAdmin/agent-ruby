@@ -16,101 +16,67 @@ module ForestAdminAgent
         end
 
         def handle_mcp(args = {})
-          # Verify Bearer token
           auth_info = verify_bearer_auth(args)
+          raise ForbiddenError, 'Missing required scope: mcp:read' unless auth_info[:scopes]&.include?('mcp:read')
 
-          # Check required scope
-          unless auth_info[:scopes]&.include?('mcp:read')
-            raise ForbiddenError, 'Missing required scope: mcp:read'
-          end
+          request = parse_jsonrpc_request(args[:params])
+          return invalid_jsonrpc_response(request['id']) unless request['jsonrpc'] == '2.0'
 
-          # Parse JSON-RPC request from body
-          body = args[:params]
-
-          # Handle the case where body is already parsed as params
-          request = if body.is_a?(Hash) && body['jsonrpc']
-                      body
-                    elsif body.is_a?(String)
-                      JSON.parse(body)
-                    else
-                      # Try to get the raw body from headers/request
-                      raise BadRequestError, 'Invalid request body'
-                    end
-
-          # Validate JSON-RPC format
-          unless request['jsonrpc'] == '2.0'
-            return {
-              content: {
-                jsonrpc: '2.0',
-                id: request['id'],
-                error: {
-                  code: -32600,
-                  message: 'Invalid Request: missing or invalid jsonrpc version'
-                }
-              }
-            }
-          end
-
-          # Handle the MCP protocol request
           result = protocol_handler.handle_request(request, auth_info)
-
           { content: result }
         rescue JSON::ParserError => e
-          {
-            content: {
-              jsonrpc: '2.0',
-              id: nil,
-              error: {
-                code: -32700,
-                message: "Parse error: #{e.message}"
-              }
-            }
-          }
+          jsonrpc_error_response(-32_700, "Parse error: #{e.message}")
         rescue UnauthorizedError => e
-          {
-            content: {
-              jsonrpc: '2.0',
-              id: nil,
-              error: {
-                code: -32603,
-                message: e.message
-              }
-            },
-            status: 401
-          }
+          jsonrpc_error_response(-32_603, e.message, 401)
         rescue ForbiddenError => e
-          {
-            content: {
-              jsonrpc: '2.0',
-              id: nil,
-              error: {
-                code: -32603,
-                message: e.message
-              }
-            },
-            status: 403
-          }
+          jsonrpc_error_response(-32_603, e.message, 403)
         end
 
         private
 
+        def parse_jsonrpc_request(body)
+          return body if body.is_a?(Hash) && body['jsonrpc']
+          return JSON.parse(body) if body.is_a?(String)
+
+          raise BadRequestError, 'Invalid request body'
+        end
+
+        def invalid_jsonrpc_response(request_id)
+          {
+            content: {
+              jsonrpc: '2.0',
+              id: request_id,
+              error: {
+                code: -32_600,
+                message: 'Invalid Request: missing or invalid jsonrpc version'
+              }
+            }
+          }
+        end
+
+        def jsonrpc_error_response(code, message, status = nil)
+          response = {
+            content: {
+              jsonrpc: '2.0',
+              id: nil,
+              error: { code: code, message: message }
+            }
+          }
+          response[:status] = status if status
+          response
+        end
+
         def verify_bearer_auth(args)
           auth_header = args.dig(:headers, 'HTTP_AUTHORIZATION')
+          raise UnauthorizedError, 'Missing authorization header' unless auth_header
 
-          unless auth_header
-            raise UnauthorizedError, 'Missing authorization header'
-          end
+          parts = auth_header.split
+          valid_format = parts.length == 2 && parts[0].downcase == 'bearer'
+          raise UnauthorizedError, 'Invalid authorization header format' unless valid_format
 
-          parts = auth_header.split(' ')
-          unless parts.length == 2 && parts[0].downcase == 'bearer'
-            raise UnauthorizedError, 'Invalid authorization header format'
-          end
-
-          token = parts[1]
-          oauth_provider.verify_access_token(token)
-        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidTokenError => e
-          raise UnauthorizedError, e.message
-        rescue ForestAdminAgent::Mcp::OAuthProvider::UnsupportedTokenTypeError => e
+          oauth_provider.verify_access_token(parts[1])
+        rescue ForestAdminAgent::Mcp::OAuthProvider::InvalidTokenError,
+               ForestAdminAgent::Mcp::OAuthProvider::UnsupportedTokenTypeError => e
           raise UnauthorizedError, e.message
         end
 

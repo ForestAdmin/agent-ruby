@@ -32,6 +32,7 @@ module ForestAdminRails
   setting :append_schema_path, default: nil
   setting :skip_schema_update, default: false
   setting :disable_route_cache, default: false
+  setting :enable_mcp_server, default: false
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

@@ -24,12 +24,12 @@ module ForestAdminAgent
                  when 'ping'
                    handle_ping
                  else
-                   return jsonrpc_error(id, -32601, "Method not found: #{method}")
+                   return jsonrpc_error(id, -32_601, "Method not found: #{method}")
                  end
 
         jsonrpc_response(id, result)
       rescue StandardError => e
-        jsonrpc_error(id, -32603, e.message)
+        jsonrpc_error(id, -32_603, e.message)
       end
 
       private

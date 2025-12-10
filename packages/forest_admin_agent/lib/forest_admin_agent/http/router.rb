@@ -34,6 +34,14 @@ module ForestAdminAgent
         false
       end
 
+      def self.mcp_server_enabled?
+        config = ForestAdminAgent::Facades::Container.config_from_cache
+        config&.dig(:enable_mcp_server) == true
+      rescue StandardError
+        # If config is not available or an error occurs, default to MCP disabled
+        false
+      end
+
       def self.reset_cached_routes!
         @mutex.synchronize do
           @cached_routes = nil
@@ -63,13 +71,18 @@ module ForestAdminAgent
           { name: 'associate_related', handler: -> { Resources::Related::AssociateRelated.new.routes } },
           { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
           { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
-          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } },
-          # MCP (Model Context Protocol) routes
-          { name: 'mcp_oauth_metadata', handler: -> { Mcp::OAuthMetadata.new.routes } },
-          { name: 'mcp_oauth_authorize', handler: -> { Mcp::OAuthAuthorize.new.routes } },
-          { name: 'mcp_oauth_token', handler: -> { Mcp::OAuthToken.new.routes } },
-          { name: 'mcp_endpoint', handler: -> { Mcp::McpEndpoint.new.routes } }
+          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } }
         ]
+
+        # Add MCP routes only if enabled via configuration
+        if mcp_server_enabled?
+          route_sources += [
+            { name: 'mcp_oauth_metadata', handler: -> { Mcp::OAuthMetadata.new.routes } },
+            { name: 'mcp_oauth_authorize', handler: -> { Mcp::OAuthAuthorize.new.routes } },
+            { name: 'mcp_oauth_token', handler: -> { Mcp::OAuthToken.new.routes } },
+            { name: 'mcp_endpoint', handler: -> { Mcp::McpEndpoint.new.routes } }
+          ]
+        end
 
         all_routes = {}
 
