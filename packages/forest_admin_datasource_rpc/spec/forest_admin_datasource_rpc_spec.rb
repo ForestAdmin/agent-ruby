@@ -18,12 +18,12 @@ module ForestAdminDatasourceRpc
       include_examples 'with introspection'
 
       context 'when server is running' do
-        let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil, stop: nil) }
         let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
         before do
-          allow(Utils::SseClient).to receive(:new).and_return(sse_client)
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
         end
 
         it 'build datasource' do
@@ -62,11 +62,11 @@ module ForestAdminDatasourceRpc
           expect(datasource.live_query_connections).to eq({ 'primary' => 'primary', 'secondary' => 'secondary' })
         end
 
-        it 'initializes SSE client for schema updates' do
+        it 'initializes schema polling client for schema updates' do
           described_class.build({ uri: 'http://localhost' })
 
-          expect(Utils::SseClient).to have_received(:new).with('http://localhost/forest/sse', 'secret')
-          expect(sse_client).to have_received(:start)
+          expect(Utils::SchemaPollingClient).to have_received(:new)
+          expect(schema_polling_client).to have_received(:start)
         end
       end
 
@@ -87,10 +87,12 @@ module ForestAdminDatasourceRpc
       end
 
       context 'with schema polling interval configuration' do
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil) }
 
         before do
+          allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
           allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
         end
 
