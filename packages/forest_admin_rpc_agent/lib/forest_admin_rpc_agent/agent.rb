@@ -1,4 +1,5 @@
 require 'digest'
+require 'fileutils'
 
 module ForestAdminRpcAgent
   class Agent < ForestAdminAgent::Builder::AgentFactory # rubocop:disable Metrics/ClassLength
@@ -116,6 +117,7 @@ module ForestAdminRpcAgent
         collections: generated
       }
 
+      FileUtils.mkdir_p(File.dirname(schema_path))
       File.write(schema_path, format_schema_json(schema))
 
       # Build RPC schema in internal format (used by master agent)
