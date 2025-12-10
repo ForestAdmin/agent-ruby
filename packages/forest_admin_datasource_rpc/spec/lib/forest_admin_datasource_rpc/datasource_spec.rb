@@ -13,7 +13,7 @@ module ForestAdminDatasourceRpc
       allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
     end
 
-    let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: {}) }
+    let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: double(body: {})) }
     let(:datasource) { described_class.new({ uri: 'http://localhost' }, introspection) }
     let(:caller) { build_caller }
 
