@@ -107,7 +107,7 @@ module ForestAdminDatasourceRpc
         it 'returns a SchemaResponse with body and etag' do
           result = rpc_client.fetch_schema('/rpc/schema')
 
-          expect(result).to be_a(RpcClient::SchemaResponse)
+          expect(result).to be_a(SchemaResponse)
           expect(result.body).to eq({ collections: [] })
         end
 

@@ -19,7 +19,7 @@ module ForestAdminDatasourceRpc
 
       context 'when server is running' do
         let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
-        let(:response) { Utils::RpcClient::SchemaResponse.new(introspection, 'etag123') }
+        let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
         before do
