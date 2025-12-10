@@ -76,9 +76,12 @@ module ForestAdminDatasourceRpc
         initial_etag: cached_etag # Pass initial ETag from first schema fetch
       }
 
-      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |new_schema|
+      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |_new_schema|
         # Callback receives the new schema directly from polling
-        ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
+        ForestAdminAgent::Facades::Container.logger.log(
+          'Info',
+          '[RPCDatasource] Schema change detected, reloading agent...'
+        )
         ForestAdminAgent::Builder::AgentFactory.instance.reload!
       end
       schema_polling.start

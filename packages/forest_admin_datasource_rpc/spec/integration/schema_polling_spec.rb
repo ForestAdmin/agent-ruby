@@ -9,8 +9,8 @@ module ForestAdminDatasourceRpc
       let(:auth_secret) { 'test-secret-key' }
       let(:logger) { instance_spy(Logger) }
       let(:callback) { instance_double(Proc, call: nil) }
-      let(:schema1) { { collections: [{ name: 'Products' }], charts: [] } }
-      let(:schema2) { { collections: [{ name: 'Orders' }], charts: [] } }
+      let(:initial_schema) { { collections: [{ name: 'Products' }], charts: [] } }
+      let(:updated_schema) { { collections: [{ name: 'Orders' }], charts: [] } }
 
       before do
         allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
@@ -39,7 +39,7 @@ module ForestAdminDatasourceRpc
             Faraday::Response,
             success?: true,
             status: 200,
-            body: JSON.generate(schema1)
+            body: JSON.generate(initial_schema)
           )
 
           allow(http_client).to receive(:get).and_return(response)
@@ -58,18 +58,18 @@ module ForestAdminDatasourceRpc
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
 
-          # First poll with schema1
-          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema1))
+          # First poll with initial_schema
+          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
           allow(http_client).to receive(:get).and_return(response1)
           client.send(:check_schema)
 
-          # Second poll with schema2 (changed)
-          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema2))
+          # Second poll with updated_schema (changed)
+          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(updated_schema))
           allow(http_client).to receive(:get).and_return(response2)
           client.send(:check_schema)
 
           # Callback should have been called with new schema
-          expect(callback).to have_received(:call).with(schema2)
+          expect(callback).to have_received(:call).with(updated_schema)
           expect(logger).to have_received(:log).with('Info', /Schema changed detected/)
         end
 
@@ -79,7 +79,7 @@ module ForestAdminDatasourceRpc
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
 
-          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema1))
+          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
           allow(http_client).to receive(:get).and_return(response)
 
           # Multiple polls with same schema
@@ -106,7 +106,7 @@ module ForestAdminDatasourceRpc
               Faraday::Response,
               success?: true,
               status: 200,
-              body: JSON.generate(schema1)
+              body: JSON.generate(initial_schema)
             )
           end
 
@@ -172,11 +172,9 @@ module ForestAdminDatasourceRpc
           call_count = 0
           allow(http_client).to receive(:get) do
             call_count += 1
-            if call_count == 1
-              raise Faraday::ConnectionFailed
-            else
-              instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema1))
-            end
+            raise Faraday::ConnectionFailed if call_count == 1
+
+            instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
           end
 
           client.start

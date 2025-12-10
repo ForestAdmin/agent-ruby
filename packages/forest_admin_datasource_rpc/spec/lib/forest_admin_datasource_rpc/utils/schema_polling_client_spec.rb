@@ -54,7 +54,7 @@ module ForestAdminDatasourceRpc
           expect(client.instance_variable_get(:@http_client)).to be_a(Faraday::Connection)
         end
 
-        context 'polling interval validation' do
+        context 'with polling interval validation' do
           it 'raises error if interval is too short (< 1s)' do
             expect do
               described_class.new(uri, secret, polling_interval: 0.5) { |schema| callback.call(schema) }
@@ -460,6 +460,7 @@ module ForestAdminDatasourceRpc
           allow(http_client).to receive(:get) do
             call_count += 1
             raise Faraday::ConnectionFailed if call_count == 1
+
             schema_response
           end
 

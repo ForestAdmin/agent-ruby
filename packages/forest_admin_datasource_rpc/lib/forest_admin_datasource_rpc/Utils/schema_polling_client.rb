@@ -93,7 +93,7 @@ module ForestAdminDatasourceRpc
 
           # Sleep with interrupt check (check every second for early termination)
           remaining = @polling_interval
-          while remaining > 0 && !@closed
+          while remaining.positive? && !@closed
             sleep([remaining, 1].min)
             remaining -= 1
           end
