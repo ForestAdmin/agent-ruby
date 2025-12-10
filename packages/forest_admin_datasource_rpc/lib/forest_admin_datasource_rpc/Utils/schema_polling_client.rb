@@ -4,7 +4,6 @@ require 'time'
 
 module ForestAdminDatasourceRpc
   module Utils
-    # rubocop:disable Metrics/ClassLength
     class SchemaPollingClient
       attr_reader :closed
 
@@ -199,6 +198,5 @@ module ForestAdminDatasourceRpc
         end
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end
