@@ -83,28 +83,7 @@ module ForestAdminAgent
 
         return unless @has_env_secret
 
-        schema_path = Facades::Container.cache(:schema_path)
-
-        if Facades::Container.cache(:is_production)
-          unless schema_path && File.exist?(schema_path)
-            raise InternalServerError.new(
-              'Schema file not found in production',
-              details: { schema_path: schema_path }
-            )
-          end
-
-          schema = JSON.parse(File.read(schema_path), symbolize_names: true)
-        else
-          generated = SchemaEmitter.generate(@container.resolve(:datasource))
-          meta = SchemaEmitter.meta
-
-          schema = {
-            meta: meta,
-            collections: generated
-          }
-
-          File.write(schema_path, format_schema_json(schema))
-        end
+        schema = generate_schema_file
 
         if (append_schema_path = Facades::Container.cache(:append_schema_path))
           begin
@@ -116,6 +95,49 @@ module ForestAdminAgent
         end
 
         post_schema(schema, force)
+      end
+
+      # Generates or loads the schema and writes it to file (in development mode).
+      # This method can be overridden by subclasses that need to customize schema handling.
+      # @return [Hash] The schema hash with :meta and :collections keys
+      def generate_schema_file
+        schema_path = Facades::Container.cache(:schema_path)
+
+        if Facades::Container.cache(:is_production)
+          unless schema_path && File.exist?(schema_path)
+            raise InternalServerError.new(
+              'Schema file not found in production',
+              details: { schema_path: schema_path }
+            )
+          end
+
+          JSON.parse(File.read(schema_path), symbolize_names: true)
+        else
+          datasource = @container.resolve(:datasource)
+          schema = build_schema(datasource)
+          write_schema_file(schema_path, schema)
+          schema
+        end
+      end
+
+      # Builds the schema hash from the datasource
+      # @param datasource [Object] The datasource to generate schema from
+      # @return [Hash] The schema hash with :meta and :collections keys
+      def build_schema(datasource)
+        generated = SchemaEmitter.generate(datasource)
+        meta = SchemaEmitter.meta
+
+        {
+          meta: meta,
+          collections: generated
+        }
+      end
+
+      # Writes the schema to a file
+      # @param schema_path [String] Path to write the schema file
+      # @param schema [Hash] The schema to write
+      def write_schema_file(schema_path, schema)
+        File.write(schema_path, format_schema_json(schema))
       end
 
       private
