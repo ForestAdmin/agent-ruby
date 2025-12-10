@@ -14,6 +14,16 @@ module ForestAdminRpcAgent
 
     describe '#send_schema' do
       context 'when skip_schema_update is enabled' do
+        let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
+
+        before do
+          instance.container.register(:datasource, datasource, replace: true)
+          allow(instance).to receive(:customizer).and_return(customizer)
+          allow(customizer).to receive(:schema).and_return({})
+          allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
+          allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+        end
+
         it 'does not generate schema and logs skip message' do
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             case key
@@ -39,8 +49,6 @@ module ForestAdminRpcAgent
         end
 
         it 'generates schema when force flag is true despite skip setting' do
-          instance.container.register(:datasource, datasource, replace: true)
-
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             case key
             when :skip_schema_update then true
@@ -75,6 +83,7 @@ module ForestAdminRpcAgent
         end
 
         it 'does not write schema file and logs production mode message' do
+          instance.container.register(:datasource, datasource, replace: true)
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             case key
             when :skip_schema_update then false
@@ -84,12 +93,11 @@ module ForestAdminRpcAgent
           end
           allow(File).to receive_messages(exist?: true, write: nil,
                                           read: { meta: {}, collections: [] }.to_json)
-          # Mock customizer for building RPC schema response
+          # Mock customizer and datasource for building RPC schema
           customizer = instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer)
-          mock_datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
           allow(instance).to receive(:customizer).and_return(customizer)
-          allow(customizer).to receive_messages(schema: {}, datasource: mock_datasource)
-          allow(mock_datasource).to receive(:live_query_connections).and_return({})
+          allow(customizer).to receive(:schema).and_return({})
+          allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
 
           instance.send_schema
 
@@ -101,13 +109,12 @@ module ForestAdminRpcAgent
 
       context 'when in development mode' do
         let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
-        let(:mock_datasource) { instance_double(ForestAdminDatasourceToolkit::Datasource) }
 
         before do
           instance.container.register(:datasource, datasource, replace: true)
           allow(instance).to receive(:customizer).and_return(customizer)
-          allow(customizer).to receive_messages(schema: {}, datasource: mock_datasource)
-          allow(mock_datasource).to receive(:live_query_connections).and_return({})
+          allow(customizer).to receive(:schema).and_return({})
+          allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
         end
 
         it 'generates and writes schema to file' do
@@ -160,13 +167,12 @@ module ForestAdminRpcAgent
 
       context 'when it never sends schema to Forest Admin servers' do
         let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
-        let(:mock_datasource) { instance_double(ForestAdminDatasourceToolkit::Datasource) }
 
         before do
           instance.container.register(:datasource, datasource, replace: true)
           allow(instance).to receive(:customizer).and_return(customizer)
-          allow(customizer).to receive_messages(schema: {}, datasource: mock_datasource)
-          allow(mock_datasource).to receive(:live_query_connections).and_return({})
+          allow(customizer).to receive(:schema).and_return({})
+          allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
         end
 
         it 'logs that schema is not sent to servers' do

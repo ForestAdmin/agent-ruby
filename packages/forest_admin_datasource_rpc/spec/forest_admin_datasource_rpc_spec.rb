@@ -19,8 +19,8 @@ module ForestAdminDatasourceRpc
 
       context 'when server is running' do
         let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
-        let(:response) { Utils::RpcClient::Response.new(introspection, 'etag123') }
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: response) }
+        let(:response) { Utils::RpcClient::SchemaResponse.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
         before do
           allow(Utils::SseClient).to receive(:new).and_return(sse_client)
@@ -70,10 +70,10 @@ module ForestAdminDatasourceRpc
       end
 
       context 'when server is not running' do
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: nil) }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: nil) }
 
         it 'returns empty datasource and logs error' do
-          allow(rpc_client).to receive(:call_rpc).and_raise('server not running')
+          allow(rpc_client).to receive(:fetch_schema).and_raise('server not running')
 
           datasource = described_class.build({ uri: 'http://localhost' })
 

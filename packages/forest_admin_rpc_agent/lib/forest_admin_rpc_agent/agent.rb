@@ -61,7 +61,8 @@ module ForestAdminRpcAgent
     def rpc_schema
       return @cached_schema if @cached_schema
 
-      build_schema_from_datasource
+      build_and_cache_schema_from_datasource
+      @cached_schema
     end
 
     # Check if provided hash matches the cached schema hash
@@ -95,15 +96,19 @@ module ForestAdminRpcAgent
       end
     end
 
-    def load_and_cache_schema_from_file(schema_path)
-      file_content = JSON.parse(File.read(schema_path), symbolize_names: true)
-
-      @cached_schema = build_rpc_schema_response(file_content[:collections])
+    def load_and_cache_schema_from_file(_schema_path)
+      # File exists but RPC schema needs internal format - build from datasource
+      # The file is kept for reference/frontend but RPC always uses internal format
+      datasource = @container.resolve(:datasource)
+      @cached_schema = build_rpc_schema_from_datasource(datasource)
       compute_and_cache_hash
     end
 
     def generate_and_cache_schema(schema_path)
-      generated = ForestAdminAgent::Utils::Schema::SchemaEmitter.generate(@container.resolve(:datasource))
+      datasource = @container.resolve(:datasource)
+
+      # Generate frontend schema for file (used by Forest Admin)
+      generated = ForestAdminAgent::Utils::Schema::SchemaEmitter.generate(datasource)
       meta = ForestAdminAgent::Utils::Schema::SchemaEmitter.meta
 
       schema = {
@@ -113,22 +118,24 @@ module ForestAdminRpcAgent
 
       File.write(schema_path, format_schema_json(schema))
 
-      @cached_schema = build_rpc_schema_response(generated)
+      # Build RPC schema in internal format (used by master agent)
+      @cached_schema = build_rpc_schema_from_datasource(datasource)
       compute_and_cache_hash
     end
 
     def build_and_cache_schema_from_datasource
-      @cached_schema = build_schema_from_datasource
+      datasource = @container.resolve(:datasource)
+
+      @cached_schema = build_rpc_schema_from_datasource(datasource)
       compute_and_cache_hash
     end
 
-    def build_schema_from_datasource
+    def build_rpc_schema_from_datasource(datasource)
       schema = customizer.schema
-      datasource = customizer.datasource(ForestAdminRpcAgent::Facades::Container.logger)
 
-      schema[:collections] = datasource.collections
-                                       .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
-                                       .sort_by { |collection| collection[:name] }
+      # Serialize collections with internal schema format (fields as hash with :type keys)
+      collections = datasource.collections.map { |_name, collection| serialize_collection_for_rpc(collection) }
+      schema[:collections] = collections.sort_by { |c| c[:name] }
 
       connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
       schema[:native_query_connections] = connections
@@ -136,17 +143,105 @@ module ForestAdminRpcAgent
       schema
     end
 
-    def build_rpc_schema_response(collections)
-      schema = customizer.schema
-      datasource = customizer.datasource(ForestAdminRpcAgent::Facades::Container.logger)
+    def serialize_collection_for_rpc(collection)
+      {
+        name: collection.name,
+        countable: collection.schema[:countable],
+        searchable: collection.schema[:searchable],
+        segments: collection.schema[:segments] || [],
+        charts: collection.schema[:charts] || [],
+        actions: serialize_actions_for_rpc(collection.schema[:actions] || {}),
+        fields: serialize_fields_for_rpc(collection.schema[:fields] || {})
+      }
+    end
 
-      # Use collections from the schema file but merge with datasource collection schemas
-      schema[:collections] = collections.sort_by { |collection| collection[:name] }
+    def serialize_fields_for_rpc(fields)
+      fields.transform_values do |field_schema|
+        serialize_field_schema(field_schema)
+      end
+    end
 
-      connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
-      schema[:native_query_connections] = connections
+    def serialize_field_schema(field_schema)
+      case field_schema
+      when ForestAdminDatasourceToolkit::Schema::ColumnSchema
+        {
+          type: 'Column',
+          column_type: field_schema.column_type,
+          filter_operators: field_schema.filter_operators,
+          is_primary_key: field_schema.is_primary_key,
+          is_read_only: field_schema.is_read_only,
+          is_sortable: field_schema.is_sortable,
+          default_value: field_schema.default_value,
+          enum_values: field_schema.enum_values,
+          validation: field_schema.validation
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
+        {
+          type: 'ManyToOne',
+          foreign_collection: field_schema.foreign_collection,
+          foreign_key: field_schema.foreign_key,
+          foreign_key_target: field_schema.foreign_key_target
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema
+        {
+          type: 'OneToOne',
+          foreign_collection: field_schema.foreign_collection,
+          origin_key: field_schema.origin_key,
+          origin_key_target: field_schema.origin_key_target
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
+        {
+          type: 'OneToMany',
+          foreign_collection: field_schema.foreign_collection,
+          origin_key: field_schema.origin_key,
+          origin_key_target: field_schema.origin_key_target
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema
+        {
+          type: 'ManyToMany',
+          foreign_collection: field_schema.foreign_collection,
+          foreign_key: field_schema.foreign_key,
+          foreign_key_target: field_schema.foreign_key_target,
+          origin_key: field_schema.origin_key,
+          origin_key_target: field_schema.origin_key_target,
+          through_collection: field_schema.through_collection
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+        {
+          type: 'PolymorphicManyToOne',
+          foreign_collections: field_schema.foreign_collections,
+          foreign_key: field_schema.foreign_key,
+          foreign_key_type_field: field_schema.foreign_key_type_field,
+          foreign_key_targets: field_schema.foreign_key_targets
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema
+        {
+          type: 'PolymorphicOneToOne',
+          foreign_collection: field_schema.foreign_collection,
+          origin_key: field_schema.origin_key,
+          origin_key_target: field_schema.origin_key_target,
+          origin_type_field: field_schema.origin_type_field,
+          origin_type_value: field_schema.origin_type_value
+        }
+      when ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema
+        {
+          type: 'PolymorphicOneToMany',
+          foreign_collection: field_schema.foreign_collection,
+          origin_key: field_schema.origin_key,
+          origin_key_target: field_schema.origin_key_target,
+          origin_type_field: field_schema.origin_type_field,
+          origin_type_value: field_schema.origin_type_value
+        }
+      else
+        # Fallback: try to convert to hash if possible
+        field_schema.respond_to?(:to_h) ? field_schema.to_h : field_schema
+      end
+    end
 
-      schema
+    def serialize_actions_for_rpc(actions)
+      actions.transform_values do |action|
+        action.respond_to?(:to_h) ? action.to_h : action
+      end
     end
 
     def compute_and_cache_hash

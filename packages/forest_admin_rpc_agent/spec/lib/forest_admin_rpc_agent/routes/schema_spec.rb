@@ -93,11 +93,10 @@ module ForestAdminRpcAgent
 
         context 'with Sinatra-style request (env)' do
           let(:mock_request) do
-            request = instance_double(Sinatra::Request)
-            allow(request).to receive(:respond_to?).with(:get_header).and_return(false)
-            allow(request).to receive(:respond_to?).with(:env).and_return(true)
-            allow(request).to receive(:env).and_return({ 'HTTP_IF_NONE_MATCH' => %("#{cached_hash}") })
-            request
+            # Sinatra-style: responds to env but not get_header
+            # Using a Struct to simulate Sinatra request behavior
+            hash_value = cached_hash
+            Struct.new(:env).new({ 'HTTP_IF_NONE_MATCH' => %("#{hash_value}") })
           end
 
           it 'extracts If-None-Match from env and returns 304 when hash matches' do

@@ -18,7 +18,7 @@ module ForestAdminDatasourceRpc
 
     begin
       rpc_client = Utils::RpcClient.new(uri, auth_secret)
-      response = rpc_client.call_rpc('/forest/rpc-schema', method: :get, symbolize_keys: true)
+      response = rpc_client.fetch_schema('/forest/rpc-schema')
       schema = response.body
       # Use the ETag header for conditional requests
       cached_etag = response.etag
@@ -52,19 +52,15 @@ module ForestAdminDatasourceRpc
         ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
 
         # Send If-None-Match header to check if schema has changed (304 optimization)
-        result = rpc_client.call_rpc(
-          '/forest/rpc-schema',
-          method: :get,
-          symbolize_keys: true,
-          if_none_match: cached_etag
-        )
+        result = rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: cached_etag)
 
         # If we get NotModified, schema hasn't changed
         if result == Utils::RpcClient::NotModified
           ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed (304)')
         else
-          # Schema has changed, update the cached ETag and reload
+          # Schema has changed, update the cached ETag and schema, then reload
           cached_etag = result.etag
+          ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema changed, reloading agent...')
           ForestAdminAgent::Builder::AgentFactory.instance.reload!
         end
       end

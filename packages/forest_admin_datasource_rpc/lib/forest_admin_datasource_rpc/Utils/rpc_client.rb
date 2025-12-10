@@ -5,20 +5,17 @@ require 'time'
 
 module ForestAdminDatasourceRpc
   module Utils
-    class RpcClient
-      # RpcClient handles HTTP communication with the RPC Agent.
-      #
-      # Error Handling:
-      # When the RPC agent returns an error, this client automatically maps HTTP status codes
-      # to appropriate Forest Admin exception types. This ensures business errors from the
-      # RPC agent are properly propagated to the datasource_rpc.
-      #
-      # To add support for a new error type:
-      # 1. Add the status code and exception class to ERROR_STATUS_MAP
-      # 2. (Optional) Add a default message to generate_default_message method
-      # 3. Tests will automatically cover the new mapping
+    # Response wrapper for schema requests that need ETag
+    class SchemaResponse
+      attr_reader :body, :etag
 
-      # Map HTTP status codes to Forest Admin exception classes
+      def initialize(body, etag = nil)
+        @body = body
+        @etag = etag
+      end
+    end
+
+    class RpcClient
       ERROR_STATUS_MAP = {
         400 => ForestAdminAgent::Http::Exceptions::ValidationError,
         401 => ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
@@ -28,9 +25,12 @@ module ForestAdminDatasourceRpc
         422 => ForestAdminAgent::Http::Exceptions::UnprocessableError
       }.freeze
 
-      HTTP_NOT_MODIFIED = 304
+      DEFAULT_ERROR_MESSAGES = {
+        400 => 'Bad Request', 401 => 'Unauthorized', 403 => 'Forbidden',
+        404 => 'Not Found', 409 => 'Conflict', 422 => 'Unprocessable Entity'
+      }.freeze
 
-      # Special return value to indicate schema has not changed (HTTP 304)
+      HTTP_NOT_MODIFIED = 304
       NotModified = Class.new
 
       def initialize(api_url, auth_secret)
@@ -40,6 +40,22 @@ module ForestAdminDatasourceRpc
 
       # rubocop:disable Metrics/ParameterLists
       def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
+        response = make_request(endpoint, caller: caller, method: method, payload: payload,
+                                          symbolize_keys: symbolize_keys, if_none_match: if_none_match)
+        handle_response(response)
+      end
+
+      # rubocop:enable Metrics/ParameterLists
+
+      def fetch_schema(endpoint, if_none_match: nil)
+        response = make_request(endpoint, method: :get, symbolize_keys: true, if_none_match: if_none_match)
+        handle_response_with_etag(response)
+      end
+
+      private
+
+      # rubocop:disable Metrics/ParameterLists
+      def make_request(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
         client = Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
@@ -59,48 +75,31 @@ module ForestAdminDatasourceRpc
         headers['forest_caller'] = caller.to_json if caller
         headers['If-None-Match'] = %("#{if_none_match}") if if_none_match
 
-        response = client.send(method, endpoint, payload, headers)
-
-        handle_response(response, _symbolize_keys: symbolize_keys)
+        client.send(method, endpoint, payload, headers)
       end
       # rubocop:enable Metrics/ParameterLists
-
-      private
 
       def generate_signature(timestamp)
         OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
       end
 
-      # Response wrapper for successful responses that includes headers
-      class Response
-        attr_reader :body, :etag
-
-        def initialize(body, etag = nil)
-          @body = body
-          @etag = etag
-        end
-      end
-
-      def handle_response(response, _symbolize_keys: false)
-        # For successful responses, return the body with ETag if present
-        if response.success?
-          etag = extract_etag(response)
-          return Response.new(response.body, etag)
-        end
-
-        # Handle 304 Not Modified - schema has not changed (not an error)
+      def handle_response(response)
+        return response.body if response.success?
         return NotModified if response.status == HTTP_NOT_MODIFIED
 
-        # For other non-success responses, raise appropriate error
+        raise_appropriate_error(response)
+      end
+
+      def handle_response_with_etag(response)
+        return SchemaResponse.new(response.body, extract_etag(response)) if response.success?
+        return NotModified if response.status == HTTP_NOT_MODIFIED
+
         raise_appropriate_error(response)
       end
 
       def extract_etag(response)
         etag = response.headers['ETag'] || response.headers['etag']
-        return nil unless etag
-
-        # Strip quotes from ETag value
-        etag.gsub(/\A"?|"?\z/, '')
+        etag&.gsub(/\A"?|"?\z/, '')
       end
 
       def raise_appropriate_error(response)
@@ -123,37 +122,18 @@ module ForestAdminDatasourceRpc
       end
 
       def generate_default_message(status, url)
-        default_messages = {
-          400 => "Bad Request: #{url}",
-          401 => "Unauthorized: #{url}",
-          403 => "Forbidden: #{url}",
-          404 => "Not Found: #{url}",
-          409 => "Conflict: #{url}",
-          422 => "Unprocessable Entity: #{url}"
-        }
-
-        default_messages[status] || "Unknown error (#{url})"
+        prefix = DEFAULT_ERROR_MESSAGES[status] || 'Unknown error'
+        "#{prefix}: #{url}"
       end
 
       def parse_error_body(response)
         body = response.body
-
-        # If body is already a hash (Faraday parsed it as JSON)
         return symbolize_error_keys(body) if body.is_a?(Hash)
+        return { message: 'Unknown error' } unless body.is_a?(String) && !body.empty?
 
-        # Try to parse as JSON if it's a string
-        if body.is_a?(String) && !body.empty?
-          begin
-            parsed = JSON.parse(body)
-            return symbolize_error_keys(parsed)
-          rescue JSON::ParserError
-            # If parsing fails, return the body as the message
-            return { message: body }
-          end
-        end
-
-        # Fallback for empty or unexpected body types
-        { message: 'Unknown error' }
+        symbolize_error_keys(JSON.parse(body))
+      rescue JSON::ParserError
+        { message: body }
       end
 
       def symbolize_error_keys(hash)
