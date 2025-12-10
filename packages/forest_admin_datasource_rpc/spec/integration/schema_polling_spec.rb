@@ -39,7 +39,8 @@ module ForestAdminDatasourceRpc
             Faraday::Response,
             success?: true,
             status: 200,
-            body: JSON.generate(initial_schema)
+            body: JSON.generate(initial_schema),
+            headers: {}
           )
 
           allow(http_client).to receive(:get).and_return(response)
@@ -49,7 +50,7 @@ module ForestAdminDatasourceRpc
           # Should store hash without triggering callback
           expect(client.instance_variable_get(:@last_schema_hash)).not_to be_nil
           expect(callback).not_to have_received(:call)
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Initial schema hash stored')
+          expect(logger).to have_received(:log).with('Debug', /Initial schema hash stored/)
         end
 
         it 'detects schema change and triggers callback' do
@@ -59,12 +60,12 @@ module ForestAdminDatasourceRpc
           client.instance_variable_set(:@http_client, http_client)
 
           # First poll with initial_schema
-          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
+          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema), headers: {})
           allow(http_client).to receive(:get).and_return(response1)
           client.send(:check_schema)
 
           # Second poll with updated_schema (changed)
-          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(updated_schema))
+          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(updated_schema), headers: {})
           allow(http_client).to receive(:get).and_return(response2)
           client.send(:check_schema)
 
@@ -79,7 +80,7 @@ module ForestAdminDatasourceRpc
           http_client = instance_double(Faraday::Connection)
           client.instance_variable_set(:@http_client, http_client)
 
-          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
+          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema), headers: {})
           allow(http_client).to receive(:get).and_return(response)
 
           # Multiple polls with same schema
@@ -89,7 +90,7 @@ module ForestAdminDatasourceRpc
 
           # Callback should NOT have been called
           expect(callback).not_to have_received(:call)
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Schema unchanged').at_least(:once)
+          expect(logger).to have_received(:log).with('Debug', /Schema unchanged/).at_least(:once)
         end
 
         it 'validates HMAC signature in requests' do
@@ -106,7 +107,8 @@ module ForestAdminDatasourceRpc
               Faraday::Response,
               success?: true,
               status: 200,
-              body: JSON.generate(initial_schema)
+              body: JSON.generate(initial_schema),
+              headers: {}
             )
           end
 
@@ -174,7 +176,7 @@ module ForestAdminDatasourceRpc
             call_count += 1
             raise Faraday::ConnectionFailed if call_count == 1
 
-            instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema))
+            instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(initial_schema), headers: {})
           end
 
           client.start
