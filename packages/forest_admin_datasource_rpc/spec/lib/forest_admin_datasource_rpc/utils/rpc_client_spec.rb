@@ -6,7 +6,8 @@ module ForestAdminDatasourceRpc
       subject(:rpc_client) { described_class.new('http://localhost', 'secret') }
 
       context 'when the forest admin api is called' do
-        let(:response) { instance_double(Faraday::Response, status: 200, body: {}, success?: true) }
+        let(:response_headers) { {} }
+        let(:response) { instance_double(Faraday::Response, status: 200, body: {}, success?: true, headers: response_headers) }
         let(:faraday_connection) { instance_double(Faraday::Connection, send: response) }
         let(:timestamp) { '2025-04-01T14:07:02Z' }
 
@@ -15,7 +16,7 @@ module ForestAdminDatasourceRpc
           allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
         end
 
-        it 'returns a response on the get method' do
+        it 'returns the body directly on the get method' do
           result = rpc_client.call_rpc('/rpc/test', method: :get)
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -34,7 +35,7 @@ module ForestAdminDatasourceRpc
           expect(result).to eq({})
         end
 
-        it 'returns a response on the get method with payload' do
+        it 'returns the body directly on the get method with payload' do
           result = rpc_client.call_rpc('/rpc/test', method: :get, payload: { foo: 'arg' })
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -53,7 +54,7 @@ module ForestAdminDatasourceRpc
           expect(result).to eq({})
         end
 
-        it 'returns a response on the post method' do
+        it 'returns the body directly on the post method' do
           result = rpc_client.call_rpc('/rpc/test', method: :post)
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -72,7 +73,7 @@ module ForestAdminDatasourceRpc
           expect(result).to eq({})
         end
 
-        it 'returns a response on the post method with payload' do
+        it 'returns the body directly on the post method with payload' do
           result = rpc_client.call_rpc('/rpc/test', method: :post, payload: { foo: 'arg' })
 
           expect(faraday_connection).to have_received(:send) do |method, endpoint, payload, headers|
@@ -90,203 +91,288 @@ module ForestAdminDatasourceRpc
 
           expect(result).to eq({})
         end
+      end
 
-        context 'when request fails with error responses' do
-          let(:url) { '/rpc/test' }
+      describe '#fetch_schema' do
+        let(:response_headers) { {} }
+        let(:response) { instance_double(Faraday::Response, status: 200, body: { collections: [] }, success?: true, headers: response_headers) }
+        let(:faraday_connection) { instance_double(Faraday::Connection, send: response) }
+        let(:timestamp) { '2025-04-01T14:07:02Z' }
 
-          # NOTE: When adding a new error type to ERROR_STATUS_MAP in rpc_client.rb:
-          # 1. Add the status code mapping to ERROR_STATUS_MAP
-          # 2. Add a test case here following the same pattern
-          # 3. The test will automatically verify the mapping works correctly
+        before do
+          allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+          allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
+        end
 
-          context 'with 400 Bad Request' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 400,
-                success?: false,
-                body: { 'error' => 'Invalid parameters' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+        it 'returns a SchemaResponse with body and etag' do
+          result = rpc_client.fetch_schema('/rpc/schema')
 
-            it 'raises ValidationError with error message' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ValidationError,
-                /Invalid parameters/
-              )
-            end
-          end
+          expect(result).to be_a(SchemaResponse)
+          expect(result.body).to eq({ collections: [] })
+        end
 
-          context 'with 401 Unauthorized' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 401,
-                success?: false,
-                body: { 'error' => 'Invalid credentials' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+        context 'with If-None-Match header' do
+          it 'sends If-None-Match header when if_none_match is provided' do
+            rpc_client.fetch_schema('/rpc/schema', if_none_match: 'abc123')
 
-            it 'raises AuthenticationOpenIdClient error' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
-                /Invalid credentials/
-              )
+            expect(faraday_connection).to have_received(:send) do |_method, _endpoint, _payload, headers|
+              expect(headers['If-None-Match']).to eq('"abc123"')
             end
           end
 
-          context 'with 403 Forbidden' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 403,
-                success?: false,
-                body: { 'error' => 'Access denied' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'does not send If-None-Match header when if_none_match is nil' do
+            rpc_client.fetch_schema('/rpc/schema')
 
-            it 'raises ForbiddenError' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ForbiddenError,
-                /Access denied/
-              )
+            expect(faraday_connection).to have_received(:send) do |_method, _endpoint, _payload, headers|
+              expect(headers).not_to have_key('If-None-Match')
             end
           end
+        end
 
-          context 'with 404 Not Found' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 404,
-                success?: false,
-                body: { 'error' => 'Resource not found' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+        context 'with ETag in response' do
+          let(:response_headers) { { 'ETag' => '"etag123"' } }
 
-            it 'raises NotFoundError' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::NotFoundError,
-                /Resource not found/
-              )
-            end
+          it 'extracts ETag from response headers and strips quotes' do
+            result = rpc_client.fetch_schema('/rpc/schema')
+
+            expect(result.etag).to eq('etag123')
+          end
+        end
+
+        context 'with lowercase etag header' do
+          let(:response_headers) { { 'etag' => '"lowercase-etag"' } }
+
+          it 'extracts etag from lowercase header' do
+            result = rpc_client.fetch_schema('/rpc/schema')
+
+            expect(result.etag).to eq('lowercase-etag')
+          end
+        end
+
+        context 'without ETag in response' do
+          let(:response_headers) { {} }
+
+          it 'returns nil for etag' do
+            result = rpc_client.fetch_schema('/rpc/schema')
+
+            expect(result.etag).to be_nil
+          end
+        end
+
+        context 'with 304 Not Modified response' do
+          let(:response) { instance_double(Faraday::Response, status: 304, success?: false, headers: response_headers) }
+
+          it 'returns NotModified' do
+            result = rpc_client.fetch_schema('/rpc/schema', if_none_match: 'abc123')
+
+            expect(result).to eq(RpcClient::NotModified)
+          end
+        end
+      end
+
+      context 'when request fails with error responses' do
+        let(:response_headers) { {} }
+        let(:faraday_connection) { instance_double(Faraday::Connection, send: response) }
+        let(:timestamp) { '2025-04-01T14:07:02Z' }
+        let(:url) { '/rpc/test' }
+
+        before do
+          allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+          allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
+        end
+
+        # NOTE: When adding a new error type to ERROR_STATUS_MAP in rpc_client.rb:
+        # 1. Add the status code mapping to ERROR_STATUS_MAP
+        # 2. Add a test case here following the same pattern
+        # 3. The test will automatically verify the mapping works correctly
+
+        context 'with 400 Bad Request' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 400,
+              success?: false,
+              body: { 'error' => 'Invalid parameters' },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with 409 Conflict' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 409,
-                success?: false,
-                body: { 'error' => 'Duplicate record' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises ValidationError with error message' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ValidationError,
+              /Invalid parameters/
+            )
+          end
+        end
 
-            it 'raises ConflictError' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ConflictError,
-                /Duplicate record/
-              )
-            end
+        context 'with 401 Unauthorized' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 401,
+              success?: false,
+              body: { 'error' => 'Invalid credentials' },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with 422 Unprocessable Entity' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 422,
-                success?: false,
-                body: { 'error' => 'Validation failed', 'errors' => ['field is required'] },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises AuthenticationOpenIdClient error' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+              /Invalid credentials/
+            )
+          end
+        end
 
-            it 'raises UnprocessableError' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::UnprocessableError,
-                /Validation failed/
-              )
-            end
+        context 'with 403 Forbidden' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 403,
+              success?: false,
+              body: { 'error' => 'Access denied' },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with 500 Internal Server Error' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 500,
-                success?: false,
-                body: { 'error' => 'Something went wrong' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises ForbiddenError' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              /Access denied/
+            )
+          end
+        end
 
-            it 'raises ForestException with server error message' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                /Server Error.*Something went wrong/
-              )
-            end
+        context 'with 404 Not Found' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 404,
+              success?: false,
+              body: { 'error' => 'Resource not found' },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with error body as string instead of JSON' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 500,
-                success?: false,
-                body: 'Internal Server Error',
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises NotFoundError' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::NotFoundError,
+              /Resource not found/
+            )
+          end
+        end
 
-            it 'parses string error as message' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                /Internal Server Error/
-              )
-            end
+        context 'with 409 Conflict' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 409,
+              success?: false,
+              body: { 'error' => 'Duplicate record' },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with error body using "message" key instead of "error"' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 400,
-                success?: false,
-                body: { 'message' => 'Custom error message' },
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises ConflictError' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ConflictError,
+              /Duplicate record/
+            )
+          end
+        end
 
-            it 'extracts message correctly' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminAgent::Http::Exceptions::ValidationError,
-                /Custom error message/
-              )
-            end
+        context 'with 422 Unprocessable Entity' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 422,
+              success?: false,
+              body: { 'error' => 'Validation failed', 'errors' => ['field is required'] },
+              env: Faraday::Env.from(url: url)
+            )
           end
 
-          context 'with empty error body' do
-            let(:response) do
-              instance_double(
-                Faraday::Response,
-                status: 500,
-                success?: false,
-                body: '',
-                env: Faraday::Env.from(url: url)
-              )
-            end
+          it 'raises UnprocessableError' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::UnprocessableError,
+              /Validation failed/
+            )
+          end
+        end
 
-            it 'raises error with default message' do
-              expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                /Server Error.*Unknown error/
-              )
-            end
+        context 'with 500 Internal Server Error' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 500,
+              success?: false,
+              body: { 'error' => 'Something went wrong' },
+              env: Faraday::Env.from(url: url)
+            )
+          end
+
+          it 'raises ForestException with server error message' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              /Server Error.*Something went wrong/
+            )
+          end
+        end
+
+        context 'with error body as string instead of JSON' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 500,
+              success?: false,
+              body: 'Internal Server Error',
+              env: Faraday::Env.from(url: url)
+            )
+          end
+
+          it 'parses string error as message' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              /Internal Server Error/
+            )
+          end
+        end
+
+        context 'with error body using "message" key instead of "error"' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 400,
+              success?: false,
+              body: { 'message' => 'Custom error message' },
+              env: Faraday::Env.from(url: url)
+            )
+          end
+
+          it 'extracts message correctly' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ValidationError,
+              /Custom error message/
+            )
+          end
+        end
+
+        context 'with empty error body' do
+          let(:response) do
+            instance_double(
+              Faraday::Response,
+              status: 500,
+              success?: false,
+              body: '',
+              env: Faraday::Env.from(url: url)
+            )
+          end
+
+          it 'raises error with default message' do
+            expect { rpc_client.call_rpc(url, method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              /Server Error.*Unknown error/
+            )
           end
         end
       end

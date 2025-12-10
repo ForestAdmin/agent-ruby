@@ -19,7 +19,8 @@ module ForestAdminDatasourceRpc
 
       context 'when server is running' do
         let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
         before do
           allow(Utils::SseClient).to receive(:new).and_return(sse_client)
@@ -34,7 +35,7 @@ module ForestAdminDatasourceRpc
         it 'calls RPC client to get schema from /forest/rpc-schema' do
           described_class.build({ uri: 'http://localhost' })
 
-          expect(rpc_client).to have_received(:call_rpc).with('/forest/rpc-schema', method: :get, symbolize_keys: true)
+          expect(rpc_client).to have_received(:fetch_schema).with('/forest/rpc-schema')
         end
 
         it 'creates datasource with collections from introspection' do
@@ -53,7 +54,8 @@ module ForestAdminDatasourceRpc
           introspection_with_connections = introspection.merge(
             native_query_connections: [{ name: 'primary' }, { name: 'secondary' }]
           )
-          allow(rpc_client).to receive(:call_rpc).and_return(introspection_with_connections)
+          response_with_connections = Utils::SchemaResponse.new(introspection_with_connections, 'etag123')
+          allow(rpc_client).to receive(:fetch_schema).and_return(response_with_connections)
 
           datasource = described_class.build({ uri: 'http://localhost' })
 
@@ -69,10 +71,10 @@ module ForestAdminDatasourceRpc
       end
 
       context 'when server is not running' do
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: nil) }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: nil) }
 
         it 'returns empty datasource and logs error' do
-          allow(rpc_client).to receive(:call_rpc).and_raise('server not running')
+          allow(rpc_client).to receive(:fetch_schema).and_raise('server not running')
 
           datasource = described_class.build({ uri: 'http://localhost' })
 

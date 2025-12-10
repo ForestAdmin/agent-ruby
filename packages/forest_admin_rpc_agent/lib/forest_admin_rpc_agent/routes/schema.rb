@@ -5,23 +5,66 @@ module ForestAdminRpcAgent
       include ForestAdminAgent::Utils
       include ForestAdminAgent::Routes::QueryHandler
 
+      HTTP_OK = 200
+      HTTP_NOT_MODIFIED = 304
+
       def initialize
         super('rpc-schema', 'get', 'rpc_schema')
       end
 
-      def handle_request(_params)
+      def handle_request(args)
         agent = ForestAdminRpcAgent::Agent.instance
-        schema = agent.customizer.schema
-        datasource = agent.customizer.datasource(ForestAdminRpcAgent::Facades::Container.logger)
+        client_etag = extract_if_none_match(args)
 
-        schema[:collections] = datasource.collections
-                                         .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
-                                         .sort_by { |collection| collection[:name] }
+        # If client has cached schema and ETag matches, return 304 Not Modified
+        if client_etag && agent.schema_hash_matches?(client_etag)
+          ForestAdminRpcAgent::Facades::Container.logger.log(
+            'Debug',
+            'ETag matches, returning 304 Not Modified'
+          )
+          return { status: HTTP_NOT_MODIFIED, content: nil,
+                   headers: { 'ETag' => quote_etag(agent.cached_schema_hash) } }
+        end
 
-        connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
-        schema[:native_query_connections] = connections
+        # Get schema from cache (or build from datasource if not cached)
+        schema = agent.rpc_schema
+        etag = agent.cached_schema_hash
 
-        schema
+        # Return schema with ETag header
+        {
+          status: HTTP_OK,
+          content: schema,
+          headers: { 'ETag' => quote_etag(etag) }
+        }
+      end
+
+      private
+
+      def extract_if_none_match(args)
+        request = args[:request] if args.is_a?(Hash)
+        return nil unless request
+
+        # Get If-None-Match header (works for both Rails and Sinatra)
+        etag = if request.respond_to?(:get_header)
+                 request.get_header('HTTP_IF_NONE_MATCH')
+               elsif request.respond_to?(:env)
+                 request.env['HTTP_IF_NONE_MATCH']
+               end
+
+        # Strip quotes from ETag value if present
+        unquote_etag(etag)
+      end
+
+      def quote_etag(etag)
+        return nil unless etag
+
+        %("#{etag}")
+      end
+
+      def unquote_etag(etag)
+        return nil unless etag
+
+        etag.gsub(/\A"?|"?\z/, '')
       end
     end
   end
