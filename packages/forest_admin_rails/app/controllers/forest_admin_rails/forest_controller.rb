@@ -25,6 +25,9 @@ module ForestAdminRails
         # Handle streaming responses (NEW)
         return handle_streaming_response(data) if data.dig(:content, :type) == 'Stream'
 
+        # Handle redirect responses (for MCP OAuth)
+        return redirect_to data[:content][:url], allow_other_host: true if data.dig(:content, :type) == 'Redirect'
+
         if data.dig(:content, :type) == 'File'
           return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
                                                     disposition: 'attachment'

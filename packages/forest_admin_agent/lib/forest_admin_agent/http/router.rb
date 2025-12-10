@@ -63,7 +63,12 @@ module ForestAdminAgent
           { name: 'associate_related', handler: -> { Resources::Related::AssociateRelated.new.routes } },
           { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
           { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
-          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } }
+          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } },
+          # MCP (Model Context Protocol) routes
+          { name: 'mcp_oauth_metadata', handler: -> { Mcp::OAuthMetadata.new.routes } },
+          { name: 'mcp_oauth_authorize', handler: -> { Mcp::OAuthAuthorize.new.routes } },
+          { name: 'mcp_oauth_token', handler: -> { Mcp::OAuthToken.new.routes } },
+          { name: 'mcp_endpoint', handler: -> { Mcp::McpEndpoint.new.routes } }
         ]
 
         all_routes = {}
