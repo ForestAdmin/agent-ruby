@@ -20,11 +20,57 @@ module ForestAdminDatasourceRpc
       context 'when server is running' do
         let(:response) { Utils::RpcClient::Response.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: response) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil, stop: nil) }
+
+        before do
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
+        end
 
         it 'build datasource' do
           datasource = described_class.build({ uri: 'http://localhost' })
 
           expect(datasource).to be_a(ForestAdminDatasourceRpc::Datasource)
+        end
+
+        it 'calls RPC client to get schema from /forest/rpc-schema' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(rpc_client).to have_received(:call_rpc).with('/forest/rpc-schema', method: :get, symbolize_keys: true)
+        end
+
+        it 'creates datasource with collections from introspection' do
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.collections.keys).to include('Product', 'Manufacturer')
+        end
+
+        it 'creates datasource with charts from introspection' do
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.schema[:charts]).to eq(['appointments'])
+        end
+
+        it 'handles introspection with native_query_connections' do
+          introspection_with_connections = introspection.merge(
+            native_query_connections: [{ name: 'primary' }, { name: 'secondary' }]
+          )
+          response_with_connections = Utils::RpcClient::Response.new(introspection_with_connections, 'etag123')
+          allow(rpc_client).to receive(:call_rpc).and_return(response_with_connections)
+
+          datasource = described_class.build({ uri: 'http://localhost' })
+
+          expect(datasource.live_query_connections).to eq({ 'primary' => 'primary', 'secondary' => 'secondary' })
+        end
+
+        it 'initializes SchemaPollingClient for schema updates' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            hash_including(polling_interval: 600, initial_etag: 'etag123')
+          )
+          expect(schema_polling_client).to have_received(:start)
         end
       end
 
@@ -45,7 +91,8 @@ module ForestAdminDatasourceRpc
       end
 
       context 'schema polling interval configuration' do
-        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
+        let(:response) { Utils::RpcClient::Response.new(introspection, 'etag456') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: response) }
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil) }
 
         before do
@@ -58,8 +105,7 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 600 },
-            any_args
+            hash_including(polling_interval: 600, initial_etag: 'etag456')
           )
         end
 
@@ -69,8 +115,7 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 120 },
-            any_args
+            hash_including(polling_interval: 120, initial_etag: 'etag456')
           )
         end
 
@@ -82,8 +127,7 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 30 },
-            any_args
+            hash_including(polling_interval: 30, initial_etag: 'etag456')
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL')
@@ -97,8 +141,7 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 120 },
-            any_args
+            hash_including(polling_interval: 120, initial_etag: 'etag456')
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL')
