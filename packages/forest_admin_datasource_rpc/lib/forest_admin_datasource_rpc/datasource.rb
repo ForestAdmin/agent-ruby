@@ -36,7 +36,7 @@ module ForestAdminDatasourceRpc
         "Forwarding datasource chart '#{name}' call to the Rpc agent on #{url}."
       )
 
-      client.call_rpc(url, caller: caller, method: :post, payload: { chart: name })
+      client.call_rpc(url, caller: caller, method: :post, payload: { chart: name }).body
     end
 
     def execute_native_query(connection_name, query, binds)
@@ -49,7 +49,7 @@ module ForestAdminDatasourceRpc
       )
 
       result = client.call_rpc(url, method: :post,
-                                    payload: { connection_name: connection_name, query: query, binds: binds })
+                                    payload: { connection_name: connection_name, query: query, binds: binds }).body
       ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
     end
 

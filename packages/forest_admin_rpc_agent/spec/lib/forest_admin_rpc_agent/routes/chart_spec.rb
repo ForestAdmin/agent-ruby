@@ -21,7 +21,7 @@ module ForestAdminRpcAgent
       end
 
       let(:chart_result) { { countCurrent: 10, countPrevious: nil } }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: chart_result) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: chart_result, headers: {}) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do

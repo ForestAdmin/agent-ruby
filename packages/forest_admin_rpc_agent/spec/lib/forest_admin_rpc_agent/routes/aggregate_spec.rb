@@ -30,7 +30,7 @@ module ForestAdminRpcAgent
         )
       end
       let(:aggregate_result) { [{ 'group' => { 'country' => 'France' }, 'value' => 1000 }] }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: aggregate_result) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: aggregate_result, headers: {}) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do

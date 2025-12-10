@@ -62,7 +62,7 @@ module ForestAdminRpcAgent
         ]
       end
       let(:expected_response) { form_response.map(&:as_json).to_json }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: form_response.map(&:as_json)) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: form_response.map(&:as_json), headers: {}) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do

@@ -65,7 +65,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' list call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     def create(caller, data)
@@ -77,7 +77,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' creation call to the Rpc agent on #{url}."
       )
 
-      res = @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      res = @client.call_rpc(url, caller: caller, method: :post, payload: params).body
       res.first
     end
 
@@ -90,7 +90,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' update call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     def delete(caller, filter)
@@ -102,7 +102,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' deletion call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     def aggregate(caller, filter, aggregation, limit = nil)
@@ -114,7 +114,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' aggregate call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     def execute(caller, name, data, filter = nil)
@@ -127,7 +127,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)
@@ -143,7 +143,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action form #{name} call to the Rpc agent on #{url}."
       )
 
-      result = @client.call_rpc(url, caller: caller, method: :post, payload: params, symbolize_keys: true)
+      result = @client.call_rpc(url, caller: caller, method: :post, payload: params, symbolize_keys: true).body
       result.map do |field|
         Actions::ActionFieldFactory.build(field.to_h)
       end
@@ -158,7 +158,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' chart #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params).body
     end
 
     private

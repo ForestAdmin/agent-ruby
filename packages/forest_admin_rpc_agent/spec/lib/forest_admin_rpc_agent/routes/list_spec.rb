@@ -19,7 +19,7 @@ module ForestAdminRpcAgent
       end
 
       let(:list_result) { [{ 'id' => 1, 'email' => 'test@example.com' }] }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: list_result) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: list_result, headers: {}) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
