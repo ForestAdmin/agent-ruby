@@ -93,7 +93,7 @@ module ForestAdminRpcAgent
 
         context 'with Sinatra-style request (env)' do
           let(:mock_request) do
-            request = double('Request')
+            request = double('Request') # rubocop:disable RSpec/VerifiedDoubles
             allow(request).to receive(:respond_to?) do |method|
               method == :env
             end
