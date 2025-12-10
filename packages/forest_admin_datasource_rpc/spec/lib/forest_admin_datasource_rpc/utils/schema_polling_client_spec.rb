@@ -54,7 +54,7 @@ module ForestAdminDatasourceRpc
           expect(client.instance_variable_get(:@rpc_client)).to be_a(RpcClient)
         end
 
-        context 'polling interval validation' do
+        context 'when validating polling interval' do
           it 'raises error if interval is too short (< 1s)' do
             expect do
               described_class.new(uri, secret, polling_interval: 0.5) { |schema| callback.call(schema) }

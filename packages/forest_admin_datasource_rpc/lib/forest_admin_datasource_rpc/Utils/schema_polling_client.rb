@@ -4,6 +4,7 @@ require 'time'
 
 module ForestAdminDatasourceRpc
   module Utils
+    # rubocop:disable Metrics/ClassLength
     class SchemaPollingClient
       attr_reader :closed
 
@@ -86,7 +87,7 @@ module ForestAdminDatasourceRpc
 
           # Sleep with interrupt check (check every second for early termination)
           remaining = @polling_interval
-          while remaining > 0 && !@closed
+          while remaining.positive? && !@closed
             sleep([remaining, 1].min)
             remaining -= 1
           end
@@ -95,61 +96,16 @@ module ForestAdminDatasourceRpc
 
       def check_schema
         @connection_attempts += 1
+        log_checking_schema
 
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
-        )
-
-        # Fetch schema with ETag support (sends If-None-Match header if we have a cached ETag)
         result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @cached_etag)
-
-        # Check if schema has changed (NotModified means 304 response)
-        if result == RpcClient::NotModified
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            '[Schema Polling] Schema unchanged (HTTP 304)'
-          )
-          @connection_attempts = 0
-        else
-          # Schema changed or first poll
-          schema = result.body
-          new_etag = result.etag
-
-          if @cached_etag.nil?
-            # First poll - just store the ETag
-            @cached_etag = new_etag
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              '[Schema Polling] Initial schema loaded'
-            )
-            @connection_attempts = 0
-          else
-            # Schema changed - trigger callback
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Info',
-              '[Schema Polling] Schema changed detected, triggering reload callback'
-            )
-            @cached_etag = new_etag
-            @connection_attempts = 0
-            trigger_schema_change_callback(schema)
-          end
-        end
+        handle_schema_result(result)
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Warn',
-          "[Schema Polling] Connection error: #{e.class} - #{e.message}"
-        )
+        log_connection_error(e)
       rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "[Schema Polling] Authentication error: #{e.message}"
-        )
+        log_authentication_error(e)
       rescue StandardError => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "[Schema Polling] Unexpected error: #{e.class} - #{e.message}"
-        )
+        log_unexpected_error(e)
       end
 
       def handle_error(error)
@@ -172,6 +128,67 @@ module ForestAdminDatasourceRpc
         end
       end
 
+      def log_checking_schema
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
+        )
+      end
+
+      def handle_schema_result(result)
+        if result == RpcClient::NotModified
+          handle_schema_unchanged
+        else
+          handle_schema_changed(result)
+        end
+      end
+
+      def handle_schema_unchanged
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Schema unchanged (HTTP 304)')
+        @connection_attempts = 0
+      end
+
+      def handle_schema_changed(result)
+        new_etag = result.etag
+        @cached_etag.nil? ? handle_initial_schema(new_etag) : handle_schema_update(result.body, new_etag)
+        @connection_attempts = 0
+      end
+
+      def handle_initial_schema(etag)
+        @cached_etag = etag
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Initial schema loaded')
+      end
+
+      def handle_schema_update(schema, etag)
+        @cached_etag = etag
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Info',
+          '[Schema Polling] Schema changed detected, triggering reload callback'
+        )
+        trigger_schema_change_callback(schema)
+      end
+
+      def log_connection_error(error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Warn',
+          "[Schema Polling] Connection error: #{error.class} - #{error.message}"
+        )
+      end
+
+      def log_authentication_error(error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[Schema Polling] Authentication error: #{error.message}"
+        )
+      end
+
+      def log_unexpected_error(error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[Schema Polling] Unexpected error: #{error.class} - #{error.message}"
+        )
+      end
+
       def validate_polling_interval!
         if @polling_interval < MIN_POLLING_INTERVAL
           raise ArgumentError,
@@ -182,5 +199,6 @@ module ForestAdminDatasourceRpc
         end
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

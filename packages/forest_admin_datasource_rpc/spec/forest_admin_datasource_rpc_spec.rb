@@ -86,7 +86,7 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      context 'schema polling interval configuration' do
+      context 'with schema polling interval configuration' do
         let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: introspection) }
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil) }
 

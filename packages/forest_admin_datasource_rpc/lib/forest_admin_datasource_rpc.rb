@@ -27,14 +27,11 @@ module ForestAdminDatasourceRpc
     ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
     schema = nil
-    cached_etag = nil
 
     begin
       rpc_client = Utils::RpcClient.new(uri, auth_secret)
       response = rpc_client.fetch_schema('/forest/rpc-schema')
       schema = response.body
-      # Use the ETag header for conditional requests
-      cached_etag = response.etag
     rescue Faraday::ConnectionFailed => e
       ForestAdminAgent::Facades::Container.logger.log(
         'Error',
@@ -75,9 +72,10 @@ module ForestAdminDatasourceRpc
         polling_interval: polling_interval
       }
 
-      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do |new_schema|
-        # Callback receives the new schema directly from polling
-        ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
+      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do
+        # Callback when schema change is detected
+        logger = ForestAdminAgent::Facades::Container.logger
+        logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
         ForestAdminAgent::Builder::AgentFactory.instance.reload!
       end
       schema_polling.start
