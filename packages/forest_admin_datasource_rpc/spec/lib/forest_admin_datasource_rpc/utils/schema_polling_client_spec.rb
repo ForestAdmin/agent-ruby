@@ -205,7 +205,8 @@ module ForestAdminDatasourceRpc
             Faraday::Response,
             success?: true,
             status: 200,
-            body: JSON.generate(schema)
+            body: JSON.generate(schema),
+            headers: { 'ETag' => '"abc123"' }
           )
         end
 
@@ -239,7 +240,7 @@ module ForestAdminDatasourceRpc
 
           expect(client.instance_variable_get(:@last_schema_hash)).not_to be_nil
           expect(callback).not_to have_received(:call)
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Initial schema hash stored')
+          expect(logger).to have_received(:log).with('Debug', /Initial schema hash stored/)
         end
 
         it 'detects schema change and triggers callback with new schema' do
@@ -256,7 +257,8 @@ module ForestAdminDatasourceRpc
             Faraday::Response,
             success?: true,
             status: 200,
-            body: JSON.generate(new_schema)
+            body: JSON.generate(new_schema),
+            headers: { 'ETag' => '"def456"' }
           )
           allow(http_client).to receive(:get).and_return(new_response)
 
@@ -280,7 +282,7 @@ module ForestAdminDatasourceRpc
 
           # Callback should not have been called (only once for first poll setup)
           expect(callback).not_to have_received(:call)
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Schema unchanged')
+          expect(logger).to have_received(:log).with('Debug', /Schema unchanged/)
         end
 
         it 'handles HTTP errors gracefully' do
@@ -412,11 +414,11 @@ module ForestAdminDatasourceRpc
 
           # First poll
           schema1 = { collections: [{ name: 'Products' }] }
-          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema1))
+          response1 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema1), headers: { 'ETag' => '"etag1"' })
 
           # Second poll with different schema
           schema2 = { collections: [{ name: 'Orders' }] }
-          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema2))
+          response2 = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema2), headers: { 'ETag' => '"etag2"' })
 
           allow(http_client).to receive(:get).and_return(response1, response2)
 
@@ -435,7 +437,7 @@ module ForestAdminDatasourceRpc
           client.instance_variable_set(:@http_client, http_client)
 
           # Same schema for all polls
-          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema))
+          response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema), headers: { 'ETag' => '"etag-same"' })
           allow(http_client).to receive(:get).and_return(response)
 
           client.start
@@ -453,7 +455,7 @@ module ForestAdminDatasourceRpc
           client.instance_variable_set(:@http_client, http_client)
 
           # First poll fails, second succeeds
-          schema_response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema))
+          schema_response = instance_double(Faraday::Response, success?: true, status: 200, body: JSON.generate(schema), headers: { 'ETag' => '"etag-recover"' })
           call_count = 0
           allow(http_client).to receive(:get) do
             call_count += 1
