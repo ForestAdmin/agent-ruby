@@ -1,8 +1,6 @@
 require 'openssl'
 require 'json'
 require 'time'
-require 'faraday'
-require 'digest'
 
 module ForestAdminDatasourceRpc
   module Utils
@@ -19,7 +17,7 @@ module ForestAdminDatasourceRpc
         @polling_interval = options[:polling_interval] || DEFAULT_POLLING_INTERVAL
         @on_schema_change = on_schema_change
         @closed = false
-        @last_schema_hash = nil
+        @cached_etag = nil
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
@@ -27,12 +25,8 @@ module ForestAdminDatasourceRpc
         # Validate polling interval
         validate_polling_interval!
 
-        # HTTP client with reasonable timeouts
-        @http_client = Faraday.new do |conn|
-          conn.options.timeout = 10
-          conn.options.open_timeout = 10
-          conn.adapter Faraday.default_adapter
-        end
+        # RPC client for schema fetching with ETag support
+        @rpc_client = RpcClient.new(@uri, @auth_secret)
       end
 
       def start
@@ -101,65 +95,60 @@ module ForestAdminDatasourceRpc
 
       def check_schema
         @connection_attempts += 1
-        timestamp = Time.now.utc.iso8601(3)
-        signature = generate_signature(timestamp)
-
-        headers = {
-          'X_TIMESTAMP' => timestamp,
-          'X_SIGNATURE' => signature
-        }
 
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
-          "[Schema Polling] Fetching schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
+          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
         )
 
-        response = @http_client.get("#{@uri}/forest/rpc-schema", nil, headers)
+        # Fetch schema with ETag support (sends If-None-Match header if we have a cached ETag)
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @cached_etag)
 
-        if response.success?
-          schema = JSON.parse(response.body, symbolize_names: true)
-          new_hash = Digest::SHA1.hexdigest(schema.to_h.to_s)
+        # Check if schema has changed (NotModified means 304 response)
+        if result == RpcClient::NotModified
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            '[Schema Polling] Schema unchanged (HTTP 304)'
+          )
+          @connection_attempts = 0
+        else
+          # Schema changed or first poll
+          schema = result.body
+          new_etag = result.etag
 
-          if @last_schema_hash.nil?
-            # First poll - just store the hash
-            @last_schema_hash = new_hash
+          if @cached_etag.nil?
+            # First poll - just store the ETag
+            @cached_etag = new_etag
             ForestAdminAgent::Facades::Container.logger&.log(
               'Debug',
-              '[Schema Polling] Initial schema hash stored'
+              '[Schema Polling] Initial schema loaded'
             )
             @connection_attempts = 0
-          elsif @last_schema_hash != new_hash
+          else
             # Schema changed - trigger callback
             ForestAdminAgent::Facades::Container.logger&.log(
               'Info',
               '[Schema Polling] Schema changed detected, triggering reload callback'
             )
-            @last_schema_hash = new_hash
+            @cached_etag = new_etag
             @connection_attempts = 0
             trigger_schema_change_callback(schema)
-          else
-            # Schema unchanged
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              '[Schema Polling] Schema unchanged'
-            )
-            @connection_attempts = 0
           end
-        else
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Warn',
-            "[Schema Polling] HTTP #{response.status}: #{response.body}"
-          )
         end
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
         ForestAdminAgent::Facades::Container.logger&.log(
           'Warn',
           "[Schema Polling] Connection error: #{e.class} - #{e.message}"
         )
-      rescue JSON::ParserError => e
+      rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
         ForestAdminAgent::Facades::Container.logger&.log(
           'Error',
-          "[Schema Polling] Invalid JSON response: #{e.message}"
+          "[Schema Polling] Authentication error: #{e.message}"
+        )
+      rescue StandardError => e
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[Schema Polling] Unexpected error: #{e.class} - #{e.message}"
         )
       end
 
@@ -181,10 +170,6 @@ module ForestAdminDatasourceRpc
             "[Schema Polling] Error in schema change callback: #{e.class} - #{e.message}"
           )
         end
-      end
-
-      def generate_signature(timestamp)
-        OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
       end
 
       def validate_polling_interval!
