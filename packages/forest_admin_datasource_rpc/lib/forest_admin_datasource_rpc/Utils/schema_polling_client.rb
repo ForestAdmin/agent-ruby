@@ -20,6 +20,7 @@ module ForestAdminDatasourceRpc
         @on_schema_change = on_schema_change
         @closed = false
         @last_schema_hash = nil
+        @last_etag = options[:initial_etag] # Store initial ETag from first schema fetch
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
@@ -109,39 +110,55 @@ module ForestAdminDatasourceRpc
           'X_SIGNATURE' => signature
         }
 
+        # Add If-None-Match header if we have a cached ETag (enables 304 optimization)
+        headers['If-None-Match'] = quote_etag(@last_etag) if @last_etag
+
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
-          "[Schema Polling] Fetching schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
+          "[Schema Polling] Fetching schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})" +
+            (@last_etag ? " [ETag: #{@last_etag}]" : '')
         )
 
         response = @http_client.get("#{@uri}/forest/rpc-schema", nil, headers)
 
-        if response.success?
+        if response.status == 304
+          # 304 Not Modified - schema hasn't changed (ETag optimization)
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            '[Schema Polling] Schema unchanged (304 Not Modified)'
+          )
+          @connection_attempts = 0
+        elsif response.success?
+          # 200 OK - parse schema and update ETag
           schema = JSON.parse(response.body, symbolize_names: true)
           new_hash = Digest::SHA1.hexdigest(schema.to_h.to_s)
+          new_etag = unquote_etag(response.headers['etag'] || response.headers['ETag'])
+
+          # Update stored ETag if present
+          @last_etag = new_etag if new_etag
 
           if @last_schema_hash.nil?
             # First poll - just store the hash
             @last_schema_hash = new_hash
             ForestAdminAgent::Facades::Container.logger&.log(
               'Debug',
-              '[Schema Polling] Initial schema hash stored'
+              "[Schema Polling] Initial schema hash stored (ETag: #{@last_etag})"
             )
             @connection_attempts = 0
           elsif @last_schema_hash != new_hash
             # Schema changed - trigger callback
             ForestAdminAgent::Facades::Container.logger&.log(
               'Info',
-              '[Schema Polling] Schema changed detected, triggering reload callback'
+              "[Schema Polling] Schema changed detected (ETag: #{@last_etag}), triggering reload callback"
             )
             @last_schema_hash = new_hash
             @connection_attempts = 0
             trigger_schema_change_callback(schema)
           else
-            # Schema unchanged
+            # Schema unchanged (same hash but 200 response, shouldn't happen with ETag)
             ForestAdminAgent::Facades::Container.logger&.log(
               'Debug',
-              '[Schema Polling] Schema unchanged'
+              '[Schema Polling] Schema unchanged (same hash)'
             )
             @connection_attempts = 0
           end
@@ -195,6 +212,20 @@ module ForestAdminDatasourceRpc
           raise ArgumentError,
                 "Schema polling interval too long: #{@polling_interval}s (maximum: #{MAX_POLLING_INTERVAL}s)"
         end
+      end
+
+      def quote_etag(etag)
+        return nil unless etag
+
+        # Add quotes if not already present
+        etag.start_with?('"') ? etag : %("#{etag}")
+      end
+
+      def unquote_etag(etag)
+        return nil unless etag
+
+        # Remove quotes if present
+        etag.gsub(/\A"?|"?\z/, '')
       end
     end
   end
