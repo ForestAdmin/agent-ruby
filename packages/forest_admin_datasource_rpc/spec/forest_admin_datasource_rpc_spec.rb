@@ -18,12 +18,12 @@ module ForestAdminDatasourceRpc
       include_examples 'with introspection'
 
       context 'when server is running' do
-        let(:sse_client) { instance_double(Utils::SseClient, start: nil, close: nil) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil, stop: nil) }
         let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
         before do
-          allow(Utils::SseClient).to receive(:new).and_return(sse_client)
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
         end
 
         it 'build datasource' do
@@ -62,11 +62,11 @@ module ForestAdminDatasourceRpc
           expect(datasource.live_query_connections).to eq({ 'primary' => 'primary', 'secondary' => 'secondary' })
         end
 
-        it 'initializes SSE client for schema updates' do
+        it 'initializes schema polling client for schema updates' do
           described_class.build({ uri: 'http://localhost' })
 
-          expect(Utils::SseClient).to have_received(:new).with('http://localhost/forest/sse', 'secret')
-          expect(sse_client).to have_received(:start)
+          expect(Utils::SchemaPollingClient).to have_received(:new)
+          expect(schema_polling_client).to have_received(:start)
         end
       end
 
@@ -83,6 +83,69 @@ module ForestAdminDatasourceRpc
             'Error',
             a_string_matching(%r{Failed to get schema from RPC agent at http://localhost.*server not running})
           )
+        end
+      end
+
+      context 'with schema polling interval configuration' do
+        let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
+        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: nil) }
+
+        before do
+          allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
+        end
+
+        it 'uses default interval (600s) when no config provided' do
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 600 },
+            any_args
+          )
+        end
+
+        it 'uses options[:schema_polling_interval] when provided' do
+          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 120 },
+            any_args
+          )
+        end
+
+        it 'uses ENV["SCHEMA_POLLING_INTERVAL"] when set' do
+          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+
+          described_class.build({ uri: 'http://localhost' })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 30 },
+            any_args
+          )
+        ensure
+          ENV.delete('SCHEMA_POLLING_INTERVAL')
+        end
+
+        it 'prioritizes options[:schema_polling_interval] over ENV' do
+          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+
+          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            { polling_interval: 120 },
+            any_args
+          )
+        ensure
+          ENV.delete('SCHEMA_POLLING_INTERVAL')
         end
       end
     end

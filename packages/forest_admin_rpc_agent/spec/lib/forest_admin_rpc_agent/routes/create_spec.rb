@@ -18,7 +18,7 @@ module ForestAdminRpcAgent
           'data' => data
         }
       end
-      let(:response) { instance_double(Faraday::Response, success?: true, body: create_result) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: create_result, status: 200) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do

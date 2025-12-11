@@ -8,20 +8,30 @@ loader.setup
 module ForestAdminDatasourceRpc
   class Error < StandardError; end
 
+  # Build a RPC datasource with schema polling enabled.
+  #
+  # @param options [Hash] Configuration options
+  # @option options [String] :uri The URI of the RPC agent
+  # @option options [String] :auth_secret The authentication secret (optional, will use cache if not provided)
+  # @option options [Integer] :schema_polling_interval Polling interval in seconds (optional)
+  #   - Default: 600 seconds (10 minutes)
+  #   - Can be overridden with ENV['SCHEMA_POLLING_INTERVAL']
+  #   - Valid range: 1-3600 seconds
+  #   - Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default
+  #   - Example: SCHEMA_POLLING_INTERVAL=30 for development (30 seconds)
+  #
+  # @return [ForestAdminDatasourceRpc::Datasource] The configured datasource with schema polling
   def self.build(options)
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
     schema = nil
-    cached_etag = nil
 
     begin
       rpc_client = Utils::RpcClient.new(uri, auth_secret)
       response = rpc_client.fetch_schema('/forest/rpc-schema')
       schema = response.body
-      # Use the ETag header for conditional requests
-      cached_etag = response.etag
     rescue Faraday::ConnectionFailed => e
       ForestAdminAgent::Facades::Container.logger.log(
         'Error',
@@ -48,27 +58,31 @@ module ForestAdminDatasourceRpc
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      sse = Utils::SseClient.new("#{uri}/forest/sse", auth_secret) do
-        ForestAdminAgent::Facades::Container.logger.log('Info', 'RPC server stopped, checking schema...')
+      # Create schema polling client with configurable polling interval
+      # Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default (600)
+      polling_interval = if options[:schema_polling_interval]
+                           options[:schema_polling_interval]
+                         elsif ENV['SCHEMA_POLLING_INTERVAL']
+                           ENV['SCHEMA_POLLING_INTERVAL'].to_i
+                         else
+                           600 # 10 minutes by default
+                         end
 
-        # Send If-None-Match header to check if schema has changed (304 optimization)
-        result = rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: cached_etag)
+      polling_options = {
+        polling_interval: polling_interval
+      }
 
-        # If we get NotModified, schema hasn't changed
-        if result == Utils::RpcClient::NotModified
-          ForestAdminAgent::Facades::Container.logger.log('Debug', '[RPCDatasource] Schema has not changed (304)')
-        else
-          # Schema has changed, update the cached ETag and schema, then reload
-          cached_etag = result.etag
-          ForestAdminAgent::Facades::Container.logger.log('Info', '[RPCDatasource] Schema changed, reloading agent...')
-          ForestAdminAgent::Builder::AgentFactory.instance.reload!
-        end
+      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do
+        # Callback when schema change is detected
+        logger = ForestAdminAgent::Facades::Container.logger
+        logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
+        ForestAdminAgent::Builder::AgentFactory.instance.reload!
       end
-      sse.start
+      schema_polling.start
 
-      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, sse)
+      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
 
-      # Setup cleanup hooks for proper SSE client shutdown
+      # Setup cleanup hooks for proper schema polling client shutdown
       setup_cleanup_hooks(datasource)
 
       datasource

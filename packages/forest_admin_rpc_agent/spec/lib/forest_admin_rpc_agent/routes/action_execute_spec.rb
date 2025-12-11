@@ -22,7 +22,7 @@ module ForestAdminRpcAgent
       end
       let(:args) { { params: params } }
       let(:expected_response) { { success: true }.to_json }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: expected_response) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: expected_response, status: 200) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
