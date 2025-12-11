@@ -65,6 +65,7 @@ module ForestAdminDatasourceRpc
         'Warn',
         "RPC agent at #{uri} is unreachable, using provided introspection for resilient deployment."
       )
+      options.delete(:introspection)
       schema = provided_introspection
     end
 
