@@ -1,7 +1,7 @@
 module ForestAdminAgent
   module Routes
     module Mcp
-      class OAuthMetadata < AbstractRoute
+      class OauthMetadata < AbstractRoute
         include ForestAdminAgent::Http::Exceptions
 
         def setup_routes

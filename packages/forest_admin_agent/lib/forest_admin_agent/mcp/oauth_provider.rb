@@ -4,7 +4,7 @@ require 'json'
 
 module ForestAdminAgent
   module Mcp
-    class OAuthProvider
+    class OauthProvider
       attr_reader :environment_id, :environment_api_endpoint
 
       def initialize(forest_server_url: nil)

@@ -1,7 +1,7 @@
 module ForestAdminAgent
   module Routes
     module Mcp
-      class OAuthAuthorize < AbstractRoute
+      class OauthAuthorize < AbstractRoute
         include ForestAdminAgent::Http::Exceptions
 
         def setup_routes
@@ -80,7 +80,7 @@ module ForestAdminAgent
 
         def oauth_provider
           @oauth_provider ||= begin
-            provider = ForestAdminAgent::Mcp::OAuthProvider.new
+            provider = ForestAdminAgent::Mcp::OauthProvider.new
             provider.initialize!
             provider
           end

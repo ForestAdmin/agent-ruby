@@ -77,9 +77,9 @@ module ForestAdminAgent
         # Add MCP routes only if enabled via configuration
         if mcp_server_enabled?
           route_sources += [
-            { name: 'mcp_oauth_metadata', handler: -> { Mcp::OAuthMetadata.new.routes } },
-            { name: 'mcp_oauth_authorize', handler: -> { Mcp::OAuthAuthorize.new.routes } },
-            { name: 'mcp_oauth_token', handler: -> { Mcp::OAuthToken.new.routes } },
+            { name: 'mcp_oauth_metadata', handler: -> { Mcp::OauthMetadata.new.routes } },
+            { name: 'mcp_oauth_authorize', handler: -> { Mcp::OauthAuthorize.new.routes } },
+            { name: 'mcp_oauth_token', handler: -> { Mcp::OauthToken.new.routes } },
             { name: 'mcp_endpoint', handler: -> { Mcp::McpEndpoint.new.routes } }
           ]
         end

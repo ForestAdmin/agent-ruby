@@ -82,7 +82,7 @@ module ForestAdminAgent
 
         def oauth_provider
           @oauth_provider ||= begin
-            provider = ForestAdminAgent::Mcp::OAuthProvider.new
+            provider = ForestAdminAgent::Mcp::OauthProvider.new
             provider.initialize!
             provider
           end
