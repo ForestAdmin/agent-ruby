@@ -22,7 +22,7 @@ module ForestAdminRpcAgent
       end
       let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
       let(:update_result) { nil }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: {}) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: {}, status: 200) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
