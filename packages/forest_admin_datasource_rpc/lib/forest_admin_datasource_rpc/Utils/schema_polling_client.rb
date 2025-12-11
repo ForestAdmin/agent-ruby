@@ -87,7 +87,7 @@ module ForestAdminDatasourceRpc
           # Sleep with interrupt check (check every second for early termination)
           ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
-            "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{@cached_etag || 'none'})"
+            "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{@cached_etag || "none"})"
           )
           remaining = @polling_interval
           while remaining.positive? && !@closed
@@ -132,19 +132,17 @@ module ForestAdminDatasourceRpc
             '[Schema Polling] Schema change callback completed successfully'
           )
         rescue StandardError => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "[Schema Polling] Error in schema change callback: #{e.class} - #{e.message}\n#{e.backtrace&.first(5)&.join("\n")}"
-          )
+          error_msg = "[Schema Polling] Error in schema change callback: #{e.class} - #{e.message}"
+          backtrace = "\n#{e.backtrace&.first(5)&.join("\n")}"
+          ForestAdminAgent::Facades::Container.logger&.log('Error', error_msg + backtrace)
         end
       end
 
       def log_checking_schema
         etag_info = @cached_etag ? "with ETag: #{@cached_etag}" : 'without ETag (initial fetch)'
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts}, #{etag_info})"
-        )
+        msg = "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema " \
+              "(attempt ##{@connection_attempts}, #{etag_info})"
+        ForestAdminAgent::Facades::Container.logger&.log('Debug', msg)
       end
 
       def handle_schema_result(result)
@@ -180,10 +178,9 @@ module ForestAdminDatasourceRpc
       def handle_schema_update(schema, etag)
         old_etag = @cached_etag
         @cached_etag = etag
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Info',
-          "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{etag}), triggering reload callback"
-        )
+        msg = "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{etag}), " \
+              'triggering reload callback'
+        ForestAdminAgent::Facades::Container.logger&.log('Info', msg)
         trigger_schema_change_callback(schema)
       end
 

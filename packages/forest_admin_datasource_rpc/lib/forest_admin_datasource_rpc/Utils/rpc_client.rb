@@ -99,7 +99,7 @@ module ForestAdminDatasourceRpc
           etag = extract_etag(response)
           ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
-            "[RPC Client] Schema response received (status: #{response.status}, ETag: #{etag || 'none'})"
+            "[RPC Client] Schema response received (status: #{response.status}, ETag: #{etag || "none"})"
           )
           return SchemaResponse.new(response.body, etag)
         end
