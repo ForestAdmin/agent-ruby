@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.0...v1.18.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* **dsl:** support form_value in dynamic form field procs ([#239](https://github.com/ForestAdmin/agent-ruby/issues/239)) ([5d7625e](https://github.com/ForestAdmin/agent-ruby/commit/5d7625e78d7ff5f965df9ecb7aedb3e2009187ee))
+
 # [1.18.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.17.0...v1.18.0) (2025-12-11)
 
 
