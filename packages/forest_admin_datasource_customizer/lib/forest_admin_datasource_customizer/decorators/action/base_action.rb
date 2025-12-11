@@ -4,14 +4,15 @@ module ForestAdminDatasourceCustomizer
       class BaseAction
         attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute, :static_form
 
-        def initialize(scope:, form: nil, is_generate_file: false, description: nil, submit_button_label: nil, &execute)
+        def initialize(scope:, form: nil, is_generate_file: false, description: nil, submit_button_label: nil,
+                       static_form: false, &execute)
           @scope = scope
           @form = form
           @is_generate_file = is_generate_file
           @description = description
           @submit_button_label = submit_button_label
           @execute = execute
-          @static_form = false
+          @static_form = static_form
         end
 
         def self.from_plain_object(action)
@@ -21,6 +22,7 @@ module ForestAdminDatasourceCustomizer
             is_generate_file: action[:is_generate_file],
             description: action[:description],
             submit_button_label: action[:submit_button_label],
+            static_form: action[:static_form] || false,
             &action[:execute]
           )
         end
