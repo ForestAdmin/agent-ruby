@@ -35,7 +35,7 @@ module ForestAdminDatasourceRpc
       # the schema is available immediately. Then async polling starts.
       #
       # @return [Boolean] true if started successfully, false if already running or closed
-      def start
+      def start # rubocop:disable Naming/PredicateMethod
         return false if @closed
 
         @mutex.synchronize do
@@ -84,39 +84,37 @@ module ForestAdminDatasourceRpc
       # Fetch initial schema synchronously (called from start() in main thread)
       # This is a blocking call that sets @current_schema and @cached_etag
       def fetch_initial_schema_sync
-        begin
-          result = @rpc_client.fetch_schema('/forest/rpc-schema')
-          @cached_etag = result.etag
-          @current_schema = result.body
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
-          )
-        rescue Faraday::ConnectionFailed => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Connection failed to RPC agent at #{@uri}: #{e.message}\n#{e.backtrace.join("\n")}"
-          )
-        rescue Faraday::TimeoutError => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Request timeout to RPC agent at #{@uri}: #{e.message}"
-          )
-        rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Authentication failed with RPC agent at #{@uri}: #{e.message}"
-          )
-        rescue StandardError => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Failed to get schema from RPC agent at #{@uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
-          )
-        end
+        result = @rpc_client.fetch_schema('/forest/rpc-schema')
+        @cached_etag = result.etag
+        @current_schema = result.body
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
+        )
+      rescue Faraday::ConnectionFailed => e
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "Connection failed to RPC agent at #{@uri}: #{e.message}\n#{e.backtrace.join("\n")}"
+        )
+      rescue Faraday::TimeoutError => e
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "Request timeout to RPC agent at #{@uri}: #{e.message}"
+        )
+      rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "Authentication failed with RPC agent at #{@uri}: #{e.message}"
+        )
+      rescue StandardError => e
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "Failed to get schema from RPC agent at #{@uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+        )
       end
 
       def polling_loop
-        etag_status = @cached_etag ? "with ETag: #{@cached_etag}" : "without initial ETag"
+        etag_status = @cached_etag ? "with ETag: #{@cached_etag}" : 'without initial ETag'
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
           "[Schema Polling] Starting polling loop (interval: #{@polling_interval}s, #{etag_status})"
@@ -129,9 +127,10 @@ module ForestAdminDatasourceRpc
 
           # Wait before checking (skip wait on first iteration to start polling immediately)
           unless first_check
+            etag_info = @cached_etag || 'none'
             ForestAdminAgent::Facades::Container.logger&.log(
               'Debug',
-              "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{@cached_etag || "none"})"
+              "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{etag_info})"
             )
             sleep_with_interrupt(@polling_interval)
             break if @closed
