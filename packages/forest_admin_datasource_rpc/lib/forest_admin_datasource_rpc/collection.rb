@@ -28,31 +28,32 @@ module ForestAdminDatasourceRpc
     def add_fields(fields)
       fields.each do |field_name, schema|
         field_name = field_name.to_s
-        type = schema[:type]
-        schema.delete(:type)
-        # remove these
+        type = schema.delete(:type)
         schema.delete(:allow_null)
-        case type
-        when 'Column'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(**schema))
-        when 'ManyToMany'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(**schema))
-        when 'OneToMany'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(**schema))
-        when 'ManyToOne'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(**schema))
-        when 'OneToOne'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(**schema))
-        when 'PolymorphicManyToOne'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(**schema))
-        when 'PolymorphicOneToMany'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(**schema))
-        when 'PolymorphicOneToOne'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(**schema))
-        end
+        schema.delete(:validation)
+        field_schema = build_field_schema(type, schema)
+        add_field(field_name, field_schema) if field_schema
+      end
+    end
+
+    def build_field_schema(type, schema)
+      case type
+      when 'Column'
+        ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(**schema)
+      when 'ManyToMany'
+        ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(**schema)
+      when 'OneToMany'
+        ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(**schema)
+      when 'ManyToOne'
+        ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(**schema)
+      when 'OneToOne'
+        ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(**schema)
+      when 'PolymorphicManyToOne'
+        ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(**schema)
+      when 'PolymorphicOneToMany'
+        ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(**schema)
+      when 'PolymorphicOneToOne'
+        ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(**schema)
       end
     end
 
