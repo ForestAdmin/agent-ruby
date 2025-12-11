@@ -5,7 +5,7 @@ require 'time'
 module ForestAdminDatasourceRpc
   module Utils
     class SchemaPollingClient
-      attr_reader :closed
+      attr_reader :closed, :current_schema
 
       DEFAULT_POLLING_INTERVAL = 600 # seconds (10 minutes)
       MIN_POLLING_INTERVAL = 1 # seconds (minimum safe interval)
@@ -18,6 +18,7 @@ module ForestAdminDatasourceRpc
         @on_schema_change = on_schema_change
         @closed = false
         @cached_etag = nil
+        @current_schema = nil
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
@@ -29,55 +30,22 @@ module ForestAdminDatasourceRpc
         @rpc_client = RpcClient.new(@uri, @auth_secret)
       end
 
-      # Fetch the initial schema synchronously (blocking call)
-      # This should be called before start() to get the initial schema
-      # and populate the ETag cache to avoid redundant fetches when polling starts.
+      # Start schema polling with initial synchronous fetch
+      # The first schema fetch is done synchronously (blocking) to ensure
+      # the schema is available immediately. Then async polling starts.
       #
-      # @return [String, nil] The schema JSON string, or nil if fetch failed
-      def fetch_initial_schema
-        ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
-
-        begin
-          result = @rpc_client.fetch_schema('/forest/rpc-schema')
-          @cached_etag = result.etag
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
-          )
-          result.body
-        rescue Faraday::ConnectionFailed => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Connection failed to RPC agent at #{@uri}: #{e.message}\n#{e.backtrace.join("\n")}"
-          )
-          nil
-        rescue Faraday::TimeoutError => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Request timeout to RPC agent at #{@uri}: #{e.message}"
-          )
-          nil
-        rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Authentication failed with RPC agent at #{@uri}: #{e.message}"
-          )
-          nil
-        rescue StandardError => e
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Error',
-            "Failed to get schema from RPC agent at #{@uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
-          )
-          nil
-        end
-      end
-
+      # @return [Boolean] true if started successfully, false if already running or closed
       def start
-        return if @closed
+        return false if @closed
 
         @mutex.synchronize do
-          return if @polling_thread&.alive?
+          return false if @polling_thread&.alive?
 
+          # Fetch initial schema synchronously before starting the polling thread
+          ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
+          fetch_initial_schema_sync
+
+          # Start async polling thread
           @polling_thread = Thread.new do
             polling_loop
           rescue StandardError => e
@@ -92,6 +60,7 @@ module ForestAdminDatasourceRpc
           'Info',
           "[Schema Polling] Polling started (interval: #{@polling_interval}s)"
         )
+        true
       end
 
       def stop
@@ -112,6 +81,40 @@ module ForestAdminDatasourceRpc
 
       private
 
+      # Fetch initial schema synchronously (called from start() in main thread)
+      # This is a blocking call that sets @current_schema and @cached_etag
+      def fetch_initial_schema_sync
+        begin
+          result = @rpc_client.fetch_schema('/forest/rpc-schema')
+          @cached_etag = result.etag
+          @current_schema = result.body
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
+          )
+        rescue Faraday::ConnectionFailed => e
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Error',
+            "Connection failed to RPC agent at #{@uri}: #{e.message}\n#{e.backtrace.join("\n")}"
+          )
+        rescue Faraday::TimeoutError => e
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Error',
+            "Request timeout to RPC agent at #{@uri}: #{e.message}"
+          )
+        rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Error',
+            "Authentication failed with RPC agent at #{@uri}: #{e.message}"
+          )
+        rescue StandardError => e
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Error',
+            "Failed to get schema from RPC agent at #{@uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+          )
+        end
+      end
+
       def polling_loop
         etag_status = @cached_etag ? "with ETag: #{@cached_etag}" : "without initial ETag"
         ForestAdminAgent::Facades::Container.logger&.log(
@@ -119,37 +122,23 @@ module ForestAdminDatasourceRpc
           "[Schema Polling] Starting polling loop (interval: #{@polling_interval}s, #{etag_status})"
         )
 
-        # If we already have an ETag from fetch_initial_schema, wait before first check
-        # to avoid redundant request since schema is already up-to-date
-        first_iteration = true
-
         loop do
           break if @closed
 
-          # Wait first if we already have the schema (ETag present)
-          if first_iteration && @cached_etag
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              "[Schema Polling] Skipping immediate check (schema already fetched), waiting #{@polling_interval}s"
-            )
-            first_iteration = false
-            sleep_with_interrupt(@polling_interval)
-            next if @closed
-          end
-          first_iteration = false
-
-          begin
-            check_schema
-          rescue StandardError => e
-            handle_error(e)
-          end
-
-          # Sleep with interrupt check (check every second for early termination)
+          # Wait before checking (we already have initial schema from fetch_initial_schema_sync)
           ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
             "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{@cached_etag || "none"})"
           )
           sleep_with_interrupt(@polling_interval)
+          break if @closed
+
+          # Check for schema changes
+          begin
+            check_schema
+          rescue StandardError => e
+            handle_error(e)
+          end
         end
       end
 
@@ -227,21 +216,27 @@ module ForestAdminDatasourceRpc
 
       def handle_schema_changed(result)
         new_etag = result.etag
-        @cached_etag.nil? ? handle_initial_schema(new_etag) : handle_schema_update(result.body, new_etag)
-        @connection_attempts = 0
-      end
+        new_schema = result.body
 
-      def handle_initial_schema(etag)
-        @cached_etag = etag
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Initial schema loaded successfully (ETag: #{etag})"
-        )
+        if @cached_etag.nil?
+          # Initial schema fetch
+          @cached_etag = new_etag
+          @current_schema = new_schema
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[Schema Polling] Initial schema loaded successfully (ETag: #{new_etag})"
+          )
+        else
+          # Schema update detected
+          handle_schema_update(new_schema, new_etag)
+        end
+        @connection_attempts = 0
       end
 
       def handle_schema_update(schema, etag)
         old_etag = @cached_etag
         @cached_etag = etag
+        @current_schema = schema
         msg = "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{etag}), " \
               'triggering reload callback'
         ForestAdminAgent::Facades::Container.logger&.log('Info', msg)

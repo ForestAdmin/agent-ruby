@@ -46,18 +46,17 @@ module ForestAdminDatasourceRpc
       ForestAdminAgent::Builder::AgentFactory.instance.reload!
     end
 
-    # Fetch initial schema synchronously (blocking call)
-    # This also populates the ETag cache to avoid redundant fetch when polling starts
-    schema = schema_polling.fetch_initial_schema
+    # Start polling (includes initial synchronous schema fetch)
+    # The initial fetch is blocking, then async polling starts
+    schema_polling.start
+
+    # Get the schema from the polling client
+    schema = schema_polling.current_schema
 
     if schema.nil?
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      # Start polling for schema changes
-      # Since we already have the schema and ETag, polling will wait before the first check
-      schema_polling.start
-
       datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
 
       # Setup cleanup hooks for proper schema polling client shutdown
