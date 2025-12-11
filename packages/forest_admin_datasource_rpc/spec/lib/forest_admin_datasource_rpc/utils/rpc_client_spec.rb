@@ -5,6 +5,12 @@ module ForestAdminDatasourceRpc
     describe RpcClient do
       subject(:rpc_client) { described_class.new('http://localhost', 'secret') }
 
+      let(:logger) { instance_spy(Logger) }
+
+      before do
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+      end
+
       context 'when the forest admin api is called' do
         let(:response_headers) { {} }
         let(:response) { instance_double(Faraday::Response, status: 200, body: {}, success?: true, headers: response_headers) }

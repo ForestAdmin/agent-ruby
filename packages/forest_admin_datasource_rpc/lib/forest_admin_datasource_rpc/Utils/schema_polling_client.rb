@@ -85,6 +85,10 @@ module ForestAdminDatasourceRpc
           end
 
           # Sleep with interrupt check (check every second for early termination)
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{@cached_etag || 'none'})"
+          )
           remaining = @polling_interval
           while remaining.positive? && !@closed
             sleep([remaining, 1].min)
@@ -117,20 +121,29 @@ module ForestAdminDatasourceRpc
       def trigger_schema_change_callback(schema)
         return unless @on_schema_change
 
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          '[Schema Polling] Invoking schema change callback'
+        )
         begin
           @on_schema_change.call(schema)
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            '[Schema Polling] Schema change callback completed successfully'
+          )
         rescue StandardError => e
           ForestAdminAgent::Facades::Container.logger&.log(
             'Error',
-            "[Schema Polling] Error in schema change callback: #{e.class} - #{e.message}"
+            "[Schema Polling] Error in schema change callback: #{e.class} - #{e.message}\n#{e.backtrace&.first(5)&.join("\n")}"
           )
         end
       end
 
       def log_checking_schema
+        etag_info = @cached_etag ? "with ETag: #{@cached_etag}" : 'without ETag (initial fetch)'
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
-          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts})"
+          "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema (attempt ##{@connection_attempts}, #{etag_info})"
         )
       end
 
@@ -143,7 +156,10 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_schema_unchanged
-        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Schema unchanged (HTTP 304)')
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[Schema Polling] Schema unchanged (HTTP 304 Not Modified), ETag still valid: #{@cached_etag}"
+        )
         @connection_attempts = 0
       end
 
@@ -155,14 +171,18 @@ module ForestAdminDatasourceRpc
 
       def handle_initial_schema(etag)
         @cached_etag = etag
-        ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Initial schema loaded')
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[Schema Polling] Initial schema loaded successfully (ETag: #{etag})"
+        )
       end
 
       def handle_schema_update(schema, etag)
+        old_etag = @cached_etag
         @cached_etag = etag
         ForestAdminAgent::Facades::Container.logger&.log(
           'Info',
-          '[Schema Polling] Schema changed detected, triggering reload callback'
+          "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{etag}), triggering reload callback"
         )
         trigger_schema_change_callback(schema)
       end

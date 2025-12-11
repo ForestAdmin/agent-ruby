@@ -56,6 +56,8 @@ module ForestAdminDatasourceRpc
 
       # rubocop:disable Metrics/ParameterLists
       def make_request(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
+        log_request_start(method, endpoint, if_none_match)
+
         client = Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
@@ -75,7 +77,9 @@ module ForestAdminDatasourceRpc
         headers['forest_caller'] = caller.to_json if caller
         headers['If-None-Match'] = %("#{if_none_match}") if if_none_match
 
-        client.send(method, endpoint, payload, headers)
+        response = client.send(method, endpoint, payload, headers)
+        log_request_complete(response, endpoint)
+        response
       end
       # rubocop:enable Metrics/ParameterLists
 
@@ -91,7 +95,14 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_response_with_etag(response)
-        return SchemaResponse.new(response.body, extract_etag(response)) if response.success?
+        if response.success?
+          etag = extract_etag(response)
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[RPC Client] Schema response received (status: #{response.status}, ETag: #{etag || 'none'})"
+          )
+          return SchemaResponse.new(response.body, etag)
+        end
         return NotModified if response.status == HTTP_NOT_MODIFIED
 
         raise_appropriate_error(response)
@@ -107,6 +118,11 @@ module ForestAdminDatasourceRpc
         status = response.status
         url = response.env.url
         message = error_body[:message] || generate_default_message(status, url)
+
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[RPC Client] Request failed (status: #{status}, URL: #{url}, message: #{message})"
+        )
 
         exception_class = ERROR_STATUS_MAP[status]
 
@@ -142,6 +158,21 @@ module ForestAdminDatasourceRpc
           errors: hash['errors'] || hash[:errors],
           name: hash['name'] || hash[:name]
         }.compact
+      end
+
+      def log_request_start(method, endpoint, if_none_match)
+        etag_info = if_none_match ? " (If-None-Match: #{if_none_match})" : ''
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[RPC Client] Sending #{method.to_s.upcase} request to #{@api_url}#{endpoint}#{etag_info}"
+        )
+      end
+
+      def log_request_complete(response, endpoint)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Debug',
+          "[RPC Client] Response received (status: #{response.status}, endpoint: #{endpoint})"
+        )
       end
     end
   end
