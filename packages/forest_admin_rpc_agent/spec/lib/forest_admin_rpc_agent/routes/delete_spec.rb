@@ -17,7 +17,7 @@ module ForestAdminRpcAgent
         }
       end
       let(:delete_result) { [] }
-      let(:response) { instance_double(Faraday::Response, success?: true, body: delete_result) }
+      let(:response) { instance_double(Faraday::Response, success?: true, body: delete_result, status: 200) }
       let(:faraday_connection) { instance_double(Faraday::Connection) }
       let(:collection) { @datasource.get_collection(collection_name) }
 
