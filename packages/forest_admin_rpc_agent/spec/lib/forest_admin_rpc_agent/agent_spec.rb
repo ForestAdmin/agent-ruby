@@ -114,7 +114,7 @@ module ForestAdminRpcAgent
             { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: false }[key]
           end
 
-          test_collection = instance_double(Collection)
+          test_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
           allow(test_collection).to receive_messages(name: 'Test', schema: { fields: {} })
           allow(datasource).to receive_messages(
             collections: { 'Test' => test_collection },
