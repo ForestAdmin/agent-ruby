@@ -43,6 +43,18 @@ module ForestAdminDatasourceCustomizer
             end
           end
 
+          describe 'form_value (alias)' do
+            it 'works as an alias for get_form_value' do
+              context = described_class.new(@collection, caller, { 'title' => 'Foundation' }, Filter.new)
+              expect(context.form_value('title')).to eq('Foundation')
+            end
+
+            it 'return null value when a key doesn\'t exist' do
+              context = described_class.new(@collection, caller, { 'title' => 'Foundation' }, Filter.new)
+              expect(context.form_value('foo')).to be_nil
+            end
+          end
+
           describe 'get_records' do
             it 'return the correct values of the list collection' do
               context = described_class.new(@collection, caller, { 'title' => 'Foundation' }, Filter.new)

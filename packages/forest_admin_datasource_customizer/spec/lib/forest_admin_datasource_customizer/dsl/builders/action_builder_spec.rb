@@ -174,6 +174,38 @@ module ForestAdminDatasourceCustomizer
           result = action.execute.call(context, result_builder)
           expect(result).to eq({ type: 'Success' })
         end
+
+        it 'supports dynamic required fields using form_value' do
+          builder = described_class.new(scope: :single)
+          action = builder.instance_eval do
+            form do
+              field :amount, type: :number,
+                             description: 'The amount to charge',
+                             required: true
+
+              field :description, type: :string,
+                                  description: 'Explain why you want to charge',
+                                  required: ->(context) { context.form_value(:amount).to_i > 1000 }
+            end
+
+            execute do
+              success "Charged #{form_value(:amount)}"
+            end
+            to_action
+          end
+
+          # Verify the form structure
+          expect(action.form.length).to eq(2)
+          expect(action.form[0][:is_required]).to be true
+          expect(action.form[1][:is_required]).to be_a(Proc)
+
+          # Verify the proc works correctly
+          context = instance_spy("ActionContext")
+          allow(context).to receive(:form_value).with(:amount).and_return(1500)
+
+          required_proc = action.form[1][:is_required]
+          expect(required_proc.call(context)).to be true
+        end
       end
 
       describe '#to_action' do
