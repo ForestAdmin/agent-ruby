@@ -4,7 +4,7 @@ module ForestAdminDatasourceCustomizer
   module DSL
     # FormBuilder provides a fluent DSL for building action forms
     #
-    # @example
+    # @example Basic form
     #   form do
     #     field :email, type: :string, widget: 'TextInput'
     #     field :age, type: :number
@@ -14,6 +14,14 @@ module ForestAdminDatasourceCustomizer
     #       field :address, type: :string
     #       field :city, type: :string
     #     end
+    #   end
+    #
+    # @example Dynamic form with conditionals
+    #   form do
+    #     field :amount, type: :number, required: true
+    #     field :reason, type: :string,
+    #       required: ->(ctx) { ctx.get_form_value('amount').to_i > 1000 },
+    #       if_condition: ->(ctx) { ctx.get_form_value('amount').to_i > 500 }
     #   end
     class FormBuilder
       attr_reader :fields
@@ -26,14 +34,18 @@ module ForestAdminDatasourceCustomizer
       # @param name [String, Symbol] field name
       # @param type [String, Symbol] field type (:string, :number, :boolean, :date, :file, etc.)
       # @param widget [String] optional widget type
-      # @param options [Array<Hash>] options for dropdown/radio widgets
-      # @param readonly [Boolean] whether field is read-only
-      # @param default [Object] default value
-      # @param description [String] field description
-      # @param placeholder [String] placeholder text
+      # @param options [Array<Hash>, Proc] options for dropdown/radio widgets (static or dynamic)
+      # @param readonly [Boolean, Proc] whether field is read-only (static or dynamic)
+      # @param required [Boolean, Proc] whether field is required (static or dynamic)
+      # @param default [Object, Proc] default value (static or dynamic)
+      # @param description [String, Proc] field description (static or dynamic)
+      # @param placeholder [String, Proc] placeholder text (static or dynamic)
+      # @param if_condition [Proc] condition to display the field (dynamic only)
+      # @param enum_values [Array, Proc] enum values for enum fields (static or dynamic)
+      # @param collection_name [String, Proc] target collection name (static or dynamic)
       # @param block [Proc] optional proc for computed values
-      def field(name, type:, widget: nil, options: nil, readonly: false, default: nil,
-                description: nil, placeholder: nil, &block)
+      def field(name, type:, widget: nil, options: nil, readonly: nil, required: nil, default: nil,
+                description: nil, placeholder: nil, if_condition: nil, enum_values: nil, collection_name: nil, &block)
         field_def = {
           label: name.to_s,
           type: normalize_type(type)
@@ -42,9 +54,13 @@ module ForestAdminDatasourceCustomizer
         field_def[:widget] = widget if widget
         field_def[:options] = options if options
         field_def[:is_read_only] = readonly if readonly
+        field_def[:is_required] = required if required
         field_def[:default_value] = default if default
         field_def[:description] = description if description
         field_def[:placeholder] = placeholder if placeholder
+        field_def[:if_condition] = if_condition if if_condition
+        field_def[:enum_values] = enum_values if enum_values
+        field_def[:collection_name] = collection_name if collection_name
         field_def[:value] = block if block
 
         @fields << field_def
