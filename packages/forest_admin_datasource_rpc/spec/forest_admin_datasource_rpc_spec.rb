@@ -118,8 +118,8 @@ module ForestAdminDatasourceRpc
           )
         end
 
-        it 'uses ENV["SCHEMA_POLLING_INTERVAL"] when set' do
-          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+        it 'uses ENV["SCHEMA_POLLING_INTERVAL_SEC"] when set' do
+          ENV['SCHEMA_POLLING_INTERVAL_SEC'] = '30'
 
           described_class.build({ uri: 'http://localhost' })
 
@@ -130,11 +130,11 @@ module ForestAdminDatasourceRpc
             any_args
           )
         ensure
-          ENV.delete('SCHEMA_POLLING_INTERVAL')
+          ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
         end
 
         it 'prioritizes options[:schema_polling_interval] over ENV' do
-          ENV['SCHEMA_POLLING_INTERVAL'] = '30'
+          ENV['SCHEMA_POLLING_INTERVAL_SEC'] = '30'
 
           described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
 
@@ -145,7 +145,7 @@ module ForestAdminDatasourceRpc
             any_args
           )
         ensure
-          ENV.delete('SCHEMA_POLLING_INTERVAL')
+          ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
         end
       end
     end
