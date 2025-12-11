@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.17.0...v1.18.0) (2025-12-11)
+
+
+### Features
+
+* **rpc:** replace sse with polling  ([#235](https://github.com/ForestAdmin/agent-ruby/issues/235)) ([af7231b](https://github.com/ForestAdmin/agent-ruby/commit/af7231b6a3e0d9a04ca358c5a87fd521b54d3ccf))
+
 # [1.17.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.10...v1.17.0) (2025-12-11)
 
 
