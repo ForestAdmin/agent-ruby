@@ -12,7 +12,6 @@ module ForestAdminDatasourceRpc
       before do
         logger = instance_double(Logger, log: nil)
         allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
-        allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
       end
 
       include_examples 'with introspection'
@@ -55,8 +54,14 @@ module ForestAdminDatasourceRpc
           introspection_with_connections = introspection.merge(
             native_query_connections: [{ name: 'primary' }, { name: 'secondary' }]
           )
-          response_with_connections = Utils::SchemaResponse.new(introspection_with_connections, 'etag123')
-          allow(rpc_client).to receive(:fetch_schema).and_return(response_with_connections)
+          # Mock schema_polling_client to return introspection with connections
+          polling_client_with_connections = instance_double(
+            Utils::SchemaPollingClient,
+            start: true,
+            stop: nil,
+            current_schema: introspection_with_connections
+          )
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(polling_client_with_connections)
 
           datasource = described_class.build({ uri: 'http://localhost' })
 

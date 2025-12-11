@@ -443,7 +443,8 @@ module ForestAdminDatasourceRpc
           client.stop
 
           # Should have continued polling after failure
-          expect(logger).to have_received(:log).with('Warn', /Connection error/)
+          # Initial sync fetch failure logs as 'Error', polling loop failures log as 'Warn'
+          expect(logger).to have_received(:log).with('Error', /Connection failed/)
           expect(logger).to have_received(:log).with('Debug', /Initial schema loaded successfully/)
         end
 
