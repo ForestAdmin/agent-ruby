@@ -115,6 +115,15 @@ module ForestAdminDatasourceCustomizer
           expect(field[:is_required]).to eq(required_proc)
         end
 
+        it 'adds field with dynamic required using form_value alias' do
+          builder = described_class.new
+          required_proc = proc { |ctx| ctx.form_value(:amount).to_i > 1000 }
+          builder.field :reason, type: :string, required: required_proc
+
+          field = builder.fields[0]
+          expect(field[:is_required]).to eq(required_proc)
+        end
+
         it 'adds field with if_condition' do
           builder = described_class.new
           condition_proc = proc { |ctx| ctx.get_form_value('show_advanced') }

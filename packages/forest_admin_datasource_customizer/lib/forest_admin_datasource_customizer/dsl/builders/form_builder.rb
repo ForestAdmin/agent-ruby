@@ -20,8 +20,9 @@ module ForestAdminDatasourceCustomizer
     #   form do
     #     field :amount, type: :number, required: true
     #     field :reason, type: :string,
-    #       required: ->(ctx) { ctx.get_form_value('amount').to_i > 1000 },
-    #       if_condition: ->(ctx) { ctx.get_form_value('amount').to_i > 500 }
+    #       # You can use either form_value (DSL-style) or get_form_value (legacy)
+    #       required: ->(ctx) { ctx.form_value(:amount).to_i > 1000 },
+    #       if_condition: ->(ctx) { ctx.form_value(:amount).to_i > 500 }
     #   end
     class FormBuilder
       attr_reader :fields
