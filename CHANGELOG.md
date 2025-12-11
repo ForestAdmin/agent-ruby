@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.10...v1.17.0) (2025-12-11)
+
+
+### Features
+
+* **dsl:** add dynamic forms support with proc-based properties ([#233](https://github.com/ForestAdmin/agent-ruby/issues/233)) ([7f00984](https://github.com/ForestAdmin/agent-ruby/commit/7f009842428d45c7165b35b087b5b12a988cd084))
+
 ## [1.16.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.16.9...v1.16.10) (2025-12-09)
 
 
