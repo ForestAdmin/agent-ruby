@@ -109,12 +109,17 @@ module ForestAdminRpcAgent
                                                      'RPC agent schema file saved to /tmp/test-schema.json')
         end
 
-        it 'formats schema JSON correctly' do
+        it 'formats schema JSON correctly with RPC schema structure' do
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: false }[key]
           end
-          allow(ForestAdminAgent::Utils::Schema::SchemaEmitter)
-            .to receive_messages(generate: [{ name: 'Test' }], meta: { liana: 'agent-ruby' })
+
+          test_collection = instance_double(Collection)
+          allow(test_collection).to receive_messages(name: 'Test', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: { 'Test' => test_collection },
+            live_query_connections: { 'main' => {} }
+          )
 
           written_content = nil
           allow(File).to receive(:write) { |_path, content| written_content = content }
@@ -122,8 +127,9 @@ module ForestAdminRpcAgent
           instance.send_schema
 
           parsed = JSON.parse(written_content, symbolize_names: true)
-          expect(parsed[:meta]).to eq({ liana: 'agent-ruby' })
-          expect(parsed[:collections]).to eq([{ name: 'Test' }])
+          # RPC schema format includes collections with full schemas and native_query_connections
+          expect(parsed[:collections]).to eq([{ fields: {}, name: 'Test' }])
+          expect(parsed[:native_query_connections]).to eq([{ name: 'main' }])
         end
 
         it 'caches the schema and computes hash' do

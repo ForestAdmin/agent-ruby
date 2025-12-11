@@ -22,12 +22,13 @@ module ForestAdminRpcAgent
 
       datasource = @container.resolve(:datasource)
 
-      # Write schema file for reference (only in development mode)
-      write_schema_file_for_reference(datasource) unless ForestAdminRpcAgent::Facades::Container.cache(:is_production)
-
       # Build and cache RPC schema from live datasource
       @cached_schema = build_rpc_schema_from_datasource(datasource)
       compute_and_cache_hash
+
+      # Write schema file for reference (only in development mode)
+      # Uses the same serialization as the /rpc-schema route
+      write_schema_file_for_reference unless ForestAdminRpcAgent::Facades::Container.cache(:is_production)
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
         'Info',
@@ -71,11 +72,11 @@ module ForestAdminRpcAgent
       logger.log('Warn', '[ForestAdmin] Schema update skipped (skip_schema_update flag is true)')
     end
 
-    def write_schema_file_for_reference(datasource)
+    def write_schema_file_for_reference
       schema_path = ForestAdminRpcAgent::Facades::Container.cache(:schema_path)
-      schema = build_schema(datasource)
       FileUtils.mkdir_p(File.dirname(schema_path))
-      write_schema_file(schema_path, schema)
+      # Use the same serialization as the /rpc-schema route (.to_json)
+      File.write(schema_path, JSON.pretty_generate(JSON.parse(@cached_schema.to_json)))
 
       ForestAdminRpcAgent::Facades::Container.logger.log(
         'Info',
@@ -94,13 +95,30 @@ module ForestAdminRpcAgent
       schema = customizer.schema
 
       schema[:collections] = datasource.collections
-                                       .map { |_name, collection| collection.schema.merge({ name: collection.name }) }
+                                       .map { |_name, collection| serialize_collection_schema(collection) }
                                        .sort_by { |c| c[:name] }
 
       schema[:native_query_connections] = datasource.live_query_connections.keys
                                                     .map { |connection_name| { name: connection_name } }
 
       schema
+    end
+
+    # Serialize collection schema, converting field objects to plain hashes
+    def serialize_collection_schema(collection)
+      schema = collection.schema.dup
+      schema[:name] = collection.name
+      schema[:fields] = schema[:fields].transform_values { |field| object_to_hash(field) }
+      schema
+    end
+
+    # Convert any object to a hash using its instance variables
+    def object_to_hash(obj)
+      return obj if obj.is_a?(Hash) || obj.is_a?(Array) || obj.is_a?(String) || obj.is_a?(Numeric) || obj.nil?
+
+      obj.instance_variables.to_h do |var|
+        [var.to_s.delete('@').to_sym, obj.instance_variable_get(var)]
+      end
     end
 
     def compute_and_cache_hash

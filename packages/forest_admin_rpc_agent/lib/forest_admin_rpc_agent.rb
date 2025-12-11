@@ -20,7 +20,7 @@ module ForestAdminRpcAgent
   setting :prefix, default: nil
   setting :cache_dir, default: :'tmp/cache/forest_admin'
   setting :project_dir, default: Dir.pwd
-  setting :schema_path, default: File.join(Dir.pwd, '.forestadmin-schema.json')
+  setting :schema_path, default: File.join(Dir.pwd, '.forestadmin-rpc-schema.json')
   setting :skip_schema_update, default: false
   setting :logger_level, default: 'info'
   setting :logger, default: nil
