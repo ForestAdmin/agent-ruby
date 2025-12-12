@@ -19,11 +19,16 @@ module ForestAdminDatasourceRpc
   #   - Valid range: 1-3600 seconds
   #   - Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default
   #   - Example: SCHEMA_POLLING_INTERVAL=30 for development (30 seconds)
+  # @option options [Hash] :introspection Pre-defined schema introspection for resilient deployment
+  #   - When provided, allows the datasource to start even if the RPC slave is unreachable
+  #   - The introspection will be used as fallback when the slave connection fails
+  #   - Schema polling will still be enabled to pick up changes when the slave becomes available
   #
   # @return [ForestAdminDatasourceRpc::Datasource] The configured datasource with schema polling
   def self.build(options)
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
+    provided_introspection = options[:introspection]
     ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
     schema = nil
@@ -52,6 +57,16 @@ module ForestAdminDatasourceRpc
         'Error',
         "Failed to get schema from RPC agent at #{uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
       )
+    end
+
+    # Use provided introspection as fallback when slave is unreachable
+    if schema.nil? && provided_introspection
+      ForestAdminAgent::Facades::Container.logger.log(
+        'Warn',
+        "RPC agent at #{uri} is unreachable, using provided introspection for resilient deployment."
+      )
+      options.delete(:introspection)
+      schema = provided_introspection
     end
 
     if schema.nil?
