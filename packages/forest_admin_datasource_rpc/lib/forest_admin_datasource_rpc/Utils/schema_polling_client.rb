@@ -23,6 +23,7 @@ module ForestAdminDatasourceRpc
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
+        @initial_sync_completed = false  # Track if we've successfully fetched from RPC agent
 
         # Validate polling interval
         validate_polling_interval!
@@ -97,6 +98,7 @@ module ForestAdminDatasourceRpc
         result = @rpc_client.fetch_schema('/forest/rpc-schema')
         @current_schema = result.body
         @cached_etag = result.etag || compute_etag(@current_schema)
+        @initial_sync_completed = true  # Mark initial sync as completed
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
           "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
@@ -232,16 +234,17 @@ module ForestAdminDatasourceRpc
         new_schema = result.body
         new_etag = result.etag || compute_etag(new_schema)
 
-        if @cached_etag.nil?
-          # Initial schema fetch
+        if !@initial_sync_completed
+          # First successful fetch from RPC agent - do NOT trigger callback
           @cached_etag = new_etag
           @current_schema = new_schema
+          @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            "[Schema Polling] Initial schema loaded successfully (ETag: #{new_etag})"
+            'Info',
+            "[Schema Polling] Initial sync completed successfully (ETag: #{new_etag})"
           )
         else
-          # Schema update detected
+          # Schema update detected - trigger callback for reload
           handle_schema_update(new_schema, new_etag)
         end
         @connection_attempts = 0
