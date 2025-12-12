@@ -1,0 +1,106 @@
+name: Yank Version from RubyGems
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to yank (e.g., 2.0.0)'
+        required: true
+        default: '2.0.0'
+      confirm:
+        description: 'Type "yes" to confirm yanking'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  yank:
+    name: Yank version from RubyGems
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'yes'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Setup RubyGems credentials
+        run: |
+          mkdir -p $HOME/.gem
+          touch $HOME/.gem/credentials
+          chmod 0600 $HOME/.gem/credentials
+          printf -- "---\n:rubygems_api_key: ${{secrets.GEM_HOST_API_KEY}}\n" > $HOME/.gem/credentials
+
+      - name: Yank gems
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+
+          PACKAGES=(
+            "forest_admin_agent"
+            "forest_admin_datasource_active_record"
+            "forest_admin_datasource_customizer"
+            "forest_admin_datasource_toolkit"
+            "forest_admin_test_toolkit"
+            "forest_admin_rails"
+            "forest_admin_datasource_mongoid"
+            "forest_admin_rpc_agent"
+            "forest_admin_datasource_rpc"
+          )
+
+          echo "========================================="
+          echo "Yanking version: $VERSION"
+          echo "Total packages: ${#PACKAGES[@]}"
+          echo "========================================="
+
+          SUCCESS=0
+          FAILED=0
+          FAILED_PACKAGES=()
+
+          for package in "${PACKAGES[@]}"; do
+            echo ""
+            echo "========================================"
+            echo "Yanking $package version $VERSION..."
+            echo "========================================"
+
+            if gem yank "$package" -v "$VERSION"; then
+              echo "✓ Successfully yanked $package $VERSION"
+              ((SUCCESS++))
+            else
+              echo "✗ Failed to yank $package $VERSION"
+              ((FAILED++))
+              FAILED_PACKAGES+=("$package")
+            fi
+
+            # Be nice to RubyGems API
+            sleep 2
+          done
+
+          echo ""
+          echo "========================================="
+          echo "Summary"
+          echo "========================================="
+          echo "Successfully yanked: $SUCCESS"
+          echo "Failed: $FAILED"
+
+          if [ $FAILED -gt 0 ]; then
+            echo ""
+            echo "Failed packages:"
+            for pkg in "${FAILED_PACKAGES[@]}"; do
+              echo "  ✗ $pkg"
+            done
+            exit 1
+          fi
+
+          echo ""
+          echo "✓ All packages yanked successfully!"
+
+      - name: Verify confirmation
+        if: github.event.inputs.confirm != 'yes'
+        run: |
+          echo "::error::Confirmation not provided. You must type 'yes' in the confirm input to proceed."
+          exit 1
