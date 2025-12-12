@@ -27,7 +27,7 @@ module ForestAdminDatasourceRpc
 
     # Create schema polling client with configurable polling interval
     # Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL_SEC'] > default (600)
-    polling_interval = if options[:schema_polling_interval]
+    polling_interval = if options[:schema_polling_interval_sec]
                          options[:schema_polling_interval]
                        elsif ENV['SCHEMA_POLLING_INTERVAL_SEC']
                          ENV['SCHEMA_POLLING_INTERVAL_SEC'].to_i
