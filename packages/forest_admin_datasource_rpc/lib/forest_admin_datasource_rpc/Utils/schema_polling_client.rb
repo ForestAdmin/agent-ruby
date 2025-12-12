@@ -68,16 +68,12 @@ module ForestAdminDatasourceRpc
       def stop
         return if @closed
 
+        # Set flag to signal thread to stop (safe in trap context)
         @closed = true
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Stopping polling')
 
-        @mutex.synchronize do
-          if @polling_thread&.alive?
-            @polling_thread.kill
-            @polling_thread = nil
-          end
-        end
-
+        # The polling thread will exit naturally when it checks @closed flag
+        # We don't call Thread#kill or use mutex here to avoid "can't be called from trap context" errors
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Polling stopped')
       end
 
