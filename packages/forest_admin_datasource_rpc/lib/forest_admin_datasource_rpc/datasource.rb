@@ -25,6 +25,9 @@ module ForestAdminDatasourceRpc
       @live_query_connections = native_query_connections.to_h { |conn| [conn[:name], conn[:name]] }
 
       @schema = { charts: @charts }
+
+      # Register shutdown hook to cleanup schema polling gracefully
+      register_shutdown_hook if @schema_polling_client
     end
 
     def render_chart(caller, name)
@@ -59,15 +62,38 @@ module ForestAdminDatasourceRpc
       @cleaned_up = true
 
       if @schema_polling_client
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Stopping schema polling...')
+        log_info('[RPCDatasource] Stopping schema polling...')
         @schema_polling_client.stop
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Schema polling stopped')
+        log_info('[RPCDatasource] Schema polling stopped')
       end
     rescue StandardError => e
-      ForestAdminAgent::Facades::Container.logger&.log(
-        'Error',
-        "[RPCDatasource] Error during cleanup: #{e.class} - #{e.message}"
-      )
+      log_error("[RPCDatasource] Error during cleanup: #{e.class} - #{e.message}")
+    end
+
+    private
+
+    def register_shutdown_hook
+      # Register at_exit hook for graceful shutdown
+      # This ensures schema polling is stopped when the application exits
+      at_exit do
+        cleanup
+      end
+    end
+
+    def log_info(message)
+      return unless defined?(ForestAdminAgent::Facades::Container)
+
+      ForestAdminAgent::Facades::Container.logger&.log('Info', message)
+    rescue StandardError
+      # Silently ignore logging errors during shutdown
+    end
+
+    def log_error(message)
+      return unless defined?(ForestAdminAgent::Facades::Container)
+
+      ForestAdminAgent::Facades::Container.logger&.log('Error', message)
+    rescue StandardError
+      # Silently ignore logging errors during shutdown
     end
   end
 end

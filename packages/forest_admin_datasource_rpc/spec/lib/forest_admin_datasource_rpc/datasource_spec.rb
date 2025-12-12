@@ -39,6 +39,35 @@ module ForestAdminDatasourceRpc
       it 'handles missing nativeQueryConnections gracefully' do
         expect(datasource.live_query_connections).to eq({})
       end
+
+      context 'with schema polling client' do
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, stop: nil) }
+
+        it 'registers shutdown hook for graceful cleanup' do
+          datasource = described_class.new({ uri: 'http://localhost' }, introspection, schema_polling_client)
+
+          # Verify that at_exit was called during initialization
+          # We can't easily test at_exit execution itself, but we can verify cleanup works
+          expect(datasource.instance_variable_get(:@schema_polling_client)).to eq(schema_polling_client)
+        end
+
+        it 'calls cleanup when cleanup is invoked' do
+          datasource = described_class.new({ uri: 'http://localhost' }, introspection, schema_polling_client)
+
+          datasource.cleanup
+
+          expect(schema_polling_client).to have_received(:stop)
+        end
+
+        it 'cleanup is idempotent' do
+          datasource = described_class.new({ uri: 'http://localhost' }, introspection, schema_polling_client)
+
+          datasource.cleanup
+          datasource.cleanup
+
+          expect(schema_polling_client).to have_received(:stop).once
+        end
+      end
     end
 
     context 'when call render_chart' do

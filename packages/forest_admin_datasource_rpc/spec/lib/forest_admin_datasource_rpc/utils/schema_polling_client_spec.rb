@@ -229,7 +229,7 @@ module ForestAdminDatasourceRpc
 
           expect(client.instance_variable_get(:@cached_etag)).to eq('etag-123')
           expect(callback).not_to have_received(:call)
-          expect(logger).to have_received(:log).with('Debug', '[Schema Polling] Initial schema loaded successfully (ETag: etag-123)')
+          expect(logger).to have_received(:log).with('Info', '[Schema Polling] Initial sync completed successfully (ETag: etag-123)')
         end
 
         it 'sends If-None-Match header on subsequent polls' do
@@ -443,8 +443,9 @@ module ForestAdminDatasourceRpc
           client.stop
 
           # Should have continued polling after failure
-          expect(logger).to have_received(:log).with('Warn', /Connection error/)
-          expect(logger).to have_received(:log).with('Debug', /Initial schema loaded successfully/)
+          # Initial sync fetch failure logs as 'Error', polling loop failures log as 'Warn'
+          expect(logger).to have_received(:log).with('Error', /Connection failed/)
+          expect(logger).to have_received(:log).with('Info', /Initial sync completed successfully/)
         end
 
         it 'stops polling when closed' do
