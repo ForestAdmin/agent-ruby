@@ -83,10 +83,13 @@ module ForestAdminDatasourceRpc
           allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
         end
 
-        it 'returns empty datasource when schema fetch fails' do
-          datasource = described_class.build({ uri: 'http://localhost' })
-
-          expect(datasource).to be_a(ForestAdminDatasourceToolkit::Datasource)
+        it 'raises exception when schema fetch fails and no introspection provided' do
+          expect do
+            described_class.build({ uri: 'http://localhost' })
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /Fatal: Unable to build RPC datasource.*no introspection schema was provided/
+          )
         end
       end
 
