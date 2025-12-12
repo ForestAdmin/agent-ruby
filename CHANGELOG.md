@@ -1,3 +1,10 @@
+## [1.18.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.1...v1.18.2) (2025-12-12)
+
+
+### Bug Fixes
+
+* **rpc:** allow agent startup with introspection only ([#238](https://github.com/ForestAdmin/agent-ruby/issues/238)) ([a8cc791](https://github.com/ForestAdmin/agent-ruby/commit/a8cc791db8240cdac3657c0d8bc21c22bc8ce535))
+
 ## [1.18.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.0...v1.18.1) (2025-12-11)
 
 
