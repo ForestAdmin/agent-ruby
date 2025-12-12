@@ -38,16 +38,6 @@ module ForestAdminRpcAgent
             .with('Warn', '[ForestAdmin] Schema update skipped (skip_schema_update flag is true)')
         end
 
-        it 'logs the environment mode when skipping' do
-          allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
-            { skip_schema_update: true, is_production: true }[key]
-          end
-
-          instance.send_schema
-
-          expect(logger).to have_received(:log).with('Info', '[ForestAdmin] RPC agent running in production mode')
-        end
-
         it 'generates schema when force flag is true despite skip setting' do
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             case key
@@ -67,43 +57,31 @@ module ForestAdminRpcAgent
       end
 
       context 'when in production mode' do
-        it 'raises error if schema file does not exist' do
-          allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
-            case key
-            when :skip_schema_update then false
-            when :schema_path then '/path/to/schema.json'
-            when :is_production then true
-            end
-          end
-          allow(File).to receive(:exist?) do |path|
-            path != '/path/to/schema.json'
-          end
+        let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
 
-          expect { instance.send_schema }.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError)
-        end
-
-        it 'does not write schema file and logs production mode message' do
+        before do
           instance.container.register(:datasource, datasource, replace: true)
-          allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
-            case key
-            when :skip_schema_update then false
-            when :schema_path then '/path/to/schema.json'
-            when :is_production then true
-            end
-          end
-          allow(File).to receive_messages(exist?: true, write: nil,
-                                          read: { meta: {}, collections: [] }.to_json)
-          # Mock customizer and datasource for building RPC schema
-          customizer = instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer)
           allow(instance).to receive(:customizer).and_return(customizer)
           allow(customizer).to receive(:schema).and_return({})
           allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
+        end
+
+        it 'does not write schema file but computes schema from datasource' do
+          allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
+            case key
+            when :skip_schema_update then false
+            when :schema_path then '/path/to/schema.json'
+            when :is_production then true
+            end
+          end
+          allow(File).to receive(:write)
 
           instance.send_schema
 
-          expect(logger).to have_received(:log)
-            .with('Info', 'RPC agent running in production mode, using existing schema file.')
           expect(File).not_to have_received(:write)
+          expect(instance.cached_schema).not_to be_nil
+          expect(logger).to have_received(:log)
+            .with('Info', 'RPC agent schema computed from datasource and cached.')
         end
       end
 
@@ -128,15 +106,20 @@ module ForestAdminRpcAgent
 
           expect(File).to have_received(:write).with('/tmp/test-schema.json', anything)
           expect(logger).to have_received(:log).with('Info',
-                                                     'RPC agent schema generated and saved to /tmp/test-schema.json')
+                                                     'RPC agent schema file saved to /tmp/test-schema.json')
         end
 
-        it 'formats schema JSON correctly' do
+        it 'formats schema JSON correctly with RPC schema structure' do
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: false }[key]
           end
-          allow(ForestAdminAgent::Utils::Schema::SchemaEmitter)
-            .to receive_messages(generate: [{ name: 'Test' }], meta: { liana: 'agent-ruby' })
+
+          test_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          allow(test_collection).to receive_messages(name: 'Test', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: { 'Test' => test_collection },
+            live_query_connections: { 'main' => {} }
+          )
 
           written_content = nil
           allow(File).to receive(:write) { |_path, content| written_content = content }
@@ -144,8 +127,9 @@ module ForestAdminRpcAgent
           instance.send_schema
 
           parsed = JSON.parse(written_content, symbolize_names: true)
-          expect(parsed[:meta]).to eq({ liana: 'agent-ruby' })
-          expect(parsed[:collections]).to eq([{ name: 'Test' }])
+          # RPC schema format includes collections with full schemas and native_query_connections
+          expect(parsed[:collections]).to eq([{ fields: {}, name: 'Test' }])
+          expect(parsed[:native_query_connections]).to eq([{ name: 'main' }])
         end
 
         it 'caches the schema and computes hash' do

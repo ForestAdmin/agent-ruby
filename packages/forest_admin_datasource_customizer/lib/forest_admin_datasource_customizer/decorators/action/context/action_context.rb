@@ -61,6 +61,7 @@ module ForestAdminDatasourceCustomizer
           alias get_record_ids record_ids
           alias get_composite_record_ids composite_record_ids
           alias has_field_changed field_changed?
+          alias form_value get_form_value
         end
       end
     end

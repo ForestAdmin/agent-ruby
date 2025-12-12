@@ -11,14 +11,14 @@ module ForestAdminDatasourceRpc
       MIN_POLLING_INTERVAL = 1 # seconds (minimum safe interval)
       MAX_POLLING_INTERVAL = 3600 # seconds (1 hour max)
 
-      def initialize(uri, auth_secret, options = {}, &on_schema_change)
+      def initialize(uri, auth_secret, options = {}, previous_schema = nil, &on_schema_change)
         @uri = uri
         @auth_secret = auth_secret
         @polling_interval = options[:polling_interval] || DEFAULT_POLLING_INTERVAL
         @on_schema_change = on_schema_change
         @closed = false
-        @cached_etag = nil
-        @current_schema = nil
+        @current_schema = previous_schema
+        @cached_etag = compute_etag(previous_schema) if previous_schema
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
@@ -81,12 +81,23 @@ module ForestAdminDatasourceRpc
 
       private
 
+      # Compute ETag from schema using same algorithm as RPC slave
+      # @param schema [Hash] The schema to hash
+      # @return [String, nil] SHA1 hexdigest of schema JSON, or nil if schema is nil
+      def compute_etag(schema)
+        return nil if schema.nil?
+
+        require 'digest'
+        require 'json'
+        Digest::SHA1.hexdigest(schema.to_json)
+      end
+
       # Fetch initial schema synchronously (called from start() in main thread)
       # This is a blocking call that sets @current_schema and @cached_etag
       def fetch_initial_schema_sync
         result = @rpc_client.fetch_schema('/forest/rpc-schema')
-        @cached_etag = result.etag
         @current_schema = result.body
+        @cached_etag = compute_etag(@current_schema)
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
           "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
@@ -219,8 +230,8 @@ module ForestAdminDatasourceRpc
       end
 
       def handle_schema_changed(result)
-        new_etag = result.etag
         new_schema = result.body
+        new_etag = compute_etag(new_schema)
 
         if @cached_etag.nil?
           # Initial schema fetch
