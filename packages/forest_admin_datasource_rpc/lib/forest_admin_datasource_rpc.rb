@@ -72,11 +72,10 @@ module ForestAdminDatasourceRpc
       # FAIL FAST: If no schema is available and no introspection was provided,
       # the application cannot function properly. Better to crash early than
       # start with an empty datasource.
-      raise ForestAdminDatasourceToolkit::Exceptions::ForestException.new(
-        "Fatal: Unable to build RPC datasource for #{uri}. " \
-        "The RPC agent is unreachable and no introspection schema was provided. " \
-        "Please ensure the RPC agent is running or provide an introspection schema for resilient deployment."
-      )
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            "Fatal: Unable to build RPC datasource for #{uri}. " \
+            "The RPC agent is unreachable and no introspection schema was provided. " \
+            "Please ensure the RPC agent is running or provide an introspection schema for resilient deployment."
     else
       ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
     end

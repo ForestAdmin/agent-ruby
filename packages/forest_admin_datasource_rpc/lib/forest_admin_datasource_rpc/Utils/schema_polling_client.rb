@@ -234,7 +234,10 @@ module ForestAdminDatasourceRpc
         new_schema = result.body
         new_etag = result.etag || compute_etag(new_schema)
 
-        if !@initial_sync_completed
+        if @initial_sync_completed
+          # Schema update detected - trigger callback for reload
+          handle_schema_update(new_schema, new_etag)
+        else
           # First successful fetch from RPC agent - do NOT trigger callback
           @cached_etag = new_etag
           @current_schema = new_schema
@@ -243,9 +246,6 @@ module ForestAdminDatasourceRpc
             'Info',
             "[Schema Polling] Initial sync completed successfully (ETag: #{new_etag})"
           )
-        else
-          # Schema update detected - trigger callback for reload
-          handle_schema_update(new_schema, new_etag)
         end
         @connection_attempts = 0
       end
