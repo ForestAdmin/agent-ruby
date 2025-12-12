@@ -1,6 +1,7 @@
 require 'openssl'
 require 'json'
 require 'time'
+require 'digest'
 
 module ForestAdminDatasourceRpc
   module Utils
@@ -87,8 +88,6 @@ module ForestAdminDatasourceRpc
       def compute_etag(schema)
         return nil if schema.nil?
 
-        require 'digest'
-        require 'json'
         Digest::SHA1.hexdigest(schema.to_json)
       end
 
