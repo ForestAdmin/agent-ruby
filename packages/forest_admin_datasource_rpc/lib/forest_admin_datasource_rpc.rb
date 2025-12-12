@@ -72,8 +72,7 @@ module ForestAdminDatasourceRpc
       # return empty datasource for not breaking stack
       ForestAdminDatasourceToolkit::Datasource.new
     else
-      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
-      datasource
+      ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
     end
   end
 end
