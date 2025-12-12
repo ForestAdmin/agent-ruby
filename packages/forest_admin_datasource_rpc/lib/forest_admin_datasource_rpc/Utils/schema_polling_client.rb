@@ -96,7 +96,7 @@ module ForestAdminDatasourceRpc
       def fetch_initial_schema_sync
         result = @rpc_client.fetch_schema('/forest/rpc-schema')
         @current_schema = result.body
-        @cached_etag = compute_etag(@current_schema)
+        @cached_etag = result.etag || compute_etag(@current_schema)
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
           "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
@@ -230,7 +230,7 @@ module ForestAdminDatasourceRpc
 
       def handle_schema_changed(result)
         new_schema = result.body
-        new_etag = compute_etag(new_schema)
+        new_etag = result.etag || compute_etag(new_schema)
 
         if @cached_etag.nil?
           # Initial schema fetch

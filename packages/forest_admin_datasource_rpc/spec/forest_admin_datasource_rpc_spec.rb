@@ -111,8 +111,8 @@ module ForestAdminDatasourceRpc
           )
         end
 
-        it 'uses options[:schema_polling_interval] when provided' do
-          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+        it 'uses options[:schema_polling_interval_sec] when provided' do
+          described_class.build({ uri: 'http://localhost', schema_polling_interval_sec: 120 })
 
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
@@ -137,10 +137,10 @@ module ForestAdminDatasourceRpc
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
         end
 
-        it 'prioritizes options[:schema_polling_interval] over ENV' do
+        it 'prioritizes options[:schema_polling_interval_sec] over ENV' do
           ENV['SCHEMA_POLLING_INTERVAL_SEC'] = '30'
 
-          described_class.build({ uri: 'http://localhost', schema_polling_interval: 120 })
+          described_class.build({ uri: 'http://localhost', schema_polling_interval_sec: 120 })
 
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
