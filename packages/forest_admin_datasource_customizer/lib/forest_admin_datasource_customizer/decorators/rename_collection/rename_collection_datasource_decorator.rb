@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
 
         def rename_collection(current_name, new_name)
           # Check collection exists
-          collection = get_collection(current_name)
+          get_collection(current_name)
 
           return unless current_name != new_name
 
