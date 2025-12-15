@@ -133,22 +133,17 @@ module ForestAdminDatasourceRpc
           "[Schema Polling] Starting polling loop (interval: #{@polling_interval}s, #{etag_status})"
         )
 
-        first_check = true
-
         loop do
           break if @closed
 
-          # Wait before checking (skip wait on first iteration to start polling immediately)
-          unless first_check
-            etag_info = @cached_etag || 'none'
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Debug',
-              "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{etag_info})"
-            )
-            sleep_with_interrupt(@polling_interval)
-            break if @closed
-          end
-          first_check = false
+          # Always wait before checking - initial schema is already fetched synchronously in start()
+          etag_info = @cached_etag || 'none'
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{etag_info})"
+          )
+          sleep_with_interrupt(@polling_interval)
+          break if @closed
 
           # Check for schema changes
           begin

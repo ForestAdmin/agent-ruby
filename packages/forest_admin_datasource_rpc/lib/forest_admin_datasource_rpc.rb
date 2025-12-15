@@ -37,7 +37,7 @@ module ForestAdminDatasourceRpc
                        elsif ENV['SCHEMA_POLLING_INTERVAL_SEC']
                          ENV['SCHEMA_POLLING_INTERVAL_SEC'].to_i
                        else
-                         600 # 10 minutes by default
+                         60 # 10 minutes by default
                        end
 
     polling_options = {
