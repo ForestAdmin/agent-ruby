@@ -48,7 +48,7 @@ module ForestAdminDatasourceCustomizer
 
         def rename_collection(current_name, new_name)
           # Check collection exists
-          collection = get_collection(current_name)
+          get_collection(current_name)
 
           return unless current_name != new_name
 
@@ -62,17 +62,6 @@ module ForestAdminDatasourceCustomizer
           if @to_child_name[current_name]
             raise Exceptions::ForestException,
                   "Cannot rename a collection twice: #{@to_child_name[current_name]}->#{current_name}->#{new_name}"
-          end
-
-          polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
-          collection.schema[:fields].each do |field_name, field_schema|
-            next unless polymorphic_relations.include?(field_schema.type)
-
-            reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)
-
-            raise Exceptions::ForestException,
-                  "Cannot rename collection #{current_name} because it's a target of a polymorphic relation " \
-                  "'#{field_schema.foreign_collection}.#{reverse_relation_name}'"
           end
 
           @from_child_name[current_name] = new_name
