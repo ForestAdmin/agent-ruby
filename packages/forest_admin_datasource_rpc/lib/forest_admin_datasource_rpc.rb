@@ -31,25 +31,12 @@ module ForestAdminDatasourceRpc
       ForestAdminAgent::Builder::AgentFactory.instance.reload!
     end
 
+    # Start polling (includes initial synchronous schema fetch)
+    # - Without introspection: crashes if RPC is unreachable
+    # - With introspection: falls back to introspection if RPC is unreachable
     schema_polling.start
-    schema = schema_polling.current_schema
 
-    if schema.nil? && provided_introspection
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Warn',
-        "RPC agent at #{uri} is unreachable, using provided introspection for resilient deployment."
-      )
-      options.delete(:introspection)
-      schema = provided_introspection
-    end
-
-    if schema.nil?
-      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-            "Fatal: Unable to build RPC datasource for #{uri}. " \
-            "The RPC agent is unreachable and no introspection schema was provided. " \
-            "Please ensure the RPC agent is running or provide an introspection schema for resilient deployment."
-    else
-      ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
-    end
+    @provided_introspection = nil
+    ForestAdminDatasourceRpc::Datasource.new(options, schema_polling.current_schema, schema_polling)
   end
 end

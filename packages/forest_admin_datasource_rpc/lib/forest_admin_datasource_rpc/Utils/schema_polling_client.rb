@@ -12,14 +12,15 @@ module ForestAdminDatasourceRpc
       MIN_POLLING_INTERVAL = 1
       MAX_POLLING_INTERVAL = 3600
 
-      def initialize(uri, auth_secret, options = {}, previous_schema = nil, &on_schema_change)
+      def initialize(uri, auth_secret, options = {}, introspection_schema = nil, &on_schema_change)
         @uri = uri
         @auth_secret = auth_secret
         @polling_interval = options[:polling_interval] || DEFAULT_POLLING_INTERVAL
         @on_schema_change = on_schema_change
         @closed = false
-        @current_schema = previous_schema
-        @cached_etag = compute_etag(previous_schema) if previous_schema
+        @introspection_schema = introspection_schema
+        @current_schema = nil
+        @cached_etag = nil
         @polling_thread = nil
         @mutex = Mutex.new
         @connection_attempts = 0
@@ -36,18 +37,9 @@ module ForestAdminDatasourceRpc
         @mutex.synchronize do
           return false if @polling_thread&.alive?
 
-          # Skip initial fetch if we already have a schema from introspection
-          if @current_schema
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Info',
-              "[Schema Polling] Using provided introspection schema, skipping initial fetch (ETag: #{@cached_etag})"
-            )
-            @initial_sync_completed = true
-          else
-            # Fetch initial schema synchronously before starting the polling thread
-            ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
-            fetch_initial_schema_sync
-          end
+          # Always try to fetch initial schema from RPC agent
+          ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
+          fetch_initial_schema_sync
 
           # Start async polling thread
           @polling_thread = Thread.new do
@@ -88,34 +80,56 @@ module ForestAdminDatasourceRpc
       end
 
       def fetch_initial_schema_sync
-        result = @rpc_client.fetch_schema('/forest/rpc-schema')
-        @current_schema = result.body
-        @cached_etag = result.etag || compute_etag(@current_schema)
-        @initial_sync_completed = true # Mark initial sync as completed
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
-        )
-      rescue Faraday::ConnectionFailed => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "Connection failed to RPC agent at #{@uri}: #{e.message}\n#{e.backtrace.join("\n")}"
-        )
-      rescue Faraday::TimeoutError => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "Request timeout to RPC agent at #{@uri}: #{e.message}"
-        )
-      rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "Authentication failed with RPC agent at #{@uri}: #{e.message}"
-        )
-      rescue StandardError => e
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "Failed to get schema from RPC agent at #{@uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
-        )
+        # If we have an introspection schema, send its ETag to avoid re-downloading unchanged schema
+        introspection_etag = compute_etag(@introspection_schema) if @introspection_schema
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: introspection_etag)
+
+        if result == RpcClient::NotModified
+          # Schema unchanged from introspection - use introspection
+          @current_schema = @introspection_schema
+          @cached_etag = introspection_etag
+          @initial_sync_completed = true
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Info',
+            "[Schema Polling] RPC schema unchanged (HTTP 304), using introspection (ETag: #{@cached_etag})"
+          )
+        else
+          # New schema from RPC
+          @current_schema = result.body
+          @cached_etag = result.etag || compute_etag(@current_schema)
+          @initial_sync_completed = true
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Debug',
+            "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
+          )
+        end
+
+        @introspection_schema = nil
+      rescue Faraday::ConnectionFailed, Faraday::TimeoutError,
+             ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient, StandardError => e
+        handle_initial_fetch_error(e)
+      end
+
+      def handle_initial_fetch_error(error)
+        if @introspection_schema
+          # Fallback to introspection schema - don't crash
+          @current_schema = @introspection_schema
+          @cached_etag = compute_etag(@current_schema)
+          @introspection_schema = nil
+          @initial_sync_completed = true
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Warn',
+            "RPC agent at #{@uri} is unreachable (#{error.class}: #{error.message}), " \
+            "using provided introspection schema (ETag: #{@cached_etag})"
+          )
+        else
+          # No introspection - re-raise to crash
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Error',
+            "Failed to get schema from RPC agent at #{@uri}: #{error.class} - #{error.message}"
+          )
+          raise error
+        end
       end
 
       def polling_loop
