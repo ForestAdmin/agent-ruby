@@ -297,11 +297,48 @@ module ForestAdminDatasourceCustomizer
           end
 
           describe 'rename_collection' do
-            it 'raise an error when collection has polymorphic relation' do
-              expect { @datasource.rename_collection('user', 'renamed_user') }.to raise_error(
-                Exceptions::ForestException,
-                "Cannot rename collection user because it's a target of a polymorphic relation 'address.addressable'"
+            it 'successfully renames collection with polymorphic relations' do
+              @datasource.rename_collection('user', 'renamed_user')
+
+              # Check that the collection is renamed
+              expect(@datasource.collections.keys).to include('renamed_user')
+              expect(@datasource.collections.keys).not_to include('user')
+
+              # Check that the PolymorphicManyToOne relation is updated
+              address_collection = @datasource.get_collection('address')
+              addressable_field = address_collection.schema[:fields]['addressable']
+
+              expect(addressable_field.foreign_collections).to eq(['renamed_user'])
+              expect(addressable_field.foreign_key_targets.keys).to eq(['renamed_user'])
+            end
+
+            it 'updates origin_type_value when renaming a collection that is referenced' do
+              # First, let's create a scenario where user is the origin_type_value
+              @collection_user_v2 = build_collection(
+                name: 'user',
+                schema: {
+                  fields: {
+                    'id' => build_numeric_primary_key,
+                    'email' => build_column,
+                    'address' => Relations::PolymorphicOneToOneSchema.new(
+                      origin_key: 'addressable_id',
+                      foreign_collection: 'address',
+                      origin_key_target: 'id',
+                      origin_type_field: 'addressable_type',
+                      origin_type_value: 'user' # References itself
+                    )
+                  }
+                }
               )
+
+              @datasource_v2 = described_class.new(build_datasource_with_collections([@collection_user_v2, @collection_address]))
+              @datasource_v2.rename_collection('user', 'renamed_user')
+
+              # Check that origin_type_value is updated
+              renamed_user_collection = @datasource_v2.get_collection('renamed_user')
+              address_field = renamed_user_collection.schema[:fields]['address']
+
+              expect(address_field.origin_type_value).to eq('renamed_user')
             end
           end
         end

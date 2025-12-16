@@ -9,22 +9,175 @@ module ForestAdminDatasourceCustomizer
           datasource.get_collection_name(super)
         end
 
-        def refine_schema(sub_schema)
-          fields = {}
+        def list(caller, filter = nil, projection = nil)
+          refined_filter = refine_filter(caller, filter)
+          records = @child_collection.list(caller, refined_filter, projection)
 
-          sub_schema[:fields].each do |name, old_schema|
-            if old_schema.type != 'Column' && old_schema.type != 'PolymorphicManyToOne'
-              old_schema.foreign_collection = datasource.get_collection_name(old_schema.foreign_collection)
-              if old_schema.type == 'ManyToMany'
-                old_schema.through_collection = datasource.get_collection_name(old_schema.through_collection)
+          transform_records_polymorphic_values(records)
+        end
+
+        def create(caller, data)
+          transformed_data = transform_data_polymorphic_values(data)
+          result = @child_collection.create(caller, transformed_data)
+
+          transform_record_polymorphic_values(result)
+        end
+
+        def update(caller, filter, patch)
+          refined_filter = refine_filter(caller, filter)
+          transformed_patch = transform_data_polymorphic_values(patch)
+
+          @child_collection.update(caller, refined_filter, transformed_patch)
+        end
+
+        def refine_filter(_caller, filter)
+          return filter unless filter&.condition_tree
+
+          type_fields = polymorphic_type_fields
+
+          transformed_tree = filter.condition_tree.replace_leafs do |leaf|
+            if type_fields.include?(leaf.field)
+              transformed_value = transform_polymorphic_value(leaf.value)
+              if transformed_value == leaf.value
+                leaf
+              else
+                leaf.override(value: transformed_value)
               end
+            else
+              leaf
             end
+          end
 
-            fields[name] = old_schema
+          filter.override(condition_tree: transformed_tree)
+        end
+
+        private
+
+        def polymorphic_type_fields
+          type_fields = []
+          child_schema = @child_collection.schema
+          return type_fields unless child_schema && child_schema[:fields]
+
+          child_schema[:fields].each_value do |field_schema|
+            case field_schema.type
+            when 'PolymorphicManyToOne'
+              type_fields << field_schema.foreign_key_type_field
+            end
+          end
+          type_fields
+        end
+
+        def transform_data_polymorphic_values(data)
+          return data unless data
+
+          type_fields = polymorphic_type_fields
+          transformed_data = data.dup
+
+          type_fields.each do |type_field|
+            next unless transformed_data.key?(type_field)
+
+            original_value = transformed_data[type_field]
+            transformed_value = reverse_collection_name(original_value)
+            transformed_data[type_field] = transformed_value if transformed_value != original_value
+          end
+
+          transformed_data
+        end
+
+        def transform_polymorphic_value(value)
+          return value unless value
+
+          # Handle both single values and arrays (for IN/NOT_IN operators)
+          if value.is_a?(Array)
+            value.map { |v| reverse_collection_name(v) }
+          else
+            reverse_collection_name(value)
+          end
+        end
+
+        # convert new collection name back to old name for db queries
+        def reverse_collection_name(collection_name)
+          to_child_name = datasource.instance_variable_get(:@to_child_name)
+          to_child_name[collection_name] || collection_name
+        end
+
+        # convert old collection name to new name for returned data
+        def forward_collection_name(collection_name)
+          from_child_name = datasource.instance_variable_get(:@from_child_name)
+          from_child_name[collection_name] || collection_name
+        end
+
+        def transform_records_polymorphic_values(records)
+          return records unless records.is_a?(Array)
+
+          type_fields = polymorphic_type_fields
+          return records if type_fields.empty?
+
+          records.map do |record|
+            transform_record_polymorphic_values(record)
+          end
+        end
+
+        def transform_record_polymorphic_values(record)
+          return record unless record.is_a?(Hash)
+
+          type_fields = polymorphic_type_fields
+          return record if type_fields.empty?
+
+          transformed_record = record.dup
+
+          type_fields.each do |type_field|
+            next unless transformed_record.key?(type_field)
+
+            old_value = transformed_record[type_field]
+            new_value = forward_collection_name(old_value)
+            transformed_record[type_field] = new_value if new_value != old_value
+          end
+
+          transformed_record
+        end
+
+        protected
+
+        def refine_schema(sub_schema)
+          current_collection_name = @child_collection.name
+
+          sub_schema[:fields].each_value do |old_schema|
+            case old_schema.type
+            when 'PolymorphicOneToOne', 'PolymorphicOneToMany'
+              refine_polymorphic_one_schema(old_schema, current_collection_name)
+            when 'PolymorphicManyToOne'
+              refine_polymorphic_many_schema(old_schema)
+            when 'ManyToOne', 'OneToMany', 'OneToOne', 'ManyToMany'
+              refine_standard_relation_schema(old_schema)
+            end
           end
 
           sub_schema
         end
+
+        def refine_polymorphic_one_schema(schema, current_collection_name)
+          if schema.origin_type_value == current_collection_name
+            schema.origin_type_value = datasource.get_collection_name(current_collection_name)
+          end
+          schema.foreign_collection = datasource.get_collection_name(schema.foreign_collection)
+        end
+
+        def refine_polymorphic_many_schema(schema)
+          schema.foreign_collections = schema.foreign_collections.map { |fc| datasource.get_collection_name(fc) }
+          schema.foreign_key_targets = schema.foreign_key_targets.transform_keys do |key|
+            datasource.get_collection_name(key)
+          end
+        end
+
+        def refine_standard_relation_schema(schema)
+          schema.foreign_collection = datasource.get_collection_name(schema.foreign_collection)
+          return unless schema.type == 'ManyToMany'
+
+          schema.through_collection = datasource.get_collection_name(schema.through_collection)
+        end
+
+        public
 
         # rubocop:disable Lint/UselessMethodDefinition
         def mark_schema_as_dirty
