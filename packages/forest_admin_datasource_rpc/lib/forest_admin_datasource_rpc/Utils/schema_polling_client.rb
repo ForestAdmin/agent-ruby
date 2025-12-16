@@ -34,14 +34,19 @@ module ForestAdminDatasourceRpc
       def start # rubocop:disable Naming/PredicateMethod
         return false if @closed
 
+        # Check if already running (needs mutex)
         @mutex.synchronize do
           return false if @polling_thread&.alive?
+        end
 
-          # Always try to fetch initial schema from RPC agent
-          ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
-          fetch_initial_schema_sync
+        # Fetch initial schema synchronously (outside mutex to avoid blocking)
+        ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
+        fetch_initial_schema_sync
 
-          # Start async polling thread
+        # Start async polling thread
+        @mutex.synchronize do
+          return false if @polling_thread&.alive? # Re-check after fetch
+
           @polling_thread = Thread.new do
             polling_loop
           rescue StandardError => e
