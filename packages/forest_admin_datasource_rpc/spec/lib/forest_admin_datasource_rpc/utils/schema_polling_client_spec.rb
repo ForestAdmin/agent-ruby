@@ -8,9 +8,15 @@ module ForestAdminDatasourceRpc
       let(:logger) { instance_spy(Logger) }
       let(:callback) { instance_double(Proc, call: nil) }
       let(:schema) { { collections: [{ name: 'Products' }], charts: [] } }
+      let(:pool) { SchemaPollingPool.instance }
 
       before do
         allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+        pool.reset!
+      end
+
+      after do
+        pool.shutdown!
       end
 
       describe '#initialize' do
@@ -19,9 +25,8 @@ module ForestAdminDatasourceRpc
 
           expect(client.instance_variable_get(:@uri)).to eq(uri)
           expect(client.instance_variable_get(:@auth_secret)).to eq(secret)
-          expect(client.instance_variable_get(:@closed)).to be false
+          expect(client.closed).to be false
           expect(client.instance_variable_get(:@cached_etag)).to be_nil
-          expect(client.instance_variable_get(:@polling_thread)).to be_nil
           expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
         end
 
@@ -42,7 +47,7 @@ module ForestAdminDatasourceRpc
 
           expect(client.closed).to be false
 
-          client.stop
+          client.instance_variable_set(:@closed, true)
 
           expect(client.closed).to be true
         end
@@ -50,8 +55,12 @@ module ForestAdminDatasourceRpc
         it 'creates RPC client for schema fetching' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
 
-          # Verify RPC client was created
           expect(client.instance_variable_get(:@rpc_client)).to be_a(RpcClient)
+        end
+
+        it 'exposes client_id based on URI' do
+          client = described_class.new(uri, secret) { |schema| callback.call(schema) }
+          expect(client.client_id).to eq(uri)
         end
 
         context 'when validating polling interval' do
@@ -82,86 +91,60 @@ module ForestAdminDatasourceRpc
       end
 
       describe '#start' do
-        it 'starts the polling thread' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+        let(:rpc_client) { instance_double(RpcClient) }
+        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
 
-          # Stub polling_loop to keep thread alive without making HTTP calls
-          allow(client).to receive(:polling_loop) do
-            sleep(10) unless client.closed # Sleep until stopped
-          end
+        before do
+          allow(RpcClient).to receive(:new).and_return(rpc_client)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+        end
 
+        it 'registers with the pool' do
+          client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
+
+          expect(pool.client_count).to eq(0)
           client.start
-          sleep(0.05)
-
-          expect(client.instance_variable_get(:@polling_thread)).to be_alive
+          expect(pool.client_count).to eq(1)
 
           client.stop
         end
 
         it 'does not start if already closed' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          client.stop
+          client.instance_variable_set(:@closed, true)
 
-          client.start
+          result = client.start
 
-          expect(client.instance_variable_get(:@polling_thread)).to be_nil
+          expect(result).to be false
+          expect(pool.client_count).to eq(0)
         end
 
-        it 'does not create duplicate thread if already running' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
-          # Stub polling_loop to keep thread alive
-          allow(client).to receive(:polling_loop) do
-            sleep(10) unless client.closed
-          end
-
+        it 'logs registration with pool' do
+          client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
           client.start
-          sleep(0.05)
 
-          first_thread = client.instance_variable_get(:@polling_thread)
-          client.start
-          second_thread = client.instance_variable_get(:@polling_thread)
-
-          expect(first_thread).to eq(second_thread)
-          expect(first_thread).to be_alive
-
-          client.stop
-        end
-
-        it 'logs polling started' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
-          allow(client).to receive(:polling_loop) do
-            sleep(10) unless client.closed
-          end
-
-          client.start
-          sleep(0.05)
-
-          expect(logger).to have_received(:log).with('Info', '[Schema Polling] Polling started (interval: 1s)')
+          expect(logger).to have_received(:log).with('Info', /Registered with pool/)
 
           client.stop
         end
       end
 
       describe '#stop' do
-        it 'stops the polling thread' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+        let(:rpc_client) { instance_double(RpcClient) }
+        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
 
-          # Stub polling_loop to keep thread alive
-          allow(client).to receive(:polling_loop) do
-            sleep(10) unless client.closed
-          end
+        before do
+          allow(RpcClient).to receive(:new).and_return(rpc_client)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+        end
 
+        it 'unregisters from the pool' do
+          client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
           client.start
-          sleep(0.05)
-
-          expect(client.instance_variable_get(:@polling_thread)).to be_alive
+          expect(pool.client_count).to eq(1)
 
           client.stop
-
-          sleep(0.05)
-          expect(client.instance_variable_get(:@polling_thread)).to be_nil
+          expect(pool.client_count).to eq(0)
         end
 
         it 'is idempotent' do
@@ -182,14 +165,8 @@ module ForestAdminDatasourceRpc
         end
 
         it 'logs stopping and stopped messages' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
-          allow(client).to receive(:polling_loop) do
-            sleep(10) unless client.closed
-          end
-
+          client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
           client.start
-          sleep(0.05)
 
           client.stop
 
@@ -216,7 +193,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
-          client.send(:check_schema)
+          client.check_schema
 
           expect(rpc_client).to have_received(:fetch_schema).with('/forest/rpc-schema', if_none_match: nil)
         end
@@ -225,7 +202,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
-          client.send(:check_schema)
+          client.check_schema
 
           expect(client.instance_variable_get(:@cached_etag)).to eq('etag-123')
           expect(callback).not_to have_received(:call)
@@ -237,11 +214,11 @@ module ForestAdminDatasourceRpc
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
           # First poll
-          client.send(:check_schema)
+          client.check_schema
 
           # Second poll should include cached ETag
           allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
-          client.send(:check_schema)
+          client.check_schema
 
           expect(rpc_client).to have_received(:fetch_schema).with('/forest/rpc-schema', if_none_match: 'etag-123')
         end
@@ -251,7 +228,7 @@ module ForestAdminDatasourceRpc
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
           # First poll
-          client.send(:check_schema)
+          client.check_schema
 
           # Second poll with different ETag (schema changed)
           new_schema = { collections: [{ name: 'Orders' }], charts: [] }
@@ -262,7 +239,7 @@ module ForestAdminDatasourceRpc
           )
           allow(rpc_client).to receive(:fetch_schema).and_return(new_response)
 
-          client.send(:check_schema)
+          client.check_schema
 
           # Callback should have been called with new schema
           expect(callback).to have_received(:call).with(new_schema)
@@ -275,11 +252,11 @@ module ForestAdminDatasourceRpc
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
           # First poll
-          client.send(:check_schema)
+          client.check_schema
 
           # Second poll with 304 Not Modified
           allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
-          client.send(:check_schema)
+          client.check_schema
 
           # Callback should not have been called
           expect(callback).not_to have_received(:call)
@@ -290,7 +267,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
 
-          expect { client.send(:check_schema) }.not_to raise_error
+          expect { client.check_schema }.not_to raise_error
 
           expect(logger).to have_received(:log).with('Warn', /Connection error/)
           expect(callback).not_to have_received(:call)
@@ -300,7 +277,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::TimeoutError, 'Timeout')
 
-          expect { client.send(:check_schema) }.not_to raise_error
+          expect { client.check_schema }.not_to raise_error
 
           expect(logger).to have_received(:log).with('Warn', /Connection error/)
         end
@@ -311,7 +288,7 @@ module ForestAdminDatasourceRpc
             ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient, 'Auth failed'
           )
 
-          expect { client.send(:check_schema) }.not_to raise_error
+          expect { client.check_schema }.not_to raise_error
 
           expect(logger).to have_received(:log).with('Error', /Authentication error/)
         end
@@ -320,7 +297,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_raise(StandardError, 'Unexpected error')
 
-          expect { client.send(:check_schema) }.not_to raise_error
+          expect { client.check_schema }.not_to raise_error
 
           expect(logger).to have_received(:log).with('Error', /Unexpected error/)
         end
@@ -330,7 +307,7 @@ module ForestAdminDatasourceRpc
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
 
           # Connection attempts should be incremented then reset
-          client.send(:check_schema)
+          client.check_schema
 
           # After successful poll, connection attempts is reset to 0
           expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
@@ -362,29 +339,16 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      describe 'integration: polling loop' do
-        it 'polls at configured interval' do
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+      describe 'integration: polling via pool' do
+        let(:rpc_client) { instance_double(RpcClient) }
+        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
 
-          check_count = 0
-          allow(client).to receive(:check_schema) do
-            check_count += 1
-          end
-
-          client.start
-          sleep(0.5) # Should perform at least 1 check
-          client.stop
-
-          expect(check_count).to be >= 1
-          expect(check_count).to be <= 3
+        before do
+          allow(RpcClient).to receive(:new).and_return(rpc_client)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
         end
 
-        it 'triggers callback on schema change' do
-          rpc_client = instance_double(RpcClient)
-          allow(RpcClient).to receive(:new).and_return(rpc_client)
-
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
+        it 'triggers callback on schema change via pool' do
           # First poll
           schema1 = { collections: [{ name: 'Products' }] }
           response1 = instance_double(SchemaResponse, body: schema1, etag: 'etag-1')
@@ -395,8 +359,10 @@ module ForestAdminDatasourceRpc
 
           allow(rpc_client).to receive(:fetch_schema).and_return(response1, response2)
 
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+
           client.start
-          sleep(1.5) # Wait for 2 polls
+          sleep(2.5) # Wait for pool scheduler to poll
           client.stop
 
           # Should have been called with the changed schema
@@ -404,18 +370,15 @@ module ForestAdminDatasourceRpc
         end
 
         it 'does not trigger callback if schema stays the same' do
-          rpc_client = instance_double(RpcClient)
-          allow(RpcClient).to receive(:new).and_return(rpc_client)
-
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
           # Same ETag for all polls (schema unchanged)
           response = instance_double(SchemaResponse, body: schema, etag: 'etag-same')
           # First returns the response, then returns NotModified
           allow(rpc_client).to receive(:fetch_schema).and_return(response, RpcClient::NotModified)
 
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+
           client.start
-          sleep(1.5) # Wait for at least 2 polls
+          sleep(2.5) # Wait for pool scheduler to poll
           client.stop
 
           # Should NOT have called callback (schema unchanged)
@@ -423,48 +386,24 @@ module ForestAdminDatasourceRpc
         end
 
         it 'continues polling after connection errors' do
-          rpc_client = instance_double(RpcClient)
-          allow(RpcClient).to receive(:new).and_return(rpc_client)
-
-          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
-
-          # First poll fails, second succeeds
-          schema_response = instance_double(SchemaResponse, body: schema, etag: 'etag-123')
+          # Initial fetch succeeds, first poll fails, second poll succeeds
           call_count = 0
           allow(rpc_client).to receive(:fetch_schema) do
             call_count += 1
-            raise Faraday::ConnectionFailed, 'Connection refused' if call_count == 1
+            # First call is initial fetch (succeeds), second is first poll (fails), third succeeds
+            raise Faraday::ConnectionFailed, 'Connection refused' if call_count == 2
 
             schema_response
           end
 
-          client.start
-          sleep(1.5) # Wait for 2 polls
-          client.stop
-
-          # Should have continued polling after failure
-          # Initial sync fetch failure logs as 'Error', polling loop failures log as 'Warn'
-          expect(logger).to have_received(:log).with('Error', /Connection failed/)
-          expect(logger).to have_received(:log).with('Info', /Initial sync completed successfully/)
-        end
-
-        it 'stops polling when closed' do
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
-          check_count = 0
-          allow(client).to receive(:check_schema) do
-            check_count += 1
-          end
-
           client.start
-          sleep(0.15)
+          sleep(3) # Wait for initial fetch + polling
           client.stop
-          checks_at_stop = check_count
 
-          sleep(0.2) # Wait more time
-
-          # Should not have increased after stop
-          expect(check_count).to eq(checks_at_stop)
+          # Should have continued polling after the connection error
+          expect(logger).to have_received(:log).with('Warn', /Connection error/)
         end
       end
     end

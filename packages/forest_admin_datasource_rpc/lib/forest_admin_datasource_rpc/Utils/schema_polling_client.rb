@@ -6,60 +6,43 @@ require 'digest'
 module ForestAdminDatasourceRpc
   module Utils
     class SchemaPollingClient
-      attr_reader :closed, :current_schema
+      attr_reader :closed, :current_schema, :client_id
 
       DEFAULT_POLLING_INTERVAL = 600
       MIN_POLLING_INTERVAL = 1
       MAX_POLLING_INTERVAL = 3600
 
-      def initialize(uri, auth_secret, options = {}, introspection_schema = nil, &on_schema_change)
+      def initialize(uri, auth_secret, polling_interval: DEFAULT_POLLING_INTERVAL, introspection_schema: nil,
+                     &on_schema_change)
         @uri = uri
         @auth_secret = auth_secret
-        @polling_interval = options[:polling_interval] || DEFAULT_POLLING_INTERVAL
+        @polling_interval = polling_interval
         @on_schema_change = on_schema_change
         @closed = false
         @introspection_schema = introspection_schema
         @current_schema = nil
         @cached_etag = nil
-        @polling_thread = nil
-        @mutex = Mutex.new
         @connection_attempts = 0
         @initial_sync_completed = false
+        @client_id = uri
 
         validate_polling_interval!
 
         @rpc_client = RpcClient.new(@uri, @auth_secret)
       end
 
-      def start # rubocop:disable Naming/PredicateMethod
+      def start?
         return false if @closed
 
-        # Check if already running (needs mutex)
-        @mutex.synchronize do
-          return false if @polling_thread&.alive?
-        end
-
-        # Fetch initial schema synchronously (outside mutex to avoid blocking)
         ForestAdminAgent::Facades::Container.logger&.log('Info', "Getting schema from RPC agent on #{@uri}.")
         fetch_initial_schema_sync
 
-        # Start async polling thread
-        @mutex.synchronize do
-          return false if @polling_thread&.alive? # Re-check after fetch
-
-          @polling_thread = Thread.new do
-            polling_loop
-          rescue StandardError => e
-            ForestAdminAgent::Facades::Container.logger&.log(
-              'Error',
-              "[Schema Polling] Unexpected error in polling loop: #{e.class} - #{e.message}"
-            )
-          end
-        end
+        # Register with the shared pool
+        SchemaPollingPool.instance.register(@client_id, self)
 
         ForestAdminAgent::Facades::Container.logger&.log(
           'Info',
-          "[Schema Polling] Polling started (interval: #{@polling_interval}s)"
+          "[Schema Polling] Registered with pool (interval: #{@polling_interval}s, client: #{@client_id})"
         )
         true
       end
@@ -70,10 +53,23 @@ module ForestAdminDatasourceRpc
         @closed = true
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Stopping polling')
 
-        @polling_thread.join(2) if @polling_thread&.alive?
-        @polling_thread = nil
+        SchemaPollingPool.instance.unregister(@client_id)
 
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Polling stopped')
+      end
+
+      def check_schema
+        @connection_attempts += 1
+        log_checking_schema
+
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @cached_etag)
+        handle_schema_result(result)
+      rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
+        log_connection_error(e)
+      rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
+        log_authentication_error(e)
+      rescue StandardError => e
+        log_unexpected_error(e)
       end
 
       private
@@ -135,61 +131,6 @@ module ForestAdminDatasourceRpc
           )
           raise error
         end
-      end
-
-      def polling_loop
-        etag_status = @cached_etag ? "with ETag: #{@cached_etag}" : 'without initial ETag'
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Debug',
-          "[Schema Polling] Starting polling loop (interval: #{@polling_interval}s, #{etag_status})"
-        )
-
-        loop do
-          break if @closed
-
-          etag_info = @cached_etag || 'none'
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            "[Schema Polling] Waiting #{@polling_interval}s before next check (current ETag: #{etag_info})"
-          )
-          sleep_with_interrupt(@polling_interval)
-          break if @closed
-
-          begin
-            check_schema
-          rescue StandardError => e
-            handle_error(e)
-          end
-        end
-      end
-
-      def sleep_with_interrupt(duration)
-        remaining = duration
-        while remaining.positive? && !@closed
-          sleep([remaining, 1].min)
-          remaining -= 1
-        end
-      end
-
-      def check_schema
-        @connection_attempts += 1
-        log_checking_schema
-
-        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @cached_etag)
-        handle_schema_result(result)
-      rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
-        log_connection_error(e)
-      rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-        log_authentication_error(e)
-      rescue StandardError => e
-        log_unexpected_error(e)
-      end
-
-      def handle_error(error)
-        ForestAdminAgent::Facades::Container.logger&.log(
-          'Error',
-          "[Schema Polling] Error during schema check: #{error.class} - #{error.message}"
-        )
       end
 
       def trigger_schema_change_callback(schema)

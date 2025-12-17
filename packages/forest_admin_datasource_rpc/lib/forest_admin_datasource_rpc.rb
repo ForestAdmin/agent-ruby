@@ -8,6 +8,10 @@ loader.setup
 module ForestAdminDatasourceRpc
   class Error < StandardError; end
 
+  def self.configure_polling_pool(max_threads:)
+    Utils::SchemaPollingPool.instance.configure(max_threads: max_threads)
+  end
+
   def self.build(options)
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
@@ -21,11 +25,15 @@ module ForestAdminDatasourceRpc
                          600
                        end
 
-    polling_options = {
-      polling_interval: polling_interval
-    }
+    # Auto-configure pool with default settings if not already configured
+    ensure_pool_configured
 
-    schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options, provided_introspection) do
+    schema_polling = Utils::SchemaPollingClient.new(
+      uri,
+      auth_secret,
+      polling_interval: polling_interval,
+      introspection_schema: provided_introspection
+    ) do
       logger = ForestAdminAgent::Facades::Container.logger
       logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
       ForestAdminAgent::Builder::AgentFactory.instance.reload!
@@ -36,7 +44,16 @@ module ForestAdminDatasourceRpc
     # - With introspection: falls back to introspection if RPC is unreachable
     schema_polling.start
 
-    @provided_introspection = nil
     ForestAdminDatasourceRpc::Datasource.new(options, schema_polling.current_schema, schema_polling)
   end
+
+  def self.ensure_pool_configured
+    pool = Utils::SchemaPollingPool.instance
+    return if pool.configured
+
+    # Auto-configure with default of 1 thread if user hasn't configured
+    pool.configure(max_threads: 1)
+  end
+
+  private_class_method :ensure_pool_configured
 end

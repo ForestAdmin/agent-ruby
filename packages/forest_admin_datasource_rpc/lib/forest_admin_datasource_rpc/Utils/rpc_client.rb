@@ -32,6 +32,8 @@ module ForestAdminDatasourceRpc
 
       HTTP_NOT_MODIFIED = 304
       NotModified = Class.new
+      DEFAULT_TIMEOUT = 30 # seconds
+      DEFAULT_OPEN_TIMEOUT = 10 # seconds
 
       def initialize(api_url, auth_secret)
         @api_url = api_url
@@ -53,9 +55,6 @@ module ForestAdminDatasourceRpc
       end
 
       private
-
-      DEFAULT_TIMEOUT = 30 # seconds
-      DEFAULT_OPEN_TIMEOUT = 10 # seconds
 
       # rubocop:disable Metrics/ParameterLists
       def make_request(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)

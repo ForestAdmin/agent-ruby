@@ -205,6 +205,17 @@ module ForestAdminAgent
         @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
 
         @container.register(:config, @options.to_h)
+
+        configure_rpc_polling_pool if @options[:rpc_max_polling_threads]
+      end
+
+      def configure_rpc_polling_pool
+        max_threads = @options[:rpc_max_polling_threads].to_i
+        return unless max_threads.positive?
+
+        return unless defined?(ForestAdminDatasourceRpc)
+
+        ForestAdminDatasourceRpc.configure_polling_pool(max_threads: max_threads)
       end
 
       def build_logger
