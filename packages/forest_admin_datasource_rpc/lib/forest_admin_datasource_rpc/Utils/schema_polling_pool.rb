@@ -42,13 +42,7 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      # Register a polling client with the pool.
-      # The pool will manage polling for this client using worker threads.
-      # @param client_id [String] Unique identifier for the client (typically the RPC URI)
-      # @param client [SchemaPollingClient] The polling client instance
-      # @return [Boolean] true if registered successfully, false if already registered
-      # rubocop:disable Naming/PredicateMethod
-      def register(client_id, client)
+      def register?(client_id, client)
         @mutex.synchronize do
           if @clients.key?(client_id)
             log('Warn', "[SchemaPollingPool] Client #{client_id} already registered, skipping")
@@ -63,20 +57,15 @@ module ForestAdminDatasourceRpc
 
           log('Info', "[SchemaPollingPool] Registered client: #{client_id} (#{@clients.size} total clients)")
 
-          # Start the pool if this is the first client
           start_pool unless @running
 
-          # Schedule initial poll for this client
           schedule_poll(client_id)
         end
 
         true
       end
 
-      # Unregister a polling client from the pool.
-      # @param client_id [String] The client identifier to unregister
-      # @return [Boolean] true if unregistered successfully, false if not found
-      def unregister(client_id)
+      def unregister?(client_id)
         @mutex.synchronize do
           unless @clients.key?(client_id)
             log('Debug', "[SchemaPollingPool] Client #{client_id} not found for unregister")
@@ -86,25 +75,20 @@ module ForestAdminDatasourceRpc
           @clients.delete(client_id)
           log('Info', "[SchemaPollingPool] Unregistered client: #{client_id} (#{@clients.size} remaining)")
 
-          # Stop the pool if no clients remain
           stop_pool if @clients.empty? && @running
         end
 
         true
       end
-      # rubocop:enable Naming/PredicateMethod
 
-      # Get the number of registered clients
       def client_count
         @mutex.synchronize { @clients.size }
       end
 
-      # Check if the pool is currently running
       def running?
         @mutex.synchronize { @running }
       end
 
-      # Stop all workers and clear the pool. Used for testing and shutdown.
       def shutdown!
         @mutex.synchronize do
           return unless @running
@@ -116,7 +100,6 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      # Reset the pool to initial state. Primarily for testing.
       def reset!
         shutdown!
         @mutex.synchronize do
@@ -133,7 +116,6 @@ module ForestAdminDatasourceRpc
         @running = true
         @shutdown_requested = false
 
-        # Calculate actual thread count based on clients and max
         thread_count = @clients.size.clamp(MIN_THREADS, @max_threads)
 
         log('Info',
@@ -143,7 +125,6 @@ module ForestAdminDatasourceRpc
           @workers << Thread.new { worker_loop(i) }
         end
 
-        # Start the scheduler thread
         @scheduler_thread = Thread.new { scheduler_loop }
       end
 
@@ -154,18 +135,14 @@ module ForestAdminDatasourceRpc
 
         @running = false
 
-        # Signal workers to stop by pushing nil for each worker
         @workers.size.times { @work_queue << nil }
 
-        # Wait for workers to finish (with timeout)
         @workers.each { |w| w.join(2) }
         @workers.clear
 
-        # Stop scheduler
         @scheduler_thread&.join(2)
         @scheduler_thread = nil
 
-        # Clear the queue
         @work_queue.clear
 
         log('Info', '[SchemaPollingPool] Pool stopped')
@@ -175,10 +152,8 @@ module ForestAdminDatasourceRpc
         log('Debug', "[SchemaPollingPool] Worker #{worker_id} started")
 
         loop do
-          # Block waiting for work
           task = @work_queue.pop
 
-          # nil signals shutdown
           break if task.nil?
 
           client_id = task[:client_id]
@@ -209,10 +184,8 @@ module ForestAdminDatasourceRpc
               next if state[:next_poll_at].nil?
               next if now < state[:next_poll_at]
 
-              # Time to poll this client
               schedule_poll(client_id)
 
-              # Calculate next poll time
               interval = state[:client].instance_variable_get(:@polling_interval) || 600
               state[:next_poll_at] = now + interval
             end
@@ -236,7 +209,6 @@ module ForestAdminDatasourceRpc
 
         log('Debug', "[SchemaPollingPool] Polling client: #{client_id}")
 
-        # Call the client's check_schema method
         client.send(:check_schema)
 
         @mutex.synchronize do
@@ -254,8 +226,6 @@ module ForestAdminDatasourceRpc
         return unless defined?(ForestAdminAgent::Facades::Container)
 
         ForestAdminAgent::Facades::Container.logger&.log(level, message)
-      rescue StandardError
-        # Silently ignore logging errors
       end
     end
   end
