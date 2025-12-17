@@ -35,7 +35,7 @@ module ForestAdminDatasourceRpc
 
         it 'raises error if pool is already running' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           expect { pool.configure(max_threads: 10) }.to raise_error(RuntimeError, /Cannot configure pool while running/)
         end
@@ -46,11 +46,11 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      describe '#register' do
+      describe '#register?' do
         it 'registers a client and starts the pool' do
           client = create_mock_client('http://test1:5000')
 
-          result = pool.register('test1', client)
+          result = pool.register?('test1', client)
 
           expect(result).to be true
           expect(pool.client_count).to eq(1)
@@ -61,8 +61,8 @@ module ForestAdminDatasourceRpc
           client1 = create_mock_client('http://test1:5000')
           client2 = create_mock_client('http://test2:5000')
 
-          pool.register('test1', client1)
-          pool.register('test2', client2)
+          pool.register?('test1', client1)
+          pool.register?('test2', client2)
 
           expect(pool.client_count).to eq(2)
         end
@@ -71,8 +71,8 @@ module ForestAdminDatasourceRpc
           client1 = create_mock_client('http://test1:5000')
           client2 = create_mock_client('http://test1:5000')
 
-          pool.register('test1', client1)
-          result = pool.register('test1', client2)
+          pool.register?('test1', client1)
+          result = pool.register?('test1', client2)
 
           expect(result).to be false
           expect(pool.client_count).to eq(1)
@@ -80,42 +80,42 @@ module ForestAdminDatasourceRpc
 
         it 'logs registration' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           expect(logger).to have_received(:log).with('Info', /Registered client: test1/)
         end
       end
 
-      describe '#unregister' do
+      describe '#unregister?' do
         it 'removes a registered client' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
-          result = pool.unregister('test1')
+          result = pool.unregister?('test1')
 
           expect(result).to be true
           expect(pool.client_count).to eq(0)
         end
 
         it 'returns false for unknown client_id' do
-          result = pool.unregister('unknown')
+          result = pool.unregister?('unknown')
           expect(result).to be false
         end
 
         it 'stops the pool when last client is removed' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
           expect(pool.running?).to be true
 
-          pool.unregister('test1')
+          pool.unregister?('test1')
 
           expect(pool.running?).to be false
         end
 
         it 'logs unregistration' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
-          pool.unregister('test1')
+          pool.register?('test1', client)
+          pool.unregister?('test1')
 
           expect(logger).to have_received(:log).with('Info', /Unregistered client: test1/)
         end
@@ -129,7 +129,7 @@ module ForestAdminDatasourceRpc
         it 'tracks registered clients' do
           3.times do |i|
             client = create_mock_client("http://test#{i}:5000")
-            pool.register("test#{i}", client)
+            pool.register?("test#{i}", client)
           end
 
           expect(pool.client_count).to eq(3)
@@ -143,7 +143,7 @@ module ForestAdminDatasourceRpc
 
         it 'returns true after first client registers' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           expect(pool.running?).to be true
         end
@@ -153,8 +153,8 @@ module ForestAdminDatasourceRpc
         it 'stops all workers and clears clients' do
           client1 = create_mock_client('http://test1:5000')
           client2 = create_mock_client('http://test2:5000')
-          pool.register('test1', client1)
-          pool.register('test2', client2)
+          pool.register?('test1', client1)
+          pool.register?('test2', client2)
 
           pool.shutdown!
 
@@ -164,7 +164,7 @@ module ForestAdminDatasourceRpc
 
         it 'is idempotent' do
           client = create_mock_client('http://test1:5000')
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           expect { pool.shutdown! }.not_to raise_error
           expect { pool.shutdown! }.not_to raise_error
@@ -197,7 +197,7 @@ module ForestAdminDatasourceRpc
           pool.configure(max_threads: 10)
 
           client = create_mock_client('http://test0:5000')
-          pool.register('test0', client)
+          pool.register?('test0', client)
 
           # Pool starts with 1 thread for 1 client (min of client count and max_threads)
           expect(logger).to have_received(:log).with('Info', /Starting pool with 1 worker threads for 1 clients/)
@@ -209,7 +209,7 @@ module ForestAdminDatasourceRpc
           # Register 10 clients
           10.times do |i|
             client = create_mock_client("http://test#{i}:5000")
-            pool.register("test#{i}", client)
+            pool.register?("test#{i}", client)
           end
 
           # Pool starts on first registration, subsequent registrations don't restart
@@ -223,7 +223,7 @@ module ForestAdminDatasourceRpc
         it 'executes check_schema on registered clients' do
           client = create_mock_client('http://test1:5000')
 
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           # Wait for scheduler to run
           sleep(2.5)
@@ -235,7 +235,7 @@ module ForestAdminDatasourceRpc
           client = create_mock_client('http://test1:5000')
           allow(client).to receive(:send).with(:check_schema).and_raise(StandardError, 'Test error')
 
-          pool.register('test1', client)
+          pool.register?('test1', client)
 
           # Wait for scheduler and verify pool stays running
           sleep(2.5)
@@ -246,7 +246,7 @@ module ForestAdminDatasourceRpc
           client = create_mock_client('http://test1:5000')
           allow(client).to receive(:closed).and_return(true)
 
-          pool.register('test1', client)
+          pool.register?('test1', client)
           sleep(2.5)
 
           expect(client).not_to have_received(:send).with(:check_schema)
@@ -263,7 +263,7 @@ module ForestAdminDatasourceRpc
             allow(client).to receive(:send).with(:check_schema) do
               poll_counts[client_id] += 1
             end
-            pool.register(client_id, client)
+            pool.register?(client_id, client)
           end
 
           # Wait for initial staggered polls + one interval

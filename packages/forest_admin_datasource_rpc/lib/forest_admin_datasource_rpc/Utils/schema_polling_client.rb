@@ -38,7 +38,7 @@ module ForestAdminDatasourceRpc
         fetch_initial_schema_sync
 
         # Register with the shared pool
-        SchemaPollingPool.instance.register(@client_id, self)
+        SchemaPollingPool.instance.register?(@client_id, self)
 
         ForestAdminAgent::Facades::Container.logger&.log(
           'Info',
@@ -53,7 +53,7 @@ module ForestAdminDatasourceRpc
         @closed = true
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Stopping polling')
 
-        SchemaPollingPool.instance.unregister(@client_id)
+        SchemaPollingPool.instance.unregister?(@client_id)
 
         ForestAdminAgent::Facades::Container.logger&.log('Debug', '[Schema Polling] Polling stopped')
       end

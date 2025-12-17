@@ -42,7 +42,7 @@ module ForestAdminDatasourceRpc
     # Start polling (includes initial synchronous schema fetch)
     # - Without introspection: crashes if RPC is unreachable
     # - With introspection: falls back to introspection if RPC is unreachable
-    schema_polling.start
+    schema_polling.start?
 
     ForestAdminDatasourceRpc::Datasource.new(options, schema_polling.current_schema, schema_polling)
   end

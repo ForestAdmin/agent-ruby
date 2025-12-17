@@ -103,7 +103,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
 
           expect(pool.client_count).to eq(0)
-          client.start
+          client.start?
           expect(pool.client_count).to eq(1)
 
           client.stop
@@ -113,7 +113,7 @@ module ForestAdminDatasourceRpc
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           client.instance_variable_set(:@closed, true)
 
-          result = client.start
+          result = client.start?
 
           expect(result).to be false
           expect(pool.client_count).to eq(0)
@@ -121,7 +121,7 @@ module ForestAdminDatasourceRpc
 
         it 'logs registration with pool' do
           client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
-          client.start
+          client.start?
 
           expect(logger).to have_received(:log).with('Info', /Registered with pool/)
 
@@ -140,7 +140,7 @@ module ForestAdminDatasourceRpc
 
         it 'unregisters from the pool' do
           client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
-          client.start
+          client.start?
           expect(pool.client_count).to eq(1)
 
           client.stop
@@ -166,7 +166,7 @@ module ForestAdminDatasourceRpc
 
         it 'logs stopping and stopped messages' do
           client = described_class.new(uri, secret, polling_interval: 600) { |schema| callback.call(schema) }
-          client.start
+          client.start?
 
           client.stop
 
@@ -361,7 +361,7 @@ module ForestAdminDatasourceRpc
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
-          client.start
+          client.start?
           sleep(2.5) # Wait for pool scheduler to poll
           client.stop
 
@@ -377,7 +377,7 @@ module ForestAdminDatasourceRpc
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
-          client.start
+          client.start?
           sleep(2.5) # Wait for pool scheduler to poll
           client.stop
 
@@ -398,7 +398,7 @@ module ForestAdminDatasourceRpc
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
-          client.start
+          client.start?
           sleep(3) # Wait for initial fetch + polling
           client.stop
 
