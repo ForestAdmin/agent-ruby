@@ -43,8 +43,6 @@ module ForestAdminRails
 
     def load_configuration
       return unless running_web_server?
-
-      check_create_agent_location
       return unless create_agent_file_exists?
 
       # force eager loading models
@@ -56,32 +54,10 @@ module ForestAdminRails
       sse.run if ForestAdminRails.config[:instant_cache_refresh]
     end
 
-    def check_create_agent_location
-      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
-      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
-
-      return unless File.exist?(old_path) && !File.exist?(new_path)
-
-      logger = ActiveSupport::Logger.new($stdout)
-      logger.warn <<~WARNING
-        ⚠️  DEPRECATION WARNING: create_agent.rb detected in old location!
-
-        The file 'app/lib/forest_admin_rails/create_agent.rb' should now be located at:
-        'lib/forest_admin_rails/create_agent.rb'
-
-        Please move your file to the new location:
-          mkdir -p lib/forest_admin_rails
-          mv app/lib/forest_admin_rails/create_agent.rb lib/forest_admin_rails/create_agent.rb
-
-        This will become a hard requirement in a future version.
-      WARNING
-    end
-
     def create_agent_file_exists?
-      old_path = Rails.root.join('app', 'lib', 'forest_admin_rails', 'create_agent.rb')
-      new_path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+      path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
 
-      File.exist?(new_path) || File.exist?(old_path)
+      File.exist?(path)
     end
 
     def setup_agent_and_cache_routes
