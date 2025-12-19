@@ -11,6 +11,18 @@ module ForestAdminDatasourceCustomizer
 
         def list(caller, filter = nil, projection = nil)
           refined_filter = refine_filter(caller, filter)
+
+          # Pass the decorated datasource and disable_includes flag via caller.request
+          # This allows the ActiveRecord collection to resolve renamed collections correctly
+          if caller
+            request = caller.instance_variable_get(:@request) || {}
+            # Pass the top-level datasource (with renames) for collection resolution
+            request[:decorated_datasource] = datasource
+            # Mark if we need to disable includes for polymorphic relations
+            # to avoid Api::Api::Income errors caused by polymorphic_class_for
+            request[:disable_polymorphic_includes] = true if polymorphic_relations?
+          end
+
           records = @child_collection.list(caller, refined_filter, projection)
 
           transform_records_polymorphic_values(records)
@@ -52,6 +64,16 @@ module ForestAdminDatasourceCustomizer
         end
 
         private
+
+        def polymorphic_relations?
+          # Check self.schema (the decorator's schema) instead of @child_collection.schema
+          # because self.schema includes all transformations from the decorator chain
+          return false unless schema && schema[:fields]
+
+          schema[:fields].any? do |_name, field_schema|
+            field_schema&.type&.start_with?('Polymorphic')
+          end
+        end
 
         def polymorphic_type_fields
           type_fields = []
@@ -95,16 +117,20 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
-        # convert new collection name back to old name for db queries
         def reverse_collection_name(collection_name)
+          return nil if collection_name.nil?
+
           to_child_name = datasource.instance_variable_get(:@to_child_name)
-          to_child_name[collection_name] || collection_name
+          formatted_name = to_child_name[collection_name] || collection_name
+          formatted_name.gsub('__', '::')
         end
 
-        # convert old collection name to new name for returned data
         def forward_collection_name(collection_name)
+          return nil if collection_name.nil?
+
           from_child_name = datasource.instance_variable_get(:@from_child_name)
-          from_child_name[collection_name] || collection_name
+          formatted_name = collection_name.gsub('::', '__')
+          from_child_name[formatted_name] || collection_name
         end
 
         def transform_records_polymorphic_values(records)

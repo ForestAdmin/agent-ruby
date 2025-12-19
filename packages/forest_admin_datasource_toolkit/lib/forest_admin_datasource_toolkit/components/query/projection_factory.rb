@@ -3,7 +3,9 @@ module ForestAdminDatasourceToolkit
     module Query
       class ProjectionFactory
         include ForestAdminDatasourceToolkit::Utils
-        def self.all(collection)
+        def self.all(collection, datasource = nil)
+          datasource ||= collection.datasource
+
           projection_fields = collection.schema[:fields].reduce([]) do |memo, path|
             column_name = path[0]
             schema = path[1]
@@ -11,7 +13,7 @@ module ForestAdminDatasourceToolkit
 
             to_one_relations = %w[OneToOne ManyToOne PolymorphicOneToOne]
             if to_one_relations.include?(schema.type)
-              relation = collection.datasource.get_collection(schema.foreign_collection)
+              relation = datasource.get_collection(schema.foreign_collection)
               relation_columns = relation.schema[:fields]
                                          .select { |_column_name, relation_column| relation_column.type == 'Column' }
                                          .keys
