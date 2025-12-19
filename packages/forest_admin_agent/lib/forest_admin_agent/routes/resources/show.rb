@@ -23,7 +23,7 @@ module ForestAdminAgent
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
 
-          projection = ProjectionFactory.all(context.collection)
+          projection = ProjectionFactory.all(context.collection, context.datasource)
 
           records = context.collection.list(context.caller, filter, projection)
 

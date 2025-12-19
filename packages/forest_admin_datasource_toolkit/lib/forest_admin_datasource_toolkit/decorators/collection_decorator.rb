@@ -3,8 +3,8 @@ module ForestAdminDatasourceToolkit
     class CollectionDecorator < Collection
       include ForestAdminDatasourceToolkit::Components::Query
 
+      attr_accessor :parent
       attr_reader :datasource, :child_collection, :last_schema
-      attr_writer :parent
 
       def initialize(child_collection, datasource)
         super

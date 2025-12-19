@@ -21,19 +21,49 @@ module ForestAdminDatasourceActiveRecord
       ActiveRecord::Base.connection
     end
 
-    def list(_caller, filter, projection)
-      query = Utils::Query.new(self, projection, filter)
+    def list(caller, filter, projection)
+      # Check if the RenameCollectionDecorator marked that we should disable includes
+      # to prevent ActiveRecord from preloading polymorphic associations with wrong type resolution
+      disable_includes = false
+      decorated_datasource = nil
+      if caller
+        request = caller.instance_variable_get(:@request)
+        disable_includes = request&.dig(:disable_polymorphic_includes) || false
+        decorated_datasource = request&.dig(:decorated_datasource)
+      end
 
-      query.get.map { |record| Utils::ActiveRecordSerializer.new(record).to_hash(projection) }
+      # When disable_includes is true, we need to exclude polymorphic relations from both
+      # query building and serialization to avoid polymorphic_class_for errors
+      query_projection = projection
+      query_projection = filter_polymorphic_relations_from_projection(projection) if disable_includes && projection
+
+      # Pass decorated datasource (with renames) for resolving collection names in projections
+      query = Utils::Query.new(self, query_projection, filter, disable_includes: disable_includes,
+                                                               datasource: decorated_datasource)
+
+      query.get.map { |record| Utils::ActiveRecordSerializer.new(record).to_hash(query_projection) }
     end
 
     def aggregate(_caller, filter, aggregation, limit = nil)
       Utils::QueryAggregate.new(self, aggregation, filter, limit).get
     end
 
-    def create(_caller, data)
+    def create(caller, data)
       Utils::ErrorHandler.handle_errors(:create) do
-        Utils::ActiveRecordSerializer.new(@model.create!(data)).to_hash(ProjectionFactory.all(self))
+        # Get datasource with decorators (including rename) for ProjectionFactory
+        datasource = nil
+        if caller&.instance_variable_defined?(:@request)
+          request = caller.instance_variable_get(:@request)
+          datasource = request[:decorated_datasource] if request.is_a?(Hash)
+        end
+
+        datasource ||= begin
+          ForestAdminAgent::Facades::Container.datasource
+        rescue StandardError
+          nil
+        end
+
+        Utils::ActiveRecordSerializer.new(@model.create!(data)).to_hash(ProjectionFactory.all(self, datasource))
       end
     end
 
@@ -103,14 +133,20 @@ module ForestAdminDatasourceActiveRecord
                   origin_type_value: is_polymorphic ? @model.name : nil
                 )
               )
-            elsif association.inverse_of&.polymorphic?
+            elsif association.inverse_of&.polymorphic? || association.options[:as].present?
+              # Detect polymorphic has_one by checking either:
+              # 1. inverse_of is polymorphic (standard case)
+              # 2. association uses :as option (polymorphic target side)
+              polymorphic_name = association.options[:as] || association.inverse_of&.name
+              foreign_type_field = "#{polymorphic_name}_type"
+
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(
                   foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
-                  origin_type_field: association.inverse_of.foreign_type,
+                  origin_type_field: foreign_type_field,
                   origin_type_value: @model.name
                 )
               )
@@ -173,14 +209,20 @@ module ForestAdminDatasourceActiveRecord
                   origin_type_value: is_polymorphic ? @model.name : nil
                 )
               )
-            elsif association.inverse_of&.polymorphic?
+            elsif association.inverse_of&.polymorphic? || association.options[:as].present?
+              # Detect polymorphic has_many by checking either:
+              # 1. inverse_of is polymorphic (standard case)
+              # 2. association uses :as option (polymorphic target side)
+              polymorphic_name = association.options[:as] || association.inverse_of&.name
+              foreign_type_field = "#{polymorphic_name}_type"
+
               add_field(
                 association.name.to_s,
                 ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(
                   foreign_collection: format_model_name(association.klass.name),
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
-                  origin_type_field: association.inverse_of.foreign_type,
+                  origin_type_field: foreign_type_field,
                   origin_type_value: @model.name
                 )
               )
@@ -289,6 +331,28 @@ module ForestAdminDatasourceActiveRecord
         "in model '#{@model.name}': #{columns_list}. " \
         'This may indicate pending migrations. Run `rails db:migrate:status` to check.'
       )
+    end
+
+    def filter_polymorphic_relations_from_projection(projection)
+      return projection unless projection.is_a?(Array)
+
+      # Projection is an Array of field paths like ['id', 'name', 'relation:id']
+      # Filter out paths that start with polymorphic relation names
+      polymorphic_relations = schema[:fields].select do |_name, field_schema|
+        field_schema&.type&.start_with?('Polymorphic')
+      end.keys
+
+      # Create a new projection excluding polymorphic relation paths
+      filtered = ForestAdminDatasourceToolkit::Components::Query::Projection.new
+      projection.each do |field_path|
+        # Check if this field path starts with a polymorphic relation
+        relation_name = field_path.split(':').first
+        next if polymorphic_relations.include?(relation_name)
+
+        filtered << field_path
+      end
+
+      filtered
     end
   end
 end

@@ -84,6 +84,14 @@ module ForestAdminDatasourceCustomizer
         def get_collection_name(child_name)
           @from_child_name[child_name] || child_name
         end
+
+        # Get the Ruby class name for a collection (for polymorphic relations)
+        # Returns demodulized name because ActiveRecord's polymorphic_class_for adds namespace prefixes
+        def get_class_name_for_polymorphic(collection_name)
+          original_name = @to_child_name[collection_name] || collection_name
+          full_class_name = original_name.gsub('__', '::')
+          full_class_name.split('::').last
+        end
       end
     end
   end

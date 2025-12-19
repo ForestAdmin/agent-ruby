@@ -31,10 +31,10 @@ module ForestAdminAgent
         CallerParser.new(args).parse
       end
 
-      def self.parse_projection(collection, args)
+      def self.parse_projection(collection, args, datasource = nil)
         fields = args.dig(:params, :fields, collection.name) || ''
 
-        return ProjectionFactory.all(collection) unless fields != '' && !fields.nil?
+        return ProjectionFactory.all(collection, datasource) unless fields != '' && !fields.nil?
 
         requested_field_names = fields.split(',').map(&:strip)
         add_polymorphic_type_fields(collection, requested_field_names)

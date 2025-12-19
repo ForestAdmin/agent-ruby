@@ -25,7 +25,8 @@ module ForestAdminAgent
           )
           data = format_attributes(args, context.collection)
           context.collection.update(context.caller, filter, data)
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          records = context.collection.list(context.caller, filter,
+                                            ProjectionFactory.all(context.collection, context.datasource))
 
           {
             name: args[:params]['collection_name'],

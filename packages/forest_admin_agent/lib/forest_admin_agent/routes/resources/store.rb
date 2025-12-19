@@ -23,7 +23,8 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.match_ids(context.collection, [id])
           )
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          records = context.collection.list(context.caller, filter,
+                                            ProjectionFactory.all(context.collection, context.datasource))
 
           {
             name: args[:params]['collection_name'],
@@ -49,8 +50,11 @@ module ForestAdminAgent
             # update new relation (may update zero or one records).
             patch = { schema.origin_key => origin_value }
             if schema.type == 'PolymorphicOneToOne'
-              patch[schema.origin_type_field] =
-                context.collection.name.gsub('__', '::')
+              # Use helper to convert collection name to polymorphic class name (handles renaming)
+              patch[schema.origin_type_field] = get_polymorphic_class_name_for_collection(
+                context.datasource,
+                context.collection.name
+              )
             end
             condition_tree = ConditionTree::ConditionTreeFactory.match_records(foreign_collection, [primary_key_values])
             filter = Filter.new(condition_tree: condition_tree)

@@ -47,6 +47,54 @@ module ForestAdminAgent
 
           private
 
+          # Helper to find the RenameCollectionDatasourceDecorator in the datasource chain
+          def find_rename_datasource(_context)
+            # Access the top-level datasource from Container which should have all decorators applied
+            datasource = ForestAdminAgent::Facades::Container.datasource
+
+            # First, navigate to find the CompositeDatasource
+            depth = 0
+            composite_class = 'ForestAdminDatasourceCustomizer::CompositeDatasource'
+            while datasource && datasource.class.name != composite_class && depth < 50
+              break unless datasource.instance_variable_defined?(:@child_datasource)
+
+              datasource = datasource.instance_variable_get(:@child_datasource)
+
+              depth += 1
+            end
+
+            # If we found the CompositeDatasource, search in its @datasources array
+            if datasource&.class&.name == 'ForestAdminDatasourceCustomizer::CompositeDatasource'
+              datasources_array = datasource.instance_variable_get(:@datasources)
+              datasources_array&.each_with_index do |ds, _idx|
+                # Navigate its child_datasource chain to find RenameCollectionDatasourceDecorator
+                current = ds
+                depth2 = 0
+                while current && depth2 < 20
+                  return current if current.respond_to?(:get_class_name_for_polymorphic)
+
+                  break unless current.instance_variable_defined?(:@child_datasource)
+
+                  current = current.instance_variable_get(:@child_datasource)
+
+                  depth2 += 1
+                end
+              end
+            end
+
+            nil
+          end
+
+          # Helper to get the class name for polymorphic relations, handling renamed collections
+          def get_polymorphic_class_name(context, collection_name)
+            rename_ds = find_rename_datasource(context)
+            if rename_ds
+              rename_ds.get_class_name_for_polymorphic(collection_name)
+            else
+              collection_name.gsub('__', '::')
+            end
+          end
+
           def update_many_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             foreign_value = if linked_primary_key_values
                               Collection.get_value(context.child_collection, context.caller, linked_primary_key_values,
@@ -67,8 +115,10 @@ module ForestAdminAgent
                               )
                             end
 
-            polymorphic_type = context.child_collection.name.gsub('__', '::')
+            polymorphic_type = get_polymorphic_class_name(context, context.child_collection.name)
+
             fk_owner = ConditionTree::ConditionTreeFactory.match_ids(context.collection, [parent_primary_key_values])
+
             context.collection.update(
               context.caller,
               Filter.new(condition_tree: fk_owner),
@@ -113,7 +163,7 @@ module ForestAdminAgent
                       ConditionTree::Nodes::ConditionTreeLeaf.new(
                         relation.origin_type_field,
                         ConditionTree::Operators::EQUAL,
-                        context.collection.name.gsub('__', '::')
+                        get_polymorphic_class_name(context, context.collection.name)
                       )
                     ]
                   ),
@@ -155,7 +205,7 @@ module ForestAdminAgent
                 )
               ),
               { relation.origin_key => origin_value,
-                relation.origin_type_field => context.collection.name.gsub('__', '::') }
+                relation.origin_type_field => get_polymorphic_class_name(context, context.collection.name) }
             )
           end
 

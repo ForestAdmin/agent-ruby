@@ -51,7 +51,8 @@ module ForestAdminAgent
           )
           context.collection.update(context.caller, filter, { field_name => updated_array })
 
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          records = context.collection.list(context.caller, filter,
+                                            ProjectionFactory.all(context.collection, context.datasource))
 
           {
             name: args[:params]['collection_name'],
@@ -93,7 +94,8 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          records = context.collection.list(context.caller, filter,
+                                            ProjectionFactory.all(context.collection, context.datasource))
 
           raise Http::Exceptions::NotFoundError, 'Record not found' unless records&.any?
 

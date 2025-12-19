@@ -5,13 +5,16 @@ module ForestAdminDatasourceActiveRecord
 
       attr_reader :query, :select
 
-      def initialize(collection, projection, filter)
+      def initialize(collection, projection, filter, options = {})
         @collection = collection
         @query = @collection.model.unscoped
         @projection = projection
         @filter = filter
         @arel_table = @collection.model.arel_table
         @select = []
+        @disable_includes = options[:disable_includes] || false
+        # Use provided datasource for resolving renamed collections, fallback to collection's datasource
+        @datasource = options[:datasource] || @collection.datasource
       end
 
       def build
@@ -177,8 +180,11 @@ module ForestAdminDatasourceActiveRecord
       def build_select(collection, projection)
         return if projection.nil?
 
-        if collection.model.table_name == @collection.model.table_name
-          @select += projection.columns.map { |field| "#{collection.model.table_name}.#{field}" }
+        # Unwrap decorators to get the actual ActiveRecord collection
+        actual_collection = unwrap_collection(collection)
+
+        if actual_collection.model.table_name == @collection.model.table_name
+          @select += projection.columns.map { |field| "#{actual_collection.model.table_name}.#{field}" }
         end
 
         one_to_one_relations = %w[OneToOne PolymorphicOneToOne]
@@ -186,26 +192,35 @@ module ForestAdminDatasourceActiveRecord
 
         projection.relations.each do |relation_name, sub_projection|
           relation_schema = collection.schema[:fields][relation_name]
-          if collection.model.table_name == @collection.model.table_name
+          if actual_collection.model.table_name == @collection.model.table_name
             if one_to_one_relations.include?(relation_schema.type)
-              @select << "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
+              @select << "#{actual_collection.model.table_name}.#{relation_schema.origin_key_target}"
             elsif many_to_one_relations.include?(relation_schema.type)
-              @select << "#{collection.model.table_name}.#{relation_schema.foreign_key}"
+              @select << "#{actual_collection.model.table_name}.#{relation_schema.foreign_key}"
             end
           end
 
           next if relation_schema.type == 'PolymorphicManyToOne'
 
-          if relation_schema.respond_to?(:foreign_collection)
-            target_collection = collection.datasource.get_collection(relation_schema.foreign_collection)
-            build_select(target_collection, sub_projection)
-          end
+          next unless relation_schema.respond_to?(:foreign_collection)
+
+          # Use the provided datasource (which may be decorated with renames) to resolve collection names
+          # This ensures that renamed collections are found correctly
+          target_collection = @datasource.get_collection(relation_schema.foreign_collection)
+          build_select(target_collection, sub_projection)
         end
+      end
+
+      # Unwrap decorator chain to get the actual ActiveRecord collection
+      def unwrap_collection(collection)
+        current = collection
+        current = current.child_collection while current.respond_to?(:child_collection)
+        current
       end
 
       def apply_select
         @query = @query.select(@select.join(', ')) if @select
-        @query = @query.includes(format_relation_projection(@projection)) unless @projection.nil?
+        @query = @query.includes(format_relation_projection(@projection)) unless @projection.nil? || @disable_includes
 
         @query
       end

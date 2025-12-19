@@ -21,7 +21,15 @@ module ForestAdminAgent
 
       def type
         class_name = @options[:class_name]
-        @@class_names[class_name] ||= class_name.gsub('::', '__')
+        collection_name = class_name.gsub('::', '__')
+        # Get the actual collection name from the datasource (handles renames)
+        begin
+          forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(collection_name)
+          @@class_names[class_name] ||= forest_collection.name
+        rescue
+          # Fallback to the computed name if collection not found
+          @@class_names[class_name] ||= collection_name
+        end
       end
 
       def id
@@ -149,7 +157,10 @@ module ForestAdminAgent
                                  .schema[:fields][attribute_name.to_s]
             options = @options.clone
             if relation.type == 'PolymorphicManyToOne'
-              options[:class_name] = @object[relation.foreign_key_type_field]
+              # Use the class name of the actual loaded object instead of the stored type field value
+              # This ensures we get the full class name (e.g., "Api::Income") even when the database
+              # stores only the demodulized name (e.g., "Income")
+              options[:class_name] = object.class.name
               related_object_serializer = ForestSerializer.new(object, options)
               data[formatted_attribute_name]['data'] = {
                 'type' => related_object_serializer.type.to_s,
