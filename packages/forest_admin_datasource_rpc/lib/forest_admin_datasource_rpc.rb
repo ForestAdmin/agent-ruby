@@ -34,9 +34,16 @@ module ForestAdminDatasourceRpc
       polling_interval: polling_interval,
       introspection_schema: provided_introspection
     ) do
-      logger = ForestAdminAgent::Facades::Container.logger
-      logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
-      ForestAdminAgent::Builder::AgentFactory.instance.reload!
+      Thread.new do
+        logger = ForestAdminAgent::Facades::Container.logger
+        logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent in background...')
+        begin
+          ForestAdminAgent::Builder::AgentFactory.instance.reload!
+          logger.log('Info', '[RPCDatasource] Agent reload completed successfully')
+        rescue StandardError => e
+          logger.log('Error', "[RPCDatasource] Agent reload failed: #{e.class} - #{e.message}")
+        end
+      end
     end
 
     # Start polling (includes initial synchronous schema fetch)
@@ -51,8 +58,8 @@ module ForestAdminDatasourceRpc
     pool = Utils::SchemaPollingPool.instance
     return if pool.configured
 
-    # Auto-configure with default of 1 thread if user hasn't configured
-    pool.configure(max_threads: 1)
+    # Auto-configure with default thread count if user hasn't configured
+    pool.configure(max_threads: Utils::SchemaPollingPool::DEFAULT_MAX_THREADS)
   end
 
   private_class_method :ensure_pool_configured

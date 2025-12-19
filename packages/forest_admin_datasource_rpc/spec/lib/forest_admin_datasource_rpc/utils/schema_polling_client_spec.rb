@@ -346,6 +346,7 @@ module ForestAdminDatasourceRpc
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
           allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(pool).to receive(:calculate_initial_poll_time).and_return(Time.now)
         end
 
         it 'triggers callback on schema change via pool' do

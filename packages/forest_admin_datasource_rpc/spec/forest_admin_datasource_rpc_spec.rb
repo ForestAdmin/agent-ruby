@@ -17,7 +17,7 @@ module ForestAdminDatasourceRpc
       include_examples 'with introspection'
 
       context 'when server is running' do
-        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: true, stop: nil, current_schema: introspection) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, stop: nil, current_schema: introspection) }
         let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
 
@@ -34,7 +34,7 @@ module ForestAdminDatasourceRpc
         it 'starts schema polling which fetches the initial schema' do
           described_class.build({ uri: 'http://localhost' })
 
-          expect(schema_polling_client).to have_received(:start)
+          expect(schema_polling_client).to have_received(:start?)
           expect(schema_polling_client).to have_received(:current_schema)
         end
 
@@ -57,7 +57,7 @@ module ForestAdminDatasourceRpc
           # Mock schema_polling_client to return introspection with connections
           polling_client_with_connections = instance_double(
             Utils::SchemaPollingClient,
-            start: true,
+            start?: true,
             stop: nil,
             current_schema: introspection_with_connections
           )
@@ -72,12 +72,12 @@ module ForestAdminDatasourceRpc
           described_class.build({ uri: 'http://localhost' })
 
           expect(Utils::SchemaPollingClient).to have_received(:new)
-          expect(schema_polling_client).to have_received(:start)
+          expect(schema_polling_client).to have_received(:start?)
         end
       end
 
       context 'when server is not running' do
-        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: true, current_schema: nil) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, current_schema: nil) }
 
         before do
           allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
@@ -96,7 +96,7 @@ module ForestAdminDatasourceRpc
       context 'with schema polling interval configuration' do
         let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
         let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
-        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start: true, current_schema: introspection) }
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, current_schema: introspection) }
 
         before do
           allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
