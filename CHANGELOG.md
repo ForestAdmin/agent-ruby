@@ -1,3 +1,10 @@
+## [1.18.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.2...v1.18.3) (2025-12-22)
+
+
+### Bug Fixes
+
+* **schema-polling:** improve polling ([#237](https://github.com/ForestAdmin/agent-ruby/issues/237)) ([cf07ed4](https://github.com/ForestAdmin/agent-ruby/commit/cf07ed4bf36c316272e350cdaa5e10f27f1d65d9))
+
 ## [1.18.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.1...v1.18.2) (2025-12-12)
 
 
