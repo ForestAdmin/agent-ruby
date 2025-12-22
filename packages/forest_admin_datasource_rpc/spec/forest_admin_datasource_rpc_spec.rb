@@ -109,8 +109,8 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 600 },
-            any_args
+            polling_interval: 600,
+            introspection_schema: nil
           )
         end
 
@@ -120,8 +120,8 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 120 },
-            any_args
+            polling_interval: 120,
+            introspection_schema: nil
           )
         end
 
@@ -133,8 +133,8 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 30 },
-            any_args
+            polling_interval: 30,
+            introspection_schema: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
@@ -148,8 +148,8 @@ module ForestAdminDatasourceRpc
           expect(Utils::SchemaPollingClient).to have_received(:new).with(
             'http://localhost',
             'secret',
-            { polling_interval: 120 },
-            any_args
+            polling_interval: 120,
+            introspection_schema: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')

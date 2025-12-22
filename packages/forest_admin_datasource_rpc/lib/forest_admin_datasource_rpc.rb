@@ -51,7 +51,13 @@ module ForestAdminDatasourceRpc
     # - With introspection: falls back to introspection if RPC is unreachable
     schema_polling.start?
 
-    ForestAdminDatasourceRpc::Datasource.new(options, schema_polling.current_schema, schema_polling)
+    schema = schema_polling.current_schema
+    if schema.nil?
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'Fatal: Unable to build RPC datasource - no introspection schema was provided and schema fetch failed'
+    end
+
+    ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
   end
 
   def self.ensure_pool_configured
