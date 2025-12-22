@@ -17,13 +17,9 @@ module ForestAdminDatasourceRpc
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     provided_introspection = options[:introspection]
 
-    polling_interval = if options[:schema_polling_interval_sec]
-                         options[:schema_polling_interval_sec]
-                       elsif ENV['SCHEMA_POLLING_INTERVAL_SEC']
-                         ENV['SCHEMA_POLLING_INTERVAL_SEC'].to_i
-                       else
-                         600
-                       end
+    polling_interval = options[:schema_polling_interval_sec] ||
+                       ENV['SCHEMA_POLLING_INTERVAL_SEC']&.to_i ||
+                       600
 
     # Auto-configure pool with default settings if not already configured
     ensure_pool_configured
