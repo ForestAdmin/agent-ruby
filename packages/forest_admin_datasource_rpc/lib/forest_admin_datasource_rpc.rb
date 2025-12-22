@@ -8,131 +8,61 @@ loader.setup
 module ForestAdminDatasourceRpc
   class Error < StandardError; end
 
-  # Build a RPC datasource with schema polling enabled.
-  #
-  # @param options [Hash] Configuration options
-  # @option options [String] :uri The URI of the RPC agent
-  # @option options [String] :auth_secret The authentication secret (optional, will use cache if not provided)
-  # @option options [Integer] :schema_polling_interval Polling interval in seconds (optional)
-  #   - Default: 600 seconds (10 minutes)
-  #   - Can be overridden with ENV['SCHEMA_POLLING_INTERVAL']
-  #   - Valid range: 1-3600 seconds
-  #   - Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default
-  #   - Example: SCHEMA_POLLING_INTERVAL=30 for development (30 seconds)
-  # @option options [Hash] :introspection Pre-defined schema introspection for resilient deployment
-  #   - When provided, allows the datasource to start even if the RPC slave is unreachable
-  #   - The introspection will be used as fallback when the slave connection fails
-  #   - Schema polling will still be enabled to pick up changes when the slave becomes available
-  #
-  # @return [ForestAdminDatasourceRpc::Datasource] The configured datasource with schema polling
+  def self.configure_polling_pool(max_threads:)
+    Utils::SchemaPollingPool.instance.configure(max_threads: max_threads)
+  end
+
   def self.build(options)
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     provided_introspection = options[:introspection]
-    ForestAdminAgent::Facades::Container.logger.log('Info', "Getting schema from RPC agent on #{uri}.")
 
-    schema = nil
+    polling_interval = options[:schema_polling_interval_sec] ||
+                       ENV['SCHEMA_POLLING_INTERVAL_SEC']&.to_i ||
+                       600
 
-    begin
-      rpc_client = Utils::RpcClient.new(uri, auth_secret)
-      response = rpc_client.fetch_schema('/forest/rpc-schema')
-      schema = response.body
-    rescue Faraday::ConnectionFailed => e
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Error',
-        "Connection failed to RPC agent at #{uri}: #{e.message}\n#{e.backtrace.join("\n")}"
-      )
-    rescue Faraday::TimeoutError => e
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Error',
-        "Request timeout to RPC agent at #{uri}: #{e.message}"
-      )
-    rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Error',
-        "Authentication failed with RPC agent at #{uri}: #{e.message}"
-      )
-    rescue StandardError => e
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Error',
-        "Failed to get schema from RPC agent at #{uri}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
-      )
-    end
+    # Auto-configure pool with default settings if not already configured
+    ensure_pool_configured
 
-    # Use provided introspection as fallback when slave is unreachable
-    if schema.nil? && provided_introspection
-      ForestAdminAgent::Facades::Container.logger.log(
-        'Warn',
-        "RPC agent at #{uri} is unreachable, using provided introspection for resilient deployment."
-      )
-      options.delete(:introspection)
-      schema = provided_introspection
-    end
-
-    if schema.nil?
-      # return empty datasource for not breaking stack
-      ForestAdminDatasourceToolkit::Datasource.new
-    else
-      # Create schema polling client with configurable polling interval
-      # Priority: options[:schema_polling_interval] > ENV['SCHEMA_POLLING_INTERVAL'] > default (600)
-      polling_interval = if options[:schema_polling_interval]
-                           options[:schema_polling_interval]
-                         elsif ENV['SCHEMA_POLLING_INTERVAL']
-                           ENV['SCHEMA_POLLING_INTERVAL'].to_i
-                         else
-                           600 # 10 minutes by default
-                         end
-
-      polling_options = {
-        polling_interval: polling_interval
-      }
-
-      schema_polling = Utils::SchemaPollingClient.new(uri, auth_secret, polling_options) do
-        # Callback when schema change is detected
+    schema_polling = Utils::SchemaPollingClient.new(
+      uri,
+      auth_secret,
+      polling_interval: polling_interval,
+      introspection_schema: provided_introspection
+    ) do
+      Thread.new do
         logger = ForestAdminAgent::Facades::Container.logger
-        logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent...')
-        ForestAdminAgent::Builder::AgentFactory.instance.reload!
+        logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent in background...')
+        begin
+          ForestAdminAgent::Builder::AgentFactory.instance.reload!
+          logger.log('Info', '[RPCDatasource] Agent reload completed successfully')
+        rescue StandardError => e
+          logger.log('Error', "[RPCDatasource] Agent reload failed: #{e.class} - #{e.message}")
+        end
       end
-      schema_polling.start
-
-      datasource = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
-
-      # Setup cleanup hooks for proper schema polling client shutdown
-      setup_cleanup_hooks(datasource)
-
-      datasource
     end
+
+    # Start polling (includes initial synchronous schema fetch)
+    # - Without introspection: crashes if RPC is unreachable
+    # - With introspection: falls back to introspection if RPC is unreachable
+    schema_polling.start?
+
+    schema = schema_polling.current_schema
+    if schema.nil?
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'Fatal: Unable to build RPC datasource - no introspection schema was provided and schema fetch failed'
+    end
+
+    ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
   end
 
-  def self.setup_cleanup_hooks(datasource)
-    # Register cleanup handler for graceful shutdown
-    at_exit do
-      datasource.cleanup
-    rescue StandardError => e
-      # Silently ignore errors during exit cleanup to prevent test pollution
-      warn "[RPCDatasource] Error during at_exit cleanup: #{e.message}" if $VERBOSE
-    end
+  def self.ensure_pool_configured
+    pool = Utils::SchemaPollingPool.instance
+    return if pool.configured
 
-    # Handle SIGINT (Ctrl+C)
-    Signal.trap('INT') do
-      begin
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Received SIGINT, cleaning up...')
-      rescue StandardError
-        # Logger might not be available
-      end
-      datasource.cleanup
-      exit(0)
-    end
-
-    # Handle SIGTERM (default kill signal)
-    Signal.trap('TERM') do
-      begin
-        ForestAdminAgent::Facades::Container.logger&.log('Info', '[RPCDatasource] Received SIGTERM, cleaning up...')
-      rescue StandardError
-        # Logger might not be available
-      end
-      datasource.cleanup
-      exit(0)
-    end
+    # Auto-configure with default thread count if user hasn't configured
+    pool.configure(max_threads: Utils::SchemaPollingPool::DEFAULT_MAX_THREADS)
   end
+
+  private_class_method :ensure_pool_configured
 end

@@ -32,6 +32,8 @@ module ForestAdminDatasourceRpc
 
       HTTP_NOT_MODIFIED = 304
       NotModified = Class.new
+      DEFAULT_TIMEOUT = 30 # seconds
+      DEFAULT_OPEN_TIMEOUT = 10 # seconds
 
       def initialize(api_url, auth_secret)
         @api_url = api_url
@@ -63,6 +65,8 @@ module ForestAdminDatasourceRpc
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
           faraday.adapter Faraday.default_adapter
           faraday.ssl.verify = !ForestAdminAgent::Facades::Container.cache(:debug)
+          faraday.options.timeout = DEFAULT_TIMEOUT
+          faraday.options.open_timeout = DEFAULT_OPEN_TIMEOUT
         end
 
         timestamp = Time.now.utc.iso8601(3)
