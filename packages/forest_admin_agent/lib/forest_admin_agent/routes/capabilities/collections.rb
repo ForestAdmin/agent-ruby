@@ -28,7 +28,7 @@ module ForestAdminAgent
                 {
                   name: name,
                   type: field.column_type,
-                  operators: field.filter_operators.map { |operator| operator }
+                  operators: ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(field.filter_operators)
                 }
               end
             }
