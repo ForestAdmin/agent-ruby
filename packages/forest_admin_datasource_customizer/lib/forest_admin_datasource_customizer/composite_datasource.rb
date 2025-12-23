@@ -1,5 +1,7 @@
 module ForestAdminDatasourceCustomizer
   class CompositeDatasource
+    attr_reader :datasources
+
     def initialize
       @datasources = []
     end
