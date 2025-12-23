@@ -53,6 +53,7 @@ module ForestAdminDatasourceRpc
             'Fatal: Unable to build RPC datasource - no introspection schema was provided and schema fetch failed'
     end
 
+    options.delete(:introspection)
     ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
   end
 
