@@ -113,6 +113,16 @@ module ForestAdminAgent
               [{ name: 'primary_db' }, { name: 'replica_db' }]
             )
           end
+
+          it 'returns operators sorted alphabetically' do
+            fields = result[:content][:collections][0][:fields]
+
+            # Check that operators are sorted for each field
+            fields.each do |field|
+              operators = field[:operators]
+              expect(operators).to eq(operators.sort), "Expected operators for '#{field[:name]}' to be sorted alphabetically"
+            end
+          end
         end
 
         it 'throws an error when th collection does not exist' do
