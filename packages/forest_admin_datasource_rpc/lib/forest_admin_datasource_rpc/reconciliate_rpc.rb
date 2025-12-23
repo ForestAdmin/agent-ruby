@@ -1,7 +1,7 @@
 module ForestAdminDatasourceRpc
   class ReconciliateRpc < ForestAdminDatasourceCustomizer::Plugins::Plugin
     def run(datasource_customizer, _collection_customizer = nil, _options = {})
-      datasource_customizer.datasources.each do |datasource|
+      datasource_customizer.composite_datasource.datasources.each do |datasource|
         next unless datasource.is_a?(ForestAdminDatasourceRpc::Datasource)
 
         # Disable search for non-searchable collections
