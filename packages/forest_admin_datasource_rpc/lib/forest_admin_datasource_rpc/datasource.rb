@@ -13,10 +13,9 @@ module ForestAdminDatasourceRpc
         "collections and #{introspection[:charts].length} charts."
       )
 
-      @options = options
       @shared_rpc_client = RpcClient.new(
-        @options[:uri],
-        @options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
+        options[:uri],
+        options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
       )
 
       introspection[:collections].each do |schema|
