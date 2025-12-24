@@ -81,7 +81,7 @@ module ForestAdminRpcAgent
       rpc_relations = {}
       collections = []
 
-      datasource.collections.each do |_name, collection|
+      datasource.collections.each_value do |collection|
         relations = {}
 
         if @rpc_collections.include?(collection.name)
@@ -99,7 +99,7 @@ module ForestAdminRpcAgent
             if field.type != 'Column' && @rpc_collections.include?(field.foreign_collection)
               relations[field_name] = field
             else
-              if (field.type == 'Column')
+              if field.type == 'Column'
                 field.filter_operators = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
                   field.filter_operators
                 )
