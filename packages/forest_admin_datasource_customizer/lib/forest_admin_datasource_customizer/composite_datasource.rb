@@ -52,10 +52,9 @@ module ForestAdminDatasourceCustomizer
     end
 
     def add_data_source(datasource)
-      existing_names = collections.map { |c| c.respond_to?(:name) ? c.name : c.to_s }
-      datasource.collections.each do |c|
-        new_name = c.respond_to?(:name) ? c.name : c.to_s
-        raise ArgumentError, "Collection '#{new_name}' already exists" if existing_names.include?(new_name)
+      existing_names = collections.keys
+      datasource.collections.each_key do |name|
+        raise ArgumentError, "Collection '#{name}' already exists" if existing_names.include?(name)
       end
 
       existing_charts = schema[:charts]

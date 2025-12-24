@@ -263,7 +263,7 @@ module ForestAdminAgent
       def find_action_from_endpoint(collection_name, path, http_method)
         endpoint = path.partition('/forest/')[1..].join
         schema_file = JSON.parse(File.read(Facades::Container.config_from_cache[:schema_path]))
-        actions = schema_file['collections']&.select { |collection| collection['name'] == collection_name }&.first&.dig('actions')
+        actions = schema_file['collections']&.find { |collection| collection['name'] == collection_name }&.dig('actions')
 
         return nil if actions.nil? || actions.empty?
 

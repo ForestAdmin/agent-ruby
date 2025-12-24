@@ -240,30 +240,36 @@ module ForestAdminDatasourceCustomizer
 
         def re_project_relation_in_place(caller, records, name, projection)
           field_schema = schema[:fields][name]
-
           return if field_schema.type == 'PolymorphicManyToOne'
 
-          association = datasource.get_collection(field_schema.foreign_collection)
-
           if !@relations[name]
+            association = datasource.get_collection(field_schema.foreign_collection)
             association.re_project_in_place(caller, records.filter_map { |r| r[name] }, projection)
           elsif field_schema.type == 'ManyToOne'
-            ids = records.filter_map { |record| record[field_schema.foreign_key] }.uniq
-            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.foreign_key_target, 'In', ids))
-            sub_records = association.list(caller, sub_filter, projection.union([field_schema.foreign_key_target]))
-
-            records.each do |record|
-              record[name] = sub_records.find { |sr| sr[field_schema.foreign_key_target] == record[field_schema.foreign_key] }
-            end
+            assign_many_to_one_records(caller, records, name, field_schema, projection)
           elsif ['OneToOne', 'OneToMany'].include?(field_schema.type)
-            ids = records.filter_map { |record| record[field_schema.origin_key_target] }.uniq
-            sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.origin_key, 'In', ids))
-            sub_records = association.list(caller, sub_filter, projection.union([field_schema.origin_key]))
-
-            records.each do |record|
-              record[name] = sub_records.find { |sr| sr[field_schema.origin_key] == record[field_schema.origin_key_target] }
-            end
+            assign_to_one_or_many_records(caller, records, name, field_schema, projection)
           end
+        end
+
+        def assign_many_to_one_records(caller, records, name, field_schema, projection)
+          association = datasource.get_collection(field_schema.foreign_collection)
+          ids = records.each_with_object(Set.new) { |record, set| set << record[field_schema.foreign_key] }.delete(nil).to_a
+          sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.foreign_key_target, 'In', ids))
+          sub_records = association.list(caller, sub_filter, projection.union([field_schema.foreign_key_target]))
+          sub_records_by_key = sub_records.to_h { |sr| [sr[field_schema.foreign_key_target], sr] }
+
+          records.each { |record| record[name] = sub_records_by_key[record[field_schema.foreign_key]] }
+        end
+
+        def assign_to_one_or_many_records(caller, records, name, field_schema, projection)
+          association = datasource.get_collection(field_schema.foreign_collection)
+          ids = records.each_with_object(Set.new) { |record, set| set << record[field_schema.origin_key_target] }.delete(nil).to_a
+          sub_filter = Filter.new(condition_tree: ConditionTreeLeaf.new(field_schema.origin_key, 'In', ids))
+          sub_records = association.list(caller, sub_filter, projection.union([field_schema.origin_key]))
+          sub_records_by_key = sub_records.to_h { |sr| [sr[field_schema.origin_key], sr] }
+
+          records.each { |record| record[name] = sub_records_by_key[record[field_schema.origin_key_target]] }
         end
       end
     end

@@ -43,15 +43,13 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def get_enum_values(model, column)
-        enum_values = []
-        if get_column_type(model, column) == 'Enum'
-          if sti_column?(model, column)
-            model.descendants.each { |sti_model| enum_values << sti_model.name }
-          else
-            model.defined_enums[column.name].each_key { |name| enum_values << name }
-          end
+        return [] unless get_column_type(model, column) == 'Enum'
+
+        if sti_column?(model, column)
+          model.descendants.map(&:name)
+        else
+          model.defined_enums[column.name].keys
         end
-        enum_values
       end
 
       def sti_column?(model, column)

@@ -29,10 +29,7 @@ module ForestAdminAgent
           @options[:class_name].gsub('::', '__')
         )
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(forest_collection)
-        id = []
-        primary_keys.each { |key| id << @object[key] }
-
-        id.join('|')
+        primary_keys.map { |key| @object[key] }.join('|')
       end
 
       def format_name(attribute_name)

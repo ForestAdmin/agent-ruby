@@ -24,11 +24,13 @@ module ForestAdminAgent
             collection = datasource.get_collection(collection_name)
             {
               name: collection.name,
-              fields: collection.schema[:fields].select { |_, field| field.is_a?(ColumnSchema) }.map do |name, field|
+              fields: collection.schema[:fields].filter_map do |name, field|
+                next unless field.is_a?(ColumnSchema)
+
                 {
                   name: name,
                   type: field.column_type,
-                  operators: field.filter_operators.map { |operator| operator }
+                  operators: field.filter_operators.to_a
                 }
               end
             }
