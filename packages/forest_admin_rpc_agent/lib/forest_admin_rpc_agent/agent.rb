@@ -116,9 +116,17 @@ module ForestAdminRpcAgent
     def object_to_hash(obj)
       return obj if obj.is_a?(Hash) || obj.is_a?(Array) || obj.is_a?(String) || obj.is_a?(Numeric) || obj.nil?
 
-      obj.instance_variables.to_h do |var|
+      hash = obj.instance_variables.to_h do |var|
         [var.to_s.delete('@').to_sym, obj.instance_variable_get(var)]
       end
+
+      if hash[:filter_operators].is_a?(Array)
+        hash[:filter_operators] = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
+          hash[:filter_operators]
+        )
+      end
+
+      hash
     end
 
     def compute_and_cache_hash
