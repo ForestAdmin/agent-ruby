@@ -110,7 +110,8 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 600,
-            introspection_schema: nil
+            introspection_schema: nil,
+            introspection_etag: nil
           )
         end
 
@@ -121,7 +122,8 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 120,
-            introspection_schema: nil
+            introspection_schema: nil,
+            introspection_etag: nil
           )
         end
 
@@ -134,7 +136,8 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 30,
-            introspection_schema: nil
+            introspection_schema: nil,
+            introspection_etag: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
@@ -149,10 +152,42 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 120,
-            introspection_schema: nil
+            introspection_schema: nil,
+            introspection_etag: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
+        end
+
+        it 'passes introspection_etag to schema polling client when provided' do
+          described_class.build({
+                                  uri: 'http://localhost',
+                                  introspection: introspection,
+                                  introspection_etag: 'precomputed-etag-123'
+                                })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            polling_interval: 600,
+            introspection_schema: introspection,
+            introspection_etag: 'precomputed-etag-123'
+          )
+        end
+
+        it 'passes introspection_schema without etag when only introspection is provided' do
+          described_class.build({
+                                  uri: 'http://localhost',
+                                  introspection: introspection
+                                })
+
+          expect(Utils::SchemaPollingClient).to have_received(:new).with(
+            'http://localhost',
+            'secret',
+            polling_interval: 600,
+            introspection_schema: introspection,
+            introspection_etag: nil
+          )
         end
       end
     end

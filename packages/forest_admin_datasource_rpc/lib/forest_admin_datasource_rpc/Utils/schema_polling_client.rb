@@ -13,13 +13,14 @@ module ForestAdminDatasourceRpc
       MAX_POLLING_INTERVAL = 3600
 
       def initialize(uri, auth_secret, polling_interval: DEFAULT_POLLING_INTERVAL, introspection_schema: nil,
-                     &on_schema_change)
+                     introspection_etag: nil, &on_schema_change)
         @uri = uri
         @auth_secret = auth_secret
         @polling_interval = polling_interval
         @on_schema_change = on_schema_change
         @closed = false
         @introspection_schema = introspection_schema
+        @introspection_etag = introspection_etag
         @current_schema = nil
         @cached_etag = nil
         @connection_attempts = 0
@@ -77,12 +78,12 @@ module ForestAdminDatasourceRpc
       def compute_etag(schema)
         return nil if schema.nil?
 
-        Digest::SHA1.hexdigest(schema.to_json)
+        Digest::SHA1.hexdigest(JSON.generate(schema))
       end
 
       def fetch_initial_schema_sync
         # If we have an introspection schema, send its ETag to avoid re-downloading unchanged schema
-        introspection_etag = compute_etag(@introspection_schema) if @introspection_schema
+        introspection_etag = @introspection_etag || (@introspection_schema && compute_etag(@introspection_schema))
         result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: introspection_etag)
 
         if result == RpcClient::NotModified
@@ -115,8 +116,9 @@ module ForestAdminDatasourceRpc
         if @introspection_schema
           # Fallback to introspection schema - don't crash
           @current_schema = @introspection_schema
-          @cached_etag = compute_etag(@current_schema)
+          @cached_etag = @introspection_etag || compute_etag(@current_schema)
           @introspection_schema = nil
+          @introspection_etag = nil
           @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
             'Warn',

@@ -20,6 +20,12 @@ module ForestAdminDatasourceRpc
 
     include_examples 'with introspection'
 
+    context 'when initialized' do
+      it 'uses the datasource shared RPC client' do
+        expect(collection.instance_variable_get(:@client)).to eq(datasource.shared_rpc_client)
+      end
+    end
+
     context 'when call list' do
       it 'forward the call to the server' do
         collection.list(caller, Filter.new, Projection.new)

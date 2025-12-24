@@ -88,6 +88,20 @@ module ForestAdminDatasourceRpc
             end.not_to raise_error
           end
         end
+
+        context 'with introspection_etag parameter' do
+          it 'stores introspection_etag when provided' do
+            client = described_class.new(uri, secret, introspection_etag: 'provided-etag-123') { |schema| callback.call(schema) }
+
+            expect(client.instance_variable_get(:@introspection_etag)).to eq('provided-etag-123')
+          end
+
+          it 'defaults introspection_etag to nil' do
+            client = described_class.new(uri, secret) { |schema| callback.call(schema) }
+
+            expect(client.instance_variable_get(:@introspection_etag)).to be_nil
+          end
+        end
       end
 
       describe '#start' do
@@ -311,6 +325,104 @@ module ForestAdminDatasourceRpc
 
           # After successful poll, connection attempts is reset to 0
           expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
+        end
+      end
+
+      describe '#start? with introspection_etag' do
+        let(:rpc_client) { instance_double(RpcClient) }
+        let(:introspection) { { collections: [{ name: 'Products' }], charts: [] } }
+
+        before do
+          allow(RpcClient).to receive(:new).and_return(rpc_client)
+        end
+
+        it 'uses provided introspection_etag in initial fetch instead of computing it' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection,
+            introspection_etag: 'precomputed-etag-abc'
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
+
+          client.start?
+          client.stop
+
+          # Should use the provided etag, not compute one from the schema
+          expect(rpc_client).to have_received(:fetch_schema).with(
+            '/forest/rpc-schema',
+            if_none_match: 'precomputed-etag-abc'
+          )
+        end
+
+        it 'computes etag from introspection_schema when introspection_etag is not provided' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
+
+          client.start?
+          client.stop
+
+          # Should compute etag from the schema
+          expected_etag = Digest::SHA1.hexdigest(JSON.generate(introspection))
+          expect(rpc_client).to have_received(:fetch_schema).with(
+            '/forest/rpc-schema',
+            if_none_match: expected_etag
+          )
+        end
+
+        it 'uses provided introspection_etag as cached_etag on NotModified response' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection,
+            introspection_etag: 'precomputed-etag-xyz'
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
+
+          client.start?
+          client.stop
+
+          expect(client.instance_variable_get(:@cached_etag)).to eq('precomputed-etag-xyz')
+        end
+
+        it 'uses provided introspection_etag when falling back to introspection_schema on error' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection,
+            introspection_etag: 'fallback-etag-123'
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
+
+          client.start?
+          client.stop
+
+          # Should use the introspection schema as current schema
+          expect(client.instance_variable_get(:@current_schema)).to eq(introspection)
+          # Should use the provided etag
+          expect(client.instance_variable_get(:@cached_etag)).to eq('fallback-etag-123')
+          # Should clear introspection fields
+          expect(client.instance_variable_get(:@introspection_schema)).to be_nil
+          expect(client.instance_variable_get(:@introspection_etag)).to be_nil
+        end
+
+        it 'computes etag when falling back without introspection_etag' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
+
+          client.start?
+          client.stop
+
+          expected_etag = Digest::SHA1.hexdigest(JSON.generate(introspection))
+          expect(client.instance_variable_get(:@cached_etag)).to eq(expected_etag)
         end
       end
 
