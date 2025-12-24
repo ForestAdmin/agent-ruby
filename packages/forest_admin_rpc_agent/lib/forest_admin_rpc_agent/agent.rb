@@ -45,15 +45,6 @@ module ForestAdminRpcAgent
       self
     end
 
-    # Returns the cached schema for the /rpc-schema route
-    # Falls back to building schema from datasource if not cached
-    def rpc_schema
-      return @cached_schema if @cached_schema
-
-      build_and_cache_rpc_schema_from_datasource
-      @cached_schema
-    end
-
     # Check if provided hash matches the cached schema hash
     def schema_hash_matches?(provided_hash)
       return false unless @cached_schema_hash && provided_hash
@@ -84,13 +75,6 @@ module ForestAdminRpcAgent
       )
     end
 
-    def build_and_cache_rpc_schema_from_datasource
-      datasource = @container.resolve(:datasource)
-
-      @cached_schema = build_rpc_schema_from_datasource(datasource)
-      compute_and_cache_hash
-    end
-
     def build_rpc_schema_from_datasource(datasource)
       schema = customizer.schema
 
@@ -106,27 +90,20 @@ module ForestAdminRpcAgent
 
     # Serialize collection schema, converting field objects to plain hashes
     def serialize_collection_schema(collection)
-      schema = collection.schema.dup
+      schema = collection.schema
       schema[:name] = collection.name
-      schema[:fields] = schema[:fields].transform_values { |field| object_to_hash(field) }
+      schema[:fields] = schema[:fields].transform_values { |field| serialize_field(field) }
       schema
     end
 
-    # Convert any object to a hash using its instance variables
-    def object_to_hash(obj)
-      return obj if obj.is_a?(Hash) || obj.is_a?(Array) || obj.is_a?(String) || obj.is_a?(Numeric) || obj.nil?
-
-      hash = obj.instance_variables.to_h do |var|
-        [var.to_s.delete('@').to_sym, obj.instance_variable_get(var)]
-      end
-
-      if hash[:filter_operators].is_a?(Array)
-        hash[:filter_operators] = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
-          hash[:filter_operators]
+    def serialize_field(field)
+      if (field.type == 'Column' && field.filter_operators)
+        field.filter_operators = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
+          field.filter_operators
         )
       end
 
-      hash
+      field
     end
 
     def compute_and_cache_hash
