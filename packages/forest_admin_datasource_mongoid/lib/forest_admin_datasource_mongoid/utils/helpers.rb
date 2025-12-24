@@ -5,7 +5,8 @@ module ForestAdminDatasourceMongoid
       # @example
       # unnest(['firstname', 'book.title', 'book.author'], 'book') == ['title', 'author']
       def unnest(strings, prefix)
-        strings.select { |field| field.start_with?("#{prefix}.") }.map { |field| field[(prefix.size + 1)..] }
+        prefix_with_dot = "#{prefix}."
+        strings.filter_map { |field| field[(prefix.size + 1)..] if field.start_with?(prefix_with_dot) }
       end
 
       def escape(str)

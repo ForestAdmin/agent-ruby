@@ -4,33 +4,35 @@ module ForestAdminDatasourceMongoid
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       def get_validations(model, column)
         return [] if column.is_a?(Hash)
+        return [] if before_validation_callback?(model)
+        return [] unless model._validators? && model._validators[column.name.to_sym].size.positive?
 
-        validations = []
-        # NOTICE: Do not consider validations if a before_validation Active Records
-        #         Callback is detected.
+        parse_column_validators(model._validators[column.name.to_sym], column)
+      end
+
+      def before_validation_callback?(model)
         default_callback_excluded = [:normalize_changed_in_place_attributes]
-        return validations if model._validation_callbacks
-                                   .reject { |callback| default_callback_excluded.include?(callback.filter) }
-                                   .map(&:kind).include?(:before)
+        model._validation_callbacks.any? do |callback|
+          !default_callback_excluded.include?(callback.filter) && callback.kind == :before
+        end
+      end
 
-        if model._validators? && model._validators[column.name.to_sym].size.positive?
-          model._validators[column.name.to_sym].each do |validator|
-            # NOTICE: Do not consider conditional validations
-            next if validator.options[:if] || validator.options[:unless] || validator.options[:on]
+      def parse_column_validators(validators, column)
+        validations = []
+        validators.each do |validator|
+          next if validator.options[:if] || validator.options[:unless] || validator.options[:on]
 
-            case validator.class.to_s
-            when Mongoid::Validatable::PresenceValidator.to_s
-              validations << { operator: Operators::PRESENT }
-            when ActiveModel::Validations::NumericalityValidator.to_s
-              validations = parse_numericality_validator(validator, validations)
-            when Mongoid::Validatable::LengthValidator.to_s
-              validations = parse_length_validator(validator, validations, column)
-            when Mongoid::Validatable::FormatValidator.to_s
-              validations = parse_format_validator(validator, validations)
-            end
+          case validator.class.to_s
+          when Mongoid::Validatable::PresenceValidator.to_s
+            validations << { operator: Operators::PRESENT }
+          when ActiveModel::Validations::NumericalityValidator.to_s
+            validations = parse_numericality_validator(validator, validations)
+          when Mongoid::Validatable::LengthValidator.to_s
+            validations = parse_length_validator(validator, validations, column)
+          when Mongoid::Validatable::FormatValidator.to_s
+            validations = parse_format_validator(validator, validations)
           end
         end
-
         validations
       end
 

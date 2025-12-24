@@ -17,16 +17,22 @@ module ForestAdminDatasourceCustomizer
 
           MARKER_NAME = '__null_marker'.freeze
           def self.with_null_marker(projection)
+            seen = Set.new(projection)
             new_projection = Projection.new(projection)
+
             projection.each do |path|
               parts = path.split(':')
 
               parts.slice(1, parts.size).each_with_index do |_item, index|
-                new_projection << "#{parts.slice(0, index + 1).join(":")}:#{MARKER_NAME}"
+                marker = "#{parts.slice(0, index + 1).join(":")}:#{MARKER_NAME}"
+                next if seen.include?(marker)
+
+                seen << marker
+                new_projection << marker
               end
             end
 
-            new_projection.uniq
+            new_projection
           end
 
           def self.flatten(records, projection)

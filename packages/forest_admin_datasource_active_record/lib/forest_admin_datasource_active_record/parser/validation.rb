@@ -6,7 +6,7 @@ module ForestAdminDatasourceActiveRecord
         validations = []
         # NOTICE: Do not consider validations if a before_validation Active Records
         #         Callback is detected.
-        return validations if @model._validation_callbacks.map(&:kind).include? :before
+        return validations if @model._validation_callbacks.any? { |callback| callback.kind == :before }
 
         if @model._validators? && @model._validators[column.name.to_sym].size.positive?
           @model._validators[column.name.to_sym].each do |validator|

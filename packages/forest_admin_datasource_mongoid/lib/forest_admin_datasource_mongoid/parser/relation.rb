@@ -4,10 +4,12 @@ module ForestAdminDatasourceMongoid
       def get_polymorphic_types(relation_name)
         types = {}
 
-        ObjectSpace.each_object(Class).select { |klass| klass < Mongoid::Document }.each do |model|
-          if model.relations.any? { |_, relation| relation.options[:as] == relation_name.to_sym }
-            primary_key = model.fields.keys.find { |key| model.fields[key].options[:as] == :id } || :_id
-            types[model.name.gsub('::', '__')] = primary_key.to_s
+        ObjectSpace.each_object(Class).each do |klass|
+          next unless klass < Mongoid::Document
+
+          if klass.relations.any? { |_, relation| relation.options[:as] == relation_name.to_sym }
+            primary_key = klass.fields.keys.find { |key| klass.fields[key].options[:as] == :id } || :_id
+            types[klass.name.gsub('::', '__')] = primary_key.to_s
           end
         end
 

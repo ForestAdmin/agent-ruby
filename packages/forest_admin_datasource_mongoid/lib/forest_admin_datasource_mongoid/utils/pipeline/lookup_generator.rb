@@ -35,23 +35,25 @@ module ForestAdminDatasourceMongoid
           return {} if options[:include] && !options[:include].include?(name)
           return {} if options[:exclude]&.include?(name)
 
-          projection.filter { |field| field.include?('@@@') }
-                    .map { |field_name| "#{name}.#{field_name.tr(":", ".")}" }
-                    .each_with_object({}) do |curr, acc|
-                      acc[curr] = "$#{curr.gsub("@@@", ".")}"
-                    end
+          projection.each_with_object({}) do |field_name, acc|
+            next unless field_name.include?('@@@')
+
+            curr = "#{name}.#{field_name.tr(":", ".")}"
+            acc[curr] = "$#{curr.gsub("@@@", ".")}"
+          end
         end
 
         def self.lookup_relation(current_path, schema_stack, name, projection, options)
-          models = ObjectSpace
-                   .each_object(Class)
-                   .select { |klass| klass < Mongoid::Document && klass.name && !klass.name.start_with?('Mongoid::') }
-                   .to_h { |klass| [klass.name, klass] }
+          models = ObjectSpace.each_object(Class).with_object({}) do |klass, hash|
+            next unless klass < Mongoid::Document && klass.name && !klass.name.start_with?('Mongoid::')
+
+            hash[klass.name] = klass
+          end
 
           as = current_path ? "#{current_path}.#{name}" : name
 
-          last_schema = schema_stack[schema_stack.length - 1]
-          previous_schema = schema_stack.slice(0..(schema_stack.length - 1))
+          last_schema = schema_stack.last
+          previous_schema = schema_stack
 
           return {} if options[:include] && !options[:include].include?(as)
           return {} if options[:exclude]&.include?(as)
