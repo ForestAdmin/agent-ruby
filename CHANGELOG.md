@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.3...v1.19.0) (2025-12-24)
+
+
+### Features
+
+* sort filter operators alphabetically in rpc schema ([#245](https://github.com/ForestAdmin/agent-ruby/issues/245)) ([a584df8](https://github.com/ForestAdmin/agent-ruby/commit/a584df807cdc234102fd007d23baa925c14b241c))
+
 ## [1.18.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.2...v1.18.3) (2025-12-22)
 
 
