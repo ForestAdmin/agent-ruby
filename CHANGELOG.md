@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.0...v1.19.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* **composite datasource:** improve perf on collection exist check ([#246](https://github.com/ForestAdmin/agent-ruby/issues/246)) ([afd4481](https://github.com/ForestAdmin/agent-ruby/commit/afd4481bbe4a59626ee5940a366f41a68eea9f4f))
+
 # [1.19.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.18.3...v1.19.0) (2025-12-24)
 
 
