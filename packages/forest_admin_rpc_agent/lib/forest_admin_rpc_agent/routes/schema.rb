@@ -27,7 +27,7 @@ module ForestAdminRpcAgent
         end
 
         # Get schema from cache (or build from datasource if not cached)
-        schema = agent.rpc_schema
+        schema = agent.cached_schema
         etag = agent.cached_schema_hash
 
         # Return schema with ETag header
