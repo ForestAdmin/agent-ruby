@@ -161,7 +161,7 @@ module ForestAdminDatasourceCustomizer
       datasource = instance_double(ForestAdminDatasourceToolkit::Datasource,
                                    schema: { charts: [] },
                                    render_chart: nil,
-                                   collections: [],
+                                   collections: {},
                                    live_query_connections: {})
 
       customizer = described_class.new

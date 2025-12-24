@@ -68,7 +68,7 @@ module ForestAdminDatasourceCustomizer
           collection.schema[:fields].each do |field_name, field_schema|
             next unless polymorphic_relations.include?(field_schema.type)
 
-            reverse_relation_name = Utils::Collection.get_inverse_relation(get_collection(current_name), field_name)
+            reverse_relation_name = Utils::Collection.get_inverse_relation(collection, field_name)
 
             raise Exceptions::ForestException,
                   "Cannot rename collection #{current_name} because it's a target of a polymorphic relation " \
