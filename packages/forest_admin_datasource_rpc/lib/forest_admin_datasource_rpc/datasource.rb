@@ -2,7 +2,7 @@ module ForestAdminDatasourceRpc
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     include ForestAdminDatasourceRpc::Utils
 
-    attr_reader :shared_rpc_client
+    attr_reader :shared_rpc_client, :rpc_relations
 
     def initialize(options, introspection, schema_polling_client = nil)
       super()
