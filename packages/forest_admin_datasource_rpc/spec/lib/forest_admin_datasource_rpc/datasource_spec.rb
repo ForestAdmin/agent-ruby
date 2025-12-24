@@ -40,6 +40,22 @@ module ForestAdminDatasourceRpc
         expect(datasource.live_query_connections).to eq({})
       end
 
+      it 'creates a shared RPC client' do
+        expect(datasource.shared_rpc_client).to eq(rpc_client)
+      end
+
+      it 'creates RPC client with correct uri and auth_secret' do
+        described_class.new({ uri: 'http://localhost', auth_secret: 'custom-secret' }, introspection)
+
+        expect(Utils::RpcClient).to have_received(:new).with('http://localhost', 'custom-secret')
+      end
+
+      it 'uses Container auth_secret when not provided in options' do
+        described_class.new({ uri: 'http://localhost' }, introspection)
+
+        expect(Utils::RpcClient).to have_received(:new).with('http://localhost', 'secret')
+      end
+
       context 'with schema polling client' do
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, stop: nil) }
 

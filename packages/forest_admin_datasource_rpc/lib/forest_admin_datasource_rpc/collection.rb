@@ -6,10 +6,9 @@ module ForestAdminDatasourceRpc
     include ForestAdminDatasourceRpc::Utils
     include ForestAdminDatasourceCustomizer::Decorators::Action
 
-    def initialize(datasource, name, options, schema)
+    def initialize(datasource, name, schema)
       super(datasource, name)
-      @options = options
-      @client = RpcClient.new(@options[:uri], @options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret))
+      @client = datasource.shared_rpc_client
       @rpc_collection_uri = "/forest/rpc/#{name}"
       @base_params = { collection_name: name }
 
