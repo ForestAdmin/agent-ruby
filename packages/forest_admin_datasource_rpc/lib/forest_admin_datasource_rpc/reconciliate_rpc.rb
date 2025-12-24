@@ -6,7 +6,7 @@ module ForestAdminDatasourceRpc
         next unless real_datasource.is_a?(ForestAdminDatasourceRpc::Datasource)
 
         # Disable search for non-searchable collections
-        real_datasource.collections.each do |_name, collection|
+        real_datasource.collections.each_value do |collection|
           unless collection.schema[:searchable]
             cz = datasource_customizer.get_collection(get_collection_name(options[:rename], collection.name))
             cz.disable_search
@@ -29,7 +29,7 @@ module ForestAdminDatasourceRpc
 
     def get_datasource(datasource)
       # can be publication -> rename deco or a custom one
-      while datasource.is_a?(ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator) do
+      while datasource.is_a?(ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator)
         datasource = datasource.child_datasource
       end
 
@@ -41,7 +41,7 @@ module ForestAdminDatasourceRpc
 
       if renames.is_a?(Proc)
         name = renames.call(collection_name)
-      else renames.is_a?(Hash) && renames.key?(collection_name.to_s)
+      elsif renames.is_a?(Hash) && renames.key?(collection_name.to_s)
         name = renames[collection_name.to_s]
       end
 
@@ -50,11 +50,13 @@ module ForestAdminDatasourceRpc
 
     def add_relation(collection_customizer, renames, relation_name, relation_definition)
       type = relation_definition[:type] || relation_definition['type']
-      foreign_collection = get_collection_name(renames, relation_definition[:foreign_collection] || relation_definition['foreign_collection'])
+      foreign_collection_name = relation_definition[:foreign_collection] || relation_definition['foreign_collection']
+      foreign_collection = get_collection_name(renames, foreign_collection_name)
 
       case type
       when 'ManyToMany'
-        through_collection = get_collection_name(renames, relation_definition[:through_collection] || relation_definition['through_collection'])
+        through_collection_name = relation_definition[:through_collection] || relation_definition['through_collection']
+        through_collection = get_collection_name(renames, through_collection_name)
         collection_customizer.add_many_to_many_relation(
           relation_name,
           foreign_collection,
