@@ -1,6 +1,8 @@
 module ForestAdminDatasourceToolkit
   module Decorators
     class DatasourceDecorator
+      attr_reader :child_datasource
+
       def initialize(child_datasource, collection_decorator_class)
         @child_datasource = child_datasource
         @collection_decorator_class = collection_decorator_class

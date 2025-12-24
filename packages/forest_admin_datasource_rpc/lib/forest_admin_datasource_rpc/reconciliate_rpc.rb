@@ -1,23 +1,25 @@
 module ForestAdminDatasourceRpc
   class ReconciliateRpc < ForestAdminDatasourceCustomizer::Plugins::Plugin
-    def run(datasource_customizer, _collection_customizer = nil, _options = {})
+    def run(datasource_customizer, _collection_customizer = nil, options = {})
       datasource_customizer.composite_datasource.datasources.each do |datasource|
-        next unless datasource.is_a?(ForestAdminDatasourceRpc::Datasource)
+        real_datasource = get_datasource(datasource)
+        next unless real_datasource.is_a?(ForestAdminDatasourceRpc::Datasource)
 
         # Disable search for non-searchable collections
-        datasource.collections.each do |_name, collection|
+        real_datasource.collections.each do |_name, collection|
           unless collection.schema[:searchable]
-            cz = datasource_customizer.get_collection(collection.name)
+            cz = datasource_customizer.get_collection(get_collection_name(options[:rename], collection.name))
             cz.disable_search
           end
         end
 
         # Add relations from rpc_relations
-        (datasource.rpc_relations || {}).each do |collection_name, relations|
+        (real_datasource.rpc_relations || {}).each do |collection_name, relations|
+          collection_name = get_collection_name(options[:rename], collection_name)
           cz = datasource_customizer.get_collection(collection_name)
 
           relations.each do |relation_name, relation_definition|
-            add_relation(cz, relation_name, relation_definition)
+            add_relation(cz, options[:rename], relation_name.to_s, relation_definition)
           end
         end
       end
@@ -25,13 +27,34 @@ module ForestAdminDatasourceRpc
 
     private
 
-    def add_relation(collection_customizer, relation_name, relation_definition)
+    def get_datasource(datasource)
+      # can be publication -> rename deco or a custom one
+      while datasource.is_a?(ForestAdminDatasourceToolkit::Decorators::DatasourceDecorator) do
+        datasource = datasource.child_datasource
+      end
+
+      datasource
+    end
+
+    def get_collection_name(renames, collection_name)
+      name = collection_name
+
+      if renames.is_a?(Proc)
+        name = renames.call(collection_name)
+      else renames.is_a?(Hash) && renames.key?(collection_name.to_s)
+        name = renames[collection_name.to_s]
+      end
+
+      name
+    end
+
+    def add_relation(collection_customizer, renames, relation_name, relation_definition)
       type = relation_definition[:type] || relation_definition['type']
-      foreign_collection = relation_definition[:foreign_collection] || relation_definition['foreign_collection']
+      foreign_collection = get_collection_name(renames, relation_definition[:foreign_collection] || relation_definition['foreign_collection'])
 
       case type
       when 'ManyToMany'
-        through_collection = relation_definition[:through_collection] || relation_definition['through_collection']
+        through_collection = get_collection_name(renames, relation_definition[:through_collection] || relation_definition['through_collection'])
         collection_customizer.add_many_to_many_relation(
           relation_name,
           foreign_collection,
