@@ -1,3 +1,10 @@
+## [1.19.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.1...v1.19.2) (2026-01-05)
+
+
+### Performance Improvements
+
+* improve memory and cpu usage ([#248](https://github.com/ForestAdmin/agent-ruby/issues/248)) ([67a16c5](https://github.com/ForestAdmin/agent-ruby/commit/67a16c5a9dd4e11f03eb0f0b23d1f8739ca3b198))
+
 ## [1.19.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.0...v1.19.1) (2025-12-24)
 
 
