@@ -154,8 +154,11 @@ module ForestAdminDatasourceCustomizer
               refine_polymorphic_one_schema(old_schema, current_collection_name)
             when 'PolymorphicManyToOne'
               refine_polymorphic_many_schema(old_schema)
-            when 'ManyToOne', 'OneToMany', 'OneToOne', 'ManyToMany'
-              refine_standard_relation_schema(old_schema)
+            when 'ManyToOne', 'OneToMany', 'OneToOne'
+              old_schema.foreign_collection = datasource.get_collection_name(old_schema.foreign_collection)
+            when 'ManyToMany'
+              old_schema.foreign_collection = datasource.get_collection_name(old_schema.foreign_collection)
+              old_schema.through_collection = datasource.get_collection_name(old_schema.through_collection)
             end
           end
 
@@ -174,13 +177,6 @@ module ForestAdminDatasourceCustomizer
           schema.foreign_key_targets = schema.foreign_key_targets.transform_keys do |key|
             datasource.get_collection_name(key)
           end
-        end
-
-        def refine_standard_relation_schema(schema)
-          schema.foreign_collection = datasource.get_collection_name(schema.foreign_collection)
-          return unless schema.type == 'ManyToMany'
-
-          schema.through_collection = datasource.get_collection_name(schema.through_collection)
         end
       end
     end
