@@ -51,6 +51,12 @@ module ForestAdminDatasourceCustomizer
           filter.override(condition_tree: transformed_tree)
         end
 
+        # rubocop:disable Lint/UselessMethodDefinition
+        def mark_schema_as_dirty
+          super
+        end
+        # rubocop:enable Lint/UselessMethodDefinition
+
         private
 
         def polymorphic_type_fields
@@ -176,14 +182,6 @@ module ForestAdminDatasourceCustomizer
 
           schema.through_collection = datasource.get_collection_name(schema.through_collection)
         end
-
-        public
-
-        # rubocop:disable Lint/UselessMethodDefinition
-        def mark_schema_as_dirty
-          super
-        end
-        # rubocop:enable Lint/UselessMethodDefinition
       end
     end
   end
