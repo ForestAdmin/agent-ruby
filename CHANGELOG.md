@@ -1,3 +1,10 @@
+## [1.19.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.2...v1.19.3) (2026-01-05)
+
+
+### Performance Improvements
+
+* improve array/hash operation ([#247](https://github.com/ForestAdmin/agent-ruby/issues/247)) ([9ca00fc](https://github.com/ForestAdmin/agent-ruby/commit/9ca00fc8b765a6a3dd5c09cddb50aa2d48eafd22))
+
 ## [1.19.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.1...v1.19.2) (2026-01-05)
 
 
