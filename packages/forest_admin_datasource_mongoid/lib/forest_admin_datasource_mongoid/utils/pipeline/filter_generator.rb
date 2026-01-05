@@ -76,7 +76,7 @@ module ForestAdminDatasourceMongoid
           if condition_tree.is_a? Nodes::ConditionTreeBranch
             condition_tree.conditions.each { |condition| list_fields_used_in_filter_tree(condition, fields) }
           elsif condition_tree&.field&.include?(':')
-            list_paths(condition_tree.field).each { |field| fields << field }
+            fields.merge(list_paths(condition_tree.field))
           end
         end
 

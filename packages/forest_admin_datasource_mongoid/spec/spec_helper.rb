@@ -32,7 +32,7 @@ RSpec.configure do |config|
     models_to_load = Dir.glob(File.join('spec', 'dummy', 'app', 'models', '**', '*.rb'))
                         .collect { |file_path| File.basename(file_path, '.rb').camelize.constantize }
 
-    allow(ObjectSpace).to receive(:each_object).and_return(models_to_load)
+    allow(ObjectSpace).to receive(:each_object).and_return(models_to_load.each)
   end
 
   config.before(:suite) do

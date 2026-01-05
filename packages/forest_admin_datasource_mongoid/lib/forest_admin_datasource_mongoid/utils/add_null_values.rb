@@ -28,11 +28,13 @@ module ForestAdminDatasourceMongoid
           result[field_prefix] ||= nil
         end
 
-        nested_prefixes = projection.select { |field| field.include?(':') }.map { |field| field.split(':').first }.uniq
+        nested_prefixes = projection.filter_map { |field| field.split(':').first if field.include?(':') }.uniq
 
         nested_prefixes.each do |nested_prefix|
-          child_paths = projection.filter { |field| field.start_with?("#{nested_prefix}:") }
-                                  .map { |field| field[(nested_prefix.size + 1)..] }
+          prefix_with_colon = "#{nested_prefix}:"
+          child_paths = projection.filter_map do |field|
+            field[(nested_prefix.size + 1)..] if field.start_with?(prefix_with_colon)
+          end
 
           next unless result[nested_prefix] && !result[nested_prefix].nil?
 
