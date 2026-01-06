@@ -49,52 +49,22 @@ module ForestAdminDatasourceRpc
     end
 
     def add_relation(collection_customizer, renames, relation_name, relation_definition)
-      type = relation_definition[:type] || relation_definition['type']
-      foreign_collection_name = relation_definition[:foreign_collection] || relation_definition['foreign_collection']
-      foreign_collection = get_collection_name(renames, foreign_collection_name)
+      relation = relation_definition.transform_keys(&:to_sym)
+      foreign_collection = get_collection_name(renames, relation[:foreign_collection])
+      options = relation.except(:type, :foreign_collection, :through_collection)
 
-      case type
+      case relation[:type]
       when 'ManyToMany'
-        through_collection_name = relation_definition[:through_collection] || relation_definition['through_collection']
-        through_collection = get_collection_name(renames, through_collection_name)
-        collection_customizer.add_many_to_many_relation(
-          relation_name,
-          foreign_collection,
-          through_collection,
-          {
-            foreign_key: relation_definition[:foreign_key] || relation_definition['foreign_key'],
-            foreign_key_target: relation_definition[:foreign_key_target] || relation_definition['foreign_key_target'],
-            origin_key: relation_definition[:origin_key] || relation_definition['origin_key'],
-            origin_key_target: relation_definition[:origin_key_target] || relation_definition['origin_key_target']
-          }
-        )
+        through_collection = get_collection_name(renames, relation[:through_collection])
+        collection_customizer.add_many_to_many_relation(relation_name, foreign_collection, through_collection, options)
       when 'OneToMany'
-        collection_customizer.add_one_to_many_relation(
-          relation_name,
-          foreign_collection,
-          {
-            origin_key: relation_definition[:origin_key] || relation_definition['origin_key'],
-            origin_key_target: relation_definition[:origin_key_target] || relation_definition['origin_key_target']
-          }
-        )
+        collection_customizer.add_one_to_many_relation(relation_name, foreign_collection, options)
       when 'OneToOne'
-        collection_customizer.add_one_to_one_relation(
-          relation_name,
-          foreign_collection,
-          {
-            origin_key: relation_definition[:origin_key] || relation_definition['origin_key'],
-            origin_key_target: relation_definition[:origin_key_target] || relation_definition['origin_key_target']
-          }
-        )
-      else # ManyToOne
-        collection_customizer.add_many_to_one_relation(
-          relation_name,
-          foreign_collection,
-          {
-            foreign_key: relation_definition[:foreign_key] || relation_definition['foreign_key'],
-            foreign_key_target: relation_definition[:foreign_key_target] || relation_definition['foreign_key_target']
-          }
-        )
+        collection_customizer.add_one_to_one_relation(relation_name, foreign_collection, options)
+      when 'ManyToOne'
+        collection_customizer.add_many_to_one_relation(relation_name, foreign_collection, options)
+      else
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException, "Unsupported relation type: #{relation[:type]}"
       end
     end
   end
