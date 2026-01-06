@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ruby-version: ["3.2", "3.3"]
+        ruby-version: ["3.3", "3.4"]
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
@@ -55,7 +55,7 @@ jobs:
     needs: [lint]
     strategy:
       matrix:
-        ruby-version: ["3.2", "3.3"]
+        ruby-version: ["3.3", "3.4"]
         packages:
           - forest_admin_agent
           - forest_admin_datasource_active_record
@@ -101,7 +101,7 @@ jobs:
           cd -
 
       - name: Upload coverage
-        if: ${{ matrix.ruby-version == '3.3' }}
+        if: ${{ matrix.ruby-version == '3.4' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.ruby-version }}-${{ matrix.packages }}
@@ -114,7 +114,7 @@ jobs:
     needs: [test]
     strategy:
       matrix:
-        ruby-version: ["3.3"]
+        ruby-version: ["3.4"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
