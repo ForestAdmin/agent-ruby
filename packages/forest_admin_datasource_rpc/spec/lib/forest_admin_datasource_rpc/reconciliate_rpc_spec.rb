@@ -3,7 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceRpc
   describe ReconciliateRpc do
     let(:plugin) { described_class.new }
-    let(:collection_customizer) { instance_double(ForestAdminDatasourceCustomizer::CollectionCustomizer) }
+    let(:collection_customizer) { instance_spy(ForestAdminDatasourceCustomizer::CollectionCustomizer) }
 
     describe '#add_relation' do
       context 'with ManyToOne relation' do
@@ -15,13 +15,13 @@ module ForestAdminDatasourceRpc
             foreign_key_target: 'id'
           }
 
-          expect(collection_customizer).to receive(:add_many_to_one_relation).with(
+          plugin.send(:add_relation, collection_customizer, nil, 'manufacturer', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_one_relation).with(
             'manufacturer',
             'Manufacturer',
             { foreign_key: 'manufacturer_id', foreign_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, nil, 'manufacturer', relation_definition)
         end
 
         it 'works with string keys' do
@@ -32,13 +32,13 @@ module ForestAdminDatasourceRpc
             'foreign_key_target' => 'id'
           }
 
-          expect(collection_customizer).to receive(:add_many_to_one_relation).with(
+          plugin.send(:add_relation, collection_customizer, nil, 'manufacturer', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_one_relation).with(
             'manufacturer',
             'Manufacturer',
             { foreign_key: 'manufacturer_id', foreign_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, nil, 'manufacturer', relation_definition)
         end
       end
 
@@ -51,13 +51,13 @@ module ForestAdminDatasourceRpc
             origin_key_target: 'id'
           }
 
-          expect(collection_customizer).to receive(:add_one_to_many_relation).with(
+          plugin.send(:add_relation, collection_customizer, nil, 'products', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_one_to_many_relation).with(
             'products',
             'Product',
             { origin_key: 'manufacturer_id', origin_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, nil, 'products', relation_definition)
         end
       end
 
@@ -70,13 +70,13 @@ module ForestAdminDatasourceRpc
             origin_key_target: 'id'
           }
 
-          expect(collection_customizer).to receive(:add_one_to_one_relation).with(
+          plugin.send(:add_relation, collection_customizer, nil, 'profile', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_one_to_one_relation).with(
             'profile',
             'Profile',
             { origin_key: 'user_id', origin_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, nil, 'profile', relation_definition)
         end
       end
 
@@ -92,7 +92,9 @@ module ForestAdminDatasourceRpc
             origin_key_target: 'id'
           }
 
-          expect(collection_customizer).to receive(:add_many_to_many_relation).with(
+          plugin.send(:add_relation, collection_customizer, nil, 'tags', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_many_relation).with(
             'tags',
             'Tag',
             'ProductTag',
@@ -103,8 +105,6 @@ module ForestAdminDatasourceRpc
               origin_key_target: 'id'
             }
           )
-
-          plugin.send(:add_relation, collection_customizer, nil, 'tags', relation_definition)
         end
       end
 
@@ -134,13 +134,13 @@ module ForestAdminDatasourceRpc
           }
           renames = { 'Manufacturer' => 'RenamedManufacturer' }
 
-          expect(collection_customizer).to receive(:add_many_to_one_relation).with(
+          plugin.send(:add_relation, collection_customizer, renames, 'manufacturer', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_one_relation).with(
             'manufacturer',
             'RenamedManufacturer',
             { foreign_key: 'manufacturer_id', foreign_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, renames, 'manufacturer', relation_definition)
         end
 
         it 'renames foreign_collection using Proc' do
@@ -152,13 +152,13 @@ module ForestAdminDatasourceRpc
           }
           renames = ->(name) { "Prefix_#{name}" }
 
-          expect(collection_customizer).to receive(:add_many_to_one_relation).with(
+          plugin.send(:add_relation, collection_customizer, renames, 'manufacturer', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_one_relation).with(
             'manufacturer',
             'Prefix_Manufacturer',
             { foreign_key: 'manufacturer_id', foreign_key_target: 'id' }
           )
-
-          plugin.send(:add_relation, collection_customizer, renames, 'manufacturer', relation_definition)
         end
 
         it 'renames through_collection for ManyToMany' do
@@ -173,7 +173,9 @@ module ForestAdminDatasourceRpc
           }
           renames = { 'Tag' => 'RenamedTag', 'ProductTag' => 'RenamedProductTag' }
 
-          expect(collection_customizer).to receive(:add_many_to_many_relation).with(
+          plugin.send(:add_relation, collection_customizer, renames, 'tags', relation_definition)
+
+          expect(collection_customizer).to have_received(:add_many_to_many_relation).with(
             'tags',
             'RenamedTag',
             'RenamedProductTag',
@@ -184,8 +186,6 @@ module ForestAdminDatasourceRpc
               origin_key_target: 'id'
             }
           )
-
-          plugin.send(:add_relation, collection_customizer, renames, 'tags', relation_definition)
         end
       end
     end
