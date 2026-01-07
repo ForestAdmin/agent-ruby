@@ -111,15 +111,6 @@ module ForestAdminDatasourceCustomizer
               )
             end
 
-            it 'raise an error if the given old name does not exist' do
-              expect do
-                @datasource.rename_collection('doesNotExist', 'book')
-              end.to raise_error(
-                Exceptions::ForestException,
-                'Collection doesNotExist not found.'
-              )
-            end
-
             it 'change the foreign collection when it is a many to many' do
               @datasource.rename_collection('library_book', 'renamed_library_book')
               @datasource.rename_collection('book', 'renamed_book')
