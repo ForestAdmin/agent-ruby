@@ -6,7 +6,7 @@ module ForestAdminAgent
     module Schema
       class SchemaEmitter
         LIANA_NAME = "agent-ruby"
-        LIANA_VERSION = "1.20.0"
+        LIANA_VERSION = "1.21.0"
 
         def self.generate(datasource)
           datasource.collections

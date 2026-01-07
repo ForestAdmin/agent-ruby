@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.20.0...v1.21.0) (2026-01-07)
+
+
+### Features
+
+* support polymorphic relations in collection renaming ([#244](https://github.com/ForestAdmin/agent-ruby/issues/244)) ([1ee1251](https://github.com/ForestAdmin/agent-ruby/commit/1ee12517b2c625f7aeaca937ecda092ea7737281))
+
 # [1.20.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.3...v1.20.0) (2026-01-07)
 
 
