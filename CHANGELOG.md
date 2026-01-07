@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.3...v1.20.0) (2026-01-07)
+
+
+### Features
+
+* handle rpc relations ([#240](https://github.com/ForestAdmin/agent-ruby/issues/240)) ([c8fb188](https://github.com/ForestAdmin/agent-ruby/commit/c8fb1889df87712d5bf0bbdfd6ab630c0b2f0c21))
+
 ## [1.19.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.19.2...v1.19.3) (2026-01-05)
 
 
