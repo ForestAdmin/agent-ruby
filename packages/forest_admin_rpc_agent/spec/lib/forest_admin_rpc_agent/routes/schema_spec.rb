@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'rack'
 
 module ForestAdminRpcAgent
   module Routes
@@ -26,7 +27,7 @@ module ForestAdminRpcAgent
         allow(ForestAdminRpcAgent::Agent).to receive(:instance).and_return(agent)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
         allow(logger).to receive(:log)
-        allow(agent).to receive_messages(rpc_schema: cached_schema,
+        allow(agent).to receive_messages(cached_schema: cached_schema,
                                          cached_schema_hash: cached_hash,
                                          schema_hash_matches?: false)
       end
@@ -42,7 +43,7 @@ module ForestAdminRpcAgent
 
         context 'when client provides matching If-None-Match header' do
           let(:mock_request) do
-            instance_double(Rack::Request, get_header: %("#{cached_hash}"))
+            instance_double(::Rack::Request, get_header: %("#{cached_hash}"))
           end
 
           before do
@@ -66,7 +67,7 @@ module ForestAdminRpcAgent
 
         context 'when client provides non-matching If-None-Match header' do
           let(:mock_request) do
-            instance_double(Rack::Request, get_header: '"different_hash"')
+            instance_double(::Rack::Request, get_header: '"different_hash"')
           end
 
           it 'returns the full schema with ETag header' do
@@ -80,7 +81,7 @@ module ForestAdminRpcAgent
 
         context 'when client does not provide If-None-Match header' do
           let(:mock_request) do
-            instance_double(Rack::Request, get_header: nil)
+            instance_double(::Rack::Request, get_header: nil)
           end
 
           it 'returns the full schema' do

@@ -200,5 +200,194 @@ module ForestAdminRpcAgent
         expect(result).to eq(instance)
       end
     end
+
+    describe '#schema_hash_matches?' do
+      let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
+
+      before do
+        instance.container.register(:datasource, datasource, replace: true)
+        allow(instance).to receive(:customizer).and_return(customizer)
+        allow(customizer).to receive(:schema).and_return({})
+        allow(datasource).to receive_messages(collections: {}, live_query_connections: {})
+        allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
+          { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: true }[key]
+        end
+      end
+
+      it 'returns false when cached_schema_hash is nil' do
+        expect(instance.schema_hash_matches?('some_hash')).to be false
+      end
+
+      it 'returns false when provided_hash is nil' do
+        instance.send_schema
+        expect(instance.schema_hash_matches?(nil)).to be false
+      end
+
+      it 'returns true when hashes match' do
+        instance.send_schema
+        cached_hash = instance.cached_schema_hash
+
+        expect(instance.schema_hash_matches?(cached_hash)).to be true
+      end
+
+      it 'returns false when hashes do not match' do
+        instance.send_schema
+
+        expect(instance.schema_hash_matches?('wrong_hash')).to be false
+      end
+    end
+
+    describe '#build_rpc_schema_from_datasource' do
+      let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
+
+      before do
+        instance.container.register(:datasource, datasource, replace: true)
+        allow(instance).to receive(:customizer).and_return(customizer)
+        allow(customizer).to receive(:schema).and_return({})
+        allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
+          { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: true }[key]
+        end
+      end
+
+      it 'excludes RPC collections from schema collections' do
+        rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        allow(rpc_collection).to receive_messages(name: 'RpcCollection', schema: { fields: {} })
+        allow(normal_collection).to receive_messages(name: 'NormalCollection', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: { 'RpcCollection' => rpc_collection, 'NormalCollection' => normal_collection },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc('RpcCollection')
+        instance.send_schema
+
+        collection_names = instance.cached_schema[:collections].map { |c| c[:name] }
+        expect(collection_names).to include('NormalCollection')
+        expect(collection_names).not_to include('RpcCollection')
+      end
+
+      it 'extracts relations from RPC collections to non-RPC collections into rpc_relations' do
+        rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        relation_field = instance_double(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        allow(relation_field).to receive_messages(
+          type: 'ManyToOne',
+          foreign_collection: 'NormalCollection'
+        )
+
+        allow(rpc_collection).to receive_messages(
+          name: 'RpcCollection',
+          schema: { fields: { 'normal' => relation_field } }
+        )
+        allow(normal_collection).to receive_messages(name: 'NormalCollection', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: { 'RpcCollection' => rpc_collection, 'NormalCollection' => normal_collection },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc('RpcCollection')
+        instance.send_schema
+
+        expect(instance.cached_schema[:rpc_relations]).to have_key('RpcCollection')
+        expect(instance.cached_schema[:rpc_relations]['RpcCollection']).to have_key('normal')
+      end
+
+      it 'extracts relations from normal collections to RPC collections into rpc_relations' do
+        rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        relation_field = instance_double(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        allow(relation_field).to receive_messages(
+          type: 'ManyToOne',
+          foreign_collection: 'RpcCollection'
+        )
+
+        allow(rpc_collection).to receive_messages(name: 'RpcCollection', schema: { fields: {} })
+        allow(normal_collection).to receive_messages(
+          name: 'NormalCollection',
+          schema: { fields: { 'rpc_ref' => relation_field } }
+        )
+        allow(datasource).to receive_messages(
+          collections: { 'RpcCollection' => rpc_collection, 'NormalCollection' => normal_collection },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc('RpcCollection')
+        instance.send_schema
+
+        expect(instance.cached_schema[:rpc_relations]).to have_key('NormalCollection')
+        expect(instance.cached_schema[:rpc_relations]['NormalCollection']).to have_key('rpc_ref')
+      end
+
+      it 'does not extract relations between RPC collections' do
+        rpc_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+        rpc_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        relation_field = instance_double(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        allow(relation_field).to receive_messages(
+          type: 'ManyToOne',
+          foreign_collection: 'RpcCollection2'
+        )
+
+        allow(rpc_collection1).to receive_messages(
+          name: 'RpcCollection1',
+          schema: { fields: { 'other_rpc' => relation_field } }
+        )
+        allow(rpc_collection2).to receive_messages(name: 'RpcCollection2', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: { 'RpcCollection1' => rpc_collection1, 'RpcCollection2' => rpc_collection2 },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc('RpcCollection1', 'RpcCollection2')
+        instance.send_schema
+
+        rpc_relations_for_rpc1 = instance.cached_schema[:rpc_relations]['RpcCollection1'] || {}
+        expect(rpc_relations_for_rpc1).not_to have_key('other_rpc')
+      end
+
+      it 'sorts filter_operators for Column fields' do
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        column_field = instance_double(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
+
+        allow(column_field).to receive_messages(type: 'Column')
+        allow(column_field).to receive(:filter_operators=)
+        allow(column_field).to receive(:filter_operators).and_return(%w[equal greater_than less_than])
+        allow(ForestAdminAgent::Utils::Schema::FrontendFilterable).to receive(:sort_operators)
+          .and_return(%w[equal greater_than less_than])
+
+        allow(normal_collection).to receive_messages(
+          name: 'NormalCollection',
+          schema: { fields: { 'id' => column_field } }
+        )
+        allow(datasource).to receive_messages(
+          collections: { 'NormalCollection' => normal_collection },
+          live_query_connections: {}
+        )
+
+        instance.send_schema
+
+        expect(ForestAdminAgent::Utils::Schema::FrontendFilterable).to have_received(:sort_operators)
+      end
+
+      it 'includes native_query_connections in schema' do
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        allow(normal_collection).to receive_messages(name: 'NormalCollection', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: { 'NormalCollection' => normal_collection },
+          live_query_connections: { 'main' => {}, 'secondary' => {} }
+        )
+
+        instance.send_schema
+
+        expect(instance.cached_schema[:native_query_connections]).to contain_exactly(
+          { name: 'main' },
+          { name: 'secondary' }
+        )
+      end
+    end
   end
 end
