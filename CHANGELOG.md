@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.21.0...v1.22.0) (2026-01-08)
+
+
+### Features
+
+* add ruby 4.0.0 support ([#250](https://github.com/ForestAdmin/agent-ruby/issues/250)) ([ac30fe7](https://github.com/ForestAdmin/agent-ruby/commit/ac30fe7c749c81b9c0cd72e4ea4eab2964f223fe))
+
 # [1.21.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.20.0...v1.21.0) (2026-01-07)
 
 
