@@ -60,7 +60,21 @@ module ForestAdminDatasourceRpc
       def make_request(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
         log_request_start(method, endpoint, if_none_match)
 
-        client = Faraday.new(url: @api_url) do |faraday|
+        client = build_faraday_client(symbolize_keys)
+        headers = build_request_headers(caller, if_none_match)
+
+        response = client.send(method, endpoint, payload, headers)
+        log_request_complete(response, endpoint)
+        response
+      rescue Faraday::ConnectionFailed => e
+        handle_connection_failed(endpoint, e)
+      rescue Faraday::TimeoutError => e
+        handle_timeout_error(endpoint, e)
+      end
+      # rubocop:enable Metrics/ParameterLists
+
+      def build_faraday_client(symbolize_keys)
+        Faraday.new(url: @api_url) do |faraday|
           faraday.request :json
           faraday.response :json, parser_options: { symbolize_names: symbolize_keys }
           faraday.adapter Faraday.default_adapter
@@ -68,7 +82,9 @@ module ForestAdminDatasourceRpc
           faraday.options.timeout = DEFAULT_TIMEOUT
           faraday.options.open_timeout = DEFAULT_OPEN_TIMEOUT
         end
+      end
 
+      def build_request_headers(caller, if_none_match)
         timestamp = Time.now.utc.iso8601(3)
         signature = generate_signature(timestamp)
 
@@ -80,12 +96,26 @@ module ForestAdminDatasourceRpc
 
         headers['forest_caller'] = caller.to_json if caller
         headers['If-None-Match'] = %("#{if_none_match}") if if_none_match
-
-        response = client.send(method, endpoint, payload, headers)
-        log_request_complete(response, endpoint)
-        response
+        headers
       end
-      # rubocop:enable Metrics/ParameterLists
+
+      def handle_connection_failed(endpoint, error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[RPC Client] Connection failed to #{@api_url}#{endpoint}: #{error.message}"
+        )
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "RPC connection failed: Unable to connect to #{@api_url}. Please check if the RPC server is running."
+      end
+
+      def handle_timeout_error(endpoint, error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Error',
+          "[RPC Client] Request timeout to #{@api_url}#{endpoint}: #{error.message}"
+        )
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "RPC request timeout: The RPC server at #{@api_url} did not respond in time."
+      end
 
       def generate_signature(timestamp)
         OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
