@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.0...v1.22.1) (2026-01-13)
+
+
+### Bug Fixes
+
+* **rpc:** cleanly log tcp error on rpc polling ([#251](https://github.com/ForestAdmin/agent-ruby/issues/251)) ([32a9e3f](https://github.com/ForestAdmin/agent-ruby/commit/32a9e3f6dc5679eb132b10b0dc8c2df9c9cd1cb1))
+
 # [1.22.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.21.0...v1.22.0) (2026-01-08)
 
 
