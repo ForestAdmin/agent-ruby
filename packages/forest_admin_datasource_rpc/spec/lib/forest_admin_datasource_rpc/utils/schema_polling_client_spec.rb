@@ -307,6 +307,19 @@ module ForestAdminDatasourceRpc
           expect(logger).to have_received(:log).with('Error', /Authentication error/)
         end
 
+        it 'handles RPC errors (ForestException) gracefully' do
+          client = described_class.new(uri, secret) { |schema| callback.call(schema) }
+          allow(rpc_client).to receive(:fetch_schema).and_raise(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'RPC connection failed: Unable to connect to http://localhost. Please check if the RPC server is running.'
+          )
+
+          expect { client.check_schema }.not_to raise_error
+
+          expect(logger).to have_received(:log).with('Warn', /RPC error.*RPC connection failed/)
+          expect(callback).not_to have_received(:call)
+        end
+
         it 'handles unexpected errors gracefully' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
           allow(rpc_client).to receive(:fetch_schema).and_raise(StandardError, 'Unexpected error')
@@ -424,6 +437,29 @@ module ForestAdminDatasourceRpc
           expected_etag = Digest::SHA1.hexdigest(JSON.generate(introspection))
           expect(client.instance_variable_get(:@cached_etag)).to eq(expected_etag)
         end
+
+        it 'falls back to introspection_schema on ForestException (RPC wrapped error)' do
+          client = described_class.new(
+            uri, secret,
+            introspection_schema: introspection,
+            introspection_etag: 'fallback-etag-456'
+          ) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_raise(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'RPC connection failed: Unable to connect to http://localhost.'
+          )
+
+          client.start?
+          client.stop
+
+          # Should use the introspection schema as current schema
+          expect(client.instance_variable_get(:@current_schema)).to eq(introspection)
+          # Should use the provided etag
+          expect(client.instance_variable_get(:@cached_etag)).to eq('fallback-etag-456')
+          # Should log the warning
+          expect(logger).to have_received(:log).with('Warn', /RPC agent.*unreachable.*ForestException/)
+        end
       end
 
       describe '#trigger_schema_change_callback' do
@@ -517,6 +553,30 @@ module ForestAdminDatasourceRpc
 
           # Should have continued polling after the connection error
           expect(logger).to have_received(:log).with('Warn', /Connection error/)
+        end
+
+        it 'continues polling after RPC errors (ForestException)' do
+          # Initial fetch succeeds, first poll fails with ForestException, second poll succeeds
+          call_count = 0
+          allow(rpc_client).to receive(:fetch_schema) do
+            call_count += 1
+            # First call is initial fetch (succeeds), second is first poll (fails), third succeeds
+            if call_count == 2
+              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                    'RPC connection failed: Unable to connect to http://localhost.'
+            end
+
+            schema_response
+          end
+
+          client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
+
+          client.start?
+          sleep(3) # Wait for initial fetch + polling
+          client.stop
+
+          # Should have continued polling after the RPC error
+          expect(logger).to have_received(:log).with('Warn', /RPC error.*RPC connection failed/)
         end
       end
     end

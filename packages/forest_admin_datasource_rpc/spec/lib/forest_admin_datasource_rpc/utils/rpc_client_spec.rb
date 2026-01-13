@@ -382,6 +382,82 @@ module ForestAdminDatasourceRpc
           end
         end
       end
+
+      context 'when connection fails' do
+        let(:faraday_connection) { instance_double(Faraday::Connection) }
+        let(:timestamp) { '2025-04-01T14:07:02Z' }
+
+        before do
+          allow(Faraday).to receive(:new).and_return(faraday_connection)
+          allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
+        end
+
+        context 'with Faraday::ConnectionFailed' do
+          before do
+            allow(faraday_connection).to receive(:send).and_raise(
+              Faraday::ConnectionFailed.new('Failed to open TCP connection to localhost:3039')
+            )
+          end
+
+          it 'logs the connection error' do
+            expect { rpc_client.call_rpc('/rpc/test', method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException
+            )
+
+            expect(logger).to have_received(:log).with(
+              'Error',
+              %r{\[RPC Client\] Connection failed to http://localhost/rpc/test: Failed to open TCP connection}
+            )
+          end
+
+          it 'raises ForestException with user-friendly message' do
+            expect { rpc_client.call_rpc('/rpc/test', method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              %r{RPC connection failed: Unable to connect to http://localhost.*Please check if the RPC server is running}
+            )
+          end
+
+          it 'handles connection failure in fetch_schema' do
+            expect { rpc_client.fetch_schema('/rpc/schema') }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              /RPC connection failed/
+            )
+          end
+        end
+
+        context 'with Faraday::TimeoutError' do
+          before do
+            allow(faraday_connection).to receive(:send).and_raise(
+              Faraday::TimeoutError.new('Net::ReadTimeout')
+            )
+          end
+
+          it 'logs the timeout error' do
+            expect { rpc_client.call_rpc('/rpc/test', method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException
+            )
+
+            expect(logger).to have_received(:log).with(
+              'Error',
+              %r{\[RPC Client\] Request timeout to http://localhost/rpc/test}
+            )
+          end
+
+          it 'raises ForestException with user-friendly message' do
+            expect { rpc_client.call_rpc('/rpc/test', method: :get) }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              %r{RPC request timeout: The RPC server at http://localhost did not respond in time}
+            )
+          end
+
+          it 'handles timeout in fetch_schema' do
+            expect { rpc_client.fetch_schema('/rpc/schema') }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              /RPC request timeout/
+            )
+          end
+        end
+      end
     end
   end
 end

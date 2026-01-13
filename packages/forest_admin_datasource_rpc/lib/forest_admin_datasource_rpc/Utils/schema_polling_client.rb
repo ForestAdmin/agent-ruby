@@ -69,6 +69,8 @@ module ForestAdminDatasourceRpc
         log_connection_error(e)
       rescue ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient => e
         log_authentication_error(e)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        log_rpc_error(e)
       rescue StandardError => e
         log_unexpected_error(e)
       end
@@ -108,7 +110,8 @@ module ForestAdminDatasourceRpc
 
         @introspection_schema = nil
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError,
-             ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient, StandardError => e
+             ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient,
+             ForestAdminDatasourceToolkit::Exceptions::ForestException, StandardError => e
         handle_initial_fetch_error(e)
       end
 
@@ -210,6 +213,13 @@ module ForestAdminDatasourceRpc
         ForestAdminAgent::Facades::Container.logger&.log(
           'Warn',
           "[Schema Polling] Connection error: #{error.class} - #{error.message}"
+        )
+      end
+
+      def log_rpc_error(error)
+        ForestAdminAgent::Facades::Container.logger&.log(
+          'Warn',
+          "[Schema Polling] RPC error: #{error.message}"
         )
       end
 
