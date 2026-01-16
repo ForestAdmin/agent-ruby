@@ -65,7 +65,7 @@ module ForestAdminDatasourceActiveRecord
           is_primary_key: column_name == @model.primary_key || @model.primary_key.include?(column_name),
           is_read_only: false,
           is_sortable: true,
-          default_value: column.default,
+          default_value: column.default.nil? ? nil : normalize_default_value(column),
           enum_values: get_enum_values(@model, column),
           validation: get_validations(column)
         )
