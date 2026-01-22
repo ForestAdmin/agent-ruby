@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.1...v1.22.2) (2026-01-22)
+
+
+### Bug Fixes
+
+* **projection:** return proper bad request error on unknown fields ([#253](https://github.com/ForestAdmin/agent-ruby/issues/253)) ([2fa23a7](https://github.com/ForestAdmin/agent-ruby/commit/2fa23a74c377a1dc7aa0a1d4382501e2251b28fa))
+
 ## [1.22.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.0...v1.22.1) (2026-01-13)
 
 
