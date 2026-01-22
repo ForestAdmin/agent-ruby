@@ -239,6 +239,36 @@ module ForestAdminAgent
 
             expect(described_class.parse_projection(collection, args)).to eq(Projection.new(%w[id title author:id]))
           end
+
+          it 'raises BadRequestError when field does not exist in collection' do
+            args = {
+              params: {
+                fields: { 'Book' => 'id,nonexistent_field' }
+              }
+            }
+
+            expect do
+              described_class.parse_projection(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid projection: The 'Book\.nonexistent_field' field was not found\. Available fields are: \[.*\]\. Please check if the field name is correct\./
+            )
+          end
+
+          it 'raises BadRequestError when relationship fields are not specified' do
+            args = {
+              params: {
+                fields: { 'Book' => 'id,author' }
+              }
+            }
+
+            expect do
+              described_class.parse_projection(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid projection:/
+            )
+          end
         end
       end
 

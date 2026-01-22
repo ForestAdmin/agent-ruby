@@ -40,10 +40,11 @@ module ForestAdminAgent
         add_polymorphic_type_fields(collection, requested_field_names)
         projection_fields = build_projection_fields(collection, requested_field_names, args)
 
-        projection = Projection.new(projection_fields)
-        ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection)
+        ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection_fields)
 
-        projection
+        Projection.new(projection_fields)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        raise BadRequestError, "Invalid projection: #{e.message}"
       end
 
       def self.add_polymorphic_type_fields(collection, requested_field_names)
@@ -63,17 +64,31 @@ module ForestAdminAgent
 
       def self.build_projection_fields(collection, requested_field_names, args)
         requested_field_names.map do |field_name|
-          column = collection.schema[:fields][field_name]
-          if column.type == 'Column'
+          field = get_field(collection, field_name)
+
+          case field.type
+          when 'Column'
             field_name
-          elsif column.type == 'PolymorphicManyToOne'
+          when 'PolymorphicManyToOne'
             "#{field_name}:*"
           else
-            "#{field_name}:#{args[:params][:fields][field_name]}"
+            relation_fields = args.dig(:params, :fields, field_name)
+            "#{field_name}:#{relation_fields}"
           end
         end
       end
-      private_class_method :add_polymorphic_type_fields, :build_projection_fields
+
+      def self.get_field(collection, field_name)
+        field = collection.schema[:fields][field_name]
+        return field unless field.nil?
+
+        available_fields = collection.schema[:fields].keys.join(', ')
+        raise ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+              "The '#{collection.name}.#{field_name}' field was not found. " \
+              "Available fields are: [#{available_fields}]. " \
+              'Please check if the field name is correct.'
+      end
+      private_class_method :add_polymorphic_type_fields, :build_projection_fields, :get_field
 
       def self.parse_projection_with_pks(collection, args)
         projection = parse_projection(collection, args)
