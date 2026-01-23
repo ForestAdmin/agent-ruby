@@ -39,16 +39,16 @@ module ForestAdminRpcAgent
 
           # Skip authentication for health check (root path)
           if @url == '/'
-            params = request.query_parameters.merge(request.request_parameters)
-            result = handle_request({ params: params, caller: nil, request: request })
+            params = deep_symbolize_keys(request.query_parameters.merge(request.request_parameters))
+            result = handle_request({ params: params.with_indifferent_access, caller: nil, request: request })
             build_rails_response(result)
           else
             auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
             status, headers, response = auth_middleware.call(request.env)
 
             if status == 200
-              params = request.query_parameters.merge(request.request_parameters)
-              result = handle_request({ params: params, caller: headers[:caller], request: request })
+              params = deep_symbolize_keys(request.query_parameters.merge(request.request_parameters))
+              result = handle_request({ params: params.with_indifferent_access, caller: headers[:caller], request: request })
               build_rails_response(result)
             else
               [status, headers, response]
@@ -86,6 +86,17 @@ module ForestAdminRpcAgent
       end
 
       private
+
+      def deep_symbolize_keys(obj)
+        case obj
+        when Hash
+          obj.transform_keys(&:to_sym).transform_values { |v| deep_symbolize_keys(v) }
+        when Array
+          obj.map { |v| deep_symbolize_keys(v) }
+        else
+          obj
+        end
+      end
 
       def serialize_response(result)
         return result if result.is_a?(String) && (result.start_with?('{', '['))

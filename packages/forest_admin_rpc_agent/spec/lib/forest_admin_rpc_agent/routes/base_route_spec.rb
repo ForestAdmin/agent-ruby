@@ -121,6 +121,48 @@ module ForestAdminRpcAgent
           end
         end
       end
+
+      describe '#build_rails_response' do
+        context 'when result is a Hash with :status key' do
+          it 'returns the correct response structure' do
+            result = { status: 201, content: { id: 1 } }
+            response = route.send(:build_rails_response, result)
+
+            expect(response[0]).to eq(201)
+            expect(response[1]).to eq({ 'Content-Type' => 'application/json' })
+            expect(response[2]).to eq(['{"id":1}'])
+          end
+
+          it 'merges custom headers when provided' do
+            result = { status: 200, content: { data: 'test' }, headers: { 'X-Custom-Header' => 'value' } }
+            response = route.send(:build_rails_response, result)
+
+            expect(response[0]).to eq(200)
+            expect(response[1]).to eq({ 'Content-Type' => 'application/json', 'X-Custom-Header' => 'value' })
+            expect(response[2]).to eq(['{"data":"test"}'])
+          end
+
+          it 'returns empty body when content is nil' do
+            result = { status: 204 }
+            response = route.send(:build_rails_response, result)
+
+            expect(response[0]).to eq(204)
+            expect(response[1]).to eq({ 'Content-Type' => 'application/json' })
+            expect(response[2]).to eq([''])
+          end
+        end
+
+        context 'when result is not a Hash with :status key' do
+          it 'returns 200 with serialized result' do
+            result = { test: 'data' }
+            response = route.send(:build_rails_response, result)
+
+            expect(response[0]).to eq(200)
+            expect(response[1]).to eq({ 'Content-Type' => 'application/json' })
+            expect(response[2]).to eq(['{"test":"data"}'])
+          end
+        end
+      end
     end
   end
 end
