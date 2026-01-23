@@ -54,6 +54,12 @@ module ForestAdminRpcAgent
 
     private
 
+    def rpc_collection?(name)
+      @rpc_collections.any? do |pattern|
+        pattern.is_a?(Regexp) ? pattern.match?(name) : pattern == name
+      end
+    end
+
     def should_skip_schema_update?
       ForestAdminRpcAgent::Facades::Container.cache(:skip_schema_update) == true
     end
@@ -84,11 +90,11 @@ module ForestAdminRpcAgent
       datasource.collections.each_value do |collection|
         relations = {}
 
-        if @rpc_collections.include?(collection.name)
+        if rpc_collection?(collection.name)
           # RPC collection → extract relations to non-RPC collections
           collection.schema[:fields].each do |field_name, field|
             next if field.type == 'Column'
-            next if @rpc_collections.include?(field.foreign_collection)
+            next if rpc_collection?(field.foreign_collection)
 
             relations[field_name] = field
           end
@@ -96,7 +102,7 @@ module ForestAdminRpcAgent
           fields = {}
 
           collection.schema[:fields].each do |field_name, field|
-            if field.type != 'Column' && @rpc_collections.include?(field.foreign_collection)
+            if field.type != 'Column' && rpc_collection?(field.foreign_collection)
               relations[field_name] = field
             else
               if field.type == 'Column'
