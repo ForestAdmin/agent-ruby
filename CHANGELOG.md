@@ -1,3 +1,10 @@
+## [1.22.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.2...v1.22.3) (2026-01-23)
+
+
+### Bug Fixes
+
+* **rpcagent:** symbolize params keys in base route ([#254](https://github.com/ForestAdmin/agent-ruby/issues/254)) ([54ba34a](https://github.com/ForestAdmin/agent-ruby/commit/54ba34aa35b426997eca021bbcbfbf2bd420c6d6))
+
 ## [1.22.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.1...v1.22.2) (2026-01-22)
 
 
