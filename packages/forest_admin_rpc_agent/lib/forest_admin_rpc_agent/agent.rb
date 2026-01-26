@@ -16,13 +16,11 @@ module ForestAdminRpcAgent
     end
 
     def add_datasource(datasource, options = {})
-      mark_collections_callback = if options[:mark_collections_as_rpc]
-                                    ->(ds) { mark_collections_as_rpc(*ds.collections.keys) }
-                                  end
+      if options[:mark_collections_as_rpc]
+        options[:mark_collections_callback] = ->(ds) { mark_collections_as_rpc(*ds.collections.keys) }
+      end
 
-      @customizer.add_datasource(datasource, options, mark_collections_callback)
-
-      self
+      super(datasource, options)
     end
 
     def send_schema(force: false)
