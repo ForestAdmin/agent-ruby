@@ -12,6 +12,21 @@ module ForestAdminRpcAgent
       @rpc_collections = []
       @cached_schema = nil
       @cached_schema_hash = nil
+      @customizer = ForestAdminRpcAgent::DatasourceCustomizer.new
+    end
+
+    def add_datasource(datasource, options = {})
+      mark_collections_as_rpc = nil
+
+      if options[:mark_collections_as_rpc]
+        mark_collections_as_rpc = ->(buildedDatasource) {
+          mark_collections_as_rpc(*buildedDatasource.collections.keys)
+        }
+      end
+
+      @customizer.add_datasource(datasource, options, mark_collections_as_rpc)
+
+      self
     end
 
     def send_schema(force: false)
