@@ -353,6 +353,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/Utils/schema_polling_pool.rb'
     - 'packages/forest_admin_datasource_rpc/lib/forest_admin_datasource_rpc/Utils/sse_client.rb'
     - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/routes/sse.rb'
+    - 'packages/forest_admin_rpc_agent/lib/forest_admin_rpc_agent/agent.rb'
 
 Style/OpenStructUse:
   Exclude:
