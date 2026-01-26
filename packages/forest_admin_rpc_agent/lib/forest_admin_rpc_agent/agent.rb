@@ -19,8 +19,8 @@ module ForestAdminRpcAgent
       mark_collections_as_rpc = nil
 
       if options[:mark_collections_as_rpc]
-        mark_collections_as_rpc = ->(buildedDatasource) {
-          mark_collections_as_rpc(*buildedDatasource.collections.keys)
+        mark_collections_as_rpc = lambda { |builded_datasource|
+          mark_collections_as_rpc(*builded_datasource.collections.keys)
         }
       end
 

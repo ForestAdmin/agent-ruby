@@ -17,7 +17,7 @@ module ForestAdminRpcAgent
           datasource = rename_collection_decorator
         end
 
-        mark_collections_as_rpc.call(datasource) if mark_collections_as_rpc
+        mark_collections_as_rpc&.call(datasource)
 
         @composite_datasource.add_data_source(datasource)
       })
