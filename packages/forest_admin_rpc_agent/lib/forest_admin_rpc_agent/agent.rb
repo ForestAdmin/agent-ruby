@@ -20,7 +20,7 @@ module ForestAdminRpcAgent
         options[:mark_collections_callback] = ->(ds) { mark_collections_as_rpc(*ds.collections.keys) }
       end
 
-      super(datasource, options)
+      super
     end
 
     def send_schema(force: false)
