@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.3...v1.23.0) (2026-01-26)
+
+
+### Features
+
+* **rpc agent:** add mark collection as rpc option on add datasource ([#256](https://github.com/ForestAdmin/agent-ruby/issues/256)) ([fc9e129](https://github.com/ForestAdmin/agent-ruby/commit/fc9e1294273b63ace870ebf43b21cdbe4850cce0))
+
 ## [1.22.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.2...v1.22.3) (2026-01-23)
 
 
