@@ -16,15 +16,15 @@ module ForestAdminRpcAgent
     end
 
     def add_datasource(datasource, options = {})
-      mark_collections_as_rpc = nil
+      mark_collections_callback = nil
 
       if options[:mark_collections_as_rpc]
-        mark_collections_as_rpc = lambda { |builded_datasource|
+        mark_collections_callback = lambda { |builded_datasource|
           mark_collections_as_rpc(*builded_datasource.collections.keys)
         }
       end
 
-      @customizer.add_datasource(datasource, options, mark_collections_as_rpc)
+      @customizer.add_datasource(datasource, options, mark_collections_callback)
 
       self
     end

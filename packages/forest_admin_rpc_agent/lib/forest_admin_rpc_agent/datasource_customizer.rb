@@ -1,7 +1,6 @@
 module ForestAdminRpcAgent
   class DatasourceCustomizer < ForestAdminDatasourceCustomizer::DatasourceCustomizer
     def add_datasource(datasource, options, mark_collections_as_rpc)
-      puts mark_collections_as_rpc
       @stack.queue_customization(lambda {
         if options[:include] || options[:exclude]
           publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(datasource)
