@@ -45,13 +45,11 @@ module ForestAdminRpcAgent
         return nil unless request
 
         # Get If-None-Match header (works for both Rails and Sinatra)
-        etag = if request.respond_to?(:get_header)
-                 request.get_header('HTTP_IF_NONE_MATCH')
-               elsif request.respond_to?(:env)
-                 request.env['HTTP_IF_NONE_MATCH']
-               end
-
-        etag
+        if request.respond_to?(:get_header)
+          request.get_header('HTTP_IF_NONE_MATCH')
+        elsif request.respond_to?(:env)
+          request.env['HTTP_IF_NONE_MATCH']
+        end
       end
     end
   end
