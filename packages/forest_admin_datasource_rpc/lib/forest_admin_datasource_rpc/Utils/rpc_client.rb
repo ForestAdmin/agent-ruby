@@ -95,7 +95,7 @@ module ForestAdminDatasourceRpc
         }
 
         headers['forest_caller'] = caller.to_json if caller
-        headers['If-None-Match'] = %("#{if_none_match}") if if_none_match
+        headers['If-None-Match'] = if_none_match if if_none_match
         headers
       end
 
