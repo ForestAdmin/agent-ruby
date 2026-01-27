@@ -122,7 +122,7 @@ module ForestAdminDatasourceRpc
             rpc_client.fetch_schema('/rpc/schema', if_none_match: 'abc123')
 
             expect(faraday_connection).to have_received(:send) do |_method, _endpoint, _payload, headers|
-              expect(headers['If-None-Match']).to eq('"abc123"')
+              expect(headers['If-None-Match']).to eq('abc123')
             end
           end
 
@@ -136,9 +136,9 @@ module ForestAdminDatasourceRpc
         end
 
         context 'with ETag in response' do
-          let(:response_headers) { { 'ETag' => '"etag123"' } }
+          let(:response_headers) { { 'ETag' => 'etag123' } }
 
-          it 'extracts ETag from response headers and strips quotes' do
+          it 'extracts ETag from response headers' do
             result = rpc_client.fetch_schema('/rpc/schema')
 
             expect(result.etag).to eq('etag123')
@@ -146,7 +146,7 @@ module ForestAdminDatasourceRpc
         end
 
         context 'with lowercase etag header' do
-          let(:response_headers) { { 'etag' => '"lowercase-etag"' } }
+          let(:response_headers) { { 'etag' => 'lowercase-etag' } }
 
           it 'extracts etag from lowercase header' do
             result = rpc_client.fetch_schema('/rpc/schema')

@@ -38,12 +38,12 @@ module ForestAdminRpcAgent
 
           expect(result[:status]).to eq(200)
           expect(result[:content]).to eq(cached_schema)
-          expect(result[:headers]['ETag']).to eq(%("#{cached_hash}"))
+          expect(result[:headers]['ETag']).to eq(cached_hash)
         end
 
         context 'when client provides matching If-None-Match header' do
           let(:mock_request) do
-            instance_double(::Rack::Request, get_header: %("#{cached_hash}"))
+            instance_double(::Rack::Request, get_header: cached_hash)
           end
 
           before do
@@ -55,7 +55,7 @@ module ForestAdminRpcAgent
 
             expect(result[:status]).to eq(304)
             expect(result[:content]).to be_nil
-            expect(result[:headers]['ETag']).to eq(%("#{cached_hash}"))
+            expect(result[:headers]['ETag']).to eq(cached_hash)
           end
 
           it 'logs debug message' do
@@ -67,7 +67,7 @@ module ForestAdminRpcAgent
 
         context 'when client provides non-matching If-None-Match header' do
           let(:mock_request) do
-            instance_double(::Rack::Request, get_header: '"different_hash"')
+            instance_double(::Rack::Request, get_header: 'different_hash')
           end
 
           it 'returns the full schema with ETag header' do
@@ -75,7 +75,7 @@ module ForestAdminRpcAgent
 
             expect(result[:status]).to eq(200)
             expect(result[:content]).to eq(cached_schema)
-            expect(result[:headers]['ETag']).to eq(%("#{cached_hash}"))
+            expect(result[:headers]['ETag']).to eq(cached_hash)
           end
         end
 
@@ -97,7 +97,7 @@ module ForestAdminRpcAgent
             # Sinatra-style: responds to env but not get_header
             # Using a Struct to simulate Sinatra request behavior
             hash_value = cached_hash
-            Struct.new(:env).new({ 'HTTP_IF_NONE_MATCH' => %("#{hash_value}") })
+            Struct.new(:env).new({ 'HTTP_IF_NONE_MATCH' => hash_value })
           end
 
           it 'extracts If-None-Match from env and returns 304 when hash matches' do
