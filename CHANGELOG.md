@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.0...v1.23.1) (2026-01-28)
+
+
+### Bug Fixes
+
+* **context_variables:** update tags parsing to match API v4 response format ([#258](https://github.com/ForestAdmin/agent-ruby/issues/258)) ([57b913d](https://github.com/ForestAdmin/agent-ruby/commit/57b913df3e5f735cdc54bcf6ae2ed2db05a43372))
+
 # [1.23.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.22.3...v1.23.0) (2026-01-26)
 
 
