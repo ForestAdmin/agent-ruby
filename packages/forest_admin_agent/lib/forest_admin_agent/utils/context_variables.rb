@@ -30,9 +30,11 @@ module ForestAdminAgent
 
         if context_variable_key.start_with?(USER_VALUE_TAG_PREFIX)
           tag_key = context_variable_key[USER_VALUE_TAG_PREFIX.length..]
-          user[:tags].each do |tag|
-            return tag['value'] if tag['key'] == tag_key
-          end
+          tags = user[:tags]
+          return nil if tags.nil?
+
+          value = tags[tag_key] || tags[tag_key.to_sym]
+          return value
         end
 
         user[context_variable_key[USER_VALUE_PREFIX.length..].to_sym]
