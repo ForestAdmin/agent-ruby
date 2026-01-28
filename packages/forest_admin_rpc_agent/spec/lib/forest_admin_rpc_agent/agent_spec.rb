@@ -194,6 +194,18 @@ module ForestAdminRpcAgent
         expect(instance.rpc_collections).to include('users', 'orders')
       end
 
+      it 'accepts regex patterns' do
+        instance.mark_collections_as_rpc(/^rpc_/, /.*_private$/)
+
+        expect(instance.rpc_collections).to include(/^rpc_/, /.*_private$/)
+      end
+
+      it 'accepts mixed strings and regex patterns' do
+        instance.mark_collections_as_rpc('users', /^admin_/)
+
+        expect(instance.rpc_collections).to include('users', /^admin_/)
+      end
+
       it 'returns self for method chaining' do
         result = instance.mark_collections_as_rpc('products')
 
@@ -266,6 +278,31 @@ module ForestAdminRpcAgent
         collection_names = instance.cached_schema[:collections].map { |c| c[:name] }
         expect(collection_names).to include('NormalCollection')
         expect(collection_names).not_to include('RpcCollection')
+      end
+
+      it 'excludes collections matching regex patterns from schema collections' do
+        rpc_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+        rpc_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        allow(rpc_collection1).to receive_messages(name: 'rpc_users', schema: { fields: {} })
+        allow(rpc_collection2).to receive_messages(name: 'rpc_orders', schema: { fields: {} })
+        allow(normal_collection).to receive_messages(name: 'products', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: {
+            'rpc_users' => rpc_collection1,
+            'rpc_orders' => rpc_collection2,
+            'products' => normal_collection
+          },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc(/^rpc_/)
+        instance.send_schema
+
+        collection_names = instance.cached_schema[:collections].map { |c| c[:name] }
+        expect(collection_names).to include('products')
+        expect(collection_names).not_to include('rpc_users', 'rpc_orders')
       end
 
       it 'extracts relations from RPC collections to non-RPC collections into rpc_relations' do
