@@ -56,29 +56,29 @@ module ForestAdminDatasourceActiveRecord
         model.inheritance_column && column.name == model.inheritance_column
       end
 
+      def normalize_default_value(column)
+        case column.type
+        when :boolean
+          case column.default.to_s
+          when '0', 'f', 'false'
+            false
+          when '1', 't', 'true'
+            true
+          else
+            column.default
+          end
+        when :integer
+          column.default.to_i
+        when :float, :decimal
+          column.default.to_f
+        else
+          column.default
+        end
+      end
+
       def operators_for_column_type(type)
         result = [Operators::PRESENT, Operators::BLANK, Operators::MISSING]
         equality = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN]
-        orderables = [
-          Operators::LESS_THAN,
-          Operators::GREATER_THAN,
-          Operators::LESS_THAN_OR_EQUAL,
-          Operators::GREATER_THAN_OR_EQUAL
-        ]
-        strings = [
-          Operators::LIKE,
-          Operators::I_LIKE,
-          Operators::CONTAINS,
-          Operators::I_CONTAINS,
-          Operators::NOT_CONTAINS,
-          Operators::NOT_I_CONTAINS,
-          Operators::STARTS_WITH,
-          Operators::I_STARTS_WITH,
-          Operators::ENDS_WITH,
-          Operators::I_ENDS_WITH,
-          Operators::SHORTER_THAN,
-          Operators::LONGER_THAN
-        ]
 
         if type.is_a? String
           orderables = [
