@@ -329,6 +329,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/query_aggregate.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/collection_customizer.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/binary/binary_collection_decorator.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/publication/publication_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/search/search_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/relation/relation_collection_decorator.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/rename_collection/rename_collection_decorator.rb'
