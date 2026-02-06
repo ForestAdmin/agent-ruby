@@ -11,6 +11,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceCustomizer::DSL::DatasourceHelpers
 
       attr_reader :customizer, :container, :has_env_secret
+      attr_accessor :schema_only_mode, :schema_output_path
 
       def setup(options)
         @options = options
@@ -55,7 +56,25 @@ module ForestAdminAgent
         # Reset route cache to ensure routes are computed with all customizations
         ForestAdminAgent::Http::Router.reset_cached_routes!
 
-        send_schema
+        if @schema_only_mode
+          generate_schema_only(output_path: @schema_output_path)
+        else
+          send_schema
+        end
+      end
+
+      # Generates the schema file without sending it to the Forest Admin API.
+      # @param output_path [String, nil] Optional custom path for the schema file
+      # @return [Hash] The generated schema
+      def generate_schema_only(output_path: nil)
+        datasource = @container.resolve(:datasource)
+        schema = build_schema(datasource)
+        schema_path = output_path || Facades::Container.cache(:schema_path)
+
+        write_schema_file(schema_path, schema)
+        @logger.log('Info', "[ForestAdmin] Schema generated successfully at #{schema_path}")
+
+        schema
       end
 
       def reload!

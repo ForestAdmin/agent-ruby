@@ -47,6 +47,114 @@ module ForestAdminAgent
             expect(described_class.instance.container.resolve(:datasource))
               .to eq(described_class.instance.customizer.datasource({}))
           end
+
+          it 'calls send_schema when schema_only_mode is false' do
+            instance = described_class.instance
+            instance.schema_only_mode = false
+            allow(instance).to receive(:send_schema)
+
+            instance.build
+
+            expect(instance).to have_received(:send_schema)
+          end
+
+          it 'calls generate_schema_only when schema_only_mode is true' do
+            instance = described_class.instance
+            instance.schema_only_mode = true
+            allow(instance).to receive(:generate_schema_only)
+
+            instance.build
+
+            expect(instance).to have_received(:generate_schema_only).with(output_path: nil)
+          ensure
+            instance.schema_only_mode = false
+          end
+
+          it 'passes schema_output_path to generate_schema_only' do
+            instance = described_class.instance
+            instance.schema_only_mode = true
+            instance.schema_output_path = '/custom/path/schema.json'
+            allow(instance).to receive(:generate_schema_only)
+
+            instance.build
+
+            expect(instance).to have_received(:generate_schema_only).with(output_path: '/custom/path/schema.json')
+          ensure
+            instance.schema_only_mode = false
+            instance.schema_output_path = nil
+          end
+        end
+
+        describe 'generate_schema_only' do
+          it 'generates schema and writes to default path' do
+            instance = described_class.instance
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+            allow(File).to receive(:write)
+
+            instance.generate_schema_only
+
+            expect(File).to have_received(:write).with('/path/to/schema.json', anything)
+            expect(logger).to have_received(:log).with('Info', '[ForestAdmin] Schema generated successfully at /path/to/schema.json')
+          end
+
+          it 'writes to custom output_path when provided' do
+            instance = described_class.instance
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+            allow(File).to receive(:write)
+
+            instance.generate_schema_only(output_path: '/custom/output.json')
+
+            expect(File).to have_received(:write).with('/custom/output.json', anything)
+            expect(logger).to have_received(:log).with('Info', '[ForestAdmin] Schema generated successfully at /custom/output.json')
+          end
+
+          it 'returns the generated schema' do
+            instance = described_class.instance
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [{ name: 'Book' }], meta: { liana: 'forest-rails' })
+            allow(File).to receive(:write)
+
+            result = instance.generate_schema_only
+
+            expect(result).to eq({ meta: { liana: 'forest-rails' }, collections: [{ name: 'Book' }] })
+          end
+
+          it 'does not call post_schema' do
+            instance = described_class.instance
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+            instance.container.register(:datasource, datasource)
+
+            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
+            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
+            allow(File).to receive(:write)
+            allow(instance).to receive(:post_schema)
+
+            instance.generate_schema_only
+
+            expect(instance).not_to have_received(:post_schema)
+          end
         end
 
         describe 'reload!' do
