@@ -1,3 +1,10 @@
+## [1.23.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.1...v1.23.2) (2026-02-06)
+
+
+### Bug Fixes
+
+* **ci:** use BUNDLE_PATH to avoid insecure install path with Ruby 4.0 ([#261](https://github.com/ForestAdmin/agent-ruby/issues/261)) ([fe2bb53](https://github.com/ForestAdmin/agent-ruby/commit/fe2bb53479683981379d4ac9798c8eff11189b89))
+
 ## [1.23.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.0...v1.23.1) (2026-01-28)
 
 
