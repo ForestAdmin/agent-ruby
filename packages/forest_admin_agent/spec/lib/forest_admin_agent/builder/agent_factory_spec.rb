@@ -65,23 +65,9 @@ module ForestAdminAgent
 
             instance.build
 
-            expect(instance).to have_received(:generate_schema_only).with(output_path: nil)
+            expect(instance).to have_received(:generate_schema_only)
           ensure
             instance.schema_only_mode = false
-          end
-
-          it 'passes schema_output_path to generate_schema_only' do
-            instance = described_class.instance
-            instance.schema_only_mode = true
-            instance.schema_output_path = '/custom/path/schema.json'
-            allow(instance).to receive(:generate_schema_only)
-
-            instance.build
-
-            expect(instance).to have_received(:generate_schema_only).with(output_path: '/custom/path/schema.json')
-          ensure
-            instance.schema_only_mode = false
-            instance.schema_output_path = nil
           end
         end
 
@@ -102,23 +88,6 @@ module ForestAdminAgent
 
             expect(File).to have_received(:write).with('/path/to/schema.json', anything)
             expect(logger).to have_received(:log).with('Info', '[ForestAdmin] Schema generated successfully at /path/to/schema.json')
-          end
-
-          it 'writes to custom output_path when provided' do
-            instance = described_class.instance
-            logger = instance_spy(Services::LoggerService)
-            instance.instance_variable_set(:@logger, logger)
-
-            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
-            instance.container.register(:datasource, datasource)
-
-            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
-            allow(File).to receive(:write)
-
-            instance.generate_schema_only(output_path: '/custom/output.json')
-
-            expect(File).to have_received(:write).with('/custom/output.json', anything)
-            expect(logger).to have_received(:log).with('Info', '[ForestAdmin] Schema generated successfully at /custom/output.json')
           end
 
           it 'returns the generated schema' do

@@ -4,7 +4,6 @@ namespace :forest_admin do
     task generate: :environment do
       require 'forest_admin_agent'
 
-      output_path = ENV.fetch('output', nil)
       debug_mode = ENV['debug'] == 'true'
 
       puts '[ForestAdmin] Starting schema generation...'
@@ -26,7 +25,6 @@ namespace :forest_admin do
 
       # Enable schema-only mode (generates schema without sending to API)
       agent_factory.schema_only_mode = true
-      agent_factory.schema_output_path = output_path if output_path
 
       # Load and execute the create_agent.rb file
       require create_agent_path
