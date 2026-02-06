@@ -15,6 +15,8 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      BUNDLE_PATH: ${{ runner.temp }}/bundle
     strategy:
       matrix:
         ruby-version: ["3.4", "4.0"]
@@ -39,9 +41,7 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
 
       - name: Install dependencies on main repo
-        run: |
-          gem install bundler
-          bundle install
+        run: bundle install
 
       - name: Install dependencies on packages
         run: cd packages/${{ matrix.packages }} && bundle install && cd -
@@ -53,6 +53,8 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: [lint]
+    env:
+      BUNDLE_PATH: ${{ runner.temp }}/bundle
     strategy:
       matrix:
         ruby-version: ["3.4", "4.0"]
@@ -79,9 +81,7 @@ jobs:
           ruby-version: ${{ matrix.ruby-version }}
 
       - name: Install dependencies on main repo
-        run: |
-          gem install bundler
-          bundle install
+        run: bundle install
 
       - name: Wait for MongoDB
         if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
