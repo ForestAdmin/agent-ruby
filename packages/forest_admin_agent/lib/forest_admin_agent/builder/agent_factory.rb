@@ -63,9 +63,6 @@ module ForestAdminAgent
         end
       end
 
-      # Generates the schema file without sending it to the Forest Admin API.
-      # @param output_path [String, nil] Optional custom path for the schema file
-      # @return [Hash] The generated schema
       def generate_schema_only(output_path: nil)
         datasource = @container.resolve(:datasource)
         schema = build_schema(datasource)
