@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.3...v1.24.0) (2026-02-09)
+
+
+### Features
+
+* add rake task to generate schema without server ([#260](https://github.com/ForestAdmin/agent-ruby/issues/260)) ([1ee7189](https://github.com/ForestAdmin/agent-ruby/commit/1ee7189cd526698cefb5f25c033c26a503c92f85))
+
 ## [1.23.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.2...v1.23.3) (2026-02-09)
 
 
