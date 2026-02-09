@@ -383,6 +383,79 @@ module ForestAdminAgent
             expect(result).to eq(instance)
           end
         end
+
+        describe 'send_schema_to_server' do
+          let(:instance) { described_class.instance }
+          let(:logger) { instance_double(Services::LoggerService) }
+          let(:client) { instance_double(ForestAdminAgent::Http::ForestAdminApiRequester) }
+          let(:api_map) { { meta: { schemaFileHash: 'abc123' }, collections: [] } }
+
+          before do
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+            allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:new).and_return(client)
+            allow(logger).to receive(:log)
+          end
+
+          it 'logs success message and posts schema when successful' do
+            allow(client).to receive(:post).with('/forest/apimaps', api_map.to_json)
+
+            instance.send(:send_schema_to_server, api_map)
+
+            expect(logger).to have_received(:log).with('Info', 'schema was updated, sending new version')
+            expect(client).to have_received(:post).with('/forest/apimaps', api_map.to_json)
+          end
+
+          context 'when error occurs with HTTP status' do
+            it 'logs error with status 400' do
+              error = Faraday::ClientError.new('Bad Request', { status: 400 })
+              allow(client).to receive(:post).and_raise(error)
+
+              instance.send(:send_schema_to_server, api_map)
+
+              expect(logger).to have_received(:log).with('Info', 'schema was updated, sending new version')
+              expect(logger).to have_received(:log).with('Error', 'Failed to send schema: invalid request (HTTP 400)')
+            end
+
+            it 'logs error with status 500' do
+              error = Faraday::ServerError.new('Internal Server Error', { status: 500 })
+              allow(client).to receive(:post).and_raise(error)
+
+              instance.send(:send_schema_to_server, api_map)
+
+              expect(logger).to have_received(:log).with('Error', 'Failed to send schema: invalid request (HTTP 500)')
+            end
+
+            it 'logs error with status 502' do
+              error = Faraday::ServerError.new('Bad Gateway', { status: 502 })
+              allow(client).to receive(:post).and_raise(error)
+
+              instance.send(:send_schema_to_server, api_map)
+
+              expect(logger).to have_received(:log).with('Error', 'Failed to send schema: invalid request (HTTP 502)')
+            end
+          end
+
+          context 'when error occurs without HTTP status (unreachable)' do
+            it 'logs connection failure message' do
+              error = Faraday::ConnectionFailed.new('Failed to open TCP connection')
+              allow(client).to receive(:post).and_raise(error)
+
+              instance.send(:send_schema_to_server, api_map)
+
+              expect(logger).to have_received(:log).with('Info', 'schema was updated, sending new version')
+              expect(logger).to have_received(:log).with('Error', 'Failed to send schema: cannot reach ForestAdmin server')
+            end
+
+            it 'logs timeout error message' do
+              error = Faraday::TimeoutError.new('execution expired')
+              allow(client).to receive(:post).and_raise(error)
+
+              instance.send(:send_schema_to_server, api_map)
+
+              expect(logger).to have_received(:log).with('Error', 'Failed to send schema: cannot reach ForestAdmin server')
+            end
+          end
+        end
       end
     end
   end

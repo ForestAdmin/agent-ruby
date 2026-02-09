@@ -161,9 +161,7 @@ module ForestAdminAgent
         should_send = do_server_want_schema(api_map[:meta][:schemaFileHash])
 
         if should_send || force
-          client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-          client.post('/forest/apimaps', api_map.to_json)
-          ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
+          send_schema_to_server(api_map)
         else
           @container.resolve(:logger)
           ForestAdminAgent::Facades::Container.logger.log('Info', 'Schema was not updated since last run')
@@ -240,6 +238,25 @@ module ForestAdminAgent
         environment = Facades::Container.cache(:is_production) ? 'production' : 'development'
         @logger.log('Info',
                     "[ForestAdmin] Running in #{environment} mode")
+      end
+
+      def send_schema_to_server(api_map)
+        ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
+        client = ForestAdminAgent::Http::ForestAdminApiRequester.new
+        client.post('/forest/apimaps', api_map.to_json)
+      rescue Faraday::Error => e
+        status = e.response[:status] if e.response
+        if status
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            "Failed to send schema: invalid request (HTTP #{status})"
+          )
+        else
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Error',
+            'Failed to send schema: cannot reach ForestAdmin server'
+          )
+        end
       end
     end
   end
