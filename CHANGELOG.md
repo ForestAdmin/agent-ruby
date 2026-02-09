@@ -1,3 +1,10 @@
+## [1.23.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.2...v1.23.3) (2026-02-09)
+
+
+### Bug Fixes
+
+* **apimap:** log error on post apimap failure ([#262](https://github.com/ForestAdmin/agent-ruby/issues/262)) ([d309621](https://github.com/ForestAdmin/agent-ruby/commit/d309621deeb94c015280d7ef1bf2c6d01bd8465e))
+
 ## [1.23.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.1...v1.23.2) (2026-02-06)
 
 
