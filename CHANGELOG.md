@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.0...v1.24.1) (2026-02-10)
+
+
+### Bug Fixes
+
+* cast JWT payload exp and rendering_id to string and include role ([#263](https://github.com/ForestAdmin/agent-ruby/issues/263)) ([6f14abe](https://github.com/ForestAdmin/agent-ruby/commit/6f14abec601c44faab6a89ddb323c3f3b39cc133))
+
 # [1.24.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.23.3...v1.24.0) (2026-02-09)
 
 
