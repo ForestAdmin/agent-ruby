@@ -1,4 +1,5 @@
-require 'date'
+require 'active_support'
+require 'active_support/core_ext/numeric/time'
 require 'jwt'
 
 module ForestAdminAgent
@@ -15,19 +16,21 @@ module ForestAdminAgent
         end
 
         def expiration_in_seconds
-          (DateTime.now + (1 / 24.0)).to_time.to_i
+          Time.now.to_i + 1.hour
         end
 
         def make_jwt
           attributes = @data['attributes']
+
           user = {
             id: id,
             email: attributes['email'],
             first_name: attributes['first_name'],
             last_name: attributes['last_name'],
             team: attributes['teams'][0],
+            role: attributes['role'],
             tags: attributes['tags'],
-            rendering_id: @rendering_id,
+            rendering_id: @rendering_id.to_s,
             exp: expiration_in_seconds,
             permission_level: attributes['permission_level']
           }
