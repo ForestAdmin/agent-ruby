@@ -16,6 +16,7 @@ module ForestAdminAgent
               'first_name' => 'john',
               'last_name' => 'doe',
               'teams' => ['team'],
+              'role' => 'role',
               'tags' => ['tag'],
               'permission_level' => 'permission_level'
             }
@@ -25,7 +26,7 @@ module ForestAdminAgent
         context 'when creating a new ForestResourceOwner' do
           it 'initializes the forest resource owner' do
             expect(forest_resource_owner.id).to eq 'id'
-            expect(forest_resource_owner.expiration_in_seconds).to eq (DateTime.now + (1 / 24.0)).to_time.to_i
+            expect(forest_resource_owner.expiration_in_seconds).to eq Time.now.to_i + 1.hour
           end
 
           it 'makes a jwt' do
@@ -37,9 +38,10 @@ module ForestAdminAgent
               'first_name' => 'john',
               'last_name' => 'doe',
               'team' => 'team',
+              'role' => 'role',
               'tags' => ['tag'],
-              'rendering_id' => 10,
-              'exp' => forest_resource_owner.expiration_in_seconds,
+              'rendering_id' => '10',
+              'exp' => forest_resource_owner.expiration_in_seconds.to_s,
               'permission_level' => 'permission_level'
             }
 
