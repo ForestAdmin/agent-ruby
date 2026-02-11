@@ -25,7 +25,8 @@ module ForestAdminRails
     extend ActiveSupport::Concern
 
     initializer 'forest_admin_rails.add_autoload_paths', before: :set_autoload_paths do |app|
-      app.config.autoload_paths << Rails.root.join('lib')
+      lib_path = Rails.root.join('lib')
+      app.config.autoload_paths << lib_path unless app.config.autoload_paths.frozen?
     end
 
     initializer 'forest_admin_rails.error_subscribe' do

@@ -20,8 +20,9 @@ module ForestAdminRpcAgent
             puts "Registering #{route_class}"
             route_class.registered(app)
           else
-            ForestAdminAgent::Facades::Container.logger.log('warn',
-                                                            "Skipping #{route_class} (does not respond to :registered)")
+            ForestAdminAgent::Facades::Container.logger&.log(
+              'warn', "Skipping #{route_class} (does not respond to :registered)"
+            )
           end
         end
       end

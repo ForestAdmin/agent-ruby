@@ -12,7 +12,7 @@ module ForestAdminAgent
       end
 
       def self.logger
-        instance.resolve(:logger)
+        instance&.resolve(:logger)
       end
 
       def self.config_from_cache
