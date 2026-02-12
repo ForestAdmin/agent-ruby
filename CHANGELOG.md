@@ -1,3 +1,10 @@
+## [1.24.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.1...v1.24.2) (2026-02-12)
+
+
+### Bug Fixes
+
+* support eager_load config ([#264](https://github.com/ForestAdmin/agent-ruby/issues/264)) ([f434bfe](https://github.com/ForestAdmin/agent-ruby/commit/f434bfe3f70fdb5c10f061fb4965c5ede5bd3bcc))
+
 ## [1.24.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.0...v1.24.1) (2026-02-10)
 
 
