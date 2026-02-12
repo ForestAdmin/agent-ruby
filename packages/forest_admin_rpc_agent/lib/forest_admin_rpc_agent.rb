@@ -7,6 +7,7 @@ require 'forest_admin_datasource_toolkit'
 require 'zeitwerk'
 
 loader = Zeitwerk::Loader.for_gem
+loader.ignore("#{__dir__}/forest_admin_rpc_agent/extensions/sinatra_extension.rb")
 loader.setup
 
 module ForestAdminRpcAgent
