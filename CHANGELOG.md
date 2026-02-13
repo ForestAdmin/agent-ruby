@@ -1,3 +1,10 @@
+## [1.24.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.2...v1.24.3) (2026-02-13)
+
+
+### Bug Fixes
+
+* prevent eager_load crash when sinatra gem is present in rails app ([#265](https://github.com/ForestAdmin/agent-ruby/issues/265)) ([9378d40](https://github.com/ForestAdmin/agent-ruby/commit/9378d405504a1ad5464a6618a37765ecf084950b))
+
 ## [1.24.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.1...v1.24.2) (2026-02-12)
 
 
