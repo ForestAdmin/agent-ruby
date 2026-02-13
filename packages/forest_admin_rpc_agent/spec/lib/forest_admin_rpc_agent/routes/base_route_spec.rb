@@ -49,6 +49,21 @@ module ForestAdminRpcAgent
           end
         end
 
+        context 'when the app is an ActionDispatch::Routing::Mapper and Sinatra is defined' do
+          let(:rails_app) { Class.new(Rails::Application) }
+          let(:rails_router) { ActionDispatch::Routing::Mapper.new(rails_app.routes) }
+
+          before do
+            stub_const('Sinatra::Base', Class.new)
+            allow(route).to receive(:register_rails)
+          end
+
+          it 'calls register_rails without raising NoMethodError' do
+            expect { route.registered(rails_router) }.not_to raise_error
+            expect(route).to have_received(:register_rails).with(rails_router)
+          end
+        end
+
         context 'when the app is neither Sinatra nor Rails' do
           let(:unknown_app) { Object.new }
 
