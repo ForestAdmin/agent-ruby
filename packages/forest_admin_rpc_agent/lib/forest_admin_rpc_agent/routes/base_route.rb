@@ -8,10 +8,10 @@ module ForestAdminRpcAgent
       end
 
       def registered(app)
-        if defined?(Sinatra) && (app == Sinatra::Base || app.ancestors.include?(Sinatra::Base))
-          register_sinatra(app)
-        elsif defined?(Rails) && app.is_a?(ActionDispatch::Routing::Mapper)
+        if defined?(Rails) && app.is_a?(ActionDispatch::Routing::Mapper)
           register_rails(app)
+        elsif defined?(Sinatra) && app.is_a?(Class) && (app == Sinatra::Base || app.ancestors.include?(Sinatra::Base))
+          register_sinatra(app)
         else
           raise NotImplementedError,
                 "Unsupported application type: #{app.class}. #{self} works with Sinatra::Base or ActionDispatch::Routing::Mapper."
