@@ -1,3 +1,10 @@
+## [1.24.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.3...v1.24.4) (2026-02-17)
+
+
+### Bug Fixes
+
+* **rpc agent:** avoid error on rpc relation computing ([#266](https://github.com/ForestAdmin/agent-ruby/issues/266)) ([e6c60e6](https://github.com/ForestAdmin/agent-ruby/commit/e6c60e6758ec9f90b364d2651a40f45deb9f59ec))
+
 ## [1.24.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.2...v1.24.3) (2026-02-13)
 
 
