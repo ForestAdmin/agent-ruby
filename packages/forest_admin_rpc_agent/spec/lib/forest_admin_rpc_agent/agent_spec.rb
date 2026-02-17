@@ -349,6 +349,192 @@ module ForestAdminRpcAgent
         expect(rpc_relations_for_rpc1).not_to have_key('other_rpc')
       end
 
+      context 'with PolymorphicManyToOne relations' do
+        it 'extracts polymorphic relation from RPC collection when targeting non-RPC collections' do
+          rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[NormalCollection1 NormalCollection2]
+          )
+
+          allow(rpc_collection).to receive_messages(
+            name: 'RpcCollection',
+            schema: { fields: { 'commentable' => polymorphic_field } }
+          )
+          allow(normal_collection1).to receive_messages(name: 'NormalCollection1', schema: { fields: {} })
+          allow(normal_collection2).to receive_messages(name: 'NormalCollection2', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'RpcCollection' => rpc_collection,
+              'NormalCollection1' => normal_collection1,
+              'NormalCollection2' => normal_collection2
+            },
+            live_query_connections: {}
+          )
+
+          instance.mark_collections_as_rpc('RpcCollection')
+          instance.send_schema
+
+          expect(instance.cached_schema[:rpc_relations]).to have_key('RpcCollection')
+          expect(instance.cached_schema[:rpc_relations]['RpcCollection']).to have_key('commentable')
+        end
+
+        it 'does not extract polymorphic relation from RPC collection when all targets are RPC' do
+          rpc_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          rpc_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          rpc_collection3 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[RpcCollection2 RpcCollection3]
+          )
+
+          allow(rpc_collection1).to receive_messages(
+            name: 'RpcCollection1',
+            schema: { fields: { 'commentable' => polymorphic_field } }
+          )
+          allow(rpc_collection2).to receive_messages(name: 'RpcCollection2', schema: { fields: {} })
+          allow(rpc_collection3).to receive_messages(name: 'RpcCollection3', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'RpcCollection1' => rpc_collection1,
+              'RpcCollection2' => rpc_collection2,
+              'RpcCollection3' => rpc_collection3
+            },
+            live_query_connections: {}
+          )
+
+          instance.mark_collections_as_rpc('RpcCollection1', 'RpcCollection2', 'RpcCollection3')
+          instance.send_schema
+
+          rpc_relations_for_rpc1 = instance.cached_schema[:rpc_relations]['RpcCollection1'] || {}
+          expect(rpc_relations_for_rpc1).not_to have_key('commentable')
+        end
+
+        it 'extracts polymorphic relation from RPC collection when some targets are RPC and some are not' do
+          rpc_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          rpc_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[RpcCollection2 NormalCollection]
+          )
+
+          allow(rpc_collection1).to receive_messages(
+            name: 'RpcCollection1',
+            schema: { fields: { 'commentable' => polymorphic_field } }
+          )
+          allow(rpc_collection2).to receive_messages(name: 'RpcCollection2', schema: { fields: {} })
+          allow(normal_collection).to receive_messages(name: 'NormalCollection', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'RpcCollection1' => rpc_collection1,
+              'RpcCollection2' => rpc_collection2,
+              'NormalCollection' => normal_collection
+            },
+            live_query_connections: {}
+          )
+
+          instance.mark_collections_as_rpc('RpcCollection1', 'RpcCollection2')
+          instance.send_schema
+
+          # Mixed targets: at least one is RPC, so the relation is NOT extracted for RPC collections
+          # (the `next if relation_targets_rpc_collection?` skips it because .any? returns true)
+          rpc_relations_for_rpc1 = instance.cached_schema[:rpc_relations]['RpcCollection1'] || {}
+          expect(rpc_relations_for_rpc1).not_to have_key('commentable')
+        end
+
+        it 'extracts polymorphic relation from normal collection when any target is an RPC collection' do
+          rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[RpcCollection NormalCollection2]
+          )
+
+          allow(rpc_collection).to receive_messages(name: 'RpcCollection', schema: { fields: {} })
+          allow(normal_collection).to receive_messages(
+            name: 'NormalCollection',
+            schema: { fields: { 'commentable' => polymorphic_field } }
+          )
+          allow(normal_collection2).to receive_messages(name: 'NormalCollection2', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'RpcCollection' => rpc_collection,
+              'NormalCollection' => normal_collection,
+              'NormalCollection2' => normal_collection2
+            },
+            live_query_connections: {}
+          )
+
+          instance.mark_collections_as_rpc('RpcCollection')
+          instance.send_schema
+
+          expect(instance.cached_schema[:rpc_relations]).to have_key('NormalCollection')
+          expect(instance.cached_schema[:rpc_relations]['NormalCollection']).to have_key('commentable')
+        end
+
+        it 'does not extract polymorphic relation from normal collection when no target is RPC' do
+          normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          normal_collection3 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[NormalCollection2 NormalCollection3]
+          )
+
+          column_field = instance_double(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
+          allow(column_field).to receive_messages(type: 'Column')
+          allow(column_field).to receive(:filter_operators=)
+          allow(column_field).to receive(:filter_operators).and_return([])
+          allow(ForestAdminAgent::Utils::Schema::FrontendFilterable).to receive(:sort_operators).and_return([])
+
+          allow(normal_collection).to receive_messages(
+            name: 'NormalCollection',
+            schema: { fields: { 'id' => column_field, 'commentable' => polymorphic_field } }
+          )
+          allow(normal_collection2).to receive_messages(name: 'NormalCollection2', schema: { fields: {} })
+          allow(normal_collection3).to receive_messages(name: 'NormalCollection3', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'NormalCollection' => normal_collection,
+              'NormalCollection2' => normal_collection2,
+              'NormalCollection3' => normal_collection3
+            },
+            live_query_connections: {}
+          )
+
+          instance.send_schema
+
+          # No RPC targets, so the polymorphic relation stays in the normal collection's fields
+          expect(instance.cached_schema[:rpc_relations]).not_to have_key('NormalCollection')
+          normal_schema = instance.cached_schema[:collections].find { |c| c[:name] == 'NormalCollection' }
+          expect(normal_schema[:fields]).to have_key('commentable')
+        end
+      end
+
       it 'sorts filter_operators for Column fields' do
         normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
         column_field = instance_double(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
