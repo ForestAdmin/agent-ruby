@@ -97,7 +97,7 @@ module ForestAdminRpcAgent
           # RPC collection → extract relations to non-RPC collections
           collection.schema[:fields].each do |field_name, field|
             next if field.type == 'Column'
-            next if @rpc_collections.include?(field.foreign_collection)
+            next if relation_targets_rpc_collection?(field)
 
             relations[field_name] = field
           end
@@ -105,7 +105,7 @@ module ForestAdminRpcAgent
           fields = {}
 
           collection.schema[:fields].each do |field_name, field|
-            if field.type != 'Column' && @rpc_collections.include?(field.foreign_collection)
+            if field.type != 'Column' && relation_targets_rpc_collection?(field)
               relations[field_name] = field
             else
               if field.type == 'Column'
@@ -132,6 +132,14 @@ module ForestAdminRpcAgent
                                                     .map { |connection_name| { name: connection_name } }
 
       schema
+    end
+
+    def relation_targets_rpc_collection?(relation)
+      if relation.type == 'PolymorphicManyToOne'
+        relation.foreign_collections.any? { |fc| @rpc_collections.include?(fc) }
+      else
+        @rpc_collections.include?(relation.foreign_collection)
+      end
     end
 
     def compute_and_cache_hash
