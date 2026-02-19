@@ -5,4 +5,5 @@ class Car < ApplicationRecord
   # has_many :car_checks
   # has_many :checks, through: :car_checks
   has_and_belongs_to_many :checks
+  has_one :document, as: :documentable
 end

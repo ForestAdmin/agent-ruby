@@ -3,7 +3,7 @@ module ForestAdminRails
     def self.setup!
       datasource = ForestAdminDatasourceActiveRecord::Datasource.new(
         Rails.env.to_sym,
-        # support_polymorphic_relations: true,
+        support_polymorphic_relations: true,
         # live_query_connections: {
         #   'primary' => 'primary',
         #   'mysql' => 'mysql_db',
