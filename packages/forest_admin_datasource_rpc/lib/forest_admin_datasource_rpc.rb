@@ -12,7 +12,18 @@ module ForestAdminDatasourceRpc
     Utils::SchemaPollingPool.instance.configure(max_threads: max_threads)
   end
 
+  KNOWN_BUILD_OPTIONS = %i[uri auth_secret introspection introspection_etag schema_polling_interval_sec].freeze
+
   def self.build(options)
+    unknown_keys = options.keys - KNOWN_BUILD_OPTIONS
+    if unknown_keys.any?
+      ForestAdminAgent::Facades::Container.logger.log(
+        'Warn',
+        "[RPCDatasource] Unknown option(s) passed to build: #{unknown_keys.join(", ")}. " \
+        "Known options are: #{KNOWN_BUILD_OPTIONS.join(", ")}"
+      )
+    end
+
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     provided_introspection = options[:introspection]

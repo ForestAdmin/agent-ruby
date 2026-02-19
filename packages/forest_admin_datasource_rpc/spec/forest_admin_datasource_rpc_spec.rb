@@ -16,6 +16,39 @@ module ForestAdminDatasourceRpc
 
       include_examples 'with introspection'
 
+      context 'with unknown options' do
+        let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, stop: nil, current_schema: introspection) }
+        let(:logger) { ForestAdminAgent::Facades::Container.logger }
+
+        before do
+          allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
+        end
+
+        it 'logs a warning when unknown keys are passed' do
+          described_class.build({ uri: 'http://localhost', url: 'http://localhost', foo: 'bar' })
+
+          expect(logger).to have_received(:log).with(
+            'Warn',
+            a_string_matching(/Unknown option.*\burl\b.*\bfoo\b/)
+          )
+        end
+
+        it 'logs a warning when a key does not exist in known options' do
+          described_class.build({ uri: 'http://localhost', url: 'http://localhost' })
+
+          expect(logger).to have_received(:log).with(
+            'Warn',
+            a_string_matching(/Unknown option.*url.*Known options are/)
+          )
+        end
+
+        it 'does not log a warning when only known keys are passed' do
+          described_class.build({ uri: 'http://localhost', auth_secret: 'secret', schema_polling_interval_sec: 60 })
+
+          expect(logger).not_to have_received(:log).with('Warn', anything)
+        end
+      end
+
       context 'when server is running' do
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, stop: nil, current_schema: introspection) }
         let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
