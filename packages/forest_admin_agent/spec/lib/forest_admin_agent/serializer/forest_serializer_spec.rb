@@ -70,7 +70,7 @@ module ForestAdminAgent
               'documentable' => { 'id' => 10, 'brand' => 'Toyota' }
             }
 
-            result = JSONAPI::Serializer.serialize(record, class_name: 'Document')
+            result = JSONAPI::Serializer.serialize(record, class_name: 'Document', serializer: described_class)
 
             relationship = result['data']['relationships']['documentable']
             expect(relationship['data']['type']).to eq('Car')
@@ -86,7 +86,7 @@ module ForestAdminAgent
               'documentable' => { 'id' => 5, 'name' => 'John' }
             }
 
-            result = JSONAPI::Serializer.serialize(record, class_name: 'Document')
+            result = JSONAPI::Serializer.serialize(record, class_name: 'Document', serializer: described_class)
 
             relationship = result['data']['relationships']['documentable']
             expect(relationship['data']['type']).to eq('User')
