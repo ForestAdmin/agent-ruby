@@ -29,7 +29,7 @@ module ForestAdminDatasourceRpc
 
           expect(logger).to have_received(:log).with(
             'Warn',
-            a_string_matching(/Unknown option.*:url.*:foo/)
+            a_string_matching(/Unknown option.*\burl\b.*\bfoo\b/)
           )
         end
 
@@ -38,7 +38,7 @@ module ForestAdminDatasourceRpc
 
           expect(logger).to have_received(:log).with(
             'Warn',
-            a_string_matching(/Unknown option.*:url.*Known options are/)
+            a_string_matching(/Unknown option.*url.*Known options are/)
           )
         end
 
