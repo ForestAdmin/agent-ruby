@@ -149,7 +149,7 @@ module ForestAdminAgent
                                  .schema[:fields][attribute_name.to_s]
             options = @options.clone
             if relation.type == 'PolymorphicManyToOne'
-              options[:class_name] = object.class.name
+              options[:class_name] = @object[relation.foreign_key_type_field]
               related_object_serializer = ForestSerializer.new(object, options)
               data[formatted_attribute_name]['data'] = {
                 'type' => related_object_serializer.type.to_s,
