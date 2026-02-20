@@ -1,3 +1,10 @@
+## [1.24.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.4...v1.24.5) (2026-02-20)
+
+
+### Bug Fixes
+
+* **serializer:** resolve polymorphic relation serialization error ([#268](https://github.com/ForestAdmin/agent-ruby/issues/268)) ([52ebbcd](https://github.com/ForestAdmin/agent-ruby/commit/52ebbcd6b5b76ec6233c76af5b8fa42b30d07285))
+
 ## [1.24.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.3...v1.24.4) (2026-02-17)
 
 
