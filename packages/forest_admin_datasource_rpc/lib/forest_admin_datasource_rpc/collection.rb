@@ -22,6 +22,7 @@ module ForestAdminDatasourceRpc
       schema[:actions].each do |action_name, action_schema|
         add_action(action_name.to_s, BaseAction.from_plain_object(action_schema))
       end
+      @schema[:aggregation_capabilities] = schema[:aggregation_capabilities] if schema[:aggregation_capabilities]
     end
 
     def add_fields(fields)

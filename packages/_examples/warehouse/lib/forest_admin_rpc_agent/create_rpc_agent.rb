@@ -3,8 +3,13 @@
 
 module ForestAdminRpcAgent
   class CreateRpcAgent
-    # Single include brings all commonly-used Forest Admin types
-    include ForestAdmin::Types
+    # Include necessary types from Forest Admin packages
+    include ForestAdminDatasourceToolkit::Components::Query
+    include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+    include ForestAdminDatasourceCustomizer::Decorators::Action::Types
+
+    # Make BaseAction available
+    BaseAction = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
 
     def self.setup!
       datasource = ForestAdminDatasourceActiveRecord::Datasource.new(Rails.env.to_sym)
@@ -62,9 +67,9 @@ module ForestAdminRpcAgent
         )
       end
 
-      agent.add_chart('appointments') do |_context, result_builder|
-        result_builder.value(784, 760)
-      end
+      # agent.add_chart('appointments') do |_context, result_builder|
+      #   result_builder.value(784, 760)
+      # end
 
       agent.build
     end

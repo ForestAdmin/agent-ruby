@@ -13,7 +13,11 @@ module ForestAdminTestToolkit
               fields: {},
               countable: false,
               searchable: false,
-              segments: []
+              segments: [],
+              aggregation_capabilities: {
+                support_groups: true,
+                supported_date_operations: %w[Year Quarter Month Week Day]
+              }
             }.merge(args[:schema] || {}),
             execute: nil,
             get_form: nil,

@@ -6,6 +6,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Schema::Relations
       describe Collections do
         include_context 'with caller'
         subject(:capabilities_collections) { described_class.new }
@@ -32,7 +33,9 @@ module ForestAdminAgent
                 'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::PRESENT, Operators::EQUAL]),
                 'price' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::GREATER_THAN, Operators::LESS_THAN]),
                 'date' => ColumnSchema.new(column_type: 'Date', filter_operators: [Operators::YESTERDAY]),
-                'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL])
+                'year' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL]),
+                'author_id' => ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL], is_groupable: true),
+                'author' => ManyToOneSchema.new(foreign_key: 'author_id', foreign_key_target: 'id', foreign_collection: 'user')
               }
             }
           )
@@ -77,6 +80,12 @@ module ForestAdminAgent
               [{ name: 'primary_db' }, { name: 'replica_db' }]
             )
           end
+
+          it 'returns agentCapabilities' do
+            expect(result[:content][:agentCapabilities]).to eq(
+              { canUseProjectionOnGetOne: true }
+            )
+          end
         end
 
         context 'when there is collectionNames in params' do
@@ -108,10 +117,106 @@ module ForestAdminAgent
             expect(fields[2][:operators]).to include('equal', 'present', 'in', 'missing')
           end
 
+          it 'includes isGroupable on each field' do
+            fields = result[:content][:collections][0][:fields]
+            expect(fields).to all(have_key(:isGroupable))
+          end
+
           it 'returns all existing native query connections' do
             expect(result[:content][:nativeQueryConnections]).to eq(
               [{ name: 'primary_db' }, { name: 'replica_db' }]
             )
+          end
+
+          it 'returns agentCapabilities' do
+            expect(result[:content][:agentCapabilities]).to eq(
+              { canUseProjectionOnGetOne: true }
+            )
+          end
+        end
+
+        context 'when collection has ManyToOne relations' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer },
+              params: {
+                'collectionNames' => ['book'],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          let(:result) { capabilities_collections.handle_request(args) }
+
+          it 'includes ManyToOne fields with type and isGroupable from foreign key' do
+            fields = result[:content][:collections][0][:fields]
+            author_field = fields.find { |f| f[:name] == 'author' }
+
+            expect(author_field).not_to be_nil
+            expect(author_field[:type]).to eq('ManyToOne')
+            expect(author_field[:isGroupable]).to be true
+          end
+        end
+
+        context 'when collection has aggregation capabilities' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer },
+              params: {
+                'collectionNames' => ['user'],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          let(:result) { capabilities_collections.handle_request(args) }
+
+          it 'includes aggregationCapabilities' do
+            aggregation_caps = result[:content][:collections][0][:aggregationCapabilities]
+            expect(aggregation_caps).not_to be_nil
+            expect(aggregation_caps[:supportGroups]).to be true
+            expect(aggregation_caps[:supportedDateOperations]).to eq(%w[Year Quarter Month Week Day])
+          end
+        end
+
+        context 'when no field is groupable' do
+          before do
+            datasource = Datasource.new
+            collection_no_group = build_collection(
+              name: 'no_group',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, is_groupable: false, filter_operators: [Operators::EQUAL])
+                },
+                aggregation_capabilities: {
+                  support_groups: true,
+                  supported_date_operations: %w[Year Month]
+                }
+              }
+            )
+
+            datasource.add_collection(collection_no_group)
+            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+            allow(datasource).to receive(:live_query_connections).and_return({})
+          end
+
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer },
+              params: {
+                'collectionNames' => ['no_group'],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          let(:result) { capabilities_collections.handle_request(args) }
+
+          it 'sets supportGroups to false when no field is groupable' do
+            aggregation_caps = result[:content][:collections][0][:aggregationCapabilities]
+            expect(aggregation_caps[:supportGroups]).to be false
           end
         end
 
