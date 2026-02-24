@@ -5,6 +5,7 @@ module ForestAdminDatasourceToolkit
 
       attr_accessor :is_read_only,
                     :is_sortable,
+                    :is_groupable,
                     :validation,
                     :filter_operators,
                     :column_type
@@ -15,6 +16,7 @@ module ForestAdminDatasourceToolkit
         is_primary_key: false,
         is_read_only: false,
         is_sortable: false,
+        is_groupable: true,
         default_value: nil,
         enum_values: [],
         validation: []
@@ -24,6 +26,7 @@ module ForestAdminDatasourceToolkit
         @is_primary_key = is_primary_key
         @is_read_only = is_read_only
         @is_sortable = is_sortable
+        @is_groupable = is_groupable
         @default_value = default_value
         @enum_values = enum_values
         @validation = validation
