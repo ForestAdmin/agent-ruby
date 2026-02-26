@@ -1,3 +1,10 @@
+## [1.24.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.5...v1.24.6) (2026-02-26)
+
+
+### Bug Fixes
+
+* **composite_datasource:** use correct variable in native query error message ([#270](https://github.com/ForestAdmin/agent-ruby/issues/270)) ([d1c2f2f](https://github.com/ForestAdmin/agent-ruby/commit/d1c2f2f7b12a3b933440a80327e34e59502e44a1))
+
 ## [1.24.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.4...v1.24.5) (2026-02-20)
 
 

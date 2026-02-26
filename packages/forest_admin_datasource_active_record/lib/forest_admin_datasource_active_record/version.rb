@@ -1,3 +1,3 @@
 module ForestAdminDatasourceActiveRecord
-  VERSION = "1.24.5"
+  VERSION = "1.24.6"
 end
