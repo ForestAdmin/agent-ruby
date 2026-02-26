@@ -43,7 +43,7 @@ module ForestAdminDatasourceCustomizer
     def execute_native_query(connection_name, query, context_variables = {})
       unless live_query_connections.key?(connection_name)
         raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "Native query connection '#{name}' is unknown."
+              "Native query connection '#{connection_name}' is unknown."
       end
 
       ds = @datasources.find do |d|
