@@ -9,8 +9,8 @@ module ForestAdminDatasourceCustomizer
           @caller = caller
         end
 
-        def native_driver
-          @collection.native_driver
+        def native_driver(&block)
+          @collection.native_driver(&block)
         end
 
         def schema

@@ -34,8 +34,10 @@ module ForestAdminDatasourceActiveRecord
       end
 
       begin
-        connection = @live_query_connections[connection_name]
-        pool = ActiveRecord::Base.connects_to(database: { reading: connection.to_sym }).first
+        connection_spec = @live_query_connections[connection_name]
+        pool = @native_query_pools[connection_spec]
+
+        raise "No connection pool found for '#{connection_spec}'" unless pool
 
         result = pool.with_connection do |conn|
           conn.exec_query(query, "SQL Native Query on '#{connection_name}'", binds)
@@ -87,7 +89,7 @@ module ForestAdminDatasourceActiveRecord
 
     def init_orm(db_config)
       ActiveRecord::Base.establish_connection(db_config)
-      current_config = ActiveRecord::Base.connection_db_config.env_name
+      current_config = ActiveRecord::Base.connection_pool.db_config.env_name
       configurations = ActiveRecord::Base.configurations
                                          .configurations
                                          .group_by(&:env_name)
@@ -98,6 +100,25 @@ module ForestAdminDatasourceActiveRecord
       end.to_h
 
       @connection_drivers = configurations[current_config]
+      init_native_query_pools(current_config)
+    end
+
+    def init_native_query_pools(env_name)
+      @native_query_pools = {}
+      @live_query_connections.each_value do |spec_name|
+        next if @native_query_pools.key?(spec_name)
+
+        db_config = ActiveRecord::Base.configurations.configs_for(
+          env_name: env_name,
+          name: spec_name
+        )
+        next unless db_config
+
+        @native_query_pools[spec_name] = ActiveRecord::Base.connection_handler.establish_connection(
+          db_config,
+          owner_name: "ForestAdminNativeQuery::#{spec_name}"
+        )
+      end
     end
 
     def build_habtm(model)

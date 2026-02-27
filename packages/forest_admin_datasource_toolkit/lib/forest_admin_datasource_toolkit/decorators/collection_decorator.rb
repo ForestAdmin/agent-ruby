@@ -14,8 +14,8 @@ module ForestAdminDatasourceToolkit
         child_collection.parent = self if child_collection.is_a?(CollectionDecorator)
       end
 
-      def native_driver
-        child_collection.native_driver
+      def native_driver(&block)
+        child_collection.native_driver(&block)
       end
 
       def schema

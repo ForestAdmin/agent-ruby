@@ -15,10 +15,34 @@ module ForestAdminDatasourceActiveRecord
       expect(collections).to all(be_a(String))
     end
 
+    describe '#init_orm' do
+      it 'uses connection_pool.db_config instead of deprecated connection_db_config' do
+        mock_db_config = instance_double(ActiveRecord::DatabaseConfigurations::HashConfig, env_name: 'test')
+        mock_pool = instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool, db_config: mock_db_config)
+        allow(ActiveRecord::Base).to receive_messages(
+          establish_connection: nil,
+          connection_pool: mock_pool,
+          configurations: instance_double(ActiveRecord::DatabaseConfigurations, configurations: [])
+        )
+
+        ds = described_class.allocate
+        ds.instance_variable_set(:@live_query_connections, {})
+        ds.send(:init_orm, {})
+
+        expect(ActiveRecord::Base).to have_received(:connection_pool)
+        expect(mock_pool).to have_received(:db_config)
+      end
+    end
+
     describe '#execute_native_query' do
+      let(:mock_pool) do
+        instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool)
+      end
+
       let(:datasource) do
         ds = described_class.allocate
         ds.instance_variable_set(:@live_query_connections, { 'main' => 'primary' })
+        ds.instance_variable_set(:@native_query_pools, { 'primary' => mock_pool })
         ds
       end
 
@@ -38,11 +62,7 @@ module ForestAdminDatasourceActiveRecord
           mock_result = ActiveRecord::Result.new(['test'], [[1]])
           mock_conn = instance_double(ActiveRecord::ConnectionAdapters::AbstractAdapter)
           allow(mock_conn).to receive(:exec_query).and_return(mock_result)
-
-          mock_pool = instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool)
           allow(mock_pool).to receive(:with_connection).and_yield(mock_conn)
-
-          allow(ActiveRecord::Base).to receive(:connects_to).and_return([mock_pool])
 
           result = datasource.execute_native_query('main', 'SELECT 1 as test', [])
 
@@ -54,10 +74,7 @@ module ForestAdminDatasourceActiveRecord
 
       context 'when the query raises an error' do
         it 'wraps the error in a ForestException' do
-          mock_pool = instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool)
           allow(mock_pool).to receive(:with_connection).and_raise(StandardError, 'syntax error')
-
-          allow(ActiveRecord::Base).to receive(:connects_to).and_return([mock_pool])
 
           expect do
             datasource.execute_native_query('main', 'INVALID SQL', [])
@@ -66,6 +83,35 @@ module ForestAdminDatasourceActiveRecord
             /Error when executing SQL query.*syntax error/
           )
         end
+      end
+    end
+
+    describe '#init_native_query_pools' do
+      it 'establishes connection pools using configs_for and custom owner_name' do
+        mock_db_config = instance_double(ActiveRecord::DatabaseConfigurations::HashConfig)
+        mock_pool = instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool,
+                                    db_config: mock_db_config)
+        mock_handler = instance_double(ActiveRecord::ConnectionAdapters::ConnectionHandler)
+
+        allow(ActiveRecord::Base).to receive_messages(
+          configurations: instance_double(
+            ActiveRecord::DatabaseConfigurations,
+            configs_for: mock_db_config,
+            configurations: []
+          ),
+          connection_handler: mock_handler
+        )
+        allow(mock_handler).to receive(:establish_connection).and_return(mock_pool)
+
+        ds = described_class.allocate
+        ds.instance_variable_set(:@live_query_connections, { 'main' => 'primary' })
+        ds.send(:init_native_query_pools, 'test')
+
+        expect(mock_handler).to have_received(:establish_connection).with(
+          mock_db_config,
+          owner_name: 'ForestAdminNativeQuery::primary'
+        )
+        expect(ds.instance_variable_get(:@native_query_pools)).to eq({ 'primary' => mock_pool })
       end
     end
   end
