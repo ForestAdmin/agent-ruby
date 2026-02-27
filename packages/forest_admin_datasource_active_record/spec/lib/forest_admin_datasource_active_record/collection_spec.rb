@@ -371,8 +371,10 @@ module ForestAdminDatasourceActiveRecord
       let(:datasource) { Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }) }
       let(:collection) { described_class.new(datasource, Car) }
 
-      it 'returns a connection via connection_pool.lease_connection' do
-        expect(collection.native_driver).to be_a(ActiveRecord::ConnectionAdapters::AbstractAdapter)
+      it 'yields a connection and releases it after the block' do
+        collection.native_driver do |conn|
+          expect(conn).to be_a(ActiveRecord::ConnectionAdapters::AbstractAdapter)
+        end
       end
     end
   end
