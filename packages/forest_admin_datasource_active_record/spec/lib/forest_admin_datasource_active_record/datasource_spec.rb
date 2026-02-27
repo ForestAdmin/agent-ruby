@@ -15,6 +15,24 @@ module ForestAdminDatasourceActiveRecord
       expect(collections).to all(be_a(String))
     end
 
+    describe '#init_orm' do
+      it 'uses connection_pool.db_config instead of deprecated connection_db_config' do
+        mock_db_config = instance_double(ActiveRecord::DatabaseConfigurations::HashConfig, env_name: 'test')
+        mock_pool = instance_double(ActiveRecord::ConnectionAdapters::ConnectionPool, db_config: mock_db_config)
+        allow(ActiveRecord::Base).to receive_messages(
+          establish_connection: nil,
+          connection_pool: mock_pool,
+          configurations: instance_double(ActiveRecord::DatabaseConfigurations, configurations: [])
+        )
+
+        ds = described_class.allocate
+        ds.send(:init_orm, {})
+
+        expect(ActiveRecord::Base).to have_received(:connection_pool)
+        expect(mock_pool).to have_received(:db_config)
+      end
+    end
+
     describe '#execute_native_query' do
       let(:datasource) do
         ds = described_class.allocate
