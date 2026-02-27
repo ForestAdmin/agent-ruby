@@ -72,7 +72,7 @@ module ForestAdminDatasourceActiveRecord
       private
 
       def date_trunc_sql(operation, field, original_field_name = nil)
-        adapter_name = @collection.model.connection.adapter_name.downcase
+        adapter_name = @collection.model.connection_pool.lease_connection.adapter_name.downcase
         operation = operation.to_s.downcase
 
         unless VALID_DATE_OPERATIONS.include?(operation)

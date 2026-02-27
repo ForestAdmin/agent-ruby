@@ -87,7 +87,7 @@ module ForestAdminDatasourceActiveRecord
 
     def init_orm(db_config)
       ActiveRecord::Base.establish_connection(db_config)
-      current_config = ActiveRecord::Base.connection_db_config.env_name
+      current_config = ActiveRecord::Base.connection_pool.db_config.env_name
       configurations = ActiveRecord::Base.configurations
                                          .configurations
                                          .group_by(&:env_name)
