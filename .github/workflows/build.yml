@@ -144,7 +144,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18.14.0
+          node-version: 22.14.0
 
       - uses: actions/cache@v4
         with:
@@ -162,10 +162,8 @@ jobs:
           printf -- "---\n:rubygems_api_key: ${{secrets.GEM_HOST_API_KEY}}\n" > $HOME/.gem/credentials
 
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v2
+        uses: cycjimmy/semantic-release-action@v4
         id: semantic
-        with:
-          semantic_version: 17.3.0
         env:
           GEM_HOST_API_KEY: ${{ secrets.GEM_HOST_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
