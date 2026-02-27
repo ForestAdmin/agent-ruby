@@ -4,6 +4,7 @@ module ForestAdminAgent
     module Capabilities
       class Collections < AbstractRoute
         include ForestAdminDatasourceToolkit::Schema
+        include ForestAdminDatasourceToolkit::Schema::Relations
 
         def setup_routes
           add_route('forest_capabilities_collections',
@@ -22,24 +23,48 @@ module ForestAdminAgent
 
           result = collections.map do |collection_name|
             collection = datasource.get_collection(collection_name)
-            {
-              name: collection.name,
-              fields: collection.schema[:fields].filter_map do |name, field|
-                next unless field.is_a?(ColumnSchema)
+            aggregation_capabilities = collection.schema[:aggregation_capabilities]
 
+            fields = collection.schema[:fields].filter_map do |name, field|
+              if field.is_a?(ManyToOneSchema)
+                foreign_key_field = collection.schema[:fields][field.foreign_key]
+                {
+                  name: name,
+                  type: 'ManyToOne',
+                  isGroupable: foreign_key_field.is_a?(ColumnSchema) ? foreign_key_field.is_groupable : true
+                }
+              elsif field.is_a?(ColumnSchema)
                 {
                   name: name,
                   type: field.column_type,
-                  operators: field.filter_operators.to_a
+                  operators: field.filter_operators.to_a,
+                  isGroupable: field.is_groupable
                 }
               end
+            end
+
+            collection_result = {
+              name: collection.name,
+              fields: fields
             }
+
+            if aggregation_capabilities
+              collection_result[:aggregationCapabilities] = {
+                supportGroups: aggregation_capabilities[:support_groups] && fields.any? { |f| f[:isGroupable] },
+                supportedDateOperations: aggregation_capabilities[:supported_date_operations]
+              }
+            end
+
+            collection_result
           end
 
           {
             content: {
               collections: result,
-              nativeQueryConnections: connections
+              nativeQueryConnections: connections,
+              agentCapabilities: {
+                canUseProjectionOnGetOne: true
+              }
             },
             status: 200
           }
