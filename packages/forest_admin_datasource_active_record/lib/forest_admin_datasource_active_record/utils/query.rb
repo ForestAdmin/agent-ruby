@@ -149,7 +149,7 @@ module ForestAdminDatasourceActiveRecord
                     end
 
           # Use database-specific regex syntax
-          adapter_name = @collection.model.connection_pool.with_connection { |conn| conn.adapter_name.downcase }
+          adapter_name = @collection.model.connection_pool.db_config.adapter.downcase
           table_and_column = "#{arel_attr.relation.name}.#{arel_attr.name}"
           regex_clause = case adapter_name
                          when 'postgresql'
