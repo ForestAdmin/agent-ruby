@@ -1,3 +1,10 @@
+## [1.24.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.7...v1.24.8) (2026-02-27)
+
+
+### Bug Fixes
+
+* **security:** resolve all JS devDependency vulnerabilities (PRD-180) ([#272](https://github.com/ForestAdmin/agent-ruby/issues/272)) ([e5ab9b4](https://github.com/ForestAdmin/agent-ruby/commit/e5ab9b45dc3eeb7464d51d9d27e93ddfa9f62ee2))
+
 ## [1.24.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.6...v1.24.7) (2026-02-26)
 
 
