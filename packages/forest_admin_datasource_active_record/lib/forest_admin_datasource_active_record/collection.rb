@@ -227,16 +227,15 @@ module ForestAdminDatasourceActiveRecord
       through_model_name = association.join_table.classify
 
       # Check if the join table exists and has an 'id' column
-      if ActiveRecord::Base.connection_pool.with_connection { |conn| conn.table_exists?(join_table) }
-        columns = ActiveRecord::Base.connection_pool.with_connection { |conn| conn.columns(join_table) }
-        has_id_column = columns.any? { |col| col.name == 'id' }
+      has_id_column = ActiveRecord::Base.connection_pool.with_connection do |conn|
+        conn.table_exists?(join_table) && conn.columns(join_table).any? { |col| col.name == 'id' }
+      end
 
-        if has_id_column
-          begin
-            through_model_name.constantize
-          rescue NameError
-            create_virtual_habtm_model(association, through_model_name)
-          end
+      if has_id_column
+        begin
+          through_model_name.constantize
+        rescue NameError
+          create_virtual_habtm_model(association, through_model_name)
         end
       end
 
