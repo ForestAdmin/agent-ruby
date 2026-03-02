@@ -1,3 +1,10 @@
+## [1.24.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.9...v1.24.10) (2026-03-02)
+
+
+### Bug Fixes
+
+* **rpc:** add etag in rpc schema ([#273](https://github.com/ForestAdmin/agent-ruby/issues/273)) ([064d051](https://github.com/ForestAdmin/agent-ruby/commit/064d0518a32c31178ab01b19822bac46fc89960e))
+
 ## [1.24.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.8...v1.24.9) (2026-03-02)
 
 
