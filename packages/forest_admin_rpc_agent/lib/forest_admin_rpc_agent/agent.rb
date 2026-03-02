@@ -5,13 +5,12 @@ module ForestAdminRpcAgent
   class Agent < ForestAdminAgent::Builder::AgentFactory
     include ForestAdminAgent::Http::Exceptions
 
-    attr_reader :rpc_collections, :cached_schema, :cached_schema_hash
+    attr_reader :rpc_collections, :cached_schema
 
     def setup(options)
       super
       @rpc_collections = []
       @cached_schema = nil
-      @cached_schema_hash = nil
       @customizer = ForestAdminRpcAgent::DatasourceCustomizer.new
     end
 
@@ -31,9 +30,7 @@ module ForestAdminRpcAgent
 
       datasource = @container.resolve(:datasource)
 
-      # Build and cache RPC schema from live datasource
       @cached_schema = build_rpc_schema_from_datasource(datasource)
-      compute_and_cache_hash
 
       # Write schema file for reference (only in development mode)
       # Uses the same serialization as the /rpc-schema route
@@ -54,11 +51,15 @@ module ForestAdminRpcAgent
       self
     end
 
-    # Check if provided hash matches the cached schema hash
+    # Check if provided hash matches the cached schema etag
     def schema_hash_matches?(provided_hash)
-      return false unless @cached_schema_hash && provided_hash
+      return false unless @cached_schema && @cached_schema[:etag] && provided_hash
 
-      @cached_schema_hash == provided_hash
+      @cached_schema[:etag] == provided_hash
+    end
+
+    def cached_schema_hash
+      @cached_schema&.dig(:etag)
     end
 
     private
@@ -131,6 +132,13 @@ module ForestAdminRpcAgent
       schema[:native_query_connections] = datasource.live_query_connections.keys
                                                     .map { |connection_name| { name: connection_name } }
 
+      schema[:etag] = Digest::SHA1.hexdigest(schema.to_json)
+
+      ForestAdminRpcAgent::Facades::Container.logger.log(
+        'Debug',
+        "RPC agent schema etag computed: #{schema[:etag]}"
+      )
+
       schema
     end
 
@@ -140,17 +148,6 @@ module ForestAdminRpcAgent
       else
         @rpc_collections.include?(relation.foreign_collection)
       end
-    end
-
-    def compute_and_cache_hash
-      return unless @cached_schema
-
-      @cached_schema_hash = Digest::SHA1.hexdigest(@cached_schema.to_json)
-
-      ForestAdminRpcAgent::Facades::Container.logger.log(
-        'Debug',
-        "RPC agent schema hash computed: #{@cached_schema_hash}"
-      )
     end
   end
 end

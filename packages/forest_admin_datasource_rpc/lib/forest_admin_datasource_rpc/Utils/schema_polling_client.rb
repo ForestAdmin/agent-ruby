@@ -80,7 +80,7 @@ module ForestAdminDatasourceRpc
       def compute_etag(schema)
         return nil if schema.nil?
 
-        Digest::SHA1.hexdigest(JSON.generate(schema))
+        schema[:etag] || schema['etag'] || Digest::SHA1.hexdigest(JSON.generate(schema))
       end
 
       def fetch_initial_schema_sync

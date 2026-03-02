@@ -15,22 +15,19 @@ module ForestAdminRpcAgent
       def handle_request(args)
         agent = ForestAdminRpcAgent::Agent.instance
         client_etag = extract_if_none_match(args)
+        etag = agent.cached_schema_hash
 
-        # If client has cached schema and ETag matches, return 304 Not Modified
         if client_etag && agent.schema_hash_matches?(client_etag)
           ForestAdminRpcAgent::Facades::Container.logger.log(
             'Debug',
             'ETag matches, returning 304 Not Modified'
           )
           return { status: HTTP_NOT_MODIFIED, content: nil,
-                   headers: { 'ETag' => agent.cached_schema_hash } }
+                   headers: { 'ETag' => etag } }
         end
 
-        # Get schema from cache (or build from datasource if not cached)
         schema = agent.cached_schema
-        etag = agent.cached_schema_hash
 
-        # Return schema with ETag header
         {
           status: HTTP_OK,
           content: schema,
