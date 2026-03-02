@@ -90,6 +90,22 @@ module ForestAdminDatasourceActiveRecord
           expect(result.size).to eq(1)
         end
 
+        it 'uses DATE_TRUNC when adapter is postgresql' do
+          db_config = collection.model.connection_pool.db_config
+          allow(db_config).to receive(:adapter).and_return('postgresql')
+
+          aggregation = Aggregation.new(
+            operation: 'Count',
+            field: nil,
+            groups: [{ field: 'created_at', operation: 'month' }]
+          )
+
+          query_aggregate = described_class.new(collection, aggregation)
+          sql = query_aggregate.send(:date_trunc_sql, 'month', '"cars"."created_at"', 'created_at')
+
+          expect(sql).to eq("DATE_TRUNC('month', \"cars\".\"created_at\")")
+        end
+
         it 'raises an error when given an unsupported date truncation operation' do
           aggregation = Aggregation.new(
             operation: 'Sum',

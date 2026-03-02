@@ -279,6 +279,20 @@ module ForestAdminDatasourceActiveRecord
             expect(sql).to include('(test)')
             expect(sql).not_to include('/gi')
           end
+
+          it 'uses ~ operator when adapter is postgresql' do
+            db_config = collection.model.connection_pool.db_config
+            allow(db_config).to receive(:adapter).and_return('postgresql')
+
+            condition_tree = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new('brand', ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::MATCH, 'Toyota|Honda')
+            filter = Filter.new(condition_tree: condition_tree)
+            query_builder = described_class.new(collection, nil, filter)
+            query_builder.build
+
+            sql = query_builder.query.to_sql
+            expect(sql).to include('~ ')
+            expect(sql).not_to include('REGEXP')
+          end
         end
 
         context 'when filtering on related fields' do
