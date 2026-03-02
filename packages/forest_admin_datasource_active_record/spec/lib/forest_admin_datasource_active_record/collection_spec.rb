@@ -126,6 +126,15 @@ module ForestAdminDatasourceActiveRecord
             expect(book_association.class_name).to eq('Book')
           end
 
+          it 'uses connection_pool.with_connection to check join table' do
+            pool = ActiveRecord::Base.connection_pool
+            allow(pool).to receive(:with_connection).and_call_original
+
+            described_class.new(datasource, Author)
+
+            expect(pool).to have_received(:with_connection).at_least(:once)
+          end
+
           it 'does not recreate virtual model if already exists' do
             # First creation
             described_class.new(datasource, Author)
