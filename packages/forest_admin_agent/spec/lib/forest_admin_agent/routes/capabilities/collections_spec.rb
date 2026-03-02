@@ -181,6 +181,22 @@ module ForestAdminAgent
 
         context 'when no field is groupable' do
           before do
+            agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+            agent_factory.setup(
+              {
+                auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+                is_production: false,
+                cache_dir: 'tmp/cache/forest_admin',
+                schema_path: File.join('tmp', '.forestadmin-schema.json'),
+                forest_server_url: 'https://api.development.forestadmin.com',
+                debug: true,
+                prefix: 'forest',
+                customize_error_message: nil,
+                append_schema_path: nil
+              }
+            )
+
             datasource = Datasource.new
             collection_no_group = build_collection(
               name: 'no_group',
