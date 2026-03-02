@@ -1,3 +1,10 @@
+## [1.24.9](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.8...v1.24.9) (2026-03-02)
+
+
+### Bug Fixes
+
+* **active_record:** support rails 8 connection pool API ([#274](https://github.com/ForestAdmin/agent-ruby/issues/274)) ([f02d792](https://github.com/ForestAdmin/agent-ruby/commit/f02d792e74528fd18a19850229e22d19dc17aa81))
+
 ## [1.24.8](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.7...v1.24.8) (2026-02-27)
 
 
