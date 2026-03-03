@@ -8,7 +8,6 @@ module ForestAdminRpcAgent
       let(:route) { described_class.new }
       let(:agent) { instance_double(ForestAdminRpcAgent::Agent) }
       let(:logger) { instance_double(Logger) }
-      let(:cached_hash) { 'abc123hash' }
 
       let(:cached_schema) do
         {
@@ -19,7 +18,8 @@ module ForestAdminRpcAgent
           ],
           native_query_connections: [
             { name: 'primary' }
-          ]
+          ],
+          etag: 'abc123hash'
         }
       end
 
@@ -27,35 +27,27 @@ module ForestAdminRpcAgent
         allow(ForestAdminRpcAgent::Agent).to receive(:instance).and_return(agent)
         allow(ForestAdminRpcAgent::Facades::Container).to receive(:logger).and_return(logger)
         allow(logger).to receive(:log)
-        allow(agent).to receive_messages(cached_schema: cached_schema,
-                                         cached_schema_hash: cached_hash,
-                                         schema_hash_matches?: false)
+        allow(agent).to receive(:cached_schema).and_return(cached_schema)
       end
 
       describe '#handle_request' do
-        it 'returns the schema with ETag header' do
+        it 'returns the schema' do
           result = route.handle_request({})
 
           expect(result[:status]).to eq(200)
           expect(result[:content]).to eq(cached_schema)
-          expect(result[:headers]['ETag']).to eq(cached_hash)
         end
 
         context 'when client provides matching If-None-Match header' do
           let(:mock_request) do
-            instance_double(::Rack::Request, get_header: cached_hash)
+            instance_double(::Rack::Request, get_header: 'abc123hash')
           end
 
-          before do
-            allow(agent).to receive(:schema_hash_matches?) { |hash| hash == cached_hash }
-          end
-
-          it 'returns 304 Not Modified with ETag header' do
+          it 'returns 304 Not Modified' do
             result = route.handle_request({ request: mock_request })
 
             expect(result[:status]).to eq(304)
             expect(result[:content]).to be_nil
-            expect(result[:headers]['ETag']).to eq(cached_hash)
           end
 
           it 'logs debug message' do
@@ -70,12 +62,11 @@ module ForestAdminRpcAgent
             instance_double(::Rack::Request, get_header: 'different_hash')
           end
 
-          it 'returns the full schema with ETag header' do
+          it 'returns the full schema' do
             result = route.handle_request({ request: mock_request })
 
             expect(result[:status]).to eq(200)
             expect(result[:content]).to eq(cached_schema)
-            expect(result[:headers]['ETag']).to eq(cached_hash)
           end
         end
 
@@ -94,15 +85,10 @@ module ForestAdminRpcAgent
 
         context 'with Sinatra-style request (env)' do
           let(:mock_request) do
-            # Sinatra-style: responds to env but not get_header
-            # Using a Struct to simulate Sinatra request behavior
-            hash_value = cached_hash
-            Struct.new(:env).new({ 'HTTP_IF_NONE_MATCH' => hash_value })
+            Struct.new(:env).new({ 'HTTP_IF_NONE_MATCH' => 'abc123hash' })
           end
 
           it 'extracts If-None-Match from env and returns 304 when hash matches' do
-            allow(agent).to receive(:schema_hash_matches?) { |hash| hash == cached_hash }
-
             result = route.handle_request({ request: mock_request })
 
             expect(result[:status]).to eq(304)

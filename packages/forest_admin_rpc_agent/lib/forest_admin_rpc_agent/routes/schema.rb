@@ -16,7 +16,6 @@ module ForestAdminRpcAgent
         agent = ForestAdminRpcAgent::Agent.instance
         client_etag = extract_if_none_match(args)
 
-        puts client_etag
         if client_etag && client_etag == agent.cached_schema&.dig(:etag)
           ForestAdminRpcAgent::Facades::Container.logger.log(
             'Debug',

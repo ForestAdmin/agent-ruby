@@ -61,7 +61,7 @@ module ForestAdminDatasourceRpc
         @connection_attempts += 1
         log_checking_schema
 
-        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @current_schema[:etag])
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @current_schema&.dig(:etag))
         handle_schema_result(result)
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
         log_connection_error(e)
@@ -146,7 +146,8 @@ module ForestAdminDatasourceRpc
       end
 
       def log_checking_schema
-        etag_info = @current_schema&.dig(:etag) ? "with ETag: #{@current_schema&.dig(:etag)}" : 'without ETag (initial fetch)'
+        etag = @current_schema&.dig(:etag)
+        etag_info = etag ? "with ETag: #{etag}" : 'without ETag (initial fetch)'
         msg = "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema " \
               "(attempt ##{@connection_attempts}, #{etag_info})"
         ForestAdminAgent::Facades::Container.logger&.log('Debug', msg)
