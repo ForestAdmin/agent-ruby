@@ -12,17 +12,15 @@ module ForestAdminDatasourceRpc
       MIN_POLLING_INTERVAL = 1
       MAX_POLLING_INTERVAL = 3600
 
-      def initialize(uri, auth_secret, polling_interval: DEFAULT_POLLING_INTERVAL, introspection_schema: nil,
-                     introspection_etag: nil, &on_schema_change)
+      def initialize(uri, auth_secret, polling_interval: DEFAULT_POLLING_INTERVAL, introspection: nil,
+                     &on_schema_change)
         @uri = uri
         @auth_secret = auth_secret
         @polling_interval = polling_interval
         @on_schema_change = on_schema_change
         @closed = false
-        @introspection_schema = introspection_schema
-        @introspection_etag = introspection_etag
+        @introspection_schema = introspection
         @current_schema = nil
-        @cached_etag = nil
         @connection_attempts = 0
         @initial_sync_completed = false
         @client_id = uri
@@ -63,7 +61,7 @@ module ForestAdminDatasourceRpc
         @connection_attempts += 1
         log_checking_schema
 
-        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @cached_etag)
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @current_schema[:etag])
         handle_schema_result(result)
       rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
         log_connection_error(e)
@@ -77,34 +75,25 @@ module ForestAdminDatasourceRpc
 
       private
 
-      def compute_etag(schema)
-        return nil if schema.nil?
-
-        schema[:etag] || schema['etag'] || Digest::SHA1.hexdigest(JSON.generate(schema))
-      end
-
       def fetch_initial_schema_sync
         # If we have an introspection schema, send its ETag to avoid re-downloading unchanged schema
-        introspection_etag = @introspection_etag || (@introspection_schema && compute_etag(@introspection_schema))
-        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: introspection_etag)
+        result = @rpc_client.fetch_schema('/forest/rpc-schema', if_none_match: @introspection_schema&.dig(:etag))
 
         if result == RpcClient::NotModified
           # Schema unchanged from introspection - use introspection
           @current_schema = @introspection_schema
-          @cached_etag = introspection_etag
           @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
             'Info',
-            "[Schema Polling] RPC schema unchanged (HTTP 304), using introspection (ETag: #{@cached_etag})"
+            "[Schema Polling] RPC schema unchanged (HTTP 304), using introspection (ETag: #{@current_schema[:etag]})"
           )
         else
           # New schema from RPC
-          @current_schema = result.body
-          @cached_etag = result.etag || compute_etag(@current_schema)
+          @current_schema = result
           @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
             'Debug',
-            "[Schema Polling] Initial schema fetched successfully (ETag: #{@cached_etag})"
+            "[Schema Polling] Initial schema fetched successfully (ETag: #{@current_schema[:etag]})"
           )
         end
 
@@ -119,14 +108,12 @@ module ForestAdminDatasourceRpc
         if @introspection_schema
           # Fallback to introspection schema - don't crash
           @current_schema = @introspection_schema
-          @cached_etag = @introspection_etag || compute_etag(@current_schema)
           @introspection_schema = nil
-          @introspection_etag = nil
           @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
             'Warn',
             "RPC agent at #{@uri} is unreachable (#{error.class}: #{error.message}), " \
-            "using provided introspection schema (ETag: #{@cached_etag})"
+            "using provided introspection schema (ETag: #{@current_schema[:etag]})"
           )
         else
           # No introspection - re-raise to crash
@@ -159,7 +146,7 @@ module ForestAdminDatasourceRpc
       end
 
       def log_checking_schema
-        etag_info = @cached_etag ? "with ETag: #{@cached_etag}" : 'without ETag (initial fetch)'
+        etag_info = @current_schema&.dig(:etag) ? "with ETag: #{@current_schema&.dig(:etag)}" : 'without ETag (initial fetch)'
         msg = "[Schema Polling] Checking schema from #{@uri}/forest/rpc-schema " \
               "(attempt ##{@connection_attempts}, #{etag_info})"
         ForestAdminAgent::Facades::Container.logger&.log('Debug', msg)
@@ -176,34 +163,31 @@ module ForestAdminDatasourceRpc
       def handle_schema_unchanged
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
-          "[Schema Polling] Schema unchanged (HTTP 304 Not Modified), ETag still valid: #{@cached_etag}"
+          "[Schema Polling] Schema unchanged (HTTP 304 Not Modified), ETag still valid: #{@current_schema[:etag]}"
         )
         @connection_attempts = 0
       end
 
       def handle_schema_changed(result)
-        new_schema = result.body
-        new_etag = result.etag || compute_etag(new_schema)
+        new_schema = result
 
         if @initial_sync_completed
-          handle_schema_update(new_schema, new_etag)
+          handle_schema_update(new_schema)
         else
-          @cached_etag = new_etag
           @current_schema = new_schema
           @initial_sync_completed = true
           ForestAdminAgent::Facades::Container.logger&.log(
             'Info',
-            "[Schema Polling] Initial sync completed successfully (ETag: #{new_etag})"
+            "[Schema Polling] Initial sync completed successfully (ETag: #{@current_schema[:etag]})"
           )
         end
         @connection_attempts = 0
       end
 
-      def handle_schema_update(schema, etag)
-        old_etag = @cached_etag
-        @cached_etag = etag
+      def handle_schema_update(schema)
+        old_etag = @current_schema[:etag]
         @current_schema = schema
-        msg = "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{etag}), " \
+        msg = "[Schema Polling] Schema changed detected (old ETag: #{old_etag}, new ETag: #{schema[:etag]}), " \
               'triggering reload callback'
         ForestAdminAgent::Facades::Container.logger&.log('Info', msg)
         trigger_schema_change_callback(schema)

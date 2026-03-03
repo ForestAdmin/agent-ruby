@@ -12,7 +12,7 @@ module ForestAdminDatasourceRpc
     Utils::SchemaPollingPool.instance.configure(max_threads: max_threads)
   end
 
-  KNOWN_BUILD_OPTIONS = %i[uri auth_secret introspection introspection_etag schema_polling_interval_sec].freeze
+  KNOWN_BUILD_OPTIONS = %i[uri auth_secret introspection schema_polling_interval_sec].freeze
 
   def self.build(options)
     unknown_keys = options.keys - KNOWN_BUILD_OPTIONS
@@ -27,7 +27,6 @@ module ForestAdminDatasourceRpc
     uri = options[:uri]
     auth_secret = options[:auth_secret] || ForestAdminAgent::Facades::Container.cache(:auth_secret)
     provided_introspection = options[:introspection]
-    provided_introspection_etag = options[:introspection_etag]
 
     polling_interval = options[:schema_polling_interval_sec] ||
                        ENV['SCHEMA_POLLING_INTERVAL_SEC']&.to_i ||
@@ -40,8 +39,7 @@ module ForestAdminDatasourceRpc
       uri,
       auth_secret,
       polling_interval: polling_interval,
-      introspection_schema: provided_introspection,
-      introspection_etag: provided_introspection_etag
+      introspection: provided_introspection
     ) do
       Thread.new do
         logger = ForestAdminAgent::Facades::Container.logger

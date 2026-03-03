@@ -5,16 +5,6 @@ require 'time'
 
 module ForestAdminDatasourceRpc
   module Utils
-    # Response wrapper for schema requests that need ETag
-    class SchemaResponse
-      attr_reader :body, :etag
-
-      def initialize(body, etag = nil)
-        @body = body
-        @etag = etag
-      end
-    end
-
     class RpcClient
       ERROR_STATUS_MAP = {
         400 => ForestAdminAgent::Http::Exceptions::ValidationError,
@@ -51,14 +41,14 @@ module ForestAdminDatasourceRpc
 
       def fetch_schema(endpoint, if_none_match: nil)
         response = make_request(endpoint, method: :get, symbolize_keys: true, if_none_match: if_none_match)
-        handle_response_with_etag(response)
+        handle_response(response)
       end
 
       private
 
       # rubocop:disable Metrics/ParameterLists
       def make_request(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
-        log_request_start(method, endpoint, if_none_match)
+        log_request_start(method, endpoint)
 
         client = build_faraday_client(symbolize_keys)
         headers = build_request_headers(caller, if_none_match)
@@ -128,25 +118,6 @@ module ForestAdminDatasourceRpc
         raise_appropriate_error(response)
       end
 
-      def handle_response_with_etag(response)
-        if response.success?
-          etag = extract_etag(response)
-          ForestAdminAgent::Facades::Container.logger&.log(
-            'Debug',
-            "[RPC Client] Schema response received (status: #{response.status}, ETag: #{etag || "none"})"
-          )
-          return SchemaResponse.new(response.body, etag)
-        end
-        return NotModified if response.status == HTTP_NOT_MODIFIED
-
-        raise_appropriate_error(response)
-      end
-
-      def extract_etag(response)
-        etag = response.headers['ETag'] || response.headers['etag']
-        etag&.gsub(/\A"?|"?\z/, '')
-      end
-
       def raise_appropriate_error(response)
         error_body = parse_error_body(response)
         status = response.status
@@ -194,11 +165,10 @@ module ForestAdminDatasourceRpc
         }.compact
       end
 
-      def log_request_start(method, endpoint, if_none_match)
-        etag_info = if_none_match ? " (If-None-Match: #{if_none_match})" : ''
+      def log_request_start(method, endpoint)
         ForestAdminAgent::Facades::Container.logger&.log(
           'Debug',
-          "[RPC Client] Sending #{method.to_s.upcase} request to #{@api_url}#{endpoint}#{etag_info}"
+          "[RPC Client] Sending #{method.to_s.upcase} request to #{@api_url}#{endpoint}"
         )
       end
 
