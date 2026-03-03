@@ -105,7 +105,7 @@ module ForestAdminAgent
 
           it 'call collection.list with projection from query params' do
             args[:params]['id'] = 1
-            args[:params]['fields'] = { 'user' => 'id,first_name' }
+            args[:params][:fields] = { 'user' => 'id,first_name' }
             show.handle_request(args)
 
             expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
