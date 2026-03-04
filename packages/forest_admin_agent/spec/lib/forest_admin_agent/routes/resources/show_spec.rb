@@ -103,6 +103,17 @@ module ForestAdminAgent
             end
           end
 
+          it 'call collection.list with projection from query params' do
+            args[:params]['id'] = 1
+            args[:params][:fields] = { 'user' => 'id,first_name' }
+            show.handle_request(args)
+
+            expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to include('id', 'first_name')
+              expect(projection).not_to include('last_name')
+            end
+          end
+
           it 'raises NotFoundError when collection does not exist' do
             args[:params]['collection_name'] = 'non_existent_collection'
             args[:params]['id'] = 1

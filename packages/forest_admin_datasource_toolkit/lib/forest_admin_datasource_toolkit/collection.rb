@@ -17,7 +17,11 @@ module ForestAdminDatasourceToolkit
         searchable: false,
         charts: [],
         segments: [],
-        actions: {}
+        actions: {},
+        aggregation_capabilities: {
+          support_groups: true,
+          supported_date_operations: %w[Year Quarter Month Week Day]
+        }
       }
     end
 

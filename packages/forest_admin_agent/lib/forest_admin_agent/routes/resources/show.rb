@@ -6,6 +6,7 @@ module ForestAdminAgent
     module Resources
       class Show < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
+        include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
         def setup_routes
           add_route('forest_show', 'get', '/:collection_name/:id', ->(args) { handle_request(args) })
@@ -23,7 +24,7 @@ module ForestAdminAgent
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
 
-          projection = ProjectionFactory.all(context.collection)
+          projection = QueryStringParser.parse_projection_with_pks(context.collection, args)
 
           records = context.collection.list(context.caller, filter, projection)
 
