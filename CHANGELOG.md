@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.0...v1.25.1) (2026-03-04)
+
+
+### Bug Fixes
+
+* **etag:** rpc and agent etag handling ([#275](https://github.com/ForestAdmin/agent-ruby/issues/275)) ([c63ad2a](https://github.com/ForestAdmin/agent-ruby/commit/c63ad2a7c5a67d5140bfd7cd1e03a6f57b1c34a0))
+
 # [1.25.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.10...v1.25.0) (2026-03-04)
 
 
