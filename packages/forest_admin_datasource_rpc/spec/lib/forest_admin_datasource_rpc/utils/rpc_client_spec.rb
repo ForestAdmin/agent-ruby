@@ -110,11 +110,11 @@ module ForestAdminDatasourceRpc
           allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
         end
 
-        it 'returns a SchemaResponse with body and etag' do
+        it 'returns the parsed response body' do
           result = rpc_client.fetch_schema('/rpc/schema')
 
-          expect(result).to be_a(SchemaResponse)
-          expect(result.body).to eq({ collections: [] })
+          expect(result).to be_a(Hash)
+          expect(result).to eq({ collections: [] })
         end
 
         context 'with If-None-Match header' do
@@ -135,33 +135,13 @@ module ForestAdminDatasourceRpc
           end
         end
 
-        context 'with ETag in response' do
-          let(:response_headers) { { 'ETag' => 'etag123' } }
+        context 'with ETag in response body' do
+          let(:response) { instance_double(Faraday::Response, status: 200, body: { collections: [], etag: 'etag123' }, success?: true, headers: response_headers) }
 
-          it 'extracts ETag from response headers' do
+          it 'returns schema hash containing etag' do
             result = rpc_client.fetch_schema('/rpc/schema')
 
-            expect(result.etag).to eq('etag123')
-          end
-        end
-
-        context 'with lowercase etag header' do
-          let(:response_headers) { { 'etag' => 'lowercase-etag' } }
-
-          it 'extracts etag from lowercase header' do
-            result = rpc_client.fetch_schema('/rpc/schema')
-
-            expect(result.etag).to eq('lowercase-etag')
-          end
-        end
-
-        context 'without ETag in response' do
-          let(:response_headers) { {} }
-
-          it 'returns nil for etag' do
-            result = rpc_client.fetch_schema('/rpc/schema')
-
-            expect(result.etag).to be_nil
+            expect(result[:etag]).to eq('etag123')
           end
         end
 

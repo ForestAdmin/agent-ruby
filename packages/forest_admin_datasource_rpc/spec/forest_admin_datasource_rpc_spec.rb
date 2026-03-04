@@ -127,12 +127,9 @@ module ForestAdminDatasourceRpc
       end
 
       context 'with schema polling interval configuration' do
-        let(:response) { Utils::SchemaResponse.new(introspection, 'etag123') }
-        let(:rpc_client) { instance_double(Utils::RpcClient, fetch_schema: response) }
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, current_schema: introspection) }
 
         before do
-          allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
           allow(Utils::SchemaPollingClient).to receive(:new).and_return(schema_polling_client)
         end
 
@@ -143,8 +140,7 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 600,
-            introspection_schema: nil,
-            introspection_etag: nil
+            introspection: nil
           )
         end
 
@@ -155,8 +151,7 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 120,
-            introspection_schema: nil,
-            introspection_etag: nil
+            introspection: nil
           )
         end
 
@@ -169,8 +164,7 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 30,
-            introspection_schema: nil,
-            introspection_etag: nil
+            introspection: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
@@ -185,30 +179,13 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 120,
-            introspection_schema: nil,
-            introspection_etag: nil
+            introspection: nil
           )
         ensure
           ENV.delete('SCHEMA_POLLING_INTERVAL_SEC')
         end
 
-        it 'passes introspection_etag to schema polling client when provided' do
-          described_class.build({
-                                  uri: 'http://localhost',
-                                  introspection: introspection,
-                                  introspection_etag: 'precomputed-etag-123'
-                                })
-
-          expect(Utils::SchemaPollingClient).to have_received(:new).with(
-            'http://localhost',
-            'secret',
-            polling_interval: 600,
-            introspection_schema: introspection,
-            introspection_etag: 'precomputed-etag-123'
-          )
-        end
-
-        it 'passes introspection_schema without etag when only introspection is provided' do
+        it 'passes introspection to schema polling client when provided' do
           described_class.build({
                                   uri: 'http://localhost',
                                   introspection: introspection
@@ -218,8 +195,7 @@ module ForestAdminDatasourceRpc
             'http://localhost',
             'secret',
             polling_interval: 600,
-            introspection_schema: introspection,
-            introspection_etag: nil
+            introspection: introspection
           )
         end
       end

@@ -26,7 +26,7 @@ module ForestAdminDatasourceRpc
           expect(client.instance_variable_get(:@uri)).to eq(uri)
           expect(client.instance_variable_get(:@auth_secret)).to eq(secret)
           expect(client.closed).to be false
-          expect(client.instance_variable_get(:@cached_etag)).to be_nil
+          expect(client.instance_variable_get(:@current_schema)).to be_nil
           expect(client.instance_variable_get(:@connection_attempts)).to eq(0)
         end
 
@@ -89,28 +89,29 @@ module ForestAdminDatasourceRpc
           end
         end
 
-        context 'with introspection_etag parameter' do
-          it 'stores introspection_etag when provided' do
-            client = described_class.new(uri, secret, introspection_etag: 'provided-etag-123') { |schema| callback.call(schema) }
+        context 'with introspection parameter' do
+          it 'stores introspection schema when provided' do
+            introspection = { collections: [], charts: [], etag: 'provided-etag-123' }
+            client = described_class.new(uri, secret, introspection: introspection) { |schema| callback.call(schema) }
 
-            expect(client.instance_variable_get(:@introspection_etag)).to eq('provided-etag-123')
+            expect(client.instance_variable_get(:@introspection_schema)).to eq(introspection)
           end
 
-          it 'defaults introspection_etag to nil' do
+          it 'defaults introspection schema to nil' do
             client = described_class.new(uri, secret) { |schema| callback.call(schema) }
 
-            expect(client.instance_variable_get(:@introspection_etag)).to be_nil
+            expect(client.instance_variable_get(:@introspection_schema)).to be_nil
           end
         end
       end
 
       describe '#start' do
         let(:rpc_client) { instance_double(RpcClient) }
-        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
+        let(:schema_with_etag) { schema.merge(etag: 'etag-123') }
 
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
         end
 
         it 'registers with the pool' do
@@ -145,11 +146,11 @@ module ForestAdminDatasourceRpc
 
       describe '#stop' do
         let(:rpc_client) { instance_double(RpcClient) }
-        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
+        let(:schema_with_etag) { schema.merge(etag: 'etag-123') }
 
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
         end
 
         it 'unregisters from the pool' do
@@ -191,13 +192,7 @@ module ForestAdminDatasourceRpc
 
       describe '#check_schema' do
         let(:rpc_client) { instance_double(RpcClient) }
-        let(:schema_response) do
-          instance_double(
-            SchemaResponse,
-            body: schema,
-            etag: 'etag-123'
-          )
-        end
+        let(:schema_with_etag) { schema.merge(etag: 'etag-123') }
 
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
@@ -205,27 +200,29 @@ module ForestAdminDatasourceRpc
 
         it 'uses RpcClient to fetch schema with ETag support' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          # current_schema is nil initially, so etag is nil
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           client.check_schema
 
           expect(rpc_client).to have_received(:fetch_schema).with('/forest/rpc-schema', if_none_match: nil)
         end
 
-        it 'stores ETag on first poll without triggering callback' do
+        it 'stores schema with ETag on first poll without triggering callback' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           client.check_schema
 
-          expect(client.instance_variable_get(:@cached_etag)).to eq('etag-123')
+          expect(client.instance_variable_get(:@current_schema)).to eq(schema_with_etag)
+          expect(client.current_schema[:etag]).to eq('etag-123')
           expect(callback).not_to have_received(:call)
           expect(logger).to have_received(:log).with('Info', '[Schema Polling] Initial sync completed successfully (ETag: etag-123)')
         end
 
         it 'sends If-None-Match header on subsequent polls' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           # First poll
           client.check_schema
@@ -239,31 +236,26 @@ module ForestAdminDatasourceRpc
 
         it 'detects schema change via ETag and triggers callback' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           # First poll
           client.check_schema
 
           # Second poll with different ETag (schema changed)
-          new_schema = { collections: [{ name: 'Orders' }], charts: [] }
-          new_response = instance_double(
-            SchemaResponse,
-            body: new_schema,
-            etag: 'etag-456'
-          )
-          allow(rpc_client).to receive(:fetch_schema).and_return(new_response)
+          new_schema = { collections: [{ name: 'Orders' }], charts: [], etag: 'etag-456' }
+          allow(rpc_client).to receive(:fetch_schema).and_return(new_schema)
 
           client.check_schema
 
           # Callback should have been called with new schema
           expect(callback).to have_received(:call).with(new_schema)
           expect(logger).to have_received(:log).with('Info', /Schema changed detected/)
-          expect(client.instance_variable_get(:@cached_etag)).to eq('etag-456')
+          expect(client.current_schema[:etag]).to eq('etag-456')
         end
 
         it 'handles NotModified (304) response without triggering callback' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           # First poll
           client.check_schema
@@ -331,7 +323,7 @@ module ForestAdminDatasourceRpc
 
         it 'increments and resets connection attempts on successful poll' do
           client = described_class.new(uri, secret) { |schema| callback.call(schema) }
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
 
           # Connection attempts should be incremented then reset
           client.check_schema
@@ -341,19 +333,18 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      describe '#start? with introspection_etag' do
+      describe '#start? with introspection' do
         let(:rpc_client) { instance_double(RpcClient) }
-        let(:introspection) { { collections: [{ name: 'Products' }], charts: [] } }
+        let(:introspection) { { collections: [{ name: 'Products' }], charts: [], etag: 'introspection-etag-abc' } }
 
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
         end
 
-        it 'uses provided introspection_etag in initial fetch instead of computing it' do
+        it 'uses introspection etag in initial fetch' do
           client = described_class.new(
             uri, secret,
-            introspection_schema: introspection,
-            introspection_etag: 'precomputed-etag-abc'
+            introspection: introspection
           ) { |s| callback.call(s) }
 
           allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
@@ -361,17 +352,16 @@ module ForestAdminDatasourceRpc
           client.start?
           client.stop
 
-          # Should use the provided etag, not compute one from the schema
           expect(rpc_client).to have_received(:fetch_schema).with(
             '/forest/rpc-schema',
-            if_none_match: 'precomputed-etag-abc'
+            if_none_match: 'introspection-etag-abc'
           )
         end
 
-        it 'computes etag from introspection_schema when introspection_etag is not provided' do
+        it 'uses introspection schema on NotModified response' do
           client = described_class.new(
             uri, secret,
-            introspection_schema: introspection
+            introspection: introspection
           ) { |s| callback.call(s) }
 
           allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
@@ -379,34 +369,30 @@ module ForestAdminDatasourceRpc
           client.start?
           client.stop
 
-          # Should compute etag from the schema
-          expected_etag = Digest::SHA1.hexdigest(JSON.generate(introspection))
-          expect(rpc_client).to have_received(:fetch_schema).with(
-            '/forest/rpc-schema',
-            if_none_match: expected_etag
-          )
+          expect(client.current_schema).to eq(introspection)
+          expect(client.current_schema[:etag]).to eq('introspection-etag-abc')
         end
 
-        it 'uses provided introspection_etag as cached_etag on NotModified response' do
+        it 'uses new schema when RPC returns updated schema' do
+          new_schema = { collections: [{ name: 'Orders' }], charts: [], etag: 'new-etag-456' }
           client = described_class.new(
             uri, secret,
-            introspection_schema: introspection,
-            introspection_etag: 'precomputed-etag-xyz'
+            introspection: introspection
           ) { |s| callback.call(s) }
 
-          allow(rpc_client).to receive(:fetch_schema).and_return(RpcClient::NotModified)
+          allow(rpc_client).to receive(:fetch_schema).and_return(new_schema)
 
           client.start?
           client.stop
 
-          expect(client.instance_variable_get(:@cached_etag)).to eq('precomputed-etag-xyz')
+          expect(client.current_schema).to eq(new_schema)
+          expect(client.current_schema[:etag]).to eq('new-etag-456')
         end
 
-        it 'uses provided introspection_etag when falling back to introspection_schema on error' do
+        it 'falls back to introspection schema on connection error' do
           client = described_class.new(
             uri, secret,
-            introspection_schema: introspection,
-            introspection_etag: 'fallback-etag-123'
+            introspection: introspection
           ) { |s| callback.call(s) }
 
           allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
@@ -414,35 +400,15 @@ module ForestAdminDatasourceRpc
           client.start?
           client.stop
 
-          # Should use the introspection schema as current schema
-          expect(client.instance_variable_get(:@current_schema)).to eq(introspection)
-          # Should use the provided etag
-          expect(client.instance_variable_get(:@cached_etag)).to eq('fallback-etag-123')
-          # Should clear introspection fields
+          expect(client.current_schema).to eq(introspection)
+          expect(client.current_schema[:etag]).to eq('introspection-etag-abc')
           expect(client.instance_variable_get(:@introspection_schema)).to be_nil
-          expect(client.instance_variable_get(:@introspection_etag)).to be_nil
         end
 
-        it 'computes etag when falling back without introspection_etag' do
+        it 'falls back to introspection schema on ForestException (RPC wrapped error)' do
           client = described_class.new(
             uri, secret,
-            introspection_schema: introspection
-          ) { |s| callback.call(s) }
-
-          allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
-
-          client.start?
-          client.stop
-
-          expected_etag = Digest::SHA1.hexdigest(JSON.generate(introspection))
-          expect(client.instance_variable_get(:@cached_etag)).to eq(expected_etag)
-        end
-
-        it 'falls back to introspection_schema on ForestException (RPC wrapped error)' do
-          client = described_class.new(
-            uri, secret,
-            introspection_schema: introspection,
-            introspection_etag: 'fallback-etag-456'
+            introspection: introspection
           ) { |s| callback.call(s) }
 
           allow(rpc_client).to receive(:fetch_schema).and_raise(
@@ -453,12 +419,17 @@ module ForestAdminDatasourceRpc
           client.start?
           client.stop
 
-          # Should use the introspection schema as current schema
-          expect(client.instance_variable_get(:@current_schema)).to eq(introspection)
-          # Should use the provided etag
-          expect(client.instance_variable_get(:@cached_etag)).to eq('fallback-etag-456')
-          # Should log the warning
+          expect(client.current_schema).to eq(introspection)
+          expect(client.current_schema[:etag]).to eq('introspection-etag-abc')
           expect(logger).to have_received(:log).with('Warn', /RPC agent.*unreachable.*ForestException/)
+        end
+
+        it 'raises error when no introspection and initial fetch fails' do
+          client = described_class.new(uri, secret) { |s| callback.call(s) }
+
+          allow(rpc_client).to receive(:fetch_schema).and_raise(Faraday::ConnectionFailed, 'Connection refused')
+
+          expect { client.start? }.to raise_error(Faraday::ConnectionFailed)
         end
       end
 
@@ -489,24 +460,22 @@ module ForestAdminDatasourceRpc
 
       describe 'integration: polling via pool' do
         let(:rpc_client) { instance_double(RpcClient) }
-        let(:schema_response) { instance_double(SchemaResponse, body: schema, etag: 'etag-123') }
+        let(:schema_with_etag) { schema.merge(etag: 'etag-123') }
 
         before do
           allow(RpcClient).to receive(:new).and_return(rpc_client)
-          allow(rpc_client).to receive(:fetch_schema).and_return(schema_response)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema_with_etag)
           allow(pool).to receive(:calculate_initial_poll_time).and_return(Time.now)
         end
 
         it 'triggers callback on schema change via pool' do
           # First poll
-          schema1 = { collections: [{ name: 'Products' }] }
-          response1 = instance_double(SchemaResponse, body: schema1, etag: 'etag-1')
+          schema1 = { collections: [{ name: 'Products' }], etag: 'etag-1' }
 
           # Second poll with different schema
-          schema2 = { collections: [{ name: 'Orders' }] }
-          response2 = instance_double(SchemaResponse, body: schema2, etag: 'etag-2')
+          schema2 = { collections: [{ name: 'Orders' }], etag: 'etag-2' }
 
-          allow(rpc_client).to receive(:fetch_schema).and_return(response1, response2)
+          allow(rpc_client).to receive(:fetch_schema).and_return(schema1, schema2)
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
 
@@ -520,7 +489,7 @@ module ForestAdminDatasourceRpc
 
         it 'does not trigger callback if schema stays the same' do
           # Same ETag for all polls (schema unchanged)
-          response = instance_double(SchemaResponse, body: schema, etag: 'etag-same')
+          response = schema.merge(etag: 'etag-same')
           # First returns the response, then returns NotModified
           allow(rpc_client).to receive(:fetch_schema).and_return(response, RpcClient::NotModified)
 
@@ -542,7 +511,7 @@ module ForestAdminDatasourceRpc
             # First call is initial fetch (succeeds), second is first poll (fails), third succeeds
             raise Faraday::ConnectionFailed, 'Connection refused' if call_count == 2
 
-            schema_response
+            schema_with_etag
           end
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }
@@ -566,7 +535,7 @@ module ForestAdminDatasourceRpc
                     'RPC connection failed: Unable to connect to http://localhost.'
             end
 
-            schema_response
+            schema_with_etag
           end
 
           client = described_class.new(uri, secret, polling_interval: 1) { |schema| callback.call(schema) }

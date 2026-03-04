@@ -132,7 +132,7 @@ module ForestAdminRpcAgent
           expect(parsed[:native_query_connections]).to eq([{ name: 'main' }])
         end
 
-        it 'caches the schema and computes hash' do
+        it 'caches the schema with an etag' do
           allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
             { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: false }[key]
           end
@@ -143,9 +143,9 @@ module ForestAdminRpcAgent
           instance.send_schema
 
           expect(instance.cached_schema).not_to be_nil
-          expect(instance.cached_schema_hash).not_to be_nil
-          expect(instance.cached_schema_hash).to be_a(String)
-          expect(instance.cached_schema_hash.length).to eq(40) # SHA1 hex length
+          expect(instance.cached_schema[:etag]).not_to be_nil
+          expect(instance.cached_schema[:etag]).to be_a(String)
+          expect(instance.cached_schema[:etag].length).to eq(40) # SHA1 hex length
         end
       end
 
@@ -201,7 +201,7 @@ module ForestAdminRpcAgent
       end
     end
 
-    describe '#schema_hash_matches?' do
+    describe 'etag in cached_schema' do
       let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
 
       before do
@@ -214,26 +214,28 @@ module ForestAdminRpcAgent
         end
       end
 
-      it 'returns false when cached_schema_hash is nil' do
-        expect(instance.schema_hash_matches?('some_hash')).to be false
+      it 'returns nil etag when cached_schema is nil' do
+        expect(instance.cached_schema&.dig(:etag)).to be_nil
       end
 
-      it 'returns false when provided_hash is nil' do
+      it 'computes etag after send_schema' do
         instance.send_schema
-        expect(instance.schema_hash_matches?(nil)).to be false
+        expect(instance.cached_schema[:etag]).not_to be_nil
+        expect(instance.cached_schema[:etag]).to be_a(String)
+        expect(instance.cached_schema[:etag].length).to eq(40)
       end
 
-      it 'returns true when hashes match' do
+      it 'etag matches itself' do
         instance.send_schema
-        cached_hash = instance.cached_schema_hash
+        etag = instance.cached_schema[:etag]
 
-        expect(instance.schema_hash_matches?(cached_hash)).to be true
+        expect(etag).to eq(instance.cached_schema[:etag])
       end
 
-      it 'returns false when hashes do not match' do
+      it 'etag does not match a different hash' do
         instance.send_schema
 
-        expect(instance.schema_hash_matches?('wrong_hash')).to be false
+        expect(instance.cached_schema[:etag]).not_to eq('wrong_hash')
       end
     end
 

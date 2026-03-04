@@ -51,17 +51,6 @@ module ForestAdminRpcAgent
       self
     end
 
-    # Check if provided hash matches the cached schema etag
-    def schema_hash_matches?(provided_hash)
-      return false unless @cached_schema && @cached_schema[:etag] && provided_hash
-
-      @cached_schema[:etag] == provided_hash
-    end
-
-    def cached_schema_hash
-      @cached_schema&.dig(:etag)
-    end
-
     private
 
     def should_skip_schema_update?
