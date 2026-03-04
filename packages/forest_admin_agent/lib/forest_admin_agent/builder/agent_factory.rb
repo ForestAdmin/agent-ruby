@@ -82,8 +82,7 @@ module ForestAdminAgent
           return
         end
 
-        @container._container.delete('datasource')
-        @container.register(:datasource, @customizer.datasource(@logger))
+        container_replace(:datasource, @customizer.datasource(@logger))
 
         # Reset route cache before sending schema to ensure routes are recomputed with all customizations
         ForestAdminAgent::Http::Router.reset_cached_routes!
@@ -158,6 +157,11 @@ module ForestAdminAgent
       end
 
       private
+
+      def container_replace(key, value)
+        @container._container.delete(key.to_s)
+        @container.register(key, value)
+      end
 
       def format_schema_json(schema)
         # Custom JSON formatting that keeps single-element arrays on one line
