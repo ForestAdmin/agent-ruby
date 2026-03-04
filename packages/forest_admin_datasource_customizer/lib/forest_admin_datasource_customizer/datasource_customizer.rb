@@ -76,8 +76,8 @@ module ForestAdminDatasourceCustomizer
 
       begin
         new_composite = ForestAdminDatasourceCustomizer::CompositeDatasource.new
-        @stack.reload!(new_composite, logger)
         @composite_datasource = new_composite
+        @stack.reload!(new_composite, logger)
       rescue StandardError => e
         @composite_datasource = old_composite
         raise e
