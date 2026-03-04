@@ -35,16 +35,19 @@ module ForestAdminDatasourceRpc
     # Auto-configure pool with default settings if not already configured
     ensure_pool_configured
 
+    datasource_ref = nil
+
     schema_polling = Utils::SchemaPollingClient.new(
       uri,
       auth_secret,
       polling_interval: polling_interval,
       introspection: provided_introspection
-    ) do
+    ) do |new_schema|
       Thread.new do
         logger = ForestAdminAgent::Facades::Container.logger
         logger.log('Info', '[RPCDatasource] Schema change detected, reloading agent in background...')
         begin
+          datasource_ref&.refresh!(new_schema)
           ForestAdminAgent::Builder::AgentFactory.instance.reload!
           logger.log('Info', '[RPCDatasource] Agent reload completed successfully')
         rescue StandardError => e
@@ -65,7 +68,7 @@ module ForestAdminDatasourceRpc
     end
 
     options.delete(:introspection)
-    ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
+    datasource_ref = ForestAdminDatasourceRpc::Datasource.new(options, schema, schema_polling)
   end
 
   def self.ensure_pool_configured

@@ -1,4 +1,4 @@
-lrequire 'dry-container'
+require 'dry-container'
 require 'json'
 
 module ForestAdminAgent
