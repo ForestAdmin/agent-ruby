@@ -1,4 +1,4 @@
-require 'dry-container'
+lrequire 'dry-container'
 require 'json'
 
 module ForestAdminAgent
@@ -82,7 +82,8 @@ module ForestAdminAgent
           return
         end
 
-        @container.register(:datasource, @customizer.datasource(@logger), replace: true)
+        @container._container.delete('datasource')
+        @container.register(:datasource, @customizer.datasource(@logger))
 
         # Reset route cache before sending schema to ensure routes are recomputed with all customizations
         ForestAdminAgent::Http::Router.reset_cached_routes!
