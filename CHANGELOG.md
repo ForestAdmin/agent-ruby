@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.10...v1.25.0) (2026-03-04)
+
+
+### Features
+
+* add capabilities on aggregate ([#269](https://github.com/ForestAdmin/agent-ruby/issues/269)) ([3ae391d](https://github.com/ForestAdmin/agent-ruby/commit/3ae391dd2fd2831dffcaf7943edd3032c030f208))
+
 ## [1.24.10](https://github.com/ForestAdmin/agent-ruby/compare/v1.24.9...v1.24.10) (2026-03-02)
 
 

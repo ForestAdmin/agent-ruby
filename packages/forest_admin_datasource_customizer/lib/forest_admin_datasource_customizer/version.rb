@@ -1,3 +1,3 @@
 module ForestAdminDatasourceCustomizer
-  VERSION = "1.24.10"
+  VERSION = "1.25.0"
 end
