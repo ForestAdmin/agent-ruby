@@ -66,8 +66,8 @@ module ForestAdminDatasourceRpc
     def refresh!(new_schema)
       # Replace collections with those from the new schema
       @collections = {}
-      new_schema[:collections].each do |schema|
-        add_collection(Collection.new(self, schema[:name], schema))
+      new_schema[:collections].each do |collection|
+        add_collection(Collection.new(self, collection[:name], collection))
       end
 
       @charts = new_schema[:charts]
