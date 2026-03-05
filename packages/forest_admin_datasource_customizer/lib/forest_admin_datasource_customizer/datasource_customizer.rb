@@ -27,9 +27,8 @@ module ForestAdminDatasourceCustomizer
     end
 
     def add_datasource(datasource, options)
-      original_datasource = datasource
       @stack.queue_customization(lambda {
-        ds = original_datasource
+        ds = datasource
 
         if options[:include] || options[:exclude]
           publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(ds)
