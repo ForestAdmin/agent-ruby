@@ -63,6 +63,22 @@ module ForestAdminDatasourceRpc
       ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
     end
 
+    def refresh!(new_schema)
+      # Replace collections with those from the new schema
+      @collections = {}
+      new_schema[:collections].each do |collection|
+        add_collection(Collection.new(self, collection[:name], collection))
+      end
+
+      @charts = new_schema[:charts]
+      @rpc_relations = new_schema[:rpc_relations]
+
+      native_query_connections = new_schema[:native_query_connections] || []
+      @live_query_connections = native_query_connections.to_h { |conn| [conn[:name], conn[:name]] }
+
+      @schema = { charts: @charts }
+    end
+
     def cleanup
       return if @cleaned_up
 

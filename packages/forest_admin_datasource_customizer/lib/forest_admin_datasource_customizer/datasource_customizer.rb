@@ -28,21 +28,21 @@ module ForestAdminDatasourceCustomizer
 
     def add_datasource(datasource, options)
       @stack.queue_customization(lambda {
+        ds = datasource
+
         if options[:include] || options[:exclude]
-          publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(datasource)
+          publication_decorator = Decorators::Publication::PublicationDatasourceDecorator.new(ds)
           publication_decorator.keep_collections_matching(options[:include], options[:exclude])
-          datasource = publication_decorator
+          ds = publication_decorator
         end
 
         if options[:rename]
-          rename_collection_decorator = Decorators::RenameCollection::RenameCollectionDatasourceDecorator.new(
-            datasource
-          )
+          rename_collection_decorator = Decorators::RenameCollection::RenameCollectionDatasourceDecorator.new(ds)
           rename_collection_decorator.rename_collections(options[:rename])
-          datasource = rename_collection_decorator
+          ds = rename_collection_decorator
         end
 
-        @composite_datasource.add_data_source(datasource)
+        @composite_datasource.add_data_source(ds)
       })
 
       self
@@ -76,8 +76,8 @@ module ForestAdminDatasourceCustomizer
 
       begin
         new_composite = ForestAdminDatasourceCustomizer::CompositeDatasource.new
-        @stack.reload!(new_composite, logger)
         @composite_datasource = new_composite
+        @stack.reload!(new_composite, logger)
       rescue StandardError => e
         @composite_datasource = old_composite
         raise e
