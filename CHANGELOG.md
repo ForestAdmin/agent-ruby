@@ -1,3 +1,10 @@
+## [1.25.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.1...v1.25.2) (2026-03-06)
+
+
+### Bug Fixes
+
+* **rpc:** reload of RPC agent schema changes   ([#276](https://github.com/ForestAdmin/agent-ruby/issues/276)) ([0eab10c](https://github.com/ForestAdmin/agent-ruby/commit/0eab10cddb8247ab58b5c1f442335078ab6e51d3))
+
 ## [1.25.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.0...v1.25.1) (2026-03-04)
 
 
