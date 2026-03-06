@@ -105,7 +105,7 @@ module ForestAdminDatasourceCustomizer
         end
 
         it 'throws when hiding a field which does not exists' do
-          expect { @decorated_person.change_field_visibility('unknown', false) }.to raise_error(ForestException, "No such field 'unknown'")
+          expect { @decorated_person.change_field_visibility('unknown', false) }.to raise_error(ForestException, /No such field 'unknown'/)
         end
 
         it 'raise when hiding a field referenced in a polymorphic relation' do
@@ -113,19 +113,19 @@ module ForestAdminDatasourceCustomizer
             @decorated_comment.change_field_visibility('commentable_id', false)
           end.to raise_error(
             ForestException,
-            "Cannot remove field 'comment.commentable_id', because it's implied in a polymorphic relation 'comment.commentable'"
+            /Cannot remove field 'comment.commentable_id', because it's implied in a polymorphic relation 'comment.commentable'/
           )
 
           expect do
             @decorated_comment.change_field_visibility('commentable_type', false)
           end.to raise_error(
             ForestException,
-            "Cannot remove field 'comment.commentable_type', because it's implied in a polymorphic relation 'comment.commentable'"
+            /Cannot remove field 'comment.commentable_type', because it's implied in a polymorphic relation 'comment.commentable'/
           )
         end
 
         it 'throws when hiding the primary key' do
-          expect { @decorated_person.change_field_visibility('id', false) }.to raise_error(ForestException, 'Cannot hide primary key')
+          expect { @decorated_person.change_field_visibility('id', false) }.to raise_error(ForestException, /Cannot hide primary key/)
         end
 
         it 'the schema should be the same when doing nothing' do
@@ -200,6 +200,107 @@ module ForestAdminDatasourceCustomizer
             result = @decorated_book.published?('unknown_field')
 
             expect(logger).to have_received(:log).with('Warn', "Field 'unknown_field' not found in schema of collection 'book'")
+            expect(result).to be(false)
+          end
+        end
+
+        context 'when checking bidirectional relations (circular references)' do
+          before do
+            @collection_user = instance_double(
+              ForestAdminDatasourceToolkit::Collection,
+              name: 'user',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'orders' => Relations::OneToManySchema.new(
+                    foreign_collection: 'order',
+                    origin_key: 'user_id',
+                    origin_key_target: 'id'
+                  )
+                }
+              }
+            )
+
+            @collection_order = instance_double(
+              ForestAdminDatasourceToolkit::Collection,
+              name: 'order',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'user_id' => ColumnSchema.new(column_type: 'Number'),
+                  'user' => Relations::ManyToOneSchema.new(
+                    foreign_collection: 'user',
+                    foreign_key: 'user_id',
+                    foreign_key_target: 'id'
+                  )
+                }
+              }
+            )
+
+            @circular_datasource = ForestAdminDatasourceToolkit::Datasource.new
+            @circular_datasource.add_collection(@collection_user)
+            @circular_datasource.add_collection(@collection_order)
+
+            @circular_datasource_decorator = PublicationDatasourceDecorator.new(@circular_datasource)
+            @decorated_user = @circular_datasource_decorator.get_collection('user')
+            @decorated_order = @circular_datasource_decorator.get_collection('order')
+          end
+
+          it 'does not cause infinite recursion when checking published on bidirectional relations' do
+            # This should not raise SystemStackError (stack level too deep)
+            expect { @decorated_user.published?('orders') }.not_to raise_error
+            expect { @decorated_order.published?('user') }.not_to raise_error
+          end
+
+          it 'returns true for valid bidirectional relations' do
+            expect(@decorated_user.published?('orders')).to be(true)
+            expect(@decorated_order.published?('user')).to be(true)
+          end
+
+          it 'schema includes bidirectional relations without infinite recursion' do
+            # This should not raise SystemStackError
+            expect { @decorated_user.schema }.not_to raise_error
+            expect { @decorated_order.schema }.not_to raise_error
+
+            expect(@decorated_user.schema[:fields]).to have_key('orders')
+            expect(@decorated_order.schema[:fields]).to have_key('user')
+          end
+        end
+
+        context 'when relation has missing foreign key target' do
+          before do
+            @collection_with_bad_relation = instance_double(
+              ForestAdminDatasourceToolkit::Collection,
+              name: 'bad_collection',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'related' => Relations::ManyToOneSchema.new(
+                    foreign_collection: 'person',
+                    foreign_key: 'related_id',
+                    foreign_key_target: 'missing_field'
+                  ),
+                  'related_id' => ColumnSchema.new(column_type: 'Number')
+                }
+              }
+            )
+
+            datasource.add_collection(@collection_with_bad_relation)
+            datasource_decorator = PublicationDatasourceDecorator.new(datasource)
+            @decorated_bad = datasource_decorator.get_collection('bad_collection')
+          end
+
+          it 'logs a warning and returns false when foreign_key_target is missing' do
+            logger = instance_spy(Logger)
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+            result = @decorated_bad.published?('related')
+
+            expect(logger).to have_received(:log).with(
+              'Warn',
+              "Field 'missing_field' (foreign_key_target) not found in schema of collection 'person'. " \
+              'This relation will be hidden. Check if the field exists in your database.'
+            )
             expect(result).to be(false)
           end
         end

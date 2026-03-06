@@ -1,4 +1,5 @@
 require_relative 'forest_admin_datasource_customizer/version'
+require 'set'
 require 'zeitwerk'
 
 loader = Zeitwerk::Loader.for_gem

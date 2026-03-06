@@ -70,6 +70,49 @@ module ForestAdminAgent
             relationship: 'HasOne'
           )
         end
+
+        context 'when relations have missing fields' do
+          before do
+            @datasource_with_bad_relations = Datasource.new
+
+            collection_order = Collection.new(@datasource_with_bad_relations, 'Order')
+            collection_order.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'total' => ColumnSchema.new(column_type: 'Number'),
+                # Relation with missing foreign_key
+                'customer' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'missing_customer_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Customer'
+                )
+              }
+            )
+
+            collection_customer = Collection.new(@datasource_with_bad_relations, 'Customer')
+            collection_customer.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'name' => ColumnSchema.new(column_type: 'String')
+              }
+            )
+
+            @datasource_with_bad_relations.add_collection(collection_order)
+            @datasource_with_bad_relations.add_collection(collection_customer)
+          end
+
+          it 'filters out relations with missing fields from schema' do
+            logger = instance_spy(Logger)
+            allow(Facades::Container).to receive(:logger).and_return(logger)
+
+            schema = described_class.build_schema(@datasource_with_bad_relations.get_collection('Order'))
+
+            # Should only have 'id' and 'total', not 'customer' (which has missing foreign_key)
+            field_names = schema[:fields].map { |f| f[:field] }
+            expect(field_names).to contain_exactly('id', 'total')
+            expect(field_names).not_to include('customer')
+          end
+        end
       end
     end
   end
