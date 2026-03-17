@@ -137,7 +137,7 @@ module ForestAdminDatasourceCustomizer
 
         context 'when refine_filter' do
           context 'when the collection has polymorphic relation' do
-            it 'not search over polymorphic relations with the search extended and show a debug log' do
+            it 'not search over PolymorphicManyToOne relations with the search extended and show a debug log' do
               logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
               allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
               filter = Filter.new(search: 'a search value', search_extended: true)
@@ -151,6 +151,58 @@ module ForestAdminDatasourceCustomizer
                   'See more: https://docs.forestadmin.com/developer-guide-agents-ruby/agent-customization/search'
                 )
               end
+            end
+
+            it 'not search over PolymorphicOneToOne relations with the search extended and show a debug log' do
+              collection_order = ForestAdminDatasourceToolkit::Collection.new(datasource, 'order')
+              collection_order.add_fields(
+                {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::EQUAL]),
+                  'reference' => ColumnSchema.new(column_type: 'String',
+                                                  filter_operators: [Operators::I_CONTAINS]),
+                  'document_attachment' => Relations::PolymorphicOneToOneSchema.new(
+                    origin_key: 'record_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'attachment',
+                    origin_type_field: 'record_type',
+                    origin_type_value: 'Order'
+                  )
+                }
+              )
+
+              collection_attachment = ForestAdminDatasourceToolkit::Collection.new(datasource, 'attachment')
+              collection_attachment.add_fields(
+                {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::EQUAL]),
+                  'name' => ColumnSchema.new(column_type: 'String',
+                                             filter_operators: [Operators::I_CONTAINS])
+                }
+              )
+
+              datasource.add_collection(collection_order)
+              datasource.add_collection(collection_attachment)
+
+              logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+              allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+              filter = Filter.new(search: 'test', search_extended: true)
+              search_collection_decorator = described_class.new(collection_order, datasource)
+              refined_filter = search_collection_decorator.refine_filter(caller, filter)
+
+              # Should log the debug message for PolymorphicOneToOne
+              expect(ForestAdminAgent::Facades::Container.logger).to have_received(:log).with(
+                'Debug',
+                "We're not searching through order.document_attachment because it's a polymorphic relation. " \
+                "You can override the default search behavior with 'replace_search'. " \
+                'See more: https://docs.forestadmin.com/developer-guide-agents-ruby/agent-customization/search'
+              )
+
+              # Should only search on direct fields, not on the polymorphic relation fields
+              expect(refined_filter.condition_tree).to have_attributes(
+                field: 'reference', operator: Operators::I_CONTAINS, value: 'test'
+              )
             end
           end
 

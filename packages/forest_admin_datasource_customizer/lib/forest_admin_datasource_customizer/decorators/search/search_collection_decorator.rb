@@ -5,6 +5,9 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+        POLYMORPHIC_TYPES = %w[PolymorphicManyToOne PolymorphicOneToOne].freeze
+        TO_ONE_RELATIONS = %w[ManyToOne OneToOne].freeze
+
         def initialize(child_collection, datasource)
           super
           @replacer = nil
@@ -112,7 +115,7 @@ module ForestAdminDatasourceCustomizer
           @child_collection.schema[:fields].each do |name, field|
             fields.push([name, field]) if field.type == 'Column' && searchable_field?(field)
 
-            if field.type == 'PolymorphicManyToOne' && extended
+            if POLYMORPHIC_TYPES.include?(field.type) && extended
               ForestAdminAgent::Facades::Container.logger.log(
                 'Debug',
                 "We're not searching through #{self.name}.#{name} because it's a polymorphic relation. " \
@@ -121,8 +124,7 @@ module ForestAdminDatasourceCustomizer
               )
             end
 
-            to_one_relations = %w[ManyToOne OneToOne PolymorphicOneToOne]
-            next unless extended && to_one_relations.include?(field.type)
+            next unless extended && TO_ONE_RELATIONS.include?(field.type)
 
             related = @child_collection.datasource.get_collection(field.foreign_collection)
 

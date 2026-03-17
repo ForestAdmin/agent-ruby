@@ -368,8 +368,8 @@ module ForestAdminDatasourceActiveRecord
             query_builder = described_class.new(collection, nil, filter)
             query_builder.build
 
-            # The query should include the category relation
-            expect(query_builder.query.includes_values).to include(:category)
+            # The query should left join the category relation
+            expect(query_builder.query.left_outer_joins_values).to include(:category)
           end
         end
       end
@@ -392,7 +392,7 @@ module ForestAdminDatasourceActiveRecord
           query_builder = described_class.new(collection, nil, filter)
           query_builder.build
 
-          expect(query_builder.query.includes_values).to include(:category)
+          expect(query_builder.query.left_outer_joins_values).to include(:category)
         end
       end
     end
