@@ -211,7 +211,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def add_join_relation(relation_name)
-        @query = @query.includes(relation_name.to_sym)
+        @query = @query.left_joins(relation_name.to_sym)
 
         @query
       end
@@ -251,8 +251,9 @@ module ForestAdminDatasourceActiveRecord
 
       def query_aggregator(aggregator, query)
         if !@query.respond_to?(:where_clause) || @query.where_clause.empty?
-          # Preserve includes from @query when replacing with new query
+          # Preserve includes and joins from @query when replacing with new query
           query = query.includes(@query.includes_values) if @query.includes_values.any?
+          query = query.left_joins(*@query.left_outer_joins_values) if @query.left_outer_joins_values.any?
           query
         else
           @query.send(aggregator, query)
