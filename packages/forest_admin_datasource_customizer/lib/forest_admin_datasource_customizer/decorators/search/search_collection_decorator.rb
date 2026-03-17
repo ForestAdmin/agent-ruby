@@ -124,8 +124,7 @@ module ForestAdminDatasourceCustomizer
               )
             end
 
-            to_one_relations = %w[ManyToOne OneToOne]
-            next unless extended && to_one_relations.include?(field.type)
+            next unless extended && TO_ONE_RELATIONS.include?(field.type)
 
             related = @child_collection.datasource.get_collection(field.foreign_collection)
 
