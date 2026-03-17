@@ -1,3 +1,10 @@
+## [1.25.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.2...v1.25.3) (2026-03-17)
+
+
+### Bug Fixes
+
+* **search:** exclude polymorphic relations from extended search and fix missing JOIN on list ([#277](https://github.com/ForestAdmin/agent-ruby/issues/277)) ([0081a83](https://github.com/ForestAdmin/agent-ruby/commit/0081a8358362aee5aa834549ac96c3dfaab36885))
+
 ## [1.25.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.1...v1.25.2) (2026-03-06)
 
 
