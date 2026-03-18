@@ -756,6 +756,7 @@ module ForestAdminAgent
           expect(page.limit).to be_nil
         end
       end
+
       describe 'parse_chart_parameters' do
         it 'returns all scalar parameters as strings' do
           args = {
@@ -769,12 +770,14 @@ module ForestAdminAgent
 
           result = described_class.parse_chart_parameters(args)
 
-          expect(result).to eq({
-            'timezone' => 'Europe/Paris',
-            'record_id' => '123',
-            'startDate' => '2024-01-01',
-            'endDate' => '2024-12-31'
-          })
+          expect(result).to eq(
+            {
+              'timezone' => 'Europe/Paris',
+              'record_id' => '123',
+              'startDate' => '2024-01-01',
+              'endDate' => '2024-12-31'
+            }
+          )
         end
 
         it 'converts non-string primitives to strings' do
