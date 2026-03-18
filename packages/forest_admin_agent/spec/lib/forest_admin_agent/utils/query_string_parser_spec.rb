@@ -756,6 +756,49 @@ module ForestAdminAgent
           expect(page.limit).to be_nil
         end
       end
+      describe 'parse_chart_parameters' do
+        it 'returns all scalar parameters as strings' do
+          args = {
+            params: {
+              'timezone' => 'Europe/Paris',
+              'record_id' => '123',
+              'startDate' => '2024-01-01',
+              'endDate' => '2024-12-31'
+            }
+          }
+
+          result = described_class.parse_chart_parameters(args)
+
+          expect(result).to eq({
+            'timezone' => 'Europe/Paris',
+            'record_id' => '123',
+            'startDate' => '2024-01-01',
+            'endDate' => '2024-12-31'
+          })
+        end
+
+        it 'converts non-string primitives to strings' do
+          args = { params: { 'count' => 42, 'active' => true } }
+
+          result = described_class.parse_chart_parameters(args)
+
+          expect(result).to eq({ 'count' => '42', 'active' => 'true' })
+        end
+
+        it 'ignores nil, hash and array values' do
+          args = { params: { 'valid' => 'yes', 'nested' => { a: 1 }, 'list' => [1, 2], 'empty' => nil } }
+
+          result = described_class.parse_chart_parameters(args)
+
+          expect(result).to eq({ 'valid' => 'yes' })
+        end
+
+        it 'returns empty hash when no params' do
+          args = { params: {} }
+
+          expect(described_class.parse_chart_parameters(args)).to eq({})
+        end
+      end
     end
   end
 end

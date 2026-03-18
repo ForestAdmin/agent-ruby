@@ -6,11 +6,12 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-        attr_reader :composite_record_id
+        attr_reader :composite_record_id, :parameters
 
-        def initialize(collection, caller, record_id)
+        def initialize(collection, caller, record_id, parameters = {})
           super(collection, caller)
           @composite_record_id = record_id
+          @parameters = (parameters || {}).freeze
         end
 
         def _composite_record_id=(value)

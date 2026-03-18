@@ -158,6 +158,17 @@ module ForestAdminAgent
         sort
       end
 
+      def self.parse_chart_parameters(args)
+        params = args[:params] || {}
+
+        params.each_with_object({}) do |(key, value), result|
+          key_s = key.to_s
+          next if value.nil? || value.is_a?(Hash) || value.is_a?(Array)
+
+          result[key_s] = value.to_s
+        end
+      end
+
       def self.parse_segment(collection, args)
         segment = args.dig(:params, :data, :attributes, :all_records_subset_query,
                            :segment) || args.dig(:params, :segment)

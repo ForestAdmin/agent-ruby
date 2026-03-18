@@ -44,6 +44,29 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe 'parameters' do
+          it 'returns empty hash when no parameters provided' do
+            expect(@context.parameters).to eq({})
+          end
+
+          it 'returns the parameters when provided' do
+            collection = build_collection(
+              name: 'my_collection',
+              schema: {
+                fields: { 'id1' => build_numeric_primary_key, 'id2' => build_numeric_primary_key }
+              },
+              list: [{ id1: 1, id2: 2 }]
+            )
+            ctx = described_class.new(collection, caller, [1, 2], { 'startDate' => '2024-01-01', 'endDate' => '2024-12-31' })
+
+            expect(ctx.parameters).to eq({ 'startDate' => '2024-01-01', 'endDate' => '2024-12-31' })
+          end
+
+          it 'returns a frozen hash' do
+            expect(@context.parameters).to be_frozen
+          end
+        end
+
         describe 'attribute access pattern' do
           describe '#composite_record_id=' do
             it 'does not exist (raises NoMethodError)' do

@@ -51,6 +51,18 @@ module ForestAdminDatasourceCustomizer
               expect(result).to eq({ countCurrent: 34, countPrevious: 45 })
               expect(datasource).not_to have_received(:render_chart)
             end
+
+            it 'passes parameters to the handler context' do
+              received_ctx = nil
+              decorator.add_chart('chart_with_params') do |ctx, result_builder|
+                received_ctx = ctx
+                result_builder.value(10)
+              end
+
+              decorator.render_chart(caller, 'chart_with_params', { 'startDate' => '2024-01-01' })
+
+              expect(received_ctx.parameters).to eq({ 'startDate' => '2024-01-01' })
+            end
           end
         end
 

@@ -31,9 +31,9 @@ module ForestAdminDatasourceCustomizer
             "Collection '#{name}' not found. List of available collections: #{collections.keys.sort.join(", ")}"
     end
 
-    def render_chart(caller_obj, name)
+    def render_chart(caller_obj, name, parameters = {})
       @datasources.each do |ds|
-        return ds.render_chart(caller_obj, name) if ds.schema[:charts].include?(name)
+        return ds.render_chart(caller_obj, name, parameters) if ds.schema[:charts].include?(name)
       end
 
       raise ForestAdminDatasourceToolkit::Exceptions::ForestException,

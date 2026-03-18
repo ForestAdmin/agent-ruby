@@ -38,13 +38,15 @@ module ForestAdminAgent
 
         def handle_api_chart(args = {})
           caller = Utils::QueryStringParser.parse_caller(args)
+          parameters = Utils::QueryStringParser.parse_chart_parameters(args)
           datasource = ForestAdminAgent::Facades::Container.datasource
 
           {
             content: Serializer::ForestChartSerializer.serialize(
               datasource.render_chart(
                 caller,
-                @chart_name
+                @chart_name,
+                parameters
               )
             )
           }
@@ -52,12 +54,14 @@ module ForestAdminAgent
 
         def handle_smart_chart(args = {})
           caller = Utils::QueryStringParser.parse_caller(args)
+          parameters = Utils::QueryStringParser.parse_chart_parameters(args)
           datasource = ForestAdminAgent::Facades::Container.datasource
 
           {
             content: datasource.render_chart(
               caller,
-              @chart_name
+              @chart_name,
+              parameters
             )
           }
         end
