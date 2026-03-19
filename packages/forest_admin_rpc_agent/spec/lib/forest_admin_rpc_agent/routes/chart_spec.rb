@@ -76,6 +76,23 @@ module ForestAdminRpcAgent
           end
         end
 
+        context 'when parameters are provided' do
+          let(:params) do
+            {
+              'collection_name' => collection_name,
+              'caller' => caller.to_h,
+              'chart' => chart_name,
+              'record_id' => record_id,
+              'parameters' => { 'startDate' => '2024-01-01' }
+            }
+          end
+
+          it 'returns the chart data' do
+            result = route.handle_request(params: params)
+            expect(result).to eq(chart_result)
+          end
+        end
+
         context 'when collection_name is missing' do
           it 'returns an empty hash' do
             result = route.handle_request(params: {})

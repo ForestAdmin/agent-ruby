@@ -43,6 +43,21 @@ module ForestAdminRpcAgent
           end
         end
 
+        context 'when chart is provided with parameters' do
+          let(:params) do
+            {
+              'chart' => chart_name,
+              'caller' => caller.to_h,
+              'parameters' => { 'startDate' => '2024-01-01' }
+            }
+          end
+
+          it 'forwards the parameters to render_chart' do
+            result = route.handle_request(params: params)
+            expect(result).to eq(chart_result)
+          end
+        end
+
         context 'when chart is missing' do
           it 'returns an empty hash' do
             result = route.handle_request(params: {})
