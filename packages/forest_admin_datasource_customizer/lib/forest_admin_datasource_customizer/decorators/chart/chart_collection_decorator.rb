@@ -19,15 +19,15 @@ module ForestAdminDatasourceCustomizer
           mark_schema_as_dirty
         end
 
-        def render_chart(caller, name, record_id)
+        def render_chart(caller, name, record_id, parameters = {})
           if @charts.key?(name)
-            context = ChartContext.new(self, caller, record_id)
+            context = ChartContext.new(self, caller, record_id, parameters)
             result_builder = ResultBuilder.new
 
             return @charts[name].call(context, result_builder)
           end
 
-          @child_collection.render_chart(caller, name, record_id)
+          @child_collection.render_chart(caller, name, record_id, parameters)
         end
 
         def refine_schema(sub_schema)

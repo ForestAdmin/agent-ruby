@@ -76,7 +76,7 @@ module ForestAdminDatasourceToolkit
       schema[:charts] << name
     end
 
-    def render_chart(_caller, name, _record_id)
+    def render_chart(_caller, name, _record_id, _parameters = {})
       raise Exceptions::ForestException, "Chart #{name} is not implemented."
     end
   end

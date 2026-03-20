@@ -36,7 +36,7 @@ module ForestAdminDatasourceRpc
       register_shutdown_hook if @schema_polling_client
     end
 
-    def render_chart(caller, name)
+    def render_chart(caller, name, parameters = {})
       url = 'forest/rpc-datasource-chart'
 
       ForestAdminAgent::Facades::Container.logger.log(
@@ -44,7 +44,7 @@ module ForestAdminDatasourceRpc
         "Forwarding datasource chart '#{name}' call to the Rpc agent on #{url}."
       )
 
-      @shared_rpc_client.call_rpc(url, caller: caller, method: :post, payload: { chart: name })
+      @shared_rpc_client.call_rpc(url, caller: caller, method: :post, payload: { chart: name, parameters: parameters })
     end
 
     def execute_native_query(connection_name, query, binds)

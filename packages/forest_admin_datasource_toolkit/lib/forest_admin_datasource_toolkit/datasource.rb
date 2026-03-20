@@ -23,7 +23,7 @@ module ForestAdminDatasourceToolkit
       @collections[collection.name] = collection
     end
 
-    def render_chart(_caller, name)
+    def render_chart(_caller, name, _parameters = {})
       raise Exceptions::ForestException, "No chart named #{name} exists on this datasource."
     end
 

@@ -71,8 +71,8 @@ module ForestAdminDatasourceToolkit
         @child_collection.aggregate(caller, refined_filter, aggregation, limit)
       end
 
-      def render_chart(caller, name, record_id)
-        @child_collection.render_chart(caller, name, record_id)
+      def render_chart(caller, name, record_id, parameters = {})
+        @child_collection.render_chart(caller, name, record_id, parameters)
       end
 
       protected

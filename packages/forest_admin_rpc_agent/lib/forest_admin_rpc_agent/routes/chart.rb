@@ -13,10 +13,11 @@ module ForestAdminRpcAgent
         return {} unless args[:params]['collection_name']
 
         chart_name = args[:params]['chart']
+        parameters = args[:params]['parameters']
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = get_collection_safe(datasource, args[:params]['collection_name'])
 
-        collection.render_chart(caller, chart_name, args[:params]['record_id'])
+        collection.render_chart(caller, chart_name, args[:params]['record_id'], parameters)
       end
     end
   end

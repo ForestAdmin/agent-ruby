@@ -176,7 +176,26 @@ module ForestAdminDatasourceRpc
             {
               collection_name: 'Product',
               chart: 'my_chart',
-              record_id: 1
+              record_id: 1,
+              parameters: {}
+            }
+          )
+        end
+      end
+
+      it 'forward the call with parameters' do
+        collection.render_chart(caller, 'my_chart', 1, { 'startDate' => '2024-01-01' })
+
+        expect(rpc_client).to have_received(:call_rpc) do |url, options|
+          expect(url).to eq('/forest/rpc/Product/chart')
+          expect(options[:caller]).to eq(caller)
+          expect(options[:method]).to eq(:post)
+          expect(options[:payload]).to eq(
+            {
+              collection_name: 'Product',
+              chart: 'my_chart',
+              record_id: 1,
+              parameters: { 'startDate' => '2024-01-01' }
             }
           )
         end

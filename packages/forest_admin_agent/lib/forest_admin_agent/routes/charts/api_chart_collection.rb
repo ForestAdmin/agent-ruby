@@ -45,12 +45,14 @@ module ForestAdminAgent
 
         def handle_api_chart(args)
           context = build(args)
+          parameters = Utils::QueryStringParser.parse_chart_parameters(args)
           {
             content: Serializer::ForestChartSerializer.serialize(
               context.collection.render_chart(
                 context.caller,
                 @chart_name,
-                Id.unpack_id(context.collection, args[:params]['record_id'])
+                Id.unpack_id(context.collection, args[:params]['record_id']),
+                parameters
               )
             )
           }
@@ -58,11 +60,13 @@ module ForestAdminAgent
 
         def handle_smart_chart(args)
           context = build(args)
+          parameters = Utils::QueryStringParser.parse_chart_parameters(args)
           {
             content: context.collection.render_chart(
               context.caller,
               @chart_name,
-              Id.unpack_id(context.collection, args[:params]['record_id'])
+              Id.unpack_id(context.collection, args[:params]['record_id']),
+              parameters
             )
           }
         end

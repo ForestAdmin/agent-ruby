@@ -149,8 +149,8 @@ module ForestAdminDatasourceRpc
       end
     end
 
-    def render_chart(caller, name, record_id)
-      params = build_params(chart: name, record_id: record_id)
+    def render_chart(caller, name, record_id, parameters = {})
+      params = build_params(chart: name, record_id: record_id, parameters: parameters)
       url = "#{@rpc_collection_uri}/chart"
 
       ForestAdminAgent::Facades::Container.logger.log(

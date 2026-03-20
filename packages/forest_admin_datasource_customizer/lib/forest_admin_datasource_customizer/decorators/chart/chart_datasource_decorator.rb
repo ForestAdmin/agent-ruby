@@ -28,12 +28,12 @@ module ForestAdminDatasourceCustomizer
           @charts[name] = definition
         end
 
-        def render_chart(caller, name)
+        def render_chart(caller, name, parameters = {})
           chart_definition = @charts[name]
 
           if chart_definition
             return chart_definition.call(
-              Context::AgentCustomizationContext.new(self, caller),
+              DatasourceChartContext.new(self, caller, parameters),
               ResultBuilder.new
             )
           end

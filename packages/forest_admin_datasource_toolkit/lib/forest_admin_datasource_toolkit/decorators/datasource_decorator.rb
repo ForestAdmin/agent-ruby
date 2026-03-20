@@ -30,8 +30,8 @@ module ForestAdminDatasourceToolkit
         @decorators[collection.name]
       end
 
-      def render_chart(caller, name)
-        @child_datasource.render_chart(caller, name)
+      def render_chart(caller, name, parameters = {})
+        @child_datasource.render_chart(caller, name, parameters)
       end
 
       def execute_native_query(connection_name, query, binds)
