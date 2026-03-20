@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.3...v1.26.0) (2026-03-20)
+
+
+### Features
+
+* **api chart:** allow customizing api chart with query or body parameters ([#278](https://github.com/ForestAdmin/agent-ruby/issues/278)) ([3728660](https://github.com/ForestAdmin/agent-ruby/commit/3728660638f36b18d69563e807c9916032143e0a))
+
 ## [1.25.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.2...v1.25.3) (2026-03-17)
 
 
