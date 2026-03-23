@@ -86,9 +86,7 @@ module ForestAdminRails
                }
              end
 
-      unless ForestAdminAgent::Facades::Container.cache(:is_production) || http_exception.status < 500
-        ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message)
-      end
+      ForestAdminAgent::Facades::Container.logger.log('Error', exception.full_message) if http_exception.status >= 500
 
       render json: data, status: http_exception.status
     end
