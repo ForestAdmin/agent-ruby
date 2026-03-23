@@ -191,15 +191,27 @@ module ForestAdminDatasourceToolkit
         end
 
         def self.add_polymorphic_condition(conditions, relation)
-          return conditions unless relation.respond_to?(:origin_type_field) &&
-                                   relation.origin_type_field &&
-                                   relation.origin_type_value
+          if relation.respond_to?(:origin_type_field) &&
+             relation.origin_type_field &&
+             relation.origin_type_value
+            conditions << Nodes::ConditionTreeLeaf.new(
+              relation.origin_type_field,
+              Operators::EQUAL,
+              relation.origin_type_value
+            )
+          end
 
-          conditions << Nodes::ConditionTreeLeaf.new(
-            relation.origin_type_field,
-            Operators::EQUAL,
-            relation.origin_type_value
-          )
+          if relation.respond_to?(:foreign_type_field) &&
+             relation.foreign_type_field &&
+             relation.foreign_type_value
+            conditions << Nodes::ConditionTreeLeaf.new(
+              relation.foreign_type_field,
+              Operators::EQUAL,
+              relation.foreign_type_value
+            )
+          end
+
+          conditions
         end
       end
     end

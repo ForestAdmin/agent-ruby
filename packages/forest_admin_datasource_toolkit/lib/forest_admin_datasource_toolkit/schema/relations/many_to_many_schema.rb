@@ -3,7 +3,7 @@ module ForestAdminDatasourceToolkit
     module Relations
       class ManyToManySchema < RelationSchema
         attr_accessor :origin_key, :through_collection, :foreign_key, :origin_key_target, :foreign_key_target,
-                      :origin_type_field, :origin_type_value
+                      :origin_type_field, :origin_type_value, :foreign_type_field, :foreign_type_value
 
         def initialize(
           origin_key:,
@@ -13,7 +13,9 @@ module ForestAdminDatasourceToolkit
           foreign_collection:,
           through_collection:,
           origin_type_field: nil,
-          origin_type_value: nil
+          origin_type_value: nil,
+          foreign_type_field: nil,
+          foreign_type_value: nil
         )
           super(foreign_collection, 'ManyToMany')
           @origin_key = origin_key
@@ -23,6 +25,8 @@ module ForestAdminDatasourceToolkit
           @foreign_key_target = foreign_key_target
           @origin_type_field = origin_type_field
           @origin_type_value = origin_type_value
+          @foreign_type_field = foreign_type_field
+          @foreign_type_value = foreign_type_value
         end
       end
     end
