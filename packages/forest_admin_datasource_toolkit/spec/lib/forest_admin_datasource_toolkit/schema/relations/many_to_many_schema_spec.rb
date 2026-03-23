@@ -25,6 +25,31 @@ module ForestAdminDatasourceToolkit
           it { expect(relation.through_collection).to eq 'through_collection' }
         end
 
+        describe 'with polymorphic foreign type fields' do
+          subject(:relation_with_foreign_type) do
+            described_class.new(
+              foreign_key: 'memberable_id',
+              foreign_key_target: 'id',
+              foreign_collection: 'Company',
+              through_collection: 'Member',
+              origin_key: 'user_id',
+              origin_key_target: 'id',
+              foreign_type_field: 'memberable_type',
+              foreign_type_value: 'Company'
+            )
+          end
+
+          it { expect(relation_with_foreign_type.foreign_type_field).to eq 'memberable_type' }
+          it { expect(relation_with_foreign_type.foreign_type_value).to eq 'Company' }
+        end
+
+        describe 'without polymorphic fields' do
+          it { expect(relation.origin_type_field).to be_nil }
+          it { expect(relation.origin_type_value).to be_nil }
+          it { expect(relation.foreign_type_field).to be_nil }
+          it { expect(relation.foreign_type_value).to be_nil }
+        end
+
         describe 'setters' do
           before do
             relation.foreign_key = 'new_foreign_key'
