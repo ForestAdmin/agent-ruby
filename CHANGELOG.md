@@ -1,3 +1,10 @@
+## [1.26.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.1...v1.26.2) (2026-03-23)
+
+
+### Bug Fixes
+
+* **datasource:** handle nil group in lazy join aggregate results ([#282](https://github.com/ForestAdmin/agent-ruby/issues/282)) ([b86bf34](https://github.com/ForestAdmin/agent-ruby/commit/b86bf3440ecbbbc7072c706ccd736f1d1d3c8859))
+
 ## [1.26.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.0...v1.26.1) (2026-03-23)
 
 
