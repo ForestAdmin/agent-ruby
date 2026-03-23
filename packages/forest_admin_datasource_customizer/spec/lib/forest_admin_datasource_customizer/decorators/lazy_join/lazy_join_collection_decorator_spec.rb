@@ -314,6 +314,20 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
+          it 'not crash on aggregate without group (simple count)' do
+            allow(@collection_book).to receive(:aggregate).and_return(
+              [{ 'value' => 42, 'group' => nil }]
+            )
+
+            result = @datasource_decorator.get_collection('book').aggregate(
+              caller,
+              Filter.new(condition_tree: Nodes::ConditionTreeLeaf.new('author:id', Operators::EQUAL, 2)),
+              Aggregation.new(operation: 'Count')
+            )
+
+            expect(result).to eq([{ 'value' => 42, 'group' => nil }])
+          end
+
           it 'join on aggregate when group by foreign pk and filter on foreign field' do
             allow(@collection_book).to receive(:aggregate).and_return(
               [

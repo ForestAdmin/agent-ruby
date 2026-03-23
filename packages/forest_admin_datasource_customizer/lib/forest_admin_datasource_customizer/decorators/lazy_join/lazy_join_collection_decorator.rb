@@ -107,9 +107,11 @@ module ForestAdminDatasourceCustomizer
         end
 
         def apply_joins_on_aggregate_result(initial_aggregation, requested_aggregation, results, fields_to_replace)
-          return result if initial_aggregation == requested_aggregation
+          return results if initial_aggregation == requested_aggregation
 
           results.each do |result|
+            next unless result['group']
+
             group = {}
             result['group'].each do |field, value|
               if fields_to_replace.include?(field)
