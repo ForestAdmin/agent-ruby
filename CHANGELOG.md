@@ -1,3 +1,10 @@
+## [1.26.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.0...v1.26.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* log 500 errors in production for better debugging ([#281](https://github.com/ForestAdmin/agent-ruby/issues/281)) ([007f3d7](https://github.com/ForestAdmin/agent-ruby/commit/007f3d7ed0105677266374c76fd0823b26a5628f))
+
 # [1.26.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.25.3...v1.26.0) (2026-03-20)
 
 
