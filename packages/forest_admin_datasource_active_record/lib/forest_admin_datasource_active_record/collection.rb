@@ -92,6 +92,8 @@ module ForestAdminDatasourceActiveRecord
             if association.through_reflection?
               through_reflection = association.through_reflection
               is_polymorphic = through_reflection.options[:as].present?
+              source_polymorphic = association.source_reflection&.polymorphic? &&
+                                   association.options[:source_type].present?
 
               add_field(
                 association.name.to_s,
@@ -103,7 +105,9 @@ module ForestAdminDatasourceActiveRecord
                   foreign_key_target: association.association_primary_key,
                   through_collection: format_model_name(through_reflection.klass.name),
                   origin_type_field: is_polymorphic ? through_reflection.type : nil,
-                  origin_type_value: is_polymorphic ? @model.name : nil
+                  origin_type_value: is_polymorphic ? @model.name : nil,
+                  foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
+                  foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
                 )
               )
             elsif association.inverse_of&.polymorphic?
@@ -162,6 +166,8 @@ module ForestAdminDatasourceActiveRecord
             if association.through_reflection?
               through_reflection = association.through_reflection
               is_polymorphic = through_reflection.options[:as].present?
+              source_polymorphic = association.source_reflection&.polymorphic? &&
+                                   association.options[:source_type].present?
 
               add_field(
                 association.name.to_s,
@@ -173,7 +179,9 @@ module ForestAdminDatasourceActiveRecord
                   foreign_key_target: association.association_primary_key,
                   through_collection: format_model_name(through_reflection.klass.name),
                   origin_type_field: is_polymorphic ? through_reflection.type : nil,
-                  origin_type_value: is_polymorphic ? @model.name : nil
+                  origin_type_value: is_polymorphic ? @model.name : nil,
+                  foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
+                  foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
                 )
               )
             elsif association.inverse_of&.polymorphic?

@@ -292,6 +292,87 @@ module ForestAdminDatasourceToolkit
               ).to_h
             )
           end
+
+          context 'with foreign_type polymorphic (source_type direction)' do
+            let(:collection_user_with_source_type) do
+              collection = ForestAdminDatasourceToolkit::Collection.new(datasource, 'UserWithSourceType')
+              collection.add_fields(
+                {
+                  'id' => ColumnSchema.new(column_type: PrimitiveType::NUMBER, is_primary_key: true),
+                  'books' => ManyToManySchema.new(
+                    origin_key: 'user_id',
+                    origin_key_target: 'id',
+                    foreign_key: 'memberable_id',
+                    foreign_key_target: 'id',
+                    foreign_collection: 'Book',
+                    through_collection: 'Member',
+                    foreign_type_field: 'memberable_type',
+                    foreign_type_value: 'Book'
+                  )
+                }
+              )
+
+              collection
+            end
+
+            before do
+              datasource.add_collection(collection_user_with_source_type)
+            end
+
+            it 'includes foreign_type condition in make_through_filter' do
+              allow(collection_member).to receive(:list).and_return([{ 'memberable_id' => 1 }, { 'memberable_id' => 2 }])
+              allow(collection_book).to receive(:list).and_return([{ 'id' => 1 }, { 'id' => 2 }])
+
+              base_filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::EQUAL, 1),
+                                       segment: 'someSegment')
+              filter = described_class.make_through_filter(collection_user_with_source_type, [1], 'books', caller, base_filter)
+
+              expect(filter.condition_tree.to_h).to eq(
+                ConditionTreeBranch.new(
+                  'And',
+                  [
+                    ConditionTreeLeaf.new('user_id', Operators::EQUAL, 1),
+                    ConditionTreeLeaf.new('memberable_id', Operators::IN, [1, 2]),
+                    ConditionTreeLeaf.new('memberable_type', Operators::EQUAL, 'Book')
+                  ]
+                ).to_h
+              )
+            end
+
+            it 'includes foreign_type condition in make_foreign_filter' do
+              allow(collection_member).to receive(:list).and_return([{ 'memberable_id' => 1 }, { 'memberable_id' => 2 }])
+
+              base_filter = Filter.new(
+                condition_tree: ConditionTreeLeaf.new('some_field', Operators::EQUAL, 1),
+                segment: 'some-segment'
+              )
+
+              filter = described_class.make_foreign_filter(collection_user_with_source_type, [1], 'books', caller, base_filter)
+
+              expect(collection_member).to have_received(:list) do |_caller, through_filter|
+                expect(through_filter.condition_tree.to_h).to eq(
+                  {
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'user_id', operator: 'equal', value: 1 },
+                      { field: 'memberable_id', operator: 'present', value: nil },
+                      { field: 'memberable_type', operator: 'equal', value: 'Book' }
+                    ]
+                  }
+                )
+              end
+
+              expect(filter.condition_tree.to_h).to eq(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'some_field', operator: 'equal', value: 1 },
+                    { field: 'id', operator: 'in', value: [1, 2] }
+                  ]
+                }
+              )
+            end
+          end
         end
 
         context 'when call make_foreign_filter' do

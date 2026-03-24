@@ -155,6 +155,26 @@ module ForestAdminDatasourceActiveRecord
           expect(datasource.get_collection('Address').schema[:fields].keys).to include('addressable')
         end
 
+        it 'sets foreign_type_field/value for has_many :through with polymorphic source_type' do
+          user_collection = datasource.get_collection('User')
+          projects_relation = user_collection.schema[:fields]['projects']
+
+          expect(projects_relation).to be_a(Relations::ManyToManySchema)
+          expect(projects_relation.foreign_type_field).to eq('memberable_type')
+          expect(projects_relation.foreign_type_value).to eq('Project')
+          expect(projects_relation.through_collection).to eq('Member')
+          expect(projects_relation.foreign_key).to eq('memberable_id')
+          expect(projects_relation.origin_key).to eq('user_id')
+        end
+
+        it 'does not set origin_type for has_many :through with source_type (non-polymorphic origin)' do
+          user_collection = datasource.get_collection('User')
+          projects_relation = user_collection.schema[:fields]['projects']
+
+          expect(projects_relation.origin_type_field).to be_nil
+          expect(projects_relation.origin_type_value).to be_nil
+        end
+
         # rubocop:disable RSpec/ExampleLength
         it 'handles polymorphic associations with missing foreign key columns' do
           # This test reproduces issue #202: Server crashing on startup when missing columns for foreign keys
