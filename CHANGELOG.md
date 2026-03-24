@@ -1,3 +1,10 @@
+## [1.26.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.2...v1.26.3) (2026-03-24)
+
+
+### Bug Fixes
+
+* **polymorphic:** add source_type filtering for has_many through with polymorphic source ([#280](https://github.com/ForestAdmin/agent-ruby/issues/280)) ([f211830](https://github.com/ForestAdmin/agent-ruby/commit/f211830eb4bb9d98fe6ee7d3386aee6829b6b3a5))
+
 ## [1.26.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.1...v1.26.2) (2026-03-23)
 
 
