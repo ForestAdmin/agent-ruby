@@ -1,3 +1,10 @@
+# [1.0.0-beta.111](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.110...v1.0.0-beta.111) (2026-03-30)
+
+
+### Bug Fixes
+
+* **security:** upgrade semantic-release to v25 and resolve all audit vulnerabilities (PRD-180) ([c2df548](https://github.com/ForestAdmin/agent-ruby/commit/c2df5484c006bbb577474b2207d412b67232ab23))
+
 # [1.0.0-beta.110](https://github.com/ForestAdmin/agent-ruby/compare/v1.0.0-beta.109...v1.0.0-beta.110) (2025-09-22)
 
 
