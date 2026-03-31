@@ -41,9 +41,8 @@ module ForestAdminRails
                    .select { |a| a.macro == :has_one_attached }
                    .each do |attachment|
           name = attachment.name.to_s
-          field_name = options[:field_name]&.call(name) || name
           hide_attachment_relations(collection, name)
-          add_file_field(collection, model_class, name, field_name, options.fetch(:download_images_on_list, false))
+          add_file_field(collection, model_class, name, options.fetch(:download_images_on_list, false))
         end
       end
 
@@ -55,10 +54,10 @@ module ForestAdminRails
         end
       end
 
-      def add_file_field(collection, model_class, attachment_name, field_name, download_images_on_list)
-        return if collection.schema[:fields][field_name]
+      def add_file_field(collection, model_class, attachment_name, download_images_on_list)
+        return if collection.schema[:fields][attachment_name]
 
-        collection.add_field(field_name,
+        collection.add_field(attachment_name,
                              ForestAdminDatasourceCustomizer::Decorators::Computed::ComputedDefinition.new(
                                column_type: 'File',
                                dependencies: ['id'],
@@ -67,7 +66,7 @@ module ForestAdminRails
                                }
                              ))
 
-        collection.replace_field_writing(field_name) do |value, context|
+        collection.replace_field_writing(attachment_name) do |value, context|
           handle_write(value, context, model_class, attachment_name)
         end
       end

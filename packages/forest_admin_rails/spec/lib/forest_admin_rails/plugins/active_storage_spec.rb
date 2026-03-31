@@ -92,14 +92,6 @@ RSpec.describe ForestAdminRails::Plugins::ActiveStorage do
       end
     end
 
-    context 'with :field_name option' do
-      it 'uses custom field naming' do
-        plugin.run(datasource_customizer, nil, { field_name: ->(name) { "#{name}_file" } })
-
-        expect(order_collection.added_fields).to have_key('document_file')
-      end
-    end
-
     it 'skips if field already exists' do
       order_collection.schema = { fields: { 'document' => true } }
 
