@@ -19,6 +19,7 @@ module ForestAdminRails
           'User' => 'Customer',
         })
                                                       # .add_datasource(mongo_datasource)
+      @agent.use(ForestAdminRails::Plugins::ActiveStorage, { download_images_on_list: true })
 
       customize
       @agent.build

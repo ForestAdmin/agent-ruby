@@ -128,6 +128,17 @@ module ForestAdmin
     # Plugin - base class for creating custom plugins
     Plugin = ForestAdminDatasourceCustomizer::Plugins::Plugin
 
+    # ActiveStoragePlugin - plugin to expose Active Storage attachments as File fields
+    # Lazy-loaded because Zeitwerk may not have autoloaded it yet when types.rb is required
+    def self.const_missing(name)
+      if name == :ActiveStoragePlugin
+        require 'forest_admin_rails/plugins/active_storage'
+        const_set(:ActiveStoragePlugin, ForestAdminRails::Plugins::ActiveStorage)
+      else
+        super
+      end
+    end
+
     # ============================================
     # Additional Context Classes
     # ============================================
