@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.3...v1.27.0) (2026-04-01)
+
+
+### Features
+
+* **rails:** support active storage attachments ([#283](https://github.com/ForestAdmin/agent-ruby/issues/283)) ([7076b1b](https://github.com/ForestAdmin/agent-ruby/commit/7076b1b5cac1ee2984c2ad4971e6604530738049))
+
 ## [1.26.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.2...v1.26.3) (2026-03-24)
 
 
