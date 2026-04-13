@@ -31,6 +31,11 @@ module ForestAdminAgent
 
       def self.parse_value(collection, leaf)
         schema = Collection.get_field_schema(collection, leaf[:field])
+
+        if ['ManyToOne', 'PolymorphicManyToOne'].include?(schema.type)
+          schema = collection.schema[:fields][schema.foreign_key]
+        end
+
         expected_type = get_expected_type_for_condition(leaf, schema)
 
         cast_to_type(leaf[:value], expected_type)

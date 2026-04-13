@@ -11,8 +11,9 @@ module ForestAdminAgent
     describe ConditionTreeParser do
       subject(:condition_tree_parser) { described_class }
 
+      let(:datasource) { Datasource.new }
+
       let(:collection_category) do
-        datasource = Datasource.new
         collection_category = Collection.new(datasource, 'Category')
         collection_category.add_fields(
           {
@@ -26,6 +27,27 @@ module ForestAdminAgent
         datasource.add_collection(collection_category)
 
         return collection_category
+      end
+
+      let(:collection_product) do
+        collection_product = Collection.new(datasource, 'Product')
+        collection_product.add_fields(
+          {
+            'id' => ColumnSchema.new(column_type: 'Uuid', is_primary_key: true,
+                                     filter_operators: [Operators::EQUAL, Operators::IN, Operators::NOT_IN]),
+            'category_id' => ColumnSchema.new(column_type: 'Uuid',
+                                              filter_operators: [Operators::EQUAL, Operators::IN, Operators::NOT_IN]),
+            'category' => ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(
+              foreign_key: 'category_id',
+              foreign_key_target: 'id',
+              foreign_collection: 'Category'
+            )
+          }
+        )
+
+        datasource.add_collection(collection_product)
+
+        return collection_product
       end
 
       it 'failed if provided something else' do
@@ -158,6 +180,29 @@ module ForestAdminAgent
 
           expect(condition_tree_parser.from_plain_object(collection_category, filters))
             .to have_attributes(field: filters[:field], operator: filters[:operator], value: %w[tag1 tag2 tag3])
+        end
+      end
+
+      context 'with ManyToOne relation field' do
+        it 'works with "IN" on a ManyToOne relation field' do
+          filters = { field: 'category', operator: Operators::IN, value: 'uuid1,uuid2' }
+
+          expect(condition_tree_parser.from_plain_object(collection_product, filters))
+            .to have_attributes(field: 'category', operator: Operators::IN, value: %w[uuid1 uuid2])
+        end
+
+        it 'works with "NOT_IN" on a ManyToOne relation field' do
+          filters = { field: 'category', operator: Operators::NOT_IN, value: 'uuid1,uuid2' }
+
+          expect(condition_tree_parser.from_plain_object(collection_product, filters))
+            .to have_attributes(field: 'category', operator: Operators::NOT_IN, value: %w[uuid1 uuid2])
+        end
+
+        it 'works with "EQUAL" on a ManyToOne relation field' do
+          filters = { field: 'category', operator: Operators::EQUAL, value: 'some-uuid' }
+
+          expect(condition_tree_parser.from_plain_object(collection_product, filters))
+            .to have_attributes(field: 'category', operator: Operators::EQUAL, value: 'some-uuid')
         end
       end
     end
