@@ -56,7 +56,7 @@ module ForestAdminDatasourceZendesk
       def translate_page(page)
         return [1, Client::MAX_PER_PAGE] if page.nil?
 
-        per_page = page.limit && page.limit.positive? ? [page.limit, Client::MAX_PER_PAGE].min : Client::MAX_PER_PAGE
+        per_page = page.limit&.positive? ? [page.limit, Client::MAX_PER_PAGE].min : Client::MAX_PER_PAGE
         page_num = (page.offset.to_i / per_page) + 1
         [page_num, per_page]
       end

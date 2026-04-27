@@ -137,17 +137,17 @@ RSpec.describe ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator do
   describe 'branches (aggregators)' do
     it 'joins AND children with spaces' do
       branch = Branch.new('And', [
-        Leaf.new('status', 'equal', 'open'),
-        Leaf.new('priority', 'equal', 'high')
-      ])
+                            Leaf.new('status', 'equal', 'open'),
+                            Leaf.new('priority', 'equal', 'high')
+                          ])
       expect(translate(branch)).to eq('status:open priority:high')
     end
 
     it 'raises on OR aggregator' do
       branch = Branch.new('Or', [
-        Leaf.new('status', 'equal', 'open'),
-        Leaf.new('status', 'equal', 'pending')
-      ])
+                            Leaf.new('status', 'equal', 'open'),
+                            Leaf.new('status', 'equal', 'pending')
+                          ])
       expect { translate(branch) }
         .to raise_error(ForestAdminDatasourceZendesk::UnsupportedOperatorError, /OR/i)
     end

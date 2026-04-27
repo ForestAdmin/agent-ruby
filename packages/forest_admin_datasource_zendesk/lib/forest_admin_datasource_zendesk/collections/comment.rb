@@ -6,6 +6,7 @@ module ForestAdminDatasourceZendesk
     # else raises ForestException.
     class Comment < BaseCollection
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
+      Branch          = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
 
       def initialize(datasource)
         super(datasource, 'ZendeskComment')
@@ -54,8 +55,6 @@ module ForestAdminDatasourceZendesk
 
       private
 
-      Branch = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
-
       # Walks the (possibly-Branch) condition tree and collects equality/IN
       # values for `field`. Returns nil if no matching leaf was found.
       def extract_field_lookup(node, field)
@@ -78,7 +77,7 @@ module ForestAdminDatasourceZendesk
         parts = value.to_s.split('-')
         return [nil, nil] unless parts.size == 2
 
-        c_id, t_id = parts.map { |p| Integer(p, 10) rescue nil }
+        c_id, t_id = parts.map { |p| Integer(p, 10, exception: false) }
         [c_id, t_id]
       end
 
@@ -99,53 +98,53 @@ module ForestAdminDatasourceZendesk
         # /ZendeskComment/<comment_id>-<ticket_id>; filter on `id` carries the
         # full synthetic value, which we decode in #list.
         add_field('id',         ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::IN],
-                                                  is_primary_key: true, is_read_only: true, is_sortable: false))
+                                                 is_primary_key: true, is_read_only: true, is_sortable: false))
         add_field('ticket_id',  ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::IN],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('author_id',  ColumnSchema.new(column_type: 'Number', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('body',       ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('html_body',  ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('plain_body', ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('public',     ColumnSchema.new(column_type: 'Boolean', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('type',       ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                 is_read_only: true, is_sortable: false))
         add_field('via_channel', ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                   is_read_only: true, is_sortable: false))
-        add_field('created_at', ColumnSchema.new(column_type: 'Date',   filter_operators: [],
                                                   is_read_only: true, is_sortable: false))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: [],
+                                                 is_read_only: true, is_sortable: false))
       end
 
       def define_relations
         add_field('author', ManyToOneSchema.new(
-          foreign_collection: 'ZendeskUser',
-          foreign_key: 'author_id',
-          foreign_key_target: 'id'
-        ))
+                              foreign_collection: 'ZendeskUser',
+                              foreign_key: 'author_id',
+                              foreign_key_target: 'id'
+                            ))
         add_field('ticket', ManyToOneSchema.new(
-          foreign_collection: 'ZendeskTicket',
-          foreign_key: 'ticket_id',
-          foreign_key_target: 'id'
-        ))
+                              foreign_collection: 'ZendeskTicket',
+                              foreign_key: 'ticket_id',
+                              foreign_key_target: 'id'
+                            ))
       end
 
       def serialize(comment)
         attrs = attrs_of(comment)
         {
-          'id'          => "#{attrs['id']}-#{attrs['ticket_id']}",
-          'ticket_id'   => attrs['ticket_id'],
-          'author_id'   => attrs['author_id'],
-          'body'        => attrs['body'],
-          'html_body'   => attrs['html_body'],
-          'plain_body'  => attrs['plain_body'] || attrs['body'],
-          'public'      => attrs['public'],
-          'type'        => attrs['type'],
+          'id' => "#{attrs["id"]}-#{attrs["ticket_id"]}",
+          'ticket_id' => attrs['ticket_id'],
+          'author_id' => attrs['author_id'],
+          'body' => attrs['body'],
+          'html_body' => attrs['html_body'],
+          'plain_body' => attrs['plain_body'] || attrs['body'],
+          'public' => attrs['public'],
+          'type' => attrs['type'],
           'via_channel' => (attrs.dig('via', 'channel') || attrs.dig(:via, :channel)),
-          'created_at'  => attrs['created_at']
+          'created_at' => attrs['created_at']
         }
       end
     end

@@ -13,22 +13,22 @@ RSpec.describe ForestAdminDatasourceZendesk::Configuration do
     end
 
     it 'raises a ConfigurationError when subdomain is nil' do
-      expect { described_class.new(**valid_args.merge(subdomain: nil)) }
+      expect { described_class.new(**valid_args, subdomain: nil) }
         .to raise_error(ForestAdminDatasourceZendesk::ConfigurationError, /subdomain/)
     end
 
     it 'raises a ConfigurationError when subdomain is blank' do
-      expect { described_class.new(**valid_args.merge(subdomain: '   ')) }
+      expect { described_class.new(**valid_args, subdomain: '   ') }
         .to raise_error(ForestAdminDatasourceZendesk::ConfigurationError, /subdomain/)
     end
 
     it 'raises with username when username is missing' do
-      expect { described_class.new(**valid_args.merge(username: nil)) }
+      expect { described_class.new(**valid_args, username: nil) }
         .to raise_error(ForestAdminDatasourceZendesk::ConfigurationError, /username/)
     end
 
     it 'raises with token when token is missing' do
-      expect { described_class.new(**valid_args.merge(token: '')) }
+      expect { described_class.new(**valid_args, token: '') }
         .to raise_error(ForestAdminDatasourceZendesk::ConfigurationError, /token/)
     end
 

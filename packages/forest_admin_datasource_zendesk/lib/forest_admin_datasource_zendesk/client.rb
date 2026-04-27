@@ -113,7 +113,7 @@ module ForestAdminDatasourceZendesk
       ids = Array(ids).compact.uniq
       return {} if ids.empty?
 
-      ids.each_slice(MAX_PER_PAGE).each_with_object({}) do |batch, acc|
+      ids.each_slice(MAX_PER_PAGE).with_object({}) do |batch, acc|
         body = api.connection.get("#{resource}/show_many", ids: batch.join(',')).body
         Array(body[resource]).each do |item|
           k, v = yield(item)
@@ -124,12 +124,10 @@ module ForestAdminDatasourceZendesk
 
     def must_succeed(operation)
       yield
-    rescue ZendeskAPI::Error::RecordNotFound => e
-      # Bubble untouched; these are domain-level "not found" signals callers
-      # of find_* already handle. For search/count this shouldn't happen, but
-      # if it does we'd want it visible.
-      raise APIError, "Zendesk API call failed: #{operation}: #{e.class}: #{e.message}"
     rescue StandardError => e
+      # find_* methods rescue RecordNotFound themselves and return nil; if a
+      # 404 reaches us here (for search/count), surface it like any other
+      # failure rather than silently mapping to nil/zero.
       raise APIError, "Zendesk API call failed: #{operation}: #{e.class}: #{e.message}"
     end
 

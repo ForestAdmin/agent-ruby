@@ -15,8 +15,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
   describe '#search' do
     it 'prefixes the query with type:<resource> when caller passes nothing' do
       stub = stub_request(:get, "#{base}/search")
-        .with(query: hash_including('query' => 'type:ticket'))
-        .to_return(empty_search_response)
+             .with(query: hash_including('query' => 'type:ticket'))
+             .to_return(empty_search_response)
 
       client.search('ticket', query: '')
       expect(stub).to have_been_requested
@@ -24,8 +24,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'composes type:<resource> with the caller-supplied query' do
       stub = stub_request(:get, "#{base}/search")
-        .with(query: hash_including('query' => 'type:user role:end-user'))
-        .to_return(empty_search_response)
+             .with(query: hash_including('query' => 'type:user role:end-user'))
+             .to_return(empty_search_response)
 
       client.search('user', query: 'role:end-user')
       expect(stub).to have_been_requested
@@ -33,8 +33,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'caps per_page at MAX_PER_PAGE' do
       stub = stub_request(:get, "#{base}/search")
-        .with(query: hash_including('per_page' => '100'))
-        .to_return(empty_search_response)
+             .with(query: hash_including('per_page' => '100'))
+             .to_return(empty_search_response)
 
       client.search('ticket', query: '', per_page: 999)
       expect(stub).to have_been_requested
@@ -42,8 +42,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'forwards sort_by and sort_order' do
       stub = stub_request(:get, "#{base}/search")
-        .with(query: hash_including('sort_by' => 'updated_at', 'sort_order' => 'desc'))
-        .to_return(empty_search_response)
+             .with(query: hash_including('sort_by' => 'updated_at', 'sort_order' => 'desc'))
+             .to_return(empty_search_response)
 
       client.search('ticket', query: '', sort_by: 'updated_at', sort_order: 'desc')
       expect(stub).to have_been_requested
@@ -62,7 +62,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'raises APIError when the API errors out (no silent zero)' do
       stub_request(:get, "#{base}/search/count").with(query: hash_including({}))
-        .to_return(status: 500, body: 'boom')
+                                                .to_return(status: 500, body: 'boom')
 
       expect { client.count('ticket', query: '') }
         .to raise_error(ForestAdminDatasourceZendesk::APIError, /count\(ticket\)/)
@@ -70,7 +70,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'returns 0 when the body has no count key (this is a real Zendesk response shape)' do
       stub_request(:get, "#{base}/search/count").with(query: hash_including({}))
-        .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+                                                .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
 
       expect(client.count('ticket', query: '')).to eq(0)
     end
@@ -175,7 +175,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'returns {} if the bulk endpoint errors' do
       stub_request(:get, "#{base}/users/show_many").with(query: hash_including({}))
-        .to_return(status: 500, body: 'boom')
+                                                   .to_return(status: 500, body: 'boom')
       expect(client.fetch_user_emails([1])).to eq({})
     end
   end
@@ -198,7 +198,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'returns {} on error' do
       stub_request(:get, "#{base}/users/show_many").with(query: hash_including({}))
-        .to_return(status: 500, body: 'boom')
+                                                   .to_return(status: 500, body: 'boom')
       expect(client.fetch_users_by_ids([1])).to eq({})
     end
   end
@@ -223,7 +223,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'logs a warning when fetch_user_emails fails and returns {}' do
       stub_request(:get, "#{base}/users/show_many").with(query: hash_including({}))
-        .to_return(status: 500, body: 'boom')
+                                                   .to_return(status: 500, body: 'boom')
 
       expect(logger).to receive(:warn).with(/fetch_user_emails failed; degrading/)
       expect(client.fetch_user_emails([1])).to eq({})

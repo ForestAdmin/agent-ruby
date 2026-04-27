@@ -20,18 +20,18 @@ module ForestAdminDatasourceZendesk
                     Operators::PRESENT, Operators::BLANK].freeze
 
       ZENDESK_TO_COLUMN_TYPE = {
-        'text'              => 'String',
-        'textarea'          => 'String',
-        'regexp'            => 'String',
+        'text' => 'String',
+        'textarea' => 'String',
+        'regexp' => 'String',
         'partialcreditcard' => 'String',
-        'integer'           => 'Number',
-        'decimal'           => 'Number',
-        'date'              => 'Dateonly',
-        'checkbox'          => 'Boolean',
-        'dropdown'          => 'Enum',
-        'tagger'            => 'Enum',
-        'multiselect'       => 'Json',
-        'lookup'            => 'Number'
+        'integer' => 'Number',
+        'decimal' => 'Number',
+        'date' => 'Dateonly',
+        'checkbox' => 'Boolean',
+        'dropdown' => 'Enum',
+        'tagger' => 'Enum',
+        'multiselect' => 'Json',
+        'lookup' => 'Number'
       }.freeze
 
       def initialize(client)
@@ -72,9 +72,9 @@ module ForestAdminDatasourceZendesk
         case strategy
         when :ticket
           # No reliable key on ticket_fields; use the id.
-          ["custom_#{raw['id']}", nil]
+          ["custom_#{raw["id"]}", nil]
         when :user_or_org
-          key = raw['key'] || "custom_#{raw['id']}"
+          key = raw['key'] || "custom_#{raw["id"]}"
           [key, key]
         end
       end
@@ -88,7 +88,7 @@ module ForestAdminDatasourceZendesk
         }
 
         if column_type == 'Enum'
-          opts[:enum_values] = Array(raw['custom_field_options']).map { |o| o['value'] }.compact
+          opts[:enum_values] = Array(raw['custom_field_options']).filter_map { |o| o['value'] }
           # If for some reason there are no options, drop back to String so the
           # column still appears (Forest rejects empty Enum schemas).
           if opts[:enum_values].empty?
@@ -103,7 +103,7 @@ module ForestAdminDatasourceZendesk
 
       def filter_operators_for(column_type)
         case column_type
-        when 'Number'  then NUMBER_OPS
+        when 'Number' then NUMBER_OPS
         when 'Dateonly' then DATE_OPS
         when 'Boolean' then [Operators::EQUAL, Operators::NOT_EQUAL]
         when 'Json'    then []

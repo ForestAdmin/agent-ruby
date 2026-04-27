@@ -47,17 +47,16 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::User do
       expect(client).to receive(:count).with('user', query: 'role:admin').and_return(3)
 
       result = collection.aggregate(nil,
-        Filter.new(condition_tree: Leaf.new('role', 'equal', 'admin')),
-        Aggregation.new(operation: 'Count')
-      )
+                                    Filter.new(condition_tree: Leaf.new('role', 'equal', 'admin')),
+                                    Aggregation.new(operation: 'Count'))
 
       expect(result).to eq([{ 'value' => 3, 'group' => {} }])
     end
 
     it 'raises on unsupported aggregations' do
-      expect {
+      expect do
         collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Sum', field: 'id'))
-      }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+      end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
     end
   end
 
@@ -65,7 +64,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::User do
     let(:cf) do
       [{ column_name: 'tier', zendesk_id: 1, zendesk_key: 'tier',
          schema: ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-           column_type: 'String', filter_operators: [], is_read_only: true) }]
+           column_type: 'String', filter_operators: [], is_read_only: true
+         ) }]
     end
     let(:collection) { described_class.new(datasource, custom_fields: cf) }
 

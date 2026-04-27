@@ -50,9 +50,9 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Organization do
     end
 
     it 'raises on unsupported aggregations' do
-      expect {
+      expect do
         collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Sum', field: 'id'))
-      }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+      end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
     end
   end
 
@@ -60,7 +60,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Organization do
     let(:cf) do
       [{ column_name: 'plan', zendesk_id: 2, zendesk_key: 'plan',
          schema: ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
-           column_type: 'String', filter_operators: [], is_read_only: true) }]
+           column_type: 'String', filter_operators: [], is_read_only: true
+         ) }]
     end
     let(:collection) { described_class.new(datasource, custom_fields: cf) }
 

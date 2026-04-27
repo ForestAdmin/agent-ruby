@@ -6,7 +6,7 @@ module ForestAdminDatasourceZendesk
       ZENDESK_SORTABLE = {
         'created_at' => 'created_at',
         'updated_at' => 'updated_at',
-        'name'       => 'name'
+        'name' => 'name'
       }.freeze
 
       def initialize(datasource, custom_fields: [])
@@ -30,8 +30,8 @@ module ForestAdminDatasourceZendesk
                     sort_by, sort_order = translate_sort(filter.sort, ZENDESK_SORTABLE)
                     page, per_page      = translate_page(filter.page)
                     datasource.client.search('organization', query: query,
-                                                              sort_by: sort_by, sort_order: sort_order,
-                                                              page: page, per_page: per_page)
+                                                             sort_by: sort_by, sort_order: sort_order,
+                                                             page: page, per_page: per_page)
                   end
         records.map { |o| project(serialize(o), projection) }
       end
@@ -45,7 +45,8 @@ module ForestAdminDatasourceZendesk
         query = ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.call(
           filter.condition_tree, timezone: timezone_for(caller)
         )
-        count = datasource.client.count('organization', query: [query, filter.search].compact.reject(&:empty?).join(' '))
+        count = datasource.client.count('organization',
+                                        query: [query, filter.search].compact.reject(&:empty?).join(' '))
         [{ 'value' => count, 'group' => {} }]
       end
 
@@ -53,23 +54,23 @@ module ForestAdminDatasourceZendesk
 
       def define_schema
         add_field('id',           ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                    is_primary_key: true, is_read_only: true, is_sortable: true))
+                                                   is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('name',         ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                    is_read_only: true, is_sortable: true))
+                                                   is_read_only: true, is_sortable: true))
         add_field('domain_names', ColumnSchema.new(column_type: 'Json',   filter_operators: [],
-                                                    is_read_only: true, is_sortable: false))
+                                                   is_read_only: true, is_sortable: false))
         add_field('details',      ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                    is_read_only: true, is_sortable: false))
+                                                   is_read_only: true, is_sortable: false))
         add_field('notes',        ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                    is_read_only: true, is_sortable: false))
+                                                   is_read_only: true, is_sortable: false))
         add_field('group_id',     ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                    is_read_only: true, is_sortable: false))
+                                                   is_read_only: true, is_sortable: false))
         add_field('shared_tickets', ColumnSchema.new(column_type: 'Boolean', filter_operators: [],
-                                                      is_read_only: true, is_sortable: false))
+                                                     is_read_only: true, is_sortable: false))
         add_field('created_at',   ColumnSchema.new(column_type: 'Date',   filter_operators: DATE_OPS,
-                                                    is_read_only: true, is_sortable: true))
+                                                   is_read_only: true, is_sortable: true))
         add_field('updated_at',   ColumnSchema.new(column_type: 'Date',   filter_operators: DATE_OPS,
-                                                    is_read_only: true, is_sortable: true))
+                                                   is_read_only: true, is_sortable: true))
 
         @custom_fields.each do |cf|
           add_field(cf[:column_name], cf[:schema])
@@ -78,29 +79,29 @@ module ForestAdminDatasourceZendesk
 
       def define_relations
         add_field('users', OneToManySchema.new(
-          foreign_collection: 'ZendeskUser',
-          origin_key: 'organization_id',
-          origin_key_target: 'id'
-        ))
+                             foreign_collection: 'ZendeskUser',
+                             origin_key: 'organization_id',
+                             origin_key_target: 'id'
+                           ))
         add_field('tickets', OneToManySchema.new(
-          foreign_collection: 'ZendeskTicket',
-          origin_key: 'organization_id',
-          origin_key_target: 'id'
-        ))
+                               foreign_collection: 'ZendeskTicket',
+                               origin_key: 'organization_id',
+                               origin_key_target: 'id'
+                             ))
       end
 
       def serialize(org)
         attrs = attrs_of(org)
         result = {
-          'id'             => attrs['id'],
-          'name'           => attrs['name'],
-          'domain_names'   => attrs['domain_names'],
-          'details'        => attrs['details'],
-          'notes'          => attrs['notes'],
-          'group_id'       => attrs['group_id'],
+          'id' => attrs['id'],
+          'name' => attrs['name'],
+          'domain_names' => attrs['domain_names'],
+          'details' => attrs['details'],
+          'notes' => attrs['notes'],
+          'group_id' => attrs['group_id'],
           'shared_tickets' => attrs['shared_tickets'],
-          'created_at'     => attrs['created_at'],
-          'updated_at'     => attrs['updated_at']
+          'created_at' => attrs['created_at'],
+          'updated_at' => attrs['updated_at']
         }
 
         org_fields = attrs['organization_fields'] || {}

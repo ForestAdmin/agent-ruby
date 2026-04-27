@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata['homepage_uri']    = spec.homepage
   spec.metadata['source_code_uri'] = 'https://github.com/ForestAdmin/agent-ruby'
   spec.metadata['changelog_uri']   = 'https://github.com/ForestAdmin/agent-ruby/blob/main/CHANGELOG.md'
-  spec.metadata['rubygems_mfa_required'] = 'false'
+  spec.metadata['rubygems_mfa_required'] = 'true'
 
   spec.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|

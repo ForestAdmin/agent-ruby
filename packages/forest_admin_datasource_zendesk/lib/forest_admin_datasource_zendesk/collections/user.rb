@@ -8,7 +8,7 @@ module ForestAdminDatasourceZendesk
       ZENDESK_SORTABLE = {
         'created_at' => 'created_at',
         'updated_at' => 'updated_at',
-        'name'       => 'name'
+        'name' => 'name'
       }.freeze
 
       def initialize(datasource, custom_fields: [])
@@ -54,29 +54,29 @@ module ForestAdminDatasourceZendesk
 
       def define_schema
         add_field('id',              ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                       is_primary_key: true, is_read_only: true, is_sortable: true))
+                                                      is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('email',           ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('name',            ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: true, is_sortable: true))
-        add_field('role',            ColumnSchema.new(column_type: 'Enum',  filter_operators: STRING_OPS,
-                                                       enum_values: ENUM_ROLE, is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: true))
+        add_field('role',            ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
+                                                      enum_values: ENUM_ROLE, is_read_only: true, is_sortable: false))
         add_field('phone',           ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('organization_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('time_zone',       ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('locale',          ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('verified',        ColumnSchema.new(column_type: 'Boolean', filter_operators: STRING_OPS,
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('suspended',       ColumnSchema.new(column_type: 'Boolean', filter_operators: STRING_OPS,
-                                                       is_read_only: true, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('created_at',      ColumnSchema.new(column_type: 'Date',   filter_operators: DATE_OPS,
-                                                       is_read_only: true, is_sortable: true))
+                                                      is_read_only: true, is_sortable: true))
         add_field('updated_at',      ColumnSchema.new(column_type: 'Date',   filter_operators: DATE_OPS,
-                                                       is_read_only: true, is_sortable: true))
+                                                      is_read_only: true, is_sortable: true))
 
         @custom_fields.each do |cf|
           add_field(cf[:column_name], cf[:schema])
@@ -88,32 +88,32 @@ module ForestAdminDatasourceZendesk
         # We declare the relation regardless; if the collection isn't registered, Forest
         # will surface a clear error when something tries to traverse it.
         add_field('organization', ManyToOneSchema.new(
-          foreign_collection: 'ZendeskOrganization',
-          foreign_key: 'organization_id',
-          foreign_key_target: 'id'
-        ))
+                                    foreign_collection: 'ZendeskOrganization',
+                                    foreign_key: 'organization_id',
+                                    foreign_key_target: 'id'
+                                  ))
         add_field('requested_tickets', OneToManySchema.new(
-          foreign_collection: 'ZendeskTicket',
-          origin_key: 'requester_id',
-          origin_key_target: 'id'
-        ))
+                                         foreign_collection: 'ZendeskTicket',
+                                         origin_key: 'requester_id',
+                                         origin_key_target: 'id'
+                                       ))
       end
 
       def serialize(user)
         attrs = attrs_of(user)
         result = {
-          'id'              => attrs['id'],
-          'email'           => attrs['email'],
-          'name'            => attrs['name'],
-          'role'            => attrs['role'],
-          'phone'           => attrs['phone'],
+          'id' => attrs['id'],
+          'email' => attrs['email'],
+          'name' => attrs['name'],
+          'role' => attrs['role'],
+          'phone' => attrs['phone'],
           'organization_id' => attrs['organization_id'],
-          'time_zone'       => attrs['time_zone'],
-          'locale'          => attrs['locale'],
-          'verified'        => attrs['verified'],
-          'suspended'       => attrs['suspended'],
-          'created_at'      => attrs['created_at'],
-          'updated_at'      => attrs['updated_at']
+          'time_zone' => attrs['time_zone'],
+          'locale' => attrs['locale'],
+          'verified' => attrs['verified'],
+          'suspended' => attrs['suspended'],
+          'created_at' => attrs['created_at'],
+          'updated_at' => attrs['updated_at']
         }
 
         user_fields = attrs['user_fields'] || {}

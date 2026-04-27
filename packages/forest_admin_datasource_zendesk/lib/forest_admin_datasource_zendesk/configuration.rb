@@ -23,7 +23,7 @@ module ForestAdminDatasourceZendesk
       return if missing.empty?
 
       raise ConfigurationError,
-            "ForestAdminDatasourceZendesk missing required config: #{missing.join(', ')}"
+            "ForestAdminDatasourceZendesk missing required config: #{missing.join(", ")}"
     end
 
     def blank?(value)

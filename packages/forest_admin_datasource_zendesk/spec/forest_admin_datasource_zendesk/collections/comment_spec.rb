@@ -29,9 +29,9 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Comment do
   describe '#list' do
     it 'fetches comments by parent ticket_id (EQUAL); synthesizes id as <comment_id>-<ticket_id>' do
       expect(client).to receive(:fetch_ticket_comments).with(42).and_return([
-        { 'id' => 1, 'body' => 'hi', 'author_id' => 7, 'public' => true,
-          'created_at' => '2026-01-01' }
-      ])
+                                                                              { 'id' => 1, 'body' => 'hi', 'author_id' => 7, 'public' => true,
+                                                                                'created_at' => '2026-01-01' }
+                                                                            ])
 
       filter = Filter.new(condition_tree: Leaf.new('ticket_id', 'equal', 42))
       result = collection.list(nil, filter, nil)
@@ -50,7 +50,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Comment do
     it 'returns [] when filter targets a non-ticket_id field (top-level browse)' do
       expect(client).not_to receive(:fetch_ticket_comments)
       result = collection.list(nil,
-        Filter.new(condition_tree: Leaf.new('public', 'equal', true)), nil)
+                               Filter.new(condition_tree: Leaf.new('public', 'equal', true)), nil)
       expect(result).to eq([])
     end
 
@@ -67,9 +67,9 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Comment do
 
     it 'fetches a single comment via the synthetic id (show route: id = "<comment>-<ticket>")' do
       expect(client).to receive(:fetch_ticket_comments).with(226).and_return([
-        { 'id' => 1, 'body' => 'first' },
-        { 'id' => 2, 'body' => 'second' }
-      ])
+                                                                               { 'id' => 1, 'body' => 'first' },
+                                                                               { 'id' => 2, 'body' => 'second' }
+                                                                             ])
 
       filter = Filter.new(condition_tree: Leaf.new('id', 'equal', '2-226'))
       result = collection.list(nil, filter, nil)
@@ -86,8 +86,9 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Comment do
 
     it 'flattens via.channel into via_channel' do
       expect(client).to receive(:fetch_ticket_comments).with(1).and_return([
-        { 'id' => 99, 'via' => { 'channel' => 'web' } }
-      ])
+                                                                             { 'id' => 99,
+                                                                               'via' => { 'channel' => 'web' } }
+                                                                           ])
 
       filter = Filter.new(condition_tree: Leaf.new('ticket_id', 'equal', 1))
       result = collection.list(nil, filter, nil).first

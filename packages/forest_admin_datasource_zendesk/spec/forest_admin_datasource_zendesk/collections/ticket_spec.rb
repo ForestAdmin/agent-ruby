@@ -53,7 +53,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
         expect(client).not_to receive(:search)
 
         filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 215))
-        result = collection.list(nil, filter, ['id', 'subject', 'requester_email'])
+        result = collection.list(nil, filter, %w[id subject requester_email])
 
         expect(result.first['id']).to eq(215)
         expect(result.first['requester_email']).to eq('x@y.com')
@@ -160,10 +160,10 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
     describe 'requester_email enrichment' do
       before do
         allow(client).to receive(:search).and_return([
-          zendesk_record('id' => 1, 'requester_id' => 10),
-          zendesk_record('id' => 2, 'requester_id' => 10),
-          zendesk_record('id' => 3, 'requester_id' => 20)
-        ])
+                                                       zendesk_record('id' => 1, 'requester_id' => 10),
+                                                       zendesk_record('id' => 2, 'requester_id' => 10),
+                                                       zendesk_record('id' => 3, 'requester_id' => 20)
+                                                     ])
       end
 
       it 'bulk-fetches emails when requester_email is in the projection' do
@@ -223,8 +223,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       end
 
       it 'embeds only requester (no assignee) when only requester:* is in projection' do
-        allow(client).to receive(:fetch_user_emails).and_return({})
-        allow(client).to receive(:fetch_users_by_ids).and_return(10 => { 'id' => 10 })
+        allow(client).to receive_messages(fetch_user_emails: {}, fetch_users_by_ids: { 10 => { 'id' => 10 } })
 
         result = collection.list(nil, Filter.new, ['id', 'requester:id']).first
         expect(result).to have_key('requester')
@@ -232,8 +231,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       end
 
       it 'fetches users but only embeds assignee when only assignee:* is requested' do
-        allow(client).to receive(:fetch_user_emails).and_return({})
-        allow(client).to receive(:fetch_users_by_ids).and_return(11 => { 'id' => 11 })
+        allow(client).to receive_messages(fetch_user_emails: {}, fetch_users_by_ids: { 11 => { 'id' => 11 } })
 
         result = collection.list(nil, Filter.new, ['id', 'assignee:id']).first
         expect(result).to have_key('assignee')
@@ -241,11 +239,10 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       end
 
       it 'leaves the relation hash nil when the foreign id is not resolvable' do
-        allow(client).to receive(:search).and_return([
-          zendesk_record('id' => 9, 'requester_id' => 999, 'assignee_id' => nil, 'organization_id' => nil)
-        ])
-        allow(client).to receive(:fetch_user_emails).and_return({})
-        allow(client).to receive(:fetch_users_by_ids).and_return({})
+        allow(client).to receive_messages(search: [
+                                            zendesk_record('id' => 9, 'requester_id' => 999,
+                                                           'assignee_id' => nil, 'organization_id' => nil)
+                                          ], fetch_user_emails: {}, fetch_users_by_ids: {})
 
         result = collection.list(nil, Filter.new, ['id', 'requester:id']).first
         expect(result['requester']).to be_nil
@@ -254,8 +251,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
     describe 'projection edge cases' do
       it 'returns the full record when projection is nil' do
-        allow(client).to receive(:search).and_return([zendesk_record('id' => 1, 'requester_id' => nil)])
-        allow(client).to receive(:fetch_user_emails).and_return({})
+        allow(client).to receive_messages(search: [zendesk_record('id' => 1, 'requester_id' => nil)],
+                                          fetch_user_emails: {})
 
         record = collection.list(nil, Filter.new, nil).first
         expect(record.keys).to include('id', 'subject', 'status')
@@ -263,8 +260,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
       it 'falls back to to_h when ticket lacks attributes' do
         plain_hash_ticket = { 'id' => 1, 'subject' => 'plain', 'requester_id' => nil }
-        allow(client).to receive(:search).and_return([plain_hash_ticket])
-        allow(client).to receive(:fetch_user_emails).and_return({})
+        allow(client).to receive_messages(search: [plain_hash_ticket], fetch_user_emails: {})
 
         result = collection.list(nil, Filter.new, nil).first
         expect(result['subject']).to eq('plain')
@@ -306,8 +302,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
     it 'falls back to UTC when caller.timezone is blank' do
       blank_tz_caller = Caller.new(id: 1, email: 'x@x', first_name: 'X', last_name: 'Y',
-                                    tags: {}, team: 'Ops', rendering_id: 1, timezone: '',
-                                    permission_level: 'admin', role: 'Admin', request: {})
+                                   tags: {}, team: 'Ops', rendering_id: 1, timezone: '',
+                                   permission_level: 'admin', role: 'Admin', request: {})
       expect(client).to receive(:search) do |_type, args|
         expect(args[:query]).to eq('created_at>2026-04-27T00:00:00Z')
         []
@@ -324,27 +320,26 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       expect(client).to receive(:count).with('ticket', query: 'status:open').and_return(7)
 
       result = collection.aggregate(nil,
-        Filter.new(condition_tree: Leaf.new('status', 'equal', 'open')),
-        Aggregation.new(operation: 'Count')
-      )
+                                    Filter.new(condition_tree: Leaf.new('status', 'equal', 'open')),
+                                    Aggregation.new(operation: 'Count'))
 
       expect(result).to eq([{ 'value' => 7, 'group' => {} }])
     end
 
     it 'raises for unsupported aggregations' do
-      expect {
+      expect do
         collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Sum', field: 'priority'))
-      }.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+      end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
     end
   end
 
   describe 'custom fields integration' do
     let(:cf_schema) do
       ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(column_type: 'String',
-                                                              filter_operators: [], is_read_only: true)
+                                                             filter_operators: [], is_read_only: true)
     end
     let(:custom_fields) do
-      [{ column_name: 'custom_360001', zendesk_id: 360001, zendesk_key: nil, schema: cf_schema }]
+      [{ column_name: 'custom_360001', zendesk_id: 360_001, zendesk_key: nil, schema: cf_schema }]
     end
     let(:collection) { described_class.new(datasource, custom_fields: custom_fields) }
 
@@ -354,11 +349,10 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
     it 'serializes the custom field value from ticket.custom_fields array' do
       ticket = zendesk_record('id' => 1, 'requester_id' => nil, 'custom_fields' => [
-        { 'id' => 360001, 'value' => 'gold' },
-        { 'id' => 999999, 'value' => 'ignored' }
-      ])
-      allow(client).to receive(:search).and_return([ticket])
-      allow(client).to receive(:fetch_user_emails).and_return({})
+                                { 'id' => 360_001, 'value' => 'gold' },
+                                { 'id' => 999_999, 'value' => 'ignored' }
+                              ])
+      allow(client).to receive_messages(search: [ticket], fetch_user_emails: {})
 
       result = collection.list(nil, Filter.new, nil).first
       expect(result['custom_360001']).to eq('gold')
