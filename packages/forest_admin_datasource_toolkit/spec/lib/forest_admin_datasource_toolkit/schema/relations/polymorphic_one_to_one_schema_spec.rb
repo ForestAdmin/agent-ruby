@@ -21,6 +21,21 @@ module ForestAdminDatasourceToolkit
           it { expect(relation.origin_type_field).to eq 'origin_type_field' }
           it { expect(relation.origin_type_value).to eq 'origin_type_value' }
           it { expect(relation.foreign_collection).to eq 'foreign_collection' }
+          it { expect(relation.cascade_on_delete).to be false }
+        end
+
+        describe 'cascade_on_delete' do
+          it 'accepts an explicit cascade_on_delete value' do
+            relation = described_class.new(
+              origin_key: 'origin_key',
+              origin_key_target: 'origin_key_target',
+              origin_type_field: 'origin_type_field',
+              origin_type_value: 'origin_type_value',
+              foreign_collection: 'foreign_collection',
+              cascade_on_delete: true
+            )
+            expect(relation.cascade_on_delete).to be true
+          end
         end
       end
     end
