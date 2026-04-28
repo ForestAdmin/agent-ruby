@@ -23,6 +23,8 @@ module ForestAdminDatasourceToolkit
 
       def get_collection(name)
         collection = @child_datasource.get_collection(name)
+        return nil if collection.nil?
+
         unless @decorators.key?(collection.name)
           @decorators[collection.name] = @collection_decorator_class.new(collection, self)
         end

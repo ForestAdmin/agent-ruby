@@ -26,7 +26,7 @@ module ForestAdminAgent
               ForestAdminDatasourceToolkit::Utils::Schema.primary_key?(collection, name)
           end
 
-          fields.map { |name, _field| GeneratorField.build_schema(collection, name) }
+          fields.filter_map { |name, _field| GeneratorField.build_schema(collection, name) }
                 .sort_by { |v| v[:field] }
         end
 
