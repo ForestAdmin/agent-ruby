@@ -48,9 +48,11 @@ module ForestAdminDatasourceSnowflake
     def fetch_fields
       rows = @datasource.with_connection do |conn|
         stmt = conn.columns(@table_name)
-        result = stmt.fetch_all || []
-        stmt.drop
-        result
+        begin
+          stmt.fetch_all || []
+        ensure
+          stmt.drop
+        end
       end
 
       native_types = @datasource.fetch_snowflake_native_types(@table_name)
