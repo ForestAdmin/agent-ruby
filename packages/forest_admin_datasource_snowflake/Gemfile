@@ -1,0 +1,13 @@
+source 'https://rubygems.org'
+
+gemspec
+
+gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
+
+group :development, :test do
+  gem 'pry'
+  gem 'rspec',         '~> 3.12'
+  gem 'rubocop',       require: false
+  gem 'rubocop-rspec', require: false
+  gem 'simplecov',     require: false
+end
