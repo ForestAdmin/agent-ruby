@@ -88,11 +88,21 @@ module ForestAdminDatasourceZendesk
 
       def format_value(value)
         case value
+        when nil            then raise_nil_value_error
         when Time, DateTime then value.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         when Date           then format_date(value)
         when String         then format_string(value)
         else                     value.to_s
         end
+      end
+
+      # Forest's UI never naturally produces an EQUAL/NOT_EQUAL/IN with a nil
+      # value (it uses PRESENT / BLANK for that). Falling through to
+      # nil.to_s would emit a malformed `field:` clause that Zendesk's
+      # search treats as a presence check — i.e. silently the wrong query.
+      def raise_nil_value_error
+        raise UnsupportedOperatorError,
+              'Filter value is nil; use the PRESENT or BLANK operator to filter for absence.'
       end
 
       # A bare Date is interpreted as 00:00 in the caller's timezone, then

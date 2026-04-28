@@ -20,8 +20,7 @@ module ForestAdminDatasourceZendesk
       protected
 
       def aggregate_count(caller, filter)
-        query = compose_count_query(caller, filter)
-        datasource.client.count(zendesk_resource, query: query)
+        datasource.client.count(zendesk_resource, query: compose_full_query(caller, filter))
       end
 
       private
@@ -35,18 +34,21 @@ module ForestAdminDatasourceZendesk
       end
 
       def search_records(caller, filter)
-        query = ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.call(
-          filter.condition_tree, timezone: timezone_for(caller)
-        )
         sort_by, sort_order = translate_sort(filter.sort, sortable_fields)
         page, per_page      = translate_page(filter.page)
 
         datasource.client.search(zendesk_resource,
-                                 query: query, sort_by: sort_by, sort_order: sort_order,
+                                 query: compose_full_query(caller, filter),
+                                 sort_by: sort_by, sort_order: sort_order,
                                  page: page, per_page: per_page)
       end
 
-      def compose_count_query(caller, filter)
+      # Both list and count must build the query the same way: condition tree
+      # AND `filter.search`. A previous version of search_records omitted the
+      # search term, which made the count badge disagree with the rendered
+      # list ("100 results, count says 5") — guard against that by sharing
+      # this builder.
+      def compose_full_query(caller, filter)
         translated = ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.call(
           filter.condition_tree, timezone: timezone_for(caller)
         )

@@ -37,18 +37,16 @@ module ForestAdminDatasourceZendesk
       # (`id = "<comment_id>-<ticket_id>"`). `comment_ids` may be nil
       # (meaning "no narrowing — return all comments for the ticket").
       def resolve_scope(filter)
-        synthetic_ids = extract_field_lookup(filter.condition_tree, 'id')
-        ticket_ids    = extract_field_lookup(filter.condition_tree, 'ticket_id') || []
-        comment_ids   = []
-
-        Array(synthetic_ids).each do |sid|
-          c_id, t_id = decode_synthetic_id(sid)
-          comment_ids << c_id if c_id
-          ticket_ids << t_id if t_id
-        end
-
-        ticket_ids.uniq!
+        decoded = decoded_synthetic_pairs(filter)
+        ticket_ids = ((extract_field_lookup(filter.condition_tree, 'ticket_id') || []) +
+                      decoded.map(&:last)).compact.uniq
+        comment_ids = decoded.filter_map(&:first)
         [ticket_ids, comment_ids.empty? ? nil : comment_ids.uniq]
+      end
+
+      def decoded_synthetic_pairs(filter)
+        Array(extract_field_lookup(filter.condition_tree, 'id'))
+          .map { |sid| decode_synthetic_id(sid) }
       end
 
       def fetch_comments(ticket_ids, comment_ids)

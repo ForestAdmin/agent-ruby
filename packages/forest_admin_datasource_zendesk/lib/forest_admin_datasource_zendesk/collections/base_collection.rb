@@ -92,12 +92,17 @@ module ForestAdminDatasourceZendesk
       # `field`/`ascending`) or as plain hashes (the toolkit normalises them
       # at construction time, but specs and a few code paths still build them
       # by hand). Handle both.
+      #
+      # `key?` (rather than `||`) for the boolean: `entry[:ascending] || ...`
+      # would silently flip a descending sort to ascending if both symbol and
+      # string keys exist with different values, and falls through to the
+      # other key whenever ascending is explicitly false.
       def sort_field_and_direction(entry)
-        if entry.respond_to?(:field)
-          [entry.field, entry.ascending]
-        else
-          [entry[:field] || entry['field'], entry[:ascending] || entry['ascending']]
-        end
+        return [entry.field, entry.ascending] if entry.respond_to?(:field)
+
+        field     = entry.key?(:field)     ? entry[:field]     : entry['field']
+        ascending = entry.key?(:ascending) ? entry[:ascending] : entry['ascending']
+        [field, ascending]
       end
     end
   end

@@ -53,6 +53,31 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::User do
       expect(result).to eq([{ 'value' => 3, 'group' => {} }])
     end
 
+    it 'composes the count query with both filter.condition_tree and filter.search' do
+      # Regression: a previous version of the search/count split fed the
+      # search term to count() but not to search(), causing the count badge
+      # to disagree with the rendered list.
+      expect(client).to receive(:count).with('user', query: 'role:admin pierre').and_return(2)
+
+      result = collection.aggregate(nil,
+                                    Filter.new(condition_tree: Leaf.new('role', 'equal', 'admin'),
+                                               search: 'pierre'),
+                                    Aggregation.new(operation: 'Count'))
+      expect(result.first['value']).to eq(2)
+    end
+
+    it 'list passes the same search term to search() that count() sees' do
+      expect(client).to receive(:search) do |type, **opts|
+        expect(type).to eq('user')
+        expect(opts[:query]).to eq('role:admin pierre')
+        []
+      end
+
+      collection.list(nil,
+                      Filter.new(condition_tree: Leaf.new('role', 'equal', 'admin'), search: 'pierre'),
+                      ['id'])
+    end
+
     it 'raises on unsupported aggregations' do
       expect do
         collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Sum', field: 'id'))

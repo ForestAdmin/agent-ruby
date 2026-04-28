@@ -124,6 +124,20 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
         collection.list(nil, filter, ['id'])
       end
 
+      it 'preserves ascending=false even when both symbol and string keys are present' do
+        # Regression: `entry[:ascending] || entry['ascending']` would silently
+        # flip a descending sort to ascending if both keys existed with
+        # different values.
+        expect(client).to receive(:search) do |_type, args|
+          expect(args[:sort_order]).to eq('desc')
+          []
+        end
+
+        filter = Filter.new(sort: Sort.new([{ field: 'updated_at', ascending: false,
+                                              'ascending' => true }]))
+        collection.list(nil, filter, ['id'])
+      end
+
       it 'returns no sort_by when the field is not in Zendesk allow-list' do
         expect(client).to receive(:search) do |_type, args|
           expect(args[:sort_by]).to be_nil

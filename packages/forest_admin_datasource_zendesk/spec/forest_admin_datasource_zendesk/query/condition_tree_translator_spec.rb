@@ -87,6 +87,11 @@ RSpec.describe ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator do
       expect(translate(Leaf.new('updated_at', 'after', t)))
         .to eq('updated_at>2026-04-27T09:30:00Z')
     end
+
+    it 'raises rather than emit a malformed `field:` clause for nil values' do
+      expect { translate(Leaf.new('subject', 'equal', nil)) }
+        .to raise_error(ForestAdminDatasourceZendesk::UnsupportedOperatorError, /PRESENT or BLANK/)
+    end
   end
 
   describe 'timezone handling' do
