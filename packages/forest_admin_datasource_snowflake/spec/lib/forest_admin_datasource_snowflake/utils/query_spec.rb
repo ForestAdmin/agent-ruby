@@ -156,5 +156,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Utils::Query do
         described_class.new(collection, aggregation: agg).to_aggregate_sql
       end.to raise_error(ForestAdminDatasourceSnowflake::Error, /Unsupported aggregation/)
     end
+
+    it 'rejects SUM/AVG/MIN/MAX without a field rather than emitting invalid SQL like SUM()' do
+      %w[Sum Avg Min Max].each do |op|
+        expect do
+          described_class.new(
+            collection,
+            aggregation: Aggregation.new(operation: op)
+          ).to_aggregate_sql
+        end.to raise_error(ForestAdminDatasourceSnowflake::Error, /requires a field/),
+               "expected #{op} without field to raise"
+      end
+    end
   end
 end

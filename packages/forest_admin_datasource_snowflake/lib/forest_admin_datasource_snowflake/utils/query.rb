@@ -66,6 +66,10 @@ module ForestAdminDatasourceSnowflake
         when 'COUNT'
           field ? "COUNT(#{q(field)})" : 'COUNT(*)'
         when 'SUM', 'AVG', 'MIN', 'MAX'
+          if field.nil? || field.to_s.empty?
+            raise ForestAdminDatasourceSnowflake::Error, "Aggregation '#{op}' requires a field"
+          end
+
           "#{op}(#{q(field)})"
         else
           raise ForestAdminDatasourceSnowflake::Error, "Unsupported aggregation operation: #{op}"
