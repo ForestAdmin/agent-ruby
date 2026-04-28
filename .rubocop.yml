@@ -237,6 +237,8 @@ Metrics/ParameterLists:
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/dsl/builders/form_builder.rb'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/datasource.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/many_to_many_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/polymorphic_one_to_many_schema.rb'
+    - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/relations/polymorphic_one_to_one_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/schema/column_schema.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/caller.rb'
     - 'packages/forest_admin_datasource_toolkit/lib/forest_admin_datasource_toolkit/components/query/filter.rb'
