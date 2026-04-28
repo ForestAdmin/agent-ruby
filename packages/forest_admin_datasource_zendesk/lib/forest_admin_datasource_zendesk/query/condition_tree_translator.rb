@@ -88,25 +88,29 @@ module ForestAdminDatasourceZendesk
 
       def format_value(value)
         case value
-        when Time, DateTime
-          value.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-        when Date
-          # Interpret a bare Date as 00:00 in the caller's timezone, then to UTC.
-          # If activesupport's TZ table doesn't know the zone, fall back to UTC.
-          Time.use_zone(@timezone) do
-            Time.zone.local(value.year, value.month, value.day).utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-          end
-        when String
-          value.match?(/\s/) ? %("#{value}") : value
-        else
-          value.to_s
+        when Time, DateTime then value.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        when Date           then format_date(value)
+        when String         then format_string(value)
+        else                     value.to_s
+        end
+      end
+
+      # A bare Date is interpreted as 00:00 in the caller's timezone, then
+      # converted to UTC. If activesupport's TZ table doesn't recognise the
+      # zone, fall back to UTC and log a warning.
+      def format_date(value)
+        Time.use_zone(@timezone) do
+          Time.zone.local(value.year, value.month, value.day).utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         end
       rescue ArgumentError
-        # Unknown timezone identifier — degrade to UTC interpretation.
         ForestAdminDatasourceZendesk.logger.warn(
           "[forest_admin_datasource_zendesk] unknown timezone '#{@timezone}', falling back to UTC"
         )
-        value.is_a?(Date) ? value.strftime('%Y-%m-%dT00:00:00Z') : value.to_s
+        value.strftime('%Y-%m-%dT00:00:00Z')
+      end
+
+      def format_string(value)
+        value.match?(/\s/) ? %("#{value}") : value
       end
     end
   end

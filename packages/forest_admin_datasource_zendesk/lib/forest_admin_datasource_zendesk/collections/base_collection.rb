@@ -11,7 +11,23 @@ module ForestAdminDatasourceZendesk
       DATE_OPS    = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
                      Operators::PRESENT, Operators::BLANK].freeze
 
+      # Toolkit contract — subclasses override `aggregate_count` instead of
+      # touching the 4-arg signature directly.
+      def aggregate(caller, filter, aggregation, _limit = nil)
+        unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                'Zendesk datasource only supports Count aggregation without groups.'
+        end
+
+        [{ 'value' => aggregate_count(caller, filter), 'group' => {} }]
+      end
+
       protected
+
+      # Default no-op; the Searchable mixin (and Ticket) override.
+      def aggregate_count(_caller, _filter)
+        raise NotImplementedError, "#{self.class} did not implement aggregate_count"
+      end
 
       # Pulls the value(s) from a leaf shaped like `id = N` or `id IN [...]`.
       # Used by collections to short-circuit PK lookups (Zendesk Search has no
@@ -43,9 +59,7 @@ module ForestAdminDatasourceZendesk
       def translate_sort(sort, allow_list)
         return [nil, nil] if sort.nil? || sort.empty?
 
-        first = sort.first
-        field = first.respond_to?(:field) ? first.field : first[:field] || first['field']
-        ascending = first.respond_to?(:ascending) ? first.ascending : (first[:ascending] || first['ascending'])
+        field, ascending = sort_field_and_direction(sort.first)
         zd_field = allow_list[field.to_s]
         return [nil, nil] unless zd_field
 
@@ -70,6 +84,20 @@ module ForestAdminDatasourceZendesk
 
         tz = caller.timezone
         tz.nil? || tz.empty? ? 'UTC' : tz
+      end
+
+      private
+
+      # Sort entries arrive either as Sort::Clause objects (responding to
+      # `field`/`ascending`) or as plain hashes (the toolkit normalises them
+      # at construction time, but specs and a few code paths still build them
+      # by hand). Handle both.
+      def sort_field_and_direction(entry)
+        if entry.respond_to?(:field)
+          [entry.field, entry.ascending]
+        else
+          [entry[:field] || entry['field'], entry[:ascending] || entry['ascending']]
+        end
       end
     end
   end

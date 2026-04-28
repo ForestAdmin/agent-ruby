@@ -33,17 +33,10 @@ module ForestAdminDatasourceZendesk
         rows
       end
 
-      def aggregate(caller, filter, aggregation, _limit = nil)
-        unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                'Zendesk datasource only supports Count aggregation without groups. ' \
-                "Got operation=#{aggregation.operation.inspect}, " \
-                "field=#{aggregation.field.inspect}, " \
-                "groups=#{aggregation.groups.inspect}"
-        end
+      protected
 
-        count = datasource.client.count('ticket', query: build_query(filter, timezone_for(caller)))
-        [{ 'value' => count, 'group' => {} }]
+      def aggregate_count(caller, filter)
+        datasource.client.count('ticket', query: build_query(filter, timezone_for(caller)))
       end
 
       private
@@ -77,37 +70,30 @@ module ForestAdminDatasourceZendesk
       end
 
       # Embeds requester/assignee/organization (ManyToOne) when their projection
-      # paths are requested. OneToMany relations (`comments`, etc.) are fetched
-      # lazily by Forest via separate /relationships requests, so we don't
-      # eager-load them here.
-      # Reads FK values from the source Zendesk records (not the projected
-      # rows, which may have stripped FK columns) and embeds the related
-      # objects onto the projected rows by index.
+      # paths are requested. Reads FK values from the source Zendesk records
+      # (not the projected rows, whose FK columns may have been stripped) and
+      # writes onto rows by index.
       def embed_relations(records, rows, projection)
         return if projection.nil?
 
-        relation_prefixes = relations_in(projection)
-        return if relation_prefixes.empty?
+        relations = relations_in(projection)
+        return if relations.empty?
 
         sources = records.map { |t| attrs_of(t) }
+        embed_users(rows, sources, relations) if (relations & %w[requester assignee]).any?
+        embed_organizations(rows, sources) if relations.include?('organization')
+      end
 
-        if relation_prefixes.include?('requester') || relation_prefixes.include?('assignee')
-          ids = sources.flat_map { |a| [a['requester_id'], a['assignee_id']] }.compact.uniq
-          users = datasource.client.fetch_users_by_ids(ids)
-          rows.each_with_index do |row, i|
-            if relation_prefixes.include?('requester')
-              row['requester'] =
-                serialized_user(users[sources[i]['requester_id']])
-            end
-            if relation_prefixes.include?('assignee')
-              row['assignee']  =
-                serialized_user(users[sources[i]['assignee_id']])
-            end
-          end
+      def embed_users(rows, sources, relations)
+        ids = sources.flat_map { |a| [a['requester_id'], a['assignee_id']] }.compact.uniq
+        users = datasource.client.fetch_users_by_ids(ids)
+        rows.each_with_index do |row, i|
+          row['requester'] = serialized_user(users[sources[i]['requester_id']]) if relations.include?('requester')
+          row['assignee']  = serialized_user(users[sources[i]['assignee_id']]) if relations.include?('assignee')
         end
+      end
 
-        return unless relation_prefixes.include?('organization')
-
+      def embed_organizations(rows, sources)
         ids = sources.filter_map { |a| a['organization_id'] }.uniq
         orgs = datasource.client.fetch_organizations_by_ids(ids)
         rows.each_with_index do |row, i|
@@ -147,42 +133,40 @@ module ForestAdminDatasourceZendesk
       end
 
       def define_schema
-        add_field('id',              ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                      is_primary_key: true, is_read_only: true, is_sortable: true))
-        add_field('subject',         ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                      is_read_only: true, is_sortable: false))
-        add_field('description',     ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                      is_read_only: true, is_sortable: false))
-        add_field('status',          ColumnSchema.new(column_type: 'Enum',  filter_operators: STRING_OPS,
-                                                      enum_values: ENUM_STATUS, is_read_only: true, is_sortable: true))
-        add_field('priority',        ColumnSchema.new(column_type: 'Enum',  filter_operators: STRING_OPS,
-                                                      enum_values: ENUM_PRIORITY, is_read_only: true, is_sortable: true))
-        add_field('ticket_type',     ColumnSchema.new(column_type: 'Enum',  filter_operators: STRING_OPS,
-                                                      enum_values: ENUM_TYPE, is_read_only: true, is_sortable: true))
-        add_field('requester_id',    ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                      is_read_only: true, is_sortable: true))
-        add_field('assignee_id',     ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                      is_read_only: true, is_sortable: true))
-        add_field('group_id',        ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                      is_read_only: true, is_sortable: true))
+        add_field('id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                         is_primary_key: true, is_read_only: true, is_sortable: true))
+        add_field('subject', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+                                              is_read_only: true, is_sortable: false))
+        add_field('description', ColumnSchema.new(column_type: 'String', filter_operators: [],
+                                                  is_read_only: true, is_sortable: false))
+        add_field('status', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
+                                             enum_values: ENUM_STATUS, is_read_only: true, is_sortable: true))
+        add_field('priority', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
+                                               enum_values: ENUM_PRIORITY, is_read_only: true, is_sortable: true))
+        add_field('ticket_type', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
+                                                  enum_values: ENUM_TYPE, is_read_only: true, is_sortable: true))
+        add_field('requester_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                                   is_read_only: true, is_sortable: true))
+        add_field('assignee_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                                  is_read_only: true, is_sortable: true))
+        add_field('group_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                               is_read_only: true, is_sortable: true))
         add_field('organization_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
                                                       is_read_only: true, is_sortable: true))
-        add_field('external_id',     ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                      is_read_only: true, is_sortable: false))
+        add_field('external_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+                                                  is_read_only: true, is_sortable: false))
         add_field('requester_email', ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL],
                                                       is_read_only: true, is_sortable: false))
-        add_field('tags',            ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                      is_read_only: true, is_sortable: false))
-        add_field('url',             ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                      is_read_only: true, is_sortable: false))
-        add_field('created_at',      ColumnSchema.new(column_type: 'Date',  filter_operators: DATE_OPS,
-                                                      is_read_only: true, is_sortable: true))
-        add_field('updated_at',      ColumnSchema.new(column_type: 'Date',  filter_operators: DATE_OPS,
-                                                      is_read_only: true, is_sortable: true))
+        add_field('tags', ColumnSchema.new(column_type: 'Json', filter_operators: [],
+                                           is_read_only: true, is_sortable: false))
+        add_field('url', ColumnSchema.new(column_type: 'String', filter_operators: [],
+                                          is_read_only: true, is_sortable: false))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                                 is_read_only: true, is_sortable: true))
+        add_field('updated_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                                 is_read_only: true, is_sortable: true))
 
-        @custom_fields.each do |cf|
-          add_field(cf[:column_name], cf[:schema])
-        end
+        @custom_fields.each { |cf| add_field(cf[:column_name], cf[:schema]) }
       end
 
       def define_relations
@@ -210,31 +194,24 @@ module ForestAdminDatasourceZendesk
 
       def serialize(ticket, emails = {})
         attrs = attrs_of(ticket)
-        result = {
-          'id' => attrs['id'],
-          'subject' => attrs['subject'],
-          'description' => attrs['description'],
-          'status' => attrs['status'],
-          'priority' => attrs['priority'],
-          'ticket_type' => attrs['type'],
-          'requester_id' => attrs['requester_id'],
-          'assignee_id' => attrs['assignee_id'],
-          'group_id' => attrs['group_id'],
-          'organization_id' => attrs['organization_id'],
+        result = base_attributes(attrs, emails)
+        cf_values = Array(attrs['custom_fields']).to_h { |f| [f['id'], f['value']] }
+        @custom_fields.each { |cf| result[cf[:column_name]] = cf_values[cf[:zendesk_id]] }
+        result
+      end
+
+      def base_attributes(attrs, emails)
+        {
+          'id' => attrs['id'], 'subject' => attrs['subject'],
+          'description' => attrs['description'], 'status' => attrs['status'],
+          'priority' => attrs['priority'], 'ticket_type' => attrs['type'],
+          'requester_id' => attrs['requester_id'], 'assignee_id' => attrs['assignee_id'],
+          'group_id' => attrs['group_id'], 'organization_id' => attrs['organization_id'],
           'external_id' => attrs['external_id'],
           'requester_email' => emails[attrs['requester_id']],
-          'tags' => attrs['tags'],
-          'url' => attrs['url'],
-          'created_at' => attrs['created_at'],
-          'updated_at' => attrs['updated_at']
+          'tags' => attrs['tags'], 'url' => attrs['url'],
+          'created_at' => attrs['created_at'], 'updated_at' => attrs['updated_at']
         }
-
-        cf_values_by_id = Array(attrs['custom_fields']).to_h { |f| [f['id'], f['value']] }
-        @custom_fields.each do |cf|
-          result[cf[:column_name]] = cf_values_by_id[cf[:zendesk_id]]
-        end
-
-        result
       end
     end
   end

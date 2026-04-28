@@ -1,9 +1,11 @@
 module ForestAdminDatasourceZendesk
   module Collections
     # Comments are *always* fetched in the context of a parent ticket
-    # (Zendesk: GET /tickets/{id}/comments). The collection only supports
-    # filters of the form `ticket_id = N` or `ticket_id IN [...]`. Anything
-    # else raises ForestException.
+    # (Zendesk: GET /tickets/{id}/comments). The collection's `list` only
+    # responds to filters that resolve to one or more `ticket_id` values
+    # (either directly via `ticket_id = N` / `ticket_id IN [...]`, or
+    # indirectly via the synthetic primary key `<comment_id>-<ticket_id>`).
+    # Any other filter shape returns [].
     class Comment < BaseCollection
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       Branch          = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
@@ -15,22 +17,7 @@ module ForestAdminDatasourceZendesk
       end
 
       def list(_caller, filter, projection)
-        synthetic_ids = extract_field_lookup(filter.condition_tree, 'id')
-        ticket_ids    = extract_field_lookup(filter.condition_tree, 'ticket_id') || []
-        comment_ids   = []
-
-        Array(synthetic_ids).each do |sid|
-          c_id, t_id = decode_synthetic_id(sid)
-          comment_ids << c_id if c_id
-          ticket_ids << t_id  if t_id
-        end
-
-        ticket_ids.uniq!
-        comment_ids = comment_ids.empty? ? nil : comment_ids.uniq
-
-        # Top-level browse with no ticket scope -> return []. Zendesk has no
-        # /comments listing endpoint; legitimate access (Ticket -> comments
-        # relation, show route via synthetic id) always carries a ticket_id.
+        ticket_ids, comment_ids = resolve_scope(filter)
         if ticket_ids.empty?
           ForestAdminDatasourceZendesk.logger.info(
             '[forest_admin_datasource_zendesk] ZendeskComment.list called without a ticket scope; ' \
@@ -39,37 +26,54 @@ module ForestAdminDatasourceZendesk
           return []
         end
 
-        records = ticket_ids.flat_map do |ticket_id|
+        records = fetch_comments(ticket_ids, comment_ids)
+        records.map { |c| project(serialize(c), projection) }
+      end
+
+      private
+
+      # Resolves the filter into [ticket_ids, comment_ids]. Both come from a
+      # mix of direct `ticket_id` filters and synthetic-id filters
+      # (`id = "<comment_id>-<ticket_id>"`). `comment_ids` may be nil
+      # (meaning "no narrowing — return all comments for the ticket").
+      def resolve_scope(filter)
+        synthetic_ids = extract_field_lookup(filter.condition_tree, 'id')
+        ticket_ids    = extract_field_lookup(filter.condition_tree, 'ticket_id') || []
+        comment_ids   = []
+
+        Array(synthetic_ids).each do |sid|
+          c_id, t_id = decode_synthetic_id(sid)
+          comment_ids << c_id if c_id
+          ticket_ids << t_id if t_id
+        end
+
+        ticket_ids.uniq!
+        [ticket_ids, comment_ids.empty? ? nil : comment_ids.uniq]
+      end
+
+      def fetch_comments(ticket_ids, comment_ids)
+        ticket_ids.flat_map do |ticket_id|
           comments = datasource.client.fetch_ticket_comments(ticket_id).map do |c|
             c.merge('ticket_id' => ticket_id)
           end
           comment_ids ? comments.select { |c| comment_ids.include?(c['id']) } : comments
         end
-
-        records.map { |c| project(serialize(c), projection) }
       end
-
-      # Counts are deactivated for comments — Zendesk doesn't expose a count
-      # endpoint for ticket comments, and the list endpoint already returns
-      # everything in a single response.
-
-      private
 
       # Walks the (possibly-Branch) condition tree and collects equality/IN
       # values for `field`. Returns nil if no matching leaf was found.
       def extract_field_lookup(node, field)
         leaves = collect_leaves(node).select { |l| l.field == field }
-        return nil if leaves.empty?
-
-        values = leaves.flat_map do |leaf|
-          case leaf.operator
-          when Operators::EQUAL then [leaf.value]
-          when Operators::IN    then Array(leaf.value)
-          else                       []
-          end
-        end
-
+        values = leaves.flat_map { |l| values_from_leaf(l) }
         values.empty? ? nil : values
+      end
+
+      def values_from_leaf(leaf)
+        case leaf.operator
+        when Operators::EQUAL then [leaf.value]
+        when Operators::IN    then Array(leaf.value)
+        else                       []
+        end
       end
 
       def decode_synthetic_id(value)
@@ -77,8 +81,7 @@ module ForestAdminDatasourceZendesk
         parts = value.to_s.split('-')
         return [nil, nil] unless parts.size == 2
 
-        c_id, t_id = parts.map { |p| Integer(p, 10, exception: false) }
-        [c_id, t_id]
+        parts.map { |p| Integer(p, 10, exception: false) }
       end
 
       def collect_leaves(node)
@@ -90,29 +93,27 @@ module ForestAdminDatasourceZendesk
       end
 
       def define_schema
-        # Synthetic composite primary key: a comment is only addressable in the
-        # context of its parent ticket (Zendesk has no /comments/{id} endpoint).
-        # We encode <comment_id>-<ticket_id> as a single String PK because
-        # forest_admin_rails 1.26.2's URL constraint rejects '|' (used by the
-        # toolkit's native pack_id for composite keys). Forest URL becomes
-        # /ZendeskComment/<comment_id>-<ticket_id>; filter on `id` carries the
-        # full synthetic value, which we decode in #list.
-        add_field('id',         ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::IN],
-                                                 is_primary_key: true, is_read_only: true, is_sortable: false))
-        add_field('ticket_id',  ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::IN],
-                                                 is_read_only: true, is_sortable: false))
-        add_field('author_id',  ColumnSchema.new(column_type: 'Number', filter_operators: [],
-                                                 is_read_only: true, is_sortable: false))
-        add_field('body',       ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                 is_read_only: true, is_sortable: false))
-        add_field('html_body',  ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                 is_read_only: true, is_sortable: false))
+        # Synthetic composite primary key: a comment is only addressable in
+        # the context of its parent ticket (Zendesk has no /comments/{id}
+        # endpoint). We encode <comment_id>-<ticket_id> as a single String
+        # PK because forest_admin_rails 1.26.2's URL constraint rejects '|'
+        # (used by the toolkit's native pack_id for composite keys).
+        add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::IN],
+                                         is_primary_key: true, is_read_only: true, is_sortable: false))
+        add_field('ticket_id', ColumnSchema.new(column_type: 'Number', filter_operators: [Operators::EQUAL, Operators::IN],
+                                                is_read_only: true, is_sortable: false))
+        add_field('author_id', ColumnSchema.new(column_type: 'Number', filter_operators: [],
+                                                is_read_only: true, is_sortable: false))
+        add_field('body', ColumnSchema.new(column_type: 'String', filter_operators: [],
+                                           is_read_only: true, is_sortable: false))
+        add_field('html_body', ColumnSchema.new(column_type: 'String', filter_operators: [],
+                                                is_read_only: true, is_sortable: false))
         add_field('plain_body', ColumnSchema.new(column_type: 'String', filter_operators: [],
                                                  is_read_only: true, is_sortable: false))
-        add_field('public',     ColumnSchema.new(column_type: 'Boolean', filter_operators: [],
-                                                 is_read_only: true, is_sortable: false))
-        add_field('type',       ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                 is_read_only: true, is_sortable: false))
+        add_field('public', ColumnSchema.new(column_type: 'Boolean', filter_operators: [],
+                                             is_read_only: true, is_sortable: false))
+        add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: [],
+                                           is_read_only: true, is_sortable: false))
         add_field('via_channel', ColumnSchema.new(column_type: 'String', filter_operators: [],
                                                   is_read_only: true, is_sortable: false))
         add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: [],
@@ -143,7 +144,7 @@ module ForestAdminDatasourceZendesk
           'plain_body' => attrs['plain_body'] || attrs['body'],
           'public' => attrs['public'],
           'type' => attrs['type'],
-          'via_channel' => (attrs.dig('via', 'channel') || attrs.dig(:via, :channel)),
+          'via_channel' => attrs.dig('via', 'channel') || attrs.dig(:via, :channel),
           'created_at' => attrs['created_at']
         }
       end

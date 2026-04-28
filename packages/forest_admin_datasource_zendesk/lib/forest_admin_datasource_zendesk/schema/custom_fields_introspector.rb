@@ -53,19 +53,26 @@ module ForestAdminDatasourceZendesk
       private
 
       def introspect(raw_fields, key_strategy:)
-        Array(raw_fields).filter_map do |raw|
-          next unless raw['active']
-          # System ticket fields can't be removed; skip them so we don't
-          # double-up (e.g., `subject`, `status`, `priority`).
-          next if key_strategy == :ticket && raw['removable'] == false
+        Array(raw_fields)
+          .select { |raw| usable_field?(raw, key_strategy) }
+          .filter_map { |raw| build_entry(raw, key_strategy) }
+      end
 
-          column_type = ZENDESK_TO_COLUMN_TYPE[raw['type']]
-          next unless column_type
+      # System ticket fields can't be removed; skip them so we don't double-up
+      # the columns the Ticket schema already declares (e.g. subject/status).
+      # Inactive fields and unrecognized types are also skipped.
+      def usable_field?(raw, key_strategy)
+        return false unless raw['active']
+        return false if key_strategy == :ticket && raw['removable'] == false
 
-          name, key = column_naming(raw, key_strategy)
-          schema    = build_schema(raw, column_type)
-          { column_name: name, zendesk_id: raw['id'], zendesk_key: key, schema: schema }
-        end
+        ZENDESK_TO_COLUMN_TYPE.key?(raw['type'])
+      end
+
+      def build_entry(raw, key_strategy)
+        column_type = ZENDESK_TO_COLUMN_TYPE.fetch(raw['type'])
+        name, key   = column_naming(raw, key_strategy)
+        { column_name: name, zendesk_id: raw['id'], zendesk_key: key,
+          schema: build_schema(raw, column_type) }
       end
 
       def column_naming(raw, strategy)

@@ -18,15 +18,12 @@ module ForestAdminDatasourceZendesk
 
     # ---------- Search (critical) ----------
 
-    def search(type, query:, sort_by: nil, sort_order: nil, page: 1, per_page: MAX_PER_PAGE)
-      params = {
-        query: compose_query(type, query),
-        per_page: [per_page, MAX_PER_PAGE].min,
-        page: page
-      }
-      params[:sort_by]    = sort_by    if sort_by
-      params[:sort_order] = sort_order if sort_order
-
+    # `opts` accepts: :query (required), :sort_by, :sort_order, :page,
+    # :per_page. We use an options hash rather than five named args so the
+    # call sites (the Searchable mixin) stay tidy and the signature stays
+    # narrow.
+    def search(type, **opts)
+      params = build_search_params(type, opts)
       must_succeed("search(#{type})") { api.search(params).to_a }
     end
 
@@ -142,6 +139,17 @@ module ForestAdminDatasourceZendesk
 
     def compose_query(type, query)
       [type ? "type:#{type}" : nil, query.to_s.strip].compact.reject(&:empty?).join(' ')
+    end
+
+    def build_search_params(type, opts)
+      params = {
+        query: compose_query(type, opts[:query]),
+        per_page: [opts[:per_page] || MAX_PER_PAGE, MAX_PER_PAGE].min,
+        page: opts[:page] || 1
+      }
+      params[:sort_by]    = opts[:sort_by]    if opts[:sort_by]
+      params[:sort_order] = opts[:sort_order] if opts[:sort_order]
+      params
     end
 
     def api
