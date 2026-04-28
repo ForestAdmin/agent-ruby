@@ -83,6 +83,10 @@ module ForestAdminDatasourceActiveRecord
       association.polymorphic?
     end
 
+    def cascade_on_delete?(association)
+      %i[destroy destroy_async delete_all].include?(association.options[:dependent])
+    end
+
     # rubocop:disable Metrics/BlockNesting
     def fetch_associations
       associations(@model, support_polymorphic_relations: @support_polymorphic_relations).each do |association|
@@ -118,7 +122,8 @@ module ForestAdminDatasourceActiveRecord
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
                   origin_type_field: association.inverse_of.foreign_type,
-                  origin_type_value: @model.name
+                  origin_type_value: @model.name,
+                  cascade_on_delete: cascade_on_delete?(association)
                 )
               )
             else
@@ -192,7 +197,8 @@ module ForestAdminDatasourceActiveRecord
                   origin_key: association.foreign_key,
                   origin_key_target: association.association_primary_key,
                   origin_type_field: association.inverse_of.foreign_type,
-                  origin_type_value: @model.name
+                  origin_type_value: @model.name,
+                  cascade_on_delete: cascade_on_delete?(association)
                 )
               )
             else
