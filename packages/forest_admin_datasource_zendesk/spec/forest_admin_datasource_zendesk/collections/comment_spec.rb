@@ -84,6 +84,22 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Comment do
       expect(collection.list(nil, filter, nil)).to eq([])
     end
 
+    it 'returns [] when only the comment_id half is invalid (e.g., "abc-456")' do
+      # Regression: previously the malformed `abc-456` synthetic id
+      # contributed its valid `456` ticket_id to the scope, then fetched ALL
+      # comments for ticket 456 — wrong, because the row the user clicked
+      # doesn't actually exist.
+      expect(client).not_to receive(:fetch_ticket_comments)
+      filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 'abc-456'))
+      expect(collection.list(nil, filter, nil)).to eq([])
+    end
+
+    it 'returns [] when only the ticket_id half is invalid (e.g., "1-bad")' do
+      expect(client).not_to receive(:fetch_ticket_comments)
+      filter = Filter.new(condition_tree: Leaf.new('id', 'equal', '1-bad'))
+      expect(collection.list(nil, filter, nil)).to eq([])
+    end
+
     it 'flattens via.channel into via_channel' do
       expect(client).to receive(:fetch_ticket_comments).with(1).and_return([
                                                                              { 'id' => 99,

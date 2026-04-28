@@ -10,35 +10,30 @@ module ForestAdminDatasourceZendesk
     # Unsupported operators raise UnsupportedOperatorError so failures are
     # loud, not silent wrong results.
     #
-    # Custom-field translation: when `Datasource#register_custom_field_translations`
-    # has set `custom_field_mapping`, filters on a custom column are rewritten
-    # to the Zendesk-side search field (e.g. `custom_360001234` →
-    # `custom_field_360001234`, or `vip_tier` → `vip_tier` for keyed
-    # user/org fields).
+    # Custom-field translation: callers pass `custom_fields:` (a hash from
+    # Forest column names to Zendesk Search field names, owned by the
+    # Datasource instance) so multi-tenant agents with several Zendesk
+    # datasources don't trample each other's mappings.
     #
-    # Timezone handling: callers may pass `timezone:` to `.call`; Date values
-    # are interpreted as start-of-day in that TZ, then converted to UTC.
+    # Timezone handling: callers pass `timezone:`; Date values are
+    # interpreted as start-of-day in that TZ, then converted to UTC.
     # Time/DateTime values are converted to UTC directly (they already carry
-    # offset info). String values are passed through verbatim.
+    # offset info). String values are passed through verbatim, with internal
+    # double quotes escaped when wrapping in quotes is needed.
     class ConditionTreeTranslator
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
       Branch    = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
       Leaf      = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
 
-      class << self
-        attr_accessor :custom_field_mapping
+      def self.call(condition_tree, timezone: nil, custom_fields: {})
+        return '' if condition_tree.nil?
 
-        def call(condition_tree, timezone: nil)
-          return '' if condition_tree.nil?
-
-          new(timezone: timezone).translate(condition_tree)
-        end
+        new(timezone: timezone, custom_fields: custom_fields).translate(condition_tree)
       end
 
-      self.custom_field_mapping = {}
-
-      def initialize(timezone: nil)
+      def initialize(timezone: nil, custom_fields: {})
         @timezone = timezone || 'UTC'
+        @custom_fields = custom_fields || {}
       end
 
       def translate(node)
@@ -70,8 +65,8 @@ module ForestAdminDatasourceZendesk
         case leaf.operator
         when Operators::EQUAL        then "#{field}:#{format_value(value)}"
         when Operators::NOT_EQUAL    then "-#{field}:#{format_value(value)}"
-        when Operators::IN           then Array(value).map { |v| "#{field}:#{format_value(v)}" }.join(' ')
-        when Operators::NOT_IN       then Array(value).map { |v| "-#{field}:#{format_value(v)}" }.join(' ')
+        when Operators::IN           then translate_in(field, value, negate: false)
+        when Operators::NOT_IN       then translate_in(field, value, negate: true)
         when Operators::GREATER_THAN, Operators::AFTER  then "#{field}>#{format_value(value)}"
         when Operators::LESS_THAN,    Operators::BEFORE then "#{field}<#{format_value(value)}"
         when Operators::PRESENT      then "#{field}:*"
@@ -82,8 +77,23 @@ module ForestAdminDatasourceZendesk
         end
       end
 
+      # `IN []` and `NOT_IN []` are nonsense filters that previously produced
+      # an empty string, which the branch translator dropped — silently
+      # turning "match nothing" into "match everything". Raise instead.
+      def translate_in(field, value, negate:)
+        values = Array(value)
+        if values.empty?
+          raise UnsupportedOperatorError,
+                "#{negate ? "NOT_IN" : "IN"} on field '#{field}' was given an empty array; " \
+                'pass at least one value or use the BLANK / PRESENT operators.'
+        end
+
+        prefix = negate ? '-' : ''
+        values.map { |v| "#{prefix}#{field}:#{format_value(v)}" }.join(' ')
+      end
+
       def mapped_field(field)
-        self.class.custom_field_mapping[field] || field
+        @custom_fields[field] || field
       end
 
       def format_value(value)
@@ -119,8 +129,14 @@ module ForestAdminDatasourceZendesk
         value.strftime('%Y-%m-%dT00:00:00Z')
       end
 
+      # Strings with whitespace OR internal double quotes need quoting so
+      # Zendesk parses them as a single phrase. We backslash-escape internal
+      # quotes per Zendesk's documented quoting rules; without this, a value
+      # like `test "with" quotes` would emit a malformed query.
       def format_string(value)
-        value.match?(/\s/) ? %("#{value}") : value
+        return value unless value.match?(/[\s"]/)
+
+        %("#{value.gsub('"', '\\"')}")
       end
     end
   end

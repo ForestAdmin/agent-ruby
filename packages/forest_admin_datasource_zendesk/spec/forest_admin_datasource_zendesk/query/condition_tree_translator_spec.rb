@@ -92,6 +92,30 @@ RSpec.describe ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator do
       expect { translate(Leaf.new('subject', 'equal', nil)) }
         .to raise_error(ForestAdminDatasourceZendesk::UnsupportedOperatorError, /PRESENT or BLANK/)
     end
+
+    it 'escapes internal double quotes when wrapping in quotes' do
+      # Without escaping, `test "with" quotes` would emit
+      # `subject:"test "with" quotes"` which Zendesk parses as malformed.
+      expect(translate(Leaf.new('subject', 'equal', 'test "with" quotes')))
+        .to eq('subject:"test \\"with\\" quotes"')
+    end
+
+    it 'still quotes a string that has only internal quotes (no whitespace)' do
+      expect(translate(Leaf.new('subject', 'equal', %(say"hi))))
+        .to eq('subject:"say\\"hi"')
+    end
+  end
+
+  describe 'IN / NOT_IN with empty array' do
+    it 'raises on IN [] (would otherwise silently match everything)' do
+      expect { translate(Leaf.new('status', 'in', [])) }
+        .to raise_error(ForestAdminDatasourceZendesk::UnsupportedOperatorError, /empty array/)
+    end
+
+    it 'raises on NOT_IN []' do
+      expect { translate(Leaf.new('status', 'not_in', [])) }
+        .to raise_error(ForestAdminDatasourceZendesk::UnsupportedOperatorError, /empty array/)
+    end
   end
 
   describe 'timezone handling' do
@@ -122,20 +146,35 @@ RSpec.describe ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator do
   end
 
   describe 'custom field mapping' do
-    around do |ex|
-      previous = described_class.custom_field_mapping
-      described_class.custom_field_mapping = { 'custom_360001' => 'custom_field_360001' }
-      ex.run
-      described_class.custom_field_mapping = previous
-    end
+    let(:mapping) { { 'custom_360001' => 'custom_field_360001' } }
 
     it 'rewrites a custom field column name to the Zendesk Search field' do
-      expect(translate(Leaf.new('custom_360001', 'equal', 'gold')))
-        .to eq('custom_field_360001:gold')
+      result = described_class.call(Leaf.new('custom_360001', 'equal', 'gold'),
+                                    custom_fields: mapping)
+      expect(result).to eq('custom_field_360001:gold')
     end
 
     it 'leaves non-mapped fields untouched' do
-      expect(translate(Leaf.new('status', 'equal', 'open'))).to eq('status:open')
+      result = described_class.call(Leaf.new('status', 'equal', 'open'),
+                                    custom_fields: mapping)
+      expect(result).to eq('status:open')
+    end
+
+    it 'does not leak mapping between calls (no class-level state)' do
+      # Multi-tenant safety: a previous version stashed the mapping on the
+      # class. Two datasources with different mappings would step on each
+      # other. With per-call custom_fields, each call carries its own.
+      first = described_class.call(Leaf.new('custom_360001', 'equal', 'a'),
+                                   custom_fields: { 'custom_360001' => 'custom_field_111' })
+      second = described_class.call(Leaf.new('custom_360001', 'equal', 'b'),
+                                    custom_fields: { 'custom_360001' => 'custom_field_222' })
+      expect(first).to eq('custom_field_111:a')
+      expect(second).to eq('custom_field_222:b')
+    end
+
+    it 'falls back to the raw field name when no mapping is supplied' do
+      expect(described_class.call(Leaf.new('custom_360001', 'equal', 'gold')))
+        .to eq('custom_360001:gold')
     end
   end
 

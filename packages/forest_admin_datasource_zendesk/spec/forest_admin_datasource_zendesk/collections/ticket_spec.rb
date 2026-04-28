@@ -5,8 +5,11 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
   Aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation
   Leaf        = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
 
-  let(:client)     { instance_double(ForestAdminDatasourceZendesk::Client) }
-  let(:datasource) { instance_double(ForestAdminDatasourceZendesk::Datasource, client: client) }
+  let(:client) { instance_double(ForestAdminDatasourceZendesk::Client) }
+  let(:datasource) do
+    instance_double(ForestAdminDatasourceZendesk::Datasource,
+                    client: client, custom_field_mapping: {})
+  end
   let(:collection) { described_class.new(datasource) }
 
   def zendesk_record(attrs)

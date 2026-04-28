@@ -44,9 +44,14 @@ module ForestAdminDatasourceZendesk
         [ticket_ids, comment_ids.empty? ? nil : comment_ids.uniq]
       end
 
+      # Only return pairs where BOTH halves are valid integers. A malformed
+      # synthetic id like `"abc-456"` would otherwise contribute its
+      # ticket_id to the scope and silently fetch every comment for that
+      # ticket — wrong, since the row the user clicked doesn't exist.
       def decoded_synthetic_pairs(filter)
         Array(extract_field_lookup(filter.condition_tree, 'id'))
           .map { |sid| decode_synthetic_id(sid) }
+          .reject { |c, t| c.nil? || t.nil? }
       end
 
       def fetch_comments(ticket_ids, comment_ids)

@@ -1,11 +1,12 @@
 module ForestAdminDatasourceZendesk
   class Datasource < ForestAdminDatasourceToolkit::Datasource
-    attr_reader :client, :configuration
+    attr_reader :client, :configuration, :custom_field_mapping
 
     def initialize(subdomain:, username:, token:)
       super()
       @configuration = Configuration.new(subdomain: subdomain, username: username, token: token)
       @client = Client.new(@configuration)
+      @custom_field_mapping = {}
 
       register_collections
     end
@@ -24,23 +25,23 @@ module ForestAdminDatasourceZendesk
       add_collection(Collections::Organization.new(self, custom_fields: org_cf))
       add_collection(Collections::Comment.new(self))
 
-      register_custom_field_translations(ticket_cf, user_cf, org_cf)
+      @custom_field_mapping = build_custom_field_mapping(ticket_cf, user_cf, org_cf)
     end
 
-    # The translator needs the (Forest column → Zendesk search field) mapping
-    # to translate filters on custom fields. We hand it the merged set so any
-    # filter on a custom column resolves to the right search syntax.
-    def register_custom_field_translations(ticket_cf, user_cf, org_cf)
+    # Forest column name -> Zendesk Search field name. The mapping lives on
+    # the Datasource instance (not on the translator class) so multi-tenant
+    # agents with multiple Zendesk datasources don't trample each other.
+    # The collections pass it through to ConditionTreeTranslator.call(...).
+    def build_custom_field_mapping(ticket_cf, user_cf, org_cf)
       mapping = {}
       ticket_cf.each { |cf| mapping[cf[:column_name]] = "custom_field_#{cf[:zendesk_id]}" }
-      # User/org custom fields are addressed by key in Zendesk Search.
+      # User / org custom fields are addressed by key in Zendesk Search.
       (user_cf + org_cf).each do |cf|
         next unless cf[:zendesk_key]
 
         mapping[cf[:column_name]] ||= cf[:zendesk_key]
       end
-
-      ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.custom_field_mapping = mapping
+      mapping
     end
   end
 end

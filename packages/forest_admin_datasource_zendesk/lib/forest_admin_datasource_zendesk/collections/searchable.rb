@@ -50,7 +50,8 @@ module ForestAdminDatasourceZendesk
       # this builder.
       def compose_full_query(caller, filter)
         translated = ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.call(
-          filter.condition_tree, timezone: timezone_for(caller)
+          filter.condition_tree, timezone: timezone_for(caller),
+                                 custom_fields: datasource.custom_field_mapping
         )
         [translated, filter.search].compact.reject(&:empty?).join(' ')
       end
