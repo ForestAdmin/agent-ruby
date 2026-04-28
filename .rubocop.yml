@@ -265,6 +265,7 @@ Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']
   Max: 20
   Exclude:
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/builder/agent_factory.rb'
@@ -321,6 +322,7 @@ Metrics/BlockLength:
 
 Metrics/ClassLength:
   Exclude:
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/builder/agent_factory.rb'

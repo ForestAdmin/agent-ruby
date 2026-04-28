@@ -144,8 +144,11 @@ module ForestAdminDatasourceSnowflake
     def visible_tables
       with_connection do |conn|
         stmt = conn.tables
-        rows = stmt.fetch_all || []
-        stmt.drop
+        rows = begin
+          stmt.fetch_all || []
+        ensure
+          stmt.drop
+        end
 
         rows
           .map { |row| { catalog: row[0], schema: row[1], name: row[2], type: row[3] } }
