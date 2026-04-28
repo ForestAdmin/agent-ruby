@@ -1,0 +1,42 @@
+inherit_from: ../../.rubocop.yml
+
+# Per-package overrides. The spec suite makes heavy use of RSpec patterns that
+# rubocop's defaults flag stylistically but that don't affect correctness:
+# - constant aliases at the top of describe blocks for readability (Leaf, Filter, ...)
+# - combined stub + call expectation via `expect(x).to receive(...).and_return(...)`
+# - "must not be called" assertions via `expect(x).not_to receive(...)`
+# Disabling these for spec/** keeps the tests concise without weakening lint
+# coverage of the production code.
+
+# Schemas in this package are wide-fact-tables (one ColumnSchema per real
+# Zendesk field) and are intrinsically long. Bumping the limits is cheaper
+# than splitting them into noise.
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/MethodLength:
+  Max: 25
+
+Metrics/ParameterLists:
+  Max: 6
+
+Layout/LineLength:
+  Max: 130
+  Exclude:
+    - 'spec/**/*'
+
+RSpec/StubbedMock:
+  Exclude:
+    - 'spec/**/*'
+
+RSpec/MessageSpies:
+  Exclude:
+    - 'spec/**/*'
+
+RSpec/LeakyConstantDeclaration:
+  Exclude:
+    - 'spec/**/*'
+
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - 'spec/**/*'
