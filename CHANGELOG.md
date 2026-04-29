@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.0...v1.27.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **polymorphic:** skip pre-delete FK nullify when datasource cascades ([#291](https://github.com/ForestAdmin/agent-ruby/issues/291)) ([5e05ad0](https://github.com/ForestAdmin/agent-ruby/commit/5e05ad0d122f017c04aaa3ea0cbafa09cec0494b)), closes [#289](https://github.com/ForestAdmin/agent-ruby/issues/289)
+
 # [1.27.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.26.3...v1.27.0) (2026-04-01)
 
 
