@@ -380,6 +380,105 @@ module ForestAdminAgent
               end
             end
           end
+
+          context 'with polymorphic relation that cascades on delete' do
+            before do
+              cache = FileCache.new('app', 'tmp/cache/forest_admin')
+              cache.clear
+
+              agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
+              agent_factory.setup(
+                {
+                  auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                  env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+                  is_production: false,
+                  cache_dir: 'tmp/cache/forest_admin',
+                  schema_path: File.join('tmp', '.forestadmin-schema.json'),
+                  forest_server_url: 'https://api.development.forestadmin.com',
+                  debug: true,
+                  prefix: 'forest',
+                  customize_error_message: nil,
+                  append_schema_path: nil
+                }
+              )
+
+              feedback_class = Struct.new(:id, :body)
+              evidence_class = Struct.new(:id, :evidence_id, :evidence_type)
+              stub_const('Feedback', feedback_class)
+              stub_const('AchievementEvidence', evidence_class)
+
+              datasource = Datasource.new
+
+              feedback_collection = build_collection(
+                name: 'feedback',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'body' => ColumnSchema.new(column_type: 'String'),
+                    'achievement_evidences' => Relations::PolymorphicOneToManySchema.new(
+                      foreign_collection: 'achievement_evidence',
+                      origin_key: 'evidence_id',
+                      origin_key_target: 'id',
+                      origin_type_field: 'evidence_type',
+                      origin_type_value: 'Feedback',
+                      cascade_on_delete: true
+                    )
+                  }
+                },
+                delete: true
+              )
+
+              evidence_collection = build_collection(
+                name: 'achievement_evidence',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'evidence_id' => ColumnSchema.new(column_type: 'Number'),
+                    'evidence_type' => ColumnSchema.new(column_type: 'String')
+                  }
+                },
+                update: true
+              )
+
+              allow(agent_factory).to receive(:send_schema).and_return(nil)
+              datasource.add_collection(feedback_collection)
+              datasource.add_collection(evidence_collection)
+              agent_factory.add_datasource(datasource)
+              agent_factory.build
+
+              @datasource = ForestAdminAgent::Facades::Container.datasource
+              allow(@datasource.get_collection('feedback')).to receive(:delete)
+              allow(@datasource.get_collection('achievement_evidence')).to receive(:update)
+            end
+
+            let(:params) do
+              {
+                'collection_name' => 'feedback',
+                'timezone' => 'Europe/Paris',
+                'id' => 1
+              }
+            end
+
+            it 'does not nullify the polymorphic FK on the foreign collection' do
+              delete.handle_request(args)
+
+              expect(@datasource.get_collection('achievement_evidence')).not_to have_received(:update)
+            end
+
+            it 'still calls delete on the parent collection' do
+              delete.handle_request(args)
+
+              expect(@datasource.get_collection('feedback')).to have_received(:delete)
+            end
+          end
         end
       end
     end

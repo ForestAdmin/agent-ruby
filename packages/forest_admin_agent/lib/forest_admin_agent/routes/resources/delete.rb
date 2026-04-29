@@ -41,6 +41,7 @@ module ForestAdminAgent
 
           context.collection.schema[:fields].each_value do |field_schema|
             next unless ['PolymorphicOneToOne', 'PolymorphicOneToMany'].include?(field_schema.type)
+            next if field_schema.respond_to?(:cascade_on_delete) && field_schema.cascade_on_delete
 
             origin_values = selection_ids[:ids].map do |pk_hash|
               if pk_hash.is_a?(Hash)

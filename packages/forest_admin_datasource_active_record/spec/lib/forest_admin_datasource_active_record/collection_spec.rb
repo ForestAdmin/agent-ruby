@@ -155,6 +155,18 @@ module ForestAdminDatasourceActiveRecord
           expect(datasource.get_collection('Address').schema[:fields].keys).to include('addressable')
         end
 
+        it 'sets cascade_on_delete=true on polymorphic has_many when dependent: :destroy is declared' do
+          members = datasource.get_collection('Project').schema[:fields]['members']
+          expect(members).to be_a(Relations::PolymorphicOneToManySchema)
+          expect(members.cascade_on_delete).to be true
+        end
+
+        it 'leaves cascade_on_delete=false on polymorphic has_one without dependent option' do
+          address = datasource.get_collection('User').schema[:fields]['address']
+          expect(address).to be_a(Relations::PolymorphicOneToOneSchema)
+          expect(address.cascade_on_delete).to be false
+        end
+
         it 'sets foreign_type_field/value for has_many :through with polymorphic source_type' do
           user_collection = datasource.get_collection('User')
           projects_relation = user_collection.schema[:fields]['projects']
