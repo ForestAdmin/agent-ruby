@@ -63,7 +63,8 @@ module ForestAdminAgent
           { name: 'associate_related', handler: -> { Resources::Related::AssociateRelated.new.routes } },
           { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
           { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
-          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } }
+          { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } },
+          { name: 'workflow_executor_proxy', handler: -> { Workflow::WorkflowExecutorProxy.new.routes } }
         ]
 
         all_routes = {}
