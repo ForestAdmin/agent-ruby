@@ -14,7 +14,9 @@ module ForestAdminDatasourceSnowflake
       /Session.*timed out/i,
       /Broken pipe/i,
       /Not connected/i,
-      /timeout expired/i
+      /timeout expired/i,
+      /Authentication token has expired/i,
+      /token.*expired/i
     ].freeze
 
     SYSTEM_SCHEMAS = %w[INFORMATION_SCHEMA].freeze
