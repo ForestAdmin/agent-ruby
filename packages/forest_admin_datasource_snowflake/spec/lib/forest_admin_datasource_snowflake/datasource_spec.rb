@@ -169,6 +169,21 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       end
     end
 
+    it 'retries on Snowflake auth token expiry so a fresh connection re-authenticates' do
+      datasource
+      attempts = 0
+
+      result = datasource.with_connection do |_conn|
+        attempts += 1
+        raise ODBC::Error, '08001 (390114) Authentication token has expired.' if attempts == 1
+
+        :reauthed
+      end
+
+      expect(result).to eq(:reauthed)
+      expect(attempts).to eq(2)
+    end
+
     it 'does not retry on errors that are not connection-related' do
       datasource
       attempts = 0
