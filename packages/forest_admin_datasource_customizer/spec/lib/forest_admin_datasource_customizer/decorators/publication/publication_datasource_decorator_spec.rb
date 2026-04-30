@@ -129,14 +129,14 @@ module ForestAdminDatasourceCustomizer
 
         context 'when keep_collections_matching is called' do
           it 'throws an error if a name is unknown' do
-            expect { @datasource_decorator.keep_collections_matching(['unknown']) }.to raise_error(ForestException, 'Collection unknown not found.')
-            expect { @datasource_decorator.keep_collections_matching(nil, ['unknown']) }.to raise_error(ForestException, 'Collection unknown not found.')
+            expect { @datasource_decorator.keep_collections_matching(['unknown']) }.to raise_error(ForestException, /Collection unknown not found\./)
+            expect { @datasource_decorator.keep_collections_matching(nil, ['unknown']) }.to raise_error(ForestException, /Collection unknown not found\./)
           end
 
           it 'throws an error if a collection is a target of polymorphic ManyToOne' do
             expect { @datasource_decorator.keep_collections_matching(nil, ['user']) }.to raise_error(
               ForestException,
-              "Cannot remove user because it's a potential target of polymorphic relation address.addressable"
+              /Cannot remove user because it's a potential target of polymorphic relation address\.addressable/
             )
           end
 
@@ -151,7 +151,7 @@ module ForestAdminDatasourceCustomizer
           it 'is able to remove "book" collection' do
             @datasource_decorator.keep_collections_matching(nil, ['book'])
 
-            expect { @datasource_decorator.get_collection('book') }.to raise_error(ForestException, "Collection 'book' was removed.")
+            expect { @datasource_decorator.get_collection('book') }.to raise_error(ForestException, /Collection 'book' was removed\./)
             expect(@datasource_decorator.get_collection('library_book').schema[:fields]).not_to have_key('my_book')
             expect(@datasource_decorator.get_collection('library').schema[:fields]).not_to have_key('my_books')
           end

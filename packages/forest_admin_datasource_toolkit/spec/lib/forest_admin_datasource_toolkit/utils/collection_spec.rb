@@ -325,6 +325,41 @@ module ForestAdminDatasourceToolkit
           expect(described_class.aggregate_relation(collection_book, [1], 'myPersons', caller, ForestAdminDatasourceToolkit::Components::Query::Filter.new,
                                                     ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))).to eq(1)
         end
+
+        context 'when relation or collection is missing' do
+          it 'get_inverse_relation returns nil when relation_field is nil' do
+            # ForestAdminAgent logger is mocked at integration level
+            # Here we just test the return value
+            result = described_class.get_inverse_relation(collection_book, 'nonexistent_relation')
+            expect(result).to be_nil
+          end
+
+          it 'list_relation raises ForestException when relation is nil' do
+            expect do
+              described_class.list_relation(
+                collection_book,
+                [1],
+                'nonexistent_relation',
+                caller,
+                ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                ForestAdminDatasourceToolkit::Components::Query::Projection.new
+              )
+            end.to raise_error(ForestException, "Relation 'nonexistent_relation' not found in collection 'Book'")
+          end
+
+          it 'aggregate_relation raises ForestException when relation is nil' do
+            expect do
+              described_class.aggregate_relation(
+                collection_book,
+                [1],
+                'nonexistent_relation',
+                caller,
+                ForestAdminDatasourceToolkit::Components::Query::Filter.new,
+                ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+              )
+            end.to raise_error(ForestException, "Relation 'nonexistent_relation' not found in collection 'Book'")
+          end
+        end
       end
     end
   end
