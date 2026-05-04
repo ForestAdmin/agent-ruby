@@ -23,23 +23,20 @@ module ForestAdminDatasourceSnowflake
 
     attr_reader :pool
 
-    def initialize(conn_str:, tables: nil, schema: nil,
+    def initialize(conn_str:,
                    pool_size: DEFAULT_POOL_SIZE, pool_timeout: DEFAULT_POOL_TIMEOUT,
-                   statement_timeout: nil, introspect_relations: false,
-                   primary_keys: nil)
+                   statement_timeout: nil, primary_keys: nil)
       super()
       @conn_str               = conn_str
-      @tables_filter          = tables&.map(&:to_s)&.map(&:upcase)
-      @schema_override        = schema
+      @schema_override        = extract_schema_from_conn_str(conn_str)
       @statement_timeout      = statement_timeout
-      @introspect_relations   = introspect_relations
       @primary_keys_override  = (primary_keys || {}).transform_keys { |k| k.to_s.upcase }
       @pool                   = ConnectionPool.new(size: pool_size, timeout: pool_timeout) do
         open_connection(conn_str)
       end
 
       generate_collections
-      discover_relations if @introspect_relations
+      discover_relations
     end
 
     def with_connection(&block)
@@ -109,13 +106,23 @@ module ForestAdminDatasourceSnowflake
     end
 
     def open_connection(conn_str)
-      attrs  = conn_str.split(';').reject(&:empty?).to_h { |option| option.split('=', 2) }
       driver = ::ODBC::Driver.new
       driver.name  = 'odbc'
-      driver.attrs = attrs
+      driver.attrs = parse_conn_str(conn_str)
       conn = ::ODBC::Database.new.drvconnect(driver)
       apply_session_settings(conn)
       conn
+    end
+
+    def parse_conn_str(conn_str)
+      conn_str.split(';').reject(&:empty?).to_h { |option| option.split('=', 2) }
+    end
+
+    def extract_schema_from_conn_str(conn_str)
+      attrs = parse_conn_str(conn_str)
+      pair  = attrs.find { |k, _| k.to_s.casecmp('schema').zero? }
+      value = pair && pair[1]
+      value if value && !value.empty?
     end
 
     def apply_session_settings(conn)
@@ -189,7 +196,6 @@ module ForestAdminDatasourceSnowflake
           .reject { |t| SYSTEM_SCHEMAS.include?(t[:schema].to_s.upcase) }
           .reject { |t| t[:type].to_s.upcase == 'SYSTEM TABLE' }
           .select { |t| @schema_override.nil? || t[:schema].to_s.casecmp(@schema_override).zero? }
-          .select { |t| @tables_filter.nil? || @tables_filter.include?(t[:name].to_s.upcase) }
           .map { |t| t[:name] }
       end
     end
