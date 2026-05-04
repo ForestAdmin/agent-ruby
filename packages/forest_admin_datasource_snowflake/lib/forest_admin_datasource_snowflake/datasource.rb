@@ -120,6 +120,8 @@ module ForestAdminDatasourceSnowflake
 
     def apply_session_settings(conn)
       run_session_statement(conn, "ALTER SESSION SET TIMEZONE = 'UTC'")
+      run_session_statement(conn, "USE SCHEMA #{Utils::Identifier.quote(@schema_override)}") if @schema_override
+
       return unless @statement_timeout
 
       seconds = Integer(@statement_timeout)

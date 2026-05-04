@@ -27,6 +27,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     allow(database_double).to receive(:drvconnect).and_return(odbc_connection)
 
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
+    allow(odbc_connection).to receive(:prepare).with(/^USE SCHEMA/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
 
@@ -119,6 +120,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
 
     it 'does not run STATEMENT_TIMEOUT_IN_SECONDS when statement_timeout is nil' do
       expect(odbc_connection).not_to receive(:prepare).with(/STATEMENT_TIMEOUT/)
+      described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+    end
+
+    it 'aligns the session schema with the Ruby schema option (USE SCHEMA) so introspection targets the right schema' do
+      expect(odbc_connection).to receive(:prepare).with('USE SCHEMA "ANALYTICS"').and_return(alter_stmt)
+
+      described_class.new(conn_str: 'DRIVER={X}', pool_size: 1, schema: 'ANALYTICS')
+    end
+
+    it 'does not run USE SCHEMA when no Ruby schema option is provided' do
+      expect(odbc_connection).not_to receive(:prepare).with(/^USE SCHEMA/)
       described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
     end
   end
