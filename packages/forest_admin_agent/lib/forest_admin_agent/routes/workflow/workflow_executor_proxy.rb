@@ -73,9 +73,10 @@ module ForestAdminAgent
           query = forwarded_query_params(args[:params])
           headers = forwarded_request_headers(args[:headers])
           body = forwarded_body(method, args[:params])
+          target_url = "#{base_url}#{path}"
 
-          client = build_client(base_url)
-          client.run_request(method, path, body, headers) do |req|
+          client = build_client
+          client.run_request(method, target_url, body, headers) do |req|
             req.params.update(query) unless query.empty?
           end
         rescue Faraday::TimeoutError => e
@@ -84,8 +85,8 @@ module ForestAdminAgent
           raise Http::Exceptions::ServiceUnavailableError.new('Workflow executor unreachable', cause: e)
         end
 
-        def build_client(base_url)
-          Faraday.new(url: base_url) do |f|
+        def build_client
+          Faraday.new do |f|
             f.request :json
             f.response :json, content_type: /\bjson$/
             f.adapter Faraday.default_adapter

@@ -52,12 +52,12 @@ module ForestAdminAgent
 
           allow(Faraday).to receive(:new).and_wrap_original do |original, *args, &block|
             connection = original.call(*args, &block)
-            allow(connection).to receive(:run_request) do |method, path, body, hdrs, &req_block|
+            allow(connection).to receive(:run_request) do |method, url, body, hdrs, &req_block|
               captured_params = {}
               req_block&.call(faraday_request_class.new(captured_params))
               captured_state.merge!(
                 method: method,
-                url: "#{args.first[:url]}#{path}",
+                url: url,
                 body: body,
                 headers: hdrs,
                 query: captured_params.dup
