@@ -133,7 +133,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     end
   end
 
-  describe '#primary_key_for' do
+  describe '#primary_keys_for' do
     it 'returns the operator-supplied override (case-insensitive table lookup) above all else' do
       ds = described_class.new(
         conn_str: 'DRIVER={X}',
@@ -141,7 +141,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
         primary_keys: { 'billing_usage' => 'TENANT_ID' }
       )
 
-      expect(ds.primary_key_for('BILLING_USAGE')).to eq('TENANT_ID')
+      expect(ds.primary_keys_for('BILLING_USAGE')).to eq(['TENANT_ID'])
+    end
+
+    it 'accepts an array in the operator override for composite primary keys' do
+      ds = described_class.new(
+        conn_str: 'DRIVER={X}',
+        pool_size: 1,
+        primary_keys: { 'orders' => %w[ORDER_ID PRODUCT_ID] }
+      )
+
+      expect(ds.primary_keys_for('ORDERS')).to eq(%w[ORDER_ID PRODUCT_ID])
     end
 
     it 'falls back to Snowflake-defined primary key when no override is supplied' do
@@ -151,10 +161,10 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
                                                         ])
 
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.primary_key_for('BILLING_USAGE')).to eq('CUSTOMER_ID')
+      expect(ds.primary_keys_for('BILLING_USAGE')).to eq(['CUSTOMER_ID'])
     end
 
-    it 'returns the lowest-key-sequence column for composite primary keys' do
+    it 'preserves every column of a Snowflake-declared composite primary key, ordered by key_sequence' do
       allow(pks_stmt).to receive(:fetch_all).and_return([
                                                           [Time.now, 'DB', 'PUBLIC', 'ORDERS', 'CUSTOMER_ID',
                                                            2, 'pk1', 'rely', ''],
@@ -163,19 +173,19 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
                                                         ])
 
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.primary_key_for('ORDERS')).to eq('ORDER_ID')
+      expect(ds.primary_keys_for('ORDERS')).to eq(%w[ORDER_ID CUSTOMER_ID])
     end
 
-    it 'returns nil when neither override nor Snowflake declaration is available' do
+    it 'returns an empty array when neither override nor Snowflake declaration is available' do
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.primary_key_for('UNRELATED_TABLE')).to be_nil
+      expect(ds.primary_keys_for('UNRELATED_TABLE')).to eq([])
     end
 
     it 'silently skips when SHOW PRIMARY KEYS errors (e.g. permissions)' do
       allow(pks_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
 
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.primary_key_for('BILLING_USAGE')).to be_nil
+      expect(ds.primary_keys_for('BILLING_USAGE')).to eq([])
     end
   end
 
