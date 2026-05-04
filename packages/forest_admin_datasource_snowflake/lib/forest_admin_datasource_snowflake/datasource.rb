@@ -25,14 +25,16 @@ module ForestAdminDatasourceSnowflake
 
     def initialize(conn_str:, tables: nil, schema: nil,
                    pool_size: DEFAULT_POOL_SIZE, pool_timeout: DEFAULT_POOL_TIMEOUT,
-                   statement_timeout: nil, introspect_relations: false)
+                   statement_timeout: nil, introspect_relations: false,
+                   primary_keys: nil)
       super()
-      @conn_str             = conn_str
-      @tables_filter        = tables&.map(&:to_s)&.map(&:upcase)
-      @schema_override      = schema
-      @statement_timeout    = statement_timeout
-      @introspect_relations = introspect_relations
-      @pool                 = ConnectionPool.new(size: pool_size, timeout: pool_timeout) do
+      @conn_str               = conn_str
+      @tables_filter          = tables&.map(&:to_s)&.map(&:upcase)
+      @schema_override        = schema
+      @statement_timeout      = statement_timeout
+      @introspect_relations   = introspect_relations
+      @primary_keys_override  = (primary_keys || {}).transform_keys { |k| k.to_s.upcase }
+      @pool                   = ConnectionPool.new(size: pool_size, timeout: pool_timeout) do
         open_connection(conn_str)
       end
 
@@ -58,6 +60,13 @@ module ForestAdminDatasourceSnowflake
       @pool.shutdown { |conn| safe_disconnect(conn) }
     end
 
+    def primary_key_for(table_name)
+      upper = table_name.to_s.upcase
+      return @primary_keys_override[upper] if @primary_keys_override.key?(upper)
+
+      snowflake_primary_keys[upper]
+    end
+
     def fetch_snowflake_native_types(table_name)
       with_connection do |conn|
         stmt = conn.prepare(
@@ -77,6 +86,27 @@ module ForestAdminDatasourceSnowflake
     end
 
     private
+
+    def snowflake_primary_keys
+      @snowflake_primary_keys ||= fetch_snowflake_primary_keys
+    end
+
+    def fetch_snowflake_primary_keys
+      with_connection do |conn|
+        stmt = conn.prepare('SHOW PRIMARY KEYS IN SCHEMA')
+        rows = begin
+          stmt.execute
+          stmt.fetch_all || []
+        ensure
+          stmt.drop
+        end
+
+        rows.group_by { |r| r[3].to_s.upcase }
+            .transform_values { |table_rows| table_rows.min_by { |r| r[5].to_i }[4].to_s }
+      end
+    rescue ::ODBC::Error
+      {}
+    end
 
     def open_connection(conn_str)
       attrs  = conn_str.split(';').reject(&:empty?).to_h { |option| option.split('=', 2) }

@@ -18,6 +18,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
   let(:prepared_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
   let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
   before do
     allow(ODBC::Driver).to receive(:new).and_return(driver_double)
@@ -33,6 +34,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
     allow(odbc_connection).to receive_messages(tables: tables_stmt, columns: columns_stmt)
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
     allow(columns_stmt).to receive(:fetch_all).and_return([
                                                             [nil, nil, 'BILLING_USAGE', 'ID',
                                                              ODBC::SQL_DECIMAL, nil, nil, nil, nil, nil, 0],
@@ -87,6 +89,34 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
 
       result = collection.list(:caller, Filter.new, Projection.new(['META']))
       expect(result.first['META']).to eq('not-json')
+    end
+
+    it 'honors a Snowflake-declared primary key over the "id" / first-column fallback' do
+      allow(pks_stmt).to receive(:fetch_all).and_return([
+                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
+                                                           1, 'pk1', 'rely', '']
+                                                        ])
+
+      expect(collection.schema[:fields]['CUSTOMER_ID'].is_primary_key).to be(true)
+      expect(collection.schema[:fields]['ID'].is_primary_key).to be(false)
+    end
+
+    it 'honors an operator-supplied primary_keys override above the Snowflake declaration' do
+      allow(pks_stmt).to receive(:fetch_all).and_return([
+                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
+                                                           1, 'pk1', 'rely', '']
+                                                        ])
+
+      ds = ForestAdminDatasourceSnowflake::Datasource.new(
+        conn_str: 'DRIVER={X}',
+        pool_size: 1,
+        primary_keys: { 'BILLING_USAGE' => 'EVENT_TYPE' }
+      )
+      coll = ds.get_collection('BILLING_USAGE')
+
+      expect(coll.schema[:fields]['EVENT_TYPE'].is_primary_key).to be(true)
+      expect(coll.schema[:fields]['CUSTOMER_ID'].is_primary_key).to be(false)
+      expect(coll.schema[:fields]['ID'].is_primary_key).to be(false)
     end
 
     it 'designates the first column as primary key when no "id" exists' do

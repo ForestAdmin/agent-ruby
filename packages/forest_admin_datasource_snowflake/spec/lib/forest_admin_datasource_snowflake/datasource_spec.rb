@@ -17,6 +17,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
   let(:columns_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
   let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
   before do
     allow(ODBC::Driver).to receive(:new).and_return(driver_double)
@@ -27,6 +28,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
 
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
 
     allow(tables_stmt).to receive(:fetch_all).and_return([
                                                            ['BILLING_POC', 'PUBLIC', 'BILLING_USAGE',
@@ -118,6 +120,52 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     it 'does not run STATEMENT_TIMEOUT_IN_SECONDS when statement_timeout is nil' do
       expect(odbc_connection).not_to receive(:prepare).with(/STATEMENT_TIMEOUT/)
       described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+    end
+  end
+
+  describe '#primary_key_for' do
+    it 'returns the operator-supplied override (case-insensitive table lookup) above all else' do
+      ds = described_class.new(
+        conn_str: 'DRIVER={X}',
+        pool_size: 1,
+        primary_keys: { 'billing_usage' => 'TENANT_ID' }
+      )
+
+      expect(ds.primary_key_for('BILLING_USAGE')).to eq('TENANT_ID')
+    end
+
+    it 'falls back to Snowflake-defined primary key when no override is supplied' do
+      allow(pks_stmt).to receive(:fetch_all).and_return([
+                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
+                                                           1, 'pk1', 'rely', '']
+                                                        ])
+
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.primary_key_for('BILLING_USAGE')).to eq('CUSTOMER_ID')
+    end
+
+    it 'returns the lowest-key-sequence column for composite primary keys' do
+      allow(pks_stmt).to receive(:fetch_all).and_return([
+                                                          [Time.now, 'DB', 'PUBLIC', 'ORDERS', 'CUSTOMER_ID',
+                                                           2, 'pk1', 'rely', ''],
+                                                          [Time.now, 'DB', 'PUBLIC', 'ORDERS', 'ORDER_ID',
+                                                           1, 'pk1', 'rely', '']
+                                                        ])
+
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.primary_key_for('ORDERS')).to eq('ORDER_ID')
+    end
+
+    it 'returns nil when neither override nor Snowflake declaration is available' do
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.primary_key_for('UNRELATED_TABLE')).to be_nil
+    end
+
+    it 'silently skips when SHOW PRIMARY KEYS errors (e.g. permissions)' do
+      allow(pks_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
+
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.primary_key_for('BILLING_USAGE')).to be_nil
     end
   end
 

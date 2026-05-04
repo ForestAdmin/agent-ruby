@@ -56,7 +56,7 @@ module ForestAdminDatasourceSnowflake
       end
 
       native_types = @datasource.fetch_snowflake_native_types(@table_name)
-      pk_name = (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
+      pk_name = resolve_primary_key(rows)
 
       rows.each do |row|
         column_name = row[3]
@@ -80,6 +80,17 @@ module ForestAdminDatasourceSnowflake
         @primary_keys << column_name if field.is_primary_key
         add_field(column_name, field)
       end
+    end
+
+    def resolve_primary_key(rows)
+      column_names = rows.map { |r| r[3] }
+      declared_pk = @datasource.primary_key_for(@table_name)
+      if declared_pk
+        match = column_names.find { |name| name.to_s.casecmp(declared_pk.to_s).zero? }
+        return match if match
+      end
+
+      (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
     end
 
     def execute_to_hashes(sql, binds, projected_columns)
