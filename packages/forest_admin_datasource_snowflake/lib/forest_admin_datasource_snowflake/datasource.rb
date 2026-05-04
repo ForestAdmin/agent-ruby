@@ -27,7 +27,6 @@ module ForestAdminDatasourceSnowflake
                    pool_size: DEFAULT_POOL_SIZE, pool_timeout: DEFAULT_POOL_TIMEOUT,
                    statement_timeout: nil, primary_keys: nil)
       super()
-      @conn_str               = conn_str
       @schema_override        = extract_schema_from_conn_str(conn_str)
       @statement_timeout      = statement_timeout
       @primary_keys_override  = (primary_keys || {}).transform_keys { |k| k.to_s.upcase }

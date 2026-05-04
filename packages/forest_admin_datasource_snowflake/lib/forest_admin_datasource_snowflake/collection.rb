@@ -12,7 +12,6 @@ module ForestAdminDatasourceSnowflake
     def initialize(datasource, table_name)
       super
       @table_name = table_name
-      @primary_keys = []
       @json_columns = []
       fetch_fields
       enable_count
@@ -77,7 +76,6 @@ module ForestAdminDatasourceSnowflake
           enum_values: [],
           validation: nullable ? [] : [{ operator: 'Present' }]
         )
-        @primary_keys << column_name if field.is_primary_key
         add_field(column_name, field)
       end
     end
