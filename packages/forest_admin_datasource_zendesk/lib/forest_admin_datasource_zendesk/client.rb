@@ -40,6 +40,27 @@ module ForestAdminDatasourceZendesk
       end
     end
 
+    # ---------- Writes (critical) ----------
+    #
+    # All writes go through `api.connection` rather than the gem's resource
+    # objects (`api.tickets.create!`, etc.) for two reasons:
+    # 1. The collections already build flattened payloads; a hash POST is the
+    #    most direct path and matches how reads work today.
+    # 2. The gem's `save!` mutates a stateful resource and returns true/false;
+    #    we want the parsed response body so create can return the full record.
+
+    def create_ticket(attributes) = post_resource('tickets', 'ticket', attributes)
+    def update_ticket(id, attrs)  = put_resource('tickets', 'ticket', id, attrs)
+    def delete_ticket(id)         = delete_resource('tickets', id)
+
+    def create_user(attributes) = post_resource('users', 'user', attributes)
+    def update_user(id, attrs)  = put_resource('users', 'user', id, attrs)
+    def delete_user(id)         = delete_resource('users', id)
+
+    def create_organization(attrs)     = post_resource('organizations', 'organization', attrs)
+    def update_organization(id, attrs) = put_resource('organizations', 'organization', id, attrs)
+    def delete_organization(id)        = delete_resource('organizations', id)
+
     # ---------- Direct fetches (404 -> nil; other errors propagate) ----------
 
     def find_ticket(id)
@@ -105,6 +126,27 @@ module ForestAdminDatasourceZendesk
     end
 
     private
+
+    def post_resource(path, key, attributes)
+      must_succeed("create(#{path})") do
+        body = api.connection.post(path) { |req| req.body = { key => attributes } }.body
+        body[key] || body
+      end
+    end
+
+    def put_resource(path, key, id, attributes)
+      must_succeed("update(#{path}/#{id})") do
+        body = api.connection.put("#{path}/#{id}") { |req| req.body = { key => attributes } }.body
+        body[key] || body
+      end
+    end
+
+    def delete_resource(path, id)
+      must_succeed("delete(#{path}/#{id})") do
+        api.connection.delete("#{path}/#{id}")
+        true
+      end
+    end
 
     def bulk_show_many(resource, ids)
       ids = Array(ids).compact.uniq

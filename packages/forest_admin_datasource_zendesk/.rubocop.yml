@@ -9,10 +9,11 @@ inherit_from: ../../.rubocop.yml
 # coverage of the production code.
 
 # Schemas in this package are wide-fact-tables (one ColumnSchema per real
-# Zendesk field) and are intrinsically long. Bumping the limits is cheaper
-# than splitting them into noise.
+# Zendesk field) and are intrinsically long; the same collection class also
+# carries its read, write, and serialization pipelines. Bumping the limits
+# is cheaper than splitting them into noise.
 Metrics/ClassLength:
-  Max: 200
+  Max: 230
 
 Metrics/MethodLength:
   Max: 25

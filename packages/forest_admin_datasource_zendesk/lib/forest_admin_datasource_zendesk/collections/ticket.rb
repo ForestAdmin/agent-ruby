@@ -33,6 +33,22 @@ module ForestAdminDatasourceZendesk
         rows
       end
 
+      def create(_caller, data)
+        payload = build_payload(data, on_create: true)
+        created = datasource.client.create_ticket(payload)
+        serialize(created)
+      end
+
+      def update(caller, filter, patch)
+        ids = ids_for(caller, filter)
+        payload = build_payload(patch, on_create: false)
+        ids.each { |id| datasource.client.update_ticket(id, payload) }
+      end
+
+      def delete(caller, filter)
+        ids_for(caller, filter).each { |id| datasource.client.delete_ticket(id) }
+      end
+
       protected
 
       def aggregate_count(caller, filter)
@@ -40,6 +56,44 @@ module ForestAdminDatasourceZendesk
       end
 
       private
+
+      # Translates a Forest flat hash into a Zendesk ticket payload.
+      # - `ticket_type` is renamed to `type` (Zendesk's column name)
+      # - `description` is only meaningful at creation time (it becomes the
+      #   first comment); on update it is silently dropped because Zendesk
+      #   exposes no write path for it
+      # - custom-field columns (`custom_<id>`) are folded into the
+      #   `custom_fields` array Zendesk expects
+      def build_payload(data, on_create:)
+        attrs = data.transform_keys(&:to_s)
+        custom_fields, base = split_custom_fields(attrs)
+
+        base.delete('id')
+        base.delete('requester_email')
+        base.delete('url')
+        base.delete('created_at')
+        base.delete('updated_at')
+        base['type'] = base.delete('ticket_type') if base.key?('ticket_type')
+
+        description = base.delete('description')
+        base['comment'] = { 'body' => description } if on_create && description && !description.empty?
+
+        base['custom_fields'] = custom_fields unless custom_fields.empty?
+        base
+      end
+
+      def split_custom_fields(attrs)
+        cf_by_column = @custom_fields.to_h { |cf| [cf[:column_name], cf[:zendesk_id]] }
+        custom = []
+        rest = attrs.each_with_object({}) do |(k, v), h|
+          if (zendesk_id = cf_by_column[k])
+            custom << { 'id' => zendesk_id, 'value' => v }
+          else
+            h[k] = v
+          end
+        end
+        [custom, rest]
+      end
 
       def fetch_records(filter, timezone)
         ids = extract_id_lookup(filter.condition_tree)
@@ -136,29 +190,29 @@ module ForestAdminDatasourceZendesk
         add_field('id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
                                          is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('subject', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                              is_read_only: true, is_sortable: false))
+                                              is_read_only: false, is_sortable: false))
         add_field('description', ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
+                                                  is_read_only: false, is_sortable: false))
         add_field('status', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                             enum_values: ENUM_STATUS, is_read_only: true, is_sortable: true))
+                                             enum_values: ENUM_STATUS, is_read_only: false, is_sortable: true))
         add_field('priority', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                               enum_values: ENUM_PRIORITY, is_read_only: true, is_sortable: true))
+                                               enum_values: ENUM_PRIORITY, is_read_only: false, is_sortable: true))
         add_field('ticket_type', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                  enum_values: ENUM_TYPE, is_read_only: true, is_sortable: true))
+                                                  enum_values: ENUM_TYPE, is_read_only: false, is_sortable: true))
         add_field('requester_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                   is_read_only: true, is_sortable: true))
+                                                   is_read_only: false, is_sortable: true))
         add_field('assignee_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                  is_read_only: true, is_sortable: true))
+                                                  is_read_only: false, is_sortable: true))
         add_field('group_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                               is_read_only: true, is_sortable: true))
+                                               is_read_only: false, is_sortable: true))
         add_field('organization_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                      is_read_only: true, is_sortable: true))
+                                                      is_read_only: false, is_sortable: true))
         add_field('external_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                  is_read_only: true, is_sortable: false))
+                                                  is_read_only: false, is_sortable: false))
         add_field('requester_email', ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL],
                                                       is_read_only: true, is_sortable: false))
         add_field('tags', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                           is_read_only: true, is_sortable: false))
+                                           is_read_only: false, is_sortable: false))
         add_field('url', ColumnSchema.new(column_type: 'String', filter_operators: [],
                                           is_read_only: true, is_sortable: false))
         add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,

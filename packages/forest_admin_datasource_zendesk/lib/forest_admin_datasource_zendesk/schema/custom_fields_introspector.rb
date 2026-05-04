@@ -90,7 +90,7 @@ module ForestAdminDatasourceZendesk
         opts = {
           column_type: column_type,
           filter_operators: filter_operators_for(column_type),
-          is_read_only: true,
+          is_read_only: false,
           is_sortable: false
         }
 

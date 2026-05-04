@@ -375,4 +375,135 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       expect(result['custom_360001']).to eq('gold')
     end
   end
+
+  describe '#create' do
+    it 'POSTs the payload, renames ticket_type -> type, and lifts description into the initial comment' do
+      expect(client).to receive(:create_ticket) do |payload|
+        expect(payload).to include('subject' => 'Hi', 'type' => 'incident',
+                                   'comment' => { 'body' => 'longer body' })
+        expect(payload).not_to have_key('ticket_type')
+        expect(payload).not_to have_key('description')
+        { 'id' => 42, 'subject' => 'Hi', 'type' => 'incident' }
+      end
+
+      result = collection.create(nil,
+                                 'subject' => 'Hi',
+                                 'ticket_type' => 'incident',
+                                 'description' => 'longer body')
+      expect(result['id']).to eq(42)
+    end
+
+    it 'omits the comment when description is blank' do
+      expect(client).to receive(:create_ticket) do |payload|
+        expect(payload).not_to have_key('comment')
+        { 'id' => 1 }
+      end
+      collection.create(nil, 'subject' => 'Hi')
+    end
+
+    it 'strips read-only and PK fields from the payload' do
+      expect(client).to receive(:create_ticket) do |payload|
+        expect(payload.keys).not_to include('id', 'requester_email', 'url',
+                                            'created_at', 'updated_at')
+        { 'id' => 1 }
+      end
+      collection.create(nil, 'id' => 99, 'requester_email' => 'a@b.com',
+                             'url' => 'x', 'created_at' => 't', 'updated_at' => 't',
+                             'subject' => 'S')
+    end
+
+    context 'with custom fields' do
+      let(:cf_schema) do
+        ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
+          column_type: 'String', filter_operators: [], is_read_only: false
+        )
+      end
+      let(:custom_fields) do
+        [{ column_name: 'custom_360001', zendesk_id: 360_001, zendesk_key: nil, schema: cf_schema }]
+      end
+      let(:collection) { described_class.new(datasource, custom_fields: custom_fields) }
+
+      it 'folds custom_<id> columns into the custom_fields array' do
+        expect(client).to receive(:create_ticket) do |payload|
+          expect(payload['custom_fields']).to eq([{ 'id' => 360_001, 'value' => 'gold' }])
+          expect(payload).not_to have_key('custom_360001')
+          { 'id' => 1 }
+        end
+        collection.create(nil, 'subject' => 'X', 'custom_360001' => 'gold')
+      end
+    end
+  end
+
+  describe '#update' do
+    it 'updates every id resolved from the filter (PK lookup short-circuit)' do
+      allow(client).to receive(:fetch_user_emails).and_return({})
+      ticket = zendesk_record('id' => 12, 'subject' => 'A', 'requester_id' => nil)
+      allow(client).to receive(:find_ticket).with(12).and_return(ticket)
+
+      expect(client).to receive(:update_ticket).with(12, hash_including('status' => 'solved'))
+
+      filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 12))
+      collection.update(nil, filter, 'status' => 'solved')
+    end
+
+    it 'updates each id when the filter resolves to several' do
+      allow(client).to receive(:fetch_user_emails).and_return({})
+      [1, 2].each do |id|
+        allow(client).to receive(:find_ticket).with(id).and_return(zendesk_record('id' => id, 'requester_id' => nil))
+      end
+
+      expect(client).to receive(:update_ticket).with(1, hash_including('priority' => 'high'))
+      expect(client).to receive(:update_ticket).with(2, hash_including('priority' => 'high'))
+
+      filter = Filter.new(condition_tree: Leaf.new('id', 'in', [1, 2]))
+      collection.update(nil, filter, 'priority' => 'high')
+    end
+
+    it 'silently drops description on update (no comment write path)' do
+      allow(client).to receive(:fetch_user_emails).and_return({})
+      allow(client).to receive(:find_ticket).with(7).and_return(zendesk_record('id' => 7, 'requester_id' => nil))
+
+      expect(client).to receive(:update_ticket) do |id, payload|
+        expect(id).to eq(7)
+        expect(payload).not_to have_key('comment')
+        expect(payload).not_to have_key('description')
+      end
+
+      filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 7))
+      collection.update(nil, filter, 'description' => 'should be ignored')
+    end
+  end
+
+  describe '#delete' do
+    it 'deletes each id resolved from the filter' do
+      allow(client).to receive(:fetch_user_emails).and_return({})
+      [1, 2].each do |id|
+        allow(client).to receive(:find_ticket).with(id).and_return(zendesk_record('id' => id, 'requester_id' => nil))
+      end
+
+      expect(client).to receive(:delete_ticket).with(1)
+      expect(client).to receive(:delete_ticket).with(2)
+
+      filter = Filter.new(condition_tree: Leaf.new('id', 'in', [1, 2]))
+      collection.delete(nil, filter)
+    end
+  end
+
+  describe 'schema writability' do
+    it 'marks user-editable fields as writable' do
+      fields = collection.schema[:fields]
+      expect(fields['subject'].is_read_only).to be(false)
+      expect(fields['status'].is_read_only).to be(false)
+      expect(fields['priority'].is_read_only).to be(false)
+      expect(fields['requester_id'].is_read_only).to be(false)
+    end
+
+    it 'keeps server-managed fields read-only' do
+      fields = collection.schema[:fields]
+      expect(fields['id'].is_read_only).to be(true)
+      expect(fields['url'].is_read_only).to be(true)
+      expect(fields['created_at'].is_read_only).to be(true)
+      expect(fields['requester_email'].is_read_only).to be(true)
+    end
+  end
 end

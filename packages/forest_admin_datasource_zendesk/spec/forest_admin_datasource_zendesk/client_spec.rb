@@ -237,6 +237,103 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
     end
   end
 
+  describe 'writes' do
+    def json(body)
+      { status: 200, body: body.to_json, headers: { 'Content-Type' => 'application/json' } }
+    end
+
+    describe '#create_ticket' do
+      it 'POSTs to /tickets and returns the parsed ticket hash' do
+        stub_request(:post, "#{base}/tickets")
+          .with(body: hash_including('ticket' => hash_including('subject' => 'Hello')))
+          .to_return(json('ticket' => { 'id' => 99, 'subject' => 'Hello' }))
+
+        expect(client.create_ticket('subject' => 'Hello'))
+          .to eq('id' => 99, 'subject' => 'Hello')
+      end
+
+      it 'wraps API errors in APIError' do
+        stub_request(:post, "#{base}/tickets").to_return(status: 422, body: 'boom')
+        expect { client.create_ticket('subject' => '') }
+          .to raise_error(ForestAdminDatasourceZendesk::APIError, /create\(tickets\)/)
+      end
+    end
+
+    describe '#update_ticket' do
+      it 'PUTs to /tickets/{id} and returns the parsed ticket hash' do
+        stub_request(:put, "#{base}/tickets/12")
+          .with(body: hash_including('ticket' => hash_including('status' => 'solved')))
+          .to_return(json('ticket' => { 'id' => 12, 'status' => 'solved' }))
+
+        expect(client.update_ticket(12, 'status' => 'solved'))
+          .to eq('id' => 12, 'status' => 'solved')
+      end
+    end
+
+    describe '#delete_ticket' do
+      it 'DELETEs /tickets/{id} and returns true' do
+        stub = stub_request(:delete, "#{base}/tickets/3").to_return(status: 204, body: '')
+        expect(client.delete_ticket(3)).to be(true)
+        expect(stub).to have_been_requested
+      end
+
+      it 'wraps API errors in APIError' do
+        stub_request(:delete, "#{base}/tickets/3").to_return(status: 500, body: 'boom')
+        expect { client.delete_ticket(3) }
+          .to raise_error(ForestAdminDatasourceZendesk::APIError, %r{delete\(tickets/3\)})
+      end
+    end
+
+    describe '#create_user / #update_user / #delete_user' do
+      it 'POSTs to /users with the user wrapper' do
+        stub_request(:post, "#{base}/users")
+          .with(body: hash_including('user' => hash_including('email' => 'a@b.com')))
+          .to_return(json('user' => { 'id' => 7, 'email' => 'a@b.com' }))
+
+        expect(client.create_user('email' => 'a@b.com')).to eq('id' => 7, 'email' => 'a@b.com')
+      end
+
+      it 'PUTs to /users/{id}' do
+        stub_request(:put, "#{base}/users/7")
+          .with(body: hash_including('user' => hash_including('name' => 'New')))
+          .to_return(json('user' => { 'id' => 7, 'name' => 'New' }))
+
+        expect(client.update_user(7, 'name' => 'New')['name']).to eq('New')
+      end
+
+      it 'DELETEs /users/{id}' do
+        stub = stub_request(:delete, "#{base}/users/7").to_return(status: 204, body: '')
+        client.delete_user(7)
+        expect(stub).to have_been_requested
+      end
+    end
+
+    describe '#create_organization / #update_organization / #delete_organization' do
+      it 'POSTs to /organizations with the organization wrapper' do
+        stub_request(:post, "#{base}/organizations")
+          .with(body: hash_including('organization' => hash_including('name' => 'Acme')))
+          .to_return(json('organization' => { 'id' => 5, 'name' => 'Acme' }))
+
+        expect(client.create_organization('name' => 'Acme'))
+          .to eq('id' => 5, 'name' => 'Acme')
+      end
+
+      it 'PUTs to /organizations/{id}' do
+        stub_request(:put, "#{base}/organizations/5")
+          .with(body: hash_including('organization' => hash_including('details' => 'top')))
+          .to_return(json('organization' => { 'id' => 5, 'details' => 'top' }))
+
+        expect(client.update_organization(5, 'details' => 'top')['details']).to eq('top')
+      end
+
+      it 'DELETEs /organizations/{id}' do
+        stub = stub_request(:delete, "#{base}/organizations/5").to_return(status: 204, body: '')
+        client.delete_organization(5)
+        expect(stub).to have_been_requested
+      end
+    end
+  end
+
   describe 'schema introspection endpoints' do
     it 'fetches ticket_fields' do
       stub_request(:get, "#{base}/ticket_fields")

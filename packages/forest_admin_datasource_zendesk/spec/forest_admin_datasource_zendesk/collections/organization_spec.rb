@@ -75,5 +75,70 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Organization do
       result = collection.list(nil, Filter.new, nil).first
       expect(result['plan']).to eq('enterprise')
     end
+
+    it 'folds custom-field columns into organization_fields on create' do
+      expect(client).to receive(:create_organization) do |payload|
+        expect(payload).to include('name' => 'Acme',
+                                   'organization_fields' => { 'plan' => 'enterprise' })
+        expect(payload).not_to have_key('plan')
+        { 'id' => 1 }
+      end
+      collection.create(nil, 'name' => 'Acme', 'plan' => 'enterprise')
+    end
+  end
+
+  describe '#create' do
+    it 'POSTs the payload, stripping read-only fields' do
+      expect(client).to receive(:create_organization) do |payload|
+        expect(payload).to include('name' => 'Acme', 'details' => 'top')
+        expect(payload.keys).not_to include('id', 'created_at', 'updated_at')
+        { 'id' => 5, 'name' => 'Acme', 'details' => 'top' }
+      end
+
+      result = collection.create(nil,
+                                 'id' => 999, 'name' => 'Acme', 'details' => 'top',
+                                 'created_at' => 't', 'updated_at' => 't')
+      expect(result['id']).to eq(5)
+    end
+  end
+
+  describe '#update' do
+    it 'PUTs each id resolved by the filter' do
+      [10, 11].each do |id|
+        allow(client).to receive(:find_organization).with(id).and_return(zendesk_org('id' => id))
+      end
+
+      expect(client).to receive(:update_organization).with(10, hash_including('details' => 'top'))
+      expect(client).to receive(:update_organization).with(11, hash_including('details' => 'top'))
+
+      collection.update(nil,
+                        Filter.new(condition_tree: Leaf.new('id', 'in', [10, 11])),
+                        'details' => 'top')
+    end
+  end
+
+  describe '#delete' do
+    it 'DELETEs each id resolved by the filter' do
+      allow(client).to receive(:find_organization).with(5).and_return(zendesk_org('id' => 5))
+      expect(client).to receive(:delete_organization).with(5)
+
+      collection.delete(nil, Filter.new(condition_tree: Leaf.new('id', 'equal', 5)))
+    end
+  end
+
+  describe 'schema writability' do
+    it 'marks user-editable fields as writable' do
+      f = collection.schema[:fields]
+      %w[name domain_names details notes group_id shared_tickets].each do |k|
+        expect(f[k].is_read_only).to be(false), "#{k} should be writable"
+      end
+    end
+
+    it 'keeps id and timestamps read-only' do
+      f = collection.schema[:fields]
+      %w[id created_at updated_at].each do |k|
+        expect(f[k].is_read_only).to be(true), "#{k} should be read-only"
+      end
+    end
   end
 end

@@ -79,6 +79,15 @@ module ForestAdminDatasourceZendesk
         record.respond_to?(:attributes) ? record.attributes : record.to_h
       end
 
+      # Resolves the records targeted by a write filter into their primary keys.
+      # Mirrors the Mongoid datasource pattern: route through `list(... , ['id'])`
+      # so any filter shape the read pipeline already understands works for
+      # update/delete too (id-equality, id IN [...], or any condition the
+      # Search API can express).
+      def ids_for(caller, filter)
+        list(caller, filter, ['id']).filter_map { |row| row['id'] }
+      end
+
       def timezone_for(caller)
         return 'UTC' unless caller.respond_to?(:timezone)
 

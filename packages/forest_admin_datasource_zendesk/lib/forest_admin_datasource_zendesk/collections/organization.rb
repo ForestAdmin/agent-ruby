@@ -20,6 +20,22 @@ module ForestAdminDatasourceZendesk
         enable_count
       end
 
+      def create(_caller, data)
+        payload = build_payload(data)
+        created = datasource.client.create_organization(payload)
+        serialize(created)
+      end
+
+      def update(caller, filter, patch)
+        ids = ids_for(caller, filter)
+        payload = build_payload(patch)
+        ids.each { |id| datasource.client.update_organization(id, payload) }
+      end
+
+      def delete(caller, filter)
+        ids_for(caller, filter).each { |id| datasource.client.delete_organization(id) }
+      end
+
       protected
 
       def zendesk_resource = 'organization'
@@ -28,21 +44,39 @@ module ForestAdminDatasourceZendesk
 
       private
 
+      # Translates a Forest flat hash into a Zendesk organization payload,
+      # folding custom-field columns into `organization_fields`.
+      def build_payload(data)
+        attrs = data.transform_keys(&:to_s)
+        cf_keys = @custom_fields.to_h { |cf| [cf[:column_name], cf[:zendesk_key]] }
+        org_fields = {}
+        base = attrs.each_with_object({}) do |(k, v), h|
+          if (key = cf_keys[k])
+            org_fields[key] = v
+          else
+            h[k] = v
+          end
+        end
+        %w[id created_at updated_at].each { |k| base.delete(k) }
+        base['organization_fields'] = org_fields unless org_fields.empty?
+        base
+      end
+
       def define_schema
         add_field('id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
                                          is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: true, is_sortable: true))
+                                           is_read_only: false, is_sortable: true))
         add_field('domain_names', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                   is_read_only: true, is_sortable: false))
+                                                   is_read_only: false, is_sortable: false))
         add_field('details', ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                              is_read_only: true, is_sortable: false))
+                                              is_read_only: false, is_sortable: false))
         add_field('notes', ColumnSchema.new(column_type: 'String', filter_operators: [],
-                                            is_read_only: true, is_sortable: false))
+                                            is_read_only: false, is_sortable: false))
         add_field('group_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                               is_read_only: true, is_sortable: false))
+                                               is_read_only: false, is_sortable: false))
         add_field('shared_tickets', ColumnSchema.new(column_type: 'Boolean', filter_operators: [],
-                                                     is_read_only: true, is_sortable: false))
+                                                     is_read_only: false, is_sortable: false))
         add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                  is_read_only: true, is_sortable: true))
         add_field('updated_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
