@@ -121,6 +121,32 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
       expect(coll.schema[:fields]['ID'].is_primary_key).to be(false)
     end
 
+    it 'flags every column of a composite primary key declared in Snowflake' do
+      allow(pks_stmt).to receive(:fetch_all).and_return([
+                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'ID',
+                                                           1, 'pk1', 'rely', ''],
+                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
+                                                           2, 'pk1', 'rely', '']
+                                                        ])
+
+      expect(collection.schema[:fields]['ID'].is_primary_key).to be(true)
+      expect(collection.schema[:fields]['CUSTOMER_ID'].is_primary_key).to be(true)
+      expect(collection.schema[:fields]['EVENT_TYPE'].is_primary_key).to be(false)
+    end
+
+    it 'flags every column of a composite primary_keys override' do
+      ds = ForestAdminDatasourceSnowflake::Datasource.new(
+        conn_str: 'DRIVER={X}',
+        pool_size: 1,
+        primary_keys: { 'BILLING_USAGE' => %w[ID CUSTOMER_ID] }
+      )
+      coll = ds.get_collection('BILLING_USAGE')
+
+      expect(coll.schema[:fields]['ID'].is_primary_key).to be(true)
+      expect(coll.schema[:fields]['CUSTOMER_ID'].is_primary_key).to be(true)
+      expect(coll.schema[:fields]['EVENT_TYPE'].is_primary_key).to be(false)
+    end
+
     it 'designates the first column as primary key when no "id" exists' do
       allow(columns_stmt).to receive(:fetch_all).and_return([
                                                               [nil, nil, 'T', 'PK', ODBC::SQL_VARCHAR, nil, nil, nil,

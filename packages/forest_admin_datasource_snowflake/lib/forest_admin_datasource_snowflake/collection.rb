@@ -55,7 +55,7 @@ module ForestAdminDatasourceSnowflake
       end
 
       native_types = @datasource.fetch_snowflake_native_types(@table_name)
-      pk_name = resolve_primary_key(rows)
+      pk_names = resolve_primary_keys(rows)
 
       rows.each do |row|
         column_name = row[3]
@@ -69,7 +69,7 @@ module ForestAdminDatasourceSnowflake
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
           column_type: forest_type,
           filter_operators: Parser::Column.operators_for_column_type(forest_type),
-          is_primary_key: column_name == pk_name,
+          is_primary_key: pk_names.include?(column_name),
           is_read_only: true,
           is_sortable: true,
           default_value: nil,
@@ -80,15 +80,16 @@ module ForestAdminDatasourceSnowflake
       end
     end
 
-    def resolve_primary_key(rows)
+    def resolve_primary_keys(rows)
       column_names = rows.map { |r| r[3] }
-      declared_pk = @datasource.primary_key_for(@table_name)
-      if declared_pk
-        match = column_names.find { |name| name.to_s.casecmp(declared_pk.to_s).zero? }
-        return match if match
+      declared_pks = @datasource.primary_keys_for(@table_name)
+      matches = declared_pks.filter_map do |pk|
+        column_names.find { |name| name.to_s.casecmp(pk.to_s).zero? }
       end
+      return matches if matches.any?
 
-      (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
+      fallback = (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
+      fallback ? [fallback] : []
     end
 
     def execute_to_hashes(sql, binds, projected_columns)

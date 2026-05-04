@@ -56,11 +56,11 @@ module ForestAdminDatasourceSnowflake
       @pool.shutdown { |conn| safe_disconnect(conn) }
     end
 
-    def primary_key_for(table_name)
+    def primary_keys_for(table_name)
       upper = table_name.to_s.upcase
-      return @primary_keys_override[upper] if @primary_keys_override.key?(upper)
+      return Array(@primary_keys_override[upper]) if @primary_keys_override.key?(upper)
 
-      snowflake_primary_keys[upper]
+      snowflake_primary_keys[upper] || []
     end
 
     def fetch_snowflake_native_types(table_name)
@@ -98,7 +98,7 @@ module ForestAdminDatasourceSnowflake
         end
 
         rows.group_by { |r| r[3].to_s.upcase }
-            .transform_values { |table_rows| table_rows.min_by { |r| r[5].to_i }[4].to_s }
+            .transform_values { |table_rows| table_rows.sort_by { |r| r[5].to_i }.map { |r| r[4].to_s } }
       end
     rescue ::ODBC::Error
       {}
