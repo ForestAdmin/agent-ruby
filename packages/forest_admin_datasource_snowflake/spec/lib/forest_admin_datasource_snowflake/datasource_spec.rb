@@ -18,6 +18,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
   let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
   before do
     allow(ODBC::Driver).to receive(:new).and_return(driver_double)
@@ -30,6 +31,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     allow(odbc_connection).to receive(:prepare).with(/^USE SCHEMA/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
 
     allow(tables_stmt).to receive(:fetch_all).and_return([
                                                            ['BILLING_POC', 'PUBLIC', 'BILLING_USAGE',
@@ -60,23 +62,13 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       expect(datasource.collections.keys).to contain_exactly('BILLING_USAGE', 'INTERNAL_LOG')
     end
 
-    it 'honors the optional :tables whitelist (case-insensitive)' do
-      ds = described_class.new(
-        conn_str: 'DRIVER={Snowflake};X=1',
-        tables: ['billing_usage'],
-        pool_size: 1
-      )
-      expect(ds.collections.keys).to eq(['BILLING_USAGE'])
-    end
-
-    it 'honors the optional :schema filter' do
+    it 'honors the Schema= attribute from the connection string as a table-list filter' do
       allow(tables_stmt).to receive(:fetch_all).and_return([
                                                              ['BILLING_POC', 'PUBLIC', 'A', 'TABLE', nil],
                                                              ['BILLING_POC', 'PRIVATE', 'B', 'TABLE', nil]
                                                            ])
       ds = described_class.new(
-        conn_str: 'DRIVER={Snowflake};X=1',
-        schema: 'PRIVATE',
+        conn_str: 'DRIVER={Snowflake};Schema=PRIVATE',
         pool_size: 1
       )
       expect(ds.collections.keys).to eq(['B'])
@@ -123,15 +115,21 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
     end
 
-    it 'aligns the session schema with the Ruby schema option (USE SCHEMA) so introspection targets the right schema' do
+    it 'aligns the session schema with the Schema= attribute (USE SCHEMA) so introspection targets the right schema' do
       expect(odbc_connection).to receive(:prepare).with('USE SCHEMA "ANALYTICS"').and_return(alter_stmt)
 
-      described_class.new(conn_str: 'DRIVER={X}', pool_size: 1, schema: 'ANALYTICS')
+      described_class.new(conn_str: 'DRIVER={X};Schema=ANALYTICS', pool_size: 1)
     end
 
-    it 'does not run USE SCHEMA when no Ruby schema option is provided' do
+    it 'does not run USE SCHEMA when no Schema= attribute is present in the connection string' do
       expect(odbc_connection).not_to receive(:prepare).with(/^USE SCHEMA/)
       described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+    end
+
+    it 'recognises the Schema= attribute case-insensitively in the connection string' do
+      expect(odbc_connection).to receive(:prepare).with('USE SCHEMA "ANALYTICS"').and_return(alter_stmt)
+
+      described_class.new(conn_str: 'DRIVER={X};SCHEMA=ANALYTICS', pool_size: 1)
     end
   end
 
@@ -273,28 +271,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     end
   end
 
-  describe 'introspect_relations' do
-    let(:relation_stmt) { instance_double('ODBC::Statement', drop: nil) }
-
+  describe 'foreign-key auto-discovery' do
     let(:imported_keys_row) do
       [Time.now, 'DB', 'PUBLIC', 'INTERNAL_LOG', 'ID',
        'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
        1, 'NO ACTION', 'NO ACTION', 'fk1', 'pk1', 'NOT_DEFERRABLE', 'false', '']
     end
 
-    before do
-      allow(odbc_connection).to receive(:prepare)
-        .with('SHOW IMPORTED KEYS IN SCHEMA').and_return(relation_stmt)
-      allow(relation_stmt).to receive(:execute)
-      allow(relation_stmt).to receive(:fetch_all).and_return([imported_keys_row])
-    end
+    it 'runs unconditionally and adds a ManyToOne field on the source collection per discovered FK' do
+      allow(imported_keys_stmt).to receive(:fetch_all).and_return([imported_keys_row])
 
-    it 'adds a ManyToOne field on the source collection per discovered FK' do
-      ds = described_class.new(
-        conn_str: 'DRIVER={X}',
-        pool_size: 1,
-        introspect_relations: true
-      )
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
 
       source = ds.get_collection('BILLING_USAGE')
       relation = source.schema[:fields]['customer_id_internal_log']
@@ -305,20 +292,11 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     end
 
     it 'silently skips when the FK introspection query errors (e.g. permissions)' do
-      allow(relation_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
+      allow(imported_keys_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
 
       expect do
-        described_class.new(
-          conn_str: 'DRIVER={X}',
-          pool_size: 1,
-          introspect_relations: true
-        )
+        described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
       end.not_to raise_error
-    end
-
-    it 'is off by default - no FK query runs unless introspect_relations: true' do
-      expect(odbc_connection).not_to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA')
-      described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
     end
   end
 end

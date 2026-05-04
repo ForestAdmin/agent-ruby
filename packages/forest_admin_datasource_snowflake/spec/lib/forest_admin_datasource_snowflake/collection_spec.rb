@@ -19,6 +19,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
   let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
   before do
     allow(ODBC::Driver).to receive(:new).and_return(driver_double)
@@ -35,6 +36,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
     allow(columns_stmt).to receive(:fetch_all).and_return([
                                                             [nil, nil, 'BILLING_USAGE', 'ID',
                                                              ODBC::SQL_DECIMAL, nil, nil, nil, nil, nil, 0],
