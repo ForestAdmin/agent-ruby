@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.0...v1.28.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* **zendesk:** align version.rb with semantic-release sed pattern ([#296](https://github.com/ForestAdmin/agent-ruby/issues/296)) ([2e45efb](https://github.com/ForestAdmin/agent-ruby/commit/2e45efb5c39d28ad78fcd37d8351567d044de247))
+
 # [1.28.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.2...v1.28.0) (2026-05-05)
 
 
