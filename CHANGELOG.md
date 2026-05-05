@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.2...v1.28.0) (2026-05-05)
+
+
+### Features
+
+* **zendesk:** add Zendesk datasource package ([#288](https://github.com/ForestAdmin/agent-ruby/issues/288)) ([fa7efd5](https://github.com/ForestAdmin/agent-ruby/commit/fa7efd562770f1d702e43decbdbdefacf18d71f1))
+
 ## [1.27.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.1...v1.27.2) (2026-05-05)
 
 
