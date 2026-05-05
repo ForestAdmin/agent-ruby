@@ -70,7 +70,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'returns 0 when the body has no count key (this is a real Zendesk response shape)' do
       stub_request(:get, "#{base}/search/count").with(query: hash_including({}))
-                                                .to_return(status: 200, body: '{}', headers: { 'Content-Type' => 'application/json' })
+                                                .to_return(status: 200, body: '{}',
+                                                           headers: { 'Content-Type' => 'application/json' })
 
       expect(client.count('ticket', query: '')).to eq(0)
     end
@@ -162,12 +163,13 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
 
     it 'batches ids in groups of 100' do
       ids = (1..150).to_a
-      first  = stub_request(:get, "#{base}/users/show_many").with(query: hash_including('ids' => (1..100).to_a.join(',')))
-                                                            .to_return(status: 200, body: { 'users' => [] }.to_json,
-                                                                       headers: { 'Content-Type' => 'application/json' })
-      second = stub_request(:get, "#{base}/users/show_many").with(query: hash_including('ids' => (101..150).to_a.join(',')))
-                                                            .to_return(status: 200, body: { 'users' => [] }.to_json,
-                                                                       headers: { 'Content-Type' => 'application/json' })
+      json_headers = { 'Content-Type' => 'application/json' }
+      first  = stub_request(:get, "#{base}/users/show_many")
+               .with(query: hash_including('ids' => (1..100).to_a.join(',')))
+               .to_return(status: 200, body: { 'users' => [] }.to_json, headers: json_headers)
+      second = stub_request(:get, "#{base}/users/show_many")
+               .with(query: hash_including('ids' => (101..150).to_a.join(',')))
+               .to_return(status: 200, body: { 'users' => [] }.to_json, headers: json_headers)
       client.fetch_user_emails(ids)
       expect(first).to have_been_requested
       expect(second).to have_been_requested
@@ -249,15 +251,15 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
       stub_request(:get, "#{base}/users/show_many").with(query: hash_including({}))
                                                    .to_return(status: 500, body: 'boom')
 
-      expect(logger).to receive(:warn).with(/fetch_user_emails failed; degrading/)
       expect(client.fetch_user_emails([1])).to eq({})
+      expect(logger).to have_received(:warn).with(/fetch_user_emails failed; degrading/)
     end
 
     it 'logs a warning when introspection fails at boot and returns []' do
       stub_request(:get, "#{base}/ticket_fields").to_return(status: 500, body: 'boom')
 
-      expect(logger).to receive(:warn).with(/fetch_ticket_fields.*custom fields will be unavailable/)
       expect(client.fetch_ticket_fields).to eq([])
+      expect(logger).to have_received(:warn).with(/fetch_ticket_fields.*custom fields will be unavailable/)
     end
   end
 

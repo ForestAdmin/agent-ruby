@@ -27,7 +27,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Schema::CustomFieldsIntrospector do
 
     it 'builds Enum schemas with custom_field_options' do
       allow(client).to receive(:fetch_ticket_fields).and_return([
-                                                                  { 'id' => 5, 'type' => 'dropdown', 'active' => true, 'removable' => true,
+                                                                  { 'id' => 5, 'type' => 'dropdown',
+                                                                    'active' => true, 'removable' => true,
                                                                     'custom_field_options' => [
                                                                       { 'value' => 'gold' }, { 'value' => 'silver' }
                                                                     ] }
@@ -51,7 +52,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Schema::CustomFieldsIntrospector do
 
     it 'falls back to String when an Enum has no options' do
       allow(client).to receive(:fetch_ticket_fields).and_return([
-                                                                  { 'id' => 6, 'type' => 'dropdown', 'active' => true, 'removable' => true,
+                                                                  { 'id' => 6, 'type' => 'dropdown',
+                                                                    'active' => true, 'removable' => true,
                                                                     'custom_field_options' => [] }
                                                                 ])
 
