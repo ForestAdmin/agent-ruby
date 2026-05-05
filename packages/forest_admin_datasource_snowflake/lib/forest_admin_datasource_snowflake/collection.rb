@@ -82,6 +82,9 @@ module ForestAdminDatasourceSnowflake
 
     def resolve_primary_keys(rows)
       column_names = rows.map { |r| r[3] }
+      override = @datasource.primary_keys_override_for(@table_name)
+      return resolve_override_primary_keys(override, column_names) if override
+
       declared_pks = @datasource.primary_keys_for(@table_name)
       matches = declared_pks.filter_map do |pk|
         column_names.find { |name| name.to_s.casecmp(pk.to_s).zero? }
@@ -90,6 +93,15 @@ module ForestAdminDatasourceSnowflake
 
       fallback = (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
       fallback ? [fallback] : []
+    end
+
+    def resolve_override_primary_keys(override, column_names)
+      override.map do |declared_pk|
+        column_names.find { |name| name.to_s.casecmp(declared_pk.to_s).zero? } ||
+          raise(ForestAdminDatasourceSnowflake::Error,
+                "primary_keys override '#{declared_pk}' does not match any column on table " \
+                "'#{@table_name}' (available: #{column_names.join(", ")})")
+      end
     end
 
     def execute_to_hashes(sql, binds, projected_columns)
