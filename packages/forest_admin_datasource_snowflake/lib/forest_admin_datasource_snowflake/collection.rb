@@ -45,25 +45,15 @@ module ForestAdminDatasourceSnowflake
     private
 
     def fetch_fields
-      rows = @datasource.with_connection do |conn|
-        stmt = conn.columns(@table_name)
-        begin
-          stmt.fetch_all || []
-        ensure
-          stmt.drop
-        end
-      end
-
-      native_types = @datasource.fetch_snowflake_native_types(@table_name)
+      rows = @datasource.snowflake_columns_for(@table_name)
       pk_names = resolve_primary_keys(rows)
 
       rows.each do |row|
-        column_name = row[3]
-        odbc_type   = row[4]
-        nullable    = row[10] != 0
+        column_name    = row[1]
+        snowflake_type = row[2]
+        nullable       = row[3].to_s.casecmp('YES').zero?
 
-        forest_type = Parser::Column.forest_type_for_snowflake_native(native_types[column_name]) ||
-                      Parser::Column.forest_type_for(odbc_type)
+        forest_type = Parser::Column.forest_type_for_snowflake_native(snowflake_type)
         @json_columns << column_name if forest_type == 'Json'
 
         field = ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
@@ -81,7 +71,7 @@ module ForestAdminDatasourceSnowflake
     end
 
     def resolve_primary_keys(rows)
-      column_names = rows.map { |r| r[3] }
+      column_names = rows.map { |r| r[1] }
       override = @datasource.primary_keys_override_for(@table_name)
       return resolve_override_primary_keys(override, column_names) if override
 
@@ -91,7 +81,7 @@ module ForestAdminDatasourceSnowflake
       end
       return matches if matches.any?
 
-      fallback = (rows.find { |r| r[3].to_s.casecmp('id').zero? } || rows.first)&.dig(3)
+      fallback = (rows.find { |r| r[1].to_s.casecmp('id').zero? } || rows.first)&.dig(1)
       fallback ? [fallback] : []
     end
 

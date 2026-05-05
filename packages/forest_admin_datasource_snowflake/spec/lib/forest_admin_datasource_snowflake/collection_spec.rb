@@ -14,10 +14,9 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
   let(:database_double) { instance_double('ODBC::Database') }
 
   let(:tables_stmt) { instance_double('ODBC::Statement', drop: nil) }
-  let(:columns_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:prepared_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
-  let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:bulk_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
@@ -32,19 +31,16 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
                                                            ['BILLING_POC', 'PUBLIC', 'BILLING_USAGE', 'TABLE', nil]
                                                          ])
 
-    allow(odbc_connection).to receive_messages(tables: tables_stmt, columns: columns_stmt)
+    allow(odbc_connection).to receive(:tables).and_return(tables_stmt)
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
-    allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
+    allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(bulk_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
-    allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                            [nil, nil, 'BILLING_USAGE', 'ID',
-                                                             ODBC::SQL_DECIMAL, nil, nil, nil, nil, nil, 0],
-                                                            [nil, nil, 'BILLING_USAGE', 'CUSTOMER_ID',
-                                                             ODBC::SQL_DECIMAL,  nil, nil, nil, nil, nil, 0],
-                                                            [nil, nil, 'BILLING_USAGE', 'EVENT_TYPE',
-                                                             ODBC::SQL_VARCHAR,  nil, nil, nil, nil, nil, 1]
-                                                          ])
+    allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                 %w[BILLING_USAGE ID NUMBER NO],
+                                                                 %w[BILLING_USAGE CUSTOMER_ID NUMBER NO],
+                                                                 %w[BILLING_USAGE EVENT_TYPE VARCHAR YES]
+                                                               ])
   end
 
   describe 'schema introspection' do
@@ -57,34 +53,30 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
       expect(id_field.is_read_only).to be(true)
     end
 
-    it 'overrides ODBC type with Snowflake native type for VARIANT/OBJECT/ARRAY (mapped to Json) and BINARY' do
-      allow(is_columns_stmt).to receive(:fetch_all).and_return([
-                                                                 ['META', 'VARIANT'],
-                                                                 ['BLOB', 'BINARY']
-                                                               ])
-      allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                              [nil, nil, 'BILLING_USAGE', 'META',
-                                                               ODBC::SQL_VARCHAR, nil, nil, nil, nil, nil, 1],
-                                                              [nil, nil, 'BILLING_USAGE', 'BLOB',
-                                                               ODBC::SQL_VARCHAR, nil, nil, nil, nil, nil, 1]
-                                                            ])
+    it 'maps VARIANT/OBJECT/ARRAY to Json and BINARY/VARBINARY to Binary' do
+      allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                   %w[BILLING_USAGE META VARIANT YES],
+                                                                   %w[BILLING_USAGE BLOB BINARY YES],
+                                                                   %w[BILLING_USAGE STUFF OBJECT YES]
+                                                                 ])
 
       expect(collection.schema[:fields]['META'].column_type).to eq('Json')
       expect(collection.schema[:fields]['BLOB'].column_type).to eq('Binary')
+      expect(collection.schema[:fields]['STUFF'].column_type).to eq('Json')
     end
 
-    it 'falls back to ODBC type when the column is not in the Snowflake-native override list' do
-      allow(is_columns_stmt).to receive(:fetch_all).and_return([['ID', 'NUMBER']])
+    it 'falls back to String for unknown Snowflake types' do
+      allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                   %w[BILLING_USAGE WEIRD SOMETHING_NEW YES]
+                                                                 ])
 
-      expect(collection.schema[:fields]['ID'].column_type).to eq('Number')
+      expect(collection.schema[:fields]['WEIRD'].column_type).to eq('String')
     end
 
     it 'returns invalid JSON unchanged so a malformed row does not crash the list' do
-      allow(is_columns_stmt).to receive(:fetch_all).and_return([['META', 'VARIANT']])
-      allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                              [nil, nil, 'BILLING_USAGE', 'META',
-                                                               ODBC::SQL_VARCHAR, nil, nil, nil, nil, nil, 1]
-                                                            ])
+      allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                   %w[BILLING_USAGE META VARIANT YES]
+                                                                 ])
       allow(odbc_connection).to receive(:prepare).with(/FROM "BILLING_USAGE"/).and_return(prepared_stmt)
       allow(prepared_stmt).to receive(:execute)
       allow(prepared_stmt).to receive(:fetch_all).and_return([['not-json']])
@@ -161,12 +153,10 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
     end
 
     it 'designates the first column as primary key when no "id" exists' do
-      allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                              [nil, nil, 'T', 'PK', ODBC::SQL_VARCHAR, nil, nil, nil,
-                                                               nil, nil, 0],
-                                                              [nil, nil, 'T', 'X', ODBC::SQL_VARCHAR, nil, nil, nil,
-                                                               nil, nil, 1]
-                                                            ])
+      allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                   %w[T PK VARCHAR NO],
+                                                                   %w[T X VARCHAR YES]
+                                                                 ])
       allow(tables_stmt).to receive(:fetch_all).and_return([
                                                              ['BILLING_POC', 'PUBLIC', 'T', 'TABLE', nil]
                                                            ])
@@ -218,16 +208,10 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
     end
 
     it 'parses JSON-typed columns into Ruby objects so the UI receives structured data' do
-      allow(is_columns_stmt).to receive(:fetch_all).and_return([
-                                                                 ['ID', 'NUMBER'],
-                                                                 ['META', 'VARIANT']
-                                                               ])
-      allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                              [nil, nil, 'BILLING_USAGE', 'ID',
-                                                               ODBC::SQL_DECIMAL, nil, nil, nil, nil, nil, 0],
-                                                              [nil, nil, 'BILLING_USAGE', 'META',
-                                                               ODBC::SQL_VARCHAR, nil, nil, nil, nil, nil, 1]
-                                                            ])
+      allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                   %w[BILLING_USAGE ID NUMBER NO],
+                                                                   %w[BILLING_USAGE META VARIANT YES]
+                                                                 ])
       allow(odbc_connection).to receive(:prepare).with(/FROM "BILLING_USAGE"/).and_return(prepared_stmt)
       allow(prepared_stmt).to receive(:execute)
       allow(prepared_stmt).to receive(:fetch_all).and_return([[1, '{"foo":1,"bar":[true,null]}']])
