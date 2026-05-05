@@ -1,3 +1,3 @@
 module ForestAdminDatasourceZendesk
-  VERSION = '0.1.0'.freeze
+  VERSION = "1.28.0"
 end
