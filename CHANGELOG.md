@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.1...v1.27.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* **rpc-agent:** qualify Decorators namespace in datasource customizer ([#295](https://github.com/ForestAdmin/agent-ruby/issues/295)) ([12ef7c9](https://github.com/ForestAdmin/agent-ruby/commit/12ef7c9880a6dc6d3d6659ae2ebf00f126e6a116))
+
 ## [1.27.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.27.0...v1.27.1) (2026-04-29)
 
 
