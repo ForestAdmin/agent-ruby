@@ -46,8 +46,6 @@ module ForestAdminDatasourceZendesk
 
       private
 
-      # Translates a Forest flat hash into a Zendesk user payload, folding
-      # custom-field columns into the keyed `user_fields` hash.
       def build_payload(data)
         attrs = data.transform_keys(&:to_s)
         cf_keys = @custom_fields.to_h { |cf| [cf[:column_name], cf[:zendesk_key]] }
@@ -94,16 +92,10 @@ module ForestAdminDatasourceZendesk
       end
 
       def define_relations
-        add_field('organization', ManyToOneSchema.new(
-                                    foreign_collection: 'ZendeskOrganization',
-                                    foreign_key: 'organization_id',
-                                    foreign_key_target: 'id'
-                                  ))
-        add_field('requested_tickets', OneToManySchema.new(
-                                         foreign_collection: 'ZendeskTicket',
-                                         origin_key: 'requester_id',
-                                         origin_key_target: 'id'
-                                       ))
+        add_field('organization', ManyToOneSchema.new(foreign_collection: 'ZendeskOrganization',
+                                                      foreign_key: 'organization_id', foreign_key_target: 'id'))
+        add_field('requested_tickets', OneToManySchema.new(foreign_collection: 'ZendeskTicket',
+                                                           origin_key: 'requester_id', origin_key_target: 'id'))
       end
 
       def serialize(user)

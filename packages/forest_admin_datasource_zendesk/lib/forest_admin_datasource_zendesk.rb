@@ -12,9 +12,6 @@ module ForestAdminDatasourceZendesk
   class ConfigurationError < Error; end
   class UnsupportedOperatorError < Error; end
 
-  # Raised when a Zendesk API call fails for any reason other than the
-  # well-known `RecordNotFound`. Wraps the underlying error so callers can
-  # rescue a single class without depending on the zendesk_api gem.
   class APIError < Error; end
 
   class << self

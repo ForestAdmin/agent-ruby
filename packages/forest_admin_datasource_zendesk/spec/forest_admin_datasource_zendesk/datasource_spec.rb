@@ -22,10 +22,10 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
       .to raise_error(ForestAdminDatasourceZendesk::ConfigurationError)
   end
 
-  it 'registers the four Zendesk collections' do
+  it 'registers the three Zendesk collections' do
     ds = described_class.new(**valid_args)
     expect(ds.collections.keys).to contain_exactly(
-      'ZendeskTicket', 'ZendeskUser', 'ZendeskOrganization', 'ZendeskComment'
+      'ZendeskTicket', 'ZendeskUser', 'ZendeskOrganization'
     )
   end
 

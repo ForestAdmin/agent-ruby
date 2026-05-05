@@ -44,8 +44,6 @@ module ForestAdminDatasourceZendesk
 
       private
 
-      # Translates a Forest flat hash into a Zendesk organization payload,
-      # folding custom-field columns into `organization_fields`.
       def build_payload(data)
         attrs = data.transform_keys(&:to_s)
         cf_keys = @custom_fields.to_h { |cf| [cf[:column_name], cf[:zendesk_key]] }

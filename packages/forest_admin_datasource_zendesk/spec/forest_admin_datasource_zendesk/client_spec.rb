@@ -180,6 +180,30 @@ RSpec.describe ForestAdminDatasourceZendesk::Client do
     end
   end
 
+  describe '#fetch_tickets_by_ids' do
+    it 'hits /tickets/show_many in a single request and returns id -> ticket' do
+      stub_request(:get, "#{base}/tickets/show_many")
+        .with(query: hash_including('ids' => '1,2'))
+        .to_return(status: 200,
+                   body: { 'tickets' => [
+                     { 'id' => 1, 'subject' => 'First' },
+                     { 'id' => 2, 'subject' => 'Second' }
+                   ] }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+
+      result = client.fetch_tickets_by_ids([1, 2])
+      expect(result.keys).to contain_exactly(1, 2)
+      expect(result[1]['subject']).to eq('First')
+    end
+
+    it 'raises APIError on failure (no silent empty hash for the primary read path)' do
+      stub_request(:get, "#{base}/tickets/show_many").with(query: hash_including({}))
+                                                     .to_return(status: 500, body: 'boom')
+      expect { client.fetch_tickets_by_ids([1]) }
+        .to raise_error(ForestAdminDatasourceZendesk::APIError, /fetch_tickets_by_ids/)
+    end
+  end
+
   describe '#fetch_users_by_ids' do
     it 'returns id -> full user hash' do
       stub_request(:get, "#{base}/users/show_many")

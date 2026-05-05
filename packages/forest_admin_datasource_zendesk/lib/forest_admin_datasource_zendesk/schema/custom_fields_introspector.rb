@@ -1,14 +1,8 @@
 module ForestAdminDatasourceZendesk
   module Schema
-    # Discovers admin-defined Zendesk custom fields and produces
-    # ColumnSchema entries our collections can `add_field` directly.
-    #
-    # Each entry has the shape:
-    #   { column_name: 'custom_360001234', zendesk_id: 360001234,
-    #     zendesk_key: nil, schema: ColumnSchema }
-    #
-    # `zendesk_key` is set for user_fields/organization_fields (Zendesk
-    # exposes those keyed). `zendesk_id` is set for ticket_fields.
+    # Returns entries shaped { column_name:, zendesk_id:, zendesk_key:, schema: }.
+    # `zendesk_key` is set for user/org fields (Zendesk addresses those by key);
+    # ticket fields use `zendesk_id` only.
     class CustomFieldsIntrospector
       ColumnSchema = ForestAdminDatasourceToolkit::Schema::ColumnSchema
       Operators    = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
@@ -58,9 +52,9 @@ module ForestAdminDatasourceZendesk
           .filter_map { |raw| build_entry(raw, key_strategy) }
       end
 
-      # System ticket fields can't be removed; skip them so we don't double-up
-      # the columns the Ticket schema already declares (e.g. subject/status).
-      # Inactive fields and unrecognized types are also skipped.
+      # Skip non-removable ticket fields: those are system fields the Ticket
+      # schema already declares (subject, status, ...), and re-adding them
+      # would conflict.
       def usable_field?(raw, key_strategy)
         return false unless raw['active']
         return false if key_strategy == :ticket && raw['removable'] == false
@@ -77,9 +71,7 @@ module ForestAdminDatasourceZendesk
 
       def column_naming(raw, strategy)
         case strategy
-        when :ticket
-          # No reliable key on ticket_fields; use the id.
-          ["custom_#{raw["id"]}", nil]
+        when :ticket then ["custom_#{raw["id"]}", nil]
         when :user_or_org
           key = raw['key'] || "custom_#{raw["id"]}"
           [key, key]
@@ -96,8 +88,8 @@ module ForestAdminDatasourceZendesk
 
         if column_type == 'Enum'
           opts[:enum_values] = Array(raw['custom_field_options']).filter_map { |o| o['value'] }
-          # If for some reason there are no options, drop back to String so the
-          # column still appears (Forest rejects empty Enum schemas).
+          # Forest rejects empty Enum schemas; fall back to String so the column
+          # still appears.
           if opts[:enum_values].empty?
             opts[:column_type] = 'String'
             opts[:filter_operators] = STRING_OPS

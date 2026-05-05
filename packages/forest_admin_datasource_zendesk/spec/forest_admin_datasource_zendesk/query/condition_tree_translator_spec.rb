@@ -104,6 +104,19 @@ RSpec.describe ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator do
       expect(translate(Leaf.new('subject', 'equal', %(say"hi))))
         .to eq('subject:"say\\"hi"')
     end
+
+    it 'quotes values containing parentheses so Zendesk does not parse them as grouping' do
+      expect(translate(Leaf.new('subject', 'equal', '(test'))).to eq('subject:"(test"')
+      expect(translate(Leaf.new('subject', 'equal', 'a)b'))).to eq('subject:"a)b"')
+    end
+
+    it 'quotes values containing a colon so Zendesk does not parse them as a field separator' do
+      expect(translate(Leaf.new('subject', 'equal', 'a:b'))).to eq('subject:"a:b"')
+    end
+
+    it 'quotes values containing a dash so Zendesk does not parse them as negation' do
+      expect(translate(Leaf.new('subject', 'equal', '-foo'))).to eq('subject:"-foo"')
+    end
   end
 
   describe 'IN / NOT_IN with empty array' do

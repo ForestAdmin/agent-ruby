@@ -40,8 +40,12 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       expect(collection.schema[:fields]['organization']).to be_a(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
     end
 
-    it 'declares OneToMany comments' do
-      expect(collection.schema[:fields]['comments']).to be_a(ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema)
+    it 'declares comments as a structured array column (not a relation)' do
+      schema = collection.schema[:fields]['comments']
+      expect(schema).to be_a(ForestAdminDatasourceToolkit::Schema::ColumnSchema)
+      expect(schema.column_type).to be_a(Array)
+      expect(schema.column_type.first).to include('id', 'body', 'author_email', 'author_name')
+      expect(schema.is_read_only).to be(true)
     end
   end
 
@@ -49,10 +53,10 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
     let(:tickets) { [zendesk_record('id' => 1, 'subject' => 'a', 'requester_id' => 10)] }
 
     context 'when filtering by id (PK lookup)' do
-      it 'short-circuits to find_ticket' do
-        ticket = zendesk_record('id' => 215, 'subject' => 'show', 'requester_id' => 10)
+      it 'short-circuits to a single bulk fetch' do
+        ticket = { 'id' => 215, 'subject' => 'show', 'requester_id' => 10 }
         allow(client).to receive(:fetch_user_emails).with([10]).and_return(10 => 'x@y.com')
-        expect(client).to receive(:find_ticket).with(215).and_return(ticket)
+        expect(client).to receive(:fetch_tickets_by_ids).with([215]).and_return(215 => ticket)
         expect(client).not_to receive(:search)
 
         filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 215))
@@ -62,18 +66,30 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
         expect(result.first['requester_email']).to eq('x@y.com')
       end
 
-      it 'fetches every id in an IN list' do
-        expect(client).to receive(:find_ticket).with(1).and_return(zendesk_record('id' => 1, 'requester_id' => nil))
-        expect(client).to receive(:find_ticket).with(2).and_return(zendesk_record('id' => 2, 'requester_id' => nil))
+      it 'sends one bulk request for an IN list and preserves input order' do
+        expect(client).to receive(:fetch_tickets_by_ids).once.with([1, 2]).and_return(
+          2 => { 'id' => 2, 'requester_id' => nil },
+          1 => { 'id' => 1, 'requester_id' => nil }
+        )
         allow(client).to receive(:fetch_user_emails).and_return({})
 
         filter = Filter.new(condition_tree: Leaf.new('id', 'in', [1, 2]))
         expect(collection.list(nil, filter, ['id']).map { |r| r['id'] }).to eq([1, 2])
       end
 
+      it 'silently drops ids the bulk endpoint did not return' do
+        expect(client).to receive(:fetch_tickets_by_ids).with([1, 2]).and_return(
+          1 => { 'id' => 1, 'requester_id' => nil }
+        )
+        allow(client).to receive(:fetch_user_emails).and_return({})
+
+        filter = Filter.new(condition_tree: Leaf.new('id', 'in', [1, 2]))
+        expect(collection.list(nil, filter, ['id']).map { |r| r['id'] }).to eq([1])
+      end
+
       it 'falls back to search when the id leaf uses an unsupported operator' do
         expect(client).to receive(:search).and_return([])
-        expect(client).not_to receive(:find_ticket)
+        expect(client).not_to receive(:fetch_tickets_by_ids)
 
         filter = Filter.new(condition_tree: Leaf.new('id', 'greater_than', 100))
         collection.list(nil, filter, ['id'])
@@ -128,9 +144,6 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       end
 
       it 'preserves ascending=false even when both symbol and string keys are present' do
-        # Regression: `entry[:ascending] || entry['ascending']` would silently
-        # flip a descending sort to ascending if both keys existed with
-        # different values.
         expect(client).to receive(:search) do |_type, args|
           expect(args[:sort_order]).to eq('desc')
           []
@@ -198,6 +211,7 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
       it 'fetches by default when projection is nil' do
         expect(client).to receive(:fetch_user_emails).and_return({})
+        allow(client).to receive_messages(fetch_ticket_comments: [], fetch_users_by_ids: {})
         collection.list(nil, Filter.new, nil)
       end
     end
@@ -266,10 +280,57 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
       end
     end
 
+    describe 'comments embedding' do
+      let(:ticket) { zendesk_record('id' => 7, 'requester_id' => nil) }
+
+      before do
+        allow(client).to receive_messages(search: [ticket], fetch_user_emails: {})
+      end
+
+      it 'does not fetch comments when projection excludes them' do
+        expect(client).not_to receive(:fetch_ticket_comments)
+        collection.list(nil, Filter.new, ['id', 'subject'])
+      end
+
+      it 'fetches comments when projection requests the field' do
+        expect(client).to receive(:fetch_ticket_comments).with(7).and_return([
+                                                                               { 'id' => 11, 'body' => 'hi',
+                                                                                 'html_body' => '<p>hi</p>',
+                                                                                 'public' => true, 'author_id' => 99,
+                                                                                 'created_at' => 'now' }
+                                                                             ])
+        allow(client).to receive(:fetch_users_by_ids).with([99])
+                                                     .and_return(99 => { 'email' => 'a@b.com', 'name' => 'A' })
+
+        result = collection.list(nil, Filter.new, ['id', 'comments']).first
+        expect(result['comments']).to eq([{
+                                           'id' => 11, 'body' => 'hi', 'html_body' => '<p>hi</p>',
+                                           'public' => true, 'author_email' => 'a@b.com',
+                                           'author_name' => 'A', 'created_at' => 'now'
+                                         }])
+      end
+
+      it 'fetches comments when projection requests a sub-field of comments' do
+        expect(client).to receive(:fetch_ticket_comments).with(7).and_return([])
+        allow(client).to receive(:fetch_users_by_ids).and_return({})
+        collection.list(nil, Filter.new, ['comments:body'])
+      end
+
+      it 'leaves author_email/author_name nil when the author cannot be resolved' do
+        allow(client).to receive(:fetch_ticket_comments).and_return([{ 'id' => 1, 'author_id' => 999 }])
+        allow(client).to receive(:fetch_users_by_ids).and_return({})
+
+        result = collection.list(nil, Filter.new, ['comments']).first
+        expect(result['comments'].first['author_email']).to be_nil
+        expect(result['comments'].first['author_name']).to be_nil
+      end
+    end
+
     describe 'projection edge cases' do
       it 'returns the full record when projection is nil' do
         allow(client).to receive_messages(search: [zendesk_record('id' => 1, 'requester_id' => nil)],
-                                          fetch_user_emails: {})
+                                          fetch_user_emails: {}, fetch_ticket_comments: [],
+                                          fetch_users_by_ids: {})
 
         record = collection.list(nil, Filter.new, nil).first
         expect(record.keys).to include('id', 'subject', 'status')
@@ -277,7 +338,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
       it 'falls back to to_h when ticket lacks attributes' do
         plain_hash_ticket = { 'id' => 1, 'subject' => 'plain', 'requester_id' => nil }
-        allow(client).to receive_messages(search: [plain_hash_ticket], fetch_user_emails: {})
+        allow(client).to receive_messages(search: [plain_hash_ticket], fetch_user_emails: {},
+                                          fetch_ticket_comments: [], fetch_users_by_ids: {})
 
         result = collection.list(nil, Filter.new, nil).first
         expect(result['subject']).to eq('plain')
@@ -369,7 +431,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
                                 { 'id' => 360_001, 'value' => 'gold' },
                                 { 'id' => 999_999, 'value' => 'ignored' }
                               ])
-      allow(client).to receive_messages(search: [ticket], fetch_user_emails: {})
+      allow(client).to receive_messages(search: [ticket], fetch_user_emails: {},
+                                        fetch_ticket_comments: [], fetch_users_by_ids: {})
 
       result = collection.list(nil, Filter.new, nil).first
       expect(result['custom_360001']).to eq('gold')
@@ -436,9 +499,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
   describe '#update' do
     it 'updates every id resolved from the filter (PK lookup short-circuit)' do
-      allow(client).to receive(:fetch_user_emails).and_return({})
-      ticket = zendesk_record('id' => 12, 'subject' => 'A', 'requester_id' => nil)
-      allow(client).to receive(:find_ticket).with(12).and_return(ticket)
+      allow(client).to receive_messages(fetch_user_emails: {},
+                                        fetch_tickets_by_ids: { 12 => { 'id' => 12, 'requester_id' => nil } })
 
       expect(client).to receive(:update_ticket).with(12, hash_including('status' => 'solved'))
 
@@ -447,10 +509,11 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
     end
 
     it 'updates each id when the filter resolves to several' do
-      allow(client).to receive(:fetch_user_emails).and_return({})
-      [1, 2].each do |id|
-        allow(client).to receive(:find_ticket).with(id).and_return(zendesk_record('id' => id, 'requester_id' => nil))
-      end
+      allow(client).to receive_messages(fetch_user_emails: {},
+                                        fetch_tickets_by_ids: {
+                                          1 => { 'id' => 1, 'requester_id' => nil },
+                                          2 => { 'id' => 2, 'requester_id' => nil }
+                                        })
 
       expect(client).to receive(:update_ticket).with(1, hash_including('priority' => 'high'))
       expect(client).to receive(:update_ticket).with(2, hash_including('priority' => 'high'))
@@ -460,8 +523,8 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
     end
 
     it 'silently drops description on update (no comment write path)' do
-      allow(client).to receive(:fetch_user_emails).and_return({})
-      allow(client).to receive(:find_ticket).with(7).and_return(zendesk_record('id' => 7, 'requester_id' => nil))
+      allow(client).to receive_messages(fetch_user_emails: {},
+                                        fetch_tickets_by_ids: { 7 => { 'id' => 7, 'requester_id' => nil } })
 
       expect(client).to receive(:update_ticket) do |id, payload|
         expect(id).to eq(7)
@@ -476,10 +539,11 @@ RSpec.describe ForestAdminDatasourceZendesk::Collections::Ticket do
 
   describe '#delete' do
     it 'deletes each id resolved from the filter' do
-      allow(client).to receive(:fetch_user_emails).and_return({})
-      [1, 2].each do |id|
-        allow(client).to receive(:find_ticket).with(id).and_return(zendesk_record('id' => id, 'requester_id' => nil))
-      end
+      allow(client).to receive_messages(fetch_user_emails: {},
+                                        fetch_tickets_by_ids: {
+                                          1 => { 'id' => 1, 'requester_id' => nil },
+                                          2 => { 'id' => 2, 'requester_id' => nil }
+                                        })
 
       expect(client).to receive(:delete_ticket).with(1)
       expect(client).to receive(:delete_ticket).with(2)

@@ -2,24 +2,11 @@ require 'active_support/core_ext/time/zones'
 
 module ForestAdminDatasourceZendesk
   module Query
-    # Translates a Forest ConditionTree into a Zendesk Search API query string.
     # See https://developer.zendesk.com/api-reference/ticketing/ticket-management/search/
     #
-    # v1 supports: EQUAL, NOT_EQUAL, IN, NOT_IN, GREATER_THAN, LESS_THAN,
-    # BEFORE, AFTER, PRESENT, BLANK. AND aggregator only.
-    # Unsupported operators raise UnsupportedOperatorError so failures are
-    # loud, not silent wrong results.
-    #
-    # Custom-field translation: callers pass `custom_fields:` (a hash from
-    # Forest column names to Zendesk Search field names, owned by the
-    # Datasource instance) so multi-tenant agents with several Zendesk
-    # datasources don't trample each other's mappings.
-    #
-    # Timezone handling: callers pass `timezone:`; Date values are
-    # interpreted as start-of-day in that TZ, then converted to UTC.
-    # Time/DateTime values are converted to UTC directly (they already carry
-    # offset info). String values are passed through verbatim, with internal
-    # double quotes escaped when wrapping in quotes is needed.
+    # Unsupported operators raise UnsupportedOperatorError rather than
+    # silently producing the wrong query. Only the AND aggregator is
+    # supported (Zendesk Search has no general OR).
     class ConditionTreeTranslator
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
       Branch    = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
@@ -60,7 +47,9 @@ module ForestAdminDatasourceZendesk
         field = mapped_field(leaf.field)
         value = leaf.value
 
-        return "requester:#{format_value(value)}" if leaf.field == 'requester_email' && leaf.operator == Operators::EQUAL
+        if leaf.field == 'requester_email' && leaf.operator == Operators::EQUAL
+          return "requester:#{format_value(value)}"
+        end
 
         case leaf.operator
         when Operators::EQUAL        then "#{field}:#{format_value(value)}"
@@ -77,9 +66,8 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # `IN []` and `NOT_IN []` are nonsense filters that previously produced
-      # an empty string, which the branch translator dropped — silently
-      # turning "match nothing" into "match everything". Raise instead.
+      # An empty `IN []` would translate to '', which the branch then drops —
+      # silently turning "match nothing" into "match everything". Raise instead.
       def translate_in(field, value, negate:)
         values = Array(value)
         if values.empty?
@@ -106,18 +94,13 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Forest's UI never naturally produces an EQUAL/NOT_EQUAL/IN with a nil
-      # value (it uses PRESENT / BLANK for that). Falling through to
-      # nil.to_s would emit a malformed `field:` clause that Zendesk's
-      # search treats as a presence check — i.e. silently the wrong query.
+      # `field:` with a nil value would parse as a presence check on Zendesk's
+      # side — silently the wrong query. PRESENT / BLANK is the supported path.
       def raise_nil_value_error
         raise UnsupportedOperatorError,
               'Filter value is nil; use the PRESENT or BLANK operator to filter for absence.'
       end
 
-      # A bare Date is interpreted as 00:00 in the caller's timezone, then
-      # converted to UTC. If activesupport's TZ table doesn't recognise the
-      # zone, fall back to UTC and log a warning.
       def format_date(value)
         Time.use_zone(@timezone) do
           Time.zone.local(value.year, value.month, value.day).utc.strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -129,12 +112,8 @@ module ForestAdminDatasourceZendesk
         value.strftime('%Y-%m-%dT00:00:00Z')
       end
 
-      # Strings with whitespace OR internal double quotes need quoting so
-      # Zendesk parses them as a single phrase. We backslash-escape internal
-      # quotes per Zendesk's documented quoting rules; without this, a value
-      # like `test "with" quotes` would emit a malformed query.
       def format_string(value)
-        return value unless value.match?(/[\s"]/)
+        return value unless value.match?(/[\s"():-]/)
 
         %("#{value.gsub('"', '\\"')}")
       end

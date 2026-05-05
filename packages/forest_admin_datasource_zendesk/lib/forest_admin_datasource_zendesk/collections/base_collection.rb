@@ -11,8 +11,6 @@ module ForestAdminDatasourceZendesk
       DATE_OPS    = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
                      Operators::PRESENT, Operators::BLANK].freeze
 
-      # Toolkit contract — subclasses override `aggregate_count` instead of
-      # touching the 4-arg signature directly.
       def aggregate(caller, filter, aggregation, _limit = nil)
         unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
@@ -24,14 +22,12 @@ module ForestAdminDatasourceZendesk
 
       protected
 
-      # Default no-op; the Searchable mixin (and Ticket) override.
       def aggregate_count(_caller, _filter)
         raise NotImplementedError, "#{self.class} did not implement aggregate_count"
       end
 
-      # Pulls the value(s) from a leaf shaped like `id = N` or `id IN [...]`.
-      # Used by collections to short-circuit PK lookups (Zendesk Search has no
-      # `id:` operator, so /resource/{id} is the only viable path for show).
+      # Zendesk Search has no `id:` operator, so collections short-circuit
+      # PK lookups to /resource/{id} when the filter is `id = N` or `id IN [...]`.
       def extract_id_lookup(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
 
@@ -41,21 +37,17 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Filters projection down to direct columns (drops "relation:subfield"
-      # entries). Returns the record unchanged when projection is nil or
-      # contains only relation paths.
       def project(record, projection)
         return record if projection.nil?
 
         wanted = Array(projection).map(&:to_s).reject { |p| p.include?(':') }
         return record if wanted.empty?
 
-        wanted.each_with_object({}) { |k, h| h[k] = record[k] }
+        wanted.to_h { |k| [k, record[k]] }
       end
 
-      # Translates a Forest Sort into Zendesk's [sort_by, sort_order] tuple,
-      # using the subclass-supplied allow-list. Unknown fields silently
-      # disable sorting (Zendesk's Search API only honours specific fields).
+      # Unknown fields silently disable sorting — Zendesk's Search API only
+      # honours a fixed allow-list per resource.
       def translate_sort(sort, allow_list)
         return [nil, nil] if sort.nil? || sort.empty?
 
@@ -66,7 +58,6 @@ module ForestAdminDatasourceZendesk
         [zd_field, ascending ? 'asc' : 'desc']
       end
 
-      # Translates a Forest Page (offset/limit) into Zendesk's [page, per_page].
       def translate_page(page)
         return [1, Client::MAX_PER_PAGE] if page.nil?
 
@@ -79,11 +70,6 @@ module ForestAdminDatasourceZendesk
         record.respond_to?(:attributes) ? record.attributes : record.to_h
       end
 
-      # Resolves the records targeted by a write filter into their primary keys.
-      # Mirrors the Mongoid datasource pattern: route through `list(... , ['id'])`
-      # so any filter shape the read pipeline already understands works for
-      # update/delete too (id-equality, id IN [...], or any condition the
-      # Search API can express).
       def ids_for(caller, filter)
         list(caller, filter, ['id']).filter_map { |row| row['id'] }
       end
@@ -95,17 +81,16 @@ module ForestAdminDatasourceZendesk
         tz.nil? || tz.empty? ? 'UTC' : tz
       end
 
+      def build_zendesk_query(caller, filter)
+        translated = ForestAdminDatasourceZendesk::Query::ConditionTreeTranslator.call(
+          filter.condition_tree, timezone: timezone_for(caller),
+                                 custom_fields: datasource.custom_field_mapping
+        )
+        [translated, filter.search].compact.reject(&:empty?).join(' ')
+      end
+
       private
 
-      # Sort entries arrive either as Sort::Clause objects (responding to
-      # `field`/`ascending`) or as plain hashes (the toolkit normalises them
-      # at construction time, but specs and a few code paths still build them
-      # by hand). Handle both.
-      #
-      # `key?` (rather than `||`) for the boolean: `entry[:ascending] || ...`
-      # would silently flip a descending sort to ascending if both symbol and
-      # string keys exist with different values, and falls through to the
-      # other key whenever ascending is explicitly false.
       def sort_field_and_direction(entry)
         return [entry.field, entry.ascending] if entry.respond_to?(:field)
 
