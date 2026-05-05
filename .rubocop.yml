@@ -108,6 +108,7 @@ Style/MutableConstant:
     - 'packages/forest_admin_test_toolkit/lib/forest_admin_test_toolkit/version.rb'
     - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/version.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb'
 
 # Offense count: 38
 # This cop supports safe autocorrection (--autocorrect).
@@ -188,6 +189,7 @@ Style/StringLiterals:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record.rb'
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
     - 'packages/forest_admin_datasource_active_record/spec/spec_helper.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
@@ -220,6 +222,7 @@ Lint/NestedMethodDefinition:
 Performance/CollectionLiteralInLoop:
   Exclude:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/condition_tree_parser.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
 
 Naming/PredicatePrefix:
   Exclude:
@@ -227,6 +230,7 @@ Naming/PredicatePrefix:
 
 Metrics/ParameterLists:
   Exclude:
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/query_handler.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/smart_action_checker.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/related/list_related_spec.rb'
@@ -265,6 +269,8 @@ Metrics/MethodLength:
   CountAsOne: ['array', 'hash', 'method_call']
   Max: 20
   Exclude:
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/auth/oauth2/forest_provider.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/builder/agent_factory.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/http/error_translator.rb'
@@ -320,6 +326,9 @@ Metrics/BlockLength:
 
 Metrics/ClassLength:
   Exclude:
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
+    - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/builder/agent_factory.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/generator_field.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/charts/charts.rb'
@@ -407,6 +416,18 @@ Layout/LineLength:
 RSpec/VerifiedDoubles:
   Exclude:
     - 'packages/forest_admin_datasource_customizer/spec/lib/forest_admin_datasource_customizer/composite_datasource_spec.rb'
+
+RSpec/VerifiedDoubleReference:
+  Exclude:
+    - 'packages/forest_admin_datasource_snowflake/spec/**/*'
+
+RSpec/StubbedMock:
+  Exclude:
+    - 'packages/forest_admin_datasource_snowflake/spec/**/*'
+
+RSpec/MessageSpies:
+  Exclude:
+    - 'packages/forest_admin_datasource_snowflake/spec/**/*'
 
 RSpec/MultipleMemoizedHelpers:
   Max: 15
