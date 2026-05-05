@@ -38,6 +38,7 @@ Gemspec/RequireMFA:
     - 'packages/forest_admin_test_toolkit/forest_admin_test_toolkit.gemspec'
     - 'packages/forest_admin_datasource_customizer/forest_admin_datasource_customizer.gemspec'
     - 'packages/forest_admin_datasource_active_record/forest_admin_datasource_active_record.gemspec'
+    - 'packages/forest_admin_datasource_zendesk/forest_admin_datasource_zendesk.gemspec'
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
@@ -255,6 +256,7 @@ Metrics/ModuleLength:
     - 'packages/forest_admin_datasource_rpc/spec/**/*'
     - 'packages/forest_admin_datasource_mongoid/spec/**/*'
     - 'packages/forest_admin_datasource_customizer/spec/**/*'
+    - 'packages/forest_admin_datasource_zendesk/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
     - 'packages/forest_admin_rpc_agent/spec/**/*'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/helpers.rb'
