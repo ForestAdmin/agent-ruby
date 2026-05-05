@@ -70,16 +70,24 @@ module ForestAdminDatasourceSnowflake
       Array(@primary_keys_override[upper])
     end
 
-    def fetch_snowflake_native_types(table_name)
+    def snowflake_columns_for(table_name)
+      snowflake_columns[table_name.to_s.upcase] || []
+    end
+
+    private
+
+    def snowflake_columns
+      @snowflake_columns ||= fetch_snowflake_columns
+    end
+
+    def fetch_snowflake_columns
+      sql, binds = build_snowflake_columns_query
       with_connection do |conn|
-        stmt = conn.prepare(
-          'SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS ' \
-          'WHERE TABLE_NAME = ? AND TABLE_SCHEMA = CURRENT_SCHEMA()'
-        )
+        stmt = conn.prepare(sql)
         begin
-          stmt.execute(table_name.to_s.upcase)
+          stmt.execute(*binds)
           rows = stmt.fetch_all || []
-          rows.to_h { |r| [r[0], r[1]] }
+          rows.group_by { |r| r[0].to_s.upcase }
         ensure
           stmt.drop
         end
@@ -88,7 +96,12 @@ module ForestAdminDatasourceSnowflake
       {}
     end
 
-    private
+    def build_snowflake_columns_query
+      base   = 'SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS '
+      filter = @schema_override ? 'WHERE TABLE_SCHEMA = ? ' : "WHERE TABLE_SCHEMA <> 'INFORMATION_SCHEMA' "
+      binds  = @schema_override ? [@schema_override] : []
+      ["#{base}#{filter}ORDER BY TABLE_NAME, ORDINAL_POSITION", binds]
+    end
 
     def snowflake_primary_keys
       @snowflake_primary_keys ||= fetch_snowflake_primary_keys

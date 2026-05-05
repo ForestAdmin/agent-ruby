@@ -1,33 +1,24 @@
 require 'spec_helper'
 
 RSpec.describe ForestAdminDatasourceSnowflake::Parser::Column do
-  describe '.forest_type_for' do
-    {
-      ODBC::SQL_BIT => 'Boolean',
-      ODBC::SQL_INTEGER => 'Number',
-      ODBC::SQL_DECIMAL => 'Number',
-      ODBC::SQL_DOUBLE => 'Number',
-      ODBC::SQL_TYPE_DATE => 'Dateonly',
-      ODBC::SQL_TYPE_TIMESTAMP => 'Date',
-      ODBC::SQL_TYPE_TIME => 'Time',
-      ODBC::SQL_VARCHAR => 'String',
-      ODBC::SQL_LONGVARCHAR => 'String',
-      ODBC::SQL_VARBINARY => 'Binary',
-      ODBC::SQL_GUID => 'Uuid',
-      2004 => 'Json'
-    }.each do |odbc_type, expected_forest_type|
-      it "maps ODBC type #{odbc_type} to '#{expected_forest_type}'" do
-        expect(described_class.forest_type_for(odbc_type)).to eq(expected_forest_type)
-      end
-    end
-
-    it "falls back to 'String' for unknown types" do
-      expect(described_class.forest_type_for(99_999)).to eq('String')
-    end
-  end
-
   describe '.forest_type_for_snowflake_native' do
     {
+      'NUMBER' => 'Number',
+      'DECIMAL' => 'Number',
+      'INTEGER' => 'Number',
+      'BIGINT' => 'Number',
+      'FLOAT' => 'Number',
+      'DOUBLE' => 'Number',
+      'BOOLEAN' => 'Boolean',
+      'TEXT' => 'String',
+      'VARCHAR' => 'String',
+      'CHAR' => 'String',
+      'DATE' => 'Dateonly',
+      'TIME' => 'Time',
+      'TIMESTAMP' => 'Date',
+      'TIMESTAMP_NTZ' => 'Date',
+      'TIMESTAMP_LTZ' => 'Date',
+      'TIMESTAMP_TZ' => 'Date',
       'VARIANT' => 'Json',
       'OBJECT' => 'Json',
       'ARRAY' => 'Json',
@@ -43,10 +34,9 @@ RSpec.describe ForestAdminDatasourceSnowflake::Parser::Column do
       expect(described_class.forest_type_for_snowflake_native('variant')).to eq('Json')
     end
 
-    it 'returns nil for types not in the override list (let ODBC mapping take over)' do
-      expect(described_class.forest_type_for_snowflake_native('NUMBER')).to be_nil
-      expect(described_class.forest_type_for_snowflake_native('TIMESTAMP_NTZ')).to be_nil
-      expect(described_class.forest_type_for_snowflake_native(nil)).to be_nil
+    it "falls back to 'String' for unknown / nil types" do
+      expect(described_class.forest_type_for_snowflake_native('SOMETHING_NEW')).to eq('String')
+      expect(described_class.forest_type_for_snowflake_native(nil)).to eq('String')
     end
   end
 

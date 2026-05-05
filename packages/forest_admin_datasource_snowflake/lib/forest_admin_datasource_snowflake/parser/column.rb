@@ -1,58 +1,51 @@
-require 'odbc'
-
 module ForestAdminDatasourceSnowflake
   module Parser
     module Column
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      ODBC_TYPE_TO_FOREST = {
-        ODBC::SQL_BIT => 'Boolean',
-        ODBC::SQL_TINYINT => 'Number',
-        ODBC::SQL_SMALLINT => 'Number',
-        ODBC::SQL_INTEGER => 'Number',
-        ODBC::SQL_BIGINT => 'Number',
-        ODBC::SQL_NUMERIC => 'Number',
-        ODBC::SQL_DECIMAL => 'Number',
-        ODBC::SQL_DOUBLE => 'Number',
-        ODBC::SQL_REAL => 'Number',
-        ODBC::SQL_FLOAT => 'Number',
-        ODBC::SQL_DATE => 'Dateonly',
-        ODBC::SQL_TYPE_DATE => 'Dateonly',
-        ODBC::SQL_TIME => 'Time',
-        ODBC::SQL_TYPE_TIME => 'Time',
-        ODBC::SQL_TIMESTAMP => 'Date',
-        ODBC::SQL_TYPE_TIMESTAMP => 'Date',
-        ODBC::SQL_CHAR => 'String',
-        ODBC::SQL_VARCHAR => 'String',
-        ODBC::SQL_LONGVARCHAR => 'String',
-        ODBC::SQL_WCHAR => 'String',
-        ODBC::SQL_WVARCHAR => 'String',
-        ODBC::SQL_WLONGVARCHAR => 'String',
-        ODBC::SQL_BINARY => 'Binary',
-        ODBC::SQL_VARBINARY => 'Binary',
-        ODBC::SQL_LONGVARBINARY => 'Binary',
-        ODBC::SQL_GUID => 'Uuid'
-      }.freeze
-
-      SNOWFLAKE_VARIANT_TYPE = 2004
-      ODBC_TYPE_TO_FOREST_WITH_SNOWFLAKE = ODBC_TYPE_TO_FOREST.merge(SNOWFLAKE_VARIANT_TYPE => 'Json').freeze
-
       SNOWFLAKE_NATIVE_TYPE_TO_FOREST = {
+        'NUMBER' => 'Number',
+        'DECIMAL' => 'Number',
+        'NUMERIC' => 'Number',
+        'INT' => 'Number',
+        'INTEGER' => 'Number',
+        'BIGINT' => 'Number',
+        'SMALLINT' => 'Number',
+        'TINYINT' => 'Number',
+        'BYTEINT' => 'Number',
+        'FLOAT' => 'Number',
+        'FLOAT4' => 'Number',
+        'FLOAT8' => 'Number',
+        'DOUBLE' => 'Number',
+        'DOUBLE PRECISION' => 'Number',
+        'REAL' => 'Number',
+        'BOOLEAN' => 'Boolean',
+        'TEXT' => 'String',
+        'VARCHAR' => 'String',
+        'CHAR' => 'String',
+        'CHARACTER' => 'String',
+        'STRING' => 'String',
+        'DATE' => 'Dateonly',
+        'TIME' => 'Time',
+        'DATETIME' => 'Date',
+        'TIMESTAMP' => 'Date',
+        'TIMESTAMP_NTZ' => 'Date',
+        'TIMESTAMP_LTZ' => 'Date',
+        'TIMESTAMP_TZ' => 'Date',
         'VARIANT' => 'Json',
         'OBJECT' => 'Json',
         'ARRAY' => 'Json',
         'BINARY' => 'Binary',
-        'VARBINARY' => 'Binary'
+        'VARBINARY' => 'Binary',
+        'GEOGRAPHY' => 'String',
+        'GEOMETRY' => 'String',
+        'VECTOR' => 'String'
       }.freeze
 
       module_function
 
-      def forest_type_for(odbc_type)
-        ODBC_TYPE_TO_FOREST_WITH_SNOWFLAKE[odbc_type] || 'String'
-      end
-
       def forest_type_for_snowflake_native(snowflake_type)
-        SNOWFLAKE_NATIVE_TYPE_TO_FOREST[snowflake_type.to_s.upcase]
+        SNOWFLAKE_NATIVE_TYPE_TO_FOREST[snowflake_type.to_s.upcase] || 'String'
       end
 
       def operators_for_column_type(type)

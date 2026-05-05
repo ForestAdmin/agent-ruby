@@ -14,9 +14,8 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
   let(:database_double) { instance_double('ODBC::Database') }
 
   let(:tables_stmt) { instance_double('ODBC::Statement', drop: nil) }
-  let(:columns_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
-  let(:is_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
+  let(:bulk_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
 
@@ -29,7 +28,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
 
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/^USE SCHEMA/).and_return(session_stmt)
-    allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(is_columns_stmt)
+    allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(bulk_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
 
@@ -44,17 +43,16 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
                                                             'SYSTEM TABLE', nil]
                                                          ])
 
-    allow(odbc_connection).to receive_messages(tables: tables_stmt, columns: columns_stmt)
-    allow(columns_stmt).to receive(:fetch_all).and_return([
-                                                            [nil, nil, 'BILLING_USAGE', 'ID',
-                                                             ODBC::SQL_DECIMAL, nil, nil, nil, nil, nil, 0],
-                                                            [nil, nil, 'BILLING_USAGE', 'CUSTOMER_ID',
-                                                             ODBC::SQL_DECIMAL,  nil, nil, nil, nil, nil, 0],
-                                                            [nil, nil, 'BILLING_USAGE', 'EVENT_TYPE',
-                                                             ODBC::SQL_VARCHAR,  nil, nil, nil, nil, nil, 1],
-                                                            [nil, nil, 'BILLING_USAGE', 'OCCURRED_AT',
-                                                             ODBC::SQL_TIMESTAMP, nil, nil, nil, nil, nil, 1]
-                                                          ])
+    allow(odbc_connection).to receive(:tables).and_return(tables_stmt)
+    allow(bulk_columns_stmt).to receive(:fetch_all).and_return([
+                                                                 %w[BILLING_USAGE ID NUMBER NO],
+                                                                 %w[BILLING_USAGE CUSTOMER_ID NUMBER NO],
+                                                                 %w[BILLING_USAGE EVENT_TYPE VARCHAR
+                                                                    YES],
+                                                                 %w[BILLING_USAGE OCCURRED_AT TIMESTAMP_NTZ
+                                                                    YES],
+                                                                 %w[INTERNAL_LOG ID NUMBER NO]
+                                                               ])
   end
 
   describe 'introspection' do
@@ -189,24 +187,37 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
     end
   end
 
-  describe '#fetch_snowflake_native_types' do
-    it 'returns COLUMN_NAME => DATA_TYPE from INFORMATION_SCHEMA.COLUMNS' do
-      stmt = instance_double('ODBC::Statement', drop: nil, execute: nil)
-      allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(stmt)
-      allow(stmt).to receive(:fetch_all).and_return([%w[META VARIANT], %w[BLOB BINARY]])
+  describe '#snowflake_columns_for' do
+    it 'fetches every column for the schema in a single bulk INFORMATION_SCHEMA.COLUMNS query' do
+      expect(odbc_connection).to receive(:prepare)
+        .with(a_string_matching(/INFORMATION_SCHEMA\.COLUMNS/)).once.and_return(bulk_columns_stmt)
 
-      expect(datasource.fetch_snowflake_native_types('billing_usage')).to eq(
-        'META' => 'VARIANT',
-        'BLOB' => 'BINARY'
-      )
+      datasource.snowflake_columns_for('BILLING_USAGE')
+      datasource.snowflake_columns_for('INTERNAL_LOG')
     end
 
-    it 'returns an empty hash when the query errors (lacking permissions, etc.)' do
-      stmt = instance_double('ODBC::Statement', drop: nil)
-      allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(stmt)
-      allow(stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
+    it 'groups bulk rows by upper-cased table name' do
+      expect(datasource.snowflake_columns_for('billing_usage').map { |r| r[1] })
+        .to eq(%w[ID CUSTOMER_ID EVENT_TYPE OCCURRED_AT])
+      expect(datasource.snowflake_columns_for('INTERNAL_LOG').map { |r| r[1] }).to eq(['ID'])
+    end
 
-      expect(datasource.fetch_snowflake_native_types('billing_usage')).to eq({})
+    it 'returns an empty array for a table absent from the bulk result' do
+      expect(datasource.snowflake_columns_for('UNRELATED')).to eq([])
+    end
+
+    it 'returns an empty hash when the bulk query errors (lacking permissions, etc.)' do
+      allow(bulk_columns_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.snowflake_columns_for('BILLING_USAGE')).to eq([])
+    end
+
+    it 'binds the schema-override value when Schema= is set in the connection string' do
+      allow(tables_stmt).to receive(:fetch_all).and_return([])
+      ds = described_class.new(conn_str: 'DRIVER={X};Schema=ANALYTICS', pool_size: 1)
+      ds.snowflake_columns_for('BILLING_USAGE')
+
+      expect(bulk_columns_stmt).to have_received(:execute).with('ANALYTICS')
     end
   end
 
