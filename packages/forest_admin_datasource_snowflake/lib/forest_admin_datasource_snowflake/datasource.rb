@@ -63,6 +63,13 @@ module ForestAdminDatasourceSnowflake
       snowflake_primary_keys[upper] || []
     end
 
+    def primary_keys_override_for(table_name)
+      upper = table_name.to_s.upcase
+      return nil unless @primary_keys_override.key?(upper)
+
+      Array(@primary_keys_override[upper])
+    end
+
     def fetch_snowflake_native_types(table_name)
       with_connection do |conn|
         stmt = conn.prepare(

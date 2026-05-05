@@ -138,10 +138,10 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       ds = described_class.new(
         conn_str: 'DRIVER={X}',
         pool_size: 1,
-        primary_keys: { 'billing_usage' => 'TENANT_ID' }
+        primary_keys: { 'billing_usage' => 'CUSTOMER_ID' }
       )
 
-      expect(ds.primary_keys_for('BILLING_USAGE')).to eq(['TENANT_ID'])
+      expect(ds.primary_keys_for('BILLING_USAGE')).to eq(['CUSTOMER_ID'])
     end
 
     it 'accepts an array in the operator override for composite primary keys' do

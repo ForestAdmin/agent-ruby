@@ -147,6 +147,19 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
       expect(coll.schema[:fields]['EVENT_TYPE'].is_primary_key).to be(false)
     end
 
+    it 'raises when a primary_keys override names a column that does not exist' do
+      expect do
+        ForestAdminDatasourceSnowflake::Datasource.new(
+          conn_str: 'DRIVER={X}',
+          pool_size: 1,
+          primary_keys: { 'BILLING_USAGE' => 'CUSTOMER_IDD' }
+        )
+      end.to raise_error(
+        ForestAdminDatasourceSnowflake::Error,
+        /primary_keys override 'CUSTOMER_IDD' does not match any column on table 'BILLING_USAGE'/
+      )
+    end
+
     it 'designates the first column as primary key when no "id" exists' do
       allow(columns_stmt).to receive(:fetch_all).and_return([
                                                               [nil, nil, 'T', 'PK', ODBC::SQL_VARCHAR, nil, nil, nil,
