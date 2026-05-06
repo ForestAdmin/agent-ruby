@@ -60,7 +60,7 @@ module ForestAdminDatasourceSnowflake
       upper = table_name.to_s.upcase
       return Array(@primary_keys_override[upper]) if @primary_keys_override.key?(upper)
 
-      snowflake_primary_keys[upper] || []
+      (snowflake_primary_keys || {})[upper] || []
     end
 
     def primary_keys_override_for(table_name)
@@ -71,7 +71,7 @@ module ForestAdminDatasourceSnowflake
     end
 
     def snowflake_columns_for(table_name)
-      snowflake_columns[table_name.to_s.upcase] || []
+      (snowflake_columns || {})[table_name.to_s.upcase] || []
     end
 
     private
@@ -93,7 +93,7 @@ module ForestAdminDatasourceSnowflake
         end
       end
     rescue ::ODBC::Error
-      {}
+      nil
     end
 
     def build_snowflake_columns_query
@@ -121,7 +121,7 @@ module ForestAdminDatasourceSnowflake
             .transform_values { |table_rows| table_rows.sort_by { |r| r[5].to_i }.map { |r| r[4].to_s } }
       end
     rescue ::ODBC::Error
-      {}
+      nil
     end
 
     def open_connection(conn_str)
