@@ -4,6 +4,7 @@ module ForestAdminDatasourceZendesk
     include Introspection
 
     MAX_PER_PAGE = 100
+    MAX_TOTAL_RESULTS = 1000
 
     def initialize(configuration)
       @configuration = configuration

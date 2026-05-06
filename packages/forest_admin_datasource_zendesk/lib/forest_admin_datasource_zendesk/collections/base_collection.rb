@@ -63,6 +63,12 @@ module ForestAdminDatasourceZendesk
 
         per_page = page.limit&.positive? ? [page.limit, Client::MAX_PER_PAGE].min : Client::MAX_PER_PAGE
         page_num = (page.offset.to_i / per_page) + 1
+        if page_num * per_page > Client::MAX_TOTAL_RESULTS
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Zendesk Search caps total results at #{Client::MAX_TOTAL_RESULTS}; " \
+                "page #{page_num} (offset=#{page.offset}, per_page=#{per_page}) exceeds this limit. " \
+                'Narrow the filter to fetch records past this point.'
+        end
         [page_num, per_page]
       end
 
