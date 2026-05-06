@@ -170,6 +170,13 @@ RSpec.describe ForestAdminDatasourceSnowflake::Utils::Query do
       expect(groups).to eq([])
     end
 
+    it 'falls through to COUNT(*) when the field is an empty string rather than emitting COUNT("")' do
+      agg = instance_double('Aggregation', operation: 'Count', field: '', groups: [])
+      sql, = described_class.new(collection, aggregation: agg).to_aggregate_sql
+
+      expect(sql).to eq('SELECT COUNT(*) FROM "BILLING_USAGE"')
+    end
+
     it 'builds SUM with WHERE and GROUP BY, returns group columns alongside SQL' do
       filter = Filter.new(condition_tree: ConditionTreeLeaf.new('STATUS', Operators::EQUAL, 'paid'))
       sql, binds, groups = described_class.new(

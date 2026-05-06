@@ -63,13 +63,13 @@ module ForestAdminDatasourceSnowflake
         op    = aggregation.operation.to_s.upcase
         field = aggregation.field
 
+        blank_field = field.nil? || field.to_s.empty?
+
         case op
         when 'COUNT'
-          field ? "COUNT(#{q(field)})" : 'COUNT(*)'
+          blank_field ? 'COUNT(*)' : "COUNT(#{q(field)})"
         when 'SUM', 'AVG', 'MIN', 'MAX'
-          if field.nil? || field.to_s.empty?
-            raise ForestAdminDatasourceSnowflake::Error, "Aggregation '#{op}' requires a field"
-          end
+          raise ForestAdminDatasourceSnowflake::Error, "Aggregation '#{op}' requires a field" if blank_field
 
           "#{op}(#{q(field)})"
         else
