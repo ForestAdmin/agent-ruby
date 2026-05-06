@@ -8,6 +8,7 @@ module ForestAdminAgent
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Utils
         include ForestAdminDatasourceToolkit::Components::Query
+
         def setup_routes
           add_route('forest_show', 'get', '/:collection_name/:id', ->(args) { handle_request(args) })
 

@@ -5,6 +5,7 @@ module ForestAdminDatasourceCustomizer
     module Computed
       module Utils
         include ForestAdminDatasourceToolkit::Components::Query
+
         describe Flattener do
           it 'unflatten() should work with simple case' do
             flat_list = [

@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceMongoid
   module Parser
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe Validation do
       before do
         logger = instance_double(Logger, log: nil)

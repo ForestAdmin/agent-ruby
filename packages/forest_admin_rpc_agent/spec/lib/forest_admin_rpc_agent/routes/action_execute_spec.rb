@@ -6,6 +6,7 @@ module ForestAdminRpcAgent
     include ForestAdminDatasourceRpc
     include ForestAdminDatasourceToolkit::Components::Query
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe ActionExecute do
       include_context 'with caller'
       subject(:route) { described_class.new }

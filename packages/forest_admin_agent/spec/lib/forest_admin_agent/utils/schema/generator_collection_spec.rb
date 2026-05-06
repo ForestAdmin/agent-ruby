@@ -5,6 +5,7 @@ module ForestAdminAgent
     module Schema
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
+
       describe GeneratorCollection do
         before do
           @datasource = Datasource.new

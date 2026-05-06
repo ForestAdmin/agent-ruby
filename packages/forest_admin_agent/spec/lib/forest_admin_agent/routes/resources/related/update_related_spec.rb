@@ -7,6 +7,7 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
         describe UpdateRelated do
           include_context 'with caller'
           subject(:update) { described_class.new }

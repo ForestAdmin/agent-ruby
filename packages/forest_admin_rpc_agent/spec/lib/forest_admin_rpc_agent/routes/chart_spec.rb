@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminRpcAgent
   module Routes
     include ForestAdminDatasourceRpc
+
     describe Chart do
       include_context 'with caller'
 

@@ -5,6 +5,7 @@ module ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Exceptions
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe FieldValidator do
       before do
         @datasource = Datasource.new

@@ -5,6 +5,7 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Validations
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceToolkit::Exceptions
+
         attr_reader :validation
 
         def initialize(child_collection, datasource)

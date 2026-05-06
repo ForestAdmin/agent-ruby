@@ -19,7 +19,7 @@ module ForestAdminDatasourceToolkit
                 depends_on: [Operators::MATCH],
                 for_types: ['String'],
                 replacer: proc { |leaf|
-                  regex = leaf.value.gsub(/([\.\\\+\*\?\[\^\]\$\(\)\{\}\=\!\<\>\|\:\-])/, '\\\\\1')
+                  regex = leaf.value.gsub(/([.\\+*?\[\^\]$(){}=!<>|:-])/, '\\\\\1')
                   regex.gsub!('%', '.*')
                   regex.tr!('_', '.')
 

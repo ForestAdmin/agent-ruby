@@ -5,6 +5,7 @@ module ForestAdminAgent
     module Schema
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
+
       describe GeneratorField do
         context 'when field is polymorphic relation' do
           before do

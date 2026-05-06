@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminAgent
   module Utils
     include ForestAdminDatasourceToolkit::Components::Query
+
     describe CsvGenerator do
       let(:projection) { Projection.new(%w[id last_name first_name email active created_at updated_at address:planet]) }
       let(:records) do

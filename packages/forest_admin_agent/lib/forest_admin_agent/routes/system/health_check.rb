@@ -3,6 +3,7 @@ module ForestAdminAgent
     module System
       class HealthCheck < AbstractRoute
         include ForestAdminAgent::Builder
+
         def setup_routes
           add_route('forest', 'GET', '/', ->(args) { handle_request(args) })
 

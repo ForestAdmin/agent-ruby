@@ -5,6 +5,7 @@ module ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Components::Query
+
     describe SortValidator do
       let(:collection_user) do
         datasource = Datasource.new

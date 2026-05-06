@@ -44,8 +44,8 @@ module ForestAdminDatasourceActiveRecord
         rows.map do |row|
           {
             'value' => row.send(@operation.to_sym),
-            'group' => @aggregation.groups.each_with_object({}) do |group, memo|
-              memo[group[:field]] = row.send(group[:field].to_sym)
+            'group' => @aggregation.groups.to_h do |group|
+              [group[:field], row.send(group[:field].to_sym)]
             end
           }
         end

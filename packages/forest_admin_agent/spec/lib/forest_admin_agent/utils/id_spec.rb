@@ -97,9 +97,11 @@ module ForestAdminAgent
                 parent_association_name: nil,
                 all_records: true,
                 all_records_subset_query: [
-                  'fields[Car]' => 'id,first_name,last_name',
-                  'page[number]' => 1,
-                  'page[size]' => 15
+                  {
+                    'fields[Car]' => 'id,first_name,last_name',
+                    'page[number]' => 1,
+                    'page[size]' => 15
+                  }
                 ],
                 all_records_ids_excluded: ['4'],
                 smart_action_id: nil
@@ -122,9 +124,11 @@ module ForestAdminAgent
                 parent_association_name: nil,
                 all_records: false,
                 all_records_subset_query: [
-                  'fields[Car]' => 'id,first_name,last_name',
-                  'page[number]' => 1,
-                  'page[size]' => 15
+                  {
+                    'fields[Car]' => 'id,first_name,last_name',
+                    'page[number]' => 1,
+                    'page[size]' => 15
+                  }
                 ],
                 all_records_ids_excluded: ['4'],
                 smart_action_id: nil

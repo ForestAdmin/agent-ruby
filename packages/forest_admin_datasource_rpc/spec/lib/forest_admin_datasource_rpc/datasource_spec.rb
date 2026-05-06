@@ -17,7 +17,7 @@ module ForestAdminDatasourceRpc
     let(:datasource) { described_class.new({ uri: 'http://localhost' }, introspection) }
     let(:caller) { build_caller }
 
-    include_examples 'with introspection'
+    include_context 'with introspection'
 
     context 'when initialize the datasource' do
       it 'add collections' do

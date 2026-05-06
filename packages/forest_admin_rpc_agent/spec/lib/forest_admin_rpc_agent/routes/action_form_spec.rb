@@ -6,6 +6,7 @@ module ForestAdminRpcAgent
   module Routes
     include ForestAdminDatasourceRpc
     include ForestAdminDatasourceToolkit::Components::Query
+
     describe ActionForm do
       include_context 'with caller'
       subject(:route) { described_class.new }

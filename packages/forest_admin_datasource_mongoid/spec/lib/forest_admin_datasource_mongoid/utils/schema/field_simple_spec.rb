@@ -12,6 +12,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             Class.new do
               include Mongoid::Document
+
               field :a_field, type: Integer
               validates :a_field, presence: true
             end
@@ -28,6 +29,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             Class.new do
               include Mongoid::Document
+
               field :a_field, type: Integer
             end
           end
@@ -43,6 +45,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             Class.new do
               include Mongoid::Document
+
               field :a_field, type: String, default: 'default_value'
             end
           end
@@ -66,6 +69,7 @@ module ForestAdminDatasourceMongoid
           it 'builds the field schema with is_read_only as true' do
             class ImmutableFieldModel
               include Mongoid::Document
+
               field :a_field, type: Date
               attr_readonly :a_field
             end
@@ -83,6 +87,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             Class.new do
               include Mongoid::Document
+
               field :a_field, type: Integer
               validates :a_field, inclusion: { in: [1, 2] }
             end
@@ -100,6 +105,7 @@ module ForestAdminDatasourceMongoid
             let(:model) do
               Class.new do
                 include Mongoid::Document
+
                 field :a_field, type: Array
               end
             end
@@ -115,11 +121,13 @@ module ForestAdminDatasourceMongoid
             it 'builds the right schema' do
               class ObjectArrayModel
                 include Mongoid::Document
+
                 embeds_many :nested_objects, class_name: 'NestedObject'
               end
 
               class NestedObject
                 include Mongoid::Document
+
                 field :level, type: Integer
               end
 
@@ -134,11 +142,13 @@ module ForestAdminDatasourceMongoid
           it 'adds a relation _manyToOne in the fields schema' do
             class ManyToOneModel
               include Mongoid::Document
+
               belongs_to :company, class_name: 'Company'
             end
 
             class Company
               include Mongoid::Document
+
               field :name, type: String
             end
 

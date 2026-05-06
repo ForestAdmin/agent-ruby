@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Exceptions
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+
     describe ConditionTreeValidator do
       describe 'when the field is an UUID' do
         let(:collection) do

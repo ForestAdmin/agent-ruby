@@ -13,7 +13,7 @@ module ForestAdminDatasourceMongoid
     attr_reader :model, :stack
 
     def initialize(datasource, model, stack)
-      prefix = stack[stack.length - 1][:prefix]
+      prefix = stack[-1][:prefix]
 
       @model = model
       @stack = stack

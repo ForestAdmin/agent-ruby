@@ -4,6 +4,7 @@ module ForestAdminDatasourceToolkit
   module Components
     module Contracts
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe CollectionContract do
         subject(:collection) { described_class.new }
 

@@ -4,6 +4,7 @@ module ForestAdminDatasourceToolkit
   module Components
     module Query
       include ForestAdminDatasourceToolkit::Schema
+
       describe Projection do
         let(:collection) do
           collection = Collection.new(Datasource.new, '__collection__')

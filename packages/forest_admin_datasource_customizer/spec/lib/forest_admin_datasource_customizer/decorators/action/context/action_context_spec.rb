@@ -8,6 +8,7 @@ module ForestAdminDatasourceCustomizer
         include ForestAdminDatasourceToolkit::Decorators
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query
+
         describe ActionContext do
           include_context 'with caller'
           before do

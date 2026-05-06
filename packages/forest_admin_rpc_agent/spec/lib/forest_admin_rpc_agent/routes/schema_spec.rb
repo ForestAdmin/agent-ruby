@@ -4,6 +4,7 @@ require 'rack'
 module ForestAdminRpcAgent
   module Routes
     include ForestAdminDatasourceRpc
+
     describe Schema do
       let(:route) { described_class.new }
       let(:agent) { instance_double(ForestAdminRpcAgent::Agent) }

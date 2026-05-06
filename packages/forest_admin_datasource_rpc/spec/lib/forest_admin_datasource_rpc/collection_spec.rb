@@ -18,7 +18,7 @@ module ForestAdminDatasourceRpc
     let(:collection) { datasource.get_collection('Product') }
     let(:caller) { build_caller }
 
-    include_examples 'with introspection'
+    include_context 'with introspection'
 
     context 'when initialized' do
       it 'uses the datasource shared RPC client' do

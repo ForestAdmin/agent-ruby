@@ -7,6 +7,7 @@ module ForestAdminAgent
       class Store < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query
+
         def setup_routes
           add_route('forest_store', 'post', '/:collection_name', ->(args) { handle_request(args) })
 

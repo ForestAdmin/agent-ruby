@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Override
       class OverrideCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include Context
+
         attr_reader :create_handler, :update_handler, :delete_handler
 
         def create(caller, data)

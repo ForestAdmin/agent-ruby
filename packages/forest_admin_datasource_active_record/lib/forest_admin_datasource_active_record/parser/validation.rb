@@ -2,6 +2,7 @@ module ForestAdminDatasourceActiveRecord
   module Parser
     module Validation
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       def get_validations(column)
         validations = []
         # NOTICE: Do not consider validations if a before_validation Active Records

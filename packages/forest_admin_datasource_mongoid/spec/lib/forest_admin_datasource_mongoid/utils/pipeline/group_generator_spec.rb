@@ -4,6 +4,7 @@ module ForestAdminDatasourceMongoid
   module Utils
     module Pipeline
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe GroupGenerator do
         it 'creates a pipeline for sum (w/o field nor group)' do
           aggregation = Aggregation.new(operation: 'Sum', field: 'price')

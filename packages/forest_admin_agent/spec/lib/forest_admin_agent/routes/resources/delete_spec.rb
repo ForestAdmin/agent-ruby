@@ -8,6 +8,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+
       describe Delete do
         include_context 'with caller'
         subject(:delete) { described_class.new }

@@ -4,6 +4,7 @@ module ForestAdminDatasourceMongoid
       class MongoidSchema
         include ForestAdminDatasourceToolkit::Exceptions
         include Utils::Helpers
+
         attr_reader :is_array, :is_leaf, :fields, :models
 
         def initialize(model, fields, is_array, is_leaf)

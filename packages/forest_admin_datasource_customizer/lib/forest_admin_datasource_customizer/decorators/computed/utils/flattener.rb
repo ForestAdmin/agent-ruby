@@ -53,10 +53,10 @@ module ForestAdminDatasourceCustomizer
                 end
 
                 # for markers, the value tells us which fields are null so that we can set them.
-                if parts[parts.length - 1] == MARKER_NAME
+                if parts[-1] == MARKER_NAME
                   value.nil? ? nil : Undefined.new
-                elsif value&.key?(parts[parts.length - 1])
-                  value[parts[parts.length - 1]]
+                elsif value&.key?(parts[-1])
+                  value[parts[-1]]
                 else
                   Undefined.new
                 end

@@ -4,6 +4,7 @@ module ForestAdminDatasourceMongoid
   module Utils
     module Pipeline
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe FilterGenerator do
         before do
           logger = instance_double(Logger, log: nil)

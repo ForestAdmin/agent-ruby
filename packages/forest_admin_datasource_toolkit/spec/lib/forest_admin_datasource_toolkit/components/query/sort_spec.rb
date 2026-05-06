@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Components::Query::SortUtils
+
       describe Sort do
         let(:sort) { described_class.new([{ field: 'column1', ascending: true }, { field: 'column2', ascending: false }]) }
 

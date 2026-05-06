@@ -1,6 +1,7 @@
 module ForestAdminDatasourceCustomizer
   class DatasourceCustomizer
     include DSL::DatasourceHelpers
+
     attr_reader :stack, :composite_datasource
 
     def initialize(_db_config = {})

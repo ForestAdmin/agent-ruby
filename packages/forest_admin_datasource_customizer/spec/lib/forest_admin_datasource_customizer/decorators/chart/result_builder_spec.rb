@@ -7,6 +7,7 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Decorators
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe ResultBuilder do
         let(:builder) { described_class.new }
 

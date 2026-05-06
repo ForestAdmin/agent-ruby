@@ -5,6 +5,7 @@ module ForestAdminRpcAgent
     include ForestAdminDatasourceRpc
     include ForestAdminDatasourceToolkit::Schema
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe Update do
       include_context 'with caller'
 

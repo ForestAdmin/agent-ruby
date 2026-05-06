@@ -3,6 +3,7 @@ module ForestAdminDatasourceToolkit
     module Query
       class Projection < Array
         include ForestAdminDatasourceToolkit::Utils
+
         def with_pks(collection)
           ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection).each do |key|
             push(key) unless include?(key)

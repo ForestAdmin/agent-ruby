@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceMongoid
   module Parser
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe Column do
       let(:dummy_class) { Class.new { extend Column } }
 
@@ -75,6 +76,7 @@ module ForestAdminDatasourceMongoid
         it 'returns embedded fields for a model' do
           model = Class.new do
             include Mongoid::Document
+
             embeds_many :embedded_items
           end
 
@@ -85,6 +87,7 @@ module ForestAdminDatasourceMongoid
         it 'returns an empty hash when no embedded fields are present' do
           model = Class.new do
             include Mongoid::Document
+
             field :simple_field, type: String
           end
 

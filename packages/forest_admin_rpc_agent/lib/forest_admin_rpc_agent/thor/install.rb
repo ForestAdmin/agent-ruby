@@ -5,6 +5,7 @@ module ForestAdminRpcAgent
   module Thor
     class Install < ::Thor
       include ::Thor::Actions
+
       # Run the command:
       # for a rails app : forest_admin_rpc_agent install AUTH_SECRET_FROM_YOUR_FOREST_APP
       # for a sinatra app : forest_admin_rpc_agent install AUTH_SECRET_FROM_YOUR_FOREST_APP --app_file=app.rb

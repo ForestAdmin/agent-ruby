@@ -23,14 +23,14 @@ module ForestAdminDatasourceMongoid
             # Create inverse of 'parent' relationship so that the relation name matches the actual name
             # of the data which is stored in the database.
             stack = collection.stack
-            prefix = stack[stack.length - 1][:prefix]
+            prefix = stack[-1][:prefix]
             is_array = MongoidSchema.from_model(collection.model).apply_stack(stack).is_array
 
             type = is_array ? OneToManySchema : OneToOneSchema
             inverse_name = escape(prefix)
 
             if stack.length > 2
-              previous_length = stack[stack.length - 2][:prefix].length + 1
+              previous_length = stack[-2][:prefix].length + 1
               inverse_name = prefix[previous_length..]
             end
           else

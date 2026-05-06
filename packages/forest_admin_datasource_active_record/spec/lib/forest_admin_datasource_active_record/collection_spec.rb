@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module ForestAdminDatasourceActiveRecord
   include ForestAdminDatasourceToolkit::Schema
+
   describe Collection do
     context 'without polymorphic support' do
       let(:datasource) { Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }) }

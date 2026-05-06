@@ -75,8 +75,8 @@ module ForestAdminDatasourceMongoid
           def compute_groups_projection(groups)
             return { '$literal' => {} } if groups.nil? || groups.empty?
 
-            groups.each_with_object({}) do |group, memo|
-              memo[group[:field]] = "$_id.#{group[:field]}"
+            groups.to_h do |group|
+              [group[:field], "$_id.#{group[:field]}"]
             end
           end
         end

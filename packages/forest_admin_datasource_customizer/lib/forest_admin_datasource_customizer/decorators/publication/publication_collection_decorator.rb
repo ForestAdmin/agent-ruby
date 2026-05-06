@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Publication
       class PublicationCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Exceptions
+
         attr_reader :blacklist
 
         def initialize(child_collection, datasource)

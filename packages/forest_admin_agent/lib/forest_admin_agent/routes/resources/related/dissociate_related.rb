@@ -8,6 +8,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query
+
           def setup_routes
             add_route(
               'forest_related_dissociate',

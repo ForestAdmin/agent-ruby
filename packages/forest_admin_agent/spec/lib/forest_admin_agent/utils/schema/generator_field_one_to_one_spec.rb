@@ -5,6 +5,7 @@ module ForestAdminAgent
     module Schema
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
+
       describe GeneratorField do
         context 'when field is OneToOne relation' do
           before do
