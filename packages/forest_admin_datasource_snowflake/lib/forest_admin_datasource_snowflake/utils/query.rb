@@ -102,10 +102,8 @@ module ForestAdminDatasourceSnowflake
       def translate_leaf(leaf)
         field = q(leaf.field)
         case leaf.operator
-        when Operators::EQUAL                  then bind!(leaf.value)
-                                                    "#{field} = ?"
-        when Operators::NOT_EQUAL              then bind!(leaf.value)
-                                                    "#{field} <> ?"
+        when Operators::EQUAL                  then translate_equality(field, leaf.value)
+        when Operators::NOT_EQUAL              then translate_equality(field, leaf.value, negate: true)
         when Operators::LESS_THAN              then bind!(leaf.value)
                                                     "#{field} < ?"
         when Operators::GREATER_THAN           then bind!(leaf.value)
@@ -137,6 +135,13 @@ module ForestAdminDatasourceSnowflake
           raise ForestAdminDatasourceSnowflake::Error,
                 "Unsupported operator '#{leaf.operator}' on field '#{leaf.field}'"
         end
+      end
+
+      def translate_equality(quoted_field, value, negate: false)
+        return "#{quoted_field} #{negate ? "IS NOT NULL" : "IS NULL"}" if value.nil?
+
+        bind!(value)
+        "#{quoted_field} #{negate ? "<>" : "="} ?"
       end
 
       def translate_in(quoted_field, values, negate: false)

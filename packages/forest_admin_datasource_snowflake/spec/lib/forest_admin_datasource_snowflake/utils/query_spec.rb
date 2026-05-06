@@ -72,6 +72,19 @@ RSpec.describe ForestAdminDatasourceSnowflake::Utils::Query do
       expect(ew_binds).to eq(['%bar'])
     end
 
+    it 'translates EQUAL / NOT_EQUAL with a nil value to IS NULL / IS NOT NULL (SQL three-valued logic)' do
+      eq_nil = Filter.new(condition_tree: ConditionTreeLeaf.new('NOTES', Operators::EQUAL,     nil))
+      ne_nil = Filter.new(condition_tree: ConditionTreeLeaf.new('NOTES', Operators::NOT_EQUAL, nil))
+
+      eq_sql, eq_binds = described_class.new(collection, projection: Projection.new(['id']), filter: eq_nil).to_sql
+      ne_sql, ne_binds = described_class.new(collection, projection: Projection.new(['id']), filter: ne_nil).to_sql
+
+      expect(eq_sql).to include('"NOTES" IS NULL')
+      expect(ne_sql).to include('"NOTES" IS NOT NULL')
+      expect(eq_binds).to eq([])
+      expect(ne_binds).to eq([])
+    end
+
     it 'translates PRESENT / MISSING / BLANK without bind values' do
       [Operators::PRESENT, Operators::MISSING, Operators::BLANK].each do |op|
         filter = Filter.new(condition_tree: ConditionTreeLeaf.new('id', op, nil))
