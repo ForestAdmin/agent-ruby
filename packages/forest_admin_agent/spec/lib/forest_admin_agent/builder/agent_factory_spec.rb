@@ -160,6 +160,64 @@ module ForestAdminAgent
             expect(instance.container).not_to have_received(:register)
             expect(instance).not_to have_received(:send_schema)
           end
+
+          it 'skips reload if another reload is already in progress' do
+            instance = described_class.instance
+
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            # Simulate a long-running reload by blocking inside customizer.reload!
+            reload_started = Queue.new
+            proceed = Queue.new
+
+            allow(instance.customizer).to receive(:reload!) do
+              reload_started << true
+              proceed.pop
+            end
+            allow(instance).to receive(:send_schema)
+
+            first_thread = Thread.new { instance.reload! }
+            reload_started.pop # wait until the first reload is inside customizer.reload!
+
+            # Second reload should be skipped
+            instance.reload!
+
+            expect(logger).to have_received(:log).with('Info', 'Agent is already reloading. Do nothing.')
+
+            proceed << true # unblock first reload
+            first_thread.join
+          end
+
+          it 'allows a new reload after the previous one completes' do
+            instance = described_class.instance
+
+            allow(instance.customizer).to receive(:reload!)
+            allow(instance).to receive(:send_schema)
+
+            instance.reload!
+            instance.reload!
+
+            expect(instance.customizer).to have_received(:reload!).twice
+          end
+
+          it 'resets the reloading flag even when an error occurs' do
+            instance = described_class.instance
+
+            logger = instance_spy(Services::LoggerService)
+            instance.instance_variable_set(:@logger, logger)
+
+            allow(instance.customizer).to receive(:reload!).and_raise(StandardError.new('Boom'))
+            allow(instance).to receive(:send_schema)
+
+            instance.reload!
+
+            # Should allow a subsequent reload (flag was reset despite the error)
+            allow(instance.customizer).to receive(:reload!)
+            instance.reload!
+
+            expect(instance.customizer).to have_received(:reload!).twice
+          end
         end
 
         describe 'send_schema' do

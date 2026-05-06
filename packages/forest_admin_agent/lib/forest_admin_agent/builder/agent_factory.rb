@@ -13,6 +13,11 @@ module ForestAdminAgent
       attr_reader :customizer, :container, :has_env_secret
       attr_accessor :schema_only_mode
 
+      def initialize
+        super
+        @reloading = false
+      end
+
       def setup(options)
         @options = options
         @has_env_secret = options.to_h.key?(:env_secret)
@@ -75,6 +80,14 @@ module ForestAdminAgent
       end
 
       def reload!
+        if @reloading
+          @logger.log('Info', 'Agent is already reloading. Do nothing.')
+          return
+        end
+
+        @reloading = true
+        @logger.log('Info', 'Agent is reloading...')
+
         begin
           @customizer.reload!(logger: @logger)
         rescue StandardError => e
@@ -89,6 +102,8 @@ module ForestAdminAgent
         @logger.log('Info', 'route cache cleared due to agent reload')
 
         send_schema
+      ensure
+        @reloading = false
       end
 
       def send_schema(force: false)
