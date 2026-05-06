@@ -15,6 +15,9 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
 
   let(:tables_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
+  let(:current_schema_stmt) do
+    instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: [['PUBLIC']])
+  end
   let(:bulk_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
@@ -28,6 +31,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
 
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
     allow(odbc_connection).to receive(:prepare).with(/^USE SCHEMA/).and_return(session_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SELECT CURRENT_SCHEMA()').and_return(current_schema_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(bulk_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
@@ -71,6 +75,46 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       )
       expect(ds.collections.keys).to eq(['B'])
     end
+
+    it 'snapshots CURRENT_SCHEMA() at boot when Schema= is missing so the datasource scopes to one schema' do
+      allow(current_schema_stmt).to receive(:fetch_all).and_return([['ANALYTICS']])
+      allow(tables_stmt).to receive(:fetch_all).and_return([
+                                                             ['BILLING_POC', 'ANALYTICS', 'X', 'TABLE', nil],
+                                                             ['BILLING_POC', 'OTHER',     'Y', 'TABLE', nil]
+                                                           ])
+
+      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      expect(ds.collections.keys).to eq(['X'])
+    end
+
+    it 'does not call CURRENT_SCHEMA() when Schema= is supplied explicitly' do
+      expect(odbc_connection).not_to receive(:prepare).with('SELECT CURRENT_SCHEMA()')
+
+      described_class.new(conn_str: 'DRIVER={X};Schema=ANALYTICS', pool_size: 1)
+    end
+
+    it 'raises a clear error when Schema= is absent and CURRENT_SCHEMA() returns nil' do
+      allow(current_schema_stmt).to receive(:fetch_all).and_return([[nil]])
+
+      expect do
+        described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      end.to raise_error(
+        ForestAdminDatasourceSnowflake::Error,
+        /Snowflake session has no default schema.*set Schema=<name>/
+      )
+    end
+
+    it 'raises a clear error when Schema= is absent and CURRENT_SCHEMA() errors' do
+      allow(current_schema_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
+
+      expect do
+        described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      end.to raise_error(
+        ForestAdminDatasourceSnowflake::Error,
+        /Could not resolve default Snowflake schema.*permission denied.*set Schema=<name>/
+      )
+    end
+
   end
 
   describe '#with_connection' do

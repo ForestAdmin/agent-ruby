@@ -16,6 +16,9 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
   let(:tables_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:prepared_stmt) { instance_double('ODBC::Statement', drop: nil) }
   let(:session_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil) }
+  let(:current_schema_stmt) do
+    instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: [['PUBLIC']])
+  end
   let(:bulk_columns_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:pks_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
   let(:imported_keys_stmt) { instance_double('ODBC::Statement', drop: nil, execute: nil, fetch_all: []) }
@@ -33,6 +36,8 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
 
     allow(odbc_connection).to receive(:tables).and_return(tables_stmt)
     allow(odbc_connection).to receive(:prepare).with(/ALTER SESSION/).and_return(session_stmt)
+    allow(odbc_connection).to receive(:prepare).with(/^USE SCHEMA/).and_return(session_stmt)
+    allow(odbc_connection).to receive(:prepare).with('SELECT CURRENT_SCHEMA()').and_return(current_schema_stmt)
     allow(odbc_connection).to receive(:prepare).with(/INFORMATION_SCHEMA\.COLUMNS/).and_return(bulk_columns_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW PRIMARY KEYS IN SCHEMA').and_return(pks_stmt)
     allow(odbc_connection).to receive(:prepare).with('SHOW IMPORTED KEYS IN SCHEMA').and_return(imported_keys_stmt)
@@ -185,6 +190,7 @@ RSpec.describe ForestAdminDatasourceSnowflake::Collection do
     end
 
     it 'returns an empty array when the query yields no rows' do
+      collection
       allow(odbc_connection).to receive(:prepare).and_return(prepared_stmt)
       allow(prepared_stmt).to receive(:execute)
       allow(prepared_stmt).to receive(:fetch_all).and_return(nil)

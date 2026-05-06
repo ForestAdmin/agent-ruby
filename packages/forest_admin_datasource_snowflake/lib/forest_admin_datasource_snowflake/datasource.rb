@@ -34,6 +34,8 @@ module ForestAdminDatasourceSnowflake
         open_connection(conn_str)
       end
 
+      @schema_override ||= resolve_default_schema!
+
       generate_collections
       discover_relations
     end
@@ -148,6 +150,27 @@ module ForestAdminDatasourceSnowflake
       pair  = attrs.find { |k, _| k.to_s.casecmp('schema').zero? }
       value = pair && pair[1]
       value if value && !value.empty?
+    end
+
+    def resolve_default_schema!
+      resolved = with_connection do |conn|
+        stmt = conn.prepare('SELECT CURRENT_SCHEMA()')
+        begin
+          stmt.execute
+          (stmt.fetch_all || []).first&.first
+        ensure
+          stmt.drop
+        end
+      end
+
+      return resolved if resolved && !resolved.to_s.empty?
+
+      raise ForestAdminDatasourceSnowflake::Error,
+            'Snowflake session has no default schema; set Schema=<name> in the connection string ' \
+            'so the datasource can scope introspection to a single schema.'
+    rescue ::ODBC::Error => e
+      raise ForestAdminDatasourceSnowflake::Error,
+            "Could not resolve default Snowflake schema (#{e.message}); set Schema=<name> in the connection string."
     end
 
     def apply_session_settings(conn)
