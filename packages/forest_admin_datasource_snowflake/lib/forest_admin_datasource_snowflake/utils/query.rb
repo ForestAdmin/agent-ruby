@@ -16,7 +16,8 @@ module ForestAdminDatasourceSnowflake
 
       def to_sql
         @binds = []
-        cols = @projection ? @projection.columns.map { |c| q(c) } : ['*']
+        cols = @projection&.columns&.map { |c| q(c) }
+        cols = ['*'] if cols.nil? || cols.empty?
         sql  = "SELECT #{cols.join(", ")} FROM #{q(@collection.table_name)}"
 
         where = build_where_clause(@filter&.condition_tree)

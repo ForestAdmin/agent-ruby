@@ -19,6 +19,11 @@ RSpec.describe ForestAdminDatasourceSnowflake::Utils::Query do
       expect(sql).to eq('SELECT * FROM "BILLING_USAGE"')
     end
 
+    it 'selects * when the projection has no scalar columns (e.g. only relation paths)' do
+      sql, = described_class.new(collection, projection: Projection.new(%w[customer:name product:title])).to_sql
+      expect(sql).to eq('SELECT * FROM "BILLING_USAGE"')
+    end
+
     it 'translates a single equal leaf to a parameterized WHERE with quoted column' do
       filter = Filter.new(
         condition_tree: ConditionTreeLeaf.new('CUSTOMER_ID', Operators::EQUAL, 42)
