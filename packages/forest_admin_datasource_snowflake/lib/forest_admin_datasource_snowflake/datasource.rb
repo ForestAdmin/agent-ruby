@@ -142,7 +142,14 @@ module ForestAdminDatasourceSnowflake
     end
 
     def parse_conn_str(conn_str)
-      conn_str.split(';').reject(&:empty?).to_h { |option| option.split('=', 2) }
+      conn_str.split(';').reject(&:empty?).to_h do |option|
+        pair = option.split('=', 2)
+        if pair.size != 2
+          raise ForestAdminDatasourceSnowflake::Error,
+                "Malformed connection string option '#{option}': expected 'key=value'."
+        end
+        pair
+      end
     end
 
     def extract_schema_from_conn_str(conn_str)

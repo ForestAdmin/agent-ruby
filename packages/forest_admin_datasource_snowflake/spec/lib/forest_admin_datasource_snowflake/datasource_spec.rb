@@ -115,6 +115,14 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       )
     end
 
+    it 'raises a clear error when the connection string contains a key-only option (no `=`)' do
+      expect do
+        described_class.new(conn_str: 'Driver=Snowflake;SomeFlag;Server=X', pool_size: 1)
+      end.to raise_error(
+        ForestAdminDatasourceSnowflake::Error,
+        /Malformed connection string option 'SomeFlag': expected 'key=value'/
+      )
+    end
   end
 
   describe '#with_connection' do
