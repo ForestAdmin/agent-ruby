@@ -94,7 +94,8 @@ module ForestAdminDatasourceSnowflake
           stmt.drop
         end
       end
-    rescue ::ODBC::Error
+    rescue ::ODBC::Error => e
+      warn "[forest_admin_datasource_snowflake] column introspection failed: #{e.message}"
       nil
     end
 
@@ -124,7 +125,8 @@ module ForestAdminDatasourceSnowflake
         rows.group_by { |r| r[3].to_s.upcase }
             .transform_values { |table_rows| table_rows.sort_by { |r| r[5].to_i }.map { |r| r[4].to_s } }
       end
-    rescue ::ODBC::Error
+    rescue ::ODBC::Error => e
+      warn "[forest_admin_datasource_snowflake] primary-key introspection failed: #{e.message}"
       nil
     end
 

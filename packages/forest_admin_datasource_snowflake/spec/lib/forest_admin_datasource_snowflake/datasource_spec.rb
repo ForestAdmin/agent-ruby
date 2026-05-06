@@ -179,14 +179,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       expect(ds.primary_keys_for('UNRELATED_TABLE')).to eq([])
     end
 
-    it 'silently skips when SHOW PRIMARY KEYS errors (e.g. permissions)' do
+    it 'warns and returns [] when SHOW PRIMARY KEYS errors (e.g. permissions) so the cause is traceable' do
       allow(pks_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
 
-      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.primary_keys_for('BILLING_USAGE')).to eq([])
+      expect do
+        ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+        expect(ds.primary_keys_for('BILLING_USAGE')).to eq([])
+      end.to output(/primary-key introspection failed: permission denied/).to_stderr
     end
 
     it 'caches a SHOW PRIMARY KEYS failure so repeated lookups do not re-hit Snowflake' do
+      allow($stderr).to receive(:write)
       call_count = 0
       allow(pks_stmt).to receive(:execute) do
         call_count += 1
@@ -219,13 +222,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       expect(datasource.snowflake_columns_for('UNRELATED')).to eq([])
     end
 
-    it 'returns an empty hash when the bulk query errors (lacking permissions, etc.)' do
+    it 'warns and returns [] when the bulk query errors so the cause is traceable' do
       allow(bulk_columns_stmt).to receive(:execute).and_raise(ODBC::Error, 'permission denied')
-      ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
-      expect(ds.snowflake_columns_for('BILLING_USAGE')).to eq([])
+
+      expect do
+        ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+        expect(ds.snowflake_columns_for('BILLING_USAGE')).to eq([])
+      end.to output(/column introspection failed: permission denied/).to_stderr
     end
 
     it 'caches the bulk-query failure so repeated lookups do not re-hit Snowflake' do
+      allow($stderr).to receive(:write)
       call_count = 0
       allow(bulk_columns_stmt).to receive(:execute) do
         call_count += 1
