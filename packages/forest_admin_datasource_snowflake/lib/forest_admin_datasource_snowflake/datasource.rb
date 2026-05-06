@@ -77,7 +77,9 @@ module ForestAdminDatasourceSnowflake
     private
 
     def snowflake_columns
-      @snowflake_columns ||= fetch_snowflake_columns
+      return @snowflake_columns if defined?(@snowflake_columns)
+
+      @snowflake_columns = fetch_snowflake_columns
     end
 
     def fetch_snowflake_columns
@@ -104,7 +106,9 @@ module ForestAdminDatasourceSnowflake
     end
 
     def snowflake_primary_keys
-      @snowflake_primary_keys ||= fetch_snowflake_primary_keys
+      return @snowflake_primary_keys if defined?(@snowflake_primary_keys)
+
+      @snowflake_primary_keys = fetch_snowflake_primary_keys
     end
 
     def fetch_snowflake_primary_keys

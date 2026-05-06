@@ -186,21 +186,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       expect(ds.primary_keys_for('BILLING_USAGE')).to eq([])
     end
 
-    it 'does not poison the cache after a transient ODBC::Error so a later call can recover' do
+    it 'caches a SHOW PRIMARY KEYS failure so repeated lookups do not re-hit Snowflake' do
       call_count = 0
       allow(pks_stmt).to receive(:execute) do
         call_count += 1
-        raise ODBC::Error, 'warehouse momentarily unavailable' if call_count == 1
+        raise ODBC::Error, 'permission denied'
       end
-      allow(pks_stmt).to receive(:fetch_all).and_return([
-                                                          [Time.now, 'DB', 'PUBLIC', 'BILLING_USAGE', 'CUSTOMER_ID',
-                                                           1, 'pk1', 'rely', '']
-                                                        ])
 
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      3.times { ds.primary_keys_for('BILLING_USAGE') }
 
-      expect(ds.primary_keys_for('BILLING_USAGE')).to eq(['CUSTOMER_ID'])
-      expect(call_count).to be >= 2
+      expect(call_count).to eq(1)
     end
   end
 
@@ -229,18 +225,17 @@ RSpec.describe ForestAdminDatasourceSnowflake::Datasource do
       expect(ds.snowflake_columns_for('BILLING_USAGE')).to eq([])
     end
 
-    it 'does not poison the cache after a transient ODBC::Error so a later call can recover' do
+    it 'caches the bulk-query failure so repeated lookups do not re-hit Snowflake' do
       call_count = 0
       allow(bulk_columns_stmt).to receive(:execute) do
         call_count += 1
-        raise ODBC::Error, 'warehouse momentarily unavailable' if call_count == 1
+        raise ODBC::Error, 'permission denied'
       end
 
       ds = described_class.new(conn_str: 'DRIVER={X}', pool_size: 1)
+      3.times { ds.snowflake_columns_for('BILLING_USAGE') }
 
-      expect(ds.snowflake_columns_for('BILLING_USAGE').map { |r| r[1] })
-        .to eq(%w[ID CUSTOMER_ID EVENT_TYPE OCCURRED_AT])
-      expect(call_count).to be >= 2
+      expect(call_count).to eq(1)
     end
 
     it 'binds the schema-override value when Schema= is set in the connection string' do
