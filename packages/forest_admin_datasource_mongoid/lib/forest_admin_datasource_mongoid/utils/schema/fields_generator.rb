@@ -38,7 +38,7 @@ module ForestAdminDatasourceMongoid
 
           return our_schema unless stack.length > 1
 
-          parent_prefix = stack[stack.length - 2][:prefix]
+          parent_prefix = stack[-2][:prefix]
 
           our_schema['_id'] = build_virtual_primary_key
           parent_id = child_schema.fields['parent']['_id']

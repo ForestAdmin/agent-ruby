@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
     module Query
       class Aggregation
         include ForestAdminDatasourceToolkit::Exceptions
+
         attr_reader :operation
         attr_accessor :groups, :field
 

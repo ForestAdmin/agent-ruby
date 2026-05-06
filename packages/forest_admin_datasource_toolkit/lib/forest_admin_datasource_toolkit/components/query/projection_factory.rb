@@ -3,6 +3,7 @@ module ForestAdminDatasourceToolkit
     module Query
       class ProjectionFactory
         include ForestAdminDatasourceToolkit::Utils
+
         def self.all(collection)
           projection_fields = collection.schema[:fields].reduce([]) do |memo, path|
             column_name = path[0]

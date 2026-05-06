@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
   include ForestAdminDatasourceToolkit::Exceptions
+
   describe Datasource do
     let(:datasource) { described_class.new }
 
@@ -54,10 +55,12 @@ module ForestAdminDatasourceMongoid
       it 'accept both dots and colons as separator in options' do
         class_book = Class.new do
           include Mongoid::Document
+
           embeds_one :author, class_name: 'Dummy::Author'
         end
         class_author = Class.new do
           include Mongoid::Document
+
           field :first_name, type: String
           field :last_name, type: String
         end
@@ -77,6 +80,7 @@ module ForestAdminDatasourceMongoid
       it 'raise an error' do
         class_book = Class.new do
           include Mongoid::Document
+
           embeds_one :author
         end
         stub_const('Dummy::Book', class_book)

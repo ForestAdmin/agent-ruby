@@ -7,6 +7,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Schema::Relations
+
       describe Collections do
         include_context 'with caller'
         subject(:capabilities_collections) { described_class.new }

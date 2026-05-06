@@ -5,9 +5,9 @@ gemspec
 group :development, :tests do
   gem "overcommit", "~> 0.60"
   gem "rspec", "~> 3.0"
-  gem "rubocop", "1.77"
-  gem "rubocop-performance", "1.25.0"
-  gem "rubocop-rspec", "3.5.0"
+  gem "rubocop", "1.86.1"
+  gem "rubocop-performance", "1.26.1"
+  gem "rubocop-rspec", "3.9.0"
   gem 'simplecov', "~> 0.22", require: false
   gem 'simplecov_json_formatter', "~> 0.1.4"
 end

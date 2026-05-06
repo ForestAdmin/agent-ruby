@@ -5,6 +5,7 @@ module ForestAdminDatasourceMongoid
   module Utils
     module Pipeline
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe ReparentGenerator do
         let(:author_model) do
           Class.new do

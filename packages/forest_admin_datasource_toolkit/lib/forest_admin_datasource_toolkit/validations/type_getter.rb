@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
   module Validations
     class TypeGetter
       include ForestAdminDatasourceToolkit::Schema::Concerns
+
       def self.get(value, type_context)
         return PrimitiveTypes::JSON if type_context == PrimitiveTypes::JSON
 
@@ -30,6 +31,7 @@ module ForestAdminDatasourceToolkit
 
       class << self
         include ForestAdminDatasourceToolkit::Schema::Concerns
+
         def get_date_type(value)
           return PrimitiveTypes::DATE_ONLY if date?(value) && Date.parse(value).iso8601 == value
 

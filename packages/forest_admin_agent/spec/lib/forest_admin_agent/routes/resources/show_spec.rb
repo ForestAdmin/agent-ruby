@@ -8,6 +8,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       describe Show do
         include_context 'with caller'
         subject(:show) { described_class.new }

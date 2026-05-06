@@ -6,6 +6,7 @@ module ForestAdminDatasourceToolkit
     include ForestAdminDatasourceToolkit::Exceptions
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+
     describe ConditionTreeValidator do
       describe 'when the field is a boolean' do
         it 'not raise an error when it using the In operator with an empty array' do

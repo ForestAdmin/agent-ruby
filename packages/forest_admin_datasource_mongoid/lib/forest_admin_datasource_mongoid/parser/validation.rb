@@ -2,6 +2,7 @@ module ForestAdminDatasourceMongoid
   module Parser
     module Validation
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       def get_validations(model, column)
         return [] if column.is_a?(Hash)
         return [] if before_validation_callback?(model)

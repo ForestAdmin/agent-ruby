@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceMongoid
   module Parser
     include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
     describe Validation do
       before do
         logger = instance_double(Logger, log: nil)
@@ -16,6 +17,7 @@ module ForestAdminDatasourceMongoid
         let(:model) do
           model_class = Class.new do
             include Mongoid::Document
+
             before_validation :some_before_validation_callback
             validates :email, presence: true
 
@@ -37,6 +39,7 @@ module ForestAdminDatasourceMongoid
         let(:model) do
           model_class = Class.new do
             include Mongoid::Document
+
             field :email, type: String
             validates :email, presence: true
           end
@@ -100,6 +103,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             model_class = Class.new do
               include Mongoid::Document
+
               field :title, type: String
               validates :title, length: { minimum: 5 }
             end
@@ -120,6 +124,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             model_class = Class.new do
               include Mongoid::Document
+
               field :title, type: String
               validates :title, length: { maximum: 10 }
             end
@@ -140,6 +145,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             model_class = Class.new do
               include Mongoid::Document
+
               field :title, type: String
               validates :title, length: { is: 8 }
             end
@@ -163,6 +169,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             model_class = Class.new do
               include Mongoid::Document
+
               field :email, type: String
               validates :email, format: { with: URI::MailTo::EMAIL_REGEXP }
             end
@@ -188,6 +195,7 @@ module ForestAdminDatasourceMongoid
           let(:model) do
             model_class = Class.new do
               include Mongoid::Document
+
               field :username, type: String
               validates :username, format: { with: /\A[a-zA-Z0-9_]+\z/, message: 'only allows letters, numbers, and underscores' }
             end

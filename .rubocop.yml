@@ -59,6 +59,24 @@ Lint/EmptyFile:
   Exclude:
     - 'packages/forest_admin_rails/app/models/forest_admin_rails/application_record.rb'
 
+Lint/InterpolationCheck:
+  Exclude:
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/http/error_translator_spec.rb'
+    - 'packages/forest_admin_rails/lib/generators/forest_admin_rails/install_generator.rb'
+
+Naming/MethodName:
+  Exclude:
+    - 'packages/forest_admin_datasource_toolkit/spec/lib/forest_admin_datasource_toolkit/utils/collection_spec.rb'
+
+Style/OneClassPerFile:
+  Exclude:
+    - 'packages/forest_admin_rails/lib/forest_admin_rails/engine.rb'
+
+Style/SelectByKind:
+  Exclude:
+    - 'packages/forest_admin_agent/lib/forest_admin_agent/utils/schema/frontend_validation_utils.rb'
+    - 'packages/forest_admin_datasource_customizer/lib/forest_admin_datasource_customizer/decorators/empty/empty_collection_decorator.rb'
+
 Metrics/AbcSize:
   Enabled: false
 
@@ -425,10 +443,6 @@ Lint/DuplicateBranch:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/utils/error_handler.rb'
 
 Style/PercentLiteralDelimiters:
-  Exclude:
-    - 'packages/forest_admin_rails/lib/generators/forest_admin_rails/install_generator.rb'
-
-Lint/InterpolationCheck:
   Exclude:
     - 'packages/forest_admin_rails/lib/generators/forest_admin_rails/install_generator.rb'
 

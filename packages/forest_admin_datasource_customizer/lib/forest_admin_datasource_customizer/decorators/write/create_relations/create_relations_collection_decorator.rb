@@ -6,6 +6,7 @@ module ForestAdminDatasourceCustomizer
           include ForestAdminDatasourceToolkit::Components::Query
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
+
           def create(caller, data)
             # Step 1: Remove all relations from records, and store them in a map
             # Note: the extractRelations method modifies the records array in place!

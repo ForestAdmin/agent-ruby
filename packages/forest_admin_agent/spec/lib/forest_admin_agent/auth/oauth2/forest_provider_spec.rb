@@ -5,6 +5,7 @@ module ForestAdminAgent
   module Auth
     module OAuth2
       include ForestAdminAgent::Utils
+
       describe ForestProvider do
         let(:rendering_id) { 10 }
         let(:attributes) do

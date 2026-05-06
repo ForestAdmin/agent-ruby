@@ -4,6 +4,7 @@ require 'faraday'
 module ForestAdminRpcAgent
   module Routes
     include ForestAdminDatasourceRpc
+
     describe DatasourceChart do
       include_context 'with caller'
 

@@ -4,6 +4,7 @@ module ForestAdminDatasourceMongoid
   module Utils
     module Pipeline
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe ProjectionGenerator do
         it 'generates a $replaceRoot stage when no fields are provided' do
           pipeline = described_class.project(Projection.new)

@@ -6,6 +6,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+
       describe GeneratorField do
         before do
           @datasource = Datasource.new

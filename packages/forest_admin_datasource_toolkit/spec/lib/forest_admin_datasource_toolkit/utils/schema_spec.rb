@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceToolkit
   module Utils
     include ForestAdminDatasourceToolkit::Schema
+
     describe Schema do
       let(:collection) do
         collection = ForestAdminDatasourceToolkit::Collection.new(Datasource.new, '__collection__')

@@ -2,6 +2,7 @@ require 'spec_helper'
 
 module ForestAdminDatasourceMongoid
   include ForestAdminDatasourceToolkit::Components::Query
+
   describe Collection do
     before do
       logger = instance_double(Logger, log: nil)
@@ -45,6 +46,7 @@ module ForestAdminDatasourceMongoid
     it 'escapes collection names' do
       model = Class.new do
         include Mongoid::Document
+
         field :content, type: String
       end
 

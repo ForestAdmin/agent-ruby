@@ -5,6 +5,7 @@ module ForestAdminDatasourceCustomizer
         class WriteReplaceCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
           include ForestAdminDatasourceToolkit::Exceptions
           include ForestAdminDatasourceToolkit::Validations
+
           attr_reader :handlers
 
           def initialize(child_collection, datasource)

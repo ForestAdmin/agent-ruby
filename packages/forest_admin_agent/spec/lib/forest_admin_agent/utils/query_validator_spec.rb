@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminAgent
   module Utils
     include ForestAdminDatasourceToolkit::Exceptions
+
     describe QueryValidator do
       describe 'valid queries' do
         it 'allows a simple SELECT query' do

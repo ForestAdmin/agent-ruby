@@ -5,6 +5,7 @@ module ForestAdminDatasourceToolkit
     module Query
       include ForestAdminDatasourceToolkit::Schema
       include ForestAdminDatasourceToolkit::Schema::Relations
+
       describe ProjectionFactory do
         describe 'with one to one and many to one relations' do
           before do

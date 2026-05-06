@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceToolkit
   module Validations
     include ForestAdminDatasourceToolkit::Schema::Concerns
+
     describe TypeGetter do
       context 'when get is called' do
         context 'when the value is a number' do

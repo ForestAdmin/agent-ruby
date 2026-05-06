@@ -4,6 +4,7 @@ module ForestAdminDatasourceMongoid
   module Utils
     module Pipeline
       include ForestAdminDatasourceToolkit::Components::Query
+
       describe LookupGenerator do
         describe 'with the root collection' do
           let(:stack) { [{ prefix: nil, as_fields: [], as_models: [] }] }

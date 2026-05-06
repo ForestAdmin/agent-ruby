@@ -4,6 +4,7 @@ module ForestAdminDatasourceToolkit
   module Components
     module Query
       include ForestAdminDatasourceToolkit::Schema
+
       describe Aggregation do
         it 'raise if the operation is invalid' do
           expect do

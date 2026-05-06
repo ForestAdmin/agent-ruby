@@ -88,8 +88,8 @@ module ForestAdminDatasourceCustomizer
       end
 
       def backup_stack
-        instance_variables.each_with_object({}) do |var, hash|
-          hash[var] = instance_variable_get(var)
+        instance_variables.to_h do |var|
+          [var, instance_variable_get(var)]
         end
       end
 

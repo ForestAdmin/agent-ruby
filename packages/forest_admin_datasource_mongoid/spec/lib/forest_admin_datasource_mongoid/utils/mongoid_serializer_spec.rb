@@ -3,6 +3,7 @@ require 'spec_helper'
 module ForestAdminDatasourceMongoid
   module Utils
     include ForestAdminDatasourceToolkit::Components::Query
+
     describe MongoidSerializer do
       describe '#to_hash' do
         describe 'without relations' do

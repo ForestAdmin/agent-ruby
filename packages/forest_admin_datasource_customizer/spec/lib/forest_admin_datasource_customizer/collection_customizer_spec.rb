@@ -7,6 +7,7 @@ module ForestAdminDatasourceCustomizer
   include ForestAdminDatasourceCustomizer::Decorators::Computed
   include ForestAdminDatasourceCustomizer::Decorators::Action
   include ForestAdminDatasourceCustomizer::Context
+
   describe CollectionCustomizer do
     include_context 'with caller'
     before do
@@ -307,7 +308,7 @@ module ForestAdminDatasourceCustomizer
         customizer.add_external_relation(
           'tags',
           {
-            schema: ['etag' => 'String', 'selfLink' => 'String'],
+            schema: [{ 'etag' => 'String', 'selfLink' => 'String' }],
             listRecords: proc {
               [
                 { 'etag' => 'OTD2tB19qn4', 'selfLink' => 'https://www.googleapis.com/books/v1/volumes/_ojXNuzgHRcC' },

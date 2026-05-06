@@ -3,6 +3,7 @@ module ForestAdminDatasourceCustomizer
     module Action
       module WidgetField
         include Types
+
         def self.validate_arg(options, attribute, rule)
           case rule[attribute]
           when 'contains'

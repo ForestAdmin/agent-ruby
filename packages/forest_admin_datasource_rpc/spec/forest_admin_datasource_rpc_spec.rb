@@ -14,7 +14,7 @@ module ForestAdminDatasourceRpc
         allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
       end
 
-      include_examples 'with introspection'
+      include_context 'with introspection'
 
       context 'with unknown options' do
         let(:schema_polling_client) { instance_double(Utils::SchemaPollingClient, start?: true, stop: nil, current_schema: introspection) }

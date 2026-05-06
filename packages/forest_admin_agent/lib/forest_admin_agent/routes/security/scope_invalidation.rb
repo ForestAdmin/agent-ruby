@@ -4,6 +4,7 @@ module ForestAdminAgent
       class ScopeInvalidation < AbstractRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Services
+
         def setup_routes
           add_route(
             'forest_scope_invalidation',

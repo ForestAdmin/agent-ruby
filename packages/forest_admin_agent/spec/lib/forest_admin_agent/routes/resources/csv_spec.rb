@@ -10,6 +10,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
       include ForestAdminDatasourceToolkit::Schema
+
       describe Csv do
         include_context 'with caller'
         subject(:csv) { described_class.new }

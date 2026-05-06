@@ -7,6 +7,7 @@ module ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::SortUtils
+
         describe SortFactory do
           it 'returns a sort instance sorted by primary keys' do
             collection_with_composite_id = Collection.new(Datasource.new, 'Book')
