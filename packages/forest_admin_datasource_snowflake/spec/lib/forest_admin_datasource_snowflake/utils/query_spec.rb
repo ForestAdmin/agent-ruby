@@ -56,6 +56,36 @@ RSpec.describe ForestAdminDatasourceSnowflake::Utils::Query do
       expect(binds).to eq([])
     end
 
+    it 'splits a nil out of an IN list into IS NULL OR IN (...) so NULL rows are matched' do
+      filter = Filter.new(condition_tree: ConditionTreeLeaf.new('STATUS', Operators::IN, ['paid', nil, 'sent']))
+      sql, binds = described_class.new(collection, projection: Projection.new(['id']), filter: filter).to_sql
+
+      expect(sql).to eq('SELECT "id" FROM "BILLING_USAGE" WHERE ("STATUS" IS NULL OR "STATUS" IN (?, ?))')
+      expect(binds).to eq(%w[paid sent])
+    end
+
+    it 'splits a nil out of a NOT_IN list into IS NOT NULL AND NOT IN (...) so NULL rows are excluded' do
+      filter = Filter.new(condition_tree: ConditionTreeLeaf.new('STATUS', Operators::NOT_IN, ['paid', nil]))
+      sql, binds = described_class.new(collection, projection: Projection.new(['id']), filter: filter).to_sql
+
+      expect(sql).to eq('SELECT "id" FROM "BILLING_USAGE" WHERE ("STATUS" IS NOT NULL AND "STATUS" NOT IN (?))')
+      expect(binds).to eq(['paid'])
+    end
+
+    it 'collapses an IN [nil] / NOT_IN [nil] list to IS NULL / IS NOT NULL' do
+      in_only_nil  = Filter.new(condition_tree: ConditionTreeLeaf.new('STATUS', Operators::IN,     [nil]))
+      not_only_nil = Filter.new(condition_tree: ConditionTreeLeaf.new('STATUS', Operators::NOT_IN, [nil]))
+
+      proj = Projection.new(['id'])
+      in_sql,  in_binds  = described_class.new(collection, projection: proj, filter: in_only_nil).to_sql
+      not_sql, not_binds = described_class.new(collection, projection: proj, filter: not_only_nil).to_sql
+
+      expect(in_sql).to include('"STATUS" IS NULL')
+      expect(not_sql).to include('"STATUS" IS NOT NULL')
+      expect(in_binds).to eq([])
+      expect(not_binds).to eq([])
+    end
+
     it 'translates I_CONTAINS into a case-insensitive LIKE with wildcards' do
       filter = Filter.new(condition_tree: ConditionTreeLeaf.new('EVENT_TYPE', Operators::I_CONTAINS, 'login'))
       sql, binds = described_class.new(collection, projection: Projection.new(['id']), filter: filter).to_sql

@@ -149,11 +149,18 @@ module ForestAdminDatasourceSnowflake
         list = Array(values)
         return negate ? '1=1' : '1=0' if list.empty?
 
-        placeholders = list.map do |v|
+        non_nils = list.compact
+        null_term = "#{quoted_field} #{negate ? "IS NOT NULL" : "IS NULL"}"
+        return null_term if non_nils.empty?
+
+        placeholders = non_nils.map do |v|
           bind!(v)
           '?'
         end.join(', ')
-        "#{quoted_field} #{negate ? "NOT IN" : "IN"} (#{placeholders})"
+        in_term = "#{quoted_field} #{negate ? "NOT IN" : "IN"} (#{placeholders})"
+        return in_term if non_nils.size == list.size
+
+        "(#{null_term}#{negate ? " AND " : " OR "}#{in_term})"
       end
 
       def translate_like(quoted_field, value, negate: false)
