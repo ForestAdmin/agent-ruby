@@ -1,3 +1,10 @@
+## [1.28.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.1...v1.28.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* **rpc:** prevent race condition on agent reload ([#297](https://github.com/ForestAdmin/agent-ruby/issues/297)) ([c02c26e](https://github.com/ForestAdmin/agent-ruby/commit/c02c26e39dec81fe6f6cd72b8615ae86fedeec38))
+
 ## [1.28.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.0...v1.28.1) (2026-05-05)
 
 
