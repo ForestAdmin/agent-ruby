@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.2...v1.29.0) (2026-05-07)
+
+
+### Features
+
+* **snowflake:** add read-only Snowflake datasource gem ([#292](https://github.com/ForestAdmin/agent-ruby/issues/292)) ([bc79f94](https://github.com/ForestAdmin/agent-ruby/commit/bc79f94027fb20145b04622c80b34ad9a83503f3))
+
 ## [1.28.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.1...v1.28.2) (2026-05-06)
 
 
