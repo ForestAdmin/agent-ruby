@@ -21,6 +21,15 @@ module ForestAdminDatasourceMambuPayments
 
       def list_internal_accounts(**params) = list_resource('internal_accounts', params)
       def find_internal_account(id)        = get_resource('internal_accounts', id)
+
+      def list_incoming_payments(**params) = list_resource('incoming_payments', params)
+      def find_incoming_payment(id)        = get_resource('incoming_payments', id)
+
+      def list_direct_debit_mandates(**params) = list_resource('direct_debit_mandates', params)
+      def find_direct_debit_mandate(id)        = get_resource('direct_debit_mandates', id)
+
+      def list_expected_payments(**params) = list_resource('expected_payments', params)
+      def find_expected_payment(id)        = get_resource('expected_payments', id)
     end
   end
 end

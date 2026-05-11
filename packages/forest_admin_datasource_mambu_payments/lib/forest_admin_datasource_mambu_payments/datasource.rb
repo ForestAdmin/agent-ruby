@@ -20,6 +20,9 @@ module ForestAdminDatasourceMambuPayments
       add_collection(Collections::AccountHolder.new(self))
       add_collection(Collections::ExternalAccount.new(self))
       add_collection(Collections::InternalAccount.new(self))
+      add_collection(Collections::IncomingPayment.new(self))
+      add_collection(Collections::DirectDebitMandate.new(self))
+      add_collection(Collections::ExpectedPayment.new(self))
     end
   end
 end
