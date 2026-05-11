@@ -1,0 +1,273 @@
+RSpec.describe ForestAdminDatasourceMambuPayments::Client do
+  let(:configuration) { ForestAdminDatasourceMambuPayments::Configuration.new(api_key: 'k') }
+  let(:client) { described_class.new(configuration) }
+  let(:base) { "#{configuration.base_url}/v1" }
+
+  def json(payload, status = 200)
+    { status: status, body: payload.is_a?(String) ? payload : payload.to_json,
+      headers: { 'Content-Type' => 'application/json' } }
+  end
+
+  describe 'authentication' do
+    it 'sends the api key in the x-api-key header (no Bearer prefix)' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .with(headers: { 'x-api-key' => 'k' })
+        .to_return(json('records' => []))
+
+      client.list_connected_accounts
+      expect(WebMock).to have_requested(:get, "#{base}/connected_accounts")
+        .with(headers: { 'x-api-key' => 'k' })
+    end
+  end
+
+  describe '#list_connected_accounts' do
+    it 'returns the array under the "records" wrapper' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .to_return(json('records' => [{ 'id' => 'a' }, { 'id' => 'b' }]))
+
+      expect(client.list_connected_accounts.map { |r| r['id'] }).to eq(%w[a b])
+    end
+
+    it 'also accepts a "data" wrapper' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .to_return(json('data' => [{ 'id' => 'a' }]))
+
+      expect(client.list_connected_accounts.size).to eq(1)
+    end
+
+    it 'accepts an array body directly' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .to_return(json([{ 'id' => 'a' }]))
+
+      expect(client.list_connected_accounts.size).to eq(1)
+    end
+
+    it 'falls back to the first array-valued field when the wrapper key is unknown' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .to_return(json('accounts' => [{ 'id' => 'a' }], 'total' => 1))
+
+      expect(client.list_connected_accounts.size).to eq(1)
+    end
+
+    it 'returns [] when the body is a Hash with no array values' do
+      stub_request(:get, "#{base}/connected_accounts").to_return(json('total' => 0))
+      expect(client.list_connected_accounts).to eq([])
+    end
+
+    it 'forwards query params, joining arrays with commas' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .with(query: { 'limit' => '10', 'ids' => 'a,b' })
+        .to_return(json('records' => []))
+
+      client.list_connected_accounts(limit: 10, ids: %w[a b])
+      expect(WebMock).to have_requested(:get, "#{base}/connected_accounts")
+        .with(query: hash_including('limit' => '10', 'ids' => 'a,b'))
+    end
+
+    it 'drops nil params before sending' do
+      stub_request(:get, "#{base}/connected_accounts")
+        .with(query: { 'limit' => '5' })
+        .to_return(json('records' => []))
+
+      client.list_connected_accounts(limit: 5, cursor: nil)
+      expect(WebMock).to have_requested(:get, "#{base}/connected_accounts")
+        .with(query: { 'limit' => '5' })
+    end
+
+    it 'raises APIError on 5xx' do
+      stub_request(:get, "#{base}/connected_accounts").to_return(status: 500, body: 'boom')
+      expect { client.list_connected_accounts }
+        .to raise_error(ForestAdminDatasourceMambuPayments::APIError, /list\(connected_accounts\)/)
+    end
+  end
+
+  describe '#find_connected_account' do
+    it 'returns the record directly when the body is not wrapped' do
+      stub_request(:get, "#{base}/connected_accounts/abc")
+        .to_return(json('id' => 'abc', 'name' => 'Acme'))
+
+      expect(client.find_connected_account('abc')).to include('id' => 'abc', 'name' => 'Acme')
+    end
+
+    it 'unwraps a top-level "data" hash' do
+      stub_request(:get, "#{base}/connected_accounts/abc")
+        .to_return(json('data' => { 'id' => 'abc' }))
+
+      expect(client.find_connected_account('abc')).to eq('id' => 'abc')
+    end
+
+    it 'returns nil on 404' do
+      stub_request(:get, "#{base}/connected_accounts/xyz").to_return(status: 404, body: '{}')
+      expect(client.find_connected_account('xyz')).to be_nil
+    end
+
+    it 'raises APIError on other failures' do
+      stub_request(:get, "#{base}/connected_accounts/xyz").to_return(status: 500, body: 'boom')
+      expect { client.find_connected_account('xyz') }
+        .to raise_error(ForestAdminDatasourceMambuPayments::APIError, /get\(connected_accounts/)
+    end
+  end
+
+  describe '#create_connected_account' do
+    it 'POSTs the payload as JSON and returns the response body' do
+      stub_request(:post, "#{base}/connected_accounts")
+        .with(body: { 'name' => 'Acme' }.to_json,
+              headers: { 'Content-Type' => 'application/json' })
+        .to_return(json('id' => 'new', 'name' => 'Acme'))
+
+      expect(client.create_connected_account('name' => 'Acme')).to include('id' => 'new')
+    end
+  end
+
+  describe '#update_connected_account' do
+    it 'PATCHes the payload to /resource/:id' do
+      stub_request(:patch, "#{base}/connected_accounts/abc")
+        .with(body: { 'name' => 'NewName' }.to_json)
+        .to_return(json('id' => 'abc', 'name' => 'NewName'))
+
+      expect(client.update_connected_account('abc', 'name' => 'NewName'))
+        .to include('name' => 'NewName')
+    end
+  end
+
+  describe '#delete_connected_account' do
+    it 'DELETEs /resource/:id and returns true on success' do
+      stub_request(:delete, "#{base}/connected_accounts/abc").to_return(status: 204, body: '')
+      expect(client.delete_connected_account('abc')).to be(true)
+    end
+  end
+
+  describe 'payment_orders / transactions / balances' do
+    it 'list_payment_orders hits /payment_orders' do
+      stub_request(:get, "#{base}/payment_orders").to_return(json('records' => []))
+      client.list_payment_orders
+      expect(WebMock).to have_requested(:get, "#{base}/payment_orders")
+    end
+
+    it 'find_payment_order hits /payment_orders/:id' do
+      stub_request(:get, "#{base}/payment_orders/po1").to_return(json('id' => 'po1'))
+      expect(client.find_payment_order('po1')).to include('id' => 'po1')
+    end
+
+    it 'list_transactions hits /transactions' do
+      stub_request(:get, "#{base}/transactions").to_return(json('records' => []))
+      client.list_transactions
+      expect(WebMock).to have_requested(:get, "#{base}/transactions")
+    end
+
+    it 'find_transaction hits /transactions/:id' do
+      stub_request(:get, "#{base}/transactions/tx1").to_return(json('id' => 'tx1'))
+      expect(client.find_transaction('tx1')).to include('id' => 'tx1')
+    end
+
+    it 'list_balances hits /balances' do
+      stub_request(:get, "#{base}/balances").to_return(json('records' => []))
+      client.list_balances
+      expect(WebMock).to have_requested(:get, "#{base}/balances")
+    end
+
+    it 'find_balance hits /balances/:id' do
+      stub_request(:get, "#{base}/balances/bal1").to_return(json('id' => 'bal1'))
+      expect(client.find_balance('bal1')).to include('id' => 'bal1')
+    end
+
+    it 'create_payment_order POSTs to /payment_orders' do
+      stub_request(:post, "#{base}/payment_orders").to_return(json('id' => 'po1'))
+      expect(client.create_payment_order({})).to include('id' => 'po1')
+    end
+
+    it 'update_payment_order PATCHes /payment_orders/:id' do
+      stub_request(:patch, "#{base}/payment_orders/po1").to_return(json('id' => 'po1'))
+      expect(client.update_payment_order('po1', {})).to include('id' => 'po1')
+    end
+
+    it 'delete_payment_order DELETEs /payment_orders/:id' do
+      stub_request(:delete, "#{base}/payment_orders/po1").to_return(status: 204, body: '')
+      expect(client.delete_payment_order('po1')).to be(true)
+    end
+  end
+
+  describe 'account_holders' do
+    it 'list_account_holders hits /account_holders' do
+      stub_request(:get, "#{base}/account_holders").to_return(json('records' => []))
+      client.list_account_holders
+      expect(WebMock).to have_requested(:get, "#{base}/account_holders")
+    end
+
+    it 'find_account_holder hits /account_holders/:id' do
+      stub_request(:get, "#{base}/account_holders/ah1").to_return(json('id' => 'ah1'))
+      expect(client.find_account_holder('ah1')).to include('id' => 'ah1')
+    end
+
+    it 'create_account_holder POSTs to /account_holders' do
+      stub_request(:post, "#{base}/account_holders").to_return(json('id' => 'ah1'))
+      expect(client.create_account_holder({})).to include('id' => 'ah1')
+    end
+
+    it 'update_account_holder PATCHes /account_holders/:id' do
+      stub_request(:patch, "#{base}/account_holders/ah1").to_return(json('id' => 'ah1'))
+      expect(client.update_account_holder('ah1', {})).to include('id' => 'ah1')
+    end
+
+    it 'delete_account_holder DELETEs /account_holders/:id' do
+      stub_request(:delete, "#{base}/account_holders/ah1").to_return(status: 204, body: '')
+      expect(client.delete_account_holder('ah1')).to be(true)
+    end
+  end
+
+  describe 'external_accounts' do
+    it 'list_external_accounts hits /external_accounts' do
+      stub_request(:get, "#{base}/external_accounts").to_return(json('records' => []))
+      client.list_external_accounts
+      expect(WebMock).to have_requested(:get, "#{base}/external_accounts")
+    end
+
+    it 'find_external_account hits /external_accounts/:id' do
+      stub_request(:get, "#{base}/external_accounts/ea1").to_return(json('id' => 'ea1'))
+      expect(client.find_external_account('ea1')).to include('id' => 'ea1')
+    end
+
+    it 'create_external_account POSTs to /external_accounts' do
+      stub_request(:post, "#{base}/external_accounts").to_return(json('id' => 'ea1'))
+      expect(client.create_external_account({})).to include('id' => 'ea1')
+    end
+
+    it 'update_external_account PATCHes /external_accounts/:id' do
+      stub_request(:patch, "#{base}/external_accounts/ea1").to_return(json('id' => 'ea1'))
+      expect(client.update_external_account('ea1', {})).to include('id' => 'ea1')
+    end
+
+    it 'delete_external_account DELETEs /external_accounts/:id' do
+      stub_request(:delete, "#{base}/external_accounts/ea1").to_return(status: 204, body: '')
+      expect(client.delete_external_account('ea1')).to be(true)
+    end
+  end
+
+  describe 'internal_accounts' do
+    it 'list_internal_accounts hits /internal_accounts' do
+      stub_request(:get, "#{base}/internal_accounts").to_return(json('records' => []))
+      client.list_internal_accounts
+      expect(WebMock).to have_requested(:get, "#{base}/internal_accounts")
+    end
+
+    it 'find_internal_account hits /internal_accounts/:id' do
+      stub_request(:get, "#{base}/internal_accounts/ia1").to_return(json('id' => 'ia1'))
+      expect(client.find_internal_account('ia1')).to include('id' => 'ia1')
+    end
+
+    it 'create_internal_account POSTs to /internal_accounts' do
+      stub_request(:post, "#{base}/internal_accounts").to_return(json('id' => 'ia1'))
+      expect(client.create_internal_account({})).to include('id' => 'ia1')
+    end
+
+    it 'update_internal_account PATCHes /internal_accounts/:id' do
+      stub_request(:patch, "#{base}/internal_accounts/ia1").to_return(json('id' => 'ia1'))
+      expect(client.update_internal_account('ia1', {})).to include('id' => 'ia1')
+    end
+
+    it 'delete_internal_account DELETEs /internal_accounts/:id' do
+      stub_request(:delete, "#{base}/internal_accounts/ia1").to_return(status: 204, body: '')
+      expect(client.delete_internal_account('ia1')).to be(true)
+    end
+  end
+end
