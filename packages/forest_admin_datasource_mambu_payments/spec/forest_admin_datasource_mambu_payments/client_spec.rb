@@ -270,4 +270,73 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
       expect(client.delete_internal_account('ia1')).to be(true)
     end
   end
+
+  describe 'incoming_payments' do
+    it 'list_incoming_payments hits /incoming_payments' do
+      stub_request(:get, "#{base}/incoming_payments").to_return(json('records' => []))
+      client.list_incoming_payments
+      expect(WebMock).to have_requested(:get, "#{base}/incoming_payments")
+    end
+
+    it 'find_incoming_payment hits /incoming_payments/:id' do
+      stub_request(:get, "#{base}/incoming_payments/ip1").to_return(json('id' => 'ip1'))
+      expect(client.find_incoming_payment('ip1')).to include('id' => 'ip1')
+    end
+  end
+
+  describe 'direct_debit_mandates' do
+    it 'list_direct_debit_mandates hits /direct_debit_mandates' do
+      stub_request(:get, "#{base}/direct_debit_mandates").to_return(json('records' => []))
+      client.list_direct_debit_mandates
+      expect(WebMock).to have_requested(:get, "#{base}/direct_debit_mandates")
+    end
+
+    it 'find_direct_debit_mandate hits /direct_debit_mandates/:id' do
+      stub_request(:get, "#{base}/direct_debit_mandates/dm1").to_return(json('id' => 'dm1'))
+      expect(client.find_direct_debit_mandate('dm1')).to include('id' => 'dm1')
+    end
+
+    it 'create_direct_debit_mandate POSTs to /direct_debit_mandates' do
+      stub_request(:post, "#{base}/direct_debit_mandates").to_return(json('id' => 'dm1'))
+      expect(client.create_direct_debit_mandate({})).to include('id' => 'dm1')
+    end
+
+    it 'update_direct_debit_mandate PATCHes /direct_debit_mandates/:id' do
+      stub_request(:patch, "#{base}/direct_debit_mandates/dm1").to_return(json('id' => 'dm1'))
+      expect(client.update_direct_debit_mandate('dm1', {})).to include('id' => 'dm1')
+    end
+
+    it 'delete_direct_debit_mandate DELETEs /direct_debit_mandates/:id' do
+      stub_request(:delete, "#{base}/direct_debit_mandates/dm1").to_return(status: 204, body: '')
+      expect(client.delete_direct_debit_mandate('dm1')).to be(true)
+    end
+  end
+
+  describe 'expected_payments' do
+    it 'list_expected_payments hits /expected_payments' do
+      stub_request(:get, "#{base}/expected_payments").to_return(json('records' => []))
+      client.list_expected_payments
+      expect(WebMock).to have_requested(:get, "#{base}/expected_payments")
+    end
+
+    it 'find_expected_payment hits /expected_payments/:id' do
+      stub_request(:get, "#{base}/expected_payments/ep1").to_return(json('id' => 'ep1'))
+      expect(client.find_expected_payment('ep1')).to include('id' => 'ep1')
+    end
+
+    it 'create_expected_payment POSTs to /expected_payments' do
+      stub_request(:post, "#{base}/expected_payments").to_return(json('id' => 'ep1'))
+      expect(client.create_expected_payment({})).to include('id' => 'ep1')
+    end
+
+    it 'update_expected_payment PATCHes /expected_payments/:id' do
+      stub_request(:patch, "#{base}/expected_payments/ep1").to_return(json('id' => 'ep1'))
+      expect(client.update_expected_payment('ep1', {})).to include('id' => 'ep1')
+    end
+
+    it 'delete_expected_payment DELETEs /expected_payments/:id' do
+      stub_request(:delete, "#{base}/expected_payments/ep1").to_return(status: 204, body: '')
+      expect(client.delete_expected_payment('ep1')).to be(true)
+    end
+  end
 end

@@ -1,4 +1,3 @@
-# rubocop:disable Metrics/ModuleLength
 module ForestAdminDatasourceMambuPayments
   Leaf = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
   Branch = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
@@ -184,5 +183,3 @@ module ForestAdminDatasourceMambuPayments
     end
   end
 end
-
-# rubocop:enable Metrics/ModuleLength
