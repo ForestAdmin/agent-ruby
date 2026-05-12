@@ -38,27 +38,26 @@ module ForestAdminDatasourceMambuPayments
         {
           'id' => a['id'],
           'object' => a['object'],
+          'idempotency_key' => a['idempotency_key'],
           'connected_account_id' => a['connected_account_id'],
           'internal_account_id' => a['internal_account_id'],
           'external_account_id' => a['external_account_id'],
-          'type' => a['type'],
           'direction' => a['direction'],
-          'status' => a['status'],
-          'amount' => a['amount'],
-          'amount_min' => a['amount_min'],
-          'amount_max' => a['amount_max'],
+          'amount_from' => a['amount_from'],
+          'amount_to' => a['amount_to'],
           'currency' => a['currency'],
-          'reference' => a['reference'],
-          'end_to_end_id' => a['end_to_end_id'],
-          'expected_at' => a['expected_at'],
-          'earliest_expected_at' => a['earliest_expected_at'],
-          'latest_expected_at' => a['latest_expected_at'],
-          'counterparty' => a['counterparty'],
-          'matched_amount' => a['matched_amount'],
-          'matched_payments' => a['matched_payments'],
+          'start_date' => a['start_date'],
+          'end_date' => a['end_date'],
+          'descriptions' => a['descriptions'],
+          'internal_account_snapshot' => a['internal_account'],
+          'external_account_snapshot' => a['external_account'],
+          'reconciliation_status' => a['reconciliation_status'],
+          'reconciled_amount' => a['reconciled_amount'],
           'custom_fields' => a['custom_fields'],
           'metadata' => a['metadata'],
-          'created_at' => a['created_at']
+          'created_at' => a['created_at'],
+          'updated_at' => a['updated_at'],
+          'canceled_at' => a['canceled_at']
         }
       end
 
@@ -80,7 +79,8 @@ module ForestAdminDatasourceMambuPayments
 
       def build_payload(data)
         attrs = data.transform_keys(&:to_s)
-        %w[id object status created_at matched_amount matched_payments].each { |k| attrs.delete(k) }
+        %w[id object reconciliation_status reconciled_amount created_at updated_at canceled_at
+           internal_account_snapshot external_account_snapshot].each { |k| attrs.delete(k) }
         attrs
       end
 
@@ -114,49 +114,47 @@ module ForestAdminDatasourceMambuPayments
                                          is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                              is_read_only: true, is_sortable: false))
+        add_field('idempotency_key', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+                                                      is_read_only: false, is_sortable: false))
         add_field('connected_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                            is_read_only: false, is_sortable: true))
         add_field('internal_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                           is_read_only: false, is_sortable: false))
         add_field('external_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                           is_read_only: false, is_sortable: false))
-        add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
         add_field('direction', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
                                                 enum_values: ENUM_DIRECTION,
                                                 is_read_only: false, is_sortable: true))
-        add_field('status', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: true))
-        add_field('amount', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                             is_read_only: false, is_sortable: false))
-        add_field('amount_min', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                 is_read_only: false, is_sortable: false))
-        add_field('amount_max', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                 is_read_only: false, is_sortable: false))
+        add_field('amount_from', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                                  is_read_only: false, is_sortable: false))
+        add_field('amount_to', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                                is_read_only: false, is_sortable: false))
         add_field('currency', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                is_read_only: false, is_sortable: false))
-        add_field('reference', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
-        add_field('end_to_end_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                    is_read_only: false, is_sortable: false))
-        add_field('expected_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                  is_read_only: false, is_sortable: true))
-        add_field('earliest_expected_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                           is_read_only: false, is_sortable: true))
-        add_field('latest_expected_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                         is_read_only: false, is_sortable: true))
-        add_field('counterparty', ColumnSchema.new(column_type: 'Json', filter_operators: [],
+        add_field('start_date', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                                 is_read_only: false, is_sortable: true))
+        add_field('end_date', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                               is_read_only: false, is_sortable: true))
+        add_field('descriptions', ColumnSchema.new(column_type: 'Json', filter_operators: [],
                                                    is_read_only: false, is_sortable: false))
-        add_field('matched_amount', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
-                                                     is_read_only: true, is_sortable: false))
-        add_field('matched_payments', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                       is_read_only: true, is_sortable: false))
+        add_field('internal_account_snapshot', ColumnSchema.new(column_type: 'Json', filter_operators: [],
+                                                                is_read_only: true, is_sortable: false))
+        add_field('external_account_snapshot', ColumnSchema.new(column_type: 'Json', filter_operators: [],
+                                                                is_read_only: true, is_sortable: false))
+        add_field('reconciliation_status', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+                                                            is_read_only: true, is_sortable: true))
+        add_field('reconciled_amount', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
+                                                        is_read_only: true, is_sortable: false))
         add_field('custom_fields', ColumnSchema.new(column_type: 'Json', filter_operators: [],
                                                     is_read_only: false, is_sortable: false))
         add_field('metadata', ColumnSchema.new(column_type: 'Json', filter_operators: [],
                                                is_read_only: false, is_sortable: false))
         add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                  is_read_only: true, is_sortable: true))
+        add_field('updated_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                                 is_read_only: true, is_sortable: true))
+        add_field('canceled_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
+                                                  is_read_only: true, is_sortable: true))
       end
 
       def define_relations
