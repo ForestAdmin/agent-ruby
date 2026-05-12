@@ -16,20 +16,25 @@ module ForestAdminDatasourceMambuPayments
     let(:account) { { 'id' => 'acc1', 'name' => 'Acme' } }
     let(:expected_payment) do
       {
-        'id' => 'ep1', 'object' => 'expected_payment',
-        'connected_account_id' => 'acc1',
-        'internal_account_id' => 'ia1', 'external_account_id' => 'ea1',
-        'type' => 'sepa_credit_transfer', 'direction' => 'credit',
-        'status' => 'pending',
-        'amount' => 10_000, 'amount_min' => nil, 'amount_max' => nil,
+        'id' => '019e17e6-bac7-7607-9d91-12147d8db4c8',
+        'idempotency_key' => '',
+        'object' => 'expected_payment',
+        'direction' => 'debit',
+        'amount_from' => 5000, 'amount_to' => 6000,
         'currency' => 'EUR',
-        'reference' => 'INV-42', 'end_to_end_id' => 'e2e',
-        'expected_at' => '2026-06-01',
-        'earliest_expected_at' => '2026-05-28', 'latest_expected_at' => '2026-06-05',
-        'counterparty' => { 'name' => 'Jane Doe' },
-        'matched_amount' => 0, 'matched_payments' => [],
-        'custom_fields' => {}, 'metadata' => {},
-        'created_at' => '2026-05-11T08:50:28Z'
+        'start_date' => '2026-05-11', 'end_date' => '2026-05-11',
+        'connected_account_id' => '456d2975-d58b-4a90-89b8-efcc3239c866',
+        'external_account' => { 'account_number' => 'AG454545', 'holder_name' => 'test external account' },
+        'external_account_id' => '',
+        'internal_account' => { 'account_number' => '43244675643525' },
+        'internal_account_id' => '',
+        'reconciliation_status' => 'unreconciled',
+        'reconciled_amount' => 0,
+        'metadata' => {}, 'custom_fields' => {},
+        'descriptions' => ['test expected payment'],
+        'created_at' => '2026-05-11T16:37:37.612847Z',
+        'updated_at' => '2026-05-11T16:37:37.612855Z',
+        'canceled_at' => nil
       }
     end
 
@@ -43,13 +48,24 @@ module ForestAdminDatasourceMambuPayments
       it 'declares the API-aligned columns' do
         keys = collection.schema[:fields].keys
         expect(keys).to include(
-          'id', 'connected_account_id', 'internal_account_id', 'external_account_id',
-          'type', 'direction', 'status', 'amount', 'amount_min', 'amount_max', 'currency',
-          'reference', 'end_to_end_id', 'expected_at',
-          'earliest_expected_at', 'latest_expected_at',
-          'counterparty', 'matched_amount', 'matched_payments',
-          'custom_fields', 'metadata', 'created_at'
+          'id', 'object', 'idempotency_key',
+          'connected_account_id', 'internal_account_id', 'external_account_id',
+          'direction', 'amount_from', 'amount_to', 'currency',
+          'start_date', 'end_date', 'descriptions',
+          'internal_account_snapshot', 'external_account_snapshot',
+          'reconciliation_status', 'reconciled_amount',
+          'custom_fields', 'metadata',
+          'created_at', 'updated_at', 'canceled_at'
         )
+      end
+
+      it 'does not expose fields that are absent from the Numeral payload' do
+        keys = collection.schema[:fields].keys
+        %w[amount amount_min amount_max status type reference end_to_end_id
+           expected_at earliest_expected_at latest_expected_at
+           counterparty matched_amount matched_payments].each do |k|
+          expect(keys).not_to include(k), "schema unexpectedly exposes #{k}"
+        end
       end
 
       it 'declares ManyToOne to connected_account, internal_account and external_account' do
@@ -65,67 +81,103 @@ module ForestAdminDatasourceMambuPayments
         expect(f['direction'].enum_values).to contain_exactly('debit', 'credit')
       end
 
-      it 'marks reconciliation outcome and system-managed fields as read-only' do
+      it 'keeps account snapshots and descriptions as Json' do
         f = collection.schema[:fields]
-        %w[id status matched_amount matched_payments created_at].each do |k|
+        %w[internal_account_snapshot external_account_snapshot descriptions].each do |k|
+          expect(f[k].column_type).to eq('Json')
+        end
+      end
+
+      it 'marks reconciliation outcome, snapshots and timestamps as read-only' do
+        f = collection.schema[:fields]
+        %w[id object reconciliation_status reconciled_amount
+           internal_account_snapshot external_account_snapshot
+           created_at updated_at canceled_at].each do |k|
           expect(f[k].is_read_only).to be(true), "#{k} should be read-only"
         end
       end
     end
 
     describe '#list' do
+      it 'serializes amount_from/to, start/end_date and exposes account snapshots' do
+        allow(client).to receive(:list_expected_payments).and_return([expected_payment])
+
+        rows = collection.list(nil, Filter.new,
+                               %w[id amount_from amount_to start_date end_date
+                                  internal_account_snapshot external_account_snapshot descriptions])
+
+        expect(rows.first).to include(
+          'amount_from' => 5000, 'amount_to' => 6000,
+          'start_date' => '2026-05-11', 'end_date' => '2026-05-11',
+          'descriptions' => ['test expected payment']
+        )
+        expect(rows.first['external_account_snapshot']).to include('account_number' => 'AG454545')
+        expect(rows.first['internal_account_snapshot']).to include('account_number' => '43244675643525')
+      end
+
       it 'returns rows without resolving relations when projection has no relation prefix' do
         allow(client).to receive(:list_expected_payments).and_return([expected_payment])
         allow(client).to receive(:find_connected_account)
         allow(client).to receive(:find_internal_account)
         allow(client).to receive(:find_external_account)
 
-        rows = collection.list(nil, Filter.new, ['id', 'amount'])
+        collection.list(nil, Filter.new, %w[id amount_from])
 
-        expect(rows).to eq([{ 'id' => 'ep1', 'amount' => 10_000 }])
         expect(client).not_to have_received(:find_connected_account)
+        expect(client).not_to have_received(:find_internal_account)
+        expect(client).not_to have_received(:find_external_account)
       end
 
-      it 'embeds connected_account, internal_account and external_account when requested' do
+      it 'embeds connected_account when requested' do
         allow(client).to receive(:list_expected_payments).and_return([expected_payment])
-        allow(client).to receive(:find_connected_account).with('acc1').and_return(account)
-        allow(client).to receive(:find_internal_account).with('ia1').and_return('id' => 'ia1')
-        allow(client).to receive(:find_external_account).with('ea1').and_return('id' => 'ea1')
+        allow(client).to receive(:find_connected_account)
+          .with('456d2975-d58b-4a90-89b8-efcc3239c866').and_return(account)
 
-        rows = collection.list(nil, Filter.new,
-                               ['id', 'connected_account:name', 'internal_account:id', 'external_account:id'])
-
+        rows = collection.list(nil, Filter.new, ['id', 'connected_account:name'])
         expect(rows.first['connected_account']).to include('name' => 'Acme')
-        expect(rows.first['internal_account']).to include('id' => 'ia1')
-        expect(rows.first['external_account']).to include('id' => 'ea1')
+      end
+
+      it 'skips internal/external account fetches when their FK is the empty string' do
+        allow(client).to receive(:list_expected_payments).and_return([expected_payment])
+        allow(client).to receive(:find_internal_account)
+        allow(client).to receive(:find_external_account)
+
+        collection.list(nil, Filter.new, ['id', 'internal_account:id', 'external_account:id'])
+
+        expect(client).not_to have_received(:find_internal_account)
+        expect(client).not_to have_received(:find_external_account)
       end
 
       it 'short-circuits to find_expected_payment on id lookup' do
-        allow(client).to receive(:find_expected_payment).with('ep1').and_return(expected_payment)
+        allow(client).to receive(:find_expected_payment)
+          .with('019e17e6-bac7-7607-9d91-12147d8db4c8').and_return(expected_payment)
         allow(client).to receive(:list_expected_payments)
 
-        filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 'ep1'))
+        filter = Filter.new(condition_tree: Leaf.new('id', 'equal', '019e17e6-bac7-7607-9d91-12147d8db4c8'))
         collection.list(nil, filter, nil)
 
-        expect(client).to have_received(:find_expected_payment).with('ep1')
+        expect(client).to have_received(:find_expected_payment)
         expect(client).not_to have_received(:list_expected_payments)
       end
     end
 
     describe '#create' do
-      it 'strips system-managed fields before POSTing' do
+      it 'strips system-managed fields and snapshots before POSTing' do
         allow(client).to receive(:create_expected_payment) do |payload|
-          expect(payload).to include('amount' => 10_000, 'direction' => 'credit')
-          expect(payload.keys).not_to include('id', 'object', 'status', 'created_at',
-                                              'matched_amount', 'matched_payments')
-          { 'id' => 'ep1', 'amount' => 10_000 }
+          expect(payload).to include('amount_from' => 5000, 'amount_to' => 6000, 'direction' => 'debit')
+          expect(payload.keys).not_to include('id', 'object', 'reconciliation_status', 'reconciled_amount',
+                                              'created_at', 'updated_at', 'canceled_at',
+                                              'internal_account_snapshot', 'external_account_snapshot')
+          { 'id' => 'ep1', 'amount_from' => 5000 }
         end
 
         collection.create(nil,
                           'id' => 'ignored', 'object' => 'expected_payment',
-                          'status' => 'pending', 'created_at' => 't',
-                          'matched_amount' => 0, 'matched_payments' => [],
-                          'amount' => 10_000, 'direction' => 'credit')
+                          'reconciliation_status' => 'unreconciled', 'reconciled_amount' => 0,
+                          'created_at' => 't', 'updated_at' => 't', 'canceled_at' => nil,
+                          'internal_account_snapshot' => { 'a' => 'b' },
+                          'external_account_snapshot' => { 'a' => 'b' },
+                          'amount_from' => 5000, 'amount_to' => 6000, 'direction' => 'debit')
 
         expect(client).to have_received(:create_expected_payment)
       end
@@ -139,10 +191,10 @@ module ForestAdminDatasourceMambuPayments
 
         collection.update(nil,
                           Filter.new(condition_tree: Leaf.new('id', 'in', %w[a b])),
-                          'amount' => 200)
+                          'amount_to' => 7000)
 
-        expect(client).to have_received(:update_expected_payment).with('a', hash_including('amount' => 200))
-        expect(client).to have_received(:update_expected_payment).with('b', hash_including('amount' => 200))
+        expect(client).to have_received(:update_expected_payment).with('a', hash_including('amount_to' => 7000))
+        expect(client).to have_received(:update_expected_payment).with('b', hash_including('amount_to' => 7000))
       end
     end
 
