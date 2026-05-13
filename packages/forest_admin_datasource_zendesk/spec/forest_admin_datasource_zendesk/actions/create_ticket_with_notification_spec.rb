@@ -24,6 +24,7 @@ module ForestAdminDatasourceZendesk
     let(:datasource_email_templates) { [] }
     let(:datasource_priority_override) { nil }
     let(:datasource_type_override) { nil }
+    let(:datasource_sender_email) { nil }
     let(:datasource) do
       instance_double(ForestAdminDatasourceZendesk::Datasource,
                       client: client, custom_field_mapping: {},
@@ -33,7 +34,8 @@ module ForestAdminDatasourceZendesk
                       default_ticket_action_name: datasource_action_name,
                       email_templates: datasource_email_templates,
                       priority_override: datasource_priority_override,
-                      type_override: datasource_type_override)
+                      type_override: datasource_type_override,
+                      sender_email: datasource_sender_email)
     end
 
     let(:context) { Struct.new(:form_values).new(form_values) }
@@ -78,7 +80,7 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      context 'when given a Proc resolver' do
+      context 'when given a Proc resolver' do # rubocop:disable RSpec/MultipleMemoizedHelpers
         let(:resolver) { ->(record) { record['email'] } }
 
         it 'pre-fills the email field from the selected record via the resolver' do
@@ -189,7 +191,7 @@ module ForestAdminDatasourceZendesk
         it 'creates a ticket targeting the requester by email and embeds the html comment' do
           allow(client).to receive(:create_ticket) do |payload|
             expect(payload).to eq(
-              'requester' => { 'email' => 'alice@x.com' },
+              'requester' => { 'email' => 'alice@x.com', 'name' => 'alice' },
               'subject' => 'Refund',
               'comment' => { 'html_body' => 'Hi there', 'public' => true },
               'priority' => 'high',
@@ -367,7 +369,7 @@ module ForestAdminDatasourceZendesk
       end
     end
 
-    describe 'integration with User collection' do
+    describe 'integration with User collection' do # rubocop:disable RSpec/MultipleMemoizedHelpers
       let(:user_collection) { Collections::User.new(datasource) }
       let(:filter) do
         ForestAdminDatasourceToolkit::Components::Query::Filter.new(
@@ -403,7 +405,8 @@ module ForestAdminDatasourceZendesk
                                          { 'Requester email' => 'alice@x.com', 'Subject' => 'S', 'Message' => 'M' },
                                          filter)
         expect(client).to have_received(:create_ticket).with(hash_including(
-                                                               'requester' => { 'email' => 'alice@x.com' }
+                                                               'requester' => { 'email' => 'alice@x.com',
+                                                                                'name' => 'alice' }
                                                              ))
         expect(result[:type]).to eq('Success')
       end
@@ -546,6 +549,50 @@ module ForestAdminDatasourceZendesk
           result_builder
         )
         expect(client).to have_received(:create_ticket).with(hash_including('priority' => 'urgent'))
+      end
+    end
+
+    describe 'requester name auto-derivation' do
+      # Zendesk's "create user on the fly from an email" path requires a
+      # non-empty `name` on the requester. We derive it from the email's
+      # local-part so the create succeeds; Zendesk silently ignores the name
+      # when the email already maps to an existing user.
+      it 'sends the email local-part as requester.name in the payload' do
+        allow(client).to receive(:create_ticket).and_return('id' => 1)
+        described_class.executor(datasource).call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'john.doe@acme.com',
+                                               'Subject' => 'S', 'Message' => 'M' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket).with(hash_including(
+                                                               'requester' => { 'email' => 'john.doe@acme.com',
+                                                                                'name' => 'john.doe' }
+                                                             ))
+      end
+    end
+
+    describe 'sender_email' do
+      it 'maps to Zendesk `recipient` in the payload when configured' do
+        allow(client).to receive(:create_ticket).and_return('id' => 1)
+        described_class.executor(datasource, sender_email: 'support@acme.com').call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'a@b.com',
+                                               'Subject' => 'S', 'Message' => 'M' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket).with(hash_including('recipient' => 'support@acme.com'))
+      end
+
+      it 'omits recipient from the payload when sender_email is blank' do
+        allow(client).to receive(:create_ticket) do |payload|
+          expect(payload).not_to have_key('recipient')
+          { 'id' => 1 }
+        end
+        described_class.executor(datasource).call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'a@b.com',
+                                               'Subject' => 'S', 'Message' => 'M' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket)
       end
     end
   end

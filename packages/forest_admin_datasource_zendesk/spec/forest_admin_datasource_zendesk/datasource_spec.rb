@@ -132,11 +132,13 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
                              default_ticket_action_name: 'Open ticket',
                              email_templates: templates,
                              priority_override: 'urgent',
-                             type_override: 'incident')
+                             type_override: 'incident',
+                             sender_email: 'support@acme.com')
     expect(ds.default_ticket_action_name).to eq('Open ticket')
     expect(ds.email_templates).to eq(templates)
     expect(ds.priority_override).to eq('urgent')
     expect(ds.type_override).to eq('incident')
+    expect(ds.sender_email).to eq('support@acme.com')
   end
 
   it 'propagates the new kwargs into the ZendeskUser auto-registered action' do

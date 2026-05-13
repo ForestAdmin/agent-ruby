@@ -69,15 +69,28 @@ module ForestAdminDatasourceZendesk
       def build_payload(values, email, opts = {})
         internal_note = truthy?(values['Send as internal note'])
         payload = {
-          'requester' => { 'email' => email },
+          # Zendesk creates the requester on the fly when no user matches the
+          # email, but its validation requires a non-empty name (>= 1 char).
+          # Derive it from the email's local-part so the create-user step
+          # doesn't fail; ignored when the email maps to an existing user.
+          'requester' => { 'email' => email, 'name' => derive_requester_name(email) },
           'subject' => values['Subject'],
           'comment' => { 'html_body' => values['Message'], 'public' => !internal_note }
         }
         priority = present?(opts[:priority_override]) ? opts[:priority_override] : values['Priority']
         type     = present?(opts[:type_override])     ? opts[:type_override]     : values['Type']
-        payload['priority'] = priority if present?(priority)
-        payload['type']     = type     if present?(type)
+        payload['priority']  = priority             if present?(priority)
+        payload['type']      = type                 if present?(type)
+        # Zendesk uses `recipient` to store the support address the ticket is
+        # associated with — that's the address replies/notifications appear
+        # to come FROM, so we expose it as `sender_email` to callers.
+        payload['recipient'] = opts[:sender_email] if present?(opts[:sender_email])
         payload
+      end
+
+      def derive_requester_name(email)
+        local = email.to_s.split('@').first.to_s
+        local.empty? ? email.to_s : local
       end
 
       # Best-effort: a writeback failure mustn't roll back the ticket we

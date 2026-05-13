@@ -28,7 +28,8 @@ module ForestAdminDatasourceZendesk
           requester_email_default: datasource.requester_email_default || ->(record) { record['email'] },
           email_templates: datasource.email_templates,
           priority_override: datasource.priority_override,
-          type_override: datasource.type_override
+          type_override: datasource.type_override,
+          sender_email: datasource.sender_email
         )
         enable_search
         enable_count

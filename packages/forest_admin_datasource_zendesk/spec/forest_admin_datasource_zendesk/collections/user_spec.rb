@@ -13,7 +13,8 @@ module ForestAdminDatasourceZendesk
                       client: client, custom_field_mapping: {},
                       default_ticket_subject: nil, default_ticket_message: nil,
                       requester_email_default: nil, default_ticket_action_name: nil,
-                      email_templates: [], priority_override: nil, type_override: nil)
+                      email_templates: [], priority_override: nil, type_override: nil,
+                      sender_email: nil)
     end
     let(:collection) { described_class.new(datasource) }
 

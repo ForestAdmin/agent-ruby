@@ -3,7 +3,7 @@ module ForestAdminDatasourceZendesk
     attr_reader :client, :configuration, :custom_field_mapping,
                 :default_ticket_subject, :default_ticket_message, :requester_email_default,
                 :default_ticket_action_name, :email_templates,
-                :priority_override, :type_override,
+                :priority_override, :type_override, :sender_email,
                 :close_ticket_statuses
 
     def initialize(subdomain:, username:, token:, **opts)
@@ -18,6 +18,7 @@ module ForestAdminDatasourceZendesk
       @email_templates            = Array(opts[:email_templates]).compact
       @priority_override          = opts[:priority_override]
       @type_override              = opts[:type_override]
+      @sender_email               = opts[:sender_email]
       @close_ticket_statuses      = Array(opts[:close_ticket_statuses]).map(&:to_s).uniq
 
       register_collections
