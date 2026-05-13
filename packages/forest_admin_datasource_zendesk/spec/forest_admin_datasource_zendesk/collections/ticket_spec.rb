@@ -188,6 +188,22 @@ module ForestAdminDatasourceZendesk
           expect(client).to have_received(:search)
             .with('ticket', hash_including(per_page: ForestAdminDatasourceZendesk::Client::MAX_PER_PAGE))
         end
+
+        it 'sends the last allowed page (offset 900 / limit 100) without raising' do
+          allow(client).to receive(:search).and_return([])
+
+          filter = Filter.new(page: Page.new(offset: 900, limit: 100))
+          collection.list(nil, filter, ['id'])
+
+          expect(client).to have_received(:search).with('ticket', hash_including(page: 10, per_page: 100))
+        end
+
+        it 'raises a ForestException with an actionable message past the 1000-result cap' do
+          filter = Filter.new(page: Page.new(offset: 1000, limit: 100))
+          expect { collection.list(nil, filter, ['id']) }
+            .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                            /caps total results at 1000.*Narrow the filter/m)
+        end
       end
 
       describe 'requester_email enrichment' do
