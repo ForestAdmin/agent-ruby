@@ -19,6 +19,7 @@ end
 SimpleCov.coverage_dir 'coverage'
 
 require 'webmock/rspec'
+require 'forest_admin_datasource_customizer'
 require 'forest_admin_datasource_zendesk'
 
 WebMock.disable_net_connect!(allow_localhost: true)

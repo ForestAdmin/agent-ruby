@@ -11,6 +11,26 @@ module ForestAdminDatasourceZendesk
       DATE_OPS    = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
                      Operators::PRESENT, Operators::BLANK].freeze
 
+      # Actions registered via `add_action` live in `schema[:actions]` and surface
+      # in the frontend through the agent's ActionCollectionDecorator (which merges
+      # them via `refine_schema`). Execution and form rendering, however, fall
+      # through to this collection — Forest's Collection contract leaves them
+      # NotImplementedError. We pipe both through an internal decorator instance so
+      # we reuse the same form lifecycle (default evaluation, conditional fields,
+      # change watching) the agent uses for customizer-defined actions.
+      def add_action(name, action)
+        super
+        action_runtime.add_action(name, action)
+      end
+
+      def execute(caller, name, data, filter = nil)
+        action_runtime.execute(caller, name, data, filter)
+      end
+
+      def get_form(caller, name, data = nil, filter = nil, metas = {})
+        action_runtime.get_form(caller, name, data, filter, metas)
+      end
+
       def aggregate(caller, filter, aggregation, _limit = nil)
         unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
@@ -90,6 +110,12 @@ module ForestAdminDatasourceZendesk
       end
 
       private
+
+      def action_runtime
+        @action_runtime ||= ForestAdminDatasourceCustomizer::Decorators::Action::ActionCollectionDecorator.new(
+          self, datasource
+        )
+      end
 
       def sort_field_and_direction(entry)
         return [entry.field, entry.ascending] if entry.respond_to?(:field)

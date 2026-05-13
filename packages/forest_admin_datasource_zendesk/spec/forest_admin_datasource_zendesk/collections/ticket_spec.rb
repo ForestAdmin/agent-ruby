@@ -12,7 +12,8 @@ module ForestAdminDatasourceZendesk
     let(:client) { instance_double(ForestAdminDatasourceZendesk::Client) }
     let(:datasource) do
       instance_double(ForestAdminDatasourceZendesk::Datasource,
-                      client: client, custom_field_mapping: {})
+                      client: client, custom_field_mapping: {},
+                      close_ticket_statuses: [])
     end
     let(:collection) { described_class.new(datasource) }
 
