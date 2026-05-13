@@ -113,10 +113,17 @@ module ForestAdminDatasourceZendesk
       end
 
       def message_field(default_message, templates)
-        { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
-          description: 'Sent as the ticket\'s first comment (HTML). Public comments trigger the ' \
-                       'default Zendesk notification email to the requester.',
-          default_value: message_default(default_message, templates) }
+        field = { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
+                  description: 'Sent as the ticket\'s first comment (HTML). Public comments trigger the ' \
+                               'default Zendesk notification email to the requester.' }
+        return field.merge(default_value: template_default(default_message, escape_html: true)) if templates.empty?
+
+        # `value:` (not `default_value:`) — drop_default only runs when data
+        # doesn't already have the key, but after the first render the agent
+        # caches Message='' in data, so a default_value proc would never re-fire
+        # on Template change. `value:` is re-evaluated by drop_deferred on every
+        # form fetch.
+        field.merge(value: message_value(templates))
       end
 
       def priority_field
@@ -156,15 +163,23 @@ module ForestAdminDatasourceZendesk
         ->(context) { interpolate(template, fetch_record(context), escape_html: escape_html) }
       end
 
-      # When email_templates are configured the dropdown drives the Message
-      # entirely: picking 'No template' yields an empty body, picking a title
-      # injects the configured content. `default_message` is ignored in that
-      # mode (strict opt-in to the template wizard).
-      def message_default(default_message, templates)
-        return template_default(default_message, escape_html: true) if templates.empty?
-
+      # Returns the template content (with `{{record.X}}` tokens interpolated
+      # against the host record) when Template was just changed by the user;
+      # returns nil otherwise so the agent's set_watch_changes carries over the
+      # current Message input. 'No template' (or any unknown title) yields ''.
+      def message_value(templates)
         by_title = templates.to_h { |t| [t[:title], t[:content].to_s] }
-        ->(context) { by_title[context.get_form_value('Template')].to_s }
+        lambda do |context|
+          return nil unless context.field_changed?('Template')
+
+          title = context.get_form_value('Template')
+          return '' if title == NO_TEMPLATE
+
+          content = by_title[title].to_s
+          return content unless content.match?(TOKEN_RE)
+
+          interpolate(content, fetch_record(context), escape_html: true)
+        end
       end
 
       def fetch_record(context)

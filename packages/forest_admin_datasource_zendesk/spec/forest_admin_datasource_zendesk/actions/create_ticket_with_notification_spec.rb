@@ -451,22 +451,56 @@ module ForestAdminDatasourceZendesk
         expect(template_field[:default_value]).to eq('No template')
       end
 
-      it 'pre-fills Message with the selected template content' do
+      it 'pre-fills Message via `value:` when Template was the just-changed field' do
+        # `value:` (not `default_value:`) so drop_deferred re-evaluates the proc
+        # on every form fetch — drop_default's `data.key?` check would otherwise
+        # block re-evaluation after the first render.
         action = described_class.build(datasource, email_templates: templates)
         message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
         ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
-                              get_form_value: 'Refund')
+                              field_changed?: true, get_form_value: 'Refund')
 
-        expect(message_field[:default_value].call(ctx)).to eq('<p>Refund processed.</p>')
+        expect(message_field[:value].call(ctx)).to eq('<p>Refund processed.</p>')
       end
 
-      it "yields an empty Message when 'No template' is selected" do
+      it "yields an empty Message when 'No template' was just selected" do
         action = described_class.build(datasource, email_templates: templates)
         message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
         ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
-                              get_form_value: 'No template')
+                              field_changed?: true, get_form_value: 'No template')
 
-        expect(message_field[:default_value].call(ctx)).to eq('')
+        expect(message_field[:value].call(ctx)).to eq('')
+      end
+
+      it 'returns nil (carry over current input) when another field triggered the re-fetch' do
+        action = described_class.build(datasource, email_templates: templates)
+        message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
+        ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                              field_changed?: false)
+
+        expect(message_field[:value].call(ctx)).to be_nil
+      end
+
+      it 'interpolates {{record.<field>}} tokens inside the selected template content' do
+        templated = [{ title: 'Welcome', content: '<p>Hi {{record.name}} ({{record.email}})</p>' }]
+        action = described_class.build(datasource, email_templates: templated)
+        message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
+        ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                              field_changed?: true, get_form_value: 'Welcome',
+                              get_record: { 'name' => 'Alice', 'email' => 'a@b.com' })
+
+        expect(message_field[:value].call(ctx)).to eq('<p>Hi Alice (a@b.com)</p>')
+      end
+
+      it 'HTML-escapes interpolated record values inside template content' do
+        templated = [{ title: 'Bug', content: '<p>{{record.note}}</p>' }]
+        action = described_class.build(datasource, email_templates: templated)
+        message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
+        ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                              field_changed?: true, get_form_value: 'Bug',
+                              get_record: { 'note' => '<script>x</script>' })
+
+        expect(message_field[:value].call(ctx)).to eq('<p>&lt;script&gt;x&lt;/script&gt;</p>')
       end
 
       it 'keeps the original flat form when no templates are configured' do
