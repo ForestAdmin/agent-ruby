@@ -90,6 +90,13 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
     expect(ds.close_ticket_statuses).to eq(%w[solved closed])
   end
 
+  it 'dedupes close_ticket_statuses so duplicates do not crash registration' do
+    # Without uniq this would crash with "Action ... already defined" on the
+    # second registration of the same status.
+    ds = described_class.new(**valid_args, close_ticket_statuses: %w[solved solved closed])
+    expect(ds.close_ticket_statuses).to eq(%w[solved closed])
+  end
+
   it 'opts in CloseTicket variants on the Ticket schema when close_ticket_statuses is set' do
     ds = described_class.new(**valid_args, close_ticket_statuses: %w[closed])
     actions = ds.get_collection('ZendeskTicket').schema[:actions].keys

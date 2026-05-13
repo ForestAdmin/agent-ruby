@@ -36,7 +36,9 @@ module ForestAdminDatasourceZendesk
       @default_ticket_subject = default_ticket_subject
       @default_ticket_message = default_ticket_message
       @requester_email_default = requester_email_default
-      @close_ticket_statuses = Array(close_ticket_statuses).map(&:to_s)
+      # Dedup defensively: duplicates would make register_on raise
+      # "Action ... already defined" on the second registration.
+      @close_ticket_statuses = Array(close_ticket_statuses).map(&:to_s).uniq
 
       register_collections
     end

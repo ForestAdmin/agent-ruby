@@ -130,7 +130,10 @@ module ForestAdminDatasourceZendesk
         lambda do |context|
           record = fetch_record(context)
           record.empty? ? nil : value.call(record)
-        rescue StandardError
+        rescue StandardError => e
+          ForestAdminDatasourceZendesk.logger.warn(
+            "[forest_admin_datasource_zendesk] requester_email_default resolver raised: #{e.class}: #{e.message}"
+          )
           nil
         end
       end
@@ -144,7 +147,10 @@ module ForestAdminDatasourceZendesk
 
       def fetch_record(context)
         context.get_record([]) || {}
-      rescue StandardError
+      rescue StandardError => e
+        ForestAdminDatasourceZendesk.logger.warn(
+          "[forest_admin_datasource_zendesk] failed to fetch record for token interpolation: #{e.class}: #{e.message}"
+        )
         {}
       end
 
@@ -167,7 +173,7 @@ module ForestAdminDatasourceZendesk
         return base unless writeback.is_a?(Array) && writeback.first == :failed
 
         # Ticket created Zendesk-side, but the writeback to the host collection failed.
-        "#{base} (warning: could not store the ticket id on the record — #{writeback.last})"
+        "#{base} (warning: could not store the ticket id on the record: #{writeback.last})"
       end
 
       def base_success_message(ticket_id, values)

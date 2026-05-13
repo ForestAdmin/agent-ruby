@@ -80,11 +80,25 @@ module ForestAdminDatasourceZendesk
           expect(requester_proc.call(context_double)).to eq('alice@x.com')
         end
 
-        it 'survives a record lookup that raises (returns nil)' do
+        it 'survives a record lookup that raises (returns nil) and logs the cause' do
           allow(context_double).to receive(:get_record).and_raise(StandardError, 'boom')
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
           action = described_class.build(datasource, requester_email_default: resolver)
 
           expect(action.form.first[:default_value].call(context_double)).to be_nil
+          expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
+            .with(a_string_including('fetch record', 'StandardError', 'boom'))
+        end
+
+        it 'logs and returns nil when the resolver proc itself raises' do
+          allow(context_double).to receive(:get_record).and_return({ 'email' => 'a@b.com' })
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
+          broken_resolver = ->(_record) { raise StandardError, 'typo in lambda' }
+          action = described_class.build(datasource, requester_email_default: broken_resolver)
+
+          expect(action.form.first[:default_value].call(context_double)).to be_nil
+          expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
+            .with(a_string_including('requester_email_default', 'typo in lambda'))
         end
       end
     end
@@ -119,11 +133,14 @@ module ForestAdminDatasourceZendesk
           expect(message_proc.call(context_double)).to eq('<p>Hello Alice (alice@x.com)</p>')
         end
 
-        it 'falls back to empty strings when the record lookup fails' do
+        it 'falls back to empty strings when the record lookup fails (logged)' do
           allow(context_double).to receive(:get_record).and_raise(StandardError, 'boom')
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
           action = described_class.build(datasource, default_subject: 'Hi {{record.name}}')
 
           expect(action.form.find { |f| f[:label] == 'Subject' }[:default_value].call(context_double)).to eq('Hi ')
+          expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
+            .with(a_string_including('fetch record', 'boom'))
         end
       end
     end
