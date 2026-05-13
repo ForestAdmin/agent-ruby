@@ -1,3 +1,10 @@
+## [1.29.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.29.1...v1.29.2) (2026-05-13)
+
+
+### Bug Fixes
+
+* **zendesk:** raise ForestException past Zendesk Search 1000-result cap ([#299](https://github.com/ForestAdmin/agent-ruby/issues/299)) ([d73cc13](https://github.com/ForestAdmin/agent-ruby/commit/d73cc13fa4585da755e10ffca33b425d0a3708bb))
+
 ## [1.29.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.29.0...v1.29.1) (2026-05-07)
 
 # [1.29.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.28.2...v1.29.0) (2026-05-07)
