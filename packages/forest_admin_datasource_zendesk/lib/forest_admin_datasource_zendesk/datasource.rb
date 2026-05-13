@@ -2,19 +2,23 @@ module ForestAdminDatasourceZendesk
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     attr_reader :client, :configuration, :custom_field_mapping,
                 :default_ticket_subject, :default_ticket_message, :requester_email_default,
+                :default_ticket_action_name, :email_templates,
+                :priority_override, :type_override,
                 :close_ticket_statuses
 
-    def initialize(subdomain:, username:, token:, # rubocop:disable Metrics/ParameterLists
-                   default_ticket_subject: nil, default_ticket_message: nil,
-                   requester_email_default: nil, close_ticket_statuses: [])
+    def initialize(subdomain:, username:, token:, **opts)
       super()
       @configuration = Configuration.new(subdomain: subdomain, username: username, token: token)
       @client = Client.new(@configuration)
       @custom_field_mapping = {}
-      @default_ticket_subject = default_ticket_subject
-      @default_ticket_message = default_ticket_message
-      @requester_email_default = requester_email_default
-      @close_ticket_statuses = Array(close_ticket_statuses).map(&:to_s).uniq
+      @default_ticket_subject     = opts[:default_ticket_subject]
+      @default_ticket_message     = opts[:default_ticket_message]
+      @requester_email_default    = opts[:requester_email_default]
+      @default_ticket_action_name = opts[:default_ticket_action_name]
+      @email_templates            = Array(opts[:email_templates]).compact
+      @priority_override          = opts[:priority_override]
+      @type_override              = opts[:type_override]
+      @close_ticket_statuses      = Array(opts[:close_ticket_statuses]).map(&:to_s).uniq
 
       register_collections
     end

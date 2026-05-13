@@ -125,4 +125,36 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
     expect(a.custom_field_mapping).to have_key('custom_1111')
     expect(b.custom_field_mapping).not_to have_key('custom_1111')
   end
+
+  it 'exposes the new ticket action kwargs (action_name, templates, overrides) as attr_readers' do
+    templates = [{ title: 'Welcome', content: '<p>Hi</p>' }]
+    ds = described_class.new(**valid_args,
+                             default_ticket_action_name: 'Open ticket',
+                             email_templates: templates,
+                             priority_override: 'urgent',
+                             type_override: 'incident')
+    expect(ds.default_ticket_action_name).to eq('Open ticket')
+    expect(ds.email_templates).to eq(templates)
+    expect(ds.priority_override).to eq('urgent')
+    expect(ds.type_override).to eq('incident')
+  end
+
+  it 'propagates the new kwargs into the ZendeskUser auto-registered action' do
+    templates = [{ title: 'Welcome', content: '<p>Hi</p>' }]
+    ds = described_class.new(**valid_args,
+                             default_ticket_action_name: 'Open ticket',
+                             email_templates: templates,
+                             priority_override: 'urgent',
+                             type_override: 'incident')
+
+    actions = ds.get_collection('ZendeskUser').schema[:actions]
+    expect(actions.keys).to include('Open ticket')
+
+    # Two-page wizard because templates are configured; Priority/Type are
+    # omitted from the body page since overrides are forced.
+    form = actions['Open ticket'].form
+    expect(form.size).to eq(2)
+    body_labels = form.last.elements.map(&:label)
+    expect(body_labels).not_to include('Priority', 'Type')
+  end
 end

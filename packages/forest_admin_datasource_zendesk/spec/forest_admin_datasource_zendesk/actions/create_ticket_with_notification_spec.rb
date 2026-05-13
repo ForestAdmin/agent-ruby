@@ -20,12 +20,20 @@ module ForestAdminDatasourceZendesk
     let(:default_message) { nil }
     let(:requester_email_default) { nil }
     let(:datasource_requester_default) { nil }
+    let(:datasource_action_name) { nil }
+    let(:datasource_email_templates) { [] }
+    let(:datasource_priority_override) { nil }
+    let(:datasource_type_override) { nil }
     let(:datasource) do
       instance_double(ForestAdminDatasourceZendesk::Datasource,
                       client: client, custom_field_mapping: {},
                       default_ticket_subject: default_subject,
                       default_ticket_message: default_message,
-                      requester_email_default: datasource_requester_default)
+                      requester_email_default: datasource_requester_default,
+                      default_ticket_action_name: datasource_action_name,
+                      email_templates: datasource_email_templates,
+                      priority_override: datasource_priority_override,
+                      type_override: datasource_type_override)
     end
 
     let(:context) { Struct.new(:form_values).new(form_values) }
@@ -244,7 +252,7 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      context 'with ticket_id_field configured (writeback to host record)' do
+      context 'with ticket_id_field configured (writeback to host record)' do # rubocop:disable RSpec/MultipleMemoizedHelpers
         let(:form_values) do
           { 'Requester email' => 'd@x.com', 'Subject' => 'S', 'Message' => 'M',
             'Send as internal note' => false }
@@ -254,7 +262,7 @@ module ForestAdminDatasourceZendesk
         let(:context) do
           FakeActionContext.new(form_values: form_values, collection: host_collection, filter: filter)
         end
-        let(:executor_with_writeback) { described_class.executor(datasource, 'zendesk_ticket_id') }
+        let(:executor_with_writeback) { described_class.executor(datasource, ticket_id_field: 'zendesk_ticket_id') }
 
         before do
           allow(client).to receive(:create_ticket).and_return('id' => 77)
@@ -398,6 +406,112 @@ module ForestAdminDatasourceZendesk
                                                                'requester' => { 'email' => 'alice@x.com' }
                                                              ))
         expect(result[:type]).to eq('Success')
+      end
+    end
+
+    describe 'action_name override' do
+      let(:collection) do
+        Class.new do
+          attr_reader :registered
+
+          def initialize = @registered = {}
+          def add_action(name, action) = @registered[name] = action
+        end.new
+      end
+
+      it 'registers the action under the configured name (default kept when omitted)' do
+        described_class.register_on(collection, datasource)
+        described_class.register_on(collection, datasource, action_name: 'Custom label')
+
+        expect(collection.registered.keys).to contain_exactly(described_class::NAME, 'Custom label')
+      end
+    end
+
+    describe 'email_templates wizard' do
+      let(:templates) do
+        [{ title: 'Welcome', content: '<p>Welcome aboard!</p>' },
+         { title: 'Refund',  content: '<p>Refund processed.</p>' }]
+      end
+
+      it 'flips the form into a two-page wizard (Template first, body second)' do
+        action = described_class.build(datasource, email_templates: templates)
+
+        expect(action.form.size).to eq(2)
+        page_one, page_two = action.form
+        expect(page_one[:component]).to eq('Page')
+        expect(page_one[:elements].map { |f| f[:label] }).to eq(['Template'])
+        expect(page_two[:elements].map { |f| f[:label] })
+          .to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type', 'Send as internal note'])
+      end
+
+      it 'lists No template + each template title in the dropdown' do
+        action = described_class.build(datasource, email_templates: templates)
+        template_field = action.form.first[:elements].first
+        expect(template_field[:enum_values]).to eq(['No template', 'Welcome', 'Refund'])
+        expect(template_field[:default_value]).to eq('No template')
+      end
+
+      it 'pre-fills Message with the selected template content' do
+        action = described_class.build(datasource, email_templates: templates)
+        message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
+        ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                              get_form_value: 'Refund')
+
+        expect(message_field[:default_value].call(ctx)).to eq('<p>Refund processed.</p>')
+      end
+
+      it "yields an empty Message when 'No template' is selected" do
+        action = described_class.build(datasource, email_templates: templates)
+        message_field = action.form.last[:elements].find { |f| f[:label] == 'Message' }
+        ctx = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                              get_form_value: 'No template')
+
+        expect(message_field[:default_value].call(ctx)).to eq('')
+      end
+
+      it 'keeps the original flat form when no templates are configured' do
+        action = described_class.build(datasource, email_templates: [])
+        expect(action.form.first[:component]).to be_nil # not a Page
+      end
+    end
+
+    describe 'priority_override / type_override' do
+      it 'omits the Priority field and forces the value in the payload' do
+        action = described_class.build(datasource, priority_override: 'urgent')
+        labels = action.form.map { |f| f[:label] }
+        expect(labels).not_to include('Priority')
+
+        allow(client).to receive(:create_ticket).and_return('id' => 1)
+        described_class.executor(datasource, priority_override: 'urgent').call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'a@b.com',
+                                               'Subject' => 'S', 'Message' => 'M' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket).with(hash_including('priority' => 'urgent'))
+      end
+
+      it 'omits the Type field and forces the value in the payload' do
+        action = described_class.build(datasource, type_override: 'incident')
+        labels = action.form.map { |f| f[:label] }
+        expect(labels).not_to include('Type')
+
+        allow(client).to receive(:create_ticket).and_return('id' => 1)
+        described_class.executor(datasource, type_override: 'incident').call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'a@b.com',
+                                               'Subject' => 'S', 'Message' => 'M' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket).with(hash_including('type' => 'incident'))
+      end
+
+      it 'forces the override even when the form value is also present' do
+        allow(client).to receive(:create_ticket).and_return('id' => 1)
+        described_class.executor(datasource, priority_override: 'urgent').call(
+          FakeActionContext.new(form_values: { 'Requester email' => 'a@b.com', 'Subject' => 'S',
+                                               'Message' => 'M', 'Priority' => 'low' }),
+          result_builder
+        )
+        expect(client).to have_received(:create_ticket).with(hash_including('priority' => 'urgent'))
       end
     end
   end

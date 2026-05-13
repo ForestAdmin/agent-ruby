@@ -5,66 +5,79 @@ module ForestAdminDatasourceZendesk
     # Zendesk creates the requester user automatically from the form's email,
     # so the host record needs no relation to Zendesk and the action can be
     # `register_on`'d on any collection.
-    module CreateTicketWithNotification
+    module CreateTicketWithNotification # rubocop:disable Metrics/ModuleLength
       BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
       FieldType   = ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType
 
       NAME = 'Create ticket and notify'.freeze
+      NO_TEMPLATE = 'No template'.freeze
       TOKEN_RE = /\{\{\s*record\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/
 
       module_function
 
-      def register_on(collection, datasource, default_subject: nil, default_message: nil, # rubocop:disable Metrics/ParameterLists
-                      requester_email_default: nil, ticket_id_field: nil)
-        collection.add_action(NAME, build(datasource,
-                                          default_subject: default_subject,
-                                          default_message: default_message,
-                                          requester_email_default: requester_email_default,
-                                          ticket_id_field: ticket_id_field))
+      def register_on(collection, datasource, **opts)
+        collection.add_action(opts[:action_name] || NAME, build(datasource, **opts.except(:action_name)))
       end
 
-      def build(datasource, default_subject: nil, default_message: nil,
-                requester_email_default: nil, ticket_id_field: nil)
-        BaseAction.new(
-          scope: ActionScope::SINGLE,
-          form: form(default_subject, default_message, requester_email_default),
-          &executor(datasource, ticket_id_field)
-        )
+      def build(datasource, **opts)
+        opts[:email_templates] = Array(opts[:email_templates]).compact
+        BaseAction.new(scope: ActionScope::SINGLE, form: form(opts), &executor(datasource, opts))
       end
 
-      def form(default_subject, default_message, requester_email_default)
+      # When email_templates are configured the form becomes a two-page wizard
+      # (template selection, then the prefilled body). Otherwise the original
+      # flat form is used. The ActionCollectionDecorator rejects forms that mix
+      # pages with non-page elements, so we keep each mode strictly homogeneous.
+      def form(opts)
+        body = body_fields(opts)
+        return body if opts[:email_templates].empty?
+
         [
-          { type: FieldType::STRING, label: 'Requester email', is_required: true,
-            description: 'Email of the Zendesk requester. Pre-filled from the selected record when available.',
-            default_value: requester_default(requester_email_default) },
-          { type: FieldType::STRING, label: 'Subject', is_required: true,
-            default_value: template_default(default_subject, escape_html: false) },
-          { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
-            description: 'Sent as the ticket\'s first comment (HTML). Public comments trigger the ' \
-                         'default Zendesk notification email to the requester.',
-            default_value: template_default(default_message, escape_html: true) },
-          { type: FieldType::ENUM, label: 'Priority', enum_values: Collections::Ticket::ENUM_PRIORITY,
-            default_value: 'normal' },
-          { type: FieldType::ENUM, label: 'Type', enum_values: Collections::Ticket::ENUM_TYPE },
-          { type: FieldType::BOOLEAN, label: 'Send as internal note',
-            description: 'When checked, the first comment is private and no email is sent to the requester.',
-            default_value: false }
+          { type: 'Layout', component: 'Page', next_button_label: 'Continue',
+            elements: [template_field(opts[:email_templates])] },
+          { type: 'Layout', component: 'Page', previous_button_label: 'Back',
+            elements: body }
         ]
       end
 
-      def executor(datasource, ticket_id_field = nil)
+      def body_fields(opts)
+        fields = [requester_field(opts[:requester_email_default]),
+                  subject_field(opts[:default_subject]),
+                  message_field(opts[:default_message], opts[:email_templates])]
+        fields << priority_field unless present?(opts[:priority_override])
+        fields << type_field unless present?(opts[:type_override])
+        fields << internal_note_field
+        fields
+      end
+
+      def executor(datasource, opts = {})
         lambda do |context, result_builder|
           values = context.form_values
           email  = values['Requester email']
           next result_builder.error(message: 'Requester email is required.') unless present?(email)
 
-          ticket = datasource.client.create_ticket(build_payload(values, email))
+          payload = build_payload(values, email, opts)
+          ticket = datasource.client.create_ticket(payload)
           ticket_id = ticket.respond_to?(:[]) ? ticket['id'] : nil
 
-          writeback = write_back_ticket_id(context, ticket_id_field, ticket_id)
+          writeback = write_back_ticket_id(context, opts[:ticket_id_field], ticket_id)
           result_builder.success(message: success_message(ticket_id, values, writeback))
         end
+      end
+
+      def build_payload(values, email, opts = {})
+        internal_note = truthy?(values['Send as internal note'])
+        payload = {
+          'requester' => { 'email' => email },
+          'subject' => values['Subject'],
+          'comment' => { 'html_body' => values['Message'], 'public' => !internal_note }
+        }
+        priority = present?(opts[:priority_override]) ? opts[:priority_override] : values['Priority']
+        type     = present?(opts[:type_override])     ? opts[:type_override]     : values['Type']
+        payload['priority'] = priority if present?(priority)
+        payload['type']     = type     if present?(type)
+        payload
       end
 
       # Best-effort: a writeback failure mustn't roll back the ticket we
@@ -81,16 +94,44 @@ module ForestAdminDatasourceZendesk
         [:failed, "#{e.class}: #{e.message}"]
       end
 
-      def build_payload(values, email)
-        internal_note = truthy?(values['Send as internal note'])
-        payload = {
-          'requester' => { 'email' => email },
-          'subject' => values['Subject'],
-          'comment' => { 'html_body' => values['Message'], 'public' => !internal_note }
-        }
-        payload['priority'] = values['Priority'] if present?(values['Priority'])
-        payload['type'] = values['Type'] if present?(values['Type'])
-        payload
+      def requester_field(default)
+        { type: FieldType::STRING, label: 'Requester email', is_required: true,
+          description: 'Email of the Zendesk requester. Pre-filled from the selected record when available.',
+          default_value: requester_default(default) }
+      end
+
+      def template_field(templates)
+        { type: FieldType::ENUM, label: 'Template', is_required: true,
+          enum_values: [NO_TEMPLATE] + templates.map { |t| t[:title] },
+          default_value: NO_TEMPLATE,
+          description: 'Pick a template to pre-fill the Message on the next page.' }
+      end
+
+      def subject_field(default_subject)
+        { type: FieldType::STRING, label: 'Subject', is_required: true,
+          default_value: template_default(default_subject, escape_html: false) }
+      end
+
+      def message_field(default_message, templates)
+        { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
+          description: 'Sent as the ticket\'s first comment (HTML). Public comments trigger the ' \
+                       'default Zendesk notification email to the requester.',
+          default_value: message_default(default_message, templates) }
+      end
+
+      def priority_field
+        { type: FieldType::ENUM, label: 'Priority',
+          enum_values: Collections::Ticket::ENUM_PRIORITY, default_value: 'normal' }
+      end
+
+      def type_field
+        { type: FieldType::ENUM, label: 'Type', enum_values: Collections::Ticket::ENUM_TYPE }
+      end
+
+      def internal_note_field
+        { type: FieldType::BOOLEAN, label: 'Send as internal note',
+          description: 'When checked, the first comment is private and no email is sent to the requester.',
+          default_value: false }
       end
 
       def requester_default(value)
@@ -113,6 +154,17 @@ module ForestAdminDatasourceZendesk
         return template unless template.match?(TOKEN_RE)
 
         ->(context) { interpolate(template, fetch_record(context), escape_html: escape_html) }
+      end
+
+      # When email_templates are configured the dropdown drives the Message
+      # entirely: picking 'No template' yields an empty body, picking a title
+      # injects the configured content. `default_message` is ignored in that
+      # mode (strict opt-in to the template wizard).
+      def message_default(default_message, templates)
+        return template_default(default_message, escape_html: true) if templates.empty?
+
+        by_title = templates.to_h { |t| [t[:title], t[:content].to_s] }
+        ->(context) { by_title[context.get_form_value('Template')].to_s }
       end
 
       def fetch_record(context)
