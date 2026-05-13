@@ -4,28 +4,6 @@ module ForestAdminDatasourceZendesk
                 :default_ticket_subject, :default_ticket_message, :requester_email_default,
                 :close_ticket_statuses
 
-    # Optional kwargs:
-    #
-    # CreateTicketWithNotification smart action (auto-registered on ZendeskUser):
-    #   * `default_ticket_subject` / `default_ticket_message` are strings that
-    #     support `{{record.<field>}}` tokens, interpolated against the
-    #     selected record when the form opens. `default_ticket_message` is
-    #     rendered in a RichText widget and shipped to Zendesk as `html_body`.
-    #   * `requester_email_default` is a literal email String used as the
-    #     static default for the "Requester email" form field. When unset,
-    #     ZendeskUser falls back to reading `record['email']` off the
-    #     selected user. (When attaching the action to a non-ZendeskUser
-    #     collection via `register_on(...)`, this kwarg also accepts a Proc
-    #     `record -> email_string` for callers that need to compute it.)
-    #
-    # CloseTicket smart actions (registered on ZendeskTicket):
-    #   * `close_ticket_statuses` is the opt-in list of close actions to
-    #     expose, picked from `%w[solved closed]`. Defaults to `[]` — no
-    #     close actions are registered unless explicitly listed. Each listed
-    #     status registers both a Single and a Bulk variant.
-    #
-    # All-kwargs constructor — the ParameterLists cop counts each kwarg toward
-    # its 5-param limit, which doesn't really apply to named arguments.
     def initialize(subdomain:, username:, token:, # rubocop:disable Metrics/ParameterLists
                    default_ticket_subject: nil, default_ticket_message: nil,
                    requester_email_default: nil, close_ticket_statuses: [])
@@ -36,8 +14,6 @@ module ForestAdminDatasourceZendesk
       @default_ticket_subject = default_ticket_subject
       @default_ticket_message = default_ticket_message
       @requester_email_default = requester_email_default
-      # Dedup defensively: duplicates would make register_on raise
-      # "Action ... already defined" on the second registration.
       @close_ticket_statuses = Array(close_ticket_statuses).map(&:to_s).uniq
 
       register_collections

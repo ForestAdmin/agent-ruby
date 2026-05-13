@@ -11,13 +11,8 @@ module ForestAdminDatasourceZendesk
       DATE_OPS    = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
                      Operators::PRESENT, Operators::BLANK].freeze
 
-      # Actions registered via `add_action` live in `schema[:actions]` and surface
-      # in the frontend through the agent's ActionCollectionDecorator (which merges
-      # them via `refine_schema`). Execution and form rendering, however, fall
-      # through to this collection — Forest's Collection contract leaves them
-      # NotImplementedError. We pipe both through an internal decorator instance so
-      # we reuse the same form lifecycle (default evaluation, conditional fields,
-      # change watching) the agent uses for customizer-defined actions.
+      # Pipe through an internal ActionCollectionDecorator so actions registered
+      # at the datasource level reuse the agent's form lifecycle for free.
       def add_action(name, action)
         super
         action_runtime.add_action(name, action)

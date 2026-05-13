@@ -1,19 +1,7 @@
 module ForestAdminDatasourceZendesk
   module Actions
-    # No-form actions exposed on the ZendeskTicket collection that flip the
-    # ticket status to `solved` or `closed`. Each target status is exposed in
-    # both Single and Bulk scopes, so the actions surface from a ticket's
-    # detail page *and* from a multi-selection on the index.
-    #
-    # Status semantics: `solved` is the standard "resolved" workflow — the
-    # requester can still reopen during Zendesk's reopen window. `closed` is
-    # terminal; Zendesk itself sometimes rejects the direct `open → closed`
-    # transition, in which case the underlying API error bubbles up (we don't
-    # silently retry via `solved`).
-    #
-    # Opt-in registration: neither status is registered by default. Pass
-    # `close_ticket_statuses: %w[solved closed]` (or any subset) to
-    # `Datasource.new` to expose the variants you want.
+    # Zendesk sometimes rejects the direct `open -> closed` transition; we
+    # surface the API error per-id rather than retrying via `solved`.
     module CloseTicket
       BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
@@ -41,9 +29,6 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Reads `datasource.close_ticket_statuses` by default — falls back to an
-      # explicit `statuses:` kwarg if a caller wants to override (e.g. when
-      # attaching CloseTicket to a different collection).
       def register_on(collection, datasource, statuses: nil)
         variants(statuses || datasource.close_ticket_statuses).each do |name, status, scope|
           collection.add_action(name, build(datasource, status: status, scope: scope))
@@ -68,9 +53,7 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Walks ids one by one so a single rejected transition (e.g. Zendesk
-      # refusing `open -> closed`) doesn't abort the rest of a bulk run.
-      # Returns `[succeeded_ids, failures]` where `failures` is `[[id, reason], ...]`.
+      # Per-id rescue so a single transition rejection doesn't abort bulk.
       def apply_status(datasource, ids, status)
         succeeded = []
         failed = []

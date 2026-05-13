@@ -2,35 +2,9 @@ require 'cgi'
 
 module ForestAdminDatasourceZendesk
   module Actions
-    # Smart action that opens a Zendesk ticket from any host collection. The
-    # selected record needs no relation to Zendesk: the requester is identified
-    # by an email entered (or pre-filled) in the form, and Zendesk creates the
-    # user record on the fly if it doesn't already exist.
-    #
-    # ZendeskUser auto-registers this action with a resolver that pre-fills the
-    # requester email from the user's `email` field. To expose the action on
-    # any other collection (e.g. a Postgres `customers` table customized via
-    # the agent), call `register_on` from the agent setup:
-    #
-    #   ForestAdminDatasourceZendesk::Actions::CreateTicketWithNotification
-    #     .register_on(customer, datasource,
-    #                  default_subject: 'Refund for {{record.email}}',
-    #                  default_message: '<p>Hi {{record.name}},</p>',
-    #                  requester_email_default: ->(record) { record['email'] })
-    #
-    # `requester_email_default` accepts either:
-    #   * a String — used as a literal email default (static), or
-    #   * a Proc `record -> email_string` — evaluated against the selected
-    #     record when the form opens (dynamic).
-    #
-    # `ticket_id_field` (register_on only) names a writable field on the host
-    # collection that receives the freshly-created ticket id. The update is
-    # best-effort: a failure (missing field, validation error, etc.) is logged
-    # and surfaced in the success message but doesn't roll back the ticket.
-    #
-    # The Message field uses Forest's RichText widget and ships as `html_body`.
-    # Subject and Message defaults support `{{record.<field>}}` tokens resolved
-    # against the selected record when the form opens.
+    # Zendesk creates the requester user automatically from the form's email,
+    # so the host record needs no relation to Zendesk and the action can be
+    # `register_on`'d on any collection.
     module CreateTicketWithNotification
       BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
@@ -41,8 +15,6 @@ module ForestAdminDatasourceZendesk
 
       module_function
 
-      # All-kwargs registration — the ParameterLists cop counts each kwarg
-      # toward its 5-param limit, which doesn't really apply to named args.
       def register_on(collection, datasource, default_subject: nil, default_message: nil, # rubocop:disable Metrics/ParameterLists
                       requester_email_default: nil, ticket_id_field: nil)
         collection.add_action(NAME, build(datasource,
@@ -95,10 +67,8 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Returns one of :skipped, :ok, or [:failed, "reason"]. The host record
-      # update is best-effort: a writeback failure mustn't roll back the ticket
-      # we already created Zendesk-side, so we surface the issue in the success
-      # message and the agent log instead of erroring out.
+      # Best-effort: a writeback failure mustn't roll back the ticket we
+      # already created Zendesk-side.
       def write_back_ticket_id(context, field, ticket_id)
         return :skipped if field.nil? || ticket_id.nil?
 
@@ -154,10 +124,8 @@ module ForestAdminDatasourceZendesk
         {}
       end
 
-      # `escape_html` matters for the Message template, which is rendered as HTML
-      # by the Zendesk comment endpoint (and possibly emailed to the requester).
-      # Without escaping, a record value containing `<`, `&`, or markup would
-      # break the layout or, worse, smuggle markup into the outbound email.
+      # Message ships as html_body; an unescaped `<` or `&` from a record value
+      # would break the outbound email or smuggle markup into it.
       def interpolate(template, record, escape_html:)
         template.gsub(TOKEN_RE) do
           key = ::Regexp.last_match(1)
@@ -172,7 +140,6 @@ module ForestAdminDatasourceZendesk
         base = base_success_message(ticket_id, values)
         return base unless writeback.is_a?(Array) && writeback.first == :failed
 
-        # Ticket created Zendesk-side, but the writeback to the host collection failed.
         "#{base} (warning: could not store the ticket id on the record: #{writeback.last})"
       end
 
