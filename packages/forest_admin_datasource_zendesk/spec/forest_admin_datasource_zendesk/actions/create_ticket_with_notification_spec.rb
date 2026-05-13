@@ -128,6 +128,32 @@ module ForestAdminDatasourceZendesk
       end
     end
 
+    describe 'HTML escaping on the Message template' do
+      let(:context_double) do
+        instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
+                        get_record: { 'name' => "O'Brien <admin>", 'note' => '<script>alert(1)</script>' })
+      end
+
+      it 'escapes interpolated values in the Message (RichText -> html_body)' do
+        # Otherwise a record value containing `<` or `&` would break the
+        # outbound HTML or smuggle markup into the requester email.
+        action = described_class.build(datasource,
+                                       default_message: '<p>Hi {{record.name}} - {{record.note}}</p>')
+        message_proc = action.form.find { |f| f[:label] == 'Message' }[:default_value]
+
+        expect(message_proc.call(context_double)).to eq(
+          '<p>Hi O&#39;Brien &lt;admin&gt; - &lt;script&gt;alert(1)&lt;/script&gt;</p>'
+        )
+      end
+
+      it 'leaves Subject interpolation unescaped (plain-text field)' do
+        action = described_class.build(datasource, default_subject: 'Re: {{record.name}}')
+        subject_proc = action.form.find { |f| f[:label] == 'Subject' }[:default_value]
+
+        expect(subject_proc.call(context_double)).to eq("Re: O'Brien <admin>")
+      end
+    end
+
     describe 'executor' do
       context 'with a public html comment (default)' do
         let(:form_values) do

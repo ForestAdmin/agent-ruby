@@ -1,3 +1,5 @@
+require 'cgi'
+
 module ForestAdminDatasourceZendesk
   module Actions
     # Smart action that opens a Zendesk ticket from any host collection. The
@@ -65,11 +67,11 @@ module ForestAdminDatasourceZendesk
             description: 'Email of the Zendesk requester. Pre-filled from the selected record when available.',
             default_value: requester_default(requester_email_default) },
           { type: FieldType::STRING, label: 'Subject', is_required: true,
-            default_value: template_default(default_subject) },
+            default_value: template_default(default_subject, escape_html: false) },
           { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
             description: 'Sent as the ticket\'s first comment (HTML). Public comments trigger the ' \
                          'default Zendesk notification email to the requester.',
-            default_value: template_default(default_message) },
+            default_value: template_default(default_message, escape_html: true) },
           { type: FieldType::ENUM, label: 'Priority', enum_values: Collections::Ticket::ENUM_PRIORITY,
             default_value: 'normal' },
           { type: FieldType::ENUM, label: 'Type', enum_values: Collections::Ticket::ENUM_TYPE },
@@ -133,11 +135,11 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      def template_default(template)
+      def template_default(template, escape_html:)
         return nil unless present?(template)
         return template unless template.match?(TOKEN_RE)
 
-        ->(context) { interpolate(template, fetch_record(context)) }
+        ->(context) { interpolate(template, fetch_record(context), escape_html: escape_html) }
       end
 
       def fetch_record(context)
@@ -146,11 +148,17 @@ module ForestAdminDatasourceZendesk
         {}
       end
 
-      def interpolate(template, record)
+      # `escape_html` matters for the Message template, which is rendered as HTML
+      # by the Zendesk comment endpoint (and possibly emailed to the requester).
+      # Without escaping, a record value containing `<`, `&`, or markup would
+      # break the layout or, worse, smuggle markup into the outbound email.
+      def interpolate(template, record, escape_html:)
         template.gsub(TOKEN_RE) do
           key = ::Regexp.last_match(1)
           value = record[key] || record[key.to_sym]
-          value.nil? ? '' : value.to_s
+          next '' if value.nil?
+
+          escape_html ? CGI.escapeHTML(value.to_s) : value.to_s
         end
       end
 

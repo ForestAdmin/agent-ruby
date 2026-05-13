@@ -59,14 +59,46 @@ module ForestAdminDatasourceZendesk
           ids = Array(context.record_ids).compact
           next result_builder.error(message: 'No ticket selected.') if ids.empty?
 
-          ids.each { |id| datasource.client.update_ticket(id, 'status' => status) }
-          result_builder.success(message: success_message(ids, status))
+          succeeded, failed = apply_status(datasource, ids, status)
+          if succeeded.empty?
+            result_builder.error(message: error_message(failed, status))
+          else
+            result_builder.success(message: success_message(succeeded, failed, status))
+          end
         end
       end
 
-      def success_message(ids, status)
+      # Walks ids one by one so a single rejected transition (e.g. Zendesk
+      # refusing `open -> closed`) doesn't abort the rest of a bulk run.
+      # Returns `[succeeded_ids, failures]` where `failures` is `[[id, reason], ...]`.
+      def apply_status(datasource, ids, status)
+        succeeded = []
+        failed = []
+        ids.each do |id|
+          datasource.client.update_ticket(id, 'status' => status)
+          succeeded << id
+        rescue StandardError => e
+          ForestAdminDatasourceZendesk.logger.warn(
+            "[forest_admin_datasource_zendesk] failed to set ticket ##{id} to '#{status}': #{e.class}: #{e.message}"
+          )
+          failed << [id, "#{e.class}: #{e.message}"]
+        end
+        [succeeded, failed]
+      end
+
+      def success_message(succeeded, failed, status)
         verb = status == 'closed' ? 'closed' : 'marked as solved'
-        ids.size == 1 ? "Ticket ##{ids.first} #{verb}." : "#{ids.size} tickets #{verb}."
+        base = succeeded.size == 1 ? "Ticket ##{succeeded.first} #{verb}." : "#{succeeded.size} tickets #{verb}."
+        return base if failed.empty?
+
+        "#{base} #{failed.size} failed: #{failed.map(&:first).join(", ")}."
+      end
+
+      def error_message(failed, status)
+        verb = status == 'closed' ? 'close' : 'mark as solved'
+        return "Failed to #{verb} ticket ##{failed.first.first}: #{failed.first.last}" if failed.size == 1
+
+        "Failed to #{verb} all #{failed.size} tickets. First error: #{failed.first.last}"
       end
     end
   end

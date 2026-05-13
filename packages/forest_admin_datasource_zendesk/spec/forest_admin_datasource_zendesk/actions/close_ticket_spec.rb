@@ -72,6 +72,52 @@ module ForestAdminDatasourceZendesk
         expect(client).not_to have_received(:update_ticket)
         expect(result[:type]).to eq('Error')
       end
+
+      context 'when Zendesk rejects some ids (partial success on bulk)' do
+        let(:bulk_context) { Struct.new(:record_ids).new([7, 8, 9]) }
+
+        it 'continues with the remaining ids and surfaces the failures in the message' do
+          # Mimics Zendesk refusing the `open -> closed` transition for id 8.
+          allow(client).to receive(:update_ticket)
+            .with(8, anything).and_raise(StandardError, 'cannot transition open to closed')
+          allow(client).to receive(:update_ticket).with(7, anything)
+          allow(client).to receive(:update_ticket).with(9, anything)
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
+
+          result = described_class.executor(datasource, 'closed').call(bulk_context, result_builder)
+
+          expect(client).to have_received(:update_ticket).with(7, 'status' => 'closed')
+          expect(client).to have_received(:update_ticket).with(8, 'status' => 'closed')
+          expect(client).to have_received(:update_ticket).with(9, 'status' => 'closed')
+          expect(result[:type]).to eq('Success')
+          expect(result[:message]).to include('2 tickets closed', '1 failed', '8')
+          expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
+            .with(a_string_including('#8', 'cannot transition'))
+        end
+
+        it 'returns an Error when every id fails' do
+          allow(client).to receive(:update_ticket).and_raise(StandardError, 'permission denied')
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn).exactly(3).times
+
+          result = described_class.executor(datasource, 'closed').call(bulk_context, result_builder)
+
+          expect(result[:type]).to eq('Error')
+          expect(result[:message]).to include('Failed to close', '3 tickets', 'permission denied')
+        end
+      end
+
+      context 'when the only ticket fails (single scope)' do
+        it 'returns an Error with the underlying reason' do
+          allow(client).to receive(:update_ticket)
+            .and_raise(StandardError, 'invalid transition')
+          allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
+
+          result = described_class.executor(datasource, 'closed').call(context, result_builder)
+
+          expect(result[:type]).to eq('Error')
+          expect(result[:message]).to include('Failed to close', '#42', 'invalid transition')
+        end
+      end
     end
 
     describe 'integration with Ticket collection' do
