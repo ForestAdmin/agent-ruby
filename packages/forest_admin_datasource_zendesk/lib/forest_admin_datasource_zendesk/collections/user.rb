@@ -1,6 +1,6 @@
 module ForestAdminDatasourceZendesk
   module Collections
-    class User < BaseCollection # rubocop:disable Metrics/ClassLength
+    class User < BaseCollection
       include Searchable
 
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
@@ -20,17 +20,6 @@ module ForestAdminDatasourceZendesk
         @custom_fields = custom_fields
         define_schema
         define_relations
-        Actions::CreateTicketWithNotification.register_on(
-          self, datasource,
-          action_name: datasource.default_ticket_action_name,
-          default_subject: datasource.default_ticket_subject,
-          default_message: datasource.default_ticket_message,
-          requester_email_default: datasource.requester_email_default || ->(record) { record['email'] },
-          email_templates: datasource.email_templates,
-          priority_override: datasource.priority_override,
-          type_override: datasource.type_override,
-          sender_email: datasource.sender_email
-        )
         enable_search
         enable_count
       end

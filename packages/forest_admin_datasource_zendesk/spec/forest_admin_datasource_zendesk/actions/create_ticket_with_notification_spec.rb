@@ -16,26 +16,8 @@ module ForestAdminDatasourceZendesk
 
   RSpec.describe Actions::CreateTicketWithNotification do
     let(:client) { instance_double(ForestAdminDatasourceZendesk::Client) }
-    let(:default_subject) { nil }
-    let(:default_message) { nil }
-    let(:requester_email_default) { nil }
-    let(:datasource_requester_default) { nil }
-    let(:datasource_action_name) { nil }
-    let(:datasource_email_templates) { [] }
-    let(:datasource_priority_override) { nil }
-    let(:datasource_type_override) { nil }
-    let(:datasource_sender_email) { nil }
     let(:datasource) do
-      instance_double(ForestAdminDatasourceZendesk::Datasource,
-                      client: client, custom_field_mapping: {},
-                      default_ticket_subject: default_subject,
-                      default_ticket_message: default_message,
-                      requester_email_default: datasource_requester_default,
-                      default_ticket_action_name: datasource_action_name,
-                      email_templates: datasource_email_templates,
-                      priority_override: datasource_priority_override,
-                      type_override: datasource_type_override,
-                      sender_email: datasource_sender_email)
+      instance_double(ForestAdminDatasourceZendesk::Datasource, client: client, custom_field_mapping: {})
     end
 
     let(:context) { Struct.new(:form_values).new(form_values) }
@@ -80,7 +62,7 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      context 'when given a Proc resolver' do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      context 'when given a Proc resolver' do
         let(:resolver) { ->(record) { record['email'] } }
 
         it 'pre-fills the email field from the selected record via the resolver' do
@@ -114,13 +96,10 @@ module ForestAdminDatasourceZendesk
     end
 
     describe 'subject / message defaults' do
-      let(:default_subject) { 'Welcome' }
-      let(:default_message) { '<p>Hi</p>' }
-
       it 'uses configured static defaults verbatim' do
         action = described_class.build(datasource,
-                                       default_subject: default_subject,
-                                       default_message: default_message)
+                                       default_subject: 'Welcome',
+                                       default_message: '<p>Hi</p>')
         expect(action.form.find { |f| f[:label] == 'Subject' }[:default_value]).to eq('Welcome')
         expect(action.form.find { |f| f[:label] == 'Message' }[:default_value]).to eq('<p>Hi</p>')
       end
@@ -254,7 +233,7 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      context 'with ticket_id_field configured (writeback to host record)' do # rubocop:disable RSpec/MultipleMemoizedHelpers
+      context 'with ticket_id_field configured (writeback to host record)' do
         let(:form_values) do
           { 'Requester email' => 'd@x.com', 'Subject' => 'S', 'Message' => 'M',
             'Send as internal note' => false }
@@ -264,7 +243,9 @@ module ForestAdminDatasourceZendesk
         let(:context) do
           FakeActionContext.new(form_values: form_values, collection: host_collection, filter: filter)
         end
-        let(:executor_with_writeback) { described_class.executor(datasource, ticket_id_field: 'zendesk_ticket_id') }
+        let(:executor_with_writeback) do
+          described_class.executor(datasource, ticket_id_field: 'last_zendesk_ticket_id')
+        end
 
         before do
           allow(client).to receive(:create_ticket).and_return('id' => 77)
@@ -275,7 +256,7 @@ module ForestAdminDatasourceZendesk
 
           result = executor_with_writeback.call(context, result_builder)
 
-          expect(host_collection).to have_received(:update).with(filter, { 'zendesk_ticket_id' => 77 })
+          expect(host_collection).to have_received(:update).with(filter, { 'last_zendesk_ticket_id' => 77 })
           expect(result[:type]).to eq('Success')
           expect(result[:message]).to include('Ticket #77')
           expect(result[:message]).not_to include('warning')
@@ -290,7 +271,7 @@ module ForestAdminDatasourceZendesk
           expect(result[:type]).to eq('Success')
           expect(result[:message]).to include('Ticket #77', 'warning', 'field is read-only')
           expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
-            .with(a_string_including('zendesk_ticket_id', 'field is read-only'))
+            .with(a_string_including('last_zendesk_ticket_id', 'field is read-only'))
         end
 
         it 'does not attempt any update when ticket_id_field is nil' do
@@ -339,94 +320,12 @@ module ForestAdminDatasourceZendesk
 
         expect(relax).to have_received(:update).with(filter, { 'zd_id' => 5 })
       end
-    end
 
-    describe 'datasource-level requester_email_default' do
-      context 'when set to a literal email String' do
-        let(:datasource_requester_default) { 'support@example.com' }
+      it 'registers under the configured name when action_name is provided' do
+        described_class.register_on(host_collection, datasource)
+        described_class.register_on(host_collection, datasource, action_name: 'Custom label')
 
-        it 'becomes the static default of the ZendeskUser action (no record lookup)' do
-          user_collection = Collections::User.new(datasource)
-          requester_field = user_collection.schema[:actions][described_class::NAME].form.first
-
-          expect(requester_field.default_value).to eq('support@example.com')
-        end
-      end
-
-      context 'when set to a Proc (advanced)' do
-        let(:datasource_requester_default) { ->(record) { record['primary_email'] } }
-        let(:context_double) do
-          instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle,
-                          get_record: { 'primary_email' => 'custom@x.com', 'email' => 'fallback@x.com' })
-        end
-
-        it 'overrides the ZendeskUser hardcoded record-reading fallback' do
-          user_collection = Collections::User.new(datasource)
-          requester_field = user_collection.schema[:actions][described_class::NAME].form.first
-
-          expect(requester_field.default_value.call(context_double)).to eq('custom@x.com')
-        end
-      end
-    end
-
-    describe 'integration with User collection' do # rubocop:disable RSpec/MultipleMemoizedHelpers
-      let(:user_collection) { Collections::User.new(datasource) }
-      let(:filter) do
-        ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-          condition_tree: ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new(
-            'id', 'equal', 42
-          )
-        )
-      end
-
-      it 'is registered on the ZendeskUser schema under the documented name' do
-        expect(user_collection.schema[:actions]).to have_key(described_class::NAME)
-      end
-
-      it 'marks the action form as dynamic so the agent re-fetches it when opened' do
-        # The requester_email_default resolver injects a lambda, so the form
-        # must be re-evaluated per selected record (not cached statically).
-        expect(user_collection.schema[:actions][described_class::NAME].static_form).to be(false)
-      end
-
-      it 'returns a typed form through Collection#get_form (regression for NotImplementedError)' do
-        allow(client).to receive(:find_user).with(42).and_return(Struct.new(:attributes).new({ 'id' => 42 }))
-
-        form = user_collection.get_form(nil, described_class::NAME, nil, filter)
-        labels = form.map(&:label)
-        expect(labels).to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type', 'Send as internal note'])
-      end
-
-      it 'runs the action through Collection#execute (regression for NotImplementedError)' do
-        allow(client).to receive(:find_user).with(42).and_return(Struct.new(:attributes).new({ 'id' => 42 }))
-        allow(client).to receive(:create_ticket).and_return('id' => 99)
-
-        result = user_collection.execute(nil, described_class::NAME,
-                                         { 'Requester email' => 'alice@x.com', 'Subject' => 'S', 'Message' => 'M' },
-                                         filter)
-        expect(client).to have_received(:create_ticket).with(hash_including(
-                                                               'requester' => { 'email' => 'alice@x.com',
-                                                                                'name' => 'alice' }
-                                                             ))
-        expect(result[:type]).to eq('Success')
-      end
-    end
-
-    describe 'action_name override' do
-      let(:collection) do
-        Class.new do
-          attr_reader :registered
-
-          def initialize = @registered = {}
-          def add_action(name, action) = @registered[name] = action
-        end.new
-      end
-
-      it 'registers the action under the configured name (default kept when omitted)' do
-        described_class.register_on(collection, datasource)
-        described_class.register_on(collection, datasource, action_name: 'Custom label')
-
-        expect(collection.registered.keys).to contain_exactly(described_class::NAME, 'Custom label')
+        expect(host_collection.registered.keys).to contain_exactly(described_class::NAME, 'Custom label')
       end
     end
 

@@ -1,7 +1,10 @@
 module ForestAdminDatasourceZendesk
   module Actions
     # Zendesk sometimes rejects the direct `open -> closed` transition; we
-    # surface the API error per-id rather than retrying via `solved`.
+    # surface the API error per-id rather than retrying via `solved`. The
+    # action is registered on an arbitrary host collection — the Zendesk
+    # ticket id is read from a configurable column (`ticket_id_field`) on
+    # the host record(s).
     module CloseTicket
       BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
@@ -9,8 +12,10 @@ module ForestAdminDatasourceZendesk
       STATUSES = %w[solved closed].freeze
 
       NAMES = {
-        'solved' => { single: 'Mark as solved',  bulk: 'Mark selected as solved' }.freeze,
-        'closed' => { single: 'Mark as closed',  bulk: 'Mark selected as closed' }.freeze
+        'solved' => { single: 'Mark Zendesk ticket as solved',
+                      bulk: 'Mark selected Zendesk tickets as solved' }.freeze,
+        'closed' => { single: 'Mark Zendesk ticket as closed',
+                      bulk: 'Mark selected Zendesk tickets as closed' }.freeze
       }.freeze
 
       SCOPES = { single: ActionScope::SINGLE, bulk: ActionScope::BULK }.freeze
@@ -21,7 +26,7 @@ module ForestAdminDatasourceZendesk
         unknown = statuses - STATUSES
         if unknown.any?
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "Unknown close_ticket_statuses: #{unknown.join(", ")}. Allowed: #{STATUSES.join(", ")}."
+                "Unknown CloseTicket statuses: #{unknown.join(", ")}. Allowed: #{STATUSES.join(", ")}."
         end
 
         statuses.flat_map do |status|
@@ -29,20 +34,20 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      def register_on(collection, datasource, statuses: nil)
-        variants(statuses || datasource.close_ticket_statuses).each do |name, status, scope|
-          collection.add_action(name, build(datasource, status: status, scope: scope))
+      def register_on(collection, datasource, ticket_id_field:, statuses: nil)
+        variants(statuses || STATUSES).each do |name, status, scope|
+          collection.add_action(name, build(datasource, status: status, scope: scope, ticket_id_field: ticket_id_field))
         end
       end
 
-      def build(datasource, status:, scope:)
-        BaseAction.new(scope: scope, &executor(datasource, status))
+      def build(datasource, status:, scope:, ticket_id_field:)
+        BaseAction.new(scope: scope, &executor(datasource, status, ticket_id_field))
       end
 
-      def executor(datasource, status)
+      def executor(datasource, status, ticket_id_field)
         lambda do |context, result_builder|
-          ids = Array(context.record_ids).compact
-          next result_builder.error(message: 'No ticket selected.') if ids.empty?
+          ids = resolve_ticket_ids(context, ticket_id_field)
+          next result_builder.error(message: "No Zendesk ticket id found in '#{ticket_id_field}'.") if ids.empty?
 
           succeeded, failed = apply_status(datasource, ids, status)
           if succeeded.empty?
@@ -51,6 +56,22 @@ module ForestAdminDatasourceZendesk
             result_builder.success(message: success_message(succeeded, failed, status))
           end
         end
+      end
+
+      # Reads the host record(s) and extracts the Zendesk ticket id from the
+      # configured field. Falls back to context.record_ids only when the
+      # host collection is itself the Zendesk Ticket collection (in which
+      # case ticket_id_field == 'id' is the canonical setup).
+      def resolve_ticket_ids(context, ticket_id_field)
+        records = context.get_records([ticket_id_field])
+        records = [records].compact unless records.is_a?(Array)
+        records.filter_map { |r| r[ticket_id_field] || r[ticket_id_field.to_sym] }
+      rescue StandardError => e
+        ForestAdminDatasourceZendesk.logger.warn(
+          "[forest_admin_datasource_zendesk] failed to resolve ticket ids from '#{ticket_id_field}': " \
+          "#{e.class}: #{e.message}"
+        )
+        []
       end
 
       # Per-id rescue so a single transition rejection doesn't abort bulk.

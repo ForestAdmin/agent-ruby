@@ -35,7 +35,6 @@ module ForestAdminDatasourceZendesk
         @custom_fields = custom_fields
         define_schema
         define_relations
-        Actions::CloseTicket.register_on(self, datasource)
         enable_search
         enable_count
       end

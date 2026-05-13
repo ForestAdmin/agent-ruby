@@ -1,33 +1,43 @@
 module ForestAdminDatasourceZendesk
+  # Stand-in for an action context. The executor only reads
+  # `get_records(fields)` so we don't need the full ActionContext class here.
+  class FakeCloseContext
+    def initialize(records: [])
+      @records = records
+    end
+
+    def get_records(_fields = [])
+      @records
+    end
+  end
+
   RSpec.describe Actions::CloseTicket do
     let(:client) { instance_double(ForestAdminDatasourceZendesk::Client) }
-    let(:close_ticket_statuses) { [] }
     let(:datasource) do
-      instance_double(ForestAdminDatasourceZendesk::Datasource,
-                      client: client, custom_field_mapping: {},
-                      close_ticket_statuses: close_ticket_statuses)
+      instance_double(ForestAdminDatasourceZendesk::Datasource, client: client, custom_field_mapping: {})
     end
     let(:result_builder) { ForestAdminDatasourceCustomizer::Decorators::Action::ResultBuilder.new }
     let(:action_scope) { ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope }
+    let(:ticket_id_field) { 'last_zendesk_ticket_id' }
 
     describe '.variants' do
       it 'yields all four variants when both statuses are requested' do
         variants = described_class.variants(%w[solved closed])
         expect(variants.map { |name, _status, _scope| name }).to contain_exactly(
-          'Mark as solved', 'Mark selected as solved',
-          'Mark as closed', 'Mark selected as closed'
+          'Mark Zendesk ticket as solved', 'Mark selected Zendesk tickets as solved',
+          'Mark Zendesk ticket as closed', 'Mark selected Zendesk tickets as closed'
         )
 
         scopes = variants.each_with_object({}) { |(name, _status, scope), h| h[name] = scope }
-        expect(scopes['Mark as solved']).to eq(action_scope::SINGLE)
-        expect(scopes['Mark selected as solved']).to eq(action_scope::BULK)
-        expect(scopes['Mark as closed']).to eq(action_scope::SINGLE)
-        expect(scopes['Mark selected as closed']).to eq(action_scope::BULK)
+        expect(scopes['Mark Zendesk ticket as solved']).to eq(action_scope::SINGLE)
+        expect(scopes['Mark selected Zendesk tickets as solved']).to eq(action_scope::BULK)
+        expect(scopes['Mark Zendesk ticket as closed']).to eq(action_scope::SINGLE)
+        expect(scopes['Mark selected Zendesk tickets as closed']).to eq(action_scope::BULK)
       end
 
       it 'yields only the requested status variants (subset filtering)' do
         names = described_class.variants(%w[solved]).map(&:first)
-        expect(names).to contain_exactly('Mark as solved', 'Mark selected as solved')
+        expect(names).to contain_exactly('Mark Zendesk ticket as solved', 'Mark selected Zendesk tickets as solved')
       end
 
       it 'yields nothing for an empty list' do
@@ -41,54 +51,67 @@ module ForestAdminDatasourceZendesk
     end
 
     describe 'executor' do
-      let(:context) { Struct.new(:record_ids).new([42]) }
+      let(:executor) { described_class.executor(datasource, 'solved', ticket_id_field) }
 
-      it 'PUTs status=solved for the selected ticket id' do
+      it 'reads the ticket id from the host field and PUTs status=solved' do
         allow(client).to receive(:update_ticket)
+        context = FakeCloseContext.new(records: [{ ticket_id_field => 42 }])
 
-        result = described_class.executor(datasource, 'solved').call(context, result_builder)
+        result = executor.call(context, result_builder)
 
         expect(client).to have_received(:update_ticket).with(42, 'status' => 'solved')
         expect(result[:type]).to eq('Success')
         expect(result[:message]).to include('Ticket #42', 'marked as solved')
       end
 
-      it 'PUTs status=closed for every id when run in bulk' do
+      it 'PUTs status=closed for every host record when run in bulk' do
         allow(client).to receive(:update_ticket)
-        bulk_context = Struct.new(:record_ids).new([7, 8, 9])
+        bulk_executor = described_class.executor(datasource, 'closed', ticket_id_field)
+        bulk_context = FakeCloseContext.new(
+          records: [7, 8, 9].map { |id| { ticket_id_field => id } }
+        )
 
-        result = described_class.executor(datasource, 'closed').call(bulk_context, result_builder)
+        result = bulk_executor.call(bulk_context, result_builder)
 
         [7, 8, 9].each { |id| expect(client).to have_received(:update_ticket).with(id, 'status' => 'closed') }
         expect(result[:message]).to include('3 tickets closed')
       end
 
-      it 'returns an error and skips the API when no ids are present' do
+      it 'returns an error when no host record carries a ticket id' do
         allow(client).to receive(:update_ticket)
-        empty_context = Struct.new(:record_ids).new([])
+        context = FakeCloseContext.new(records: [{ ticket_id_field => nil }])
 
-        result = described_class.executor(datasource, 'solved').call(empty_context, result_builder)
+        result = executor.call(context, result_builder)
 
         expect(client).not_to have_received(:update_ticket)
         expect(result[:type]).to eq('Error')
+        expect(result[:message]).to include(ticket_id_field)
+      end
+
+      it 'works with symbol keys on the host record' do
+        allow(client).to receive(:update_ticket)
+        context = FakeCloseContext.new(records: [{ ticket_id_field.to_sym => 99 }])
+
+        executor.call(context, result_builder)
+
+        expect(client).to have_received(:update_ticket).with(99, 'status' => 'solved')
       end
 
       context 'when Zendesk rejects some ids (partial success on bulk)' do
-        let(:bulk_context) { Struct.new(:record_ids).new([7, 8, 9]) }
+        let(:bulk_executor) { described_class.executor(datasource, 'closed', ticket_id_field) }
+        let(:bulk_context) do
+          FakeCloseContext.new(records: [7, 8, 9].map { |id| { ticket_id_field => id } })
+        end
 
         it 'continues with the remaining ids and surfaces the failures in the message' do
-          # Mimics Zendesk refusing the `open -> closed` transition for id 8.
           allow(client).to receive(:update_ticket)
             .with(8, anything).and_raise(StandardError, 'cannot transition open to closed')
           allow(client).to receive(:update_ticket).with(7, anything)
           allow(client).to receive(:update_ticket).with(9, anything)
           allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
 
-          result = described_class.executor(datasource, 'closed').call(bulk_context, result_builder)
+          result = bulk_executor.call(bulk_context, result_builder)
 
-          expect(client).to have_received(:update_ticket).with(7, 'status' => 'closed')
-          expect(client).to have_received(:update_ticket).with(8, 'status' => 'closed')
-          expect(client).to have_received(:update_ticket).with(9, 'status' => 'closed')
           expect(result[:type]).to eq('Success')
           expect(result[:message]).to include('2 tickets closed', '1 failed', '8')
           expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
@@ -99,65 +122,58 @@ module ForestAdminDatasourceZendesk
           allow(client).to receive(:update_ticket).and_raise(StandardError, 'permission denied')
           allow(ForestAdminDatasourceZendesk.logger).to receive(:warn).exactly(3).times
 
-          result = described_class.executor(datasource, 'closed').call(bulk_context, result_builder)
+          result = bulk_executor.call(bulk_context, result_builder)
 
           expect(result[:type]).to eq('Error')
           expect(result[:message]).to include('Failed to close', '3 tickets', 'permission denied')
         end
       end
 
-      context 'when the only ticket fails (single scope)' do
-        it 'returns an Error with the underlying reason' do
-          allow(client).to receive(:update_ticket)
-            .and_raise(StandardError, 'invalid transition')
+      context 'when get_records itself raises' do
+        it 'logs and returns an Error message without calling the client' do
+          context = instance_double(
+            ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle
+          )
+          allow(context).to receive(:get_records).and_raise(StandardError, 'boom')
           allow(ForestAdminDatasourceZendesk.logger).to receive(:warn)
+          allow(client).to receive(:update_ticket)
 
-          result = described_class.executor(datasource, 'closed').call(context, result_builder)
+          result = executor.call(context, result_builder)
 
+          expect(client).not_to have_received(:update_ticket)
           expect(result[:type]).to eq('Error')
-          expect(result[:message]).to include('Failed to close', '#42', 'invalid transition')
+          expect(ForestAdminDatasourceZendesk.logger).to have_received(:warn)
+            .with(a_string_including(ticket_id_field, 'boom'))
         end
       end
     end
 
-    describe 'integration with Ticket collection' do
-      let(:ticket_collection) { Collections::Ticket.new(datasource) }
-      let(:filter) do
-        ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-          condition_tree: ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf.new(
-            'id', 'equal', 42
-          )
+    describe '.register_on' do
+      let(:host_collection) do
+        Class.new do
+          attr_reader :registered
+
+          def initialize = @registered = {}
+          def add_action(name, action) = @registered[name] = action
+        end.new
+      end
+
+      it 'registers the four variants on an arbitrary host collection' do
+        described_class.register_on(host_collection, datasource, ticket_id_field: ticket_id_field)
+
+        expect(host_collection.registered.keys).to contain_exactly(
+          'Mark Zendesk ticket as solved', 'Mark selected Zendesk tickets as solved',
+          'Mark Zendesk ticket as closed', 'Mark selected Zendesk tickets as closed'
         )
       end
 
-      it 'registers nothing by default (opt-in)' do
-        action_keys = ticket_collection.schema[:actions].keys
-        expect(action_keys).not_to include('Mark as solved', 'Mark as closed',
-                                           'Mark selected as solved', 'Mark selected as closed')
-      end
+      it 'registers only the subset specified via :statuses' do
+        described_class.register_on(host_collection, datasource,
+                                    ticket_id_field: ticket_id_field, statuses: %w[solved])
 
-      context 'when close_ticket_statuses opts in to solved only' do
-        let(:close_ticket_statuses) { %w[solved] }
-
-        it 'registers only the solved variants' do
-          keys = ticket_collection.schema[:actions].keys
-          expect(keys).to include('Mark as solved', 'Mark selected as solved')
-          expect(keys).not_to include('Mark as closed', 'Mark selected as closed')
-        end
-      end
-
-      context 'when close_ticket_statuses opts in to both statuses' do
-        let(:close_ticket_statuses) { %w[solved closed] }
-
-        it 'wires the action through Collection#execute end-to-end' do
-          allow(client).to receive(:fetch_tickets_by_ids).with([42]).and_return(42 => { 'id' => 42 })
-          allow(client).to receive(:update_ticket)
-
-          result = ticket_collection.execute(nil, 'Mark as solved', {}, filter)
-
-          expect(client).to have_received(:update_ticket).with(42, 'status' => 'solved')
-          expect(result[:type]).to eq('Success')
-        end
+        expect(host_collection.registered.keys).to contain_exactly(
+          'Mark Zendesk ticket as solved', 'Mark selected Zendesk tickets as solved'
+        )
       end
     end
   end

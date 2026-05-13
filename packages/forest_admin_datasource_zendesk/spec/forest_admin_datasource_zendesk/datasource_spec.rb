@@ -29,6 +29,12 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
     )
   end
 
+  it 'registers no smart actions by default (actions are opt-in via plugins)' do
+    ds = described_class.new(**valid_args)
+    expect(ds.get_collection('ZendeskTicket').schema[:actions]).to be_empty
+    expect(ds.get_collection('ZendeskUser').schema[:actions]).to be_empty
+  end
+
   it 'forwards discovered ticket custom fields into the Ticket schema' do
     stub_request(:get, "#{base}/ticket_fields")
       .to_return(status: 200,
@@ -65,45 +71,6 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
     expect(ds.custom_field_mapping['tier']).to eq('tier')
   end
 
-  it 'defaults action templates to nil and close actions to none when no kwargs are supplied' do
-    ds = described_class.new(**valid_args)
-    expect(ds.default_ticket_subject).to be_nil
-    expect(ds.default_ticket_message).to be_nil
-    expect(ds.requester_email_default).to be_nil
-    expect(ds.close_ticket_statuses).to eq([])
-  end
-
-  it 'stores configured action defaults verbatim for the smart action to consume' do
-    ds = described_class.new(**valid_args,
-                             default_ticket_subject: 'Welcome {{record.name}}',
-                             default_ticket_message: '<p>Hi {{record.name}}</p>',
-                             requester_email_default: 'support@example.com',
-                             close_ticket_statuses: %w[solved closed])
-    expect(ds.default_ticket_subject).to eq('Welcome {{record.name}}')
-    expect(ds.default_ticket_message).to eq('<p>Hi {{record.name}}</p>')
-    expect(ds.requester_email_default).to eq('support@example.com')
-    expect(ds.close_ticket_statuses).to eq(%w[solved closed])
-  end
-
-  it 'normalizes close_ticket_statuses entries to strings' do
-    ds = described_class.new(**valid_args, close_ticket_statuses: %i[solved closed])
-    expect(ds.close_ticket_statuses).to eq(%w[solved closed])
-  end
-
-  it 'dedupes close_ticket_statuses so duplicates do not crash registration' do
-    # Without uniq this would crash with "Action ... already defined" on the
-    # second registration of the same status.
-    ds = described_class.new(**valid_args, close_ticket_statuses: %w[solved solved closed])
-    expect(ds.close_ticket_statuses).to eq(%w[solved closed])
-  end
-
-  it 'opts in CloseTicket variants on the Ticket schema when close_ticket_statuses is set' do
-    ds = described_class.new(**valid_args, close_ticket_statuses: %w[closed])
-    actions = ds.get_collection('ZendeskTicket').schema[:actions].keys
-    expect(actions).to include('Mark as closed', 'Mark selected as closed')
-    expect(actions).not_to include('Mark as solved', 'Mark selected as solved')
-  end
-
   it 'isolates custom field mappings between two datasource instances' do
     # Multi-tenancy: each datasource owns its own mapping.
     stub_request(:get, "#{base}/ticket_fields")
@@ -124,39 +91,5 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
 
     expect(a.custom_field_mapping).to have_key('custom_1111')
     expect(b.custom_field_mapping).not_to have_key('custom_1111')
-  end
-
-  it 'exposes the new ticket action kwargs (action_name, templates, overrides) as attr_readers' do
-    templates = [{ title: 'Welcome', content: '<p>Hi</p>' }]
-    ds = described_class.new(**valid_args,
-                             default_ticket_action_name: 'Open ticket',
-                             email_templates: templates,
-                             priority_override: 'urgent',
-                             type_override: 'incident',
-                             sender_email: 'support@acme.com')
-    expect(ds.default_ticket_action_name).to eq('Open ticket')
-    expect(ds.email_templates).to eq(templates)
-    expect(ds.priority_override).to eq('urgent')
-    expect(ds.type_override).to eq('incident')
-    expect(ds.sender_email).to eq('support@acme.com')
-  end
-
-  it 'propagates the new kwargs into the ZendeskUser auto-registered action' do
-    templates = [{ title: 'Welcome', content: '<p>Hi</p>' }]
-    ds = described_class.new(**valid_args,
-                             default_ticket_action_name: 'Open ticket',
-                             email_templates: templates,
-                             priority_override: 'urgent',
-                             type_override: 'incident')
-
-    actions = ds.get_collection('ZendeskUser').schema[:actions]
-    expect(actions.keys).to include('Open ticket')
-
-    # Two-page wizard because templates are configured; Priority/Type are
-    # omitted from the body page since overrides are forced.
-    form = actions['Open ticket'].form
-    expect(form.size).to eq(2)
-    body_labels = form.last.elements.map(&:label)
-    expect(body_labels).not_to include('Priority', 'Type')
   end
 end
