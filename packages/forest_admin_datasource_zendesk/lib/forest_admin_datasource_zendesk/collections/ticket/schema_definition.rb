@@ -18,11 +18,14 @@ module ForestAdminDatasourceZendesk
           add_field('description', ColumnSchema.new(column_type: 'String', filter_operators: [],
                                                     is_read_only: false, is_sortable: false))
           add_field('status', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                               enum_values: ENUM_STATUS, is_read_only: false, is_sortable: true))
+                                               enum_values: TicketEnums::STATUS, is_read_only: false,
+                                               is_sortable: true))
           add_field('priority', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                 enum_values: ENUM_PRIORITY, is_read_only: false, is_sortable: true))
+                                                 enum_values: TicketEnums::PRIORITY, is_read_only: false,
+                                                 is_sortable: true))
           add_field('ticket_type', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                    enum_values: ENUM_TYPE, is_read_only: false, is_sortable: true))
+                                                    enum_values: TicketEnums::TYPE, is_read_only: false,
+                                                    is_sortable: true))
           add_field('requester_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
                                                      is_read_only: false, is_sortable: true))
           add_field('assignee_id', ColumnSchema.new(column_type: 'Number', filter_operators: NUMBER_OPS,
