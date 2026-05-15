@@ -41,23 +41,21 @@ module ForestAdminDatasourceZendesk
       private
 
       def normalize_statuses(value)
-        list = Array(value).map(&:to_s).uniq
-        list = STATUSES if list.empty?
-        unknown = list - STATUSES
-        return list if unknown.empty?
-
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "Unknown CloseTicket statuses: #{unknown.join(", ")}. Allowed: #{STATUSES.join(", ")}."
+        normalize(value, :to_s, STATUSES, 'statuses')
       end
 
       def normalize_scopes(value)
-        list = Array(value).map(&:to_sym).uniq
-        list = SCOPE_KEYS if list.empty?
-        unknown = list - SCOPE_KEYS
+        normalize(value, :to_sym, SCOPE_KEYS, 'scopes')
+      end
+
+      def normalize(value, cast, allowed, label)
+        list = Array(value).map(&cast).uniq
+        list = allowed if list.empty?
+        unknown = list - allowed
         return list if unknown.empty?
 
         raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "Unknown CloseTicket scopes: #{unknown.join(", ")}. Allowed: #{SCOPE_KEYS.join(", ")}."
+              "Unknown CloseTicket #{label}: #{unknown.join(", ")}. Allowed: #{allowed.join(", ")}."
       end
 
       def variants(statuses, scopes)
