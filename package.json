@@ -23,7 +23,6 @@
   },
   "resolutions": {
     "semantic-release-slack-bot/**/micromatch": "^4.0.8",
-    "lodash": "^4.18.0",
-    "lodash-es": "^4.18.0"
-  } 
+    "ip-address": "^10.1.1"
+  }
 }
