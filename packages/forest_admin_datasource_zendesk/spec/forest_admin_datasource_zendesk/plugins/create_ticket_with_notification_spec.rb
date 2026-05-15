@@ -41,7 +41,7 @@ module ForestAdminDatasourceZendesk
         expect(collection_customizer.registered.keys).to contain_exactly(described_class::NAME)
         expect(action.scope).to eq(ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE)
         labels = action.form.map { |f| f[:label] }
-        expect(labels).to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type', 'Send as internal note'])
+        expect(labels).to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type'])
       end
 
       it 'honors :action_name as a custom label' do
@@ -313,7 +313,7 @@ module ForestAdminDatasourceZendesk
         expect(page_one[:component]).to eq('Page')
         expect(page_one[:elements].map { |f| f[:label] }).to eq(['Template'])
         expect(page_two[:elements].map { |f| f[:label] })
-          .to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type', 'Send as internal note'])
+          .to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Type'])
       end
 
       it 'lists No template + each template title in the dropdown' do
@@ -368,6 +368,18 @@ module ForestAdminDatasourceZendesk
 
       it 'keeps the flat form when no templates are configured' do
         expect(register(email_templates: []).form.first[:component]).to be_nil # not a Page
+      end
+    end
+
+    describe 'show_internal_note' do
+      it 'omits the Send as internal note field by default (public ticket)' do
+        action = register
+        expect(action.form.map { |f| f[:label] }).not_to include('Send as internal note')
+      end
+
+      it 'adds the Send as internal note field when enabled' do
+        action = register(show_internal_note: true)
+        expect(action.form.map { |f| f[:label] }).to include('Send as internal note')
       end
     end
 

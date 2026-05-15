@@ -31,7 +31,7 @@ module ForestAdminDatasourceZendesk
                     message_field(opts[:default_message], opts[:email_templates])]
           fields << priority_field unless present?(opts[:priority_override])
           fields << type_field unless present?(opts[:type_override])
-          fields << internal_note_field
+          fields << internal_note_field if opts[:show_internal_note]
           fields
         end
 
