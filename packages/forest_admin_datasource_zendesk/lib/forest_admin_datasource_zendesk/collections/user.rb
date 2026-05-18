@@ -6,6 +6,8 @@ module ForestAdminDatasourceZendesk
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       OneToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
       ENUM_ROLE       = %w[end-user agent admin].freeze
+      BASE_ATTR_KEYS  = %w[id email name role phone organization_id time_zone locale verified suspended
+                           created_at updated_at].freeze
 
       ZENDESK_SORTABLE = {
         'created_at' => 'created_at',
@@ -100,21 +102,10 @@ module ForestAdminDatasourceZendesk
 
       def serialize(user)
         attrs = attrs_of(user)
-        result = base_attributes(attrs)
+        result = BASE_ATTR_KEYS.to_h { |k| [k, attrs[k]] }
         user_fields = attrs['user_fields'] || {}
         @custom_fields.each { |cf| result[cf[:column_name]] = user_fields[cf[:zendesk_key]] }
         result
-      end
-
-      def base_attributes(attrs)
-        {
-          'id' => attrs['id'], 'email' => attrs['email'], 'name' => attrs['name'],
-          'role' => attrs['role'], 'phone' => attrs['phone'],
-          'organization_id' => attrs['organization_id'],
-          'time_zone' => attrs['time_zone'], 'locale' => attrs['locale'],
-          'verified' => attrs['verified'], 'suspended' => attrs['suspended'],
-          'created_at' => attrs['created_at'], 'updated_at' => attrs['updated_at']
-        }
       end
     end
   end

@@ -8,10 +8,6 @@ module ForestAdminDatasourceZendesk
 
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
 
-      ENUM_STATUS   = %w[new open pending hold solved closed].freeze
-      ENUM_PRIORITY = %w[low normal high urgent].freeze
-      ENUM_TYPE     = %w[problem incident question task].freeze
-
       ZENDESK_SORTABLE = {
         'updated_at' => 'updated_at',
         'created_at' => 'created_at',

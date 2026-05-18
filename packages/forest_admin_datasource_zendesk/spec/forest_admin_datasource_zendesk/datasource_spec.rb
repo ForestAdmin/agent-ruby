@@ -29,6 +29,12 @@ RSpec.describe ForestAdminDatasourceZendesk::Datasource do
     )
   end
 
+  it 'registers no smart actions by default (actions are opt-in via plugins)' do
+    ds = described_class.new(**valid_args)
+    expect(ds.get_collection('ZendeskTicket').schema[:actions]).to be_empty
+    expect(ds.get_collection('ZendeskUser').schema[:actions]).to be_empty
+  end
+
   it 'forwards discovered ticket custom fields into the Ticket schema' do
     stub_request(:get, "#{base}/ticket_fields")
       .to_return(status: 200,

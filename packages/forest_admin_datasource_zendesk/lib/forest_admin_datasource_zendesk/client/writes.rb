@@ -16,17 +16,30 @@ module ForestAdminDatasourceZendesk
       private
 
       def post_resource(path, key, attributes)
-        must_succeed("create(#{path})") do
-          body = api.connection.post(path) { |req| req.body = { key => attributes } }.body
-          body[key] || body
+        op = "create(#{path})"
+        body = must_succeed(op) do
+          api.connection.post(path) { |req| req.body = { key => attributes } }.body
         end
+        extract_resource(body, key, op)
       end
 
       def put_resource(path, key, id, attributes)
-        must_succeed("update(#{path}/#{id})") do
-          body = api.connection.put("#{path}/#{id}") { |req| req.body = { key => attributes } }.body
-          body[key] || body
+        op = "update(#{path}/#{id})"
+        body = must_succeed(op) do
+          api.connection.put("#{path}/#{id}") { |req| req.body = { key => attributes } }.body
         end
+        extract_resource(body, key, op)
+      end
+
+      # Zendesk wraps create/update responses in `{ "<resource>": { ... } }`.
+      # An empty or differently-shaped body means the API contract broke —
+      # surface a typed error rather than handing back a confusing envelope.
+      def extract_resource(body, key, operation)
+        resource = body[key] if body.is_a?(Hash)
+        return resource if resource.is_a?(Hash)
+
+        raise APIError,
+              "Zendesk API #{operation} returned an unexpected body shape (missing '#{key}'): #{body.inspect}"
       end
 
       def delete_resource(path, id)
