@@ -38,6 +38,14 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
+    # POST .../:id/:action — Numeral exposes side-effect endpoints (approve,
+    # cancel, verify) as sub-paths returning the updated resource.
+    def post_action_resource(path, id, action, attributes = {})
+      must_succeed("#{action}(#{path}/#{id})") do
+        extract_record(connection.post("#{path}/#{id}/#{action}", attributes).body)
+      end
+    end
+
     # Numeral list responses are typically wrapped (e.g. { "data": [...] } or
     # { "connected_accounts": [...] }) but we accept a raw array too. Falls back
     # to the first array-valued field so we don't silently coerce a wrapper hash

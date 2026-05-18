@@ -26,4 +26,11 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Datasource do
       'MambuIncomingPayment', 'MambuDirectDebitMandate', 'MambuExpectedPayment'
     )
   end
+
+  it 'registers no smart actions by default (actions are opt-in via plugins)' do
+    ds = described_class.new(**valid_args)
+    %w[MambuAccountHolder MambuExternalAccount MambuInternalAccount MambuPaymentOrder].each do |name|
+      expect(ds.get_collection(name).schema[:actions]).to be_empty
+    end
+  end
 end
