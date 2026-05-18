@@ -339,4 +339,30 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
       expect(client.delete_expected_payment('ep1')).to be(true)
     end
   end
+
+  describe 'action endpoints (approve/cancel/verify)' do
+    it 'approve_payment_order POSTs to /payment_orders/:id/approve' do
+      stub_request(:post, "#{base}/payment_orders/po_1/approve").to_return(json('id' => 'po_1', 'status' => 'approved'))
+      expect(client.approve_payment_order('po_1')).to include('id' => 'po_1', 'status' => 'approved')
+    end
+
+    it 'cancel_payment_order POSTs to /payment_orders/:id/cancel with the reason' do
+      stub_request(:post, "#{base}/payment_orders/po_1/cancel")
+        .with(body: { reason: 'AC01' }.to_json)
+        .to_return(json('id' => 'po_1', 'status' => 'canceled'))
+      expect(client.cancel_payment_order('po_1', 'reason' => 'AC01')).to include('status' => 'canceled')
+    end
+
+    it 'verify_external_account POSTs to /external_accounts/:id/verify' do
+      stub_request(:post, "#{base}/external_accounts/ea_1/verify")
+        .to_return(json('id' => 'ea_1', 'status' => 'pending_verification'))
+      expect(client.verify_external_account('ea_1')).to include('status' => 'pending_verification')
+    end
+
+    it 'wraps action endpoint errors with the operation name' do
+      stub_request(:post, "#{base}/payment_orders/bad/approve").to_return(status: 422, body: '{}')
+      expect { client.approve_payment_order('bad') }
+        .to raise_error(ForestAdminDatasourceMambuPayments::APIError, %r{approve\(payment_orders/bad\)})
+    end
+  end
 end
