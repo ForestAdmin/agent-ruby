@@ -82,7 +82,7 @@ module ForestAdminDatasourceZendesk
 
         def requester_default(value)
           return nil if value.nil?
-          return value if value.is_a?(String)
+          return template_default(value, escape_html: false) if value.is_a?(String)
 
           lambda do |context|
             record = fetch_record(context)
@@ -133,7 +133,7 @@ module ForestAdminDatasourceZendesk
         def interpolate(template, record, escape_html:)
           template.gsub(TOKEN_RE) do
             key = ::Regexp.last_match(1)
-            value = record[key] || record[key.to_sym]
+            value = record[key]
             next '' if value.nil?
 
             escape_html ? CGI.escapeHTML(value.to_s) : value.to_s

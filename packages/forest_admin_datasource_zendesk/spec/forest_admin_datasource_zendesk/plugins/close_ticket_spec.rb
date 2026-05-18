@@ -87,20 +87,20 @@ module ForestAdminDatasourceZendesk
           .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /Unknown.*weird/)
       end
 
-      it 'raises ArgumentError without :datasource' do
+      it 'raises a ForestException without :datasource' do
         expect { described_class.new.run(nil, collection_customizer, ticket_id_field: 'id') }
-          .to raise_error(ArgumentError, /datasource/)
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /datasource/)
       end
 
-      it 'raises ArgumentError without :ticket_id_field' do
+      it 'raises a ForestException without :ticket_id_field' do
         expect { described_class.new.run(nil, collection_customizer, datasource: datasource) }
-          .to raise_error(ArgumentError, /ticket_id_field/)
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /ticket_id_field/)
       end
 
-      it 'raises ArgumentError without a collection_customizer' do
+      it 'raises a ForestException without a collection_customizer' do
         expect do
           described_class.new.run(nil, nil, datasource: datasource, ticket_id_field: 'id')
-        end.to raise_error(ArgumentError, /collection/)
+        end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /collection/)
       end
     end
 
@@ -144,15 +144,6 @@ module ForestAdminDatasourceZendesk
         expect(client).not_to have_received(:update_ticket)
         expect(result[:type]).to eq('Error')
         expect(result[:message]).to include(ticket_id_field)
-      end
-
-      it 'works with symbol keys on the host record' do
-        allow(client).to receive(:update_ticket)
-        context = FakeCloseContext.new(records: [{ ticket_id_field.to_sym => 99 }])
-
-        solved_single.execute.call(context, result_builder)
-
-        expect(client).to have_received(:update_ticket).with(99, 'status' => 'solved')
       end
 
       context 'when Zendesk rejects some ids (partial success on bulk)' do
@@ -206,11 +197,20 @@ module ForestAdminDatasourceZendesk
     end
 
     describe "Zendesk's 'closed prevents ticket update' error" do
-      let(:already_closed_error) do
-        StandardError.new(
-          'Zendesk API call failed: update(tickets/254): ZendeskAPI::Error::RecordInvalid: ' \
-          '{"status" => [{"description" => "closed prevents ticket update"}]}'
+      # Mirrors the wrapping Client#must_succeed does in production:
+      # the original RecordInvalid is auto-chained as `cause` when re-raised.
+      def already_closed_error
+        invalid = ZendeskAPI::Error::RecordInvalid.allocate
+        invalid.instance_variable_set(
+          :@errors, 'status' => [{ 'description' => 'closed prevents ticket update' }]
         )
+        begin
+          raise invalid
+        rescue ZendeskAPI::Error::RecordInvalid
+          raise StandardError, 'Zendesk API call failed: update(tickets/254)'
+        end
+      rescue StandardError => e
+        e
       end
       let(:solved_single) do
         register(statuses: %w[solved], scopes: %i[single])['Mark Zendesk ticket as solved']

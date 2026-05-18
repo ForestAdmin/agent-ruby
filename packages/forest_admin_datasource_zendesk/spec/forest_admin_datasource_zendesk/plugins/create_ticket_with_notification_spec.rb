@@ -51,14 +51,14 @@ module ForestAdminDatasourceZendesk
         expect(collection_customizer.registered.keys).to contain_exactly(described_class::NAME, 'Custom label')
       end
 
-      it 'raises ArgumentError without :datasource' do
+      it 'raises a ForestException without :datasource' do
         expect { described_class.new.run(nil, collection_customizer, {}) }
-          .to raise_error(ArgumentError, /datasource/)
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /datasource/)
       end
 
-      it 'raises ArgumentError without a collection_customizer' do
+      it 'raises a ForestException without a collection_customizer' do
         expect { described_class.new.run(nil, nil, datasource: datasource) }
-          .to raise_error(ArgumentError, /collection/)
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /collection/)
       end
     end
 

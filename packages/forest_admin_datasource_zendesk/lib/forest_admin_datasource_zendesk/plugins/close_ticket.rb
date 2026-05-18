@@ -4,15 +4,12 @@ module ForestAdminDatasourceZendesk
     # record(s); Zendesk sometimes rejects the direct `open -> closed`
     # transition so failures are surfaced per-id rather than retried.
     class CloseTicket < ForestAdminDatasourceCustomizer::Plugins::Plugin
-      BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
-      ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
+      BaseAction      = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
+      ActionScope     = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
+      ForestException = ForestAdminDatasourceToolkit::Exceptions::ForestException
 
       STATUSES = %w[solved closed].freeze
       SCOPE_KEYS = %i[single bulk].freeze
-
-      # Zendesk refuses any update on a closed ticket with this exact
-      # wording — detected so we can swap the raw stack for a clean message.
-      ALREADY_CLOSED_PATTERN = 'closed prevents ticket update'.freeze
 
       NAMES = {
         'solved' => { single: 'Mark Zendesk ticket as solved',
@@ -26,9 +23,9 @@ module ForestAdminDatasourceZendesk
       def run(_datasource_customizer, collection_customizer = nil, options = {})
         datasource = options[:datasource]
         ticket_id_field = options[:ticket_id_field]
-        raise ArgumentError, 'CloseTicket plugin requires :datasource' unless datasource
-        raise ArgumentError, 'CloseTicket plugin requires :ticket_id_field' unless ticket_id_field
-        raise ArgumentError, 'CloseTicket plugin requires a collection' unless collection_customizer
+        raise ForestException, 'CloseTicket plugin requires :datasource' unless datasource
+        raise ForestException, 'CloseTicket plugin requires :ticket_id_field' unless ticket_id_field
+        raise ForestException, 'CloseTicket plugin requires a collection' unless collection_customizer
 
         statuses = normalize_statuses(options[:statuses])
         scopes   = normalize_scopes(options[:scopes])
@@ -54,7 +51,7 @@ module ForestAdminDatasourceZendesk
         unknown = list - allowed
         return list if unknown.empty?
 
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+        raise ForestException,
               "Unknown CloseTicket #{label}: #{unknown.join(", ")}. Allowed: #{allowed.join(", ")}."
       end
 
@@ -91,8 +88,7 @@ module ForestAdminDatasourceZendesk
 
       def resolve_ticket_ids(context, ticket_id_field)
         records = context.get_records([ticket_id_field])
-        records = [records].compact unless records.is_a?(Array)
-        records.filter_map { |r| r[ticket_id_field] || r[ticket_id_field.to_sym] }
+        records.filter_map { |r| r[ticket_id_field.to_s] }
       rescue StandardError => e
         ForestAdminDatasourceZendesk.logger.warn(
           "[forest_admin_datasource_zendesk] failed to resolve ticket ids from '#{ticket_id_field}': " \
@@ -110,7 +106,7 @@ module ForestAdminDatasourceZendesk
           datasource.client.update_ticket(id, 'status' => status)
           succeeded << id
         rescue StandardError => e
-          if already_closed?(e)
+          if Errors.already_closed?(e)
             already_closed << id
           else
             ForestAdminDatasourceZendesk.logger.warn(
@@ -121,10 +117,6 @@ module ForestAdminDatasourceZendesk
           end
         end
         [succeeded, already_closed, failed]
-      end
-
-      def already_closed?(error)
-        error.message.to_s.include?(ALREADY_CLOSED_PATTERN)
       end
     end
   end

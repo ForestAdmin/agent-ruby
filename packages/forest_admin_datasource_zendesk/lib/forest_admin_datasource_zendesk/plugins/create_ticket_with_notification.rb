@@ -4,15 +4,16 @@ module ForestAdminDatasourceZendesk
     # so the action can be registered on any host collection — no relation
     # to Zendesk needed.
     class CreateTicketWithNotification < ForestAdminDatasourceCustomizer::Plugins::Plugin
-      BaseAction  = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
-      ActionScope = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
+      BaseAction      = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
+      ActionScope     = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
+      ForestException = ForestAdminDatasourceToolkit::Exceptions::ForestException
 
       NAME = 'Create ticket and notify'.freeze
 
       def run(_datasource_customizer, collection_customizer = nil, options = {})
         datasource = options[:datasource]
-        raise ArgumentError, 'CreateTicketWithNotification plugin requires :datasource' unless datasource
-        raise ArgumentError, 'CreateTicketWithNotification plugin requires a collection' unless collection_customizer
+        raise ForestException, 'CreateTicketWithNotification plugin requires :datasource' unless datasource
+        raise ForestException, 'CreateTicketWithNotification plugin requires a collection' unless collection_customizer
 
         opts = options.except(:datasource)
         opts[:email_templates] = Array(opts[:email_templates]).compact
@@ -32,8 +33,7 @@ module ForestAdminDatasourceZendesk
           next result_builder.error(message: 'Requester email is required.') unless present?(email)
 
           payload = build_payload(values, email, opts)
-          ticket = datasource.client.create_ticket(payload)
-          ticket_id = ticket.respond_to?(:[]) ? ticket['id'] : nil
+          ticket_id = datasource.client.create_ticket(payload)['id']
 
           writeback = write_back_ticket_id(context, opts[:ticket_id_field], ticket_id)
           result_builder.success(message: success_message(ticket_id, values, writeback))
@@ -65,7 +65,7 @@ module ForestAdminDatasourceZendesk
 
       # Best-effort: a writeback failure mustn't roll back the Zendesk ticket.
       def write_back_ticket_id(context, field, ticket_id)
-        return :skipped if field.nil? || ticket_id.nil?
+        return :skipped if field.nil?
 
         context.collection.update(context.filter, { field => ticket_id })
         :ok
@@ -85,12 +85,8 @@ module ForestAdminDatasourceZendesk
 
       def base_success_message(ticket_id, values)
         if truthy?(values['Send as internal note'])
-          return 'Ticket created (internal note).' unless ticket_id
-
           "Ticket ##{ticket_id} created (internal note, no email)."
         else
-          return 'Ticket created and requester notified.' unless ticket_id
-
           "Ticket ##{ticket_id} created and requester notified."
         end
       end
