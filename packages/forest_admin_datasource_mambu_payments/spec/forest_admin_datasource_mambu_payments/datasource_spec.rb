@@ -23,7 +23,8 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Datasource do
     expect(ds.collections.keys).to contain_exactly(
       'MambuConnectedAccount', 'MambuPaymentOrder', 'MambuTransaction', 'MambuBalance',
       'MambuAccountHolder', 'MambuExternalAccount', 'MambuInternalAccount',
-      'MambuIncomingPayment', 'MambuDirectDebitMandate', 'MambuExpectedPayment'
+      'MambuIncomingPayment', 'MambuDirectDebitMandate', 'MambuExpectedPayment',
+      'MambuEvent', 'MambuFile'
     )
   end
 

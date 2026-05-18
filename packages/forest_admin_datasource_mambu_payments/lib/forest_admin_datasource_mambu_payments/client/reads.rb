@@ -30,6 +30,12 @@ module ForestAdminDatasourceMambuPayments
 
       def list_expected_payments(**params) = list_resource('expected_payments', params)
       def find_expected_payment(id)        = get_resource('expected_payments', id)
+
+      def list_events(**params) = list_resource('events', params)
+      def find_event(id)        = get_resource('events', id)
+
+      def list_files(**params) = list_resource('files', params)
+      def find_file(id)        = get_resource('files', id)
     end
   end
 end
