@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.29.2...v1.30.0) (2026-05-18)
+
+
+### Features
+
+* **zendesk:** add plugins for creating tickets and closing actions ([#303](https://github.com/ForestAdmin/agent-ruby/issues/303)) ([ad624e5](https://github.com/ForestAdmin/agent-ruby/commit/ad624e5e3aaf4fd2002fb73f4372f982ce12eafb))
+
 ## [1.29.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.29.1...v1.29.2) (2026-05-13)
 
 
