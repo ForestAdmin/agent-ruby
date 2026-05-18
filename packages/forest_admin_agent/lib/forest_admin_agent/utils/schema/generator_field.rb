@@ -21,6 +21,8 @@ module ForestAdminAgent
                      build_relation_schema(collection, name)
                    end
 
+          return nil if schema.nil?
+
           schema.sort_by { |k, _v| k }.to_h
         end
 
@@ -81,6 +83,22 @@ module ForestAdminAgent
             foreign_schema = through_schema.schema[:fields][relation.foreign_key]
             origin_key = through_schema.schema[:fields][relation.origin_key]
 
+            unless target_field
+              log_missing_relation_field(foreign_collection.name, target_name, 'foreign_key_target',
+                                         base_schema[:field])
+              return nil
+            end
+
+            unless foreign_schema
+              log_missing_relation_field(through_schema.name, relation.foreign_key, 'foreign_key', base_schema[:field])
+              return nil
+            end
+
+            unless origin_key
+              log_missing_relation_field(through_schema.name, relation.origin_key, 'origin_key', base_schema[:field])
+              return nil
+            end
+
             base_schema.merge(
               {
                 type: [target_field.column_type],
@@ -101,6 +119,17 @@ module ForestAdminAgent
             target_field = collection.schema[:fields][target_name]
             origin_key = foreign_collection.schema[:fields][relation.origin_key]
 
+            unless target_field
+              log_missing_relation_field(collection.name, target_name, 'origin_key_target', base_schema[:field])
+              return nil
+            end
+
+            unless origin_key
+              log_missing_relation_field(foreign_collection.name, relation.origin_key, 'origin_key',
+                                         base_schema[:field])
+              return nil
+            end
+
             base_schema.merge(
               {
                 type: [target_field.column_type],
@@ -120,6 +149,18 @@ module ForestAdminAgent
             target_field = collection.schema[:fields][relation.origin_key_target]
             key_field = foreign_collection.schema[:fields][relation.origin_key]
 
+            unless target_field
+              log_missing_relation_field(collection.name, relation.origin_key_target, 'origin_key_target',
+                                         base_schema[:field])
+              return nil
+            end
+
+            unless key_field
+              log_missing_relation_field(foreign_collection.name, relation.origin_key, 'origin_key',
+                                         base_schema[:field])
+              return nil
+            end
+
             base_schema.merge(
               {
                 type: key_field.column_type,
@@ -137,6 +178,11 @@ module ForestAdminAgent
 
           def build_many_to_one_schema(relation, collection, foreign_collection, base_schema)
             key_field = collection.schema[:fields][relation.foreign_key]
+
+            unless key_field
+              log_missing_relation_field(collection.name, relation.foreign_key, 'foreign_key', base_schema[:field])
+              return nil
+            end
 
             base_schema.merge(
               {
@@ -201,6 +247,13 @@ module ForestAdminAgent
                 build_many_to_one_schema(relation, collection, foreign_collection, relation_schema)
               end
             end
+          end
+
+          def log_missing_relation_field(collection_name, field_name, field_type, relation_name)
+            message = "Field '#{field_name}' (#{field_type}) not found in collection '#{collection_name}' " \
+                      "for relation '#{relation_name}'. This relation will be skipped. " \
+                      'Check if the field exists in your database.'
+            Facades::Container.logger.log('Warn', message)
           end
         end
       end
