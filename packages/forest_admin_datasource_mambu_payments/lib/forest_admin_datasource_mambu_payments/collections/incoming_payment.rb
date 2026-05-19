@@ -60,7 +60,16 @@ module ForestAdminDatasourceMambuPayments
         return ids.filter_map { |id| datasource.client.find_incoming_payment(id) } if ids
 
         page, per_page = translate_page(filter.page)
-        datasource.client.list_incoming_payments(page: page, limit: per_page)
+        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
+        datasource.client.list_incoming_payments(**params)
+      end
+
+      def api_filters
+        {
+          'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] },
+          'internal_account_id' => { ops: [Operators::EQUAL, Operators::IN] },
+          'external_account_id' => { ops: [Operators::EQUAL, Operators::IN] }
+        }
       end
 
       def embed_relations(rows, records, projection)

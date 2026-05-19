@@ -79,7 +79,8 @@ module ForestAdminDatasourceMambuPayments
         return ids.filter_map { |id| datasource.client.find_event(id) } if ids
 
         page, per_page = translate_page(filter.page)
-        datasource.client.list_events(page: page, limit: per_page)
+        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
+        datasource.client.list_events(**params)
       end
 
       # PolymorphicManyToOne is not resolved by the customizer, so we populate

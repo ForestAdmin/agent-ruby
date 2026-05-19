@@ -165,6 +165,18 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
+    describe '#translate_filters' do
+      it 'returns {} for a nil condition tree' do
+        expect(collection.send(:translate_filters, nil)).to eq({})
+      end
+
+      it 'raises on any non-id predicate by default (api_filters is empty on the base class)' do
+        leaf = Leaf.new('connected_account_id', 'equal', 'acc1')
+        expect { collection.send(:translate_filters, leaf) }
+          .to raise_error(ForestAdminDatasourceMambuPayments::UnsupportedOperatorError)
+      end
+    end
+
     describe '#aggregate' do
       let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
 
