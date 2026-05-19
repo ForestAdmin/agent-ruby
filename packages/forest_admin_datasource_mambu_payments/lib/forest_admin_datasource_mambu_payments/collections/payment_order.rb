@@ -73,7 +73,18 @@ module ForestAdminDatasourceMambuPayments
         return ids.filter_map { |id| datasource.client.find_payment_order(id) } if ids
 
         page, per_page = translate_page(filter.page)
-        datasource.client.list_payment_orders(page: page, limit: per_page)
+        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
+        datasource.client.list_payment_orders(**params)
+      end
+
+      # NOTE: server-side filters verified against Numeral's `GET /payment_orders` docs.
+      # Add new entries here (status, direction, currency, created_at ranges, …) as
+      # we confirm them — anything not declared raises a clear error rather than
+      # silently returning unfiltered results.
+      def api_filters
+        {
+          'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] }
+        }
       end
 
       def build_payload(data)

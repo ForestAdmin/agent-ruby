@@ -95,6 +95,26 @@ module ForestAdminDatasourceMambuPayments
         expect(client).to have_received(:find_payment_order).with('po1')
         expect(client).not_to have_received(:list_payment_orders)
       end
+
+      it 'forwards a translated connected_account_id filter to the API' do
+        allow(client).to receive(:list_payment_orders).and_return([])
+
+        filter = Filter.new(condition_tree: Leaf.new('connected_account_id', 'equal', 'acc1'))
+        collection.list(nil, filter, ['id'])
+
+        expect(client).to have_received(:list_payment_orders)
+          .with(hash_including('connected_account_id' => 'acc1', page: 1))
+      end
+
+      it 'raises a clear error on an undeclared filter rather than silently dropping it' do
+        allow(client).to receive(:list_payment_orders)
+
+        filter = Filter.new(condition_tree: Leaf.new('status', 'equal', 'pending_approval'))
+
+        expect { collection.list(nil, filter, ['id']) }
+          .to raise_error(UnsupportedOperatorError, /'status'/)
+        expect(client).not_to have_received(:list_payment_orders)
+      end
     end
 
     describe '#create' do

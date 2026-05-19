@@ -37,6 +37,19 @@ module ForestAdminDatasourceMambuPayments
         end
       end
 
+      # Server-filterable fields the Numeral API accepts for this collection.
+      # Subclasses override with entries like:
+      #   { 'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] } }
+      # Anything not declared here raises UnsupportedOperatorError when filtered
+      # on, so we never silently return unfiltered results.
+      def api_filters
+        {}
+      end
+
+      def translate_filters(condition_tree)
+        Query::ConditionTreeTranslator.call(condition_tree, api_filters: api_filters)
+      end
+
       def project(record, projection)
         return record if projection.nil?
 

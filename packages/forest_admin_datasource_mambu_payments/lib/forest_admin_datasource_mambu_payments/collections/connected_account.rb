@@ -75,7 +75,8 @@ module ForestAdminDatasourceMambuPayments
         return ids.filter_map { |id| datasource.client.find_connected_account(id) } if ids
 
         page, per_page = translate_page(filter.page)
-        datasource.client.list_connected_accounts(page: page, limit: per_page)
+        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
+        datasource.client.list_connected_accounts(**params)
       end
 
       def build_payload(data)

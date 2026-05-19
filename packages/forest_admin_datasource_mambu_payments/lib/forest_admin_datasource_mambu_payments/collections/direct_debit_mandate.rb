@@ -73,7 +73,15 @@ module ForestAdminDatasourceMambuPayments
         return ids.filter_map { |id| datasource.client.find_direct_debit_mandate(id) } if ids
 
         page, per_page = translate_page(filter.page)
-        datasource.client.list_direct_debit_mandates(page: page, limit: per_page)
+        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
+        datasource.client.list_direct_debit_mandates(**params)
+      end
+
+      def api_filters
+        {
+          'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] },
+          'external_account_id' => { ops: [Operators::EQUAL, Operators::IN] }
+        }
       end
 
       def build_payload(data)
