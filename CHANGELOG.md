@@ -1,3 +1,10 @@
+## [1.30.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.0...v1.30.1) (2026-05-20)
+
+
+### Bug Fixes
+
+* action with file ([#305](https://github.com/ForestAdmin/agent-ruby/issues/305)) ([c7f8af3](https://github.com/ForestAdmin/agent-ruby/commit/c7f8af39c5c3f8df1126a1cd62950508ea436850))
+
 # [1.30.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.29.2...v1.30.0) (2026-05-18)
 
 
