@@ -39,6 +39,12 @@ module ForestAdminDatasourceMambuPayments
 
       def list_returns(**params) = list_resource('returns', params)
       def find_return(id)        = get_resource('returns', id)
+
+      # Claims are arrived-from-the-network resources (created via the sandbox
+      # simulator or by the counterparty bank). No POST/PATCH/DELETE here:
+      # accept/reject are lifecycle actions and would belong in a plugin.
+      def list_claims(**params) = list_resource('claims', params)
+      def find_claim(id)        = get_resource('claims', id)
     end
   end
 end

@@ -366,6 +366,19 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
+  describe 'claims' do
+    it 'list_claims hits /claims' do
+      stub_request(:get, "#{base}/claims").to_return(json('records' => []))
+      client.list_claims
+      expect(WebMock).to have_requested(:get, "#{base}/claims")
+    end
+
+    it 'find_claim hits /claims/:id' do
+      stub_request(:get, "#{base}/claims/clm1").to_return(json('id' => 'clm1'))
+      expect(client.find_claim('clm1')).to include('id' => 'clm1')
+    end
+  end
+
   describe 'returns' do
     it 'list_returns hits /returns' do
       stub_request(:get, "#{base}/returns").to_return(json('records' => []))
