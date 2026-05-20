@@ -31,17 +31,20 @@ module ForestAdminDatasourceRpc
       end
 
       # rubocop:disable Metrics/ParameterLists
-      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
+      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false,
+                   if_none_match: nil, with_response: false)
         response = make_request(endpoint, caller: caller, method: method, payload: payload,
                                           symbolize_keys: symbolize_keys, if_none_match: if_none_match)
-        handle_response(response)
-      end
+        return NotModified if response.status == HTTP_NOT_MODIFIED
 
+        raise_appropriate_error(response) unless response.success?
+
+        with_response ? response : response.body
+      end
       # rubocop:enable Metrics/ParameterLists
 
       def fetch_schema(endpoint, if_none_match: nil)
-        response = make_request(endpoint, method: :get, symbolize_keys: true, if_none_match: if_none_match)
-        handle_response(response)
+        call_rpc(endpoint, method: :get, symbolize_keys: true, if_none_match: if_none_match)
       end
 
       private
@@ -109,13 +112,6 @@ module ForestAdminDatasourceRpc
 
       def generate_signature(timestamp)
         OpenSSL::HMAC.hexdigest('SHA256', @auth_secret, timestamp)
-      end
-
-      def handle_response(response)
-        return response.body if response.success?
-        return NotModified if response.status == HTTP_NOT_MODIFIED
-
-        raise_appropriate_error(response)
       end
 
       def raise_appropriate_error(response)

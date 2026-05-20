@@ -13,7 +13,14 @@ module ForestAdminDatasourceRpc
       allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
     end
 
+    let(:raw_response) do
+      instance_double(Faraday::Response, body: {}, headers: {}, status: 200, success?: true)
+    end
     let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: {}) }
+
+    before do
+      allow(rpc_client).to receive(:call_rpc).with(any_args, hash_including(with_response: true)).and_return(raw_response)
+    end
     let(:datasource) { Datasource.new({ uri: 'http://localhost' }, introspection) }
     let(:collection) { datasource.get_collection('Product') }
     let(:caller) { build_caller }
@@ -275,10 +282,11 @@ module ForestAdminDatasourceRpc
 
         expect(rpc_client).to have_received(:call_rpc) do |_url, options|
           expect(options[:symbolize_keys]).to be(true)
+          expect(options[:with_response]).to be(true)
         end
       end
 
-      it 'returns the action result as-is so :type and other keys reach ActionResult.parse' do
+      it 'returns the parsed body so :type and other keys reach ActionResult.parse' do
         success_result = {
           type: 'Success',
           message: 'ok',
@@ -286,12 +294,64 @@ module ForestAdminDatasourceRpc
           html: nil,
           response_headers: {}
         }
-        allow(rpc_client).to receive(:call_rpc).and_return(success_result)
+        allow(raw_response).to receive(:body).and_return(success_result)
 
         result = collection.execute(caller, 'my_action', {})
 
         expect(result).to eq(success_result)
         expect(result[:type]).to eq('Success')
+      end
+
+      context 'when the server replies with X-Forest-Action-Type=File' do
+        let(:file_body) { 'binary-payload' }
+        let(:raw_response) do
+          instance_double(
+            Faraday::Response,
+            body: file_body,
+            headers: {
+              'content-type' => 'application/pdf',
+              'x-forest-action-type' => 'File',
+              'x-forest-action-file-name' => CGI.escape('report final.pdf'),
+              'x-forest-action-response-headers' => { 'set-cookie' => 'token=xyz' }.to_json
+            },
+            status: 200,
+            success?: true
+          )
+        end
+
+        it 'rebuilds a File action result from the response headers and body' do
+          result = collection.execute(caller, 'download', {})
+
+          expect(result[:type]).to eq('File')
+          expect(result[:mime_type]).to eq('application/pdf')
+          expect(result[:name]).to eq('report final.pdf')
+          expect(result[:response_headers]).to eq({ 'set-cookie' => 'token=xyz' })
+          expect(result[:stream]).to eq(file_body)
+        end
+
+        context 'when response_headers header is absent' do
+          let(:raw_response) do
+            instance_double(
+              Faraday::Response,
+              body: 'hi',
+              headers: {
+                'content-type' => 'text/plain',
+                'x-forest-action-type' => 'File',
+                'x-forest-action-file-name' => 'note.txt'
+              },
+              status: 200,
+              success?: true
+            )
+          end
+
+          it 'omits response_headers from the rebuilt result' do
+            result = collection.execute(caller, 'download', {})
+
+            expect(result[:type]).to eq('File')
+            expect(result[:name]).to eq('note.txt')
+            expect(result).not_to have_key(:response_headers)
+          end
+        end
       end
     end
 
