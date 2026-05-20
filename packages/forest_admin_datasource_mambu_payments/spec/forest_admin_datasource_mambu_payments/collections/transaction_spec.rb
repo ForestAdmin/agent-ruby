@@ -43,7 +43,6 @@ module ForestAdminDatasourceMambuPayments
         expect(keys).to include(
           'id', 'connected_account_id', 'category', 'direction', 'amount', 'currency',
           'description', 'structured_reference', 'value_date', 'booking_date',
-          'internal_account_snapshot', 'external_account_snapshot',
           'internal_account_id', 'external_account_id',
           'uetr', 'bank_data', 'reconciliation_status', 'reconciled_amount',
           'custom_fields', 'created_at'
@@ -54,6 +53,13 @@ module ForestAdminDatasourceMambuPayments
         keys = collection.schema[:fields].keys
         %w[type counterparty_name counterparty_iban counterparty_bic status payment_order_id end_to_end_id]
           .each { |k| expect(keys).not_to include(k), "schema unexpectedly exposes #{k}" }
+      end
+
+      it 'does not expose internal_account_snapshot / external_account_snapshot (replaced by ManyToOne relations)' do
+        keys = collection.schema[:fields].keys
+        %w[internal_account_snapshot external_account_snapshot].each do |k|
+          expect(keys).not_to include(k), "schema unexpectedly exposes #{k}"
+        end
       end
 
       it 'declares ManyToOne to connected_account, internal_account and external_account (no payment_order)' do

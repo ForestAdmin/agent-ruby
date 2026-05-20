@@ -1,4 +1,4 @@
-# rubocop:disable Metrics/ClassLength, Metrics/MethodLength
+# rubocop:disable Metrics/ClassLength
 module ForestAdminDatasourceMambuPayments
   module Collections
     class Transaction < BaseCollection
@@ -34,8 +34,6 @@ module ForestAdminDatasourceMambuPayments
           'structured_reference' => a['structured_reference'],
           'value_date' => a['value_date'],
           'booking_date' => a['booking_date'],
-          'internal_account_snapshot' => a['internal_account'],
-          'external_account_snapshot' => a['external_account'],
           'internal_account_id' => a['internal_account_id'],
           'external_account_id' => a['external_account_id'],
           'uetr' => a['uetr'],
@@ -120,10 +118,6 @@ module ForestAdminDatasourceMambuPayments
                                                  is_read_only: true, is_sortable: true))
         add_field('booking_date', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                    is_read_only: true, is_sortable: true))
-        add_field('internal_account_snapshot', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                                is_read_only: true, is_sortable: false))
-        add_field('external_account_snapshot', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                                is_read_only: true, is_sortable: false))
         add_field('internal_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                           is_read_only: true, is_sortable: false))
         add_field('external_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
@@ -163,4 +157,4 @@ module ForestAdminDatasourceMambuPayments
   end
 end
 
-# rubocop:enable Metrics/ClassLength, Metrics/MethodLength
+# rubocop:enable Metrics/ClassLength
