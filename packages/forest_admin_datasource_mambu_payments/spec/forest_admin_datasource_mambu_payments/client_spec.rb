@@ -108,35 +108,6 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
-  describe '#create_connected_account' do
-    it 'POSTs the payload as JSON and returns the response body' do
-      stub_request(:post, "#{base}/connected_accounts")
-        .with(body: { 'name' => 'Acme' }.to_json,
-              headers: { 'Content-Type' => 'application/json' })
-        .to_return(json('id' => 'new', 'name' => 'Acme'))
-
-      expect(client.create_connected_account('name' => 'Acme')).to include('id' => 'new')
-    end
-  end
-
-  describe '#update_connected_account' do
-    it 'PATCHes the payload to /resource/:id' do
-      stub_request(:patch, "#{base}/connected_accounts/abc")
-        .with(body: { 'name' => 'NewName' }.to_json)
-        .to_return(json('id' => 'abc', 'name' => 'NewName'))
-
-      expect(client.update_connected_account('abc', 'name' => 'NewName'))
-        .to include('name' => 'NewName')
-    end
-  end
-
-  describe '#delete_connected_account' do
-    it 'DELETEs /resource/:id and returns true on success' do
-      stub_request(:delete, "#{base}/connected_accounts/abc").to_return(status: 204, body: '')
-      expect(client.delete_connected_account('abc')).to be(true)
-    end
-  end
-
   describe 'payment_orders / transactions / balances' do
     it 'list_payment_orders hits /payment_orders' do
       stub_request(:get, "#{base}/payment_orders").to_return(json('records' => []))

@@ -16,19 +16,6 @@ module ForestAdminDatasourceMambuPayments
         records.map { |r| project(serialize(r), projection) }
       end
 
-      def create(_caller, data)
-        serialize(datasource.client.create_connected_account(build_payload(data)))
-      end
-
-      def update(caller, filter, patch)
-        payload = build_payload(patch)
-        ids_for(caller, filter).each { |id| datasource.client.update_connected_account(id, payload) }
-      end
-
-      def delete(caller, filter)
-        ids_for(caller, filter).each { |id| datasource.client.delete_connected_account(id) }
-      end
-
       def serialize(record)
         a = attrs_of(record)
         {
@@ -79,65 +66,59 @@ module ForestAdminDatasourceMambuPayments
         datasource.client.list_connected_accounts(**params)
       end
 
-      def build_payload(data)
-        attrs = data.transform_keys(&:to_s)
-        %w[id object created_at disabled_at bank_data].each { |k| attrs.delete(k) }
-        attrs
-      end
-
       def define_schema
         add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                          is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                              is_read_only: true, is_sortable: false))
         add_field('name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
+                                           is_read_only: true, is_sortable: true))
         add_field('distinguished_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                         is_read_only: false, is_sortable: false))
+                                                         is_read_only: true, is_sortable: false))
         add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
+                                           is_read_only: true, is_sortable: true))
         add_field('currency', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                               is_read_only: false, is_sortable: false))
+                                               is_read_only: true, is_sortable: false))
         add_field('bank_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                              is_read_only: false, is_sortable: false))
+                                              is_read_only: true, is_sortable: false))
         add_field('bank_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
+                                                is_read_only: true, is_sortable: false))
         add_field('bank_code', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
+                                                is_read_only: true, is_sortable: false))
         add_field('bank_code_format', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: false, is_sortable: false))
+                                                       is_read_only: true, is_sortable: false))
         add_field('bank_address', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                   is_read_only: false, is_sortable: false))
+                                                   is_read_only: true, is_sortable: false))
         add_field('account_number', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: false, is_sortable: false))
+                                                     is_read_only: true, is_sortable: false))
         add_field('account_number_format', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                            is_read_only: false, is_sortable: false))
+                                                            is_read_only: true, is_sortable: false))
         add_field('settlement_account', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                         is_read_only: false, is_sortable: false))
+                                                         is_read_only: true, is_sortable: false))
         add_field('creditor_identifier', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                          is_read_only: false, is_sortable: false))
+                                                          is_read_only: true, is_sortable: false))
         add_field('legal_entity_identifier', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                              is_read_only: false, is_sortable: false))
+                                                              is_read_only: true, is_sortable: false))
         add_field('receiving_agent', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                      is_read_only: false, is_sortable: false))
+                                                      is_read_only: true, is_sortable: false))
         add_field('services_activated', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                         is_read_only: false, is_sortable: false))
+                                                         is_read_only: true, is_sortable: false))
         add_field('file_auto_approval', ColumnSchema.new(column_type: 'Boolean', filter_operators: BOOL_OPS,
-                                                         is_read_only: false, is_sortable: false))
+                                                         is_read_only: true, is_sortable: false))
         add_field('return_auto_approval', ColumnSchema.new(column_type: 'Boolean', filter_operators: BOOL_OPS,
-                                                           is_read_only: false, is_sortable: false))
+                                                           is_read_only: true, is_sortable: false))
         add_field('incoming_instant_payment_auto_approval',
                   ColumnSchema.new(column_type: 'Boolean', filter_operators: BOOL_OPS,
-                                   is_read_only: false, is_sortable: false))
+                                   is_read_only: true, is_sortable: false))
         add_field('address', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                              is_read_only: false, is_sortable: false))
+                                              is_read_only: true, is_sortable: false))
         add_field('metadata', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                               is_read_only: false, is_sortable: false))
+                                               is_read_only: true, is_sortable: false))
         add_field('bank_data', ColumnSchema.new(column_type: 'Json', filter_operators: [],
                                                 is_read_only: true, is_sortable: false))
         add_field('account_number_generation_settings',
                   ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                   is_read_only: false, is_sortable: false))
+                                   is_read_only: true, is_sortable: false))
         add_field('disabled_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                   is_read_only: true, is_sortable: true))
         add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,

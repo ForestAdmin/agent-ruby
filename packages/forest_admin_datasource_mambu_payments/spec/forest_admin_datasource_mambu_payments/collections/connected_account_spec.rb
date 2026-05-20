@@ -43,9 +43,17 @@ module ForestAdminDatasourceMambuPayments
         end
       end
 
-      it 'marks id, disabled_at, created_at as read-only' do
-        f = collection.schema[:fields]
-        %w[id disabled_at created_at].each { |k| expect(f[k].is_read_only).to be(true) }
+      it 'marks every column as read-only (Numeral has no POST/PATCH/DELETE on /connected_accounts)' do
+        f = collection.schema[:fields].reject do |_, v|
+          v.is_a?(ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema)
+        end
+        f.each do |name, schema|
+          expect(schema.is_read_only).to be(true), "#{name} should be read-only"
+        end
+      end
+
+      it 'does not implement create / update / delete' do
+        expect(collection.public_methods(false)).not_to include(:create, :update, :delete)
       end
     end
 
@@ -91,49 +99,6 @@ module ForestAdminDatasourceMambuPayments
         allow(client).to receive(:list_connected_accounts).and_return([account, account])
         result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
         expect(result.first['value']).to eq(2)
-      end
-    end
-
-    describe '#create' do
-      it 'POSTs the payload stripping system-managed fields' do
-        allow(client).to receive(:create_connected_account) do |payload|
-          expect(payload).to include('name' => 'New')
-          expect(payload.keys).not_to include('id', 'object', 'created_at', 'disabled_at', 'bank_data')
-          { 'id' => 'new', 'name' => 'New' }
-        end
-
-        result = collection.create(nil,
-                                   'id' => 'ignored', 'object' => 'connected_account',
-                                   'created_at' => 't', 'disabled_at' => 't',
-                                   'bank_data' => {}, 'name' => 'New')
-        expect(result['id']).to eq('new')
-      end
-    end
-
-    describe '#update' do
-      it 'PATCHes every id resolved by the filter' do
-        # ids_for goes through fetch_records, which calls find_* per id.
-        allow(client).to receive(:find_connected_account).with('a').and_return('id' => 'a')
-        allow(client).to receive(:find_connected_account).with('b').and_return('id' => 'b')
-        allow(client).to receive(:update_connected_account)
-
-        collection.update(nil,
-                          Filter.new(condition_tree: Leaf.new('id', 'in', %w[a b])),
-                          'name' => 'Renamed')
-
-        expect(client).to have_received(:update_connected_account).with('a', hash_including('name' => 'Renamed'))
-        expect(client).to have_received(:update_connected_account).with('b', hash_including('name' => 'Renamed'))
-      end
-    end
-
-    describe '#delete' do
-      it 'DELETEs every id resolved by the filter' do
-        allow(client).to receive(:find_connected_account).with('a').and_return('id' => 'a')
-        allow(client).to receive(:delete_connected_account)
-
-        collection.delete(nil, Filter.new(condition_tree: Leaf.new('id', 'equal', 'a')))
-
-        expect(client).to have_received(:delete_connected_account).with('a')
       end
     end
   end

@@ -1,10 +1,6 @@
 module ForestAdminDatasourceMambuPayments
   class Client
     module Writes
-      def create_connected_account(attrs)     = post_resource('connected_accounts', attrs)
-      def update_connected_account(id, attrs) = patch_resource('connected_accounts', id, attrs)
-      def delete_connected_account(id)        = delete_resource('connected_accounts', id)
-
       def create_payment_order(attrs)     = post_resource('payment_orders', attrs)
       def update_payment_order(id, attrs) = patch_resource('payment_orders', id, attrs)
       def delete_payment_order(id)        = delete_resource('payment_orders', id)
