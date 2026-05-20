@@ -366,6 +366,29 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
+  describe 'returns' do
+    it 'list_returns hits /returns' do
+      stub_request(:get, "#{base}/returns").to_return(json('records' => []))
+      client.list_returns
+      expect(WebMock).to have_requested(:get, "#{base}/returns")
+    end
+
+    it 'find_return hits /returns/:id' do
+      stub_request(:get, "#{base}/returns/ret1").to_return(json('id' => 'ret1'))
+      expect(client.find_return('ret1')).to include('id' => 'ret1')
+    end
+
+    it 'create_return POSTs to /returns' do
+      stub_request(:post, "#{base}/returns").to_return(json('id' => 'ret1'))
+      expect(client.create_return({})).to include('id' => 'ret1')
+    end
+
+    it 'update_return PATCHes /returns/:id' do
+      stub_request(:patch, "#{base}/returns/ret1").to_return(json('id' => 'ret1'))
+      expect(client.update_return('ret1', {})).to include('id' => 'ret1')
+    end
+  end
+
   describe 'action endpoints (approve/cancel/verify)' do
     it 'approve_payment_order POSTs to /payment_orders/:id/approve' do
       stub_request(:post, "#{base}/payment_orders/po_1/approve").to_return(json('id' => 'po_1', 'status' => 'approved'))

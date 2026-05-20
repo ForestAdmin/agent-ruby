@@ -36,6 +36,9 @@ module ForestAdminDatasourceMambuPayments
 
       def list_files(**params) = list_resource('files', params)
       def find_file(id)        = get_resource('files', id)
+
+      def list_returns(**params) = list_resource('returns', params)
+      def find_return(id)        = get_resource('returns', id)
     end
   end
 end
