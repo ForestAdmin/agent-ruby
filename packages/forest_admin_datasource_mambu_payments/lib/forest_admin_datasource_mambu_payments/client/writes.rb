@@ -31,6 +31,11 @@ module ForestAdminDatasourceMambuPayments
       def create_expected_payment(attrs)     = post_resource('expected_payments', attrs)
       def update_expected_payment(id, attrs) = patch_resource('expected_payments', id, attrs)
       def delete_expected_payment(id)        = delete_resource('expected_payments', id)
+
+      # Numeral has no DELETE on /returns; the lifecycle "cancel"/"approve" are
+      # exposed as side-effect actions and would belong in a plugin, not here.
+      def create_return(attrs)     = post_resource('returns', attrs)
+      def update_return(id, attrs) = patch_resource('returns', id, attrs)
     end
   end
 end

@@ -25,6 +25,7 @@ module ForestAdminDatasourceMambuPayments
       add_collection(Collections::ExpectedPayment.new(self))
       add_collection(Collections::Event.new(self))
       add_collection(Collections::File.new(self))
+      add_collection(Collections::Return.new(self))
     end
   end
 end
