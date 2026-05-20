@@ -26,6 +26,7 @@ module ForestAdminRails
         return handle_streaming_response(data) if data.dig(:content, :type) == 'Stream'
 
         if data.dig(:content, :type) == 'File'
+          response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
           return send_data data[:content][:stream], filename: data[:content][:name], type: data[:content][:mime_type],
                                                     disposition: 'attachment'
         end

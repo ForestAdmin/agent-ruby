@@ -27,9 +27,10 @@ module ForestAdminAgent
           }
         when 'File'
           keys = {
+            type: 'File',
             name: result[:name],
             mime_type: result[:mime_type],
-            stream: result[:content]
+            stream: result[:stream]
           }
         when 'Redirect'
           keys = {

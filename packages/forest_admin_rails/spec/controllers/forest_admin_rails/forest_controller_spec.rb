@@ -281,5 +281,41 @@ module ForestAdminRails
         end
       end
     end
+
+    describe '#forest_response' do
+      context 'when the content is a File action result' do
+        let(:file_data) do
+          {
+            content: {
+              type: 'File',
+              name: 'report.pdf',
+              mime_type: 'application/pdf',
+              stream: 'binary-payload'
+            }
+          }
+        end
+
+        before do
+          allow(controller).to receive(:send_data)
+        end
+
+        it 'sends the file via send_data with the filename and mime type' do
+          controller.send(:forest_response, file_data)
+
+          expect(controller).to have_received(:send_data).with(
+            'binary-payload',
+            filename: 'report.pdf',
+            type: 'application/pdf',
+            disposition: 'attachment'
+          )
+        end
+
+        it 'exposes Content-Disposition via CORS so cross-origin clients can read it' do
+          controller.send(:forest_response, file_data)
+
+          expect(response_mock.headers['Access-Control-Expose-Headers']).to eq('Content-Disposition')
+        end
+      end
+    end
   end
 end
