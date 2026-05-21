@@ -48,6 +48,12 @@ module ForestAdminDatasourceMambuPayments
 
       def list_reconciliations(**params) = list_resource('reconciliations', params)
       def find_reconciliation(id)        = get_resource('reconciliations', id)
+
+      # Payment captures are emitted by PSPs (or registered manually via API
+      # to reconcile reporting files). create/update/cancel exist on the
+      # Numeral API but are lifecycle operations deferred to a future plugin.
+      def list_payment_captures(**params) = list_resource('payment_captures', params)
+      def find_payment_capture(id)        = get_resource('payment_captures', id)
     end
   end
 end
