@@ -1,3 +1,10 @@
+## [1.30.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.1...v1.30.2) (2026-05-21)
+
+
+### Bug Fixes
+
+* **rpc datasource:** handle correctly simple action response ([#306](https://github.com/ForestAdmin/agent-ruby/issues/306)) ([acf3ec7](https://github.com/ForestAdmin/agent-ruby/commit/acf3ec7374222bddedcb3fe58d9dcdf02fbd42a6))
+
 ## [1.30.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.0...v1.30.1) (2026-05-20)
 
 
