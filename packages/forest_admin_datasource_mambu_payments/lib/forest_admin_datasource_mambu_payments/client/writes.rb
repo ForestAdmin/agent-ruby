@@ -32,6 +32,11 @@ module ForestAdminDatasourceMambuPayments
       # exposed as side-effect actions and would belong in a plugin, not here.
       def create_return(attrs)     = post_resource('returns', attrs)
       def update_return(id, attrs) = patch_resource('returns', id, attrs)
+
+      # Numeral has no DELETE on /reconciliations either; cancel is a lifecycle
+      # action and is deferred to a future plugin.
+      def create_reconciliation(attrs)     = post_resource('reconciliations', attrs)
+      def update_reconciliation(id, attrs) = patch_resource('reconciliations', id, attrs)
     end
   end
 end

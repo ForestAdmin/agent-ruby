@@ -337,6 +337,29 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
+  describe 'reconciliations' do
+    it 'list_reconciliations hits /reconciliations' do
+      stub_request(:get, "#{base}/reconciliations").to_return(json('records' => []))
+      client.list_reconciliations
+      expect(WebMock).to have_requested(:get, "#{base}/reconciliations")
+    end
+
+    it 'find_reconciliation hits /reconciliations/:id' do
+      stub_request(:get, "#{base}/reconciliations/rec1").to_return(json('id' => 'rec1'))
+      expect(client.find_reconciliation('rec1')).to include('id' => 'rec1')
+    end
+
+    it 'create_reconciliation POSTs to /reconciliations' do
+      stub_request(:post, "#{base}/reconciliations").to_return(json('id' => 'rec1'))
+      expect(client.create_reconciliation({})).to include('id' => 'rec1')
+    end
+
+    it 'update_reconciliation PATCHes /reconciliations/:id' do
+      stub_request(:patch, "#{base}/reconciliations/rec1").to_return(json('id' => 'rec1'))
+      expect(client.update_reconciliation('rec1', {})).to include('id' => 'rec1')
+    end
+  end
+
   describe 'claims' do
     it 'list_claims hits /claims' do
       stub_request(:get, "#{base}/claims").to_return(json('records' => []))

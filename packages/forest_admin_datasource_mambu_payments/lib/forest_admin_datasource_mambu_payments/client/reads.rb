@@ -45,6 +45,9 @@ module ForestAdminDatasourceMambuPayments
       # accept/reject are lifecycle actions and would belong in a plugin.
       def list_claims(**params) = list_resource('claims', params)
       def find_claim(id)        = get_resource('claims', id)
+
+      def list_reconciliations(**params) = list_resource('reconciliations', params)
+      def find_reconciliation(id)        = get_resource('reconciliations', id)
     end
   end
 end
