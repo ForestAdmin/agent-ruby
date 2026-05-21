@@ -54,6 +54,13 @@ module ForestAdminDatasourceMambuPayments
       # Numeral API but are lifecycle operations deferred to a future plugin.
       def list_payment_captures(**params) = list_resource('payment_captures', params)
       def find_payment_capture(id)        = get_resource('payment_captures', id)
+
+      # Payee verification requests are emitted by Numeral when an outgoing
+      # verification is sent (via the TriggerPayeeVerification plugin) or
+      # when an incoming verification arrives from the network. send /
+      # simulate are exposed as smart actions, not collection writes.
+      def list_payee_verification_requests(**params) = list_resource('payee_verification_requests', params)
+      def find_payee_verification_request(id)        = get_resource('payee_verification_requests', id)
     end
   end
 end

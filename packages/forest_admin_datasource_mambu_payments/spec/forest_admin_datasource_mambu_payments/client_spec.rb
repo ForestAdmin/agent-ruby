@@ -386,6 +386,19 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
+  describe 'payee_verification_requests' do
+    it 'list_payee_verification_requests hits /payee_verification_requests' do
+      stub_request(:get, "#{base}/payee_verification_requests").to_return(json('records' => []))
+      client.list_payee_verification_requests
+      expect(WebMock).to have_requested(:get, "#{base}/payee_verification_requests")
+    end
+
+    it 'find_payee_verification_request hits /payee_verification_requests/:id' do
+      stub_request(:get, "#{base}/payee_verification_requests/pvr1").to_return(json('id' => 'pvr1'))
+      expect(client.find_payee_verification_request('pvr1')).to include('id' => 'pvr1')
+    end
+  end
+
   describe 'returns' do
     it 'list_returns hits /returns' do
       stub_request(:get, "#{base}/returns").to_return(json('records' => []))

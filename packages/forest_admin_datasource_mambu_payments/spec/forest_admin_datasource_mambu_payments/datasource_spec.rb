@@ -25,7 +25,7 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Datasource do
       'MambuAccountHolder', 'MambuExternalAccount', 'MambuInternalAccount',
       'MambuIncomingPayment', 'MambuDirectDebitMandate', 'MambuExpectedPayment',
       'MambuEvent', 'MambuFile', 'MambuReturn', 'MambuClaim', 'MambuReconciliation',
-      'MambuPaymentCapture'
+      'MambuPaymentCapture', 'MambuPayeeVerificationRequest'
     )
   end
 
