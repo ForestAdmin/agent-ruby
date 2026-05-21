@@ -45,8 +45,8 @@ module ForestAdminDatasourceRpc
                   }
                 },
                 actions: {
-                  'static_action': { scope: 'global', static_form: true },
-                  'dynamic_action': { scope: 'global', static_form: false }
+                  static_action: { scope: 'global', static_form: true },
+                  dynamic_action: { scope: 'global', static_form: false }
                 }
               }
             ]

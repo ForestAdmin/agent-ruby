@@ -84,36 +84,9 @@ module ForestAdminRpcAgent
         relations = {}
 
         if @rpc_collections.include?(collection.name)
-          # RPC collection → extract relations to non-RPC collections
-          collection.schema[:fields].each do |field_name, field|
-            next if field.type == 'Column'
-            next if relation_targets_rpc_collection?(field)
-
-            relations[field_name] = field
-          end
+          extract_rpc_collection_relations(collection, relations)
         else
-          fields = {}
-
-          collection.schema[:fields].each do |field_name, field|
-            if field.type != 'Column' && relation_targets_rpc_collection?(field)
-              relations[field_name] = field
-            else
-              if field.type == 'Column'
-                field.filter_operators = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
-                  field.filter_operators
-                )
-              end
-
-              fields[field_name] = field
-            end
-          end
-
-          # Normal collection → include in schema
-          collections << collection.schema.merge(
-            name: collection.name,
-            fields: fields,
-            actions: serialize_actions(collection.schema[:actions])
-          )
+          collections << build_normal_collection_payload(collection, relations)
         end
 
         rpc_relations[collection.name] = relations unless relations.empty?
@@ -133,6 +106,40 @@ module ForestAdminRpcAgent
       )
 
       schema
+    end
+
+    # RPC collection → extract relations targeting non-RPC collections.
+    def extract_rpc_collection_relations(collection, relations)
+      collection.schema[:fields].each do |field_name, field|
+        next if field.type == 'Column'
+        next if relation_targets_rpc_collection?(field)
+
+        relations[field_name] = field
+      end
+    end
+
+    # Normal (non-RPC) collection → split fields between local schema and cross-RPC relations.
+    def build_normal_collection_payload(collection, relations)
+      fields = {}
+
+      collection.schema[:fields].each do |field_name, field|
+        if field.type != 'Column' && relation_targets_rpc_collection?(field)
+          relations[field_name] = field
+        else
+          if field.type == 'Column'
+            field.filter_operators = ForestAdminAgent::Utils::Schema::FrontendFilterable.sort_operators(
+              field.filter_operators
+            )
+          end
+          fields[field_name] = field
+        end
+      end
+
+      collection.schema.merge(
+        name: collection.name,
+        fields: fields,
+        actions: serialize_actions(collection.schema[:actions])
+      )
     end
 
     # Only expose the fields needed by an RPC consumer: scope, is_generate_file, static_form,
