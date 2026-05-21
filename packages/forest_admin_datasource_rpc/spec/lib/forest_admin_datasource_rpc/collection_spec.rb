@@ -7,23 +7,21 @@ module ForestAdminDatasourceRpc
   include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
   describe Collection do
-    before do
-      logger = instance_double(Logger, log: nil)
-      allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
-      allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
-    end
-
     let(:raw_response) do
       instance_double(Faraday::Response, body: {}, headers: {}, status: 200, success?: true)
     end
     let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: {}) }
-
-    before do
-      allow(rpc_client).to receive(:call_rpc).with(any_args, hash_including(with_response: true)).and_return(raw_response)
-    end
     let(:datasource) { Datasource.new({ uri: 'http://localhost' }, introspection) }
     let(:collection) { datasource.get_collection('Product') }
     let(:caller) { build_caller }
+
+    before do
+      logger = instance_double(Logger, log: nil)
+      allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
+      allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
+      allow(rpc_client).to receive(:call_rpc)
+        .with(any_args, hash_including(with_response: true)).and_return(raw_response)
+    end
 
     include_context 'with introspection'
 
