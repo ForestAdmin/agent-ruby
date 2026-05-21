@@ -109,7 +109,11 @@ module ForestAdminRpcAgent
           end
 
           # Normal collection → include in schema
-          collections << collection.schema.merge({ name: collection.name, fields: fields })
+          collections << collection.schema.merge(
+            name: collection.name,
+            fields: fields,
+            actions: serialize_actions(collection.schema[:actions])
+          )
         end
 
         rpc_relations[collection.name] = relations unless relations.empty?
@@ -129,6 +133,21 @@ module ForestAdminRpcAgent
       )
 
       schema
+    end
+
+    # Only expose the fields needed by an RPC consumer: scope, is_generate_file, static_form,
+    # description, submit_button_label. Drops `form` (computed via /action-form) and `execute`
+    # (server-side callback) — neither belongs on the wire.
+    def serialize_actions(actions)
+      (actions || {}).transform_values do |action|
+        {
+          scope: action.scope,
+          is_generate_file: action.is_generate_file,
+          static_form: action.static_form,
+          description: action.description,
+          submit_button_label: action.submit_button_label
+        }
+      end
     end
 
     def relation_targets_rpc_collection?(relation)
