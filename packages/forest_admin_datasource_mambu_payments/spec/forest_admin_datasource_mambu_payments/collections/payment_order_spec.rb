@@ -9,13 +9,16 @@ module ForestAdminDatasourceMambuPayments
       instance_double(ForestAdminDatasourceMambuPayments::Datasource, client: client)
     end
     let(:ca_collection) { Collections::ConnectedAccount.new(datasource) }
+    let(:ea_collection) { Collections::ExternalAccount.new(datasource) }
     let(:collection) { described_class.new(datasource) }
 
     let(:account) { { 'id' => 'acc1', 'name' => 'Acme' } }
+    let(:external_account) { { 'id' => 'ea1', 'name' => 'Receiver' } }
     let(:payment_order) do
       {
         'id' => 'po1', 'object' => 'payment_order',
         'connected_account_id' => 'acc1',
+        'receiving_account_id' => 'ea1',
         'type' => 'sepa_instant', 'direction' => 'credit',
         'status' => 'sent', 'amount' => 1000, 'currency' => 'EUR',
         'reference' => 'REF', 'purpose' => '', 'end_to_end_id' => 'e2e',
@@ -27,13 +30,15 @@ module ForestAdminDatasourceMambuPayments
 
     before do
       allow(datasource).to receive(:get_collection).with('MambuConnectedAccount').and_return(ca_collection)
+      allow(datasource).to receive(:get_collection).with('MambuExternalAccount').and_return(ea_collection)
     end
 
     describe 'schema' do
       it 'declares the API-aligned columns' do
         keys = collection.schema[:fields].keys
         expect(keys).to include(
-          'id', 'connected_account_id', 'type', 'direction', 'status', 'amount',
+          'id', 'connected_account_id', 'receiving_account_id',
+          'type', 'direction', 'status', 'amount',
           'currency', 'reference', 'purpose', 'end_to_end_id', 'idempotency_key',
           'value_date', 'initiated_at', 'requested_execution_date',
           'reconciliation_status', 'reconciled_amount',
@@ -47,6 +52,17 @@ module ForestAdminDatasourceMambuPayments
         expect(rel).to be_a(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
         expect(rel.foreign_key).to eq('connected_account_id')
         expect(rel.foreign_key_target).to eq('id')
+      end
+
+      it 'declares a ManyToOne relation to external_account via receiving_account_id' do
+        rel = collection.schema[:fields]['external_account']
+        expect(rel).to be_a(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        expect(rel.foreign_key).to eq('receiving_account_id')
+        expect(rel.foreign_key_target).to eq('id')
+      end
+
+      it 'marks receiving_account_id as read-only (set server-side at creation)' do
+        expect(collection.schema[:fields]['receiving_account_id'].is_read_only).to be(true)
       end
 
       it 'keeps originating_account / receiving_account as Json (embedded snapshots)' do
@@ -106,6 +122,25 @@ module ForestAdminDatasourceMambuPayments
           .with(hash_including('connected_account_id' => 'acc1', page: 1))
       end
 
+      it 'forwards receiving_account_id as external_account_id (Numeral list param)' do
+        allow(client).to receive(:list_payment_orders).and_return([])
+
+        filter = Filter.new(condition_tree: Leaf.new('receiving_account_id', 'equal', 'ea1'))
+        collection.list(nil, filter, ['id'])
+
+        expect(client).to have_received(:list_payment_orders)
+          .with(hash_including('external_account_id' => 'ea1'))
+      end
+
+      it 'embeds external_account when the projection asks for it' do
+        allow(client).to receive(:list_payment_orders).and_return([payment_order])
+        allow(client).to receive(:find_external_account).with('ea1').and_return(external_account)
+
+        rows = collection.list(nil, Filter.new, ['id', 'external_account:name'])
+
+        expect(rows.first['external_account']).to include('id' => 'ea1', 'name' => 'Receiver')
+      end
+
       it 'raises a clear error on an undeclared filter rather than silently dropping it' do
         allow(client).to receive(:list_payment_orders)
 
@@ -122,7 +157,8 @@ module ForestAdminDatasourceMambuPayments
         allow(client).to receive(:create_payment_order) do |payload|
           expect(payload).to include('amount' => 1000)
           expect(payload.keys).not_to include('id', 'status', 'created_at', 'value_date', 'initiated_at',
-                                              'reconciliation_status', 'reconciled_amount')
+                                              'reconciliation_status', 'reconciled_amount',
+                                              'receiving_account_id')
           { 'id' => 'po1', 'connected_account_id' => 'acc1', 'amount' => 1000 }
         end
 
@@ -130,7 +166,8 @@ module ForestAdminDatasourceMambuPayments
                           'id' => 'ignored', 'status' => 'sent',
                           'created_at' => 't', 'value_date' => 't',
                           'initiated_at' => 't', 'reconciliation_status' => 'r',
-                          'reconciled_amount' => 0, 'amount' => 1000)
+                          'reconciled_amount' => 0, 'amount' => 1000,
+                          'receiving_account_id' => 'ea-ignored')
 
         expect(client).to have_received(:create_payment_order)
       end

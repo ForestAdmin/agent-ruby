@@ -38,6 +38,7 @@ module ForestAdminDatasourceMambuPayments
         {
           'id' => a['id'],
           'connected_account_id' => a['connected_account_id'],
+          'receiving_account_id' => a['receiving_account_id'],
           'type' => a['type'],
           'direction' => a['direction'],
           'status' => a['status'],
@@ -83,13 +84,18 @@ module ForestAdminDatasourceMambuPayments
       # silently returning unfiltered results.
       def api_filters
         {
-          'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] }
+          'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] },
+          # Numeral's list endpoint exposes the receiving external account
+          # under the `external_account_id` query param.
+          'receiving_account_id' => { ops: [Operators::EQUAL, Operators::IN],
+                                      param: 'external_account_id' }
         }
       end
 
       def build_payload(data)
         attrs = data.transform_keys(&:to_s)
-        %w[id status created_at value_date initiated_at reconciliation_status reconciled_amount].each do |k|
+        %w[id status created_at value_date initiated_at reconciliation_status reconciled_amount
+           receiving_account_id].each do |k|
           attrs.delete(k)
         end
         attrs
@@ -97,12 +103,19 @@ module ForestAdminDatasourceMambuPayments
 
       def embed_relations(rows, records, projection)
         ca = datasource.get_collection('MambuConnectedAccount')
+        ea = datasource.get_collection('MambuExternalAccount')
         sources = records.map { |r| attrs_of(r) }
         embed_many_to_one(
           rows, sources, projection,
           foreign_key: 'connected_account_id', relation_name: 'connected_account',
           fetcher: ->(id) { datasource.client.find_connected_account(id) },
           serializer: ->(raw) { ca.serialize(raw) }
+        )
+        embed_many_to_one(
+          rows, sources, projection,
+          foreign_key: 'receiving_account_id', relation_name: 'external_account',
+          fetcher: ->(id) { datasource.client.find_external_account(id) },
+          serializer: ->(raw) { ea.serialize(raw) }
         )
       end
 
@@ -111,6 +124,8 @@ module ForestAdminDatasourceMambuPayments
                                          is_primary_key: true, is_read_only: true, is_sortable: true))
         add_field('connected_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                                            is_read_only: false, is_sortable: true))
+        add_field('receiving_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+                                                           is_read_only: true, is_sortable: true))
         add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
                                            is_read_only: false, is_sortable: true))
         add_field('direction', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
@@ -157,6 +172,11 @@ module ForestAdminDatasourceMambuPayments
                                          foreign_key: 'connected_account_id',
                                          foreign_key_target: 'id'
                                        ))
+        add_field('external_account', ManyToOneSchema.new(
+                                        foreign_collection: 'MambuExternalAccount',
+                                        foreign_key: 'receiving_account_id',
+                                        foreign_key_target: 'id'
+                                      ))
       end
     end
   end
