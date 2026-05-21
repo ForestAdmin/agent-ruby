@@ -127,7 +127,7 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params)
+      @client.call_rpc(url, caller: caller, method: :post, payload: params, symbolize_keys: true)
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)

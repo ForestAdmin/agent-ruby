@@ -233,6 +233,30 @@ module ForestAdminDatasourceRpc
           )
         end
       end
+
+      it 'asks the RPC client to symbolize response keys so ActionResult.parse sees :type' do
+        collection.execute(caller, 'my_action', {})
+
+        expect(rpc_client).to have_received(:call_rpc) do |_url, options|
+          expect(options[:symbolize_keys]).to be(true)
+        end
+      end
+
+      it 'returns the action result as-is so :type and other keys reach ActionResult.parse' do
+        success_result = {
+          type: 'Success',
+          message: 'ok',
+          invalidated: ['books'],
+          html: nil,
+          response_headers: {}
+        }
+        allow(rpc_client).to receive(:call_rpc).and_return(success_result)
+
+        result = collection.execute(caller, 'my_action', {})
+
+        expect(result).to eq(success_result)
+        expect(result[:type]).to eq('Success')
+      end
     end
 
     context 'when call get_form' do
