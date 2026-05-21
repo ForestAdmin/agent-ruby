@@ -1,4 +1,4 @@
-RSpec.describe ForestAdminDatasourceMambuPayments::Plugins::CreateAccountHolder do
+RSpec.describe ForestAdminDatasourceMambuPayments::Plugins::SmartActions::CreateAccountHolder do
   let(:client) { instance_double(ForestAdminDatasourceMambuPayments::Client) }
   let(:datasource) { instance_double(ForestAdminDatasourceMambuPayments::Datasource, client: client) }
   let(:result_builder) { ForestAdminDatasourceCustomizer::Decorators::Action::ResultBuilder.new }
