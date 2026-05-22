@@ -99,6 +99,28 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
+    describe '#list with server-side filter' do
+      it 'forwards related_object_id equality to the Numeral list endpoint' do
+        allow(client).to receive(:list_events).and_return([])
+
+        filter = Filter.new(condition_tree: Leaf.new('related_object_id', 'equal', 'po1'))
+        collection.list(nil, filter, %w[id])
+
+        expect(client).to have_received(:list_events)
+          .with(hash_including('related_object_id' => 'po1'))
+      end
+
+      it 'forwards related_object_id IN to the Numeral list endpoint' do
+        allow(client).to receive(:list_events).and_return([])
+
+        filter = Filter.new(condition_tree: Leaf.new('related_object_id', 'in', %w[po1 po2]))
+        collection.list(nil, filter, %w[id])
+
+        expect(client).to have_received(:list_events)
+          .with(hash_including('related_object_id' => %w[po1 po2]))
+      end
+    end
+
     describe '#list' do
       it 'returns rows without resolving related_object when projection has no relation prefix' do
         allow(client).to receive(:list_events).and_return([payment_order_event])

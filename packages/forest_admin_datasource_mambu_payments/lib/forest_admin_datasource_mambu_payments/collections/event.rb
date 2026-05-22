@@ -83,6 +83,18 @@ module ForestAdminDatasourceMambuPayments
         datasource.client.list_events(**params)
       end
 
+      # Numeral's `GET /events` exposes filtering on the polymorphic target id.
+      # Used by OneToMany relations declared on PaymentOrder/IncomingPayment/etc
+      # to navigate "events of this resource". `related_object_type` filtering
+      # is left out because we translate the enum to Forest collection names at
+      # serialize time — uniqueness of UUIDs makes the type filter redundant
+      # when filtering by id anyway.
+      def api_filters
+        {
+          'related_object_id' => { ops: [Operators::EQUAL, Operators::IN] }
+        }
+      end
+
       # PolymorphicManyToOne is not resolved by the customizer, so we populate
       # `related_object` here when the projection requests it. Records are grouped
       # by their (translated) related_object_type so each target collection is
