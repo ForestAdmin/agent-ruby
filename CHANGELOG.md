@@ -1,3 +1,10 @@
+## [1.30.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.3...v1.30.4) (2026-05-22)
+
+
+### Bug Fixes
+
+* **zendesk:** warn on custom-field name collisions ([#312](https://github.com/ForestAdmin/agent-ruby/issues/312)) ([b1274e9](https://github.com/ForestAdmin/agent-ruby/commit/b1274e9ce17ce42fa8b6fe5282fcc4f4f1c45d27))
+
 ## [1.30.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.2...v1.30.3) (2026-05-22)
 
 
