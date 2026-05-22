@@ -24,7 +24,7 @@ module ForestAdminDatasourceCustomizer
             is_generate_file: action[:is_generate_file],
             description: action[:description],
             submit_button_label: action[:submit_button_label],
-            static_form: action[:static_form],
+            static_form: action[:static_form] || false,
             &action[:execute]
           )
         end
