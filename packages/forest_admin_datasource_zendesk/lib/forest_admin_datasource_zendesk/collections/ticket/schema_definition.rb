@@ -46,8 +46,6 @@ module ForestAdminDatasourceZendesk
                                                    is_read_only: true, is_sortable: true))
           add_field('updated_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                    is_read_only: true, is_sortable: true))
-
-          @custom_fields.each { |cf| add_field(cf[:column_name], cf[:schema]) }
         end
 
         def define_relations

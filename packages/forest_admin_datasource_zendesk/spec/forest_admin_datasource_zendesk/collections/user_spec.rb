@@ -115,6 +115,37 @@ module ForestAdminDatasourceZendesk
         collection.create(nil, 'email' => 'a@b.com', 'tier' => 'gold')
         expect(client).to have_received(:create_user)
       end
+
+      context 'when a custom field collides with a native field' do
+        let(:cf) do
+          [{ column_name: 'role', zendesk_id: 42, zendesk_key: 'role',
+             schema: ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(
+               column_type: 'String', filter_operators: [], is_read_only: false
+             ) }]
+        end
+
+        it 'logs a warning and skips the conflicting custom field instead of raising' do
+          logger = instance_double(Logger, warn: nil)
+          allow(ForestAdminDatasourceZendesk).to receive(:logger).and_return(logger)
+
+          expect { collection }.not_to raise_error
+          expect(logger).to have_received(:warn).with(/Custom field 'role'.*conflicts/)
+        end
+
+        it 'keeps the native role enum schema on the collection' do
+          allow(ForestAdminDatasourceZendesk).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+          expect(collection.schema[:fields]['role'].column_type).to eq('Enum')
+        end
+
+        it 'does not overwrite the native role value when serializing' do
+          allow(ForestAdminDatasourceZendesk).to receive(:logger).and_return(instance_double(Logger, warn: nil))
+          user = zendesk_user('id' => 1, 'role' => 'admin', 'user_fields' => { 'role' => 'something-else' })
+          allow(client).to receive(:search).and_return([user])
+
+          result = collection.list(nil, Filter.new, nil).first
+          expect(result['role']).to eq('admin')
+        end
+      end
     end
 
     describe '#create' do
