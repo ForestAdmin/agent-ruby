@@ -121,6 +121,17 @@ module ForestAdminRpcAgent
             end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
           end
         end
+
+        context 'when the aggregation payload omits :groups' do
+          it 'defaults groups to [] so Aggregation.new keeps its default' do
+            route.handle_request(
+              params: params.merge('aggregation' => { 'operation' => 'Count' })
+            )
+
+            expect(ForestAdminDatasourceToolkit::Components::Query::Aggregation)
+              .to have_received(:new).with(operation: 'Count', field: nil, groups: [])
+          end
+        end
       end
     end
   end
