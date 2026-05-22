@@ -128,9 +128,9 @@ module ForestAdminRpcAgent
         context 'when collection_name is missing' do
           let(:params) { {} }
 
-          it 'returns an empty hash' do
+          it 'returns an empty array' do
             response = route.handle_request(args)
-            expect(response).to eq({})
+            expect(response).to eq([])
           end
         end
       end
