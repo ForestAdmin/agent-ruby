@@ -95,6 +95,26 @@ module ForestAdminDatasourceZendesk
         [translated, filter.search].compact.reject(&:empty?).join(' ')
       end
 
+      # Adds custom fields, skipping any whose column name collides with a
+      # field already declared on the collection (native column or relation).
+      # Returns the list of fields actually added so callers can keep their
+      # serializer in sync with the schema.
+      def add_custom_fields(custom_fields)
+        custom_fields.reject do |cf|
+          name = cf[:column_name]
+          if schema[:fields].key?(name)
+            ForestAdminDatasourceZendesk.logger.warn(
+              "[forest_admin_datasource_zendesk] Custom field '#{name}' on collection " \
+              "'#{self.name}' conflicts with an existing field; skipping."
+            )
+            true
+          else
+            add_field(name, cf[:schema])
+            false
+          end
+        end
+      end
+
       private
 
       def sort_field_and_direction(entry)

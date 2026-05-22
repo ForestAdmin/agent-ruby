@@ -16,15 +16,16 @@ module ForestAdminDatasourceZendesk
     def register_collections
       introspector = Schema::CustomFieldsIntrospector.new(@client)
 
-      ticket_cf = introspector.ticket_custom_fields
-      user_cf   = introspector.user_custom_fields
-      org_cf    = introspector.organization_custom_fields
+      ticket = Collections::Ticket.new(self, custom_fields: introspector.ticket_custom_fields)
+      user = Collections::User.new(self, custom_fields: introspector.user_custom_fields)
+      org = Collections::Organization.new(self, custom_fields: introspector.organization_custom_fields)
 
-      add_collection(Collections::Ticket.new(self, custom_fields: ticket_cf))
-      add_collection(Collections::User.new(self, custom_fields: user_cf))
-      add_collection(Collections::Organization.new(self, custom_fields: org_cf))
+      add_collection(ticket)
+      add_collection(user)
+      add_collection(org)
 
-      @custom_field_mapping = build_custom_field_mapping(ticket_cf, user_cf, org_cf)
+      @custom_field_mapping = build_custom_field_mapping(ticket.custom_fields,
+                                                         user.custom_fields, org.custom_fields)
     end
 
     # Forest column name -> Zendesk Search field name. Lives on the instance

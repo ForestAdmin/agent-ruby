@@ -3,6 +3,8 @@ module ForestAdminDatasourceZendesk
     class User < BaseCollection
       include Searchable
 
+      attr_reader :custom_fields
+
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       OneToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
       ENUM_ROLE       = %w[end-user agent admin].freeze
@@ -17,9 +19,9 @@ module ForestAdminDatasourceZendesk
 
       def initialize(datasource, custom_fields: [])
         super(datasource, 'ZendeskUser')
-        @custom_fields = custom_fields
         define_schema
         define_relations
+        @custom_fields = add_custom_fields(custom_fields)
         enable_search
         enable_count
       end
@@ -89,8 +91,6 @@ module ForestAdminDatasourceZendesk
                                                  is_read_only: true, is_sortable: true))
         add_field('updated_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
                                                  is_read_only: true, is_sortable: true))
-
-        @custom_fields.each { |cf| add_field(cf[:column_name], cf[:schema]) }
       end
 
       def define_relations
