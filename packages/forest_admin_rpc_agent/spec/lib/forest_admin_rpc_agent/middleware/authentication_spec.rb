@@ -74,44 +74,6 @@ module ForestAdminRpcAgent
         end
       end
 
-      context 'when signature is reused within allowed window (replay attack)' do
-        before do
-          env['HTTP_X_SIGNATURE'] = signature
-          env['HTTP_X_TIMESTAMP'] = timestamp
-          # First request - should pass
-          middleware.call(env)
-        end
-
-        it 'blocks the replay attack' do
-          # Second request with same signature immediately - should be blocked
-          status, _headers, body = middleware.call(env)
-          expect(status).to eq(401)
-          expect(JSON.parse(body.first)).to eq({ 'error' => 'Unauthorized' })
-        end
-      end
-
-      context 'when signature is reused after allowed window' do
-        before do
-          env['HTTP_X_SIGNATURE'] = signature
-          env['HTTP_X_TIMESTAMP'] = timestamp
-          # First request
-          middleware.call(env)
-
-          # Simulate time passing (6 seconds later)
-          travel_to = Time.now.utc + described_class::SIGNATURE_REUSE_WINDOW + 1
-          allow(Time).to receive(:now).and_return(travel_to)
-          if defined?(Time.current)
-            allow(Time).to receive(:current).and_return(travel_to)
-          end
-        end
-
-        it 'allows the request (signature expired from cache)' do
-          # After 6 seconds, signature can be reused (not in replay window anymore)
-          status, = middleware.call(env)
-          expect(status).to eq(200)
-        end
-      end
-
       context 'when timestamp is too old' do
         let(:old_timestamp) { (Time.now.utc - (described_class::ALLOWED_TIME_DIFF + 10)).iso8601 }
         let(:old_signature) { OpenSSL::HMAC.hexdigest('SHA256', secret, old_timestamp) }
@@ -157,41 +119,6 @@ module ForestAdminRpcAgent
         end
       end
 
-      context 'when cleaning up old signatures' do
-        it 'removes signatures older than ALLOWED_TIME_DIFF' do
-          # Add multiple signatures at different times
-          5.times do |i|
-            ts = (Time.now.utc - (i * 100)).iso8601
-            sig = OpenSSL::HMAC.hexdigest('SHA256', secret, ts)
-            env['HTTP_X_SIGNATURE'] = sig
-            env['HTTP_X_TIMESTAMP'] = ts
-            middleware.call(env)
-          end
-
-          # Verify cleanup happens (internal state check via new request)
-          status, = middleware.call(env)
-          expect(status).to satisfy('be either 200 or 401') { |s| [200, 401].include?(s) }
-        end
-      end
-
-      context 'with thread safety' do
-        it 'mutex protects shared state from race conditions' do
-          # This test verifies the mutex works - not testing exact behavior
-          # Just ensure no crashes when multiple threads access the middleware
-          threads = Array.new(3) do |i|
-            Thread.new do
-              ts = (Time.now.utc + (i * 10)).iso8601
-              sig = OpenSSL::HMAC.hexdigest('SHA256', secret, ts)
-              test_env = { 'HTTP_X_SIGNATURE' => sig, 'HTTP_X_TIMESTAMP' => ts }
-              middleware.call(test_env)
-            end
-          end
-
-          # Just verify no exceptions raised
-          expect { threads.each(&:join) }.not_to raise_error
-        end
-      end
-
       context 'when multiple requests with millisecond timestamps (rapid fire)' do
         it 'allows multiple requests in the same second with different milliseconds' do
           # Simulate 3 rapid requests within the same second but with different milliseconds
@@ -212,22 +139,18 @@ module ForestAdminRpcAgent
           end
         end
 
-        it 'blocks replay with same millisecond timestamp' do
-          # First request with millisecond precision
+        it 'accepts concurrent requests with identical signature' do
+          # The Node TS rpc-agent has no anti-replay protection; Ruby matches that behaviour
+          # so parallel calls from a Node main agent don't get spuriously rejected when two
+          # signatures land in the same millisecond.
           timestamp_ms = Time.now.utc.iso8601(3)
           signature_ms = OpenSSL::HMAC.hexdigest('SHA256', secret, timestamp_ms)
 
           env['HTTP_X_SIGNATURE'] = signature_ms
           env['HTTP_X_TIMESTAMP'] = timestamp_ms
 
-          # First request - should pass
-          status, = middleware.call(env)
-          expect(status).to eq(200)
-
-          # Second request with exact same timestamp and signature - should be blocked
-          status, _headers, body = middleware.call(env)
-          expect(status).to eq(401)
-          expect(JSON.parse(body.first)).to eq({ 'error' => 'Unauthorized' })
+          expect(middleware.call(env).first).to eq(200)
+          expect(middleware.call(env).first).to eq(200)
         end
       end
 
