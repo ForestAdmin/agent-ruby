@@ -128,8 +128,50 @@ module ForestAdminRpcAgent
 
           parsed = JSON.parse(written_content, symbolize_names: true)
           # RPC schema format includes collections with full schemas and native_query_connections
-          expect(parsed[:collections]).to eq([{ fields: {}, name: 'Test' }])
+          expect(parsed[:collections]).to eq([{ fields: {}, name: 'Test', actions: {} }])
           expect(parsed[:native_query_connections]).to eq([{ name: 'main' }])
+        end
+
+        it 'exposes only the RPC-relevant action fields on the wire' do
+          allow(ForestAdminRpcAgent::Facades::Container).to receive(:cache) do |key|
+            { skip_schema_update: false, schema_path: '/tmp/test-schema.json', is_production: false }[key]
+          end
+
+          action = instance_double(
+            ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction,
+            scope: 'Global',
+            is_generate_file: true,
+            static_form: false,
+            description: 'Download a report',
+            submit_button_label: 'Go',
+            form: [{ id: 'should_not_leak' }],
+            execute: -> {}
+          )
+          test_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          allow(test_collection).to receive_messages(
+            name: 'Files',
+            schema: { fields: {}, actions: { 'download' => action } }
+          )
+          allow(datasource).to receive_messages(
+            collections: { 'Files' => test_collection },
+            live_query_connections: {}
+          )
+
+          written_content = nil
+          allow(File).to receive(:write) { |_path, content| written_content = content }
+
+          instance.send_schema
+
+          parsed = JSON.parse(written_content, symbolize_names: true)
+          expect(parsed[:collections][0][:actions]).to eq(
+            download: {
+              scope: 'Global',
+              is_generate_file: true,
+              static_form: false,
+              description: 'Download a report',
+              submit_button_label: 'Go'
+            }
+          )
         end
 
         it 'caches the schema with an etag' do

@@ -24,6 +24,42 @@ module ForestAdminDatasourceRpc
       it 'uses the datasource shared RPC client' do
         expect(collection.instance_variable_get(:@client)).to eq(datasource.shared_rpc_client)
       end
+
+      context 'when the schema carries action static_form values' do
+        let(:actions_introspection) do
+          {
+            charts: [],
+            rpc_relations: [],
+            collections: [
+              {
+                name: 'Files',
+                countable: false,
+                searchable: false,
+                charts: [],
+                segments: [],
+                fields: {
+                  id: {
+                    column_type: 'Number', filter_operators: [], is_primary_key: true,
+                    is_read_only: false, is_sortable: true, default_value: nil,
+                    enum_values: [], validation: [], type: 'Column'
+                  }
+                },
+                actions: {
+                  static_action: { scope: 'global', static_form: true },
+                  dynamic_action: { scope: 'global', static_form: false }
+                }
+              }
+            ]
+          }
+        end
+        let(:actions_datasource) { Datasource.new({ uri: 'http://localhost' }, actions_introspection) }
+
+        it 'preserves :static_form from the wire instead of recomputing it against an empty form' do
+          schema = actions_datasource.get_collection('Files').schema[:actions]
+          expect(schema['static_action'].static_form).to be(true)
+          expect(schema['dynamic_action'].static_form).to be(false)
+        end
+      end
     end
 
     context 'when call list' do
