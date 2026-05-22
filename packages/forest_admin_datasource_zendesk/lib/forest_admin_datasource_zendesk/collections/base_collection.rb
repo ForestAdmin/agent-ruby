@@ -11,6 +11,23 @@ module ForestAdminDatasourceZendesk
       DATE_OPS    = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
                      Operators::PRESENT, Operators::BLANK].freeze
 
+      attr_reader :custom_fields
+
+      # Template method: subclasses implement `define_schema` and
+      # `define_relations` as hooks; ordering between them, custom-field
+      # registration, and the search/count flags is owned here so collisions
+      # are always evaluated against the final native schema. A subclass can
+      # opt out of search/count by passing `searchable: false` / `countable:
+      # false` through `super`.
+      def initialize(datasource, name, custom_fields: [], searchable: true, countable: true, native_driver: nil)
+        super(datasource, name, native_driver)
+        define_schema
+        define_relations
+        @custom_fields = add_custom_fields(custom_fields)
+        enable_search if searchable
+        enable_count if countable
+      end
+
       def aggregate(caller, filter, aggregation, _limit = nil)
         unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
           raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
@@ -97,7 +114,7 @@ module ForestAdminDatasourceZendesk
 
       # Adds custom fields, skipping any whose column name collides with a
       # field already declared on the collection (native column or relation).
-      # Returns the list of fields actually added so callers can keep their
+      # Returns the subset actually added so callers can keep their
       # serializer in sync with the schema.
       def add_custom_fields(custom_fields)
         custom_fields.reject do |cf|
@@ -116,6 +133,9 @@ module ForestAdminDatasourceZendesk
       end
 
       private
+
+      def define_schema    = raise(NotImplementedError, "#{self.class} did not implement define_schema")
+      def define_relations = raise(NotImplementedError, "#{self.class} did not implement define_relations")
 
       def sort_field_and_direction(entry)
         return [entry.field, entry.ascending] if entry.respond_to?(:field)

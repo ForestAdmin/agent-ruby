@@ -251,6 +251,7 @@ Naming/PredicatePrefix:
 
 Metrics/ParameterLists:
   Exclude:
+    - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/collections/base_collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/query_handler.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/services/smart_action_checker.rb'
@@ -347,6 +348,7 @@ Metrics/BlockLength:
 
 Metrics/ClassLength:
   Exclude:
+    - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/collections/base_collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'

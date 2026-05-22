@@ -3,8 +3,6 @@ module ForestAdminDatasourceZendesk
     class Organization < BaseCollection
       include Searchable
 
-      attr_reader :custom_fields
-
       OneToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
 
       ZENDESK_SORTABLE = {
@@ -14,12 +12,7 @@ module ForestAdminDatasourceZendesk
       }.freeze
 
       def initialize(datasource, custom_fields: [])
-        super(datasource, 'ZendeskOrganization')
-        define_schema
-        define_relations
-        @custom_fields = add_custom_fields(custom_fields)
-        enable_search
-        enable_count
+        super(datasource, 'ZendeskOrganization', custom_fields: custom_fields)
       end
 
       def create(_caller, data)

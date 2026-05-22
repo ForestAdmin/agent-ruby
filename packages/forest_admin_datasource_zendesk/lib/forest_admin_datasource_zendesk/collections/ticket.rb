@@ -6,8 +6,6 @@ module ForestAdminDatasourceZendesk
       include CommentsEmbedder
       include Serializer
 
-      attr_reader :custom_fields
-
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
 
       ZENDESK_SORTABLE = {
@@ -29,12 +27,7 @@ module ForestAdminDatasourceZendesk
       }.freeze
 
       def initialize(datasource, custom_fields: [])
-        super(datasource, 'ZendeskTicket')
-        define_schema
-        define_relations
-        @custom_fields = add_custom_fields(custom_fields)
-        enable_search
-        enable_count
+        super(datasource, 'ZendeskTicket', custom_fields: custom_fields)
       end
 
       def list(caller, filter, projection)
