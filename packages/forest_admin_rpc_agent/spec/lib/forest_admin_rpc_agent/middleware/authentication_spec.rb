@@ -119,41 +119,6 @@ module ForestAdminRpcAgent
         end
       end
 
-      context 'when cleaning up old signatures' do
-        it 'removes signatures older than ALLOWED_TIME_DIFF' do
-          # Add multiple signatures at different times
-          5.times do |i|
-            ts = (Time.now.utc - (i * 100)).iso8601
-            sig = OpenSSL::HMAC.hexdigest('SHA256', secret, ts)
-            env['HTTP_X_SIGNATURE'] = sig
-            env['HTTP_X_TIMESTAMP'] = ts
-            middleware.call(env)
-          end
-
-          # Verify cleanup happens (internal state check via new request)
-          status, = middleware.call(env)
-          expect(status).to satisfy('be either 200 or 401') { |s| [200, 401].include?(s) }
-        end
-      end
-
-      context 'with thread safety' do
-        it 'mutex protects shared state from race conditions' do
-          # This test verifies the mutex works - not testing exact behavior
-          # Just ensure no crashes when multiple threads access the middleware
-          threads = Array.new(3) do |i|
-            Thread.new do
-              ts = (Time.now.utc + (i * 10)).iso8601
-              sig = OpenSSL::HMAC.hexdigest('SHA256', secret, ts)
-              test_env = { 'HTTP_X_SIGNATURE' => sig, 'HTTP_X_TIMESTAMP' => ts }
-              middleware.call(test_env)
-            end
-          end
-
-          # Just verify no exceptions raised
-          expect { threads.each(&:join) }.not_to raise_error
-        end
-      end
-
       context 'when multiple requests with millisecond timestamps (rapid fire)' do
         it 'allows multiple requests in the same second with different milliseconds' do
           # Simulate 3 rapid requests within the same second but with different milliseconds
@@ -174,7 +139,7 @@ module ForestAdminRpcAgent
           end
         end
 
-        it 'allows replay with the same millisecond timestamp (no anti-replay)' do
+        it 'accepts concurrent requests with identical signature' do
           # The Node TS rpc-agent has no anti-replay protection; Ruby matches that behaviour
           # so parallel calls from a Node main agent don't get spuriously rejected when two
           # signatures land in the same millisecond.
