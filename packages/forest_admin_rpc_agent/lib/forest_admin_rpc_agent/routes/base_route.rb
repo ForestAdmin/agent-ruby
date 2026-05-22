@@ -91,21 +91,11 @@ module ForestAdminRpcAgent
       # consumers that don't duplicate `collection_name` in the body (the Node datasource-rpc)
       # still resolve the route correctly.
       def extract_request_params(request)
-        merged = request.path_parameters
-                        .merge(request.query_parameters)
-                        .merge(request.request_parameters)
-        deep_symbolize_keys(merged).with_indifferent_access
-      end
-
-      def deep_symbolize_keys(obj)
-        case obj
-        when Hash
-          obj.transform_keys(&:to_sym).transform_values { |v| deep_symbolize_keys(v) }
-        when Array
-          obj.map { |v| deep_symbolize_keys(v) }
-        else
-          obj
-        end
+        request.path_parameters
+               .except(:controller, :action, :format)
+               .merge(request.query_parameters)
+               .merge(request.request_parameters)
+               .with_indifferent_access
       end
 
       def serialize_response(result)

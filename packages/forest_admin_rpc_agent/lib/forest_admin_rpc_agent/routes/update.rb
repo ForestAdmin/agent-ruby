@@ -10,8 +10,6 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return {} unless args[:params]['collection_name']
-
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = get_collection_safe(datasource, args[:params]['collection_name'])
         filter = FilterFactory.from_plain_object(args[:params]['filter'])
