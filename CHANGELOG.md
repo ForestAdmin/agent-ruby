@@ -1,3 +1,10 @@
+## [1.30.6](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.5...v1.30.6) (2026-05-22)
+
+
+### Bug Fixes
+
+* **rpc agent:** allow connect as node rpc ([#310](https://github.com/ForestAdmin/agent-ruby/issues/310)) ([6f80070](https://github.com/ForestAdmin/agent-ruby/commit/6f8007001fba4986ae75140d2372b326a82836d4))
+
 ## [1.30.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.4...v1.30.5) (2026-05-22)
 
 
