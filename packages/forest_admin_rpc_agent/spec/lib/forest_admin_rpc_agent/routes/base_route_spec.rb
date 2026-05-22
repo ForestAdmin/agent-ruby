@@ -1,6 +1,7 @@
 require 'spec_helper'
 require 'rails'
 require 'action_dispatch'
+require 'active_support/core_ext/hash/indifferent_access'
 
 module ForestAdminRpcAgent
   module Routes
@@ -176,6 +177,45 @@ module ForestAdminRpcAgent
             expect(response[1]).to eq({ 'Content-Type' => 'application/json' })
             expect(response[2]).to eq(['{"test":"data"}'])
           end
+        end
+      end
+
+      describe '#extract_request_params' do
+        let(:request) do
+          instance_double(
+            ActionDispatch::Request,
+            path_parameters: { controller: 'forest_admin_rails/forest', action: 'index',
+                               format: 'json', collection_name: 'books' },
+            query_parameters: { 'page' => '2' },
+            request_parameters: { 'filter' => { 'search' => 'hello' } }
+          )
+        end
+
+        it 'merges path, query and body params with indifferent access' do
+          params = route.send(:extract_request_params, request)
+
+          expect(params['collection_name']).to eq('books')
+          expect(params[:collection_name]).to eq('books')
+          expect(params['page']).to eq('2')
+          expect(params['filter']['search']).to eq('hello')
+        end
+
+        it 'strips Rails-internal path keys (controller, action, format)' do
+          params = route.send(:extract_request_params, request)
+
+          expect(params).not_to have_key('controller')
+          expect(params).not_to have_key('action')
+          expect(params).not_to have_key('format')
+        end
+
+        it 'lets body params override path params on key collision' do
+          allow(request).to receive_messages(
+            path_parameters: { collection_name: 'from_path' },
+            query_parameters: {},
+            request_parameters: { 'collection_name' => 'from_body' }
+          )
+
+          expect(route.send(:extract_request_params, request)['collection_name']).to eq('from_body')
         end
       end
     end

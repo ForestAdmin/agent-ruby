@@ -76,10 +76,11 @@ module ForestAdminRpcAgent
           end
         end
 
-        context 'when collection_name is missing' do
-          it 'returns an empty hash' do
-            result = route.handle_request(params: {})
-            expect(result).to eq({})
+        context 'when the collection is unknown' do
+          it 'raises NotFoundError so the controller maps it to a 404 response' do
+            expect do
+              route.handle_request(params: { 'collection_name' => 'unknown' })
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
           end
         end
       end

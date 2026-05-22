@@ -112,10 +112,24 @@ module ForestAdminRpcAgent
           end
         end
 
-        context 'when collection_name is missing' do
-          it 'returns an empty hash' do
-            result = route.handle_request(params: {})
-            expect(result).to eq({})
+        context 'when the collection is unknown' do
+          it 'raises NotFoundError so the controller maps it to a 404 response' do
+            expect do
+              route.handle_request(
+                params: { 'collection_name' => 'unknown', 'aggregation' => { 'operation' => 'Count' } }
+              )
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
+          end
+        end
+
+        context 'when the aggregation payload omits :groups' do
+          it 'defaults groups to [] so Aggregation.new keeps its default' do
+            route.handle_request(
+              params: params.merge('aggregation' => { 'operation' => 'Count' })
+            )
+
+            expect(ForestAdminDatasourceToolkit::Components::Query::Aggregation)
+              .to have_received(:new).with(operation: 'Count', field: nil, groups: [])
           end
         end
       end

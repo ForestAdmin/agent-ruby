@@ -12,15 +12,13 @@ module ForestAdminRpcAgent
       end
 
       def handle_request(args)
-        return {} unless args[:params]['collection_name']
-
         datasource = ForestAdminRpcAgent::Facades::Container.datasource
         collection = get_collection_safe(datasource, args[:params]['collection_name'])
 
         aggregation = Aggregation.new(
           operation: args[:params]['aggregation']['operation'],
           field: args[:params]['aggregation']['field'],
-          groups: args[:params]['aggregation']['groups']
+          groups: args[:params]['aggregation']['groups'] || []
         )
         filter = FilterFactory.from_plain_object(args[:params]['filter'])
 

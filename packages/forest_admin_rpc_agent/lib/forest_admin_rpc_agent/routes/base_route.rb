@@ -39,16 +39,16 @@ module ForestAdminRpcAgent
 
           # Skip authentication for health check (root path)
           if @url == '/'
-            params = deep_symbolize_keys(request.query_parameters.merge(request.request_parameters))
-            result = handle_request({ params: params.with_indifferent_access, caller: nil, request: request })
+            params = extract_request_params(request)
+            result = handle_request({ params: params, caller: nil, request: request })
             build_rails_response(result)
           else
             auth_middleware = ForestAdminRpcAgent::Middleware::Authentication.new(->(_env) { [200, {}, ['OK']] })
             status, headers, response = auth_middleware.call(request.env)
 
             if status == 200
-              params = deep_symbolize_keys(request.query_parameters.merge(request.request_parameters))
-              result = handle_request({ params: params.with_indifferent_access, caller: headers[:caller], request: request })
+              params = extract_request_params(request)
+              result = handle_request({ params: params, caller: headers[:caller], request: request })
               build_rails_response(result)
             else
               [status, headers, response]
@@ -87,15 +87,15 @@ module ForestAdminRpcAgent
 
       private
 
-      def deep_symbolize_keys(obj)
-        case obj
-        when Hash
-          obj.transform_keys(&:to_sym).transform_values { |v| deep_symbolize_keys(v) }
-        when Array
-          obj.map { |v| deep_symbolize_keys(v) }
-        else
-          obj
-        end
+      # Merge path params (e.g. :collection_name from the URL) with query and body params so
+      # consumers that don't duplicate `collection_name` in the body (the Node datasource-rpc)
+      # still resolve the route correctly.
+      def extract_request_params(request)
+        request.path_parameters
+               .except(:controller, :action, :format)
+               .merge(request.query_parameters)
+               .merge(request.request_parameters)
+               .with_indifferent_access
       end
 
       def serialize_response(result)
