@@ -101,15 +101,15 @@ module ForestAdminDatasourceZendesk
       # serializer in sync with the schema.
       def add_custom_fields(custom_fields)
         custom_fields.reject do |cf|
-          name = cf[:column_name]
-          if schema[:fields].key?(name)
+          column_name = cf[:column_name]
+          if schema[:fields].key?(column_name)
             ForestAdminDatasourceZendesk.logger.warn(
-              "[forest_admin_datasource_zendesk] Custom field '#{name}' on collection " \
-              "'#{self.name}' conflicts with an existing field; skipping."
+              "[forest_admin_datasource_zendesk] Custom field '#{column_name}' on collection " \
+              "'#{name}' conflicts with an existing field; skipping."
             )
             true
           else
-            add_field(name, cf[:schema])
+            add_field(column_name, cf[:schema])
             false
           end
         end
