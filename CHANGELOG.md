@@ -1,3 +1,10 @@
+## [1.30.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.4...v1.30.5) (2026-05-22)
+
+
+### Bug Fixes
+
+* **rpc agent:** remove useless verrification to handle properly main node agent start ([#311](https://github.com/ForestAdmin/agent-ruby/issues/311)) ([684a966](https://github.com/ForestAdmin/agent-ruby/commit/684a9662b69f930201f731b4ac02ea0a25239910))
+
 ## [1.30.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.3...v1.30.4) (2026-05-22)
 
 
