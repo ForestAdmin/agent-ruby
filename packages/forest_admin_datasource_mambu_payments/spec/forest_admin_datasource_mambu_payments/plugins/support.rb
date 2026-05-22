@@ -38,10 +38,12 @@ module ForestAdminDatasourceMambuPayments
     # used by the relation plugin specs. Mirrors the public DSL shape exposed
     # by ForestAdminDatasourceCustomizer::CollectionCustomizer.
     class FakeRelationCollection
-      attr_reader :imported_fields, :many_to_one_relations, :one_to_many_relations, :operator_handlers
+      attr_reader :imported_fields, :computed_fields, :many_to_one_relations, :one_to_many_relations,
+                  :operator_handlers
 
       def initialize
         @imported_fields = {}
+        @computed_fields = {}
         @many_to_one_relations = {}
         @one_to_many_relations = {}
         @operator_handlers = {}
@@ -49,6 +51,11 @@ module ForestAdminDatasourceMambuPayments
 
       def import_field(name, options = {})
         @imported_fields[name] = options
+        self
+      end
+
+      def add_field(name, definition)
+        @computed_fields[name] = definition
         self
       end
 
