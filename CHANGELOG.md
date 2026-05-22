@@ -1,3 +1,10 @@
+## [1.30.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.2...v1.30.3) (2026-05-22)
+
+
+### Bug Fixes
+
+* **rpc:** handle properly action form ([#309](https://github.com/ForestAdmin/agent-ruby/issues/309)) ([f86013c](https://github.com/ForestAdmin/agent-ruby/commit/f86013c34362e090aaaea63226edf58f0ba1d97f))
+
 ## [1.30.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.1...v1.30.2) (2026-05-21)
 
 
