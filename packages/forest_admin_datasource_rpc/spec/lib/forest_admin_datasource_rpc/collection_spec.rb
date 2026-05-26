@@ -254,7 +254,7 @@ module ForestAdminDatasourceRpc
 
         collection.execute(caller, 'my_action', data)
 
-        expect(rpc_client).to have_received(:call_rpc) do |url, options|
+        expect(rpc_client).to have_received(:call_rpc_raw) do |url, options|
           expect(url).to eq('/forest/rpc/Product/action-execute')
           expect(options[:caller]).to eq(caller)
           expect(options[:method]).to eq(:post)

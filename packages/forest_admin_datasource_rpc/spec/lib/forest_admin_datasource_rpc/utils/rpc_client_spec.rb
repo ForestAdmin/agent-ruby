@@ -100,6 +100,18 @@ module ForestAdminDatasourceRpc
       end
 
       describe '#call_rpc_raw' do
+        let(:response_headers) { { 'x-forest-action-type' => 'File' } }
+        let(:response) do
+          instance_double(Faraday::Response, status: 200, body: {}, success?: true, headers: response_headers)
+        end
+        let(:faraday_connection) { instance_double(Faraday::Connection, send: response) }
+        let(:timestamp) { '2025-04-01T14:07:02Z' }
+
+        before do
+          allow(Faraday::Connection).to receive(:new).and_return(faraday_connection)
+          allow(Time).to receive(:now).and_return(instance_double(Time, utc: instance_double(Time, iso8601: timestamp)))
+        end
+
         it 'returns the Faraday::Response object so callers can read headers' do
           result = rpc_client.call_rpc_raw('/rpc/test', method: :post)
 
