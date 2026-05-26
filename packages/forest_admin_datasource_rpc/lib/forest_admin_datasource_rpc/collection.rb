@@ -1,4 +1,7 @@
 require 'base64'
+require 'cgi'
+require 'json'
+require 'stringio'
 
 module ForestAdminDatasourceRpc
   class Collection < ForestAdminDatasourceToolkit::Collection
@@ -127,7 +130,12 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      @client.call_rpc(url, caller: caller, method: :post, payload: params, symbolize_keys: true)
+      response = @client.call_rpc_raw(url, caller: caller, method: :post, payload: params,
+                                           symbolize_keys: true)
+
+      return build_file_result(response) if response.headers['x-forest-action-type'] == 'File'
+
+      response.body
     end
 
     def get_form(caller, name, data = nil, filter = nil, metas = nil)
@@ -175,6 +183,21 @@ module ForestAdminDatasourceRpc
           [key, value]
         end
       end
+    end
+
+    def build_file_result(response)
+      response_headers_header = response.headers['x-forest-action-response-headers']
+      file_name_header = response.headers['x-forest-action-file-name']
+
+      result = {
+        type: 'File',
+        mime_type: response.headers['content-type'],
+        name: CGI.unescape(file_name_header.to_s),
+        stream: response.body.to_s
+      }
+      result[:response_headers] = JSON.parse(response_headers_header) if response_headers_header
+
+      result
     end
   end
 end
