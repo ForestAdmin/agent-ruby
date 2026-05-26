@@ -94,6 +94,54 @@ module ForestAdminRpcAgent
               .to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
           end
         end
+
+        context 'when the action returns a File result' do
+          let(:binary_payload) { String.new("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", encoding: 'ASCII-8BIT') }
+          let(:file_result) do
+            {
+              type: 'File',
+              name: 'report final.pdf',
+              mime_type: 'application/pdf',
+              stream: binary_payload,
+              response_headers: { 'set-cookie' => 'token=xyz' }
+            }
+          end
+
+          before do
+            allow(@datasource.get_collection('users'))
+              .to receive(:execute).and_return(file_result)
+          end
+
+          it 'returns a raw HTTP response so the binary content is not JSON-encoded' do
+            response = route.handle_request(args)
+
+            expect(response).to include(status: 200, raw: true)
+            expect(response[:content]).to eq(binary_payload)
+            expect(response[:content].encoding.name).to eq('ASCII-8BIT')
+          end
+
+          it 'sets File-specific headers including the encoded filename' do
+            response = route.handle_request(args)
+            headers = response[:headers]
+
+            expect(headers['Content-Type']).to eq('application/pdf')
+            expect(headers['X-Forest-Action-Type']).to eq('File')
+            expect(headers['X-Forest-Action-File-Name']).to eq(CGI.escape('report final.pdf'))
+            expect(headers['Content-Disposition']).to include(CGI.escape('report final.pdf'))
+            expect(headers['X-Forest-Action-Response-Headers']).to eq({ 'set-cookie' => 'token=xyz' }.to_json)
+          end
+
+          context 'when the action does not provide response_headers' do
+            let(:file_result) do
+              { type: 'File', name: 'note.txt', mime_type: 'text/plain', stream: 'hi' }
+            end
+
+            it 'omits the X-Forest-Action-Response-Headers header' do
+              response = route.handle_request(args)
+              expect(response[:headers]).not_to have_key('X-Forest-Action-Response-Headers')
+            end
+          end
+        end
       end
     end
   end

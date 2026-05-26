@@ -166,6 +166,23 @@ module ForestAdminRpcAgent
             expect(response[1]).to eq({ 'Content-Type' => 'application/json' })
             expect(response[2]).to eq([''])
           end
+
+          it 'passes raw binary content through without JSON-encoding it (e.g. File action result)' do
+            binary = String.new("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", encoding: 'ASCII-8BIT')
+            result = {
+              status: 200,
+              headers: { 'Content-Type' => 'application/pdf' },
+              content: binary,
+              raw: true
+            }
+
+            response = route.send(:build_rails_response, result)
+
+            expect(response[0]).to eq(200)
+            expect(response[1]['Content-Type']).to eq('application/pdf')
+            expect(response[2]).to eq([binary])
+            expect(response[2].first.encoding.name).to eq('ASCII-8BIT')
+          end
         end
 
         context 'when result is not a Hash with :status key' do

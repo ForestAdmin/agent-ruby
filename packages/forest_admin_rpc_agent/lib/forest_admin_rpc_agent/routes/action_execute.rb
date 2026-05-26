@@ -43,7 +43,8 @@ module ForestAdminRpcAgent
         }
         headers['X-Forest-Action-Response-Headers'] = result[:response_headers].to_json if result[:response_headers]
 
-        { status: 200, headers: headers, content: result[:stream] }
+        # raw: true skips JSON encoding — file streams are arbitrary binary bytes.
+        { status: 200, headers: headers, content: result[:stream], raw: true }
       end
     end
   end

@@ -26,7 +26,13 @@ module ForestAdminRpcAgent
             status result[:status]
             # Set custom headers if provided
             result[:headers]&.each { |key, value| headers[key] = value }
-            result[:content] ? serialize_response(result[:content]) : ''
+            if result[:content].nil?
+              ''
+            elsif result[:raw]
+              result[:content].to_s
+            else
+              serialize_response(result[:content])
+            end
           else
             serialize_response(result)
           end
@@ -68,7 +74,13 @@ module ForestAdminRpcAgent
         if result.is_a?(Hash) && result.key?(:status)
           response_headers = { 'Content-Type' => 'application/json' }
           response_headers.merge!(result[:headers]) if result[:headers]
-          body = result[:content] ? serialize_response(result[:content]) : ''
+          body = if result[:content].nil?
+                   ''
+                 elsif result[:raw]
+                   result[:content].to_s
+                 else
+                   serialize_response(result[:content])
+                 end
           [result[:status], response_headers, [body]]
         else
           [200, { 'Content-Type' => 'application/json' }, [serialize_response(result)]]
