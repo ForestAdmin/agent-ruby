@@ -129,6 +129,7 @@ Style/MutableConstant:
     - 'packages/forest_admin_datasource_active_record/lib/forest_admin_datasource_active_record/version.rb'
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/version.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb'
+    - 'packages/forest_admin_datasource_mambu_payments/lib/forest_admin_datasource_mambu_payments/version.rb'
 
 # Offense count: 38
 # This cop supports safe autocorrection (--autocorrect).
