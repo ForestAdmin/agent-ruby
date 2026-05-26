@@ -31,15 +31,22 @@ module ForestAdminDatasourceRpc
       end
 
       # rubocop:disable Metrics/ParameterLists
-      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false,
-                   if_none_match: nil, with_response: false)
+      def call_rpc(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
+        resp = call_rpc_raw(endpoint, caller: caller, method: method, payload: payload,
+                                      symbolize_keys: symbolize_keys, if_none_match: if_none_match)
+        return resp if resp == NotModified
+
+        resp.body
+      end
+
+      def call_rpc_raw(endpoint, caller: nil, method: :get, payload: nil, symbolize_keys: false, if_none_match: nil)
         response = make_request(endpoint, caller: caller, method: method, payload: payload,
                                           symbolize_keys: symbolize_keys, if_none_match: if_none_match)
         return NotModified if response.status == HTTP_NOT_MODIFIED
 
         raise_appropriate_error(response) unless response.success?
 
-        with_response ? response : response.body
+        response
       end
       # rubocop:enable Metrics/ParameterLists
 

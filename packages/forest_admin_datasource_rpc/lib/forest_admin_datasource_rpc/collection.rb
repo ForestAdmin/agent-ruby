@@ -130,8 +130,8 @@ module ForestAdminDatasourceRpc
         "Forwarding '#{@name}' action #{name} call to the Rpc agent on #{url}."
       )
 
-      response = @client.call_rpc(url, caller: caller, method: :post, payload: params,
-                                       symbolize_keys: true, with_response: true)
+      response = @client.call_rpc_raw(url, caller: caller, method: :post, payload: params,
+                                           symbolize_keys: true)
 
       return build_file_result(response) if response.headers['x-forest-action-type'] == 'File'
 

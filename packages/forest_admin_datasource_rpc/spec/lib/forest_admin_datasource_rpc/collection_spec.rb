@@ -10,7 +10,7 @@ module ForestAdminDatasourceRpc
     let(:raw_response) do
       instance_double(Faraday::Response, body: {}, headers: {}, status: 200, success?: true)
     end
-    let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: {}) }
+    let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: {}, call_rpc_raw: raw_response) }
     let(:datasource) { Datasource.new({ uri: 'http://localhost' }, introspection) }
     let(:collection) { datasource.get_collection('Product') }
     let(:caller) { build_caller }
@@ -19,8 +19,6 @@ module ForestAdminDatasourceRpc
       logger = instance_double(Logger, log: nil)
       allow(ForestAdminAgent::Facades::Container).to receive_messages(logger: logger, cache: 'secret')
       allow(Utils::RpcClient).to receive(:new).and_return(rpc_client)
-      allow(rpc_client).to receive(:call_rpc)
-        .with(any_args, hash_including(with_response: true)).and_return(raw_response)
     end
 
     include_context 'with introspection'
@@ -275,12 +273,11 @@ module ForestAdminDatasourceRpc
         end
       end
 
-      it 'asks the RPC client to symbolize response keys so ActionResult.parse sees :type' do
+      it 'calls call_rpc_raw with symbolized keys so the response headers stay reachable' do
         collection.execute(caller, 'my_action', {})
 
-        expect(rpc_client).to have_received(:call_rpc) do |_url, options|
+        expect(rpc_client).to have_received(:call_rpc_raw) do |_url, options|
           expect(options[:symbolize_keys]).to be(true)
-          expect(options[:with_response]).to be(true)
         end
       end
 

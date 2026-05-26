@@ -97,23 +97,15 @@ module ForestAdminDatasourceRpc
 
           expect(result).to eq({})
         end
+      end
 
-        context 'when called with with_response: true' do
-          it 'returns the Faraday::Response object instead of the body' do
-            result = rpc_client.call_rpc('/rpc/test', method: :post, with_response: true)
+      describe '#call_rpc_raw' do
+        it 'returns the Faraday::Response object so callers can read headers' do
+          result = rpc_client.call_rpc_raw('/rpc/test', method: :post)
 
-            expect(result).to be(response)
-            expect(result.body).to eq({})
-            expect(result.headers).to eq(response_headers)
-          end
-        end
-
-        context 'when called without with_response (default)' do
-          it 'returns the response body for backward compatibility' do
-            result = rpc_client.call_rpc('/rpc/test', method: :post)
-
-            expect(result).to eq({})
-          end
+          expect(result).to be(response)
+          expect(result.body).to eq({})
+          expect(result.headers).to eq(response_headers)
         end
       end
 
