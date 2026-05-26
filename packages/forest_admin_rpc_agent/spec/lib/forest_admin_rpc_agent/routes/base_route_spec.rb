@@ -19,6 +19,20 @@ module ForestAdminRpcAgent
       end
     end
 
+    # Test route that returns a binary payload — emulates an action File result.
+    # The "%\xE2\xE3\xCF\xD3" prefix forces non-UTF8 bytes (the PDF binary marker),
+    # which is exactly what used to crash serialize_response.
+    class BinaryTestRoute < BaseRoute
+      def handle_request(_args)
+        {
+          status: 200,
+          headers: { 'Content-Type' => 'application/pdf' },
+          content: String.new("%PDF-1.4\n%\xE2\xE3\xCF\xD3\nbinary-body-bytes", encoding: 'ASCII-8BIT'),
+          raw: true
+        }
+      end
+    end
+
     describe BaseRoute do
       subject(:route) { TestRoute.new('/test', 'get', 'test_route') }
 
@@ -134,6 +148,43 @@ module ForestAdminRpcAgent
               as: 'test_route',
               route_alias: 'test_route'
             )
+          end
+        end
+
+        # Integration: exercises the handler proc that register_rails passes
+        # to router.match. This is the only place where binary action results
+        # actually hit Rack — unit tests that stub collection.execute return a
+        # Ruby Hash that never goes through serialize_response.
+        context 'when the handler returns a raw binary response (File action)' do
+          subject(:binary_route) { BinaryTestRoute.new('/binary', 'post', 'binary_test') }
+          let(:expected_bytes) do
+            String.new("%PDF-1.4\n%\xE2\xE3\xCF\xD3\nbinary-body-bytes", encoding: 'ASCII-8BIT')
+          end
+          let(:request) do
+            instance_double(
+              ActionDispatch::Request,
+              path_parameters: {}, query_parameters: {}, request_parameters: {}, env: {}
+            )
+          end
+
+          it 'passes the binary body to Rack untouched (no JSON encoding)' do
+            captured_handler = nil
+            allow(rails_router).to receive(:match) { |_, opts| captured_handler = opts[:to] }
+            binary_route.send(:register_rails, rails_router)
+
+            env = {
+              'REQUEST_METHOD' => 'POST',
+              'PATH_INFO' => '/binary',
+              'QUERY_STRING' => '',
+              'rack.input' => StringIO.new
+            }
+            status, response_headers, body = captured_handler.call(env)
+
+            expect(status).to eq(200)
+            expect(response_headers['Content-Type']).to eq('application/pdf')
+            expect(body).to be_an(Array)
+            expect(body.first).to eq(expected_bytes)
+            expect(body.first.encoding.name).to eq('ASCII-8BIT')
           end
         end
       end
