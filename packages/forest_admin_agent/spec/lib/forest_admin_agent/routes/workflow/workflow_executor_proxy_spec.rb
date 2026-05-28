@@ -51,6 +51,7 @@ module ForestAdminAgent
           response_for_request = fake_response
 
           allow(Faraday).to receive(:new).and_wrap_original do |original, *args, &block|
+            captured_state[:faraday_options] = args.first
             connection = original.call(*args, &block)
             allow(connection).to receive(:run_request) do |method, url, body, hdrs, &req_block|
               captured_params = {}
@@ -222,6 +223,22 @@ module ForestAdminAgent
             result = proxy.handle_request(:get, headers: headers, params: { 'run_id' => run_id })
             expect(result[:status]).to eq(422)
             expect(result[:content]).to eq('error' => 'invalid step')
+          end
+        end
+
+        describe 'Faraday timeouts' do
+          it 'applies a short timeout on GET requests' do
+            proxy.handle_request(:get, headers: headers, params: { 'run_id' => run_id })
+            expect(captured[:faraday_options]).to eq(request: { open_timeout: 2, timeout: 10 })
+          end
+
+          it 'applies a longer timeout on POST trigger requests' do
+            proxy.handle_request(
+              :post,
+              headers: headers,
+              params: { 'run_id' => run_id, 'data' => { 'step' => 'approve' } }
+            )
+            expect(captured[:faraday_options]).to eq(request: { open_timeout: 2, timeout: 120 })
           end
         end
 

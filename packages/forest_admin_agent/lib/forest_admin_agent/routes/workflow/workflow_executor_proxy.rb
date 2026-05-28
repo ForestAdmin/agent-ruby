@@ -10,6 +10,9 @@ module ForestAdminAgent
         EXECUTOR_PREFIX = '/runs'.freeze
         FORWARDED_HEADERS = %w[Authorization Cookie].freeze
         ROUTING_KEYS = %w[run_id route_alias controller action format].freeze
+        OPEN_TIMEOUT = 2
+        GET_TIMEOUT = 10
+        TRIGGER_TIMEOUT = 120
 
         def setup_routes
           return self unless executor_configured?
@@ -75,7 +78,7 @@ module ForestAdminAgent
           body = forwarded_body(method, args[:params])
           target_url = "#{base_url}#{path}"
 
-          client = build_client
+          client = build_client(timeout_for(method))
           client.run_request(method, target_url, body, headers) do |req|
             req.params.update(query) unless query.empty?
           end
@@ -85,8 +88,12 @@ module ForestAdminAgent
           raise Http::Exceptions::ServiceUnavailableError.new('Workflow executor unreachable', cause: e)
         end
 
-        def build_client
-          Faraday.new do |f|
+        def timeout_for(method)
+          method == :get ? GET_TIMEOUT : TRIGGER_TIMEOUT
+        end
+
+        def build_client(request_timeout)
+          Faraday.new(request: { open_timeout: OPEN_TIMEOUT, timeout: request_timeout }) do |f|
             f.request :json
             f.response :json, content_type: /\bjson$/
             f.adapter Faraday.default_adapter
