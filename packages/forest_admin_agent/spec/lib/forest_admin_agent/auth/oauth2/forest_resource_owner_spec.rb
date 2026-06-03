@@ -41,7 +41,7 @@ module ForestAdminAgent
               'role' => 'role',
               'tags' => ['tag'],
               'rendering_id' => '10',
-              'exp' => forest_resource_owner.expiration_in_seconds.to_s,
+              'exp' => forest_resource_owner.expiration_in_seconds,
               'permission_level' => 'permission_level'
             }
 

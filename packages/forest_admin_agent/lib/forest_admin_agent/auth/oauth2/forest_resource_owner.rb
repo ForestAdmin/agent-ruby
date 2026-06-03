@@ -16,7 +16,7 @@ module ForestAdminAgent
         end
 
         def expiration_in_seconds
-          Time.now.to_i + 1.hour
+          (Time.now + 1.hour).to_i
         end
 
         def make_jwt
