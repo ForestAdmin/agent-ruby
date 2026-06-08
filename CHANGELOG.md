@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.7...v1.31.0) (2026-06-08)
+
+
+### Features
+
+* **agent:** add workflow executor proxy routes ([#293](https://github.com/ForestAdmin/agent-ruby/issues/293)) ([7adf991](https://github.com/ForestAdmin/agent-ruby/commit/7adf9918c2e5c7cdb28fe8715ccfbf8cd08827a9))
+
 ## [1.30.7](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.6...v1.30.7) (2026-05-26)
 
 
