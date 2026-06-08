@@ -24,11 +24,6 @@ module ForestAdminRails
 
     extend ActiveSupport::Concern
 
-    initializer 'forest_admin_rails.add_autoload_paths', before: :set_autoload_paths do |app|
-      lib_path = Rails.root.join('lib')
-      app.config.autoload_paths << lib_path unless app.config.autoload_paths.frozen?
-    end
-
     initializer 'forest_admin_rails.error_subscribe' do
       Rails.error.subscribe(ForestAdminErrorSubscriber.new)
     end
@@ -49,16 +44,20 @@ module ForestAdminRails
       # force eager loading models
       Rails.application.eager_load!
 
+      require create_agent_path.to_s
+
       setup_agent_and_cache_routes
 
       sse = ForestAdminAgent::Services::SSECacheInvalidation
       sse.run if ForestAdminRails.config[:instant_cache_refresh]
     end
 
-    def create_agent_file_exists?
-      path = Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+    def create_agent_path
+      Rails.root.join('lib', 'forest_admin_rails', 'create_agent.rb')
+    end
 
-      File.exist?(path)
+    def create_agent_file_exists?
+      File.exist?(create_agent_path)
     end
 
     def setup_agent_and_cache_routes

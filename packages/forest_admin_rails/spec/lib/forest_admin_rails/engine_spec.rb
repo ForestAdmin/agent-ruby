@@ -271,4 +271,100 @@ module ForestAdminRails
       end
     end
   end
+
+  RSpec.describe 'Engine autoload behaviour' do
+    it 'does not register an initializer that adds the host lib/ to autoload_paths' do
+      initializer_names = ForestAdminRails::Engine.initializers.map(&:name)
+
+      expect(initializer_names).not_to include('forest_admin_rails.add_autoload_paths')
+    end
+  end
+
+  RSpec.describe 'Engine#create_agent_path' do
+    let(:engine_instance) { ForestAdminRails::Engine.allocate }
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new('/app'))
+    end
+
+    it 'points to lib/forest_admin_rails/create_agent.rb under Rails.root' do
+      expect(engine_instance.create_agent_path.to_s).to eq('/app/lib/forest_admin_rails/create_agent.rb')
+    end
+  end
+
+  RSpec.describe 'Engine#create_agent_file_exists?' do
+    let(:engine_instance) { ForestAdminRails::Engine.allocate }
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new('/app'))
+    end
+
+    it 'returns true when the host create_agent.rb exists' do
+      allow(File).to receive(:exist?).with(engine_instance.create_agent_path).and_return(true)
+
+      expect(engine_instance.create_agent_file_exists?).to be true
+    end
+
+    it 'returns false when the host create_agent.rb is absent' do
+      allow(File).to receive(:exist?).with(engine_instance.create_agent_path).and_return(false)
+
+      expect(engine_instance.create_agent_file_exists?).to be false
+    end
+  end
+
+  RSpec.describe 'Engine#load_configuration' do
+    let(:engine_instance) { ForestAdminRails::Engine.allocate }
+
+    before do
+      allow(Rails).to receive(:root).and_return(Pathname.new('/app'))
+      allow(engine_instance).to receive(:require)
+      allow(engine_instance).to receive(:setup_agent_and_cache_routes)
+    end
+
+    context 'when no web server is running' do
+      before { allow(engine_instance).to receive(:running_web_server?).and_return(false) }
+
+      it 'does not load the host create_agent.rb nor run the setup' do
+        engine_instance.load_configuration
+
+        expect(engine_instance).not_to have_received(:require)
+        expect(engine_instance).not_to have_received(:setup_agent_and_cache_routes)
+      end
+    end
+
+    context 'when the host create_agent.rb is absent' do
+      before do
+        allow(engine_instance).to receive_messages(running_web_server?: true, create_agent_file_exists?: false)
+      end
+
+      it 'does not load it nor run the setup' do
+        engine_instance.load_configuration
+
+        expect(engine_instance).not_to have_received(:require)
+        expect(engine_instance).not_to have_received(:setup_agent_and_cache_routes)
+      end
+    end
+
+    context 'when a web server is running and the host create_agent.rb exists' do
+      # rubocop:disable RSpec/VerifiedDoubles
+      let(:application) { double('application', eager_load!: nil) }
+      # rubocop:enable RSpec/VerifiedDoubles
+
+      before do
+        allow(engine_instance).to receive_messages(running_web_server?: true, create_agent_file_exists?: true)
+        allow(Rails).to receive(:application).and_return(application)
+        ForestAdminAgent::Services.const_set(:SSECacheInvalidation, Class.new)
+        without_partial_double_verification do
+          allow(ForestAdminRails).to receive(:config).and_return({})
+        end
+      end
+
+      it 'requires the host create_agent.rb explicitly, then runs the setup' do
+        engine_instance.load_configuration
+
+        expect(engine_instance).to have_received(:require).with('/app/lib/forest_admin_rails/create_agent.rb')
+        expect(engine_instance).to have_received(:setup_agent_and_cache_routes)
+      end
+    end
+  end
 end
