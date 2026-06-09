@@ -53,6 +53,6 @@ admin work on any Ruby application."
   spec.add_dependency "mono_logger", "~> 1.1"
   spec.add_dependency "openid_connect", "~> 2.2"
   spec.add_dependency "rake", "~> 13.0"
-  spec.add_dependency "rack-cors", "~> 2.0"
+  spec.add_dependency "rack-cors", "~> 3.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
 end
