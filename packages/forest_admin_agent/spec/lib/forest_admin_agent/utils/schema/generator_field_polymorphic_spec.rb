@@ -86,7 +86,8 @@ module ForestAdminAgent
                   isSortable: false,
                   isVirtual: false,
                   validations: [],
-                  polymorphic_referenced_models: %w[User Order]
+                  polymorphic_referenced_models: %w[User Order],
+                  foreign_key_type_field: 'addressable_type'
                 }
               )
             end

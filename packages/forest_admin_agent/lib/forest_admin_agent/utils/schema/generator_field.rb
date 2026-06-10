@@ -165,7 +165,8 @@ module ForestAdminAgent
                 isSortable: false,
                 validations: [],
                 reference: "#{base_schema[:field]}.id",
-                polymorphic_referenced_models: relation.foreign_collections
+                polymorphic_referenced_models: relation.foreign_collections,
+                foreign_key_type_field: relation.foreign_key_type_field
               }
             )
           end
