@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.31.0...v1.32.0) (2026-06-10)
+
+
+### Features
+
+* **schema:** expose foreign_key_type_field on polymorphic relation ([#316](https://github.com/ForestAdmin/agent-ruby/issues/316)) ([157af7e](https://github.com/ForestAdmin/agent-ruby/commit/157af7e3001c3df7d3f5a3ad0d1d4a17f550d4d5))
+
 # [1.31.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.30.7...v1.31.0) (2026-06-08)
 
 
