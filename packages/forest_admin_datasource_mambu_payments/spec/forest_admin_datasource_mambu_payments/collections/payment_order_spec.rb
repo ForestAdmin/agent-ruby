@@ -119,7 +119,7 @@ module ForestAdminDatasourceMambuPayments
         collection.list(nil, filter, ['id'])
 
         expect(client).to have_received(:list_payment_orders)
-          .with(hash_including('connected_account_id' => 'acc1', page: 1))
+          .with(hash_including('connected_account_id' => 'acc1'))
       end
 
       it 'forwards receiving_account_id as external_account_id (Numeral list param)' do

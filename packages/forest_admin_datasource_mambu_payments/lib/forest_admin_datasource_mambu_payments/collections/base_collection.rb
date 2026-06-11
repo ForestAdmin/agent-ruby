@@ -102,7 +102,7 @@ module ForestAdminDatasourceMambuPayments
         ids = extract_id_lookup(filter.condition_tree)
         return fetch_by_ids(ids) if ids
 
-        fetch_page(filter.page, translate_filters(filter.condition_tree))
+        paginate(filter.page, translate_filters(filter.condition_tree))
       end
 
       # Resolves a set of ids via the per-id `find_*` endpoint. Numeral has no
@@ -115,29 +115,35 @@ module ForestAdminDatasourceMambuPayments
         ids.filter_map { |id| client_find(id) }
       end
 
-      def fetch_page(page, params)
-        return fetch_window(page, params) if page&.limit && page.limit > Client::MAX_PER_PAGE
+      # Numeral paginates with a `starting_after` cursor (the id of the last seen
+      # record) plus a `limit` capped at MAX_PER_PAGE — it has no offset/page
+      # parameter. Forest, however, asks for an [offset, offset + limit) window,
+      # so we walk forward in cursor pages until the window is covered, then
+      # slice. The first page of a small list is a single request.
+      def paginate(page, params)
+        offset = page&.offset.to_i
+        limit  = page&.limit
+        limit  = Client::MAX_PER_PAGE if limit.nil? || limit <= 0
+        needed = offset + limit
 
-        page_num, per_page = translate_page(page)
-        client_list(**params, page: page_num, limit: per_page)
+        collected = []
+        cursor = nil
+        loop do
+          chunk = [needed - collected.size, Client::MAX_PER_PAGE].min
+          page_params = params.merge(limit: chunk)
+          page_params[:starting_after] = cursor if cursor
+          batch = client_list(**page_params)
+          collected.concat(batch)
+          break if batch.size < chunk || collected.size >= needed
+
+          cursor = record_id(batch.last)
+          break if cursor.to_s.empty?
+        end
+        collected[offset, limit] || []
       end
 
-      # Fetches a window larger than one API page by walking successive pages of
-      # MAX_PER_PAGE and slicing to the requested [offset, offset + limit) range.
-      def fetch_window(page, params)
-        offset = page.offset.to_i
-        limit  = page.limit.to_i
-        start  = offset % Client::MAX_PER_PAGE
-        page_num = (offset / Client::MAX_PER_PAGE) + 1
-        collected = []
-        loop do
-          batch = client_list(**params, page: page_num, limit: Client::MAX_PER_PAGE)
-          collected.concat(batch)
-          break if batch.size < Client::MAX_PER_PAGE || collected.size >= start + limit
-
-          page_num += 1
-        end
-        collected[start, limit] || []
+      def record_id(record)
+        attrs_of(record)['id']
       end
 
       def count_records(filter)
@@ -181,14 +187,6 @@ module ForestAdminDatasourceMambuPayments
         # column the caller did not ask for.
         wanted = Array(projection).map(&:to_s).reject { |p| p.include?(':') }
         wanted.to_h { |k| [k, record[k]] }
-      end
-
-      def translate_page(page)
-        return [1, Client::MAX_PER_PAGE] if page.nil?
-
-        per_page = page.limit&.positive? ? [page.limit, Client::MAX_PER_PAGE].min : Client::MAX_PER_PAGE
-        page_num = (page.offset.to_i / per_page) + 1
-        [page_num, per_page]
       end
 
       def ids_for(caller, filter)

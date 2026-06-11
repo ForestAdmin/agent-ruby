@@ -135,7 +135,7 @@ module ForestAdminDatasourceMambuPayments
         collection.list(nil, filter, ['id'])
 
         expect(client).to have_received(:list_reconciliations)
-          .with(hash_including('transaction_id' => 'tx1', page: 1))
+          .with(hash_including('transaction_id' => 'tx1'))
       end
 
       it 'forwards payment_id, payment_type and match_type filters to the API' do

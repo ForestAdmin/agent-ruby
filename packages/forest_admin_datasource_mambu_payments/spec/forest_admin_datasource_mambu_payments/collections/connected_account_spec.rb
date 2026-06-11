@@ -84,7 +84,7 @@ module ForestAdminDatasourceMambuPayments
         rows = collection.list(nil, Filter.new, ['id', 'name'])
 
         expect(rows).to eq([{ 'id' => 'b6425af8', 'name' => 'SEPA Indirect' }])
-        expect(client).to have_received(:list_connected_accounts).with(page: 1, limit: Client::MAX_PER_PAGE)
+        expect(client).to have_received(:list_connected_accounts).with(limit: Client::MAX_PER_PAGE)
       end
 
       it 'drops 404 (nil) records from the result' do

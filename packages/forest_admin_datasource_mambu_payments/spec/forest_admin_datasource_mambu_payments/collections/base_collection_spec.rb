@@ -66,21 +66,47 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
-    describe '#translate_page' do
-      it 'defaults to page 1 / MAX_PER_PAGE when no page is given' do
-        expect(collection.send(:translate_page, nil))
-          .to eq([1, ForestAdminDatasourceMambuPayments::Client::MAX_PER_PAGE])
+    describe '#paginate (Numeral cursor pagination)' do
+      let(:client) { instance_double(ForestAdminDatasourceMambuPayments::Client) }
+      let(:page_class) { ForestAdminDatasourceToolkit::Components::Query::Page }
+
+      before { allow(datasource).to receive(:client).and_return(client) }
+
+      it 'fetches a single page sized to the request when it fits in one window' do
+        allow(client).to receive(:list_connected_accounts).with(limit: 15).and_return(Array.new(15) { {} })
+
+        collection.send(:paginate, page_class.new(offset: 0, limit: 15), {})
+
+        expect(client).to have_received(:list_connected_accounts).with(limit: 15).once
       end
 
-      it 'computes page number from offset / limit' do
-        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(limit: 10, offset: 20)
-        expect(collection.send(:translate_page, page)).to eq([3, 10])
+      it 'never asks Numeral for more than MAX_PER_PAGE in one call' do
+        first = Array.new(100) { |i| { 'id' => "a#{i}" } }
+        second = Array.new(50) { |i| { 'id' => "b#{i}" } }
+        allow(client).to receive(:list_connected_accounts).with(limit: 100).and_return(first)
+        allow(client).to receive(:list_connected_accounts).with(limit: 50, starting_after: 'a99').and_return(second)
+
+        rows = collection.send(:paginate, page_class.new(offset: 0, limit: 150), {})
+
+        expect(rows.size).to eq(150)
+        expect(rows.last['id']).to eq('b49')
       end
 
-      it 'caps the limit at MAX_PER_PAGE' do
-        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(limit: 999, offset: 0)
-        _, per_page = collection.send(:translate_page, page)
-        expect(per_page).to eq(ForestAdminDatasourceMambuPayments::Client::MAX_PER_PAGE)
+      it 'walks the cursor to reach a non-zero offset and slices the window' do
+        first = Array.new(100) { |i| { 'id' => "a#{i}" } }
+        second = Array.new(20) { |i| { 'id' => "b#{i}" } }
+        allow(client).to receive(:list_connected_accounts).with(limit: 100).and_return(first)
+        allow(client).to receive(:list_connected_accounts).with(limit: 20, starting_after: 'a99').and_return(second)
+
+        rows = collection.send(:paginate, page_class.new(offset: 110, limit: 10), {})
+
+        expect(rows.map { |r| r['id'] }).to eq(%w[b10 b11 b12 b13 b14 b15 b16 b17 b18 b19])
+      end
+
+      it 'defaults to one MAX_PER_PAGE window when no page is given' do
+        allow(client).to receive(:list_connected_accounts).with(limit: 100).and_return([])
+        collection.send(:paginate, nil, {})
+        expect(client).to have_received(:list_connected_accounts).with(limit: 100)
       end
     end
 
@@ -222,26 +248,6 @@ module ForestAdminDatasourceMambuPayments
                                                                                groups: [{ field: 'id' }])
         expect { collection.aggregate(nil, filter, agg) }
           .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
-      end
-    end
-
-    describe '#fetch_page over a window larger than one API page' do
-      let(:client) { instance_double(ForestAdminDatasourceMambuPayments::Client) }
-      let(:page_class) { ForestAdminDatasourceToolkit::Components::Query::Page }
-
-      before { allow(datasource).to receive(:client).and_return(client) }
-
-      it 'walks successive pages and slices to the requested [offset, offset + limit)' do
-        full_page = Array.new(100) { |i| { 'id' => "p1-#{i}" } }
-        second_page = Array.new(100) { |i| { 'id' => "p2-#{i}" } }
-        allow(client).to receive(:list_connected_accounts).with(page: 1, limit: 100).and_return(full_page)
-        allow(client).to receive(:list_connected_accounts).with(page: 2, limit: 100).and_return(second_page)
-
-        rows = collection.send(:fetch_page, page_class.new(offset: 0, limit: 150), {})
-
-        expect(rows.size).to eq(150)
-        expect(rows.first['id']).to eq('p1-0')
-        expect(rows.last['id']).to eq('p2-49')
       end
     end
   end

@@ -139,7 +139,7 @@ module ForestAdminDatasourceMambuPayments
         collection.list(nil, filter, ['id'])
 
         expect(client).to have_received(:list_returns)
-          .with(hash_including('related_payment_id' => 'ip1', page: 1))
+          .with(hash_including('related_payment_id' => 'ip1'))
       end
 
       it 'forwards status and connected_account_id filters to the API' do

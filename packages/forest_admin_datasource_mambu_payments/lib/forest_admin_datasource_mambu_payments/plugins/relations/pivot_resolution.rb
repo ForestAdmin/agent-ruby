@@ -28,7 +28,11 @@ module ForestAdminDatasourceMambuPayments
         # navigation actually emits.
         SUPPORTED_OPS = [Operators::EQUAL, Operators::IN].freeze
 
-        PAGE_SIZE = 100
+        # Upper bound on resolved ids. The host collection walks Numeral's cursor
+        # pages under the hood; we ask for one large window so it fetches them all
+        # in O(n / page) rather than re-walking per offset. A relation resolving
+        # to more than this is logged rather than silently truncated.
+        MAX_RESOLVED = 10_000
 
         module_function
 
@@ -45,25 +49,23 @@ module ForestAdminDatasourceMambuPayments
           ConditionTreeBranch.new('And', leaves)
         end
 
-        # Lists every row of `collection_name` matching `condition_tree`, paging
-        # until the result is exhausted, and returns the unique non-empty values
-        # of `field` (handles both scalar columns and array columns such as
-        # InternalAccount.connected_account_ids).
+        # Lists every row of `collection_name` matching `condition_tree` and
+        # returns the unique non-empty values of `field` (handles both scalar
+        # columns and array columns such as InternalAccount.connected_account_ids).
+        # One large-window request lets the collection's cursor pagination fetch
+        # all matching rows in a single forward walk.
         def collect(context, collection_name, condition_tree, field)
-          collection = context.datasource.get_collection(collection_name)
-          offset = 0
-          values = []
-          loop do
-            rows = collection.list(
-              Filter.new(condition_tree: condition_tree, page: Page.new(offset: offset, limit: PAGE_SIZE)),
-              Projection.new([field])
+          rows = context.datasource.get_collection(collection_name).list(
+            Filter.new(condition_tree: condition_tree, page: Page.new(offset: 0, limit: MAX_RESOLVED)),
+            Projection.new([field])
+          )
+          if rows.size >= MAX_RESOLVED
+            ForestAdminDatasourceMambuPayments.logger.warn(
+              "[forest_admin_datasource_mambu_payments] #{collection_name} relation resolution hit the " \
+              "#{MAX_RESOLVED}-row cap on '#{field}'; results may be truncated."
             )
-            values.concat(rows.flat_map { |row| Array(row[field]) })
-            break if rows.size < PAGE_SIZE
-
-            offset += PAGE_SIZE
           end
-          values.compact.reject { |v| v.to_s.empty? }.uniq
+          rows.flat_map { |row| Array(row[field]) }.compact.reject { |v| v.to_s.empty? }.uniq
         end
       end
     end

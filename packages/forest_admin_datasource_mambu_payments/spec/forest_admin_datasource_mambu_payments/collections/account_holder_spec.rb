@@ -73,7 +73,7 @@ module ForestAdminDatasourceMambuPayments
         rows = collection.list(nil, Filter.new, %w[id name])
 
         expect(rows).to eq([{ 'id' => holder['id'], 'name' => holder['name'] }])
-        expect(client).to have_received(:list_account_holders).with(page: 1, limit: Client::MAX_PER_PAGE)
+        expect(client).to have_received(:list_account_holders).with(limit: Client::MAX_PER_PAGE)
       end
     end
 
