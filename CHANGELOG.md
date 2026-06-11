@@ -1,3 +1,10 @@
+## [1.32.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.32.0...v1.32.1) (2026-06-11)
+
+
+### Bug Fixes
+
+* **rails:** load create_agent.rb explicitly instead of autoloading the whole lib/ ([#314](https://github.com/ForestAdmin/agent-ruby/issues/314)) ([f870ee1](https://github.com/ForestAdmin/agent-ruby/commit/f870ee16b331aeec6424f38d746051f3902aada9))
+
 # [1.32.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.31.0...v1.32.0) (2026-06-10)
 
 
