@@ -4,18 +4,14 @@ module ForestAdminDatasourceMambuPayments
     class InternalAccount < BaseCollection
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
 
+      client_resource :internal_account
+
       def initialize(datasource)
         super(datasource, 'MambuInternalAccount')
         define_schema
         define_relations
+        reconcile_filter_operators!
         enable_count
-      end
-
-      def list(caller, filter, projection)
-        records = fetch_records(caller, filter)
-        rows = records.map { |r| project(serialize(r), projection) }
-        embed_relations(rows, records, projection)
-        rows
       end
 
       def create(_caller, data)
@@ -69,105 +65,63 @@ module ForestAdminDatasourceMambuPayments
 
       protected
 
-      def aggregate_count(caller, filter)
-        list(caller, filter, ['id']).size
-      end
-
-      private
-
-      def fetch_records(_caller, filter)
-        ids = extract_id_lookup(filter.condition_tree)
-        return ids.filter_map { |id| datasource.client.find_internal_account(id) } if ids
-
-        page, per_page = translate_page(filter.page)
-        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
-        datasource.client.list_internal_accounts(**params)
-      end
-
-      def api_filters
+      def collection_filters
         {
           'account_holder_id' => { ops: [Operators::EQUAL, Operators::IN] }
         }
       end
 
-      def build_payload(data)
-        attrs = data.transform_keys(&:to_s)
-        %w[id object status status_details created_at bank_data].each { |k| attrs.delete(k) }
-        attrs
+      def many_to_one_embeds
+        [
+          { foreign_key: 'account_holder_id', relation_name: 'account_holder',
+            collection: 'MambuAccountHolder' }
+        ]
       end
 
-      def embed_relations(rows, records, projection)
-        sources = records.map { |r| attrs_of(r) }
-        ah = datasource.get_collection('MambuAccountHolder')
-        embed_many_to_one(
-          rows, sources, projection,
-          foreign_key: 'account_holder_id', relation_name: 'account_holder',
-          fetcher: ->(id) { datasource.client.find_account_holder(id) },
-          serializer: ->(raw) { ah.serialize(raw) }
-        )
-      end
+      private
 
       def define_schema
-        add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                         is_primary_key: true, is_read_only: true, is_sortable: true))
-        add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: false))
-        add_field('status', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: true))
-        add_field('status_details', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: true, is_sortable: false))
-        add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
-        add_field('name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
-        add_field('holder_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                  is_read_only: false, is_sortable: false))
-        add_field('alternative_holder_names', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                               is_read_only: false, is_sortable: false))
-        add_field('connected_account_ids', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                            is_read_only: false, is_sortable: false))
-        add_field('account_number', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: false, is_sortable: false))
-        add_field('account_number_format', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                            is_read_only: false, is_sortable: false))
-        add_field('bank_code', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
-        add_field('bank_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
-        add_field('bank_address', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                   is_read_only: false, is_sortable: false))
-        add_field('bank_code_format', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: false, is_sortable: false))
-        add_field('holder_address', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                     is_read_only: false, is_sortable: false))
-        add_field('account_holder_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                        is_read_only: false, is_sortable: true))
-        add_field('creditor_identifier', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                          is_read_only: false, is_sortable: false))
-        add_field('organization_identification', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                                  is_read_only: false, is_sortable: false))
-        add_field('customer_bic', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                   is_read_only: false, is_sortable: false))
-        add_field('distinguished_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                         is_read_only: false, is_sortable: false))
-        add_field('currencies', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                 is_read_only: false, is_sortable: false))
-        add_field('cbs_source', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                 is_read_only: false, is_sortable: false))
-        add_field('cbs_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: false, is_sortable: false))
-        add_field('cbs_account_type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                       is_read_only: false, is_sortable: false))
-        add_field('synchronized_with_bank', ColumnSchema.new(column_type: 'Boolean', filter_operators: BOOL_OPS,
-                                                             is_read_only: false, is_sortable: false))
-        add_field('metadata', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                               is_read_only: false, is_sortable: false))
-        add_field('bank_data', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                is_read_only: true, is_sortable: false))
-        add_field('custom_fields', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                    is_read_only: false, is_sortable: false))
-        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                 is_read_only: true, is_sortable: true))
+        add_field('id', ColumnSchema.new(column_type: 'String', is_primary_key: true,
+                                         is_read_only: true, is_sortable: true))
+        add_field('object', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('status', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: true))
+        add_field('status_details', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('type', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: true))
+        add_field('name', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: true))
+        add_field('holder_name', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('alternative_holder_names', ColumnSchema.new(column_type: 'Json', is_read_only: false,
+                                                               is_sortable: false))
+        add_field('connected_account_ids', ColumnSchema.new(column_type: 'Json', is_read_only: false,
+                                                            is_sortable: false))
+        add_field('account_number', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('account_number_format', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                            is_sortable: false))
+        add_field('bank_code', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('bank_name', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('bank_address', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('bank_code_format', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                       is_sortable: false))
+        add_field('holder_address', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('account_holder_id', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                        is_sortable: true))
+        add_field('creditor_identifier', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                          is_sortable: false))
+        add_field('organization_identification', ColumnSchema.new(column_type: 'Json', is_read_only: false,
+                                                                  is_sortable: false))
+        add_field('customer_bic', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('distinguished_name', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                         is_sortable: false))
+        add_field('currencies', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('cbs_source', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('cbs_account_id', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('cbs_account_type', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                       is_sortable: false))
+        add_field('synchronized_with_bank', ColumnSchema.new(column_type: 'Boolean', is_read_only: false,
+                                                             is_sortable: false))
+        add_field('metadata', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('bank_data', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('custom_fields', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', is_read_only: true, is_sortable: true))
       end
 
       def define_relations
@@ -180,5 +134,4 @@ module ForestAdminDatasourceMambuPayments
     end
   end
 end
-
 # rubocop:enable Metrics/ClassLength, Metrics/MethodLength

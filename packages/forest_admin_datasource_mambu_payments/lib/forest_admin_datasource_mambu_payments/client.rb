@@ -1,4 +1,5 @@
 module ForestAdminDatasourceMambuPayments
+  # rubocop:disable Metrics/ClassLength
   class Client
     include Reads
     include Writes
@@ -18,10 +19,22 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
+    # Server-side count. Numeral list responses carry a `total` field, so we
+    # ask for a single record and read the total off the envelope rather than
+    # materializing (and capping at one page of) the whole collection.
+    def count_resource(path, params = {})
+      must_succeed("count(#{path})") do
+        body = connection.get(path, normalize_params(params.merge(limit: 1))).body
+        extract_total(body, path)
+      end
+    end
+
     def get_resource(path, id)
       extract_record(connection.get("#{path}/#{id}").body)
     rescue Faraday::ResourceNotFound
       nil
+    rescue Faraday::Error => e
+      raise api_error("get(#{path}/#{id})", e)
     rescue StandardError => e
       raise APIError, "Mambu Payments API call failed: get(#{path}/#{id}): #{e.class}: #{e.message}"
     end
@@ -76,6 +89,14 @@ module ForestAdminDatasourceMambuPayments
       body
     end
 
+    # Reads the `total` count off a list envelope, falling back to the size of
+    # the returned records when the API omits it (e.g. an array body).
+    def extract_total(body, path)
+      return body['total'].to_i if body.is_a?(Hash) && body.key?('total')
+
+      extract_records(body, path).size
+    end
+
     def delete_resource(path, id)
       must_succeed("delete(#{path}/#{id})") do
         connection.delete("#{path}/#{id}")
@@ -89,8 +110,47 @@ module ForestAdminDatasourceMambuPayments
 
     def must_succeed(operation)
       yield
+    rescue Faraday::Error => e
+      raise api_error(operation, e)
     rescue StandardError => e
       raise APIError, "Mambu Payments API call failed: #{operation}: #{e.class}: #{e.message}"
+    end
+
+    # Builds an APIError that preserves the HTTP status and the API's own error
+    # body. Numeral returns structured validation errors (e.g. on a 422), which
+    # smart actions surface to the operator instead of a generic failure string.
+    def api_error(operation, error)
+      response = error.respond_to?(:response) ? error.response : nil
+      status = response.is_a?(Hash) ? response[:status] : nil
+      body   = response.is_a?(Hash) ? response[:body] : nil
+      detail = error_detail(status, body) || "#{error.class}: #{error.message}"
+      APIError.new("Mambu Payments API call failed: #{operation}: #{detail}", status: status, body: parse_body(body))
+    end
+
+    def error_detail(status, body)
+      return nil unless status
+
+      ["HTTP #{status}", error_message(parse_body(body))].compact.join(' ').strip
+    end
+
+    # Pulls the human-readable message out of the common Numeral error shapes
+    # ({ "error": { "message": ... } }, { "errors": [...] }, { "message": ... }).
+    def error_message(parsed)
+      return parsed.to_s[0, 500] unless parsed.is_a?(Hash)
+
+      message = parsed.dig('error', 'message') || parsed['message'] || parsed['detail']
+      message ||= Array(parsed['errors']).filter_map do |e|
+        e.is_a?(Hash) ? (e['message'] || e['detail']) : e
+      end.join('; ')
+      (message.to_s.empty? ? parsed.to_json : message)[0, 500]
+    end
+
+    def parse_body(body)
+      return body unless body.is_a?(String) && !body.empty?
+
+      JSON.parse(body)
+    rescue JSON::ParserError
+      body
     end
 
     def best_effort(operation, default:)
@@ -117,4 +177,5 @@ module ForestAdminDatasourceMambuPayments
       end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

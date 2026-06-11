@@ -21,11 +21,7 @@ module ForestAdminDatasourceMambuPayments
         ONE_TO_MANY_NAME        = 'direct_debit_mandates'.freeze
 
         def run(datasource_customizer, _collection_customizer = nil, _options = {})
-          unless datasource_customizer
-            raise ArgumentError,
-                  'LinkAccountHolderToDirectDebitMandates must be installed at the datasource level ' \
-                  'via @agent.use(plugin, {})'
-          end
+          Plugins::Helpers.require_datasource!(datasource_customizer, self.class)
 
           datasource_customizer.customize_collection(DIRECT_DEBIT_MANDATE) do |c|
             c.import_field(FK_NAME, path: IMPORT_PATH, readonly: true)

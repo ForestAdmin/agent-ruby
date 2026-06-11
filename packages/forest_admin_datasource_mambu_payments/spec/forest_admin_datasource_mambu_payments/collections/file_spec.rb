@@ -114,8 +114,8 @@ module ForestAdminDatasourceMambuPayments
     end
 
     describe '#aggregate Count' do
-      it 'counts via list with a minimal projection' do
-        allow(client).to receive(:list_files).and_return([file_record, file_record])
+      it 'counts via the server-side total' do
+        allow(client).to receive(:count_files).and_return(2)
         result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
         expect(result.first['value']).to eq(2)
       end

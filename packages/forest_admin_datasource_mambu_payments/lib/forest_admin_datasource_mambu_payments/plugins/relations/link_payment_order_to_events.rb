@@ -19,11 +19,7 @@ module ForestAdminDatasourceMambuPayments
         EVENT         = 'MambuEvent'.freeze
 
         def run(datasource_customizer, _collection_customizer = nil, _options = {})
-          unless datasource_customizer
-            raise ArgumentError,
-                  'LinkPaymentOrderToEvents must be installed at the datasource level ' \
-                  'via @agent.use(plugin, {})'
-          end
+          Plugins::Helpers.require_datasource!(datasource_customizer, self.class)
 
           datasource_customizer.customize_collection(PAYMENT_ORDER) do |c|
             c.add_one_to_many_relation('events', EVENT,

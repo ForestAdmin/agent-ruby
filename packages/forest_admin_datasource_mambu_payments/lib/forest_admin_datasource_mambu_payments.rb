@@ -12,7 +12,19 @@ module ForestAdminDatasourceMambuPayments
   class Error < StandardError; end
   class ConfigurationError < Error; end
   class UnsupportedOperatorError < Error; end
-  class APIError < Error; end
+
+  # Raised when a Numeral API call fails. Carries the HTTP status and the
+  # (parsed) response body so callers — smart actions in particular — can
+  # surface the API's own validation message instead of a generic string.
+  class APIError < Error
+    attr_reader :status, :body
+
+    def initialize(message, status: nil, body: nil)
+      super(message)
+      @status = status
+      @body = body
+    end
+  end
 
   class << self
     attr_writer :logger

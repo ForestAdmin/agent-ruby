@@ -52,7 +52,6 @@ module ForestAdminDatasourceMambuPayments
           'connected_account_id', 'internal_account_id', 'external_account_id',
           'direction', 'amount_from', 'amount_to', 'currency',
           'start_date', 'end_date', 'descriptions',
-          'internal_account_snapshot', 'external_account_snapshot',
           'reconciliation_status', 'reconciled_amount',
           'custom_fields', 'metadata',
           'created_at', 'updated_at', 'canceled_at'
@@ -61,9 +60,12 @@ module ForestAdminDatasourceMambuPayments
 
       it 'does not expose fields that are absent from the Numeral payload' do
         keys = collection.schema[:fields].keys
+        # The account data is exposed through the ManyToOne relations, not as
+        # embedded snapshot columns (single source of truth, like Transaction).
         %w[amount amount_min amount_max status type reference end_to_end_id
            expected_at earliest_expected_at latest_expected_at
-           counterparty matched_amount matched_payments].each do |k|
+           counterparty matched_amount matched_payments
+           internal_account_snapshot external_account_snapshot].each do |k|
           expect(keys).not_to include(k), "schema unexpectedly exposes #{k}"
         end
       end
@@ -81,17 +83,14 @@ module ForestAdminDatasourceMambuPayments
         expect(f['direction'].enum_values).to contain_exactly('debit', 'credit')
       end
 
-      it 'keeps account snapshots and descriptions as Json' do
+      it 'keeps descriptions as Json' do
         f = collection.schema[:fields]
-        %w[internal_account_snapshot external_account_snapshot descriptions].each do |k|
-          expect(f[k].column_type).to eq('Json')
-        end
+        expect(f['descriptions'].column_type).to eq('Json')
       end
 
-      it 'marks reconciliation outcome, snapshots and timestamps as read-only' do
+      it 'marks reconciliation outcome and timestamps as read-only' do
         f = collection.schema[:fields]
         %w[id object reconciliation_status reconciled_amount
-           internal_account_snapshot external_account_snapshot
            created_at updated_at canceled_at].each do |k|
           expect(f[k].is_read_only).to be(true), "#{k} should be read-only"
         end
@@ -99,20 +98,17 @@ module ForestAdminDatasourceMambuPayments
     end
 
     describe '#list' do
-      it 'serializes amount_from/to, start/end_date and exposes account snapshots' do
+      it 'serializes amount_from/to, start/end_date and descriptions' do
         allow(client).to receive(:list_expected_payments).and_return([expected_payment])
 
         rows = collection.list(nil, Filter.new,
-                               %w[id amount_from amount_to start_date end_date
-                                  internal_account_snapshot external_account_snapshot descriptions])
+                               %w[id amount_from amount_to start_date end_date descriptions])
 
         expect(rows.first).to include(
           'amount_from' => 5000, 'amount_to' => 6000,
           'start_date' => '2026-05-11', 'end_date' => '2026-05-11',
           'descriptions' => ['test expected payment']
         )
-        expect(rows.first['external_account_snapshot']).to include('account_number' => 'AG454545')
-        expect(rows.first['internal_account_snapshot']).to include('account_number' => '43244675643525')
       end
 
       it 'returns rows without resolving relations when projection has no relation prefix' do
@@ -131,7 +127,8 @@ module ForestAdminDatasourceMambuPayments
       it 'embeds connected_account when requested' do
         allow(client).to receive(:list_expected_payments).and_return([expected_payment])
         allow(client).to receive(:find_connected_account)
-          .with('456d2975-d58b-4a90-89b8-efcc3239c866').and_return(account)
+          .with('456d2975-d58b-4a90-89b8-efcc3239c866')
+          .and_return(account.merge('id' => '456d2975-d58b-4a90-89b8-efcc3239c866'))
 
         rows = collection.list(nil, Filter.new, ['id', 'connected_account:name'])
         expect(rows.first['connected_account']).to include('name' => 'Acme')
@@ -162,12 +159,11 @@ module ForestAdminDatasourceMambuPayments
     end
 
     describe '#create' do
-      it 'strips system-managed fields and snapshots before POSTing' do
+      it 'strips system-managed fields before POSTing' do
         allow(client).to receive(:create_expected_payment) do |payload|
           expect(payload).to include('amount_from' => 5000, 'amount_to' => 6000, 'direction' => 'debit')
           expect(payload.keys).not_to include('id', 'object', 'reconciliation_status', 'reconciled_amount',
-                                              'created_at', 'updated_at', 'canceled_at',
-                                              'internal_account_snapshot', 'external_account_snapshot')
+                                              'created_at', 'updated_at', 'canceled_at')
           { 'id' => 'ep1', 'amount_from' => 5000 }
         end
 
@@ -175,8 +171,6 @@ module ForestAdminDatasourceMambuPayments
                           'id' => 'ignored', 'object' => 'expected_payment',
                           'reconciliation_status' => 'unreconciled', 'reconciled_amount' => 0,
                           'created_at' => 't', 'updated_at' => 't', 'canceled_at' => nil,
-                          'internal_account_snapshot' => { 'a' => 'b' },
-                          'external_account_snapshot' => { 'a' => 'b' },
                           'amount_from' => 5000, 'amount_to' => 6000, 'direction' => 'debit')
 
         expect(client).to have_received(:create_expected_payment)

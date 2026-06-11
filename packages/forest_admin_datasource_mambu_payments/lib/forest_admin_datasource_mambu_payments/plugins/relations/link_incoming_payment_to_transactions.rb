@@ -22,11 +22,7 @@ module ForestAdminDatasourceMambuPayments
         ONE_TO_MANY_NAME = 'transactions'.freeze
 
         def run(datasource_customizer, _collection_customizer = nil, _options = {})
-          unless datasource_customizer
-            raise ArgumentError,
-                  'LinkIncomingPaymentToTransactions must be installed at the datasource level ' \
-                  'via @agent.use(plugin, {})'
-          end
+          Plugins::Helpers.require_datasource!(datasource_customizer, self.class)
 
           datasource_customizer.customize_collection(TRANSACTION) do |c|
             # Virtual column: Transaction has no native incoming_payment_id.

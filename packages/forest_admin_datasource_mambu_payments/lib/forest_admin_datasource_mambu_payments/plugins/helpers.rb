@@ -10,6 +10,18 @@ module ForestAdminDatasourceMambuPayments
 
       module_function
 
+      # Relation plugins must be installed at the datasource level
+      # (`@agent.use(plugin, {})`) so they can customize several collections at
+      # once. Raises a clear error when a caller installs one on a single
+      # collection instead.
+      def require_datasource!(datasource_customizer, plugin_class)
+        return if datasource_customizer
+
+        name = plugin_class.is_a?(Class) ? plugin_class.name.split('::').last : plugin_class
+        raise ArgumentError,
+              "#{name} must be installed at the datasource level via @agent.use(plugin, {})"
+      end
+
       def normalize_scopes(value)
         list = Array(value).map(&:to_sym).uniq
         list = SCOPE_KEYS if list.empty?

@@ -1,4 +1,3 @@
-# rubocop:disable Metrics/ClassLength
 module ForestAdminDatasourceMambuPayments
   module Collections
     class Event < BaseCollection
@@ -22,31 +21,14 @@ module ForestAdminDatasourceMambuPayments
 
       ENUM_STATUS = %w[created delivered pending_retry failed archived].freeze
 
-      FETCHERS = {
-        'MambuPaymentOrder' => :find_payment_order,
-        'MambuTransaction' => :find_transaction,
-        'MambuIncomingPayment' => :find_incoming_payment,
-        'MambuExpectedPayment' => :find_expected_payment,
-        'MambuDirectDebitMandate' => :find_direct_debit_mandate,
-        'MambuBalance' => :find_balance,
-        'MambuConnectedAccount' => :find_connected_account,
-        'MambuAccountHolder' => :find_account_holder,
-        'MambuInternalAccount' => :find_internal_account,
-        'MambuExternalAccount' => :find_external_account
-      }.freeze
+      client_resource :event
 
       def initialize(datasource)
         super(datasource, 'MambuEvent')
         define_schema
         define_relations
+        reconcile_filter_operators!
         enable_count
-      end
-
-      def list(caller, filter, projection)
-        records = fetch_records(caller, filter)
-        rows = records.map { |r| project(serialize(r), projection) }
-        embed_relations(rows, records, projection)
-        rows
       end
 
       def serialize(record)
@@ -68,97 +50,75 @@ module ForestAdminDatasourceMambuPayments
 
       protected
 
-      def aggregate_count(caller, filter)
-        list(caller, filter, ['id']).size
-      end
-
-      private
-
-      def fetch_records(_caller, filter)
-        ids = extract_id_lookup(filter.condition_tree)
-        return ids.filter_map { |id| datasource.client.find_event(id) } if ids
-
-        page, per_page = translate_page(filter.page)
-        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
-        datasource.client.list_events(**params)
-      end
-
       # Numeral's `GET /events` exposes filtering on the polymorphic target id.
       # Used by OneToMany relations declared on PaymentOrder/IncomingPayment/etc
       # to navigate "events of this resource". `related_object_type` filtering
       # is left out because we translate the enum to Forest collection names at
       # serialize time — uniqueness of UUIDs makes the type filter redundant
       # when filtering by id anyway.
-      def api_filters
+      def collection_filters
         {
           'related_object_id' => { ops: [Operators::EQUAL, Operators::IN] }
         }
       end
 
       # PolymorphicManyToOne is not resolved by the customizer, so we populate
-      # `related_object` here when the projection requests it. Records are grouped
-      # by their (translated) related_object_type so each target collection is
-      # queried in a single batched pass.
+      # `related_object` here when the projection requests it. Ids are grouped by
+      # their (translated) related_object_type so each target collection is hit
+      # with a single batched fetch_by_ids pass.
       def embed_relations(rows, records, projection)
         return if projection.nil? || !relations_in(projection).include?('related_object')
 
         sources = records.map { |r| attrs_of(r) }
-        grouped = group_by_collection(sources)
-
-        caches = grouped.transform_values do |entries|
-          collection_name = entries.first[:collection_name]
-          fetcher = FETCHERS[collection_name]
-          serializer = datasource.get_collection(collection_name)
-          ids = entries.map { |e| e[:id] }.uniq
-          ids.to_h { |id| [id, datasource.client.public_send(fetcher, id)] }
-             .compact
-             .transform_values { |raw| serializer.serialize(raw) }
-        end
+        caches = build_related_object_caches(sources)
 
         rows.each_with_index do |row, i|
           src = sources[i]
           type = TYPE_TO_COLLECTION[src['related_object_type']]
           id = src['related_object_id']
-          next if type.nil? || id.nil? || id.to_s.empty?
+          next if type.nil? || id.to_s.empty?
 
           row['related_object'] = caches.dig(type, id)
         end
       end
 
-      def group_by_collection(sources)
-        sources.each_with_object({}) do |src, acc|
+      private
+
+      def build_related_object_caches(sources)
+        ids_by_collection = Hash.new { |hash, key| hash[key] = [] }
+        sources.each do |src|
           type = TYPE_TO_COLLECTION[src['related_object_type']]
           id = src['related_object_id']
-          next if type.nil? || id.nil? || id.to_s.empty?
+          next if type.nil? || id.to_s.empty?
 
-          (acc[type] ||= []) << { collection_name: type, id: id }
+          ids_by_collection[type] << id
+        end
+
+        ids_by_collection.to_h do |collection_name, ids|
+          target = datasource.get_collection(collection_name)
+          by_id = target.send(:fetch_by_ids, ids).to_h do |raw|
+            [attrs_of(raw)['id'], target.serialize(raw)]
+          end
+          [collection_name, by_id]
         end
       end
 
       def define_schema
-        add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                         is_primary_key: true, is_read_only: true, is_sortable: true))
-        add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: false))
-        add_field('topic', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                            is_read_only: true, is_sortable: true))
-        add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: true, is_sortable: true))
-        add_field('related_object_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                        is_read_only: true, is_sortable: false))
-        add_field('related_object_type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                          is_read_only: true, is_sortable: true))
-        add_field('status', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                             enum_values: ENUM_STATUS,
+        add_field('id', ColumnSchema.new(column_type: 'String', is_primary_key: true,
+                                         is_read_only: true, is_sortable: true))
+        add_field('object', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('topic', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: true))
+        add_field('type', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: true))
+        add_field('related_object_id', ColumnSchema.new(column_type: 'String', is_read_only: true,
+                                                        is_sortable: false))
+        add_field('related_object_type', ColumnSchema.new(column_type: 'String', is_read_only: true,
+                                                          is_sortable: true))
+        add_field('status', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_STATUS,
                                              is_read_only: true, is_sortable: true))
-        add_field('status_details', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: true, is_sortable: false))
-        add_field('webhook_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                 is_read_only: true, is_sortable: false))
-        add_field('data', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                           is_read_only: true, is_sortable: false))
-        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                 is_read_only: true, is_sortable: true))
+        add_field('status_details', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('webhook_id', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('data', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', is_read_only: true, is_sortable: true))
       end
 
       def define_relations
@@ -172,5 +132,3 @@ module ForestAdminDatasourceMambuPayments
     end
   end
 end
-
-# rubocop:enable Metrics/ClassLength

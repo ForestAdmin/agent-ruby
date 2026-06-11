@@ -13,14 +13,13 @@ module ForestAdminDatasourceMambuPayments
       ENUM_SCHEME          = %w[vop].freeze
       ENUM_MATCHING_RESULT = %w[match close_match no_match impossible_match].freeze
 
+      client_resource :payee_verification_request
+
       def initialize(datasource)
         super(datasource, 'MambuPayeeVerificationRequest')
         define_schema
+        reconcile_filter_operators!
         enable_count
-      end
-
-      def list(caller, filter, projection)
-        fetch_records(caller, filter).map { |r| project(serialize(r), projection) }
       end
 
       def serialize(record)
@@ -46,22 +45,7 @@ module ForestAdminDatasourceMambuPayments
 
       protected
 
-      def aggregate_count(caller, filter)
-        list(caller, filter, ['id']).size
-      end
-
-      private
-
-      def fetch_records(_caller, filter)
-        ids = extract_id_lookup(filter.condition_tree)
-        return ids.filter_map { |id| datasource.client.find_payee_verification_request(id) } if ids
-
-        page, per_page = translate_page(filter.page)
-        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
-        datasource.client.list_payee_verification_requests(**params)
-      end
-
-      def api_filters
+      def collection_filters
         {
           'status' => { ops: [Operators::EQUAL, Operators::IN] },
           'direction' => { ops: [Operators::EQUAL, Operators::IN] },
@@ -70,44 +54,35 @@ module ForestAdminDatasourceMambuPayments
         }
       end
 
+      private
+
       def define_schema
-        add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                         is_primary_key: true, is_read_only: true, is_sortable: true))
-        add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: false))
-        add_field('status', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                             enum_values: ENUM_STATUS, is_read_only: true, is_sortable: true))
-        add_field('failure_code', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                   enum_values: ENUM_FAILURE_CODE,
+        add_field('id', ColumnSchema.new(column_type: 'String', is_primary_key: true,
+                                         is_read_only: true, is_sortable: true))
+        add_field('object', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('status', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_STATUS,
+                                             is_read_only: true, is_sortable: true))
+        add_field('failure_code', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_FAILURE_CODE,
                                                    is_read_only: true, is_sortable: false))
-        add_field('status_details', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                     is_read_only: true, is_sortable: false))
-        add_field('direction', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                enum_values: ENUM_DIRECTION,
+        add_field('status_details', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('direction', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_DIRECTION,
                                                 is_read_only: true, is_sortable: true))
-        add_field('scheme', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                             enum_values: ENUM_SCHEME, is_read_only: true, is_sortable: true))
+        add_field('scheme', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_SCHEME,
+                                             is_read_only: true, is_sortable: true))
         # request, matching_details, scheme_data are nested objects with their
         # own sub-fields (payee_identification, scheme_request_id, ...). Forest
         # can't model nested columns natively, so we expose them as Json
         # snapshots — matches how IncomingPayment handles originating_account.
-        add_field('request', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                              is_read_only: true, is_sortable: false))
-        add_field('matching_result', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                      enum_values: ENUM_MATCHING_RESULT,
+        add_field('request', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('matching_result', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_MATCHING_RESULT,
                                                       is_read_only: true, is_sortable: true))
-        add_field('payee_suggested_name', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                           is_read_only: true, is_sortable: false))
-        add_field('matching_details', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                       is_read_only: true, is_sortable: false))
-        add_field('scheme_data', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                  is_read_only: true, is_sortable: false))
-        add_field('metadata', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                               is_read_only: true, is_sortable: false))
-        add_field('response_received_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                           is_read_only: true, is_sortable: true))
-        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                 is_read_only: true, is_sortable: true))
+        add_field('payee_suggested_name', ColumnSchema.new(column_type: 'String', is_read_only: true,
+                                                           is_sortable: false))
+        add_field('matching_details', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('scheme_data', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('metadata', ColumnSchema.new(column_type: 'Json', is_read_only: true, is_sortable: false))
+        add_field('response_received_at', ColumnSchema.new(column_type: 'Date', is_read_only: true, is_sortable: true))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', is_read_only: true, is_sortable: true))
       end
     end
   end

@@ -14,11 +14,7 @@ module ForestAdminDatasourceMambuPayments
         INCOMING_PAYMENT = 'MambuIncomingPayment'.freeze
 
         def run(datasource_customizer, _collection_customizer = nil, _options = {})
-          unless datasource_customizer
-            raise ArgumentError,
-                  'LinkInternalAccountToIncomingPayments must be installed at the datasource level ' \
-                  'via @agent.use(plugin, {})'
-          end
+          Plugins::Helpers.require_datasource!(datasource_customizer, self.class)
 
           datasource_customizer.customize_collection(INTERNAL_ACCOUNT) do |c|
             c.add_one_to_many_relation('incoming_payments', INCOMING_PAYMENT,

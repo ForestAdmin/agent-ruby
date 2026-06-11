@@ -7,18 +7,14 @@ module ForestAdminDatasourceMambuPayments
       ENUM_SEQUENCE_TYPE = %w[one_off recurrent first final].freeze
       ENUM_SCHEME = %w[sepa bacs ach].freeze
 
+      client_resource :direct_debit_mandate
+
       def initialize(datasource)
         super(datasource, 'MambuDirectDebitMandate')
         define_schema
         define_relations
+        reconcile_filter_operators!
         enable_count
-      end
-
-      def list(caller, filter, projection)
-        records = fetch_records(caller, filter)
-        rows = records.map { |r| project(serialize(r), projection) }
-        embed_relations(rows, records, projection)
-        rows
       end
 
       def create(_caller, data)
@@ -62,94 +58,54 @@ module ForestAdminDatasourceMambuPayments
 
       protected
 
-      def aggregate_count(caller, filter)
-        list(caller, filter, ['id']).size
-      end
-
-      private
-
-      def fetch_records(_caller, filter)
-        ids = extract_id_lookup(filter.condition_tree)
-        return ids.filter_map { |id| datasource.client.find_direct_debit_mandate(id) } if ids
-
-        page, per_page = translate_page(filter.page)
-        params = translate_filters(filter.condition_tree).merge(page: page, limit: per_page)
-        datasource.client.list_direct_debit_mandates(**params)
-      end
-
-      def api_filters
+      def collection_filters
         {
           'connected_account_id' => { ops: [Operators::EQUAL, Operators::IN] },
           'external_account_id' => { ops: [Operators::EQUAL, Operators::IN] }
         }
       end
 
-      def build_payload(data)
-        attrs = data.transform_keys(&:to_s)
-        %w[id object status created_at].each { |k| attrs.delete(k) }
-        attrs
+      def many_to_one_embeds
+        [
+          { foreign_key: 'connected_account_id', relation_name: 'connected_account',
+            collection: 'MambuConnectedAccount' },
+          { foreign_key: 'external_account_id', relation_name: 'external_account',
+            collection: 'MambuExternalAccount' }
+        ]
       end
 
-      def embed_relations(rows, records, projection)
-        sources = records.map { |r| attrs_of(r) }
-        ca = datasource.get_collection('MambuConnectedAccount')
-        ea = datasource.get_collection('MambuExternalAccount')
-        embed_many_to_one(
-          rows, sources, projection,
-          foreign_key: 'connected_account_id', relation_name: 'connected_account',
-          fetcher: ->(id) { datasource.client.find_connected_account(id) },
-          serializer: ->(raw) { ca.serialize(raw) }
-        )
-        embed_many_to_one(
-          rows, sources, projection,
-          foreign_key: 'external_account_id', relation_name: 'external_account',
-          fetcher: ->(id) { datasource.client.find_external_account(id) },
-          serializer: ->(raw) { ea.serialize(raw) }
-        )
-      end
+      private
 
       def define_schema
-        add_field('id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                         is_primary_key: true, is_read_only: true, is_sortable: true))
-        add_field('object', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: false))
-        add_field('connected_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+        add_field('id', ColumnSchema.new(column_type: 'String', is_primary_key: true,
+                                         is_read_only: true, is_sortable: true))
+        add_field('object', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: false))
+        add_field('connected_account_id', ColumnSchema.new(column_type: 'String',
                                                            is_read_only: false, is_sortable: true))
-        add_field('external_account_id', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
+        add_field('external_account_id', ColumnSchema.new(column_type: 'String',
                                                           is_read_only: false, is_sortable: false))
-        add_field('type', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                           is_read_only: false, is_sortable: true))
-        add_field('scheme', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                             enum_values: ENUM_SCHEME, is_read_only: false, is_sortable: true))
-        add_field('status', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                             is_read_only: true, is_sortable: true))
-        add_field('sequence_type', ColumnSchema.new(column_type: 'Enum', filter_operators: STRING_OPS,
-                                                    enum_values: ENUM_SEQUENCE_TYPE,
+        add_field('type', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: true))
+        add_field('scheme', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_SCHEME,
+                                             is_read_only: false, is_sortable: true))
+        add_field('status', ColumnSchema.new(column_type: 'String', is_read_only: true, is_sortable: true))
+        add_field('sequence_type', ColumnSchema.new(column_type: 'Enum', enum_values: ENUM_SEQUENCE_TYPE,
                                                     is_read_only: false, is_sortable: true))
-        add_field('reference', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                is_read_only: false, is_sortable: false))
-        add_field('unique_mandate_reference', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                               is_read_only: false, is_sortable: true))
-        add_field('creditor_identifier', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                          is_read_only: false, is_sortable: false))
-        add_field('signature_date', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                     is_read_only: false, is_sortable: true))
-        add_field('signature_location', ColumnSchema.new(column_type: 'String', filter_operators: STRING_OPS,
-                                                         is_read_only: false, is_sortable: false))
-        add_field('creditor', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                               is_read_only: false, is_sortable: false))
-        add_field('debtor', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                             is_read_only: false, is_sortable: false))
-        add_field('debtor_account', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                     is_read_only: false, is_sortable: false))
-        add_field('amendment_information', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                            is_read_only: false, is_sortable: false))
-        add_field('custom_fields', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                                    is_read_only: false, is_sortable: false))
-        add_field('metadata', ColumnSchema.new(column_type: 'Json', filter_operators: [],
-                                               is_read_only: false, is_sortable: false))
-        add_field('created_at', ColumnSchema.new(column_type: 'Date', filter_operators: DATE_OPS,
-                                                 is_read_only: true, is_sortable: true))
+        add_field('reference', ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: false))
+        add_field('unique_mandate_reference', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                               is_sortable: true))
+        add_field('creditor_identifier', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                          is_sortable: false))
+        add_field('signature_date', ColumnSchema.new(column_type: 'Date', is_read_only: false, is_sortable: true))
+        add_field('signature_location', ColumnSchema.new(column_type: 'String', is_read_only: false,
+                                                         is_sortable: false))
+        add_field('creditor', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('debtor', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('debtor_account', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('amendment_information', ColumnSchema.new(column_type: 'Json', is_read_only: false,
+                                                            is_sortable: false))
+        add_field('custom_fields', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('metadata', ColumnSchema.new(column_type: 'Json', is_read_only: false, is_sortable: false))
+        add_field('created_at', ColumnSchema.new(column_type: 'Date', is_read_only: true, is_sortable: true))
       end
 
       def define_relations
@@ -167,5 +123,4 @@ module ForestAdminDatasourceMambuPayments
     end
   end
 end
-
 # rubocop:enable Metrics/ClassLength
