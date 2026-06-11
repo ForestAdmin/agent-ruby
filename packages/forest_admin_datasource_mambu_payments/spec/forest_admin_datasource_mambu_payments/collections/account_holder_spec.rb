@@ -77,14 +77,6 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
-    describe '#aggregate Count' do
-      it 'counts via the server-side total' do
-        allow(client).to receive(:count_account_holders).and_return(2)
-        result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
-        expect(result.first['value']).to eq(2)
-      end
-    end
-
     describe '#create' do
       it 'POSTs the payload stripping system-managed fields' do
         allow(client).to receive(:create_account_holder) do |payload|

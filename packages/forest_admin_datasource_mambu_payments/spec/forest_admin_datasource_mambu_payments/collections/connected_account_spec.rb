@@ -93,13 +93,5 @@ module ForestAdminDatasourceMambuPayments
         expect(collection.list(nil, filter, nil)).to eq([])
       end
     end
-
-    describe '#aggregate Count' do
-      it 'counts via the server-side total' do
-        allow(client).to receive(:count_connected_accounts).and_return(2)
-        result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
-        expect(result.first['value']).to eq(2)
-      end
-    end
   end
 end

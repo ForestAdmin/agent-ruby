@@ -163,13 +163,5 @@ module ForestAdminDatasourceMambuPayments
         expect(client).not_to have_received(:list_payee_verification_requests)
       end
     end
-
-    describe '#aggregate Count' do
-      it 'counts via the server-side total' do
-        allow(client).to receive(:count_payee_verification_requests).and_return(2)
-        result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
-        expect(result.first['value']).to eq(2)
-      end
-    end
   end
 end

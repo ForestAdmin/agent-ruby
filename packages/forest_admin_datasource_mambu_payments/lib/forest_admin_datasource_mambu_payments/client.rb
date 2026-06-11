@@ -19,16 +19,6 @@ module ForestAdminDatasourceMambuPayments
       end
     end
 
-    # Server-side count. Numeral list responses carry a `total` field, so we
-    # ask for a single record and read the total off the envelope rather than
-    # materializing (and capping at one page of) the whole collection.
-    def count_resource(path, params = {})
-      must_succeed("count(#{path})") do
-        body = connection.get(path, normalize_params(params.merge(limit: 1))).body
-        extract_total(body, path)
-      end
-    end
-
     def get_resource(path, id)
       extract_record(connection.get("#{path}/#{id}").body)
     rescue Faraday::ResourceNotFound
@@ -87,14 +77,6 @@ module ForestAdminDatasourceMambuPayments
       return body['data'] if body.is_a?(Hash) && body['data'].is_a?(Hash)
 
       body
-    end
-
-    # Reads the `total` count off a list envelope, falling back to the size of
-    # the returned records when the API omits it (e.g. an array body).
-    def extract_total(body, path)
-      return body['total'].to_i if body.is_a?(Hash) && body.key?('total')
-
-      extract_records(body, path).size
     end
 
     def delete_resource(path, id)

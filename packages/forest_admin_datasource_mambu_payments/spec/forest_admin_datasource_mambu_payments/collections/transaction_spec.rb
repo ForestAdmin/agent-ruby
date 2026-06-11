@@ -109,13 +109,5 @@ module ForestAdminDatasourceMambuPayments
         expect(rows.first).to eq('id' => 'tx1', 'category' => 'direct_debit', 'amount' => 5000)
       end
     end
-
-    describe '#aggregate Count' do
-      it 'counts via the server-side total' do
-        allow(client).to receive(:count_transactions).and_return(2)
-        result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
-        expect(result.first['value']).to eq(2)
-      end
-    end
   end
 end

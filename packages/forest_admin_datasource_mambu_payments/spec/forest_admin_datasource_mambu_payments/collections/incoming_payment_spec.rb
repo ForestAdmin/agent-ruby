@@ -128,13 +128,5 @@ module ForestAdminDatasourceMambuPayments
         expect(rows.first).to eq('id' => 'ip1', 'status' => 'received', 'amount' => 12_500)
       end
     end
-
-    describe '#aggregate Count' do
-      it 'counts via the server-side total' do
-        allow(client).to receive(:count_incoming_payments).and_return(2)
-        result = collection.aggregate(nil, Filter.new, Aggregation.new(operation: 'Count'))
-        expect(result.first['value']).to eq(2)
-      end
-    end
   end
 end

@@ -19,7 +19,6 @@ module ForestAdminDatasourceMambuPayments
         super(datasource, 'MambuPayeeVerificationRequest')
         define_schema
         reconcile_filter_operators!
-        enable_count
       end
 
       def serialize(record)

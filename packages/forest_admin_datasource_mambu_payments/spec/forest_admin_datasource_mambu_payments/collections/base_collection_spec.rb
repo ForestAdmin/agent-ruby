@@ -226,28 +226,16 @@ module ForestAdminDatasourceMambuPayments
     end
 
     describe '#aggregate' do
-      let(:client) { instance_double(ForestAdminDatasourceMambuPayments::Client) }
       let(:filter) { ForestAdminDatasourceToolkit::Components::Query::Filter.new }
 
-      before { allow(datasource).to receive(:client).and_return(client) }
-
-      it 'counts via the server-side total rather than listing records' do
-        allow(client).to receive(:count_connected_accounts).and_return(4200)
+      it 'is not supported (Numeral exposes no count/aggregate endpoint)' do
         agg = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
-        expect(collection.aggregate(nil, filter, agg)).to eq([{ 'value' => 4200, 'group' => {} }])
+        expect { collection.aggregate(nil, filter, agg) }
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not countable/)
       end
 
-      it 'raises on non-Count aggregations' do
-        agg = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Sum', field: 'amount')
-        expect { collection.aggregate(nil, filter, agg) }
-          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /Count/)
-      end
-
-      it 'raises on Count with groups' do
-        agg = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count',
-                                                                               groups: [{ field: 'id' }])
-        expect { collection.aggregate(nil, filter, agg) }
-          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+      it 'declares the collection non-countable so Forest never requests a count' do
+        expect(collection.schema[:countable]).to be(false)
       end
     end
   end

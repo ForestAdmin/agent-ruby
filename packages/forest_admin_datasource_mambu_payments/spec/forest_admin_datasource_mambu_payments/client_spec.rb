@@ -448,31 +448,6 @@ RSpec.describe ForestAdminDatasourceMambuPayments::Client do
     end
   end
 
-  describe 'server-side count' do
-    it 'reads the total off the list envelope without materializing records' do
-      stub_request(:get, "#{base}/connected_accounts")
-        .with(query: hash_including('limit' => '1'))
-        .to_return(json('records' => [{ 'id' => 'a' }], 'total' => 4200))
-
-      expect(client.count_connected_accounts).to eq(4200)
-    end
-
-    it 'forwards filter params to the count endpoint' do
-      stub_request(:get, "#{base}/incoming_payments")
-        .with(query: hash_including('connected_account_id' => 'acc1', 'limit' => '1'))
-        .to_return(json('total' => 7))
-
-      expect(client.count_incoming_payments(connected_account_id: 'acc1')).to eq(7)
-    end
-
-    it 'falls back to the record count when the API omits total' do
-      stub_request(:get, "#{base}/transactions")
-        .with(query: hash_including('limit' => '1'))
-        .to_return(json('records' => [{ 'id' => 'a' }, { 'id' => 'b' }]))
-      expect(client.count_transactions).to eq(2)
-    end
-  end
-
   describe 'structured API errors' do
     it 'surfaces the HTTP status and the Numeral error message on a 422' do
       stub_request(:post, "#{base}/payment_orders")

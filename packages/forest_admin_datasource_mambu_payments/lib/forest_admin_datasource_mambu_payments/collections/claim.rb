@@ -14,7 +14,6 @@ module ForestAdminDatasourceMambuPayments
         define_schema
         define_relations
         reconcile_filter_operators!
-        enable_count
       end
 
       def serialize(record)

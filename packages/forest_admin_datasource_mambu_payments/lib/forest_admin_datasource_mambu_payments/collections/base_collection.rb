@@ -53,12 +53,14 @@ module ForestAdminDatasourceMambuPayments
         rows
       end
 
-      def aggregate(_caller, filter, aggregation, _limit = nil)
-        unless aggregation.operation == 'Count' && aggregation.field.nil? && aggregation.groups.empty?
-          raise ForestException, 'Mambu Payments datasource only supports Count aggregation without groups.'
-        end
-
-        [{ 'value' => count_records(filter), 'group' => {} }]
+      # Numeral exposes no count/aggregate endpoint and paginates by cursor, so
+      # there is no way to count matching records without scanning every page.
+      # Collections are therefore declared non-countable (no `enable_count`) and
+      # Forest never requests an aggregation; this guard makes the unsupported
+      # path explicit rather than returning a wrong number.
+      def aggregate(_caller, _filter, _aggregation, _limit = nil)
+        raise ForestException,
+              'Mambu Payments collections are not countable: Numeral exposes no count endpoint.'
       end
 
       protected
@@ -146,19 +148,8 @@ module ForestAdminDatasourceMambuPayments
         attrs_of(record)['id']
       end
 
-      def count_records(filter)
-        ids = extract_id_lookup(filter.condition_tree)
-        return fetch_by_ids(ids).size if ids
-
-        client_count(**translate_filters(filter.condition_tree))
-      end
-
       def client_list(**params)
         datasource.client.public_send("list_#{self.class.resource_plural}", **params)
-      end
-
-      def client_count(**params)
-        datasource.client.public_send("count_#{self.class.resource_plural}", **params)
       end
 
       def client_find(id)
