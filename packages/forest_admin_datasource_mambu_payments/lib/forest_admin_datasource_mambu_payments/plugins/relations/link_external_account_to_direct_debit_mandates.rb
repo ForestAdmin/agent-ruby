@@ -3,25 +3,10 @@ module ForestAdminDatasourceMambuPayments
     module Relations
       # Reciprocal OneToMany on MambuExternalAccount for the native
       # DirectDebitMandate.external_account ManyToOne.
-      #
-      # Install at the datasource level:
-      #   @agent.use(
-      #     ForestAdminDatasourceMambuPayments::Plugins::Relations::LinkExternalAccountToDirectDebitMandates,
-      #     {}
-      #   )
-      class LinkExternalAccountToDirectDebitMandates < ForestAdminDatasourceCustomizer::Plugins::Plugin
-        EXTERNAL_ACCOUNT     = 'MambuExternalAccount'.freeze
-        DIRECT_DEBIT_MANDATE = 'MambuDirectDebitMandate'.freeze
-
-        def run(datasource_customizer, _collection_customizer = nil, _options = {})
-          Plugins::Helpers.require_datasource!(datasource_customizer, self.class)
-
-          datasource_customizer.customize_collection(EXTERNAL_ACCOUNT) do |c|
-            c.add_one_to_many_relation('direct_debit_mandates', DIRECT_DEBIT_MANDATE,
-                                       origin_key: 'external_account_id',
-                                       origin_key_target: 'id')
-          end
-        end
+      # Install at the datasource level: @agent.use(plugin, {}).
+      class LinkExternalAccountToDirectDebitMandates < OneToManyLinkPlugin
+        link host: 'MambuExternalAccount', to: 'MambuDirectDebitMandate',
+             name: 'direct_debit_mandates', origin_key: 'external_account_id'
       end
     end
   end

@@ -1,17 +1,10 @@
 module ForestAdminDatasourceMambuPayments
   module Collections
-    # Shared behaviour for every Numeral-backed collection.
-    #
-    # Subclasses declare their REST resource once with `client_resource` and
-    # implement `serialize`. The read path (list / count / id-lookup /
-    # pagination / relation embedding) lives here so a fix lands in one place
-    # rather than being copy-pasted across ~17 collections.
-    #
-    # Filtering contract: `collection_filters` lists the server-filterable
-    # fields (merged with the always-present `id`). `reconcile_filter_operators!`
-    # then narrows each column's advertised `filter_operators` to exactly what
-    # the Numeral API can serve, so the UI never offers a filter that would
-    # raise at query time.
+    # Shared read path (list / id-lookup / pagination / relation embedding) for
+    # every Numeral-backed collection. Subclasses declare their REST resource
+    # via `client_resource` and implement `serialize`; `collection_filters`
+    # lists the server-filterable fields and `reconcile_filter_operators!`
+    # narrows each column's advertised operators to what the API can serve.
     # rubocop:disable Metrics/ClassLength
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
       ColumnSchema   = ForestAdminDatasourceToolkit::Schema::ColumnSchema
@@ -38,9 +31,8 @@ module ForestAdminDatasourceMambuPayments
         attr_accessor :resource_singular, :resource_plural
       end
 
-      # Declares the Numeral REST resource backing this collection, wiring the
-      # generic read path to the matching `list_*` / `count_*` / `find_*`
-      # client methods.
+      # Declares the Numeral REST resource, wiring the read path to the matching
+      # `list_*` / `find_*` client methods.
       def self.client_resource(singular, plural = nil)
         self.resource_singular = singular.to_s
         self.resource_plural = (plural || "#{singular}s").to_s
@@ -61,6 +53,14 @@ module ForestAdminDatasourceMambuPayments
       def aggregate(_caller, _filter, _aggregation, _limit = nil)
         raise ForestException,
               'Mambu Payments collections are not countable: Numeral exposes no count endpoint.'
+      end
+
+      # Per-id find_* (Numeral has no batch id filter); public for cross-collection embed.
+      def fetch_by_ids(ids)
+        ids = Array(ids).reject { |id| id.to_s.empty? }.uniq
+        return [] if ids.empty?
+
+        ids.filter_map { |id| client_find(id) }
       end
 
       protected
@@ -107,41 +107,40 @@ module ForestAdminDatasourceMambuPayments
         paginate(filter.page, translate_filters(filter.condition_tree))
       end
 
-      # Resolves a set of ids via the per-id `find_*` endpoint. Numeral has no
-      # `id`/`ids` list filter, so there is no batch fetch — we de-duplicate and
-      # fetch each distinct id once (one `GET /resource/:id` per id).
-      def fetch_by_ids(ids)
-        ids = Array(ids).reject { |id| id.to_s.empty? }.uniq
-        return [] if ids.empty?
-
-        ids.filter_map { |id| client_find(id) }
-      end
-
-      # Numeral paginates with a `starting_after` cursor (the id of the last seen
-      # record) plus a `limit` capped at MAX_PER_PAGE — it has no offset/page
-      # parameter. Forest, however, asks for an [offset, offset + limit) window,
-      # so we walk forward in cursor pages until the window is covered, then
-      # slice. The first page of a small list is a single request.
+      # Maps Forest's offset/limit window onto Numeral's `starting_after` cursor.
       def paginate(page, params)
         offset = page&.offset.to_i
-        limit  = page&.limit
-        limit  = Client::MAX_PER_PAGE if limit.nil? || limit <= 0
-        needed = offset + limit
+        limit = effective_limit(page)
+        fetch_window(params, offset, limit)[offset, limit] || []
+      end
 
+      def effective_limit(page)
+        limit = page&.limit
+        limit.nil? || limit <= 0 ? Client::MAX_PER_PAGE : limit
+      end
+
+      # Walks the cursor forward until at least `offset + limit` records are
+      # collected or the API runs out (a short page).
+      def fetch_window(params, offset, limit)
+        needed = offset + limit
         collected = []
         cursor = nil
         loop do
           chunk = [needed - collected.size, Client::MAX_PER_PAGE].min
-          page_params = params.merge(limit: chunk)
-          page_params[:starting_after] = cursor if cursor
-          batch = client_list(**page_params)
+          batch = client_list(**cursor_params(params, cursor, chunk))
           collected.concat(batch)
           break if batch.size < chunk || collected.size >= needed
 
           cursor = record_id(batch.last)
           break if cursor.to_s.empty?
         end
-        collected[offset, limit] || []
+        collected
+      end
+
+      def cursor_params(params, cursor, chunk)
+        page_params = params.merge(limit: chunk)
+        page_params[:starting_after] = cursor if cursor
+        page_params
       end
 
       def record_id(record)
@@ -199,6 +198,11 @@ module ForestAdminDatasourceMambuPayments
         Array(projection).map(&:to_s).filter_map { |p| p.split(':').first if p.include?(':') }.uniq
       end
 
+      # A ManyToOne relation to embed: which foreign key on the row, the
+      # relation name to populate, and the target collection that resolves and
+      # serializes the related records.
+      Embed = Struct.new(:foreign_key, :relation_name, :resolver, keyword_init: true)
+
       # Embeds the declared ManyToOne relations onto each row. The customizer's
       # relation decorator only handles emulated relations, so native datasource
       # relations like ours must populate the sub-record themselves.
@@ -207,35 +211,31 @@ module ForestAdminDatasourceMambuPayments
 
         sources = records.map { |r| attrs_of(r) }
         many_to_one_embeds.each do |embed|
-          target = datasource.get_collection(embed[:collection])
-          embed_many_to_one(
-            rows, sources, projection,
-            foreign_key: embed[:foreign_key], relation_name: embed[:relation_name],
-            batch_fetcher: ->(ids) { target.send(:fetch_by_ids, ids) },
-            serializer: ->(raw) { target.serialize(raw) }
-          )
+          embed_many_to_one(rows, sources, projection, Embed.new(
+                                                         foreign_key: embed[:foreign_key],
+                                                         relation_name: embed[:relation_name],
+                                                         resolver: datasource.get_collection(embed[:collection])
+                                                       ))
         end
       end
 
       # Bulk-fetches the related records for a ManyToOne relation in a single
-      # batched call and writes the serialized record back onto each row.
-      # rubocop:disable Metrics/ParameterLists
-      def embed_many_to_one(rows, sources, projection, foreign_key:, relation_name:, batch_fetcher:, serializer:)
-        return unless relations_in(projection).include?(relation_name)
+      # batched pass and writes the serialized record back onto each row.
+      def embed_many_to_one(rows, sources, projection, embed)
+        return unless relations_in(projection).include?(embed.relation_name)
 
-        ids = sources.filter_map { |s| s[foreign_key] }.reject { |id| id.to_s.empty? }.uniq
+        ids = sources.filter_map { |s| s[embed.foreign_key] }.reject { |id| id.to_s.empty? }.uniq
         return if ids.empty?
 
-        by_id = batch_fetcher.call(ids).to_h { |raw| [attrs_of(raw)['id'], raw] }
+        by_id = embed.resolver.fetch_by_ids(ids).to_h { |raw| [attrs_of(raw)['id'], raw] }
         rows.each_with_index do |row, i|
-          fk_value = sources[i][foreign_key]
+          fk_value = sources[i][embed.foreign_key]
           next if fk_value.to_s.empty?
 
           raw = by_id[fk_value]
-          row[relation_name] = raw && serializer.call(raw)
+          row[embed.relation_name] = raw && embed.resolver.serialize(raw)
         end
       end
-      # rubocop:enable Metrics/ParameterLists
 
       # Strips read-only columns and relation fields from a write payload,
       # deriving the deny-list from the schema's `is_read_only` flags so it can

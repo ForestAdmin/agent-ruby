@@ -58,18 +58,20 @@ module ForestAdminDatasourceMambuPayments
       return [] unless body.is_a?(Hash)
 
       wrapped = body['data'] || body[path] || body['records'] || body['items']
-      return wrapped if wrapped.is_a?(Array)
+      wrapped.is_a?(Array) ? wrapped : fallback_records(body, path)
+    end
 
+    # Last resort when the wrapper key is unknown: return the first array-valued
+    # field, logging that we guessed so an unexpected envelope is visible.
+    def fallback_records(body, path)
       fallback = body.values.find { |v| v.is_a?(Array) }
-      if fallback
-        ForestAdminDatasourceMambuPayments.logger.warn(
-          "[forest_admin_datasource_mambu_payments] list(#{path}) used wrapper-key fallback; " \
-          "body keys=#{body.keys.inspect}"
-        )
-        return fallback
-      end
+      return [] unless fallback
 
-      []
+      ForestAdminDatasourceMambuPayments.logger.warn(
+        "[forest_admin_datasource_mambu_payments] list(#{path}) used wrapper-key fallback; " \
+        "body keys=#{body.keys.inspect}"
+      )
+      fallback
     end
 
     def extract_record(body)
@@ -120,11 +122,12 @@ module ForestAdminDatasourceMambuPayments
     def error_message(parsed)
       return parsed.to_s[0, 500] unless parsed.is_a?(Hash)
 
-      message = parsed.dig('error', 'message') || parsed['message'] || parsed['detail']
-      message ||= Array(parsed['errors']).filter_map do |e|
-        e.is_a?(Hash) ? (e['message'] || e['detail']) : e
-      end.join('; ')
+      message = parsed.dig('error', 'message') || parsed['message'] || parsed['detail'] || join_errors(parsed['errors'])
       (message.to_s.empty? ? parsed.to_json : message)[0, 500]
+    end
+
+    def join_errors(errors)
+      Array(errors).filter_map { |e| e.is_a?(Hash) ? (e['message'] || e['detail']) : e }.join('; ')
     end
 
     def parse_body(body)

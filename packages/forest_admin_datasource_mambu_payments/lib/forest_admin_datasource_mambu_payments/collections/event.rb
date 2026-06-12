@@ -95,7 +95,7 @@ module ForestAdminDatasourceMambuPayments
 
         ids_by_collection.to_h do |collection_name, ids|
           target = datasource.get_collection(collection_name)
-          by_id = target.send(:fetch_by_ids, ids).to_h do |raw|
+          by_id = target.fetch_by_ids(ids).to_h do |raw|
             [attrs_of(raw)['id'], target.serialize(raw)]
           end
           [collection_name, by_id]

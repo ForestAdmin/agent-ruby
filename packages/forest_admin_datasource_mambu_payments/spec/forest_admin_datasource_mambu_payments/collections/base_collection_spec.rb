@@ -135,58 +135,56 @@ module ForestAdminDatasourceMambuPayments
           { 'connected_account_id' => '' } # blank ignored
         ]
       end
-      let(:batch_fetcher) { instance_double(Proc) }
-      let(:serializer) { ->(raw) { { 'id' => raw['id'], 'name' => raw['name'] } } }
+      let(:resolver) { instance_double(Collections::ConnectedAccount) }
+      let(:embed) do
+        Collections::BaseCollection::Embed.new(
+          foreign_key: 'connected_account_id', relation_name: 'connected_account', resolver: resolver
+        )
+      end
+
+      before do
+        allow(resolver).to receive(:serialize) { |raw| { 'id' => raw['id'], 'name' => raw['name'] } }
+      end
 
       it 'fetches the unique FKs in a single batch and assigns the serialized record' do
-        allow(batch_fetcher).to receive(:call).with(['a']).and_return([{ 'id' => 'a', 'name' => 'Acme' }])
+        allow(resolver).to receive(:fetch_by_ids).with(['a']).and_return([{ 'id' => 'a', 'name' => 'Acme' }])
 
-        collection.send(:embed_many_to_one, rows, sources, projection,
-                        foreign_key: 'connected_account_id', relation_name: 'connected_account',
-                        batch_fetcher: batch_fetcher, serializer: serializer)
+        collection.send(:embed_many_to_one, rows, sources, projection, embed)
 
         expect(rows[0]['connected_account']).to eq('id' => 'a', 'name' => 'Acme')
         expect(rows[1]['connected_account']).to eq('id' => 'a', 'name' => 'Acme')
         expect(rows[2]).not_to have_key('connected_account')
-        expect(batch_fetcher).to have_received(:call).with(['a']).once
+        expect(resolver).to have_received(:fetch_by_ids).with(['a']).once
       end
 
       it 'does nothing when the projection does not request the relation' do
-        allow(batch_fetcher).to receive(:call)
+        allow(resolver).to receive(:fetch_by_ids)
 
-        collection.send(:embed_many_to_one, rows, sources, ['id'],
-                        foreign_key: 'connected_account_id', relation_name: 'connected_account',
-                        batch_fetcher: batch_fetcher, serializer: serializer)
+        collection.send(:embed_many_to_one, rows, sources, ['id'], embed)
 
         expect(rows).to all(satisfy { |r| !r.key?('connected_account') })
-        expect(batch_fetcher).not_to have_received(:call)
+        expect(resolver).not_to have_received(:fetch_by_ids)
       end
 
       it 'does nothing when projection is nil' do
-        allow(batch_fetcher).to receive(:call)
-        collection.send(:embed_many_to_one, rows, sources, nil,
-                        foreign_key: 'connected_account_id', relation_name: 'connected_account',
-                        batch_fetcher: batch_fetcher, serializer: serializer)
-        expect(batch_fetcher).not_to have_received(:call)
+        allow(resolver).to receive(:fetch_by_ids)
+        collection.send(:embed_many_to_one, rows, sources, nil, embed)
+        expect(resolver).not_to have_received(:fetch_by_ids)
       end
 
       it 'does nothing when no source has a usable FK' do
-        allow(batch_fetcher).to receive(:call)
+        allow(resolver).to receive(:fetch_by_ids)
 
         empty_sources = [{ 'connected_account_id' => nil }, { 'connected_account_id' => '' }]
-        collection.send(:embed_many_to_one, [{ 'id' => 'a' }, { 'id' => 'b' }], empty_sources, projection,
-                        foreign_key: 'connected_account_id', relation_name: 'connected_account',
-                        batch_fetcher: batch_fetcher, serializer: serializer)
+        collection.send(:embed_many_to_one, [{ 'id' => 'a' }, { 'id' => 'b' }], empty_sources, projection, embed)
 
-        expect(batch_fetcher).not_to have_received(:call)
+        expect(resolver).not_to have_received(:fetch_by_ids)
       end
 
       it 'leaves the relation nil for rows whose record is missing from the batch' do
-        allow(batch_fetcher).to receive(:call).with(['a']).and_return([])
+        allow(resolver).to receive(:fetch_by_ids).with(['a']).and_return([])
 
-        collection.send(:embed_many_to_one, rows, sources, projection,
-                        foreign_key: 'connected_account_id', relation_name: 'connected_account',
-                        batch_fetcher: batch_fetcher, serializer: serializer)
+        collection.send(:embed_many_to_one, rows, sources, projection, embed)
 
         expect(rows[0]['connected_account']).to be_nil
         expect(rows[1]['connected_account']).to be_nil
