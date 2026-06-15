@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.32.1...v1.33.0) (2026-06-15)
+
+
+### Features
+
+* **mambu_payments:** add Mambu/Numeral payments datasource ([#317](https://github.com/ForestAdmin/agent-ruby/issues/317)) ([f806b80](https://github.com/ForestAdmin/agent-ruby/commit/f806b8094b1c75c3b7c25371125020192f1f5ee1))
+
 ## [1.32.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.32.0...v1.32.1) (2026-06-11)
 
 
