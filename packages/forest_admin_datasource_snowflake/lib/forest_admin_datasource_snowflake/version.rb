@@ -1,3 +1,3 @@
 module ForestAdminDatasourceSnowflake
-  VERSION = "1.33.0"
+  VERSION = "1.33.1"
 end

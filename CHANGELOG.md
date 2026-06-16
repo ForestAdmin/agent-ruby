@@ -1,3 +1,10 @@
+## [1.33.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.33.0...v1.33.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* **mambu_payments:** disable rubygems mfa requirement ([#318](https://github.com/ForestAdmin/agent-ruby/issues/318)) ([10c5c6c](https://github.com/ForestAdmin/agent-ruby/commit/10c5c6c98f2589ae93d94e0969cfced798243451))
+
 # [1.33.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.32.1...v1.33.0) (2026-06-15)
 
 
