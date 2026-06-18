@@ -34,6 +34,9 @@ module ForestAdminRails
   setting :disable_route_cache, default: false
   setting :rpc_max_polling_threads, default: nil
   setting :workflow_executor_url, default: nil
+  # { store: <object responding to list_by_record/count_by_record> }. When set, the record-history
+  # route (`/_audit-trail/:collection/:id`) is registered and reads from this store.
+  setting :audit_trail, default: nil
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

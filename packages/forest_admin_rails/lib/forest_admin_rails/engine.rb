@@ -34,7 +34,14 @@ module ForestAdminRails
         agent_factory.setup(ForestAdminRails.config)
         load_configuration
         load_cors
+        load_correlation_id
       end
+    end
+
+    # Echo the agent-generated correlation id on every response (mirrors the Node agent's
+    # router.use(correlationIdMiddleware)); CORS exposure of the header is handled in load_cors.
+    def load_correlation_id
+      config.middleware.use ForestAdminAgent::Http::CorrelationIdMiddleware
     end
 
     def load_configuration
@@ -102,7 +109,8 @@ module ForestAdminRails
           hostnames += ENV['CORS_ORIGINS'].split(',') if ENV['CORS_ORIGINS']
 
           origins hostnames
-          resource '*', headers: :any, methods: :any, credentials: true, max_age: 86_400
+          resource '*', headers: :any, methods: :any, credentials: true, max_age: 86_400,
+                        expose: [ForestAdminAgent::Http::CorrelationId::HEADER]
         end
       end
     end
