@@ -26,7 +26,22 @@ module ForestAdminAuditTrail
         matching(collection, record_id, user_ids, start_timestamp, end_timestamp).length
       end
 
+      def list_by_correlation(collection:, record_id:, correlation_key:)
+        by_correlation(collection, record_id) { |record| record.correlation_key == correlation_key }
+      end
+
+      def list_by_correlations(collection:, record_id:, correlation_keys:)
+        by_correlation(collection, record_id) { |record| correlation_keys.include?(record.correlation_key) }
+      end
+
       private
+
+      def by_correlation(collection, record_id)
+        matches = @records.select do |record|
+          record.collection == collection && record.record_id == record_id && yield(record)
+        end
+        sorted(matches, 'asc')
+      end
 
       def matching(collection, record_id, user_ids, start_timestamp, end_timestamp)
         @records.select do |record|

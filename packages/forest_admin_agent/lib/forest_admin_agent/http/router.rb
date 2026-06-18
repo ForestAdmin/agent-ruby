@@ -64,6 +64,9 @@ module ForestAdminAgent
           { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
           { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
           { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } },
+          # Registered before `audit_trail` so `/_audit-trail/correlation(s)` matches here instead of
+          # the per-record `/_audit-trail/:collection_name/:id` (Rails matches in definition order).
+          { name: 'audit_trail_correlation', handler: -> { Resources::AuditTrailCorrelation.new.routes } },
           { name: 'audit_trail', handler: -> { Resources::AuditTrail.new.routes } },
           { name: 'workflow_executor_proxy', handler: -> { Workflow::WorkflowExecutorProxy.new.routes } }
         ]

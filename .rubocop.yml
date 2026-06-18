@@ -453,6 +453,7 @@ RSpec/VerifiedDoubles:
   Exclude:
     - 'packages/forest_admin_audit_trail/spec/lib/forest_admin_audit_trail/plugin_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/audit_trail_spec.rb'
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/audit_trail_correlation_spec.rb'
     - 'packages/forest_admin_datasource_customizer/spec/lib/forest_admin_datasource_customizer/composite_datasource_spec.rb'
 
 RSpec/VerifiedDoubleReference:

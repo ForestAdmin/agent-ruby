@@ -21,6 +21,14 @@ module ForestAdminAuditTrail
       def count_by_record(**)
         0
       end
+
+      def list_by_correlation(**)
+        []
+      end
+
+      def list_by_correlations(**)
+        []
+      end
     end
   end
 end

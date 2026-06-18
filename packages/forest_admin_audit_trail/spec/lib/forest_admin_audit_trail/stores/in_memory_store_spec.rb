@@ -76,6 +76,47 @@ module ForestAdminAuditTrail
         expect(store.count_by_record(collection: 'accounts', record_id: '1')).to eq(3)
         expect(store.count_by_record(collection: 'accounts', record_id: '1', user_ids: [7])).to eq(2)
       end
+
+      describe '#list_by_correlation' do
+        it 'returns entries under the key for the record, oldest first, scoped to collection/record' do
+          store.append(record(timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'req-1',
+                              new_values: { 'n' => 2 }))
+          store.append(record(timestamp: '2026-01-01T00:00:00.000Z', correlation_key: 'req-1',
+                              new_values: { 'n' => 1 }))
+          store.append(record(correlation_key: 'req-2', new_values: { 'n' => 9 }))
+          store.append(record(record_id: '2', correlation_key: 'req-1'))
+          store.append(record(collection: 'contacts', correlation_key: 'req-1'))
+
+          history = store.list_by_correlation(collection: 'accounts', record_id: '1', correlation_key: 'req-1')
+
+          expect(history.map(&:new_values)).to eq([{ 'n' => 1 }, { 'n' => 2 }])
+        end
+
+        it 'returns an empty array when nothing matches' do
+          store.append(record(correlation_key: 'req-1'))
+
+          expect(store.list_by_correlation(collection: 'accounts', record_id: '1', correlation_key: 'nope')).to eq([])
+        end
+      end
+
+      describe '#list_by_correlations' do
+        it 'returns a flat list under any of the keys, oldest first' do
+          store.append(record(timestamp: '2026-01-03T00:00:00.000Z', correlation_key: 'a', new_values: { 'n' => 3 }))
+          store.append(record(timestamp: '2026-01-01T00:00:00.000Z', correlation_key: 'b', new_values: { 'n' => 1 }))
+          store.append(record(timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'a', new_values: { 'n' => 2 }))
+          store.append(record(timestamp: '2026-01-04T00:00:00.000Z', correlation_key: 'c', new_values: { 'n' => 9 }))
+
+          history = store.list_by_correlations(collection: 'accounts', record_id: '1', correlation_keys: %w[a b])
+
+          expect(history.map(&:new_values)).to eq([{ 'n' => 1 }, { 'n' => 2 }, { 'n' => 3 }])
+        end
+
+        it 'returns an empty array for an empty key list' do
+          store.append(record(correlation_key: 'a'))
+
+          expect(store.list_by_correlations(collection: 'accounts', record_id: '1', correlation_keys: [])).to eq([])
+        end
+      end
     end
   end
 end
