@@ -84,6 +84,34 @@ module ForestAdminAuditTrail
         expect(store.count_by_record(collection: 'accounts', record_id: '1', user_ids: [7])).to eq(2)
       end
 
+      it 'lists entries under a correlation key for the record, scoped and oldest first' do
+        store.append(record(record_id: '1', correlation_key: 'req-1', timestamp: '2026-01-01T00:00:02.000Z'))
+        store.append(record(record_id: '1', correlation_key: 'req-1', timestamp: '2026-01-01T00:00:01.000Z'))
+        store.append(record(record_id: '1', correlation_key: 'req-2'))
+        store.append(record(record_id: '2', correlation_key: 'req-1'))
+
+        history = store.list_by_correlation(collection: 'accounts', record_id: '1', correlation_key: 'req-1')
+        expect(history.map(&:timestamp)).to eq(['2026-01-01T00:00:01.000Z', '2026-01-01T00:00:02.000Z'])
+      end
+
+      it 'lists a flat history across multiple correlation keys, oldest first' do
+        store.append(record(correlation_key: 'a', timestamp: '2026-01-03T00:00:00.000Z'))
+        store.append(record(correlation_key: 'b', timestamp: '2026-01-01T00:00:00.000Z'))
+        store.append(record(correlation_key: 'a', timestamp: '2026-01-02T00:00:00.000Z'))
+        store.append(record(correlation_key: 'c', timestamp: '2026-01-04T00:00:00.000Z'))
+
+        history = store.list_by_correlations(collection: 'accounts', record_id: '1', correlation_keys: %w[a b])
+        expect(history.map(&:timestamp)).to eq(
+          ['2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z', '2026-01-03T00:00:00.000Z']
+        )
+      end
+
+      it 'returns an empty array for an empty correlation key list' do
+        store.append(record(correlation_key: 'a'))
+
+        expect(store.list_by_correlations(collection: 'accounts', record_id: '1', correlation_keys: [])).to eq([])
+      end
+
       it 'tracks applied migrations and is idempotent across stores' do
         store.append(record)
         described_class.new(connection_string: { adapter: 'sqlite3', database: db.path }).append(record)

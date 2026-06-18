@@ -40,6 +40,20 @@ module ForestAdminAuditTrail
         scope(collection, record_id, user_ids, start_timestamp, end_timestamp).count
       end
 
+      def list_by_correlation(collection:, record_id:, correlation_key:)
+        model.where(collection: collection, record_id: record_id, correlation_key: correlation_key)
+             .order(:timestamp, :id)
+             .map { |row| from_row(row) }
+      end
+
+      def list_by_correlations(collection:, record_id:, correlation_keys:)
+        return [] if correlation_keys.empty?
+
+        model.where(collection: collection, record_id: record_id, correlation_key: correlation_keys)
+             .order(:timestamp, :id)
+             .map { |row| from_row(row) }
+      end
+
       private
 
       def scope(collection, record_id, user_ids, start_timestamp, end_timestamp)
