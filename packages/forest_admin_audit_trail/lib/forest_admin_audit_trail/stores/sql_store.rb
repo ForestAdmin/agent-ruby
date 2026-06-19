@@ -72,7 +72,7 @@ module ForestAdminAuditTrail
 
       def model
         ensure_ready
-        Sql::AuditLog
+        @model
       end
 
       def ensure_ready
@@ -84,11 +84,16 @@ module ForestAdminAuditTrail
           Sql::AuditConnectionBase.establish_connection(@connection_string)
           connection = Sql::AuditConnectionBase.connection
           Sql::Migrator.new(connection, schema: schema_for(connection), table_name: @table_name).run
-          Sql::AuditLog.table_name = qualified(connection)
-          # The table was just created at runtime: refresh the model's cached column metadata.
-          Sql::AuditLog.reset_column_information
+          @model = build_model(qualified(connection))
           @ready = true
         end
+      end
+
+      # A per-instance concrete subclass bound to this store's own table, so distinct stores can't
+      # clobber each other's table name. reset_column_information drops stale metadata for the table
+      # the migration just created/evolved.
+      def build_model(table)
+        Class.new(Sql::AuditLog) { self.table_name = table }.tap(&:reset_column_information)
       end
 
       def schema_for(connection)

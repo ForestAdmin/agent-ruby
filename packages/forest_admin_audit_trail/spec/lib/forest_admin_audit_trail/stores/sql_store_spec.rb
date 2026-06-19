@@ -27,7 +27,7 @@ module ForestAdminAuditTrail
       it 'creates the audit table with the expected columns on first write' do
         store.append(record)
 
-        expect(ForestAdminAuditTrail::Sql::AuditLog.column_names.sort).to eq(
+        expect(store.send(:model).column_names.sort).to eq(
           %w[collection correlation_key id new_values operation previous_values record_id timestamp user_id]
         )
       end
@@ -118,6 +118,19 @@ module ForestAdminAuditTrail
 
         names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
         expect(names).to eq(['001-create-audit-logs', '002-index-record-and-correlation'])
+      end
+
+      it 'binds each store to its own model class instead of mutating a shared one' do
+        other = described_class.new(connection_string: { adapter: 'sqlite3', database: db.path })
+        store.append(record(correlation_key: 'main'))
+        other.append(record(correlation_key: 'other'))
+
+        # No shared mutable model: AuditLog is an abstract template, each store owns a distinct subclass.
+        expect(ForestAdminAuditTrail::Sql::AuditLog.abstract_class?).to be(true)
+        expect(store.send(:model)).not_to equal(other.send(:model))
+        expect(store.send(:model).table_name).to eq('audit_logs')
+        expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:correlation_key))
+          .to eq(%w[main other])
       end
 
       it 'indexes record_id, correlation_key and user_id' do
