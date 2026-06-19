@@ -66,7 +66,7 @@ module ForestAdminAuditTrail
       end
 
       def schema?
-        postgres? && !@schema.nil?
+        postgres? && @schema.present?
       end
 
       def qualified(name)
