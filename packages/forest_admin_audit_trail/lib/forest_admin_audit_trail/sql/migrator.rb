@@ -16,7 +16,8 @@ module ForestAdminAuditTrail
         {
           name: '001-create-audit-logs',
           up: lambda do |connection, table|
-            connection.create_table(table) do |t|
+            # if_not_exists: a non-PG race (no advisory lock) can let two instances both reach here.
+            connection.create_table(table, if_not_exists: true) do |t|
               t.datetime :timestamp, null: false
               t.string :operation, null: false
               t.string :collection, null: false
@@ -32,9 +33,9 @@ module ForestAdminAuditTrail
           name: '002-index-record-and-correlation',
           up: lambda do |connection, table|
             base = table.split('.').last
-            connection.add_index(table, :record_id, name: "#{base}_record_id")
-            connection.add_index(table, :correlation_key, name: "#{base}_correlation_key")
-            connection.add_index(table, :user_id, name: "#{base}_user_id")
+            connection.add_index(table, :record_id, name: "#{base}_record_id", if_not_exists: true)
+            connection.add_index(table, :correlation_key, name: "#{base}_correlation_key", if_not_exists: true)
+            connection.add_index(table, :user_id, name: "#{base}_user_id", if_not_exists: true)
           end
         }
       ].freeze
