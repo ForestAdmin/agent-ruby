@@ -36,7 +36,8 @@ module ForestAdminAgent
             body: { 'id' => run_id, 'state' => 'pending' },
             headers: {
               'content-type' => 'application/json',
-              'x-forest-executor-version' => '1.2.3',
+              # arbitrary executor response header — must be forwarded untouched.
+              'x-executor-custom' => 'passthrough-value',
               # hop-by-hop response header — must be dropped, not forwarded.
               'transfer-encoding' => 'chunked'
             }
@@ -154,7 +155,7 @@ module ForestAdminAgent
             )
           end
 
-          it 'returns the executor status, body and response headers (version gate) except hop-by-hop' do
+          it 'returns the executor status, body and response headers except hop-by-hop' do
             result = proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
 
             expect(result).to eq(
@@ -162,7 +163,7 @@ module ForestAdminAgent
               status: 200,
               headers: {
                 'content-type' => 'application/json',
-                'x-forest-executor-version' => '1.2.3'
+                'x-executor-custom' => 'passthrough-value'
               }
             )
           end

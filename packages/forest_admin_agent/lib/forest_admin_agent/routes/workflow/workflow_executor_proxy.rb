@@ -134,8 +134,8 @@ module ForestAdminAgent
           rack_name.split('_').map(&:capitalize).join('-')
         end
 
-        # Forward every executor response header except hop-by-hop ones, so the version gate
-        # (X-Forest-Executor-Version) survives the proxy.
+        # Forward every executor response header except hop-by-hop ones, so new executor headers
+        # never require an agent change (PRD-567: zero breaking, the agent stays a transparent proxy).
         def forwarded_response_headers(response)
           response.headers.each_with_object({}) do |(name, value), acc|
             next if name.nil? || SKIPPED_HEADERS.include?(name.to_s.downcase)
