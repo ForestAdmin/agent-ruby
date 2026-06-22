@@ -134,9 +134,15 @@ module ForestAdminAgent
           rack_name.split('_').map(&:capitalize).join('-')
         end
 
+        # Forward every executor response header except hop-by-hop ones, so the version gate
+        # (X-Forest-Executor-Version) survives the proxy.
         def forwarded_response_headers(response)
-          content_type = response.headers['content-type'] || response.headers['Content-Type']
-          content_type ? { 'Content-Type' => content_type } : {}
+          response.headers.each_with_object({}) do |(name, value), acc|
+            next if name.nil? || SKIPPED_HEADERS.include?(name.to_s.downcase)
+            next if value.nil? || value.to_s.empty?
+
+            acc[name.to_s] = value.to_s
+          end
         end
       end
     end

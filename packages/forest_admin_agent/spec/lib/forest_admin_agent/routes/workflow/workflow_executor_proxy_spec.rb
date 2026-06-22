@@ -34,7 +34,12 @@ module ForestAdminAgent
             Faraday::Response,
             status: 200,
             body: { 'id' => run_id, 'state' => 'pending' },
-            headers: { 'content-type' => 'application/json' }
+            headers: {
+              'content-type' => 'application/json',
+              'x-forest-executor-version' => '1.2.3',
+              # hop-by-hop response header — must be dropped, not forwarded.
+              'transfer-encoding' => 'chunked'
+            }
           )
         end
 
@@ -149,13 +154,16 @@ module ForestAdminAgent
             )
           end
 
-          it 'returns the executor status, body and Content-Type to the controller' do
+          it 'returns the executor status, body and response headers (version gate) except hop-by-hop' do
             result = proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
 
             expect(result).to eq(
               content: { 'id' => run_id, 'state' => 'pending' },
               status: 200,
-              headers: { 'Content-Type' => 'application/json' }
+              headers: {
+                'content-type' => 'application/json',
+                'x-forest-executor-version' => '1.2.3'
+              }
             )
           end
         end
