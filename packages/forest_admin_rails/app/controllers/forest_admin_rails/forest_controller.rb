@@ -48,7 +48,7 @@ module ForestAdminRails
       end
 
       # Proxy routes expose response headers at the root (their `content` is the rendered body,
-      # so headers can't nest under it like Stream/File/CSV do).
+      # so headers can't nest under it like Stream/File do).
       response.headers.merge!(data[:headers]) if data[:headers].is_a?(Hash)
 
       respond_to do |format|

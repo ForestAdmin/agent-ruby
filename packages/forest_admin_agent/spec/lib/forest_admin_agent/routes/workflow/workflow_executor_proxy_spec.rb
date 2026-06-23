@@ -255,6 +255,22 @@ module ForestAdminAgent
           end
         end
 
+        describe 'when the executor connection fails at the transport level (e.g. SSL)' do
+          before do
+            allow(Faraday).to receive(:new).and_wrap_original do |original, *args, &block|
+              connection = original.call(*args, &block)
+              allow(connection).to receive(:run_request).and_raise(Faraday::SSLError.new('cert'))
+              connection
+            end
+          end
+
+          it 'raises ServiceUnavailableError rather than a generic 500' do
+            expect do
+              proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
+            end.to raise_error(Http::Exceptions::ServiceUnavailableError, /request failed/)
+          end
+        end
+
         describe 'Faraday timeout' do
           it 'applies a single large timeout regardless of the verb' do
             proxy.handle_request(method: 'POST', headers: headers, params: { 'path' => "#{run_id}/trigger" }, body: '{}')

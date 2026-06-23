@@ -9,7 +9,8 @@ module ForestAdminAgent
         AGENT_PREFIX = '/_internal/workflow-executions'.freeze
         EXECUTOR_PREFIX = '/runs'.freeze
         # Never forwarded (request or response): hop-by-hop, Host, and body-framing headers.
-        # The body is re-serialized, so upstream length/encoding no longer match — and forwarding
+        # Faraday and `render json:` set their own length and de/recompress the body, so relaying
+        # the upstream length/encoding would mismatch the bytes we actually send — and forwarding
         # accept-encoding would disable Faraday's transparent gzip decompression.
         SKIPPED_HEADERS = %w[
           connection keep-alive transfer-encoding upgrade te trailer
@@ -97,6 +98,10 @@ module ForestAdminAgent
           raise Http::Exceptions::ServiceUnavailableError.new('Workflow executor timed out', cause: e)
         rescue Faraday::ConnectionFailed => e
           raise Http::Exceptions::ServiceUnavailableError.new('Workflow executor unreachable', cause: e)
+        # Any other transport-level Faraday failure (SSL, etc.) is an executor-reachability problem,
+        # not a 500 — Faraday never raises on executor 4xx/5xx (no raise_error middleware).
+        rescue Faraday::Error => e
+          raise Http::Exceptions::ServiceUnavailableError.new('Workflow executor request failed', cause: e)
         end
 
         def build_client
@@ -107,7 +112,7 @@ module ForestAdminAgent
           end
         end
 
-        # `env` is the Rack env: real HTTP headers are the HTTP_* keys (+ CONTENT_TYPE);
+        # `env` is the Rack env: real HTTP headers are the HTTP_* keys (+ CONTENT_TYPE/CONTENT_LENGTH);
         # rack.*/action_dispatch.*/server vars are not headers and are dropped.
         def forwarded_request_headers(env)
           return {} unless env.is_a?(Hash)
