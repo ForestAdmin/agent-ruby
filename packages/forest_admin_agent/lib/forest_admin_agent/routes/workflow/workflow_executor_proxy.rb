@@ -16,8 +16,7 @@ module ForestAdminAgent
           proxy-authenticate proxy-authorization host
           content-length content-encoding accept-encoding
         ].freeze
-        # Substrings that could let the wildcard escape EXECUTOR_PREFIX (traversal, encoded
-        # dots, backslash, null byte).
+        # Fragments that could escape EXECUTOR_PREFIX once decoded.
         UNSAFE_PATH_FRAGMENTS = ['..', '%2e', '%2E', '\\', "\0"].freeze
         OPEN_TIMEOUT = 2
         REQUEST_TIMEOUT = 120
@@ -25,8 +24,6 @@ module ForestAdminAgent
         def setup_routes
           return self unless executor_configured?
 
-          # The glob can only ever map into EXECUTOR_PREFIX (build_executor_path rejects
-          # traversal), so executor routes outside it stay unreachable through the proxy.
           add_route(
             'forest_workflow_executor_proxy',
             :all,
@@ -137,8 +134,6 @@ module ForestAdminAgent
           rack_name.split('_').map(&:capitalize).join('-')
         end
 
-        # Forward every executor response header except hop-by-hop ones, so new executor headers
-        # never require an agent change (PRD-567: zero breaking, the agent stays a transparent proxy).
         def forwarded_response_headers(response)
           response.headers.each_with_object({}) do |(name, value), acc|
             next if name.nil? || SKIPPED_HEADERS.include?(name.to_s.downcase)
