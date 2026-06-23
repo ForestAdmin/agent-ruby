@@ -47,6 +47,10 @@ module ForestAdminRails
         end
       end
 
+      # Proxy routes expose response headers at the root (their `content` is the rendered body,
+      # so headers can't nest under it like Stream/File/CSV do).
+      response.headers.merge!(data[:headers]) if data[:headers].is_a?(Hash)
+
       respond_to do |format|
         format.json { render json: data[:content], status: data[:status] || data[:content][:status] || 200 }
         format.csv { render plain: data[:content][:export], status: 200, filename: data[:filename] }

@@ -316,6 +316,27 @@ module ForestAdminRails
           expect(response_mock.headers['Access-Control-Expose-Headers']).to eq('Content-Disposition')
         end
       end
+
+      context 'when a verbatim-forwarding route returns response headers at the root' do
+        # The workflow executor proxy returns { content: <body>, status:, headers: }; its `content`
+        # is the rendered body, so response headers live at the root rather than nested under
+        # content. Without honoring data[:headers] they would be silently dropped (PRD-567).
+        let(:proxy_data) do
+          {
+            content: { 'id' => 'run-1', 'state' => 'pending' },
+            status: 200,
+            headers: { 'X-Forest-Executor-Version' => '1.2.3' }
+          }
+        end
+
+        before { allow(controller).to receive(:respond_to) }
+
+        it 'merges the root headers into the HTTP response' do
+          controller.send(:forest_response, proxy_data)
+
+          expect(response_mock.headers['X-Forest-Executor-Version']).to eq('1.2.3')
+        end
+      end
     end
   end
 end

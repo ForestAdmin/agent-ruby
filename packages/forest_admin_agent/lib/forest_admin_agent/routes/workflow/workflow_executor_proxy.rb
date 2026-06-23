@@ -8,10 +8,13 @@ module ForestAdminAgent
       class WorkflowExecutorProxy < AbstractAuthenticatedRoute
         AGENT_PREFIX = '/_internal/workflow-executions'.freeze
         EXECUTOR_PREFIX = '/runs'.freeze
-        # Hop-by-hop headers + those the HTTP client must recompute — never forwarded.
+        # Never forwarded (request or response): hop-by-hop, Host, and body-framing headers.
+        # The body is re-serialized, so upstream length/encoding no longer match — and forwarding
+        # accept-encoding would disable Faraday's transparent gzip decompression.
         SKIPPED_HEADERS = %w[
           connection keep-alive transfer-encoding upgrade te trailer
-          proxy-authenticate proxy-authorization host content-length
+          proxy-authenticate proxy-authorization host
+          content-length content-encoding accept-encoding
         ].freeze
         # Substrings that could let the wildcard escape EXECUTOR_PREFIX (traversal, encoded
         # dots, backslash, null byte).

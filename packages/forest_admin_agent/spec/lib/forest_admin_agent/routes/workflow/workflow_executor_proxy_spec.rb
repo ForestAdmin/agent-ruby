@@ -21,6 +21,8 @@ module ForestAdminAgent
             'CONTENT_LENGTH' => '123',
             'HTTP_CONNECTION' => 'keep-alive',
             'HTTP_HOST' => 'agent.test',
+            # Forwarding this would disable Faraday's transparent gzip decompression.
+            'HTTP_ACCEPT_ENCODING' => 'gzip, deflate',
             'action_dispatch.remote_ip' => '127.0.0.1',
             'rack.input' => 'raw-body'
           }
@@ -39,7 +41,9 @@ module ForestAdminAgent
               # arbitrary executor response header — must be forwarded untouched.
               'x-executor-custom' => 'passthrough-value',
               # hop-by-hop response header — must be dropped, not forwarded.
-              'transfer-encoding' => 'chunked'
+              'transfer-encoding' => 'chunked',
+              # body-framing header — meaningless once the body is re-serialized; must be dropped.
+              'content-encoding' => 'gzip'
             }
           )
         end
@@ -144,9 +148,10 @@ module ForestAdminAgent
             expect(captured[:url]).to eq("#{executor_url}/runs/#{run_id}/cancel")
           end
 
-          it 'forwards all client headers except hop-by-hop / host / content-length' do
+          it 'forwards all client headers except hop-by-hop / host / length / encoding' do
             proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
 
+            # Exact match: accept-encoding (in the fixture) must not leak through.
             expect(captured[:headers]).to eq(
               'Authorization' => bearer,
               'Cookie' => 'forest_session_token=abc',
@@ -155,9 +160,10 @@ module ForestAdminAgent
             )
           end
 
-          it 'returns the executor status, body and response headers except hop-by-hop' do
+          it 'returns the executor status, body and response headers except hop-by-hop / encoding' do
             result = proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
 
+            # Exact match: transfer-encoding and content-encoding (in fake_response) must be dropped.
             expect(result).to eq(
               content: { 'id' => run_id, 'state' => 'pending' },
               status: 200,
