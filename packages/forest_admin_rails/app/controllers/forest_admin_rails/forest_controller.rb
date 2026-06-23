@@ -11,7 +11,17 @@ module ForestAdminRails
         route = ForestAdminAgent::Http::Router.cached_routes[params['route_alias']]
 
         begin
-          forest_response route[:closure].call({ params: params.to_unsafe_h, headers: request.headers.to_h })
+          forest_response route[:closure].call(
+            {
+              params: params.to_unsafe_h,
+              headers: request.headers.to_h,
+              # Raw request context for verbatim-forwarding routes (workflow executor proxy);
+              # other routes ignore these keys.
+              method: request.request_method,
+              query_string: request.query_string,
+              body: request.raw_post
+            }
+          )
         rescue StandardError => e
           exception_handler e
         end
@@ -36,6 +46,10 @@ module ForestAdminRails
           data[:content].delete(:headers)
         end
       end
+
+      # Proxy routes expose response headers at the root (their `content` is the rendered body,
+      # so headers can't nest under it like Stream/File do).
+      response.headers.merge!(data[:headers]) if data[:headers].is_a?(Hash)
 
       respond_to do |format|
         format.json { render json: data[:content], status: data[:status] || data[:content][:status] || 200 }
