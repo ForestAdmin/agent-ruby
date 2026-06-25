@@ -1,13 +1,13 @@
 require 'faraday'
+require 'uri'
 
 module ForestAdminAgent
   module Routes
     module Workflow
-      # Generic proxy: forwards any sub-path/verb under AGENT_PREFIX to EXECUTOR_PREFIX, so a
-      # new executor route needs no change here (PRD-567). Mounted only when `workflow_executor_url` is set.
+      # Generic proxy: forwards any sub-path/verb under AGENT_PREFIX to the executor verbatim, so a
+      # new executor route needs no change here. Mounted only when `workflow_executor_url` is set.
       class WorkflowExecutorProxy < AbstractAuthenticatedRoute
-        AGENT_PREFIX = '/_internal/workflow-executions'.freeze
-        EXECUTOR_PREFIX = '/runs'.freeze
+        AGENT_PREFIX = '/_internal/executor'.freeze
         # Never forwarded (request or response): hop-by-hop, Host, and body-framing headers.
         # Faraday and `render json:` set their own length and de/recompress the body, so relaying
         # the upstream length/encoding would mismatch the bytes we actually send — and forwarding
@@ -17,7 +17,7 @@ module ForestAdminAgent
           proxy-authenticate proxy-authorization host
           content-length content-encoding accept-encoding
         ].freeze
-        # Fragments that could escape EXECUTOR_PREFIX once decoded.
+        # Fragments that could let the wildcard leave the executor origin once decoded.
         UNSAFE_PATH_FRAGMENTS = ['..', '%2e', '%2E', '\\', "\0"].freeze
         OPEN_TIMEOUT = 2
         REQUEST_TIMEOUT = 120
@@ -68,19 +68,32 @@ module ForestAdminAgent
         end
 
         def build_target_url(args)
+          base = configured_executor_url
           path = build_executor_path(args.dig(:params, 'path') || args.dig(:params, :path))
+          reject_off_origin!(base, path)
           query = args[:query_string].to_s
-          url = "#{configured_executor_url}#{path}"
+          url = "#{base}#{path}"
 
           query.empty? ? url : "#{url}?#{query}"
         end
 
-        # Security boundary: reject anything that could escape EXECUTOR_PREFIX.
+        # First-pass rejection of escape attempts; the authoritative origin check is reject_off_origin!.
         def build_executor_path(raw_path)
           path = raw_path.to_s
           raise Http::Exceptions::NotFoundError, 'Invalid workflow executor path' if unsafe_path?(path)
 
-          "#{EXECUTOR_PREFIX}/#{path}"
+          "/#{path}"
+        end
+
+        # Authoritative SSRF check: forwarding must never leave the executor origin.
+        def reject_off_origin!(base, path)
+          base_uri = URI.parse(base)
+          target = URI.parse("#{base}#{path}")
+          same = target.scheme == base_uri.scheme && target.host == base_uri.host &&
+                 target.port == base_uri.port
+          raise Http::Exceptions::NotFoundError, 'Invalid workflow executor path' unless same
+        rescue URI::InvalidURIError
+          raise Http::Exceptions::NotFoundError, 'Invalid workflow executor path'
         end
 
         def unsafe_path?(path)

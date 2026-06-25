@@ -82,7 +82,7 @@ module ForestAdminAgent
             route = proxy.routes['forest_workflow_executor_proxy']
             expect(route).to include(
               method: :all,
-              uri: '/_internal/workflow-executions/*path'
+              uri: '/_internal/executor/*path'
             )
           end
 
@@ -109,11 +109,11 @@ module ForestAdminAgent
         end
 
         describe '#handle_request — generic forwarding' do
-          it 'forwards a GET under /runs, preserving the sub-path and query verbatim' do
+          it 'forwards a run GET (caller includes runs/), preserving the sub-path and query verbatim' do
             proxy.handle_request(
               method: 'GET',
               headers: headers,
-              params: { 'path' => run_id },
+              params: { 'path' => "runs/#{run_id}" },
               query_string: 'page=2&q=foo'
             )
 
@@ -128,7 +128,7 @@ module ForestAdminAgent
             proxy.handle_request(
               method: 'POST',
               headers: headers,
-              params: { 'path' => "#{run_id}/trigger" },
+              params: { 'path' => "runs/#{run_id}/trigger" },
               body: raw
             )
 
@@ -137,15 +137,15 @@ module ForestAdminAgent
             expect(captured[:body]).to eq(raw)
           end
 
-          it 'forwards any verb and any future sub-path without a dedicated route' do
+          it 'forwards a non-runs route verbatim (no /runs prefix injected)' do
             proxy.handle_request(
               method: 'DELETE',
               headers: headers,
-              params: { 'path' => "#{run_id}/cancel" }
+              params: { 'path' => 'mcp-oauth-credentials' }
             )
 
             expect(captured[:method]).to eq(:delete)
-            expect(captured[:url]).to eq("#{executor_url}/runs/#{run_id}/cancel")
+            expect(captured[:url]).to eq("#{executor_url}/mcp-oauth-credentials")
           end
 
           it 'forwards all client headers except hop-by-hop / host / length / encoding' do
@@ -175,14 +175,15 @@ module ForestAdminAgent
           end
         end
 
-        describe 'path traversal protection (the namespace security boundary)' do
+        describe 'SSRF guard (cannot escape the executor origin)' do
           [
             '..',
             '../mcp-oauth-credentials',
             'run_abc123/../../mcp-oauth-credentials',
             '%2e%2e/mcp-oauth-credentials',
             'run_abc123%2E%2E',
-            '/runs/run_abc123',
+            '/mcp-oauth-credentials',
+            "\t//evil.com",
             "run\u0000id"
           ].each do |evil_path|
             it "rejects #{evil_path.inspect} with NotFoundError and never forwards" do
