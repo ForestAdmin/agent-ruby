@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.33.1...v1.34.0) (2026-06-26)
+
+
+### Features
+
+* **agent:** forward any executor route generically [PRD-567] ([#321](https://github.com/ForestAdmin/agent-ruby/issues/321)) ([9bc904d](https://github.com/ForestAdmin/agent-ruby/commit/9bc904d508b1bf3cff0b3c2baed1f4dee50cdb22))
+
 ## [1.33.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.33.0...v1.33.1) (2026-06-16)
 
 
