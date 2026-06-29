@@ -1,5 +1,8 @@
 require 'spec_helper'
 require 'faraday'
+require 'zlib'
+require 'stringio'
+require 'socket'
 
 module ForestAdminAgent
   module Routes
@@ -269,6 +272,55 @@ module ForestAdminAgent
             expect do
               proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => run_id })
             end.to raise_error(Http::Exceptions::ServiceUnavailableError, /request failed/)
+          end
+        end
+
+        # Real local server + real Faraday (no run_request stub) to exercise actual gzip decompression.
+        describe 'when the executor gzip-compresses the response (nginx in front)' do
+          let(:gz_body) do
+            io = StringIO.new
+            writer = Zlib::GzipWriter.new(io)
+            writer.write(JSON.generate('steps' => [{ 'stepId' => 'gz' }]))
+            writer.close
+            io.string
+          end
+
+          around do |example|
+            @gz_server = TCPServer.new('127.0.0.1', 0)
+            @gz_port = @gz_server.addr[1]
+            @gz_thread = Thread.new do
+              client = @gz_server.accept
+              client.readpartial(4096)
+              client.write(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" \
+                "Content-Encoding: gzip\r\nContent-Length: #{gz_body.bytesize}\r\n" \
+                "Connection: close\r\n\r\n"
+              )
+              client.write(gz_body)
+              client.close
+            rescue IOError, Errno::ECONNRESET, Errno::EPIPE
+              nil
+            end
+
+            example.run
+
+            @gz_thread.kill
+            @gz_server.close
+          end
+
+          before do
+            # Runs after the outer `before`, so it wins: use the real Faraday client (no run_request
+            # stub) against the local gzip server.
+            override_config(workflow_executor_url: "http://127.0.0.1:#{@gz_port}")
+            allow(Faraday).to receive(:new).and_call_original
+          end
+
+          it 'decompresses the body and drops the stale content-encoding' do
+            result = proxy.handle_request(method: 'GET', headers: headers, params: { 'path' => 'runs/gz' })
+
+            expect(result[:status]).to eq(200)
+            expect(result[:content]).to eq('steps' => [{ 'stepId' => 'gz' }])
+            expect(result[:headers].keys.map(&:downcase)).not_to include('content-encoding')
           end
         end
 
