@@ -204,10 +204,73 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def apply_select
+        unless @projection.nil?
+          join_tree = {}
+          preload_tree = {}
+          @projection.relations.each do |relation_name, sub_projection|
+            if fully_joinable?(@collection, relation_name, sub_projection)
+              join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+            else
+              preload_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+            end
+          end
+
+          # to-one relations living in the same database are resolved with a single
+          # LEFT OUTER JOIN (eager_load) instead of one extra query per relation
+          # (preload). to-many / polymorphic / cross-database relations keep preload:
+          # a JOIN would multiply rows (breaking pagination) or is simply not possible.
+          @query = @query.eager_load(join_tree) unless join_tree.empty?
+          @query = @query.includes(preload_tree) unless preload_tree.empty?
+        end
         @query = @query.select(@select.join(', ')) if @select
-        @query = @query.includes(format_relation_projection(@projection)) unless @projection.nil?
 
         @query
+      end
+
+      # A relation subtree can be collapsed into a JOIN only if the relation itself is a
+      # non-polymorphic to-one relation on the same database, and every relation nested
+      # below it satisfies the same constraint.
+      def fully_joinable?(collection, relation_name, sub_projection)
+        relation_schema = collection.schema[:fields][relation_name]
+        return false unless %w[OneToOne ManyToOne].include?(relation_schema.type)
+        return false unless relation_schema.respond_to?(:foreign_collection)
+
+        # The target must be an ActiveRecord collection living in THIS datasource. A
+        # relation towards another datasource (RPC, Mongoid, ...) is resolved above the
+        # datasource and never reaches here, but we stay defensive: anything we cannot
+        # resolve locally as an AR-backed collection falls back to preload.
+        target_collection = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        return false if target_collection.nil?
+        return false unless same_database?(collection.model, target_collection.model)
+        # A default_scope is applied to the JOINed table and may contain raw / unqualified
+        # SQL (e.g. `where('id > ?', 10)`) that becomes ambiguous once joined. Preload keeps
+        # it isolated, so fall back to preload rather than risk broken SQL.
+        return false unless target_collection.model.default_scopes.empty?
+
+        sub_projection.relations.all? do |nested_name, nested_projection|
+          fully_joinable?(target_collection, nested_name, nested_projection)
+        end
+      end
+
+      def same_database?(model_a, model_b)
+        model_a.connection_specification_name == model_b.connection_specification_name
+      rescue StandardError
+        false
+      end
+
+      # Returns the target collection only when it is ActiveRecord-backed AND belongs to
+      # the very same datasource instance we are querying; otherwise nil (=> the caller
+      # falls back to preload). Belt-and-suspenders against a foreign collection ever
+      # being reachable by name (e.g. name collision across datasources in a composite):
+      # we check the concrete class and the datasource object identity, not just the name.
+      def local_ar_collection(datasource, name)
+        collection = datasource.get_collection(name)
+        return nil unless collection.is_a?(ForestAdminDatasourceActiveRecord::Collection)
+        return nil unless collection.datasource.equal?(datasource)
+
+        collection
+      rescue StandardError
+        nil
       end
 
       def add_join_relation(relation_name)
