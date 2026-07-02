@@ -17,8 +17,7 @@ module ForestAdminDatasourceActiveRecord
         # relation path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias }, pk_alias: }
         @joined_relations = {}
         @alias_counter = 0
-        # tables already joined by apply_filter/apply_sort (resolve_field), so apply_select
-        # does not add a second, conflicting join for the same relation
+        # tables already joined by filters/sorts, so apply_select does not join them a second time
         @filter_joined_tables = Set.new
       end
 
@@ -215,9 +214,6 @@ module ForestAdminDatasourceActiveRecord
         unless @projection.nil?
           join_tree, preload_tree = split_relations
 
-          # belongs_to relations on the same database are JOINed (selecting only their projected
-          # columns, unlike eager_load which reads the whole row); the rest stays on preload, where
-          # a JOIN would multiply rows or is impossible.
           @query = @query.left_outer_joins(join_tree) unless join_tree.empty?
           @query = @query.includes(preload_tree) unless preload_tree.empty?
         end
@@ -226,7 +222,6 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
-      # Splits the projection's relations into a JOIN tree and a preload tree.
       def split_relations
         join_tree = {}
         preload_tree = {}
@@ -275,8 +270,7 @@ module ForestAdminDatasourceActiveRecord
         "fa_join_#{@alias_counter}"
       end
 
-      # Set of tables the subtree would add via JOIN, or nil when any relation in it cannot be
-      # safely joined (see joinable_target). Recurses so the whole chain must be joinable.
+      # Set of tables the subtree adds via JOIN, or nil if any relation in it can't be safely joined.
       def joinable_tables(collection, relation_name, sub_projection, used_tables)
         target = joinable_target(collection, relation_name, used_tables)
         return nil if target.nil?
@@ -291,41 +285,35 @@ module ForestAdminDatasourceActiveRecord
         tables
       end
 
-      # The target collection when this single hop is safe to collapse into a LEFT OUTER JOIN,
-      # else nil. Only belongs_to qualifies: it matches on the target's primary key, so the JOIN
-      # cannot duplicate the parent row (a has_one child may not be unique).
+      # The target collection when this hop is safe to collapse into a JOIN, else nil (-> preload).
       def joinable_target(collection, relation_name, used_tables)
         relation_schema = collection.schema[:fields][relation_name]
+        # belongs_to only: it joins on the target's primary key, so it can't duplicate the parent
+        # (a has_one child may not be unique)
         return unless relation_schema.type == 'ManyToOne' && relation_schema.respond_to?(:foreign_collection)
 
         # a scoped association applies its scope to the JOIN and may inject raw/unqualified SQL or
-        # extra joins (e.g. `belongs_to :x, -> { where('id > ?', 1) }`); the same risk exists for a
-        # default_scope on the target. Both keep it isolated when preloaded.
+        # extra joins (e.g. `belongs_to :x, -> { where('id > ?', 1) }`)
         reflection = collection.model.reflect_on_association(relation_name.to_sym)
         return if reflection.nil? || reflection.scope
 
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
-        return if target.nil? || !target.model.default_scopes.empty?
+        return if target.nil? || !target.model.default_scopes.empty? # same risk as a scoped association
         return unless same_database?(collection.model, target.model)
-
-        # a table joined twice would be aliased by ActiveRecord, which collect_joined_selects
-        # cannot reference; bail out so it is preloaded instead
-        return if used_tables.include?(target.model.table_name)
+        return if used_tables.include?(target.model.table_name) # a table joined twice would be aliased by AR
 
         target
       end
 
       def same_database?(model_a, model_b)
-        # compare the actual connection pools, not connection_specification_name (which is only the
-        # owner class name and can be shared across different databases/shards)
+        # compare the pools, not connection_specification_name (only an owner class name, shared across shards)
         model_a.connection_pool == model_b.connection_pool
       rescue StandardError
         false
       end
 
-      # The target collection if it is AR-backed AND belongs to this exact datasource, else nil.
-      # Class + identity (not just the name) guard against a foreign-datasource collection ever
-      # being reachable here (e.g. name collision in a composite) -> caller falls back to preload.
+      # The target collection only if it is AR-backed AND belongs to this exact datasource, else nil.
+      # Guards (concrete class + identity, not just the name) against a foreign-datasource collection.
       def local_ar_collection(datasource, name)
         collection = datasource.get_collection(name)
         return nil unless collection.is_a?(ForestAdminDatasourceActiveRecord::Collection)

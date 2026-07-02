@@ -1,9 +1,7 @@
 module ForestAdminDatasourceActiveRecord
   module Utils
-    # Relations in `joined_relations` (see Query#collect_joined_selects) were resolved by JOIN
-    # and are hydrated from the flat row's aliased columns; every other relation is read from
-    # its preloaded ActiveRecord association. A related record is serialized to exactly its
-    # projected columns either way, so its shape does not depend on how it was resolved.
+    # Relations in `joined_relations` (see Query#collect_joined_selects) are hydrated from the flat
+    # row's aliased columns; every other relation is read from its preloaded ActiveRecord association.
     ActiveRecordSerializer = Struct.new(:object, :joined_relations) do
       def to_hash(projection)
         hash_object(object, projection)
@@ -12,8 +10,8 @@ module ForestAdminDatasourceActiveRecord
       def hash_object(object, projection = nil, path: [])
         return if object.nil?
 
-        # the root keeps every selected column (own attributes + foreign keys); a related record
-        # is restricted to its projected columns, matching the JOINed hydration path
+        # root keeps all its selected columns (attributes + FKs); a related record is restricted to
+        # its projected columns, matching the JOINed hydration
         hash = path.empty? || projection.nil? ? base_attributes(object) : projected_columns(object, projection)
 
         serialize_associations(object, projection, hash, path) if projection
