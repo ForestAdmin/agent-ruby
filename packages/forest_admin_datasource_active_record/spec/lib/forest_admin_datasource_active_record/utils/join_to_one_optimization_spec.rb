@@ -137,6 +137,39 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    describe 'safety guard: a relation already joined by a filter/sort is not joined again' do
+      let(:collection) { Collection.new(datasource, Account) }
+      let(:projection) { Projection.new(['id', 'supplier:name']) }
+
+      it 'falls back to preload for a relation the filter already joined (no duplicate JOIN)' do
+        condition = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+                    .new('supplier:name', 'Equal', 'ACME')
+        filter = Filter.new(condition_tree: condition)
+
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        expect(query.joined_relations).to be_empty # supplier was already joined for the filter
+        expect(query.query.to_sql.scan(/LEFT OUTER JOIN "suppliers"/i).size).to eq(1)
+
+        result = collection.list(caller, filter, projection)
+        expect(result.first['supplier']['name']).to eq('ACME')
+      end
+    end
+
+    describe 'same_database?' do
+      let(:query) { Utils::Query.new(Collection.new(datasource, Account), Projection.new(['id']), filter) }
+
+      it 'compares connection pools' do
+        model_a = Class.new { def self.connection_pool = :first_pool }
+        model_b = Class.new { def self.connection_pool = :second_pool }
+
+        expect(query.send(:same_database?, model_a, model_a)).to be(true)
+        expect(query.send(:same_database?, model_a, model_b)).to be(false)
+        expect(query.send(:same_database?, Account, Supplier)).to be(true)
+      end
+    end
+
     describe 'safety guard (belt-and-suspenders): target not local to this datasource' do
       let(:collection) { Collection.new(datasource, Account) }
       let(:query) { Utils::Query.new(collection, Projection.new(['id', 'supplier:name']), filter) }

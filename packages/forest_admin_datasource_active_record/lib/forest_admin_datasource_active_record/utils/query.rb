@@ -17,6 +17,9 @@ module ForestAdminDatasourceActiveRecord
         # relation path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias }, pk_alias: }
         @joined_relations = {}
         @alias_counter = 0
+        # tables already joined by apply_filter/apply_sort (resolve_field), so apply_select
+        # does not add a second, conflicting join for the same relation
+        @filter_joined_tables = Set.new
       end
 
       def build
@@ -212,7 +215,7 @@ module ForestAdminDatasourceActiveRecord
         unless @projection.nil?
           join_tree = {}
           preload_tree = {}
-          used_tables = Set[@collection.model.table_name]
+          used_tables = Set[@collection.model.table_name] | @filter_joined_tables
           @projection.relations.each do |relation_name, sub_projection|
             tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
             if tables
@@ -238,6 +241,7 @@ module ForestAdminDatasourceActiveRecord
       def collect_joined_selects(collection, relation_name, sub_projection, path)
         relation_schema = collection.schema[:fields][relation_name]
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        connection = target.model.connection
         table = target.model.table_name
         pk_columns = Array(target.model.primary_key) # array for composite primary keys
 
@@ -245,7 +249,9 @@ module ForestAdminDatasourceActiveRecord
         # a pk column is always selected so the serializer can detect a NULL (absent) left-joined relation
         (sub_projection.columns + pk_columns).uniq.each do |column|
           sql_alias = next_join_alias
-          @select << %("#{table}"."#{column}" AS "#{sql_alias}")
+          # quote via the adapter so it works on MySQL too (ANSI "..." are string literals there)
+          @select << "#{connection.quote_table_name(table)}.#{connection.quote_column_name(column)} " \
+                     "AS #{connection.quote_column_name(sql_alias)}"
           alias_map[column] = sql_alias
         end
         @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk_columns.first] }
@@ -291,7 +297,9 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def same_database?(model_a, model_b)
-        model_a.connection_specification_name == model_b.connection_specification_name
+        # compare the actual connection pools, not connection_specification_name (which is only the
+        # owner class name and can be shared across different databases/shards)
+        model_a.connection_pool == model_b.connection_pool
       rescue StandardError
         false
       end
@@ -321,6 +329,7 @@ module ForestAdminDatasourceActiveRecord
           relation = @collection.schema[:fields][relation_name]
           related_collection = @collection.datasource.get_collection(relation.foreign_collection)
           add_join_relation(relation_name)
+          @filter_joined_tables << related_collection.model.table_name
 
           {
             formatted: "#{related_collection.model.table_name}.#{column_name}",
