@@ -24,9 +24,7 @@ module ForestAdminDatasourceActiveRecord
             query_builder = described_class.new(collection, projection, Filter.new)
             query_builder.build
 
-            # base columns (own + foreign keys) are still selected as before
             expect(query_builder.select).to include('accounts.account_history_id', 'accounts.id')
-            # nested to-one relations are resolved by JOIN and tracked for flat hydration
             expect(query_builder.joined_relations.keys).to contain_exactly('account_history', 'account_history.account')
           end
         end

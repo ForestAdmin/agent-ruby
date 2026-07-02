@@ -12,9 +12,7 @@ module ForestAdminDatasourceActiveRecord
         @filter = filter
         @arel_table = @collection.model.arel_table
         @select = []
-        # path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias },
-        # pk_alias: }. Populated for to-one relations resolved by JOIN so the serializer can
-        # hydrate them from the flat row instead of triggering a lazy association load.
+        # relation path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias }, pk_alias: }
         @joined_relations = {}
         @alias_counter = 0
       end
@@ -221,12 +219,9 @@ module ForestAdminDatasourceActiveRecord
             end
           end
 
-          # to-one relations living in the same database are resolved with a single
-          # LEFT OUTER JOIN instead of one extra query per relation hop (preload). Unlike
-          # eager_load, we select ONLY the projected columns of the joined tables (see
-          # collect_joined_selects) so a wide relation (e.g. a heavy DB view) is not fully
-          # read. to-many / polymorphic / cross-database relations keep preload: a JOIN
-          # would multiply rows (breaking pagination) or is simply not possible.
+          # to-one same-database relations are JOINed (selecting only their projected columns,
+          # unlike eager_load which reads the whole row); the rest stays on preload, where a
+          # JOIN would multiply rows (to-many) or is impossible (cross-database).
           @query = @query.left_outer_joins(join_tree) unless join_tree.empty?
           @query = @query.includes(preload_tree) unless preload_tree.empty?
         end
@@ -235,10 +230,6 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
-      # Adds "table"."column" AS "alias" entries to @select for every projected column of a
-      # joined to-one relation (recursively), and records the aliases in @joined_relations
-      # so the serializer can rebuild the nested hash from the flat row. The target primary
-      # key is always selected to let the serializer detect a NULL (absent) relation.
       def collect_joined_selects(collection, relation_name, sub_projection, path)
         relation_schema = collection.schema[:fields][relation_name]
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
@@ -246,6 +237,7 @@ module ForestAdminDatasourceActiveRecord
         pk = target.model.primary_key
 
         alias_map = {}
+        # pk is always selected so the serializer can detect a NULL (absent) left-joined relation
         (sub_projection.columns + [pk]).uniq.each do |column|
           sql_alias = next_join_alias
           @select << %("#{table}"."#{column}" AS "#{sql_alias}")
@@ -263,24 +255,17 @@ module ForestAdminDatasourceActiveRecord
         "fa_join_#{@alias_counter}"
       end
 
-      # A relation subtree can be collapsed into a JOIN only if the relation itself is a
-      # non-polymorphic to-one relation on the same database, and every relation nested
-      # below it satisfies the same constraint.
+      # True only when the relation and every relation nested below it can be safely JOINed.
       def fully_joinable?(collection, relation_name, sub_projection)
         relation_schema = collection.schema[:fields][relation_name]
         return false unless %w[OneToOne ManyToOne].include?(relation_schema.type)
         return false unless relation_schema.respond_to?(:foreign_collection)
 
-        # The target must be an ActiveRecord collection living in THIS datasource. A
-        # relation towards another datasource (RPC, Mongoid, ...) is resolved above the
-        # datasource and never reaches here, but we stay defensive: anything we cannot
-        # resolve locally as an AR-backed collection falls back to preload.
         target_collection = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
         return false if target_collection.nil?
         return false unless same_database?(collection.model, target_collection.model)
-        # A default_scope is applied to the JOINed table and may contain raw / unqualified
-        # SQL (e.g. `where('id > ?', 10)`) that becomes ambiguous once joined. Preload keeps
-        # it isolated, so fall back to preload rather than risk broken SQL.
+        # a default_scope may inject raw/unqualified SQL (e.g. `where('id > ?', 10)`) that turns
+        # ambiguous once joined; preload keeps it isolated
         return false unless target_collection.model.default_scopes.empty?
 
         sub_projection.relations.all? do |nested_name, nested_projection|
@@ -294,11 +279,9 @@ module ForestAdminDatasourceActiveRecord
         false
       end
 
-      # Returns the target collection only when it is ActiveRecord-backed AND belongs to
-      # the very same datasource instance we are querying; otherwise nil (=> the caller
-      # falls back to preload). Belt-and-suspenders against a foreign collection ever
-      # being reachable by name (e.g. name collision across datasources in a composite):
-      # we check the concrete class and the datasource object identity, not just the name.
+      # The target collection if it is AR-backed AND belongs to this exact datasource, else nil.
+      # Class + identity (not just the name) guard against a foreign-datasource collection ever
+      # being reachable here (e.g. name collision in a composite) -> caller falls back to preload.
       def local_ar_collection(datasource, name)
         collection = datasource.get_collection(name)
         return nil unless collection.is_a?(ForestAdminDatasourceActiveRecord::Collection)

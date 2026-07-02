@@ -1,9 +1,8 @@
 module ForestAdminDatasourceActiveRecord
   module Utils
-    # `joined_relations` maps a relation path ("bank_account.organizations_view") to the SQL
-    # aliases of its columns on the flat row (see Query#collect_joined_selects). Relations
-    # listed there were resolved by JOIN and are hydrated from the flat row; every other
-    # relation is read from its (preloaded) ActiveRecord association, as before.
+    # Relations in `joined_relations` (see Query#collect_joined_selects) were resolved by JOIN
+    # and are hydrated from the flat row's aliased columns; every other relation is read from
+    # its preloaded ActiveRecord association, as before.
     ActiveRecordSerializer = Struct.new(:object, :joined_relations) do
       def to_hash(projection)
         hash_object(object, projection)
@@ -54,8 +53,7 @@ module ForestAdminDatasourceActiveRecord
         end
       end
 
-      # Rebuilds a JOINed relation's hash from the flat aliased columns carried by the root
-      # object. Returns nil when the (LEFT-joined) relation is absent.
+      # Reads a JOINed relation's columns from the aliases on the root object (not a nested one).
       def hash_joined_relation(projection, relation_path)
         meta = joined_relations[relation_path.join('.')]
         return nil if object[meta[:pk_alias]].nil?

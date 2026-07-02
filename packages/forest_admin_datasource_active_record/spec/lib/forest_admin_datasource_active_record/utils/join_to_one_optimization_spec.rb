@@ -4,10 +4,6 @@ module ForestAdminDatasourceActiveRecord
   include ForestAdminDatasourceToolkit::Schema
   include ForestAdminDatasourceToolkit::Components::Query
 
-  # Proves that to-one relations on the same database are resolved with a single
-  # LEFT OUTER JOIN instead of one extra preload query per relation hop, while
-  # to-many relations, and relations whose target carries a default_scope, keep
-  # their (safe) preload behaviour.
   describe 'to-one JOIN optimization', :db_truncation do
     let(:datasource) { Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }) }
     let(:caller) { nil }
@@ -52,23 +48,20 @@ module ForestAdminDatasourceActiveRecord
       it 'resolves the whole chain in ONE JOINed query (was 3 with preload)' do
         queries = capture_sql do
           result = collection.list(caller, filter, projection)
-          # correctness: nested to-one values are still hydrated from the flat row
           expect(result.first['account']).not_to be_nil
           expect(result.first['account']['account_history']).not_to be_nil
         end
 
         expect(queries.size).to eq(1)
-        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2) # accounts + account_histories
+        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2)
       end
 
       it 'selects ONLY the projected columns of the joined tables (not table.*)' do
-        # account_histories is only reached for its id -> exactly one of its columns is read.
         query = Utils::Query.new(collection, projection, filter)
         query.build
         sql = query.query.to_sql
 
-        expect(query.query.eager_load_values).to be_empty # not eager_load (which forces table.*)
-        # every column of account_histories except id must be absent from the SELECT
+        expect(query.query.eager_load_values).to be_empty # eager_load would force account_histories.*
         AccountHistory.column_names.reject { |c| c == 'id' }.each do |col|
           expect(sql).not_to match(/account_histories"\."#{col}"/)
         end
@@ -89,8 +82,7 @@ module ForestAdminDatasourceActiveRecord
       let(:collection) { Collection.new(datasource, Car) }
       let(:projection) { Projection.new(['id', 'reference', 'category:label']) }
 
-      # Category is reached through Car, whose default_scope contains an unqualified
-      # column; a JOIN would raise "ambiguous column name". The guard must keep preload.
+      # Car's default_scope has an unqualified column; a JOIN would raise "ambiguous column name".
       it 'does not JOIN and still returns correct data' do
         query = Utils::Query.new(collection, projection, filter)
         query.build
@@ -101,9 +93,6 @@ module ForestAdminDatasourceActiveRecord
     end
 
     describe 'safety guard (belt-and-suspenders): target not local to this datasource' do
-      # A relation whose target lives in another datasource (RPC, Mongoid, ...) is
-      # resolved above the datasource and never reaches here. Even so, local_ar_collection
-      # only accepts an AR-backed collection belonging to the SAME datasource instance.
       let(:collection) { Collection.new(datasource, Account) }
       let(:query) { Utils::Query.new(collection, Projection.new(['id', 'supplier:name']), filter) }
 
@@ -113,7 +102,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       it 'returns nil when the resolved collection is not ActiveRecord-backed' do
-        # e.g. an RPC/Mongoid collection: a Toolkit collection that is not our AR subclass
+        # a Toolkit collection that is not our AR subclass, i.e. an RPC/Mongoid collection
         non_ar = instance_double(ForestAdminDatasourceToolkit::Collection)
         foreign_ds = instance_double(Datasource, get_collection: non_ar)
 
@@ -122,16 +111,16 @@ module ForestAdminDatasourceActiveRecord
 
       it 'returns nil when the resolved AR collection belongs to a DIFFERENT datasource' do
         other_datasource = Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' })
-        foreign_collection = Collection.new(other_datasource, Supplier) # AR-backed but not ours
+        foreign_collection = Collection.new(other_datasource, Supplier)
         foreign_ds = instance_double(Datasource, get_collection: foreign_collection)
 
-        expect(foreign_collection).to be_a(Collection) # passes the type check
-        expect(query.send(:local_ar_collection, foreign_ds, 'Supplier')).to be_nil # rejected on identity
+        expect(foreign_collection).to be_a(Collection) # AR-backed, so only identity can reject it
+        expect(query.send(:local_ar_collection, foreign_ds, 'Supplier')).to be_nil
       end
 
       it 'fully_joinable? is false when the target cannot be resolved locally' do
         allow(query).to receive(:local_ar_collection).and_return(nil)
-        expect(collection.schema[:fields]['supplier'].type).to eq('ManyToOne') # otherwise joinable
+        expect(collection.schema[:fields]['supplier'].type).to eq('ManyToOne') # joinable but for the stub
         expect(query.send(:fully_joinable?, collection, 'supplier', Projection.new([]))).to be(false)
       end
     end
