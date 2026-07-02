@@ -1,3 +1,10 @@
+## [1.34.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.0...v1.34.1) (2026-07-02)
+
+
+### Performance Improvements
+
+* **datasource-active-record:** JOIN same-DB to-one relations and select only projected columns ([#323](https://github.com/ForestAdmin/agent-ruby/issues/323)) ([4b121ec](https://github.com/ForestAdmin/agent-ruby/commit/4b121ec0e1bddd499e14eacdd671e1481b115c55))
+
 # [1.34.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.33.1...v1.34.0) (2026-06-26)
 
 
