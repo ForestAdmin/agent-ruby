@@ -1,3 +1,5 @@
+require 'set'
+
 module ForestAdminDatasourceActiveRecord
   module Utils
     class Query
@@ -210,8 +212,11 @@ module ForestAdminDatasourceActiveRecord
         unless @projection.nil?
           join_tree = {}
           preload_tree = {}
+          used_tables = Set[@collection.model.table_name]
           @projection.relations.each do |relation_name, sub_projection|
-            if fully_joinable?(@collection, relation_name, sub_projection)
+            tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
+            if tables
+              used_tables |= tables
               join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
               collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
             else
@@ -219,9 +224,9 @@ module ForestAdminDatasourceActiveRecord
             end
           end
 
-          # to-one same-database relations are JOINed (selecting only their projected columns,
-          # unlike eager_load which reads the whole row); the rest stays on preload, where a
-          # JOIN would multiply rows (to-many) or is impossible (cross-database).
+          # belongs_to relations on the same database are JOINed (selecting only their projected
+          # columns, unlike eager_load which reads the whole row); the rest stays on preload, where
+          # a JOIN would multiply rows or is impossible.
           @query = @query.left_outer_joins(join_tree) unless join_tree.empty?
           @query = @query.includes(preload_tree) unless preload_tree.empty?
         end
@@ -255,22 +260,34 @@ module ForestAdminDatasourceActiveRecord
         "fa_join_#{@alias_counter}"
       end
 
-      # True only when the relation and every relation nested below it can be safely JOINed.
-      def fully_joinable?(collection, relation_name, sub_projection)
+      # Set of tables the (fully joinable) subtree would add via JOIN, or nil when any relation
+      # in it cannot be safely joined. Only belongs_to is joinable: it matches on the target's
+      # primary key, so the JOIN cannot duplicate the parent row (a has_one child may not be
+      # unique). used_tables already covers the base + sibling joins: a table joined twice would
+      # be aliased by ActiveRecord, which collect_joined_selects cannot reference — so bail out.
+      def joinable_tables(collection, relation_name, sub_projection, used_tables)
         relation_schema = collection.schema[:fields][relation_name]
-        return false unless %w[OneToOne ManyToOne].include?(relation_schema.type)
-        return false unless relation_schema.respond_to?(:foreign_collection)
+        return nil unless relation_schema.type == 'ManyToOne'
+        return nil unless relation_schema.respond_to?(:foreign_collection)
 
-        target_collection = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
-        return false if target_collection.nil?
-        return false unless same_database?(collection.model, target_collection.model)
+        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        return nil if target.nil?
+        return nil unless same_database?(collection.model, target.model)
         # a default_scope may inject raw/unqualified SQL (e.g. `where('id > ?', 10)`) that turns
         # ambiguous once joined; preload keeps it isolated
-        return false unless target_collection.model.default_scopes.empty?
+        return nil unless target.model.default_scopes.empty?
 
-        sub_projection.relations.all? do |nested_name, nested_projection|
-          fully_joinable?(target_collection, nested_name, nested_projection)
+        table = target.model.table_name
+        return nil if used_tables.include?(table)
+
+        tables = Set[table]
+        sub_projection.relations.each do |nested_name, nested_projection|
+          nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
+          return nil if nested.nil?
+
+          tables |= nested
         end
+        tables
       end
 
       def same_database?(model_a, model_b)
