@@ -239,16 +239,16 @@ module ForestAdminDatasourceActiveRecord
         relation_schema = collection.schema[:fields][relation_name]
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
         table = target.model.table_name
-        pk = target.model.primary_key
+        pk_columns = Array(target.model.primary_key) # array for composite primary keys
 
         alias_map = {}
-        # pk is always selected so the serializer can detect a NULL (absent) left-joined relation
-        (sub_projection.columns + [pk]).uniq.each do |column|
+        # a pk column is always selected so the serializer can detect a NULL (absent) left-joined relation
+        (sub_projection.columns + pk_columns).uniq.each do |column|
           sql_alias = next_join_alias
           @select << %("#{table}"."#{column}" AS "#{sql_alias}")
           alias_map[column] = sql_alias
         end
-        @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk] }
+        @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk_columns.first] }
 
         sub_projection.relations.each do |nested_name, nested_projection|
           collect_joined_selects(target, nested_name, nested_projection, path + [nested_name])
