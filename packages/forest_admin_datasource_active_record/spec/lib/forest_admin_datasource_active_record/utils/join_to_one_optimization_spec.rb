@@ -92,6 +92,19 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    describe 'a related record exposes the same columns whether JOINed or preloaded' do
+      it 'returns exactly the projected columns for a JOINed to-one (account -> supplier)' do
+        result = Collection.new(datasource, Account).list(caller, filter, Projection.new(['id', 'supplier:name']))
+        expect(result.first['supplier'].keys).to contain_exactly('name')
+      end
+
+      it 'returns exactly the projected columns for a preloaded to-one (supplier -> account)' do
+        # supplier -> account is a has_one, so it is preloaded; it must still be projected-restricted
+        result = Collection.new(datasource, Supplier).list(caller, filter, Projection.new(['id', 'account:id']))
+        expect(result.first['account'].keys).to contain_exactly('id')
+      end
+    end
+
     describe 'a to-many relation (car -> checks) is left on preload' do
       let(:collection) { Collection.new(datasource, Car) }
       let(:projection) { Projection.new(['id', 'reference', 'checks:garage_name']) }
