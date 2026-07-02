@@ -86,7 +86,7 @@ module ForestAdminDatasourceActiveRecord
         query = Utils::Query.new(collection, projection, filter)
         query.build
 
-        expect(query.query.joins_values).to be_empty
+        expect(query.query.left_outer_joins_values).to be_empty
         expect(query.query.includes_values.to_s).to include('account')
         expect(query.joined_relations).to be_empty
       end
@@ -101,7 +101,7 @@ module ForestAdminDatasourceActiveRecord
         query.build
 
         expect(query.query.includes_values.to_s).to include('checks')
-        expect(query.query.joins_values).to be_empty
+        expect(query.query.left_outer_joins_values).to be_empty
 
         result = collection.list(caller, filter, projection)
         expect(result.first['checks'].first['garage_name']).to eq('Garage1')
@@ -109,16 +109,32 @@ module ForestAdminDatasourceActiveRecord
     end
 
     describe 'safety guard: a target with a default_scope falls back to preload' do
-      # Car's default_scope has an unqualified column; a JOIN would raise "ambiguous column name".
-      let(:collection) { Collection.new(datasource, Car) }
-      let(:projection) { Projection.new(['id', 'reference', 'category:label']) }
+      # Car (the target here) has a default_scope with an unqualified column; a JOIN would raise
+      # "ambiguous column name", so user -> car must stay on preload.
+      let(:collection) { Collection.new(datasource, User) }
+      let(:projection) { Projection.new(['id', 'car:reference']) }
 
-      it 'does not JOIN and still returns correct data' do
+      it 'does not JOIN the scoped target' do
         query = Utils::Query.new(collection, projection, filter)
         query.build
 
-        expect(query.query.joins_values).to be_empty
-        expect(collection.list(caller, filter, projection).first['category']['label']).to eq('Compact')
+        expect(query.joined_relations).to be_empty
+        expect(query.query.left_outer_joins_values).to be_empty
+        expect(query.query.includes_values.to_s).to include('car')
+      end
+    end
+
+    describe 'safety guard: a scoped belongs_to falls back to preload' do
+      # belongs_to :x, -> { ... } applies its scope to the JOIN (unqualified SQL / extra joins).
+      let(:collection) { Collection.new(datasource, Account) }
+      let(:query) { Utils::Query.new(collection, Projection.new(['id', 'supplier:name']), filter) }
+
+      it 'does not JOIN an association that carries a scope' do
+        scoped = Account.reflect_on_association(:supplier)
+        allow(scoped).to receive(:scope).and_return(-> { where('id > 0') })
+        allow(Account).to receive(:reflect_on_association).and_return(scoped)
+
+        expect(query.send(:joinable_target, collection, 'supplier', Set['accounts'])).to be_nil
       end
     end
 

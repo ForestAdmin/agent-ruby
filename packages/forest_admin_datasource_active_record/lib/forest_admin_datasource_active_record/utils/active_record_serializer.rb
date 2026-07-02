@@ -8,12 +8,12 @@ module ForestAdminDatasourceActiveRecord
         hash_object(object, projection)
       end
 
-      def hash_object(object, projection = nil, path: [], with_associations: true)
+      def hash_object(object, projection = nil, path: [])
         return if object.nil?
 
         hash = base_attributes(object)
 
-        serialize_associations(object, projection, hash, path) if with_associations && projection
+        serialize_associations(object, projection, hash, path) if projection
 
         hash
       end

@@ -213,19 +213,7 @@ module ForestAdminDatasourceActiveRecord
 
       def apply_select
         unless @projection.nil?
-          join_tree = {}
-          preload_tree = {}
-          used_tables = Set[@collection.model.table_name] | @filter_joined_tables
-          @projection.relations.each do |relation_name, sub_projection|
-            tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
-            if tables
-              used_tables |= tables
-              join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
-              collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
-            else
-              preload_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
-            end
-          end
+          join_tree, preload_tree = split_relations
 
           # belongs_to relations on the same database are JOINed (selecting only their projected
           # columns, unlike eager_load which reads the whole row); the rest stays on preload, where
@@ -238,21 +226,42 @@ module ForestAdminDatasourceActiveRecord
         @query
       end
 
+      # Splits the projection's relations into a JOIN tree and a preload tree.
+      def split_relations
+        join_tree = {}
+        preload_tree = {}
+        used_tables = Set[@collection.model.table_name] | @filter_joined_tables
+
+        @projection.relations.each do |relation_name, sub_projection|
+          tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
+          if tables
+            used_tables |= tables
+            join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+            collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
+          else
+            preload_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+          end
+        end
+
+        [join_tree, preload_tree]
+      end
+
       def collect_joined_selects(collection, relation_name, sub_projection, path)
         relation_schema = collection.schema[:fields][relation_name]
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
-        connection = target.model.connection
         table = target.model.table_name
         pk_columns = Array(target.model.primary_key) # array for composite primary keys
 
         alias_map = {}
         # a pk column is always selected so the serializer can detect a NULL (absent) left-joined relation
-        (sub_projection.columns + pk_columns).uniq.each do |column|
-          sql_alias = next_join_alias
-          # quote via the adapter so it works on MySQL too (ANSI "..." are string literals there)
-          @select << "#{connection.quote_table_name(table)}.#{connection.quote_column_name(column)} " \
-                     "AS #{connection.quote_column_name(sql_alias)}"
-          alias_map[column] = sql_alias
+        target.model.connection_pool.with_connection do |connection|
+          (sub_projection.columns + pk_columns).uniq.each do |column|
+            sql_alias = next_join_alias
+            # quote via the adapter so identifiers are valid on every database (e.g. backticks on MySQL)
+            @select << "#{connection.quote_table_name(table)}.#{connection.quote_column_name(column)} " \
+                       "AS #{connection.quote_column_name(sql_alias)}"
+            alias_map[column] = sql_alias
+          end
         end
         @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk_columns.first] }
 
@@ -266,27 +275,13 @@ module ForestAdminDatasourceActiveRecord
         "fa_join_#{@alias_counter}"
       end
 
-      # Set of tables the (fully joinable) subtree would add via JOIN, or nil when any relation
-      # in it cannot be safely joined. Only belongs_to is joinable: it matches on the target's
-      # primary key, so the JOIN cannot duplicate the parent row (a has_one child may not be
-      # unique). used_tables already covers the base + sibling joins: a table joined twice would
-      # be aliased by ActiveRecord, which collect_joined_selects cannot reference — so bail out.
+      # Set of tables the subtree would add via JOIN, or nil when any relation in it cannot be
+      # safely joined (see joinable_target). Recurses so the whole chain must be joinable.
       def joinable_tables(collection, relation_name, sub_projection, used_tables)
-        relation_schema = collection.schema[:fields][relation_name]
-        return nil unless relation_schema.type == 'ManyToOne'
-        return nil unless relation_schema.respond_to?(:foreign_collection)
-
-        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        target = joinable_target(collection, relation_name, used_tables)
         return nil if target.nil?
-        return nil unless same_database?(collection.model, target.model)
-        # a default_scope may inject raw/unqualified SQL (e.g. `where('id > ?', 10)`) that turns
-        # ambiguous once joined; preload keeps it isolated
-        return nil unless target.model.default_scopes.empty?
 
-        table = target.model.table_name
-        return nil if used_tables.include?(table)
-
-        tables = Set[table]
+        tables = Set[target.model.table_name]
         sub_projection.relations.each do |nested_name, nested_projection|
           nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
           return nil if nested.nil?
@@ -294,6 +289,30 @@ module ForestAdminDatasourceActiveRecord
           tables |= nested
         end
         tables
+      end
+
+      # The target collection when this single hop is safe to collapse into a LEFT OUTER JOIN,
+      # else nil. Only belongs_to qualifies: it matches on the target's primary key, so the JOIN
+      # cannot duplicate the parent row (a has_one child may not be unique).
+      def joinable_target(collection, relation_name, used_tables)
+        relation_schema = collection.schema[:fields][relation_name]
+        return unless relation_schema.type == 'ManyToOne' && relation_schema.respond_to?(:foreign_collection)
+
+        # a scoped association applies its scope to the JOIN and may inject raw/unqualified SQL or
+        # extra joins (e.g. `belongs_to :x, -> { where('id > ?', 1) }`); the same risk exists for a
+        # default_scope on the target. Both keep it isolated when preloaded.
+        reflection = collection.model.reflect_on_association(relation_name.to_sym)
+        return if reflection.nil? || reflection.scope
+
+        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        return if target.nil? || !target.model.default_scopes.empty?
+        return unless same_database?(collection.model, target.model)
+
+        # a table joined twice would be aliased by ActiveRecord, which collect_joined_selects
+        # cannot reference; bail out so it is preloaded instead
+        return if used_tables.include?(target.model.table_name)
+
+        target
       end
 
       def same_database?(model_a, model_b)
