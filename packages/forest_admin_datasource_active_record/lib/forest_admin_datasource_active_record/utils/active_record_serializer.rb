@@ -79,7 +79,7 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def join_aliases
-        @join_aliases ||= (joined_relations || {}).values.flat_map { |meta| meta[:columns].values }.to_set
+        @join_aliases ||= (joined_relations || {}).values.flat_map { |meta| meta[:columns].values }.uniq
       end
     end
   end
