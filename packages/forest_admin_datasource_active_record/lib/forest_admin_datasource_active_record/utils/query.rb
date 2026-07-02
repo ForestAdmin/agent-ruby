@@ -1,9 +1,11 @@
+require 'set'
+
 module ForestAdminDatasourceActiveRecord
   module Utils
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :query, :select
+      attr_reader :query, :select, :joined_relations
 
       def initialize(collection, projection, filter)
         @collection = collection
@@ -12,6 +14,11 @@ module ForestAdminDatasourceActiveRecord
         @filter = filter
         @arel_table = @collection.model.arel_table
         @select = []
+        # relation path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias }, pk_alias: }
+        @joined_relations = {}
+        @alias_counter = 0
+        # tables already joined by filters/sorts, so apply_select does not join them a second time
+        @filter_joined_tables = Set.new
       end
 
       def build
@@ -204,10 +211,117 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def apply_select
+        unless @projection.nil?
+          join_tree, preload_tree = split_relations
+
+          @query = @query.left_outer_joins(join_tree) unless join_tree.empty?
+          @query = @query.includes(preload_tree) unless preload_tree.empty?
+        end
         @query = @query.select(@select.join(', ')) if @select
-        @query = @query.includes(format_relation_projection(@projection)) unless @projection.nil?
 
         @query
+      end
+
+      def split_relations
+        join_tree = {}
+        preload_tree = {}
+        used_tables = Set[@collection.model.table_name] | @filter_joined_tables
+
+        @projection.relations.each do |relation_name, sub_projection|
+          tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
+          if tables
+            used_tables |= tables
+            join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+            collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
+          else
+            preload_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+          end
+        end
+
+        [join_tree, preload_tree]
+      end
+
+      def collect_joined_selects(collection, relation_name, sub_projection, path)
+        relation_schema = collection.schema[:fields][relation_name]
+        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        table = target.model.table_name
+        pk_columns = Array(target.model.primary_key) # array for composite primary keys
+
+        alias_map = {}
+        # a pk column is always selected so the serializer can detect a NULL (absent) left-joined relation
+        target.model.connection_pool.with_connection do |connection|
+          (sub_projection.columns + pk_columns).uniq.each do |column|
+            sql_alias = next_join_alias
+            # quote via the adapter so identifiers are valid on every database (e.g. backticks on MySQL)
+            @select << "#{connection.quote_table_name(table)}.#{connection.quote_column_name(column)} " \
+                       "AS #{connection.quote_column_name(sql_alias)}"
+            alias_map[column] = sql_alias
+          end
+        end
+        @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk_columns.first] }
+
+        sub_projection.relations.each do |nested_name, nested_projection|
+          collect_joined_selects(target, nested_name, nested_projection, path + [nested_name])
+        end
+      end
+
+      def next_join_alias
+        @alias_counter += 1
+        "fa_join_#{@alias_counter}"
+      end
+
+      # Set of tables the subtree adds via JOIN, or nil if any relation in it can't be safely joined.
+      def joinable_tables(collection, relation_name, sub_projection, used_tables)
+        target = joinable_target(collection, relation_name, used_tables)
+        return nil if target.nil?
+
+        tables = Set[target.model.table_name]
+        sub_projection.relations.each do |nested_name, nested_projection|
+          nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
+          return nil if nested.nil?
+
+          tables |= nested
+        end
+        tables
+      end
+
+      # The target collection when this hop is safe to collapse into a JOIN, else nil (-> preload).
+      def joinable_target(collection, relation_name, used_tables)
+        relation_schema = collection.schema[:fields][relation_name]
+        # belongs_to only: it joins on the target's primary key, so it can't duplicate the parent
+        # (a has_one child may not be unique)
+        return unless relation_schema.type == 'ManyToOne' && relation_schema.respond_to?(:foreign_collection)
+
+        # a scoped association applies its scope to the JOIN and may inject raw/unqualified SQL or
+        # extra joins (e.g. `belongs_to :x, -> { where('id > ?', 1) }`)
+        reflection = collection.model.reflect_on_association(relation_name.to_sym)
+        return if reflection.nil? || reflection.scope
+
+        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        return if target.nil? || !target.model.default_scopes.empty? # same risk as a scoped association
+        return unless same_database?(collection.model, target.model)
+        return if used_tables.include?(target.model.table_name) # a table joined twice would be aliased by AR
+
+        target
+      end
+
+      def same_database?(model_a, model_b)
+        # compare the pools, not connection_specification_name (only an owner class name, shared across shards)
+        model_a.connection_pool == model_b.connection_pool
+      rescue StandardError
+        false
+      end
+
+      # The target collection only if it is AR-backed AND belongs to this exact datasource, else nil.
+      # Guards (concrete class + identity, not just the name) against a foreign-datasource collection.
+      def local_ar_collection(datasource, name)
+        collection = datasource.get_collection(name)
+        return nil unless collection.is_a?(ForestAdminDatasourceActiveRecord::Collection)
+        return nil unless collection.datasource.equal?(datasource)
+
+        collection
+      rescue StandardError
+        nil
       end
 
       def add_join_relation(relation_name)
@@ -222,6 +336,7 @@ module ForestAdminDatasourceActiveRecord
           relation = @collection.schema[:fields][relation_name]
           related_collection = @collection.datasource.get_collection(relation.foreign_collection)
           add_join_relation(relation_name)
+          @filter_joined_tables << related_collection.model.table_name
 
           {
             formatted: "#{related_collection.model.table_name}.#{column_name}",
