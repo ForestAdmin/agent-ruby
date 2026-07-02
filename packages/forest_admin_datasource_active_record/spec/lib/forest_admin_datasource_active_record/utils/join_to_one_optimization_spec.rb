@@ -52,7 +52,7 @@ module ForestAdminDatasourceActiveRecord
       it 'resolves the whole chain in ONE JOINed query (was 3 with preload)' do
         queries = capture_sql do
           result = collection.list(caller, filter, projection)
-          # correctness: nested to-one values are still hydrated
+          # correctness: nested to-one values are still hydrated from the flat row
           expect(result.first['account']).not_to be_nil
           expect(result.first['account']['account_history']).not_to be_nil
         end
@@ -61,12 +61,17 @@ module ForestAdminDatasourceActiveRecord
         expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2) # accounts + account_histories
       end
 
-      it 'builds the query with eager_load, not preload' do
+      it 'selects ONLY the projected columns of the joined tables (not table.*)' do
+        # account_histories is only reached for its id -> exactly one of its columns is read.
         query = Utils::Query.new(collection, projection, filter)
         query.build
+        sql = query.query.to_sql
 
-        expect(query.query.eager_load_values).not_to be_empty
-        expect(query.query.includes_values).to be_empty
+        expect(query.query.eager_load_values).to be_empty # not eager_load (which forces table.*)
+        # every column of account_histories except id must be absent from the SELECT
+        AccountHistory.column_names.reject { |c| c == 'id' }.each do |col|
+          expect(sql).not_to match(/account_histories"\."#{col}"/)
+        end
       end
 
       it 'keeps a constant query count regardless of the number of rows' do

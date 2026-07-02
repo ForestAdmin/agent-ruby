@@ -3,7 +3,7 @@ module ForestAdminDatasourceActiveRecord
     class Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      attr_reader :query, :select
+      attr_reader :query, :select, :joined_relations
 
       def initialize(collection, projection, filter)
         @collection = collection
@@ -12,6 +12,11 @@ module ForestAdminDatasourceActiveRecord
         @filter = filter
         @arel_table = @collection.model.arel_table
         @select = []
+        # path (e.g. "bank_account.organizations_view") => { columns: { col => sql_alias },
+        # pk_alias: }. Populated for to-one relations resolved by JOIN so the serializer can
+        # hydrate them from the flat row instead of triggering a lazy association load.
+        @joined_relations = {}
+        @alias_counter = 0
       end
 
       def build
@@ -210,21 +215,52 @@ module ForestAdminDatasourceActiveRecord
           @projection.relations.each do |relation_name, sub_projection|
             if fully_joinable?(@collection, relation_name, sub_projection)
               join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
+              collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
             else
               preload_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
             end
           end
 
           # to-one relations living in the same database are resolved with a single
-          # LEFT OUTER JOIN (eager_load) instead of one extra query per relation
-          # (preload). to-many / polymorphic / cross-database relations keep preload:
-          # a JOIN would multiply rows (breaking pagination) or is simply not possible.
-          @query = @query.eager_load(join_tree) unless join_tree.empty?
+          # LEFT OUTER JOIN instead of one extra query per relation hop (preload). Unlike
+          # eager_load, we select ONLY the projected columns of the joined tables (see
+          # collect_joined_selects) so a wide relation (e.g. a heavy DB view) is not fully
+          # read. to-many / polymorphic / cross-database relations keep preload: a JOIN
+          # would multiply rows (breaking pagination) or is simply not possible.
+          @query = @query.left_outer_joins(join_tree) unless join_tree.empty?
           @query = @query.includes(preload_tree) unless preload_tree.empty?
         end
         @query = @query.select(@select.join(', ')) if @select
 
         @query
+      end
+
+      # Adds "table"."column" AS "alias" entries to @select for every projected column of a
+      # joined to-one relation (recursively), and records the aliases in @joined_relations
+      # so the serializer can rebuild the nested hash from the flat row. The target primary
+      # key is always selected to let the serializer detect a NULL (absent) relation.
+      def collect_joined_selects(collection, relation_name, sub_projection, path)
+        relation_schema = collection.schema[:fields][relation_name]
+        target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
+        table = target.model.table_name
+        pk = target.model.primary_key
+
+        alias_map = {}
+        (sub_projection.columns + [pk]).uniq.each do |column|
+          sql_alias = next_join_alias
+          @select << %("#{table}"."#{column}" AS "#{sql_alias}")
+          alias_map[column] = sql_alias
+        end
+        @joined_relations[path.join('.')] = { columns: alias_map, pk_alias: alias_map[pk] }
+
+        sub_projection.relations.each do |nested_name, nested_projection|
+          collect_joined_selects(target, nested_name, nested_projection, path + [nested_name])
+        end
+      end
+
+      def next_join_alias
+        @alias_counter += 1
+        "fa_join_#{@alias_counter}"
       end
 
       # A relation subtree can be collapsed into a JOIN only if the relation itself is a

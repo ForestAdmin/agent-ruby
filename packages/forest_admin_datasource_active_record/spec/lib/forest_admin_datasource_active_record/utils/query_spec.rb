@@ -18,13 +18,16 @@ module ForestAdminDatasourceActiveRecord
 
       describe 'build select' do
         context 'when projection have nested relation' do
-          it 'build select with all requested fields related to the current collection' do
+          it 'selects the current collection fields and JOINs the nested to-one relations' do
             projection = Projection.new(%w[account_history:account:id account_history:account_id account_history:id])
             collection = Collection.new(datasource, Account)
             query_builder = described_class.new(collection, projection, Filter.new)
             query_builder.build
 
-            expect(query_builder.select).to eq(%w[accounts.account_history_id accounts.id])
+            # base columns (own + foreign keys) are still selected as before
+            expect(query_builder.select).to include('accounts.account_history_id', 'accounts.id')
+            # nested to-one relations are resolved by JOIN and tracked for flat hydration
+            expect(query_builder.joined_relations.keys).to contain_exactly('account_history', 'account_history.account')
           end
         end
       end
