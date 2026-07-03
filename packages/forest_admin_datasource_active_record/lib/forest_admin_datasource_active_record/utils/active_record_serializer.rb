@@ -13,7 +13,7 @@ module ForestAdminDatasourceActiveRecord
         # root keeps all its selected columns (attributes + FKs); a related record is restricted to
         # its projected columns, matching the JOINed hydration
         hash = path.empty? || projection.nil? ? base_attributes(object) : projected_columns(object, projection)
-        hash = normalize_polymorphic_types(object, hash)
+        hash = normalize_polymorphic_types(object.class, hash)
 
         serialize_associations(object, projection, hash, path) if projection
 
@@ -66,6 +66,7 @@ module ForestAdminDatasourceActiveRecord
 
         hash = {}
         projection.columns.each { |column| hash[column] = object[meta[:columns][column]] }
+        hash = normalize_polymorphic_types(target_model(relation_path), hash)
         projection.relations.each_key do |nested_name|
           hash[nested_name] = hash_joined_relation(projection.relations[nested_name], relation_path + [nested_name])
         end
@@ -73,18 +74,29 @@ module ForestAdminDatasourceActiveRecord
         hash
       end
 
-      def normalize_polymorphic_types(object, hash)
-        object.class.reflect_on_all_associations(:belongs_to).each do |association|
+      def normalize_polymorphic_types(model_class, hash)
+        return hash if model_class.nil?
+
+        model_class.reflect_on_all_associations(:belongs_to).each do |association|
           next unless association.polymorphic?
 
           stored = hash[association.foreign_type]
           next if stored.nil?
 
-          hash = hash.merge(association.foreign_type => object.class.polymorphic_class_for(stored).name)
+          hash = hash.merge(association.foreign_type => model_class.polymorphic_class_for(stored).name)
         rescue StandardError
           next
         end
         hash
+      end
+
+      # Target model of a JOINed relation path (only belongs_to / has_one :through are ever JOINed).
+      def target_model(relation_path)
+        relation_path.reduce(object.class) do |model, name|
+          model&.reflect_on_association(name.to_sym)&.klass
+        end
+      rescue StandardError
+        nil
       end
 
       private
