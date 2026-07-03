@@ -148,6 +148,20 @@ module ForestAdminDatasourceActiveRecord
 
         expect(result).to contain_exactly('value' => 1, 'group' => { 'order:reference' => 'ORD-1' })
       end
+
+      it 'does not JOIN the intermediate table twice when it is also projected on its own' do
+        projection = Projection.new(['id', 'order:reference', 'account_history:id'])
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        # the through folds `account_histories` in for `order`; the standalone `account_history`
+        # must fall back to preload rather than JOIN the same table again
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+
+        result = collection.list(caller, filter, projection)
+        expect(result.first['order']['reference']).to eq('ORD-1')
+        expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
+      end
     end
 
     describe 'a has_one :through with a has_one hop (supplier -> account_history) stays on preload' do
@@ -161,6 +175,16 @@ module ForestAdminDatasourceActiveRecord
 
         expect(query.query.left_outer_joins_values).to be_empty
         expect(query.query.includes_values.to_s).to include('account_history')
+      end
+
+      it 'does not select the intermediate FK against the root table (it lives on the child)' do
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+        sql = query.query.to_sql
+
+        expect(sql).not_to match(/suppliers"\."supplier_id"/)
+        expect(sql).not_to match(/suppliers"\."account_id"/)
+        expect { collection.list(caller, filter, projection) }.not_to raise_error
       end
     end
 

@@ -198,7 +198,7 @@ module ForestAdminDatasourceActiveRecord
               @select << "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
               # a has_one :through preloads via the intermediate FK on this table; select it so a
               # relation that falls back to preload (e.g. it is also used by a filter) still loads.
-              through_fk = through_foreign_key(collection, relation_name)
+              through_fk = root_through_foreign_key(collection, relation_name)
               @select << "#{collection.model.table_name}.#{through_fk}" if through_fk
             elsif many_to_one_relations.include?(relation_schema.type)
               @select << "#{collection.model.table_name}.#{relation_schema.foreign_key}"
@@ -279,7 +279,9 @@ module ForestAdminDatasourceActiveRecord
         target = joinable_target(collection, relation_name, used_tables)
         return nil if target.nil?
 
-        tables = Set[target.model.table_name]
+        # a has_one :through also joins its intermediate table(s); count them so a separately
+        # projected relation on the same table is not joined a second time (AR would alias it)
+        tables = Set[target.model.table_name] | through_tables(collection, relation_name)
         sub_projection.relations.each do |nested_name, nested_projection|
           nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
           return nil if nested.nil?
@@ -313,8 +315,20 @@ module ForestAdminDatasourceActiveRecord
         return if target.nil? || !target.model.default_scopes.empty? # same risk as a scoped association
         return unless same_database?(collection.model, target.model)
         return if used_tables.include?(target.model.table_name) # a table joined twice would be aliased by AR
+        # same for the intermediate table(s) a has_one :through pulls in
+        return if through_tables(collection, relation_name).intersect?(used_tables)
 
         target
+      end
+
+      # Intermediate table(s) ActiveRecord joins for a has_one :through (empty for a direct to-one).
+      def through_tables(collection, relation_name)
+        through = collection.model.reflect_on_association(relation_name.to_sym)&.through_reflection
+        return Set[] unless through
+
+        Set[through.table_name]
+      rescue StandardError
+        Set[]
       end
 
       def belongs_to_chain_through?(reflection)
@@ -322,12 +336,12 @@ module ForestAdminDatasourceActiveRecord
 
         through = reflection.through_reflection
         source = reflection.source_reflection
-        return false unless through && source
-        return false unless through.belongs_to? && source.belongs_to?
-        return false if through.scope || source.scope
-        return false unless through.klass.default_scopes.empty?
 
-        same_database?(reflection.active_record, through.klass)
+        # every hop matches on a primary key (no row multiplication), carries no scope, and stays in
+        # this database, so the chained LEFT JOIN is safe
+        through && source && through.belongs_to? && source.belongs_to? &&
+          through.scope.nil? && source.scope.nil? && through.klass.default_scopes.empty? &&
+          same_database?(reflection.active_record, through.klass)
       rescue StandardError
         false
       end
@@ -358,11 +372,14 @@ module ForestAdminDatasourceActiveRecord
       end
 
       # The intermediate foreign key a has_one :through uses on this table, or nil for a plain to-one.
-      def through_foreign_key(collection, relation_name)
-        reflection = collection.model.reflect_on_association(relation_name.to_sym)
-        return unless reflection&.through_reflection?
+      # The intermediate FK a has_one :through preloads through, but only when it lives on THIS (root)
+      # table — i.e. the through hop is a belongs_to. For a has_one through hop the FK is on the child,
+      # so selecting it against the root table would emit an invalid column.
+      def root_through_foreign_key(collection, relation_name)
+        through = collection.model.reflect_on_association(relation_name.to_sym)&.through_reflection
+        return unless through&.belongs_to?
 
-        reflection.through_reflection.foreign_key
+        through.foreign_key
       rescue StandardError
         nil
       end
