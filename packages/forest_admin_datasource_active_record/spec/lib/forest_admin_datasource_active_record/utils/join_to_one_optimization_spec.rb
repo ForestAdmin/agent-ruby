@@ -159,6 +159,19 @@ module ForestAdminDatasourceActiveRecord
         expect(result.first['order']['reference']).to eq('ORD-1')
         expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
       end
+
+      it 'does not JOIN the intermediate table twice when a filter already joined the through' do
+        projection = Projection.new(['id', 'account_history:id'])
+        condition = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+                    .new('order:reference', 'Equal', 'ORD-1')
+        query = Utils::Query.new(collection, projection, Filter.new(condition_tree: condition))
+        query.build
+
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+
+        result = collection.list(caller, Filter.new(condition_tree: condition), projection)
+        expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
+      end
     end
 
     describe 'a has_one :through with a has_one hop (supplier -> account_history) stays on preload' do
