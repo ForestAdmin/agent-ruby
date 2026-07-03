@@ -100,21 +100,32 @@ module ForestAdminDatasourceActiveRecord
               source_polymorphic = association.source_reflection&.polymorphic? &&
                                    association.options[:source_type].present?
 
-              add_field(
-                association.name.to_s,
-                ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                  foreign_collection: format_model_name(association.klass.name),
-                  origin_key: through_reflection.foreign_key,
-                  origin_key_target: through_reflection.join_foreign_key,
-                  foreign_key: association.join_foreign_key,
-                  foreign_key_target: association.association_primary_key,
-                  through_collection: format_model_name(through_reflection.klass.name),
-                  origin_type_field: is_polymorphic ? through_reflection.type : nil,
-                  origin_type_value: is_polymorphic ? @model.name : nil,
-                  foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
-                  foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
+              if is_polymorphic || source_polymorphic
+                add_field(
+                  association.name.to_s,
+                  ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
+                    foreign_collection: format_model_name(association.klass.name),
+                    origin_key: through_reflection.foreign_key,
+                    origin_key_target: through_reflection.join_foreign_key,
+                    foreign_key: association.join_foreign_key,
+                    foreign_key_target: association.association_primary_key,
+                    through_collection: format_model_name(through_reflection.klass.name),
+                    origin_type_field: is_polymorphic ? through_reflection.type : nil,
+                    origin_type_value: is_polymorphic ? @model.name : nil,
+                    foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
+                    foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
+                  )
                 )
-              )
+              else
+                add_field(
+                  association.name.to_s,
+                  ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
+                    foreign_collection: format_model_name(association.klass.name),
+                    origin_key: association.klass.primary_key,
+                    origin_key_target: @model.primary_key
+                  )
+                )
+              end
             elsif association.inverse_of&.polymorphic?
               add_field(
                 association.name.to_s,

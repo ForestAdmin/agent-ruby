@@ -105,6 +105,98 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    describe 'a has_one :through of belongs_to hops (account -> account_history -> order)' do
+      let(:collection) { Collection.new(datasource, Account) }
+      let(:projection) { Projection.new(['id', 'order:reference']) }
+
+      before do
+        order = Order.create!(reference: 'ORD-1')
+        Account.first.account_history.update!(order: order)
+      end
+
+      it 'folds the whole chain into ONE JOINed query (was 3 with per-hop preload)' do
+        queries = capture_sql do
+          result = collection.list(caller, filter, projection)
+          expect(result.first['order']['reference']).to eq('ORD-1')
+        end
+
+        expect(queries.size).to eq(1)
+        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2)
+      end
+
+      it 'filters on a field of the through relation' do
+        condition = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+                    .new('order:reference', 'Equal', 'ORD-1')
+        result = collection.list(caller, Filter.new(condition_tree: condition), projection)
+
+        expect(result.size).to eq(1)
+        expect(result.first['order']['reference']).to eq('ORD-1')
+      end
+
+      it 'returns nothing when the through relation value does not match' do
+        condition = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+                    .new('order:reference', 'Equal', 'NOPE')
+        result = collection.list(caller, Filter.new(condition_tree: condition), Projection.new(['id']))
+
+        expect(result).to be_empty
+      end
+
+      it 'aggregates grouped by a field of the through relation' do
+        aggregation = Aggregation.new(operation: 'Count', field: nil, groups: [{ field: 'order:reference' }])
+        result = Utils::QueryAggregate.new(collection, aggregation).get
+
+        expect(result).to contain_exactly('value' => 1, 'group' => { 'order:reference' => 'ORD-1' })
+      end
+
+      it 'does not JOIN the intermediate table twice when it is also projected on its own' do
+        projection = Projection.new(['id', 'order:reference', 'account_history:id'])
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+
+        result = collection.list(caller, filter, projection)
+        expect(result.first['order']['reference']).to eq('ORD-1')
+        expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
+      end
+
+      it 'does not JOIN the intermediate table twice when a filter already joined the through' do
+        projection = Projection.new(['id', 'account_history:id'])
+        condition = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+                    .new('order:reference', 'Equal', 'ORD-1')
+        query = Utils::Query.new(collection, projection, Filter.new(condition_tree: condition))
+        query.build
+
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+
+        result = collection.list(caller, Filter.new(condition_tree: condition), projection)
+        expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
+      end
+    end
+
+    describe 'a has_one :through with a has_one hop (supplier -> account_history) stays on preload' do
+      let(:collection) { Collection.new(datasource, Supplier) }
+      let(:projection) { Projection.new(['id', 'account_history:id']) }
+
+      it 'is preloaded, not JOINed' do
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        expect(query.query.left_outer_joins_values).to be_empty
+        expect(query.query.includes_values.to_s).to include('account_history')
+      end
+
+      it 'does not select the intermediate FK against the root table (it lives on the child)' do
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+        sql = query.query.to_sql
+
+        expect(sql).not_to match(/suppliers"\."supplier_id"/)
+        expect(sql).not_to match(/suppliers"\."account_id"/)
+        expect { collection.list(caller, filter, projection) }.not_to raise_error
+      end
+    end
+
     describe 'a to-many relation (car -> checks) is left on preload' do
       let(:collection) { Collection.new(datasource, Car) }
       let(:projection) { Projection.new(['id', 'reference', 'checks:garage_name']) }

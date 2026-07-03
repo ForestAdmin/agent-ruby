@@ -44,12 +44,16 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).to include('users')
         end
 
-        it 'add has_one_through relation' do
+        it 'add has_one_through relation as a to-one (OneToOne)' do
           collection = described_class.new(datasource, Supplier)
 
           expect(collection.schema[:fields].keys).to include('account_history')
 
-          expect(collection.schema[:fields]['account_history'].class).to eq(Relations::ManyToManySchema)
+          field = collection.schema[:fields]['account_history']
+          expect(field.class).to eq(Relations::OneToOneSchema)
+          expect(field.foreign_collection).to eq('AccountHistory')
+          expect(field.origin_key).to eq(AccountHistory.primary_key)
+          expect(field.origin_key_target).to eq(Supplier.primary_key)
         end
 
         it 'skips association when foreign_key raises an error' do
