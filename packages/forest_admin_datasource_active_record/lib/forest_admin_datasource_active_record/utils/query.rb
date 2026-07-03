@@ -281,7 +281,7 @@ module ForestAdminDatasourceActiveRecord
         return nil if target.nil?
 
         joins = join_signatures(collection, relation_name)
-        return nil if conflicting?(joins, used_joins)
+        return nil if joins.nil? || conflicting?(joins, used_joins)
 
         sub_projection.relations.each do |nested_name, nested_projection|
           nested = joinable_joins(target, nested_name, nested_projection, used_joins.merge(joins))
@@ -328,12 +328,16 @@ module ForestAdminDatasourceActiveRecord
           { reflection.klass.table_name => signature(reflection) }
         end
       rescue StandardError
-        {}
+        nil
       end
 
       def signature(reflection)
         "#{reflection.active_record.table_name}.#{Array(reflection.foreign_key).join(",")}" \
-          "->#{reflection.klass.table_name}"
+          "->#{reflection.klass.table_name}.#{Array(join_key(reflection)).join(",")}"
+      end
+
+      def join_key(reflection)
+        reflection.respond_to?(:join_primary_key) ? reflection.join_primary_key : reflection.association_primary_key
       end
 
       def belongs_to_chain_through?(reflection)

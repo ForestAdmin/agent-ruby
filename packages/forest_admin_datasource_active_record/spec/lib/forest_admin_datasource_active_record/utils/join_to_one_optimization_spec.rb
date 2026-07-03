@@ -182,13 +182,21 @@ module ForestAdminDatasourceActiveRecord
         expect(query.query.includes_values).to be_empty
       end
 
-      it 'preloads a belongs_to that would alias the through intermediate (same table, different FK)' do
+      it 'preloads a belongs_to that would alias the through intermediate, and serves the right rows' do
+        secondary = AccountHistory.create! # a row distinct from the account's own account_history
+        Account.first.update!(secondary_history: secondary)
+
         projection = Projection.new(['id', 'order:reference', 'secondary_history:id'])
         query = Utils::Query.new(collection, projection, filter)
         query.build
 
         expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
         expect(query.query.includes_values.to_s).to include('secondary_history')
+
+        # a wrong merge would collapse the two account_histories joins and serve secondary the through row
+        result = collection.list(caller, filter, projection)
+        expect(result.first['secondary_history']['id']).to eq(secondary.id)
+        expect(result.first['order']['reference']).to eq('ORD-1')
       end
     end
 
@@ -270,22 +278,22 @@ module ForestAdminDatasourceActiveRecord
 
       it 'reuses the join for a matching signature and bails on a conflicting one' do
         joinable = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']), { 'accounts' => :root })
-        expect(joinable).to eq('suppliers' => 'accounts.supplier_id->suppliers')
+        expect(joinable).to eq('suppliers' => 'accounts.supplier_id->suppliers.id')
 
         reused = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
-                            { 'accounts' => :root, 'suppliers' => 'accounts.supplier_id->suppliers' })
-        expect(reused).to eq('suppliers' => 'accounts.supplier_id->suppliers') # same signature -> reused, not aliased
+                            { 'accounts' => :root, 'suppliers' => 'accounts.supplier_id->suppliers.id' })
+        expect(reused).to eq('suppliers' => 'accounts.supplier_id->suppliers.id') # same signature -> reused, not aliased
 
         conflicting = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
-                                 { 'accounts' => :root, 'suppliers' => 'account_histories.order_id->suppliers' })
+                                 { 'accounts' => :root, 'suppliers' => 'account_histories.order_id->suppliers.id' })
         expect(conflicting).to be_nil # same target/FK from a different parent -> would alias
       end
 
-      it 'scopes a signature by its source table so same target/FK from different parents differ' do
-        # the through order hop joins orders FROM account_histories; a direct belongs_to :order would
-        # join orders FROM accounts. Same FK name, same target -> must not share a signature.
+      it 'scopes a signature by its source table and target join key' do
+        # the through order hop joins orders FROM account_histories ON orders.id = account_histories.order_id;
+        # a differing source table OR target :primary_key must yield a differing signature.
         sigs = query.send(:join_signatures, collection, 'order')
-        expect(sigs['orders']).to eq('account_histories.order_id->orders')
+        expect(sigs['orders']).to eq('account_histories.order_id->orders.id')
       end
     end
 

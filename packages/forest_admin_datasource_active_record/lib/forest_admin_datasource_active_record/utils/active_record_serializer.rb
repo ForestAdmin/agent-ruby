@@ -77,15 +77,13 @@ module ForestAdminDatasourceActiveRecord
       def normalize_polymorphic_types(model_class, hash)
         return hash if model_class.nil?
 
-        model_class.reflect_on_all_associations(:belongs_to).each do |association|
-          next unless association.polymorphic?
-
+        polymorphic_belongs_to(model_class).each do |association|
           stored = hash[association.foreign_type]
           next if stored.nil?
 
           hash = hash.merge(association.foreign_type => model_class.polymorphic_class_for(stored).name)
-        rescue StandardError
-          next
+        rescue NameError => e
+          warn_unable(association.name, model_class, e)
         end
         hash
       end
@@ -95,11 +93,23 @@ module ForestAdminDatasourceActiveRecord
         relation_path.reduce(object.class) do |model, name|
           model&.reflect_on_association(name.to_sym)&.klass
         end
-      rescue StandardError
+      rescue NameError
         nil
       end
 
       private
+
+      def polymorphic_belongs_to(model_class)
+        (@polymorphic_belongs_to ||= {})[model_class] ||=
+          model_class.reflect_on_all_associations(:belongs_to).select(&:polymorphic?)
+      end
+
+      def warn_unable(name, model_class, error)
+        ActiveSupport::Logger.new($stdout).warn(
+          "[ForestAdmin] Unable to normalize polymorphic type of '#{name}' " \
+          "in model '#{model_class.name}': #{error.message}. Keeping the stored value."
+        )
+      end
 
       def joined_relation?(relation_path)
         !joined_relations.nil? && joined_relations.key?(relation_path.join('.'))
