@@ -1,3 +1,10 @@
+## [1.34.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.1...v1.34.2) (2026-07-03)
+
+
+### Performance Improvements
+
+* **agent:** cache IP whitelist rules across requests ([#324](https://github.com/ForestAdmin/agent-ruby/issues/324)) ([38d669f](https://github.com/ForestAdmin/agent-ruby/commit/38d669f8d16c81e5a86a66770977f153d8a8d9eb))
+
 ## [1.34.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.0...v1.34.1) (2026-07-02)
 
 
