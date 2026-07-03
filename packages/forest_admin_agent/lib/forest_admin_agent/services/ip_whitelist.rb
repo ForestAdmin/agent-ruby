@@ -1,4 +1,6 @@
 require 'ipaddress'
+require 'filecache'
+require 'json'
 
 module ForestAdminAgent
   module Services
@@ -6,11 +8,26 @@ module ForestAdminAgent
       RULE_MATCH_IP = 0
       RULE_MATCH_RANGE = 1
       RULE_MATCH_SUBNET = 2
+      CACHE_KEY = 'forest.ip_whitelist'.freeze
 
-      attr_reader :forest_api
+      attr_reader :forest_api, :cache
 
       def initialize
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
+        @cache = FileCache.new(
+          'ip_whitelist',
+          Facades::Container.config_from_cache[:cache_dir].to_s,
+          Facades::Container.config_from_cache[:permission_expiration]
+        )
+      end
+
+      def self.invalidate_cache
+        cache = FileCache.new(
+          'ip_whitelist',
+          Facades::Container.config_from_cache[:cache_dir].to_s,
+          Facades::Container.config_from_cache[:permission_expiration]
+        )
+        cache.delete(CACHE_KEY) unless cache.get(CACHE_KEY).nil?
       end
 
       def use_ip_whitelist
@@ -85,6 +102,13 @@ module ForestAdminAgent
       private
 
       def fetch_rules
+        ip_whitelist_data = cache.get_or_set(CACHE_KEY) { fetch_ip_whitelist_from_api }
+
+        @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
+        @rules = ip_whitelist_data['rules']
+      end
+
+      def fetch_ip_whitelist_from_api
         response = forest_api.get('/liana/v1/ip-whitelist-rules')
 
         unless response.status == 200
@@ -109,10 +133,7 @@ module ForestAdminAgent
                 ForestAdminAgent::Utils::ErrorMessages::UNEXPECTED
         end
 
-        ip_whitelist_data = body['data']['attributes']
-
-        @use_ip_whitelist = ip_whitelist_data['use_ip_whitelist']
-        @rules = ip_whitelist_data['rules']
+        body['data']['attributes']
       rescue StandardError => e
         ForestAdminAgent::Facades::Container.logger.log('Debug', {
                                                           error: e.message,

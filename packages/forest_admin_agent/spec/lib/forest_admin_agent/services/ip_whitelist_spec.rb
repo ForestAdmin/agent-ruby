@@ -10,6 +10,8 @@ module ForestAdminAgent
 
       let(:forest_api_requester) { instance_double(ForestAdminAgent::Http::ForestAdminApiRequester) }
 
+      before { described_class.invalidate_cache }
+
       context 'when there is no rule' do
         before do
           allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
@@ -284,6 +286,32 @@ module ForestAdminAgent
           expect do
             ip_whitelist.ip_matches_any_rule?(client_ip)
           end.to raise_error('Invalid rule type')
+        end
+      end
+
+      context 'when caching whitelist rules' do
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v1/ip-whitelist-rules').and_return(
+            instance_double(Faraday::Response,
+                            status: 200,
+                            body: {
+                              'data' => {
+                                'attributes' => {
+                                  'rules' => [],
+                                  'use_ip_whitelist' => false
+                                }
+                              }
+                            }.to_json)
+          )
+
+          allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:new).and_return(forest_api_requester)
+        end
+
+        it 'fetches the rules from the API only once across instances' do
+          described_class.new.use_ip_whitelist
+          described_class.new.use_ip_whitelist
+
+          expect(forest_api_requester).to have_received(:get).once
         end
       end
     end
