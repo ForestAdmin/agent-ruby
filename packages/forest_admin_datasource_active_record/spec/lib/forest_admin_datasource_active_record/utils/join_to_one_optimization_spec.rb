@@ -172,6 +172,32 @@ module ForestAdminDatasourceActiveRecord
         result = collection.list(caller, Filter.new(condition_tree: condition), projection)
         expect(result.first['account_history']['id']).to eq(Account.first.account_history_id)
       end
+
+      it 'reuses the intermediate join when a plain belongs_to shares the same signature (one query)' do
+        projection = Projection.new(['id', 'order:reference', 'account_history:id'])
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+        expect(query.query.includes_values).to be_empty
+      end
+
+      it 'preloads a belongs_to that would alias the through intermediate, and serves the right rows' do
+        secondary = AccountHistory.create! # a row distinct from the account's own account_history
+        Account.first.update!(secondary_history: secondary)
+
+        projection = Projection.new(['id', 'order:reference', 'secondary_history:id'])
+        query = Utils::Query.new(collection, projection, filter)
+        query.build
+
+        expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
+        expect(query.query.includes_values.to_s).to include('secondary_history')
+
+        # a wrong merge would collapse the two account_histories joins and serve secondary the through row
+        result = collection.list(caller, filter, projection)
+        expect(result.first['secondary_history']['id']).to eq(secondary.id)
+        expect(result.first['order']['reference']).to eq('ORD-1')
+      end
     end
 
     describe 'a has_one :through with a has_one hop (supplier -> account_history) stays on preload' do
@@ -239,22 +265,35 @@ module ForestAdminDatasourceActiveRecord
         allow(scoped).to receive(:scope).and_return(-> { where('id > 0') })
         allow(Account).to receive(:reflect_on_association).and_return(scoped)
 
-        expect(query.send(:joinable_target, collection, 'supplier', Set['accounts'])).to be_nil
+        expect(query.send(:joinable_target, collection, 'supplier')).to be_nil
       end
     end
 
-    describe 'safety guard: a table already present in the query is not joined again' do
-      # ActiveRecord would alias a table joined twice; collect_joined_selects cannot reference
-      # that alias, so such a relation must fall back to preload.
+    describe 'safety guard: a table already present in the query is not joined with a different signature' do
+      # ActiveRecord reuses a join with the same ON condition, but aliases one with a different
+      # condition; collect_joined_selects cannot reference that alias, so a conflicting relation
+      # must fall back to preload.
       let(:collection) { Collection.new(datasource, Account) }
       let(:query) { Utils::Query.new(collection, Projection.new(['id', 'supplier:name']), filter) }
 
-      it 'returns nil from joinable_tables when the target table is already used' do
-        joinable = query.send(:joinable_tables, collection, 'supplier', Projection.new(['name']), Set['accounts'])
-        expect(joinable).to eq(Set['suppliers'])
+      it 'reuses the join for a matching signature and bails on a conflicting one' do
+        joinable = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']), { 'accounts' => :root })
+        expect(joinable).to eq('suppliers' => 'accounts.supplier_id->suppliers.id')
 
-        already_used = query.send(:joinable_tables, collection, 'supplier', Projection.new(['name']), Set['accounts', 'suppliers'])
-        expect(already_used).to be_nil
+        reused = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
+                            { 'accounts' => :root, 'suppliers' => 'accounts.supplier_id->suppliers.id' })
+        expect(reused).to eq('suppliers' => 'accounts.supplier_id->suppliers.id') # same signature -> reused, not aliased
+
+        conflicting = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
+                                 { 'accounts' => :root, 'suppliers' => 'account_histories.order_id->suppliers.id' })
+        expect(conflicting).to be_nil # same target/FK from a different parent -> would alias
+      end
+
+      it 'scopes a signature by its source table and target join key' do
+        # the through order hop joins orders FROM account_histories ON orders.id = account_histories.order_id;
+        # a differing source table OR target :primary_key must yield a differing signature.
+        sigs = query.send(:join_signatures, collection, 'order')
+        expect(sigs['orders']).to eq('account_histories.order_id->orders.id')
       end
     end
 
@@ -317,10 +356,10 @@ module ForestAdminDatasourceActiveRecord
         expect(query.send(:local_ar_collection, foreign_ds, 'Supplier')).to be_nil
       end
 
-      it 'joinable_tables is nil when the target cannot be resolved locally' do
+      it 'joinable_joins is nil when the target cannot be resolved locally' do
         allow(query).to receive(:local_ar_collection).and_return(nil)
         expect(collection.schema[:fields]['supplier'].type).to eq('ManyToOne') # joinable but for the stub
-        expect(query.send(:joinable_tables, collection, 'supplier', Projection.new([]), Set['accounts'])).to be_nil
+        expect(query.send(:joinable_joins, collection, 'supplier', Projection.new([]), { 'accounts' => :root })).to be_nil
       end
     end
   end
