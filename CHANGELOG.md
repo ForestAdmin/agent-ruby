@@ -1,3 +1,10 @@
+## [1.35.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.0...v1.35.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **datasource-active-record:** normalize demodulized polymorphic types & reuse shared joins ([#328](https://github.com/ForestAdmin/agent-ruby/issues/328)) ([503a25a](https://github.com/ForestAdmin/agent-ruby/commit/503a25afdf0d187e5ee27f68ff6e8004155a373c))
+
 # [1.35.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.2...v1.35.0) (2026-07-03)
 
 
