@@ -196,6 +196,10 @@ module ForestAdminDatasourceActiveRecord
           if collection.model.table_name == @collection.model.table_name
             if one_to_one_relations.include?(relation_schema.type)
               @select << "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
+              # foreign_key is an array for a composite-key belongs_to through hop
+              Array(root_through_foreign_key(collection, relation_name)).each do |through_fk|
+                @select << "#{collection.model.table_name}.#{through_fk}"
+              end
             elsif many_to_one_relations.include?(relation_schema.type)
               @select << "#{collection.model.table_name}.#{relation_schema.foreign_key}"
             end
@@ -275,7 +279,7 @@ module ForestAdminDatasourceActiveRecord
         target = joinable_target(collection, relation_name, used_tables)
         return nil if target.nil?
 
-        tables = Set[target.model.table_name]
+        tables = Set[target.model.table_name] | through_tables(collection, relation_name)
         sub_projection.relations.each do |nested_name, nested_projection|
           nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
           return nil if nested.nil?
@@ -288,21 +292,48 @@ module ForestAdminDatasourceActiveRecord
       # The target collection when this hop is safe to collapse into a JOIN, else nil (-> preload).
       def joinable_target(collection, relation_name, used_tables)
         relation_schema = collection.schema[:fields][relation_name]
-        # belongs_to only: it joins on the target's primary key, so it can't duplicate the parent
-        # (a has_one child may not be unique)
-        return unless relation_schema.type == 'ManyToOne' && relation_schema.respond_to?(:foreign_collection)
+        return unless relation_schema.respond_to?(:foreign_collection)
 
         # a scoped association applies its scope to the JOIN and may inject raw/unqualified SQL or
         # extra joins (e.g. `belongs_to :x, -> { where('id > ?', 1) }`)
         reflection = collection.model.reflect_on_association(relation_name.to_sym)
         return if reflection.nil? || reflection.scope
 
+        case relation_schema.type
+        when 'ManyToOne' then nil
+        when 'OneToOne' then return unless belongs_to_chain_through?(reflection)
+        else return
+        end
+
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
         return if target.nil? || !target.model.default_scopes.empty? # same risk as a scoped association
         return unless same_database?(collection.model, target.model)
         return if used_tables.include?(target.model.table_name) # a table joined twice would be aliased by AR
+        return if through_tables(collection, relation_name).intersect?(used_tables)
 
         target
+      end
+
+      def through_tables(collection, relation_name)
+        through = collection.model.reflect_on_association(relation_name.to_sym)&.through_reflection
+        return Set[] unless through
+
+        Set[through.table_name]
+      rescue StandardError
+        Set[]
+      end
+
+      def belongs_to_chain_through?(reflection)
+        return false unless reflection.through_reflection?
+
+        through = reflection.through_reflection
+        source = reflection.source_reflection
+
+        through && source && through.belongs_to? && source.belongs_to? &&
+          through.scope.nil? && source.scope.nil? && through.klass.default_scopes.empty? &&
+          same_database?(reflection.active_record, through.klass)
+      rescue StandardError
+        false
       end
 
       def same_database?(model_a, model_b)
@@ -328,6 +359,15 @@ module ForestAdminDatasourceActiveRecord
         @query = @query.left_joins(relation_name.to_sym)
 
         @query
+      end
+
+      def root_through_foreign_key(collection, relation_name)
+        through = collection.model.reflect_on_association(relation_name.to_sym)&.through_reflection
+        return unless through&.belongs_to?
+
+        through.foreign_key
+      rescue StandardError
+        nil
       end
 
       def resolve_field(original_field)
