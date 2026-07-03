@@ -8,7 +8,13 @@ module ForestAdminDatasourceToolkit
 
       def self.get_inverse_relation(collection, relation_name)
         relation_field = collection.schema[:fields][relation_name]
+
+        return nil if relation_field.nil?
+
         foreign_collection = collection.datasource.get_collection(relation_field.foreign_collection)
+
+        return nil if foreign_collection.nil?
+
         polymorphic_relations = %w[PolymorphicOneToOne PolymorphicOneToMany]
 
         inverse = foreign_collection.schema[:fields].select do |_name, field|
@@ -101,6 +107,9 @@ module ForestAdminDatasourceToolkit
         raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
         through_collection = collection.datasource.get_collection(relation.through_collection)
+
+        return nil if through_collection.nil?
+
         through_collection.schema[:fields].select do |field_name, field|
           if field.is_a?(ManyToOneSchema) &&
              field.foreign_collection == relation.foreign_collection &&
@@ -118,6 +127,9 @@ module ForestAdminDatasourceToolkit
         raise ForestException, 'Relation must be many to many' unless relation.is_a?(ManyToManySchema)
 
         through_collection = collection.datasource.get_collection(relation.through_collection)
+
+        return nil if through_collection.nil?
+
         through_collection.schema[:fields].select do |field_name, field|
           if field.is_a?(ManyToOneSchema) &&
              field.foreign_collection == collection.name &&
@@ -132,7 +144,17 @@ module ForestAdminDatasourceToolkit
 
       def self.list_relation(collection, primary_key_values, relation_name, caller, foreign_filter, projection)
         relation = collection.schema[:fields][relation_name]
+
+        if relation.nil?
+          raise ForestException, "Relation '#{relation_name}' not found in collection '#{collection.name}'"
+        end
+
         foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
+
+        if foreign_collection.nil?
+          raise ForestException,
+                "Foreign collection '#{relation.foreign_collection}' not found for relation '#{collection.name}.#{relation_name}'"
+        end
 
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
@@ -158,7 +180,17 @@ module ForestAdminDatasourceToolkit
 
       def self.aggregate_relation(collection, primary_key_values, relation_name, caller, foreign_filter, aggregation, limit = nil)
         relation = collection.schema[:fields][relation_name]
+
+        if relation.nil?
+          raise ForestException, "Relation '#{relation_name}' not found in collection '#{collection.name}'"
+        end
+
         foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
+
+        if foreign_collection.nil?
+          raise ForestException,
+                "Foreign collection '#{relation.foreign_collection}' not found for relation '#{collection.name}.#{relation_name}'"
+        end
 
         if relation.is_a?(ManyToManySchema) && foreign_filter.nestable?
           foreign_relation = get_through_target(collection, relation_name)
