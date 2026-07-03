@@ -270,15 +270,22 @@ module ForestAdminDatasourceActiveRecord
 
       it 'reuses the join for a matching signature and bails on a conflicting one' do
         joinable = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']), { 'accounts' => :root })
-        expect(joinable).to eq('suppliers' => 'supplier_id->suppliers')
+        expect(joinable).to eq('suppliers' => 'accounts.supplier_id->suppliers')
 
         reused = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
-                            { 'accounts' => :root, 'suppliers' => 'supplier_id->suppliers' })
-        expect(reused).to eq('suppliers' => 'supplier_id->suppliers') # same signature -> reused, not aliased
+                            { 'accounts' => :root, 'suppliers' => 'accounts.supplier_id->suppliers' })
+        expect(reused).to eq('suppliers' => 'accounts.supplier_id->suppliers') # same signature -> reused, not aliased
 
         conflicting = query.send(:joinable_joins, collection, 'supplier', Projection.new(['name']),
-                                 { 'accounts' => :root, 'suppliers' => 'other_id->suppliers' })
-        expect(conflicting).to be_nil # different signature -> would alias
+                                 { 'accounts' => :root, 'suppliers' => 'account_histories.order_id->suppliers' })
+        expect(conflicting).to be_nil # same target/FK from a different parent -> would alias
+      end
+
+      it 'scopes a signature by its source table so same target/FK from different parents differ' do
+        # the through order hop joins orders FROM account_histories; a direct belongs_to :order would
+        # join orders FROM accounts. Same FK name, same target -> must not share a signature.
+        sigs = query.send(:join_signatures, collection, 'order')
+        expect(sigs['orders']).to eq('account_histories.order_id->orders')
       end
     end
 

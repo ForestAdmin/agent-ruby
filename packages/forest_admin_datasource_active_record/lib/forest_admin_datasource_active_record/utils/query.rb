@@ -332,7 +332,8 @@ module ForestAdminDatasourceActiveRecord
       end
 
       def signature(reflection)
-        "#{Array(reflection.foreign_key).join(",")}->#{reflection.klass.table_name}"
+        "#{reflection.active_record.table_name}.#{Array(reflection.foreign_key).join(",")}" \
+          "->#{reflection.klass.table_name}"
       end
 
       def belongs_to_chain_through?(reflection)
