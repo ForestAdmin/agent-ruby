@@ -1,3 +1,10 @@
+## [1.35.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.1...v1.35.2) (2026-07-03)
+
+
+### Performance Improvements
+
+* **datasource-toolkit:** cache collection name & lookups in serialization ([#329](https://github.com/ForestAdmin/agent-ruby/issues/329)) ([ce3b83d](https://github.com/ForestAdmin/agent-ruby/commit/ce3b83d489d1c47caea51ec64becf6dd646c7730))
+
 ## [1.35.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.0...v1.35.1) (2026-07-03)
 
 
