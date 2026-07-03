@@ -22,12 +22,11 @@ module ForestAdminDatasourceToolkit
       end
 
       def get_collection(name)
-        collection = @child_datasource.get_collection(name)
-        unless @decorators.key?(collection.name)
-          @decorators[collection.name] = @collection_decorator_class.new(collection, self)
+        @collections_by_name ||= {}
+        @collections_by_name[name] ||= begin
+          collection = @child_datasource.get_collection(name)
+          @decorators[collection.name] ||= @collection_decorator_class.new(collection, self)
         end
-
-        @decorators[collection.name]
       end
 
       def render_chart(caller, name, parameters = {})
