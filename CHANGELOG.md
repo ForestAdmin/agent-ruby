@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.2...v1.35.0) (2026-07-03)
+
+
+### Features
+
+* **datasource-active-record:** expose has_one :through as a to-one relation ([#327](https://github.com/ForestAdmin/agent-ruby/issues/327)) ([9788b60](https://github.com/ForestAdmin/agent-ruby/commit/9788b60b625c62ac8f1c7d0ae6a7ad35547551b4))
+
 ## [1.34.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.34.1...v1.34.2) (2026-07-03)
 
 
