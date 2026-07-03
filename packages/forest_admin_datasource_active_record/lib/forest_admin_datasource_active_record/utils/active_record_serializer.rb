@@ -13,6 +13,7 @@ module ForestAdminDatasourceActiveRecord
         # root keeps all its selected columns (attributes + FKs); a related record is restricted to
         # its projected columns, matching the JOINed hydration
         hash = path.empty? || projection.nil? ? base_attributes(object) : projected_columns(object, projection)
+        hash = normalize_polymorphic_types(object, hash)
 
         serialize_associations(object, projection, hash, path) if projection
 
@@ -69,6 +70,23 @@ module ForestAdminDatasourceActiveRecord
           hash[nested_name] = hash_joined_relation(projection.relations[nested_name], relation_path + [nested_name])
         end
 
+        hash
+      end
+
+      # local: the app stores demodulized polymorphic types (e.g. "Income" for Api::Income), but
+      # Forest identifies the target collection by the full class name (Api__Income). Translate the
+      # stored *_type back through the model's polymorphic_class_for. No-op for a default app.
+      def normalize_polymorphic_types(object, hash)
+        object.class.reflect_on_all_associations(:belongs_to).each do |association|
+          next unless association.polymorphic?
+
+          stored = hash[association.foreign_type]
+          next if stored.nil?
+
+          hash = hash.merge(association.foreign_type => object.class.polymorphic_class_for(stored).name)
+        rescue StandardError
+          next
+        end
         hash
       end
 
