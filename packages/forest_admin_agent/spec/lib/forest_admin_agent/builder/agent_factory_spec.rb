@@ -136,6 +136,17 @@ module ForestAdminAgent
             expect(instance.customizer).to have_received(:reload!)
           end
 
+          it 'resets the serializer primary-key cache' do
+            instance = described_class.instance
+            allow(instance).to receive(:send_schema)
+            allow(instance.customizer).to receive(:reload!)
+            allow(ForestAdminAgent::Serializer::ForestSerializer).to receive(:reset_cache!)
+
+            instance.reload!
+
+            expect(ForestAdminAgent::Serializer::ForestSerializer).to have_received(:reset_cache!)
+          end
+
           it 'add datasource to the container' do
             allow(described_class.instance).to receive(:send_schema)
             described_class.instance.reload!

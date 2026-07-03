@@ -99,6 +99,8 @@ module ForestAdminAgent
 
         # Reset route cache before sending schema to ensure routes are recomputed with all customizations
         ForestAdminAgent::Http::Router.reset_cached_routes!
+        # The datasource was rebuilt, so the serializer's primary-key cache may be stale
+        ForestAdminAgent::Serializer::ForestSerializer.reset_cache!
         @logger.log('Info', 'route cache cleared due to agent reload')
 
         send_schema

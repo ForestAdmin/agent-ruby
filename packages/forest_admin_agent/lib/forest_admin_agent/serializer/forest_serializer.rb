@@ -24,11 +24,15 @@ module ForestAdminAgent
         @@class_names[class_name] ||= class_name.gsub('::', '__')
       end
 
+      def self.reset_cache!
+        @@primary_keys = {}
+      end
+
       def id
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(
-          @options[:class_name].gsub('::', '__')
+        @@primary_keys ||= {}
+        primary_keys = @@primary_keys[type] ||= ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(
+          ForestAdminAgent::Facades::Container.datasource.get_collection(type)
         )
-        primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(forest_collection)
         primary_keys.map { |key| @object[key] }.join('|')
       end
 

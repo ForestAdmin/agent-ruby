@@ -28,7 +28,9 @@ module ForestAdminDatasourceToolkit
       end
 
       def name
-        @child_collection.name
+        # `@name` is taken by the base Collection (set via the mis-ordered `super` in initialize),
+        # so memoize under a dedicated ivar.
+        @memoized_name ||= @child_collection.name # rubocop:disable Naming/MemoizedInstanceVariableName
       end
 
       def execute(caller, name, data, filter = nil)
