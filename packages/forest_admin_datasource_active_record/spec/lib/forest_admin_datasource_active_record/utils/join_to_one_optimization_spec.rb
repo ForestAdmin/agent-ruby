@@ -106,7 +106,6 @@ module ForestAdminDatasourceActiveRecord
     end
 
     describe 'a has_one :through of belongs_to hops (account -> account_history -> order)' do
-      # every hop is a belongs_to, so the chained JOIN stays 1:1 and cannot multiply the parent.
       let(:collection) { Collection.new(datasource, Account) }
       let(:projection) { Projection.new(['id', 'order:reference']) }
 
@@ -122,7 +121,7 @@ module ForestAdminDatasourceActiveRecord
         end
 
         expect(queries.size).to eq(1)
-        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2) # account_histories + orders
+        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2)
       end
 
       it 'filters on a field of the through relation' do
@@ -154,8 +153,6 @@ module ForestAdminDatasourceActiveRecord
         query = Utils::Query.new(collection, projection, filter)
         query.build
 
-        # the through folds `account_histories` in for `order`; the standalone `account_history`
-        # must fall back to preload rather than JOIN the same table again
         expect(query.query.to_sql.scan(/JOIN "account_histories"/i).size).to eq(1)
 
         result = collection.list(caller, filter, projection)
@@ -165,7 +162,6 @@ module ForestAdminDatasourceActiveRecord
     end
 
     describe 'a has_one :through with a has_one hop (supplier -> account_history) stays on preload' do
-      # the intermediate `account` hop is a has_one and can multiply rows, so it must not be JOINed.
       let(:collection) { Collection.new(datasource, Supplier) }
       let(:projection) { Projection.new(['id', 'account_history:id']) }
 

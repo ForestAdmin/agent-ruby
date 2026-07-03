@@ -117,11 +117,6 @@ module ForestAdminDatasourceActiveRecord
                   )
                 )
               else
-                # A has_one :through is single-valued, so expose it as a to-one (HasOne). ActiveRecord
-                # resolves the join by association name, so the primary keys below only need to be real
-                # columns for reads/schema generation. This relation is display-only: it has no direct
-                # foreign key to set, so updating/associating it through the OneToOne write path is not
-                # supported (the link lives on the intermediate table).
                 add_field(
                   association.name.to_s,
                   ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
