@@ -196,8 +196,10 @@ module ForestAdminDatasourceActiveRecord
           if collection.model.table_name == @collection.model.table_name
             if one_to_one_relations.include?(relation_schema.type)
               @select << "#{collection.model.table_name}.#{relation_schema.origin_key_target}"
-              through_fk = root_through_foreign_key(collection, relation_name)
-              @select << "#{collection.model.table_name}.#{through_fk}" if through_fk
+              # foreign_key is an array for a composite-key belongs_to through hop
+              Array(root_through_foreign_key(collection, relation_name)).each do |through_fk|
+                @select << "#{collection.model.table_name}.#{through_fk}"
+              end
             elsif many_to_one_relations.include?(relation_schema.type)
               @select << "#{collection.model.table_name}.#{relation_schema.foreign_key}"
             end
