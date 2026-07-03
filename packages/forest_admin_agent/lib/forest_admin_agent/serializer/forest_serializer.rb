@@ -24,6 +24,10 @@ module ForestAdminAgent
         @@class_names[class_name] ||= class_name.gsub('::', '__')
       end
 
+      def self.reset_cache!
+        @@primary_keys = {}
+      end
+
       def id
         @@primary_keys ||= {}
         primary_keys = @@primary_keys[type] ||= ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(
