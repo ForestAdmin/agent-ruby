@@ -73,9 +73,6 @@ module ForestAdminDatasourceActiveRecord
         hash
       end
 
-      # local: the app stores demodulized polymorphic types (e.g. "Income" for Api::Income), but
-      # Forest identifies the target collection by the full class name (Api__Income). Translate the
-      # stored *_type back through the model's polymorphic_class_for. No-op for a default app.
       def normalize_polymorphic_types(object, hash)
         object.class.reflect_on_all_associations(:belongs_to).each do |association|
           next unless association.polymorphic?

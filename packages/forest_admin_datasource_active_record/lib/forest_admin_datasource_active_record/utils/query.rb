@@ -229,12 +229,13 @@ module ForestAdminDatasourceActiveRecord
       def split_relations
         join_tree = {}
         preload_tree = {}
-        used_tables = Set[@collection.model.table_name] | @filter_joined_tables
+        used_joins = { @collection.model.table_name => :root }
+        @filter_joined_tables.each { |table| used_joins[table] ||= :filter } # never reuse a filter/sort join
 
         @projection.relations.each do |relation_name, sub_projection|
-          tables = joinable_tables(@collection, relation_name, sub_projection, used_tables)
-          if tables
-            used_tables |= tables
+          joins = joinable_joins(@collection, relation_name, sub_projection, used_joins)
+          if joins
+            used_joins.merge!(joins)
             join_tree[relation_name.to_sym] = format_relation_projection(sub_projection)
             collect_joined_selects(@collection, relation_name, sub_projection, [relation_name])
           else
@@ -275,22 +276,28 @@ module ForestAdminDatasourceActiveRecord
       end
 
       # Set of tables the subtree adds via JOIN, or nil if any relation in it can't be safely joined.
-      def joinable_tables(collection, relation_name, sub_projection, used_tables)
-        target = joinable_target(collection, relation_name, used_tables)
+      def joinable_joins(collection, relation_name, sub_projection, used_joins)
+        target = joinable_target(collection, relation_name)
         return nil if target.nil?
 
-        tables = Set[target.model.table_name] | through_tables(collection, relation_name)
+        joins = join_signatures(collection, relation_name)
+        return nil if conflicting?(joins, used_joins)
+
         sub_projection.relations.each do |nested_name, nested_projection|
-          nested = joinable_tables(target, nested_name, nested_projection, used_tables | tables)
+          nested = joinable_joins(target, nested_name, nested_projection, used_joins.merge(joins))
           return nil if nested.nil?
 
-          tables |= nested
+          joins = joins.merge(nested)
         end
-        tables
+        joins
+      end
+
+      def conflicting?(new_joins, used_joins)
+        new_joins.any? { |table, signature| used_joins.key?(table) && used_joins[table] != signature }
       end
 
       # The target collection when this hop is safe to collapse into a JOIN, else nil (-> preload).
-      def joinable_target(collection, relation_name, used_tables)
+      def joinable_target(collection, relation_name)
         relation_schema = collection.schema[:fields][relation_name]
         return unless relation_schema.respond_to?(:foreign_collection)
 
@@ -308,19 +315,24 @@ module ForestAdminDatasourceActiveRecord
         target = local_ar_collection(collection.datasource, relation_schema.foreign_collection)
         return if target.nil? || !target.model.default_scopes.empty? # same risk as a scoped association
         return unless same_database?(collection.model, target.model)
-        return if used_tables.include?(target.model.table_name) # a table joined twice would be aliased by AR
-        return if through_tables(collection, relation_name).intersect?(used_tables)
 
         target
       end
 
-      def through_tables(collection, relation_name)
-        through = collection.model.reflect_on_association(relation_name.to_sym)&.through_reflection
-        return Set[] unless through
-
-        Set[through.table_name]
+      def join_signatures(collection, relation_name)
+        reflection = collection.model.reflect_on_association(relation_name.to_sym)
+        if reflection.through_reflection?
+          { reflection.through_reflection.klass.table_name => signature(reflection.through_reflection),
+            reflection.klass.table_name => signature(reflection.source_reflection) }
+        else
+          { reflection.klass.table_name => signature(reflection) }
+        end
       rescue StandardError
-        Set[]
+        {}
+      end
+
+      def signature(reflection)
+        "#{Array(reflection.foreign_key).join(",")}->#{reflection.klass.table_name}"
       end
 
       def belongs_to_chain_through?(reflection)
