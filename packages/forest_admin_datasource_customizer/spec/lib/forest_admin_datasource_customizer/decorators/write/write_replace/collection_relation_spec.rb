@@ -11,7 +11,7 @@ module ForestAdminDatasourceCustomizer
         describe WriteReplaceCollectionDecorator do
           let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
           let(:write_datasource_decorator) { ForestAdminDatasourceCustomizer::Decorators::Write::WriteDatasourceDecorator }
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
 
           before do
             @collection_author = instance_double(

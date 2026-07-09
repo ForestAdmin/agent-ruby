@@ -39,7 +39,11 @@ module ForestAdminDatasourceCustomizer
             tree = default_replacer(filter.search, filter.search_extended)
 
             if @replacer
-              plain_tree = @replacer.call(filter.search, filter.search_extended, ctx)
+              plain_tree = ForestAdminDatasourceToolkit::Monitoring.instrument(
+                'search', { collection: name }.merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+              ) do
+                @replacer.call(filter.search, filter.search_extended, ctx)
+              end
               tree = ConditionTreeFactory.from_plain_object(plain_tree)
             end
 

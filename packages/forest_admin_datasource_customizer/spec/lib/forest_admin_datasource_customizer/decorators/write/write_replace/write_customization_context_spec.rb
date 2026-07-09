@@ -8,7 +8,7 @@ module ForestAdminDatasourceCustomizer
 
         describe WriteCustomizationContext do
           let(:collection) { build_collection }
-          let(:caller_context) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+          let(:caller_context) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
           let(:action) { 'create' }
           let(:record) { { 'id' => 1, 'name' => 'Test' } }
           let(:filter) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Filter) }

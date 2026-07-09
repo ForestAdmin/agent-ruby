@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'active_support/notifications'
 
 module ForestAdminDatasourceCustomizer
   module Decorators
@@ -191,6 +192,21 @@ module ForestAdminDatasourceCustomizer
                                     { 'title' => 'Foundation', 'author' => { 'fullName' => 'Isaac Asimov' } },
                                     { 'title' => 'Beat the dealer', 'author' => { 'fullName' => 'Edward O. Thorp' } }
                                   ])
+          end
+
+          it 'list() should emit a computed_field.forest_admin notification' do
+            events = []
+            subscriber = ::ActiveSupport::Notifications.subscribe('computed_field.forest_admin') do |*args|
+              events << ::ActiveSupport::Notifications::Event.new(*args)
+            end
+
+            @new_books.list(caller, Filter.new, Projection.new(['title', 'author:fullName']))
+
+            ::ActiveSupport::Notifications.unsubscribe(subscriber)
+
+            expect(events.map(&:payload)).to include(
+              include(collection: 'book', field: 'author:fullName', user_id: 1, rendering_id: 1, project: 'terminator')
+            )
           end
 
           it 'aggregate() should use the child implementation when relevant' do

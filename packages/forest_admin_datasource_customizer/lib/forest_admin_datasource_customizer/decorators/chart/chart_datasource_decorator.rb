@@ -32,10 +32,14 @@ module ForestAdminDatasourceCustomizer
           chart_definition = @charts[name]
 
           if chart_definition
-            return chart_definition.call(
-              DatasourceChartContext.new(self, caller, parameters),
-              ResultBuilder.new
-            )
+            return ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'chart', { chart: name }.merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+            ) do
+              chart_definition.call(
+                DatasourceChartContext.new(self, caller, parameters),
+                ResultBuilder.new
+              )
+            end
           end
 
           super

@@ -10,7 +10,7 @@ module ForestAdminDatasourceCustomizer
       describe SearchCollectionDecorator do
         let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
 
-        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
 
         before do
           @collection_user = instance_double(

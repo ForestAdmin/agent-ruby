@@ -1,7 +1,8 @@
 module ForestAdminDatasourceToolkit
   module Components
     class Caller
-      attr_reader :id, :email, :first_name, :last_name, :tags, :team, :rendering_id, :timezone, :permission_level, :role
+      attr_reader :id, :email, :first_name, :last_name, :tags, :team, :rendering_id, :timezone, :permission_level,
+                  :role, :project
 
       def initialize(
         id:,

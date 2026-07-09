@@ -60,6 +60,19 @@ module ForestAdminDatasourceCustomizer
 
               expect(spy).to have_received(:call).once
             end
+
+            it 'emits a hook.forest_admin notification for registered hooks' do
+              spy = instance_double(Proc, call: nil)
+              @decorated_transaction.add_hook('Before', 'Create', spy)
+              events = []
+              sub = ::ActiveSupport::Notifications.subscribe('hook.forest_admin') do |*a|
+                events << ::ActiveSupport::Notifications::Event.new(*a)
+              end
+              @decorated_transaction.create(caller, [])
+              ::ActiveSupport::Notifications.unsubscribe(sub)
+
+              expect(events.map(&:payload)).to include({ operation: 'Create', position: 'before' })
+            end
           end
 
           describe 'on a update' do

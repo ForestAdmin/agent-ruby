@@ -9,7 +9,11 @@ module ForestAdminDatasourceCustomizer
         def create(caller, data)
           if @create_handler
             context = CreateOverrideCustomizationContext.new(@child_collection, caller, data)
-            return @create_handler.call(context)
+            return ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'override',
+              { collection: name, operation: 'create' }
+                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+            ) { @create_handler.call(context) }
           end
 
           super
@@ -22,7 +26,11 @@ module ForestAdminDatasourceCustomizer
         def update(caller, filter, patch)
           if @update_handler
             context = UpdateOverrideCustomizationContext.new(@child_collection, caller, filter, patch)
-            return @update_handler.call(context)
+            return ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'override',
+              { collection: name, operation: 'update' }
+                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+            ) { @update_handler.call(context) }
           end
 
           super
@@ -35,7 +43,11 @@ module ForestAdminDatasourceCustomizer
         def delete(caller, filter)
           if @delete_handler
             context = DeleteOverrideCustomizationContext.new(@child_collection, caller, filter)
-            return @delete_handler.call(context)
+            return ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'override',
+              { collection: name, operation: 'delete' }
+                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+            ) { @delete_handler.call(context) }
           end
 
           super

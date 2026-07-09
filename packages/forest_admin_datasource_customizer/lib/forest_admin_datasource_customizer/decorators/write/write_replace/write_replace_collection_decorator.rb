@@ -72,12 +72,22 @@ module ForestAdminDatasourceCustomizer
 
             if field_schema&.type == 'Column'
               # We either call the customer handler or a default one that does nothing.
-              handler = @handlers[key] || proc { |v| { key => v } }
-              field_patch = if context.record.key?(key) && handler.call(context.record[key], context)
-                              handler.call(context.record[key], context)
-                            else
-                              {}
-                            end
+              user_handler = @handlers[key]
+              handler = user_handler || proc { |v| { key => v } }
+              # ponytail: single evaluation (the previous code called the handler twice); only the
+              # user handler is instrumented — the default no-op proc isn't user code.
+              raw = if context.record.key?(key)
+                      if user_handler
+                        ForestAdminDatasourceToolkit::Monitoring.instrument(
+                          'write',
+                          { collection: name, field: key }
+                            .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(context.caller))
+                        ) { handler.call(context.record[key], context) }
+                      else
+                        handler.call(context.record[key], context)
+                      end
+                    end
+              field_patch = raw || {}
 
               if field_patch && !field_patch.is_a?(Hash)
                 raise ForestException, "The write handler of #{key} should return an Hash or nothing."

@@ -12,7 +12,7 @@ module ForestAdminDatasourceCustomizer
         describe WriteDatasourceDecorator do
           let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
           let(:write_datasource_decorator) { described_class }
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
 
           before do
             @collection_book = instance_double(
@@ -106,7 +106,7 @@ module ForestAdminDatasourceCustomizer
             )
             allow(@collection_owner).to receive(:create)
 
-            caller = instance_double(ForestAdminDatasourceToolkit::Components::Caller)
+            caller = instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test})
             @decorated_book.create(caller, { 'title' => 'a title' })
 
             expect(@collection_owner).to have_received(:create).with(caller, { 'name' => 'NAME TO CHANGE', 'book_id' => '123e4567-e89b-12d3-a456-111111111111' })

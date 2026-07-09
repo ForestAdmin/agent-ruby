@@ -27,7 +27,11 @@ module ForestAdminDatasourceCustomizer
           context = get_context(caller, action, data, filter)
 
           result_builder = ResultBuilder.new
-          result = action.execute.call(context, result_builder)
+          result = ForestAdminDatasourceToolkit::Monitoring.instrument(
+            'action',
+            { collection: self.name, action: name }
+              .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+          ) { action.execute.call(context, result_builder) }
 
           return result if result.is_a? Hash
 

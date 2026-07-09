@@ -11,7 +11,7 @@ module ForestAdminDatasourceCustomizer
         describe WriteReplaceCollectionDecorator do
           let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
           let(:write_datasource_decorator) { ForestAdminDatasourceCustomizer::Decorators::Write::WriteDatasourceDecorator }
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
 
           before do
             @collection_book = instance_double(
@@ -43,6 +43,27 @@ module ForestAdminDatasourceCustomizer
           end
 
           context 'when rewrite the record' do
+            it 'invokes the handler once and emits a write.forest_admin notification' do
+              record = { 'name' => 'a name' }
+              allow(@collection_book).to receive(:create).and_return(record)
+
+              calls = 0
+              @decorated_book.replace_field_writing('name') do |value, _context|
+                calls += 1
+                { 'name' => value }
+              end
+
+              events = []
+              sub = ::ActiveSupport::Notifications.subscribe('write.forest_admin') do |*a|
+                events << ::ActiveSupport::Notifications::Event.new(*a)
+              end
+              @decorated_book.create(caller, record)
+              ::ActiveSupport::Notifications.unsubscribe(sub)
+
+              expect(calls).to eq(1)
+              expect(events.map(&:payload)).to include(include(collection: 'book', field: 'name'))
+            end
+
             it 'with a empty handler' do
               record = { 'name' => 'a name', 'age' => 'some age' }
               allow(@collection_book).to receive(:create).and_return(record)

@@ -10,11 +10,11 @@ module ForestAdminDatasourceCustomizer
         def initialize(child_collection, datasource)
           super
           @hooks = {
-            'List' => Hooks.new,
-            'Create' => Hooks.new,
-            'Update' => Hooks.new,
-            'Delete' => Hooks.new,
-            'Aggregate' => Hooks.new
+            'List' => Hooks.new('List'),
+            'Create' => Hooks.new('Create'),
+            'Update' => Hooks.new('Update'),
+            'Delete' => Hooks.new('Delete'),
+            'Aggregate' => Hooks.new('Aggregate')
           }
         end
 
