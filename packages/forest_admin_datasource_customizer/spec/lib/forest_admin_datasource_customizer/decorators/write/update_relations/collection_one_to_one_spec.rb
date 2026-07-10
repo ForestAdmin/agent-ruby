@@ -13,7 +13,7 @@ module ForestAdminDatasourceCustomizer
         describe UpdateRelationsCollectionDecorator do
           let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
           let(:update_relations_datasource_decorator) { described_class }
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test') }
 
           before do
             @collection_author = instance_double(

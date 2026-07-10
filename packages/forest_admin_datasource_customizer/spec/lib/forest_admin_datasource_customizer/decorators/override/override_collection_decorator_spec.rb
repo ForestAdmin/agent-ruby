@@ -10,7 +10,7 @@ module ForestAdminDatasourceCustomizer
       describe OverrideCollectionDecorator do
         subject(:override_collection_decorator) { described_class }
 
-        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: %q{test}) }
+        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test') }
 
         before do
           datasource = Datasource.new

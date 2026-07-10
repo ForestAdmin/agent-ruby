@@ -26,7 +26,7 @@ module ForestAdminDatasourceCustomizer
 
         def instrument(position, &block)
           hooks = position == 'before' ? @before : @after
-          return block.call if hooks.empty?
+          return yield if hooks.empty?
 
           ForestAdminDatasourceToolkit::Monitoring.instrument(
             'hook', { operation: @type, position: position }, &block
