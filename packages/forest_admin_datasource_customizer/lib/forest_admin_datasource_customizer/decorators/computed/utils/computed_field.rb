@@ -36,9 +36,7 @@ module ForestAdminDatasourceCustomizer
             paths.push(new_path)
 
             flatten << ForestAdminDatasourceToolkit::Monitoring.instrument(
-              'computed_field',
-              { collection: collection.name, field: new_path }
-                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(ctx.caller))
+              'computed_field', { collection: collection.name, field: new_path }, caller: ctx.caller
             ) { compute_field(ctx, computed, computed_dependencies, dependency_values) }
           end
 

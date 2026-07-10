@@ -40,7 +40,7 @@ module ForestAdminDatasourceCustomizer
 
             if @replacer
               plain_tree = ForestAdminDatasourceToolkit::Monitoring.instrument(
-                'search', { collection: name }.merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+                'search', { collection: name }, caller: caller
               ) do
                 @replacer.call(filter.search, filter.search_extended, ctx)
               end

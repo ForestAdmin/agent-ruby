@@ -25,9 +25,7 @@ module ForestAdminDatasourceCustomizer
             result_builder = ResultBuilder.new
 
             return ForestAdminDatasourceToolkit::Monitoring.instrument(
-              'chart',
-              { collection: self.name, chart: name }
-                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+              'chart', { collection: self.name, chart: name }, caller: caller
             ) { @charts[name].call(context, result_builder) }
           end
 

@@ -90,9 +90,7 @@ module ForestAdminDatasourceCustomizer
             end
 
             result = ForestAdminDatasourceToolkit::Monitoring.instrument(
-              'operator_emulation',
-              { collection: name, field: leaf.field, operator: leaf.operator }
-                .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+              'operator_emulation', { collection: name, field: leaf.field, operator: leaf.operator }, caller: caller
             ) { handler.call(leaf.value, Context::CollectionCustomizationContext.new(self, caller)) }
 
             if result

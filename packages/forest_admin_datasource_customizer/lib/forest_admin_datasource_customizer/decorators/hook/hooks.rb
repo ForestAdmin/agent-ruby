@@ -28,9 +28,10 @@ module ForestAdminDatasourceCustomizer
           hooks = position == 'before' ? @before : @after
           return yield if hooks.empty?
 
-          payload = { collection: context.collection.name, operation: @type, position: position }
-                    .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(context.caller))
-          ForestAdminDatasourceToolkit::Monitoring.instrument('hook', payload, &block)
+          ForestAdminDatasourceToolkit::Monitoring.instrument(
+            'hook', { collection: context.collection.name, operation: @type, position: position },
+            caller: context.caller, &block
+          )
         end
       end
     end

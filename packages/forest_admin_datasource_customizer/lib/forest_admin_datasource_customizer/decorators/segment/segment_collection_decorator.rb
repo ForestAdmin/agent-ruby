@@ -43,9 +43,7 @@ module ForestAdminDatasourceCustomizer
 
           result = if definition.respond_to? :call
                      ForestAdminDatasourceToolkit::Monitoring.instrument(
-                       'segment',
-                       { collection: name, segment: segment_name }
-                         .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(caller))
+                       'segment', { collection: name, segment: segment_name }, caller: caller
                      ) { definition.call(Context::CollectionCustomizationContext.new(self, caller)) }
                    else
                      definition

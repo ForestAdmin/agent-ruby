@@ -79,9 +79,7 @@ module ForestAdminDatasourceCustomizer
               raw = if context.record.key?(key)
                       if user_handler
                         ForestAdminDatasourceToolkit::Monitoring.instrument(
-                          'write',
-                          { collection: name, field: key }
-                            .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(context.caller))
+                          'write', { collection: name, field: key }, caller: context.caller
                         ) { handler.call(context.record[key], context) }
                       else
                         handler.call(context.record[key], context)

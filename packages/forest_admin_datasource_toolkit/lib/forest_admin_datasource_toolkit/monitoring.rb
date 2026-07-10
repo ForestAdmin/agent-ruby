@@ -6,8 +6,12 @@ module ForestAdminDatasourceToolkit
   # events under the "*.forest_admin" namespace so host apps can subscribe and
   # forward to any monitoring stack. No-op cost when nobody subscribes.
   module Monitoring
-    def self.instrument(event, payload = {}, &block)
-      ActiveSupport::Notifications.instrument("#{event}.forest_admin", payload.compact, &block)
+    # Uniform entry point, callable from anywhere (decorator, utility class, plain
+    # object, or a client's custom handler). Pass `caller:` to auto-merge the acting
+    # user's non-PII identity (user_id/rendering_id/project) into the payload.
+    def self.instrument(event, payload = {}, caller: nil, &block)
+      enriched = payload.merge(caller_payload(caller)).compact
+      ActiveSupport::Notifications.instrument("#{event}.forest_admin", enriched, &block)
     end
 
     # Non-PII identity of the acting Forest user, to merge into an event payload.
