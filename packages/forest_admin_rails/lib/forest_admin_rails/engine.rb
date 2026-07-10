@@ -28,6 +28,13 @@ module ForestAdminRails
       Rails.error.subscribe(ForestAdminErrorSubscriber.new)
     end
 
+    # Runs after the host's config/initializers (where `config.monitoring` is set)
+    # but before the middleware stack is built, so the correlation middleware can
+    # still be inserted. No-op unless monitoring is enabled.
+    initializer 'forest_admin_rails.monitoring', after: :load_config_initializers do |app|
+      ForestAdminRails::Monitoring.install!(app)
+    end
+
     config.after_initialize do
       Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
         agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
