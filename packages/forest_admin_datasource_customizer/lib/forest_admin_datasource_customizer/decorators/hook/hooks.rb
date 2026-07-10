@@ -11,11 +11,11 @@ module ForestAdminDatasourceCustomizer
         end
 
         def execute_before(context)
-          instrument('before') { @before.each { |hook| hook.call(context) } }
+          instrument('before', context) { @before.each { |hook| hook.call(context) } }
         end
 
         def execute_after(context)
-          instrument('after') { @after.each { |hook| hook.call(context) } }
+          instrument('after', context) { @after.each { |hook| hook.call(context) } }
         end
 
         def add_handler(position, hook)
@@ -24,13 +24,13 @@ module ForestAdminDatasourceCustomizer
 
         private
 
-        def instrument(position, &block)
+        def instrument(position, context, &block)
           hooks = position == 'before' ? @before : @after
           return yield if hooks.empty?
 
-          ForestAdminDatasourceToolkit::Monitoring.instrument(
-            'hook', { operation: @type, position: position }, &block
-          )
+          payload = { collection: context.collection.name, operation: @type, position: position }
+                    .merge(ForestAdminDatasourceToolkit::Monitoring.caller_payload(context.caller))
+          ForestAdminDatasourceToolkit::Monitoring.instrument('hook', payload, &block)
         end
       end
     end

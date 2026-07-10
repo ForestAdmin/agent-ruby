@@ -12,7 +12,9 @@ module ForestAdminDatasourceCustomizer
       describe HookCollectionDecorator do
         subject(:hook_collection_decorator) { described_class }
 
-        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+        let(:caller) do
+          instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test')
+        end
         let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
 
         before do
@@ -71,7 +73,7 @@ module ForestAdminDatasourceCustomizer
               @decorated_transaction.create(caller, [])
               ::ActiveSupport::Notifications.unsubscribe(sub)
 
-              expect(events.map(&:payload)).to include({ operation: 'Create', position: 'before' })
+              expect(events.map(&:payload)).to include(include(operation: 'Create', position: 'before', collection: 'transaction'))
             end
           end
 
