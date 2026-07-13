@@ -86,6 +86,24 @@ module ForestAdminDatasourceZendesk
           expect(client).to have_received(:fetch_tickets_by_ids).with([1, 2]).once
         end
 
+        it 'coerces float ids (as produced by the agent parser) to integers' do
+          bulk_response = { 1 => { 'id' => 1, 'requester_id' => nil } }
+          allow(client).to receive_messages(fetch_tickets_by_ids: bulk_response, fetch_user_emails: {})
+
+          filter = Filter.new(condition_tree: Leaf.new('id', 'in', [1.0, 2.0]))
+          expect(collection.list(nil, filter, ['id']).map { |r| r['id'] }).to eq([1])
+          expect(client).to have_received(:fetch_tickets_by_ids).with([1, 2])
+        end
+
+        it 'coerces a float id on an EQUAL lookup to an integer' do
+          ticket = { 'id' => 215, 'requester_id' => nil }
+          allow(client).to receive_messages(fetch_tickets_by_ids: { 215 => ticket }, fetch_user_emails: {})
+
+          filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 215.0))
+          expect(collection.list(nil, filter, ['id']).map { |r| r['id'] }).to eq([215])
+          expect(client).to have_received(:fetch_tickets_by_ids).with([215])
+        end
+
         it 'silently drops ids the bulk endpoint did not return' do
           allow(client).to receive(:fetch_tickets_by_ids).with([1, 2]).and_return(
             1 => { 'id' => 1, 'requester_id' => nil }

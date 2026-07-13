@@ -38,6 +38,16 @@ module ForestAdminDatasourceZendesk
         expect(client).not_to have_received(:search)
       end
 
+      it 'coerces a float id (as produced by the agent parser) to an integer' do
+        user = zendesk_user('id' => 7, 'email' => 'a@b.com', 'name' => 'A')
+        allow(client).to receive_messages(find_user: user, search: [])
+
+        filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 7.0))
+        collection.list(nil, filter, ['id', 'email'])
+        expect(client).to have_received(:find_user).with(7)
+        expect(client).not_to have_received(:search)
+      end
+
       it 'searches with type:user otherwise' do
         allow(client).to receive(:search).and_return([])
 
