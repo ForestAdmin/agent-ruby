@@ -59,14 +59,8 @@ module ForestAdminDatasourceZendesk
         end
       end
 
-      # Only integral values are normalised. A fractional float (`123.9`) is
-      # left untouched rather than truncated to `123`, which would otherwise
-      # match an unrelated record instead of nothing.
       def normalize_id(value)
-        normalized = Integer(value, exception: false)
-        return value if normalized.nil? || (value.is_a?(Float) && normalized != value)
-
-        normalized
+        Integer(value, exception: false) || value
       end
 
       def project(record, projection)

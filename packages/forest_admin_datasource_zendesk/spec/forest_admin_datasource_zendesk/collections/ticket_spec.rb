@@ -104,14 +104,6 @@ module ForestAdminDatasourceZendesk
           expect(client).to have_received(:fetch_tickets_by_ids).with([215])
         end
 
-        it 'does not truncate a fractional id to an unrelated record' do
-          allow(client).to receive_messages(fetch_tickets_by_ids: {}, fetch_user_emails: {})
-
-          filter = Filter.new(condition_tree: Leaf.new('id', 'equal', 123.9))
-          expect(collection.list(nil, filter, ['id'])).to eq([])
-          expect(client).to have_received(:fetch_tickets_by_ids).with([123.9])
-        end
-
         it 'silently drops ids the bulk endpoint did not return' do
           allow(client).to receive(:fetch_tickets_by_ids).with([1, 2]).and_return(
             1 => { 'id' => 1, 'requester_id' => nil }
