@@ -45,13 +45,22 @@ module ForestAdminDatasourceZendesk
 
       # Zendesk Search has no `id:` operator, so collections short-circuit
       # PK lookups to /resource/{id} when the filter is `id = N` or `id IN [...]`.
+      #
+      # The agent parses Number values through `to_f`, so an `id IN [...]` filter
+      # arrives as floats (e.g. `123.0`). Zendesk's REST ids are integers, so the
+      # values are normalised here before hitting /show_many or /resource/{id};
+      # otherwise the API rejects `123.0` (500) or the id-keyed result map misses.
       def extract_id_lookup(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
 
         case node.operator
-        when Operators::EQUAL then [node.value]
-        when Operators::IN    then Array(node.value)
+        when Operators::EQUAL then [normalize_id(node.value)]
+        when Operators::IN    then Array(node.value).map { |v| normalize_id(v) }
         end
+      end
+
+      def normalize_id(value)
+        Integer(value, exception: false) || value
       end
 
       def project(record, projection)
