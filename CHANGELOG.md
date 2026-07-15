@@ -1,3 +1,10 @@
+## [1.35.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.2...v1.35.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* **datasource-zendesk:** coerce id filter values to integers for PK lookups ([#331](https://github.com/ForestAdmin/agent-ruby/issues/331)) ([1575509](https://github.com/ForestAdmin/agent-ruby/commit/1575509498f453d6f15dd9e285714deca5c04c20))
+
 ## [1.35.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.1...v1.35.2) (2026-07-03)
 
 
