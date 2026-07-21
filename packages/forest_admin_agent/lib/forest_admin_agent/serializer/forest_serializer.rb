@@ -112,7 +112,9 @@ module ForestAdminAgent
         foreign_type = @object[field.foreign_key_type_field]
         return nil if foreign_key.nil? || foreign_type.nil?
 
-        primary_key = (field.foreign_key_targets || {})[foreign_type] || 'id'
+        # foreign_key_targets is keyed by formatted collection names (Admin::User => Admin__User),
+        # but foreign_type is the raw AR type column value, so format it before the lookup.
+        primary_key = (field.foreign_key_targets || {})[foreign_type.gsub('::', '__')] || 'id'
         (object.is_a?(Hash) ? object : {}).merge(primary_key => foreign_key)
       end
 

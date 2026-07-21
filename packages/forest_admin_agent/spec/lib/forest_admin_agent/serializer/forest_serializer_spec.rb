@@ -34,6 +34,17 @@ module ForestAdminAgent
               }
             )
 
+            # Namespaced model (Admin::User => Admin__User) with a custom primary key
+            admin_user_collection = build_collection(
+              name: 'Admin__User',
+              schema: {
+                fields: {
+                  'reference' => ColumnSchema.new(column_type: 'String', is_primary_key: true, filter_operators: [Operators::EQUAL]),
+                  'name' => ColumnSchema.new(column_type: 'String')
+                }
+              }
+            )
+
             document_collection = build_collection(
               name: 'Document',
               schema: {
@@ -45,8 +56,8 @@ module ForestAdminAgent
                   'documentable' => PolymorphicManyToOneSchema.new(
                     foreign_key: 'documentable_id',
                     foreign_key_type_field: 'documentable_type',
-                    foreign_collections: %w[Car User],
-                    foreign_key_targets: { 'Car' => 'id', 'User' => 'id' }
+                    foreign_collections: %w[Car User Admin__User],
+                    foreign_key_targets: { 'Car' => 'id', 'User' => 'id', 'Admin__User' => 'reference' }
                   )
                 }
               }
@@ -55,6 +66,7 @@ module ForestAdminAgent
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
             datasource.add_collection(car_collection)
             datasource.add_collection(user_collection)
+            datasource.add_collection(admin_user_collection)
             datasource.add_collection(document_collection)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
             ForestAdminAgent::Builder::AgentFactory.instance.build
@@ -93,6 +105,24 @@ module ForestAdminAgent
             relationship = result['data']['relationships']['documentable']
             expect(relationship['data']['type']).to eq('Car')
             expect(relationship['data']['id']).to eq('10')
+          end
+
+          it 'builds the linkage id for a namespaced target with a custom primary key (issue #332)' do
+            # foreign_key_targets is keyed by the formatted name (Admin__User), but the type column
+            # stores the raw class name (Admin::User); the lookup must reconcile the two.
+            record = {
+              'id' => 4,
+              'title' => 'Audit Log',
+              'documentable_id' => 'ref-42',
+              'documentable_type' => 'Admin::User',
+              'documentable' => { '*' => nil }
+            }
+
+            result = JSONAPI::Serializer.serialize(record, class_name: 'Document', serializer: described_class)
+
+            relationship = result['data']['relationships']['documentable']
+            expect(relationship['data']['type']).to eq('Admin__User')
+            expect(relationship['data']['id']).to eq('ref-42')
           end
 
           it 'omits the data key for an unlinked polymorphic relation (issue #332)' do
