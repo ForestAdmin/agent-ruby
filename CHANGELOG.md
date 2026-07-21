@@ -1,3 +1,10 @@
+## [1.35.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.3...v1.35.4) (2026-07-21)
+
+
+### Bug Fixes
+
+* **forest_admin_agent:** build PolymorphicManyToOne linkage id from foreign key ([#332](https://github.com/ForestAdmin/agent-ruby/issues/332)) ([#333](https://github.com/ForestAdmin/agent-ruby/issues/333)) ([177b78f](https://github.com/ForestAdmin/agent-ruby/commit/177b78f009b22bd524034b9844a11defd5cfb9b7))
+
 ## [1.35.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.2...v1.35.3) (2026-07-15)
 
 
