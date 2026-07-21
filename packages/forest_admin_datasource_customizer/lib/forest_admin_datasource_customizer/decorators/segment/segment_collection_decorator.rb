@@ -25,24 +25,26 @@ module ForestAdminDatasourceCustomizer
           sub_schema
         end
 
-        def refine_filter(_caller, filter = nil)
+        def refine_filter(caller, filter = nil)
           return nil unless filter
 
           condition_tree = filter.condition_tree
           segment = filter.segment
           if segment && @segments.key?(segment)
-            condition_tree = compute_segment(segment, filter)
+            condition_tree = compute_segment(segment, filter, caller)
             segment = nil
           end
 
           filter.override(condition_tree: condition_tree, segment: segment)
         end
 
-        def compute_segment(segment_name, filter)
+        def compute_segment(segment_name, filter, caller)
           definition = @segments[segment_name]
 
           result = if definition.respond_to? :call
-                     definition.call(Context::CollectionCustomizationContext.new(self, caller))
+                     ForestAdminDatasourceToolkit::Monitoring.instrument(
+                       'segment', { collection: name, segment: segment_name }, caller: caller
+                     ) { definition.call(Context::CollectionCustomizationContext.new(self, caller)) }
                    else
                      definition
                    end

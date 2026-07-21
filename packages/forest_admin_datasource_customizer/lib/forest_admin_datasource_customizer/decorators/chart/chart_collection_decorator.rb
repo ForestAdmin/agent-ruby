@@ -24,7 +24,9 @@ module ForestAdminDatasourceCustomizer
             context = ChartContext.new(self, caller, record_id, parameters)
             result_builder = ResultBuilder.new
 
-            return @charts[name].call(context, result_builder)
+            return ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'chart', { collection: self.name, chart: name }, caller: caller
+            ) { @charts[name].call(context, result_builder) }
           end
 
           @child_collection.render_chart(caller, name, record_id, parameters)
