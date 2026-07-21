@@ -93,6 +93,27 @@ module ForestAdminAgent
         @to_one_associations[name] = format_field(name, options)
       end
 
+      # A PolymorphicManyToOne can't be SQL-joined, so list projections return a phantom object with no
+      # primary key. Rebuild the id from the foreign key on the owner record.
+      def has_one_relationship(attribute_name, attr_data)
+        object = super
+        return object if object.nil? # relation not projected (e.g. update/store responses)
+
+        field = ForestAdminAgent::Facades::Container.datasource
+                                                    .get_collection(@options[:class_name].gsub('::', '__'))
+                                                    .schema[:fields][attribute_name.to_s]
+        return object unless field&.type == 'PolymorphicManyToOne'
+
+        foreign_key = @object[field.foreign_key]
+        foreign_type = @object[field.foreign_key_type_field]
+        return nil if foreign_key.nil? || foreign_type.nil?
+
+        # foreign_key_targets is keyed by formatted collection names (Admin::User => Admin__User),
+        # but foreign_type is the raw AR type column value, so format it before the lookup.
+        primary_key = (field.foreign_key_targets || {})[foreign_type.gsub('::', '__')] || 'id'
+        (object.is_a?(Hash) ? object : {}).merge(primary_key => foreign_key)
+      end
+
       def has_one_relationships
         return {} if @to_one_associations.nil?
         data = {}
