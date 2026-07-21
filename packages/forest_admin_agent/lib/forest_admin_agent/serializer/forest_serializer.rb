@@ -99,6 +99,10 @@ module ForestAdminAgent
       # the frontend). No extra query is issued.
       def has_one_relationship(attribute_name, attr_data)
         object = super
+        # nil means the relation wasn't projected/loaded at all (e.g. update/store responses) — keep
+        # the previous behavior. Only the phantom object returned by list projections needs rebuilding.
+        return object if object.nil?
+
         field = ForestAdminAgent::Facades::Container.datasource
                                                     .get_collection(@options[:class_name].gsub('::', '__'))
                                                     .schema[:fields][attribute_name.to_s]
