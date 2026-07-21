@@ -77,6 +77,38 @@ module ForestAdminAgent
             expect(relationship['data']['id']).to eq('10')
           end
 
+          it 'builds the linkage id from the foreign key when the related record is a phantom (issue #332)' do
+            # The AR datasource skips polymorphic relations while building the SELECT, so the related
+            # object comes back without a primary key. The id must still be built from the owner FK.
+            record = {
+              'id' => 1,
+              'title' => 'Registration Certificate',
+              'documentable_id' => 10,
+              'documentable_type' => 'Car',
+              'documentable' => { '*' => nil }
+            }
+
+            result = JSONAPI::Serializer.serialize(record, class_name: 'Document', serializer: described_class)
+
+            relationship = result['data']['relationships']['documentable']
+            expect(relationship['data']['type']).to eq('Car')
+            expect(relationship['data']['id']).to eq('10')
+          end
+
+          it 'omits the data key for an unlinked polymorphic relation (issue #332)' do
+            record = {
+              'id' => 3,
+              'title' => 'Orphan',
+              'documentable_id' => nil,
+              'documentable_type' => nil,
+              'documentable' => { '*' => nil }
+            }
+
+            result = JSONAPI::Serializer.serialize(record, class_name: 'Document', serializer: described_class)
+
+            expect(result['data']['relationships']['documentable']).not_to have_key('data')
+          end
+
           it 'serializes a polymorphic belongs_to relation pointing to User' do
             record = {
               'id' => 2,

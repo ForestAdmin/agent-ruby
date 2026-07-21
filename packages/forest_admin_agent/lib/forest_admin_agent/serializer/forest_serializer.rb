@@ -93,6 +93,25 @@ module ForestAdminAgent
         @to_one_associations[name] = format_field(name, options)
       end
 
+      # For a PolymorphicManyToOne the related record can't be SQL-joined, so the datasource returns
+      # a phantom object without a primary key. Rebuild the id from the foreign key already loaded on
+      # the owner record instead of reading it off that phantom (which yields an empty id and crashes
+      # the frontend). No extra query is issued.
+      def has_one_relationship(attribute_name, attr_data)
+        object = super
+        field = ForestAdminAgent::Facades::Container.datasource
+                                                    .get_collection(@options[:class_name].gsub('::', '__'))
+                                                    .schema[:fields][attribute_name.to_s]
+        return object unless field&.type == 'PolymorphicManyToOne'
+
+        foreign_key = @object[field.foreign_key]
+        foreign_type = @object[field.foreign_key_type_field]
+        return nil if foreign_key.nil? || foreign_type.nil?
+
+        primary_key = (field.foreign_key_targets || {})[foreign_type] || 'id'
+        (object.is_a?(Hash) ? object : {}).merge(primary_key => foreign_key)
+      end
+
       def has_one_relationships
         return {} if @to_one_associations.nil?
         data = {}
