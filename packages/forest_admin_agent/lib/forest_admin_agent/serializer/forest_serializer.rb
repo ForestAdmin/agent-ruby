@@ -93,15 +93,11 @@ module ForestAdminAgent
         @to_one_associations[name] = format_field(name, options)
       end
 
-      # For a PolymorphicManyToOne the related record can't be SQL-joined, so the datasource returns
-      # a phantom object without a primary key. Rebuild the id from the foreign key already loaded on
-      # the owner record instead of reading it off that phantom (which yields an empty id and crashes
-      # the frontend). No extra query is issued.
+      # A PolymorphicManyToOne can't be SQL-joined, so list projections return a phantom object with no
+      # primary key. Rebuild the id from the foreign key on the owner record.
       def has_one_relationship(attribute_name, attr_data)
         object = super
-        # nil means the relation wasn't projected/loaded at all (e.g. update/store responses) — keep
-        # the previous behavior. Only the phantom object returned by list projections needs rebuilding.
-        return object if object.nil?
+        return object if object.nil? # relation not projected (e.g. update/store responses)
 
         field = ForestAdminAgent::Facades::Container.datasource
                                                     .get_collection(@options[:class_name].gsub('::', '__'))

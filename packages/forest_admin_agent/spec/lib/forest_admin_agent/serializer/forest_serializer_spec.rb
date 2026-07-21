@@ -107,6 +107,24 @@ module ForestAdminAgent
             expect(relationship['data']['id']).to eq('10')
           end
 
+          it 'builds the included document id and self-link from the foreign key (issue #332)' do
+            record = {
+              'id' => 1,
+              'title' => 'Registration Certificate',
+              'documentable_id' => 10,
+              'documentable_type' => 'Car',
+              'documentable' => { '*' => nil }
+            }
+
+            result = JSONAPI::Serializer.serialize(
+              record, class_name: 'Document', serializer: described_class, include: 'documentable'
+            )
+
+            included = result['included'].find { |r| r['type'] == 'Car' }
+            expect(included['id']).to eq('10')
+            expect(included['links']['self']).to eq('/forest/Car/10')
+          end
+
           it 'builds the linkage id for a namespaced target with a custom primary key (issue #332)' do
             # foreign_key_targets is keyed by the formatted name (Admin__User), but the type column
             # stores the raw class name (Admin::User); the lookup must reconcile the two.
