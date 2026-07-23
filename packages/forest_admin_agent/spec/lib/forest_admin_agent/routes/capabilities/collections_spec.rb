@@ -84,7 +84,7 @@ module ForestAdminAgent
 
           it 'returns agentCapabilities' do
             expect(result[:content][:agentCapabilities]).to eq(
-              { canUseProjectionOnGetOne: true }
+              { canUseProjectionOnGetOne: true, canUseMultipleFieldsProjectionOnRelation: true }
             )
           end
         end
@@ -131,7 +131,7 @@ module ForestAdminAgent
 
           it 'returns agentCapabilities' do
             expect(result[:content][:agentCapabilities]).to eq(
-              { canUseProjectionOnGetOne: true }
+              { canUseProjectionOnGetOne: true, canUseMultipleFieldsProjectionOnRelation: true }
             )
           end
         end

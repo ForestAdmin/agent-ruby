@@ -63,7 +63,8 @@ module ForestAdminAgent
               collections: result,
               nativeQueryConnections: connections,
               agentCapabilities: {
-                canUseProjectionOnGetOne: true
+                canUseProjectionOnGetOne: true,
+                canUseMultipleFieldsProjectionOnRelation: true
               }
             },
             status: 200

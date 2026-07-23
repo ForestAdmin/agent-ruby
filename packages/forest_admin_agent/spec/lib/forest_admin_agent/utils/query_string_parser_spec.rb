@@ -333,6 +333,20 @@ module ForestAdminAgent
           expect(described_class.parse_projection_with_pks(collection,
                                                            args)).to eq(Projection.new(%w[id author:name author:id]))
         end
+
+        it 'supports multiple projected fields on a belongsTo relation' do
+          args = {
+            params: {
+              fields: {
+                'Book' => 'id, author',
+                'author' => 'id,name'
+              }
+            }
+          }
+
+          expect(described_class.parse_projection_with_pks(collection,
+                                                           args)).to eq(Projection.new(%w[id author:id author:name]))
+        end
       end
 
       describe 'parse_pagination' do
