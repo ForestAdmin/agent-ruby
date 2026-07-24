@@ -63,7 +63,7 @@ module ForestAdminAgent
       end
 
       def self.build_projection_fields(collection, requested_field_names, args)
-        requested_field_names.map do |field_name|
+        requested_field_names.flat_map do |field_name|
           field = get_field(collection, field_name)
 
           case field.type
@@ -73,7 +73,12 @@ module ForestAdminAgent
             "#{field_name}:*"
           else
             relation_fields = args.dig(:params, :fields, field_name)
-            "#{field_name}:#{relation_fields}"
+
+            if relation_fields.nil? || relation_fields.empty?
+              "#{field_name}:#{relation_fields}"
+            else
+              relation_fields.split(',').map { |sub_field| "#{field_name}:#{sub_field.strip}" }
+            end
           end
         end
       end
