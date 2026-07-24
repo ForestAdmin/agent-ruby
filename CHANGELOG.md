@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.4...v1.36.0) (2026-07-24)
+
+
+### Features
+
+* handle multiple projection on relation fields ([#335](https://github.com/ForestAdmin/agent-ruby/issues/335)) ([1c4eff9](https://github.com/ForestAdmin/agent-ruby/commit/1c4eff941632c972f037ad47c6ab1c60f439fd75))
+
 ## [1.35.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.3...v1.35.4) (2026-07-21)
 
 
