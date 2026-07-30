@@ -5,7 +5,7 @@ Triage and fix open Dependabot vulnerability alerts in this repository, open a P
 **Context & token rule:** this routine runs inside GitHub Actions on a checkout of the repository's default branch. `$GH_PAT` is provided by the workflow from the `SECURITY_GH_PAT` secret (a user fine-grained PAT) — use it for **every** `curl`/REST call to `api.github.com`. Git is already authenticated with the same PAT via the checkout step, so plain `git push` works and its pushes trigger CI. Never use the Actions-provided `$GITHUB_TOKEN` for REST calls or the label POST: events it creates do not trigger other workflows, so the Slack notification would never fire.
 
 - `$GH_PAT` is set and non-empty (`[ -n "$GH_PAT" ]`) with `security_events:read` (Dependabot alerts), `contents:write`, `pull_requests:write`, `issues:write`, `actions:read` + `actions:write`, and `statuses:read` on this repo (`actions:write` is needed to re-run flaky jobs; `issues:write` is required for labeling PRs and for creating the `:lock: security` label if missing). Note: fine-grained PATs cannot carry the `Checks` permission (it is GitHub App-only), so CI monitoring below uses the Actions and Commit statuses APIs — never call the Checks API (`/check-runs`), it would 403. Probe with `curl -sS -o /tmp/preflight-body.json -w "%{http_code}" -H "Authorization: Bearer $GH_PAT" "https://api.github.com/repos/$(git remote get-url origin | sed -E 's|.*github\.com[:/]([^.]+)(\.git)?$|\1|')/dependabot/alerts?per_page=1"` — expect `200`. On any non-200, `cat /tmp/preflight-body.json` — the GitHub error body says why (missing fine-grained permission vs org restriction/pending approval vs expired token).
-- Bundler is usable: `Gemfile` and `Gemfile.lock` are present and `bundle --version` works.
+- Bundler is usable: a `Gemfile` is present and `bundle --version` works. This is a **library repo**: `Gemfile.lock` is gitignored and not committed — run `bundle lock` once to materialize a local lockfile for dependency inspection, and NEVER commit `Gemfile.lock`.
 
 If `$GH_PAT` is missing or the probe fails, stop and print exactly: `Preflight failed: GH_PAT must be set (from the SECURITY_GH_PAT repository/organization secret) with the required scopes (including issues:write for labeling) on <repo>. Probe returned <http_code>, GitHub said: <first 300 chars of /tmp/preflight-body.json>. Aborting — not falling back to bundle audit (it ignores dismissals and the 7-day gate).` Do not proceed.
 
@@ -30,12 +30,12 @@ Everything else is FIX.
 
 **3. Skip alerts opened less than 7 days ago.** These are deferred to the next run — list them in the PR description but don't touch them.
 
-**4. For each remaining FIX, prefer the narrowest bump.** Locate the gem: direct dependency (listed in the `Gemfile` or in `agent_ruby.gemspec`) or transitive (only in `Gemfile.lock`).
-- **Transitive:** run `bundle update <gem> --conservative` — it bumps only that gem (and required sub-deps) in the lockfile without touching siblings. Verify with `bundle list | grep <gem>` that the resolved version is `>= first_patched_version`.
-- **Direct:** relax/bump the version constraint in the `Gemfile` or the gemspec to allow `>= first_patched_version` (stay within the current major unless the patch only exists in a new major), then `bundle update <gem> --conservative`.
-- **Blocked bump:** if a parent constraint prevents reaching the patched version, bump the nearest ancestor the same way. If the only path is a breaking major touching APIs we use, add an explicit entry to the `Gemfile` pinning the gem to `">= first_patched_version"` with a trailing comment `# security pin — see Dependabot alert <number>`, then `bundle install`. Record it in the PR under "Security pins added" with the parent chain tried and why the bump wasn't viable.
+**4. For each remaining FIX, prefer the narrowest bump.** Locate the gem: direct dependency (listed in the `Gemfile` or in `agent_ruby.gemspec`) or transitive (only in the locally generated lockfile). Because no lockfile is committed, a lockfile-only update cannot ship a fix — every fix must land in the `Gemfile` or the gemspec:
+- **Direct:** relax/bump the version constraint in the `Gemfile` or the gemspec to require `>= first_patched_version` (stay within the current major unless the patch only exists in a new major), then regenerate the local lock (`bundle lock`) and verify with `bundle list | grep <gem>`.
+- **Transitive:** bump the constraint of the nearest direct ancestor so resolution pulls the patched version; if no ancestor bump works, add an explicit entry to the `Gemfile` pinning the gem to `">= first_patched_version"` with a trailing comment `# security pin — see Dependabot alert <number>`. Verify via `bundle lock` + `bundle list`.
+- **Blocked bump:** if the only viable path is a breaking major touching APIs we use, use the explicit Gemfile pin as above. Record it in the PR under "Security pins added" with the parent chain tried and why the bump wasn't viable.
 
-Always regenerate `Gemfile.lock` by running bundler, never by hand.
+Use bundler-generated resolution only for verification — `Gemfile.lock` is gitignored here and must never be committed.
 
 **5. Audit existing security pins.** Sweep the `Gemfile` for entries carrying a `# security pin` comment (or clearly pin-only entries not required by the code):
 - **Stale** — the gem no longer appears in the dependency tree without the pin. Remove the entry, `bundle install`, verify.
@@ -48,17 +48,9 @@ Process one entry at a time, re-running `bundle install` between each. Record ev
 **7. Open the PR.** Create the branch with this exact shell command — do **not** use any built-in branch-creation tool that auto-generates names:
 ```
 BRANCH="security/$(date -u +%Y-%m-%d)"
-if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-  # Same-day rerun: resume the existing branch instead of colliding with it.
-  git stash -u
-  git fetch origin "$BRANCH"
-  git checkout -B "$BRANCH" "origin/$BRANCH"
-  git stash pop
-else
-  git checkout -b "$BRANCH"
-fi
+git checkout -b "$BRANCH"
 ```
-If `git stash pop` reports conflicts, resolve them in favor of **this run's** changes (the stashed versions), then continue. When resuming, check for an already-open PR whose head is `$BRANCH` (`GET /repos/$REPO/pulls?head=<owner>:$BRANCH&state=open`): if one exists, skip PR creation, reuse its `$PR_NUMBER`, and update its description instead of creating a new one.
+**Same-day rerun:** if the remote branch already exists (`git ls-remote --exit-code --heads origin "$BRANCH"`), this run supersedes it — its content was recomputed from scratch off the default branch. Push with `git push --force-with-lease -u origin "$BRANCH"` instead of a plain push (the single sanctioned force-push; see Constraints). Then look for an already-**open** PR whose head is `$BRANCH` (`GET /repos/$REPO/pulls?head=<owner>:$BRANCH&state=open`): if one exists, skip PR creation, reuse its `$PR_NUMBER`, and update its description; if the only PRs on that branch are closed, create a new PR normally — the force-push has already discarded their stale history.
 Before pushing, verify the branch name matches `^security/\d{4}-\d{2}-\d{2}$`:
 ```
 git rev-parse --abbrev-ref HEAD | grep -Eq '^security/[0-9]{4}-[0-9]{2}-[0-9]{2}$' || { echo "Branch name does not match required pattern; aborting"; exit 1; }
@@ -119,11 +111,11 @@ curl -sS -H "Authorization: Bearer $GH_PAT" \
 curl -sS -H "Authorization: Bearer $GH_PAT" \
   "https://api.github.com/repos/$REPO/commits/$SHA/status"
 ```
-Wait until every workflow run has a non-null `conclusion` and — **only if the combined status reports at least one status context (`total_count > 0`)** — its `state` is no longer `pending`. An empty `statuses` array (`total_count: 0`) always reports `state: pending` on GitHub's side and must be treated as *no status gate*, not as pending CI. Cap one polling cycle at 45 minutes. (Exclude this security-fixes workflow's own run from the wait condition.)
+Wait until every workflow run has a non-null `conclusion` and — **only if the combined status reports at least one status context (`total_count > 0`)** — its `state` is no longer `pending`. An empty `statuses` array (`total_count: 0`) always reports `state: pending` on GitHub's side and must be treated as *no status gate*, not as pending CI. **Startup guard:** do not evaluate completion until at least one workflow run other than this security-fixes workflow exists for `$SHA` — with zero runs the condition would be vacuously true. If no such run has appeared after 10 minutes, comment on the PR ("No CI run started for this commit after 10 minutes — please check branch filters.") and stop. Cap one polling cycle at 45 minutes. (Exclude this security-fixes workflow's own run from the wait condition.)
 
 Outcomes:
-- **All green** → edit the PR description: replace `⏳ Awaiting CI` with `✅ CI green`. Stop.
-- **Any failure** → for each failing workflow run, fetch the logs (`GET /repos/$REPO/actions/runs/<id>/logs`) and the per-job breakdown (`GET /repos/$REPO/actions/runs/<id>/jobs`). Identify the root cause. Apply a fix, commit as `fix(security): address CI failure — <short reason>`, push to the same branch, refresh the head SHA (`SHA=$(git rev-parse HEAD)`) so the polling calls inspect the new commit, and resume polling.
+- **All green** — every workflow run concluded `success` and, when `total_count > 0`, the combined status `state` is `success` → edit the PR description: replace `⏳ Awaiting CI` with `✅ CI green`. Stop.
+- **Any failure** — a workflow run concludes non-`success`, or a status context reports `failure`/`error` → for each failing workflow run, fetch the logs (`GET /repos/$REPO/actions/runs/<id>/logs`) and the per-job breakdown (`GET /repos/$REPO/actions/runs/<id>/jobs`); a failing **status context** has no Actions logs — record its `context` name and `target_url` in the PR instead. Identify the root cause. Apply a fix, commit as `fix(security): address CI failure — <short reason>`, push to the same branch, refresh the head SHA (`SHA=$(git rev-parse HEAD)`) so the polling calls inspect the new commit, and resume polling.
 - **Still pending after 45 minutes** → comment on the PR: "CI still pending after 45 minutes; stopping automated monitoring. Please review." Stop.
 
 **Retry cap: 3 fix-and-push cycles.** After the third failing cycle, stop. Comment on the PR with: the failure signatures seen each cycle, what fixes were attempted, and which alerts in the diff are most likely responsible. Update Validation to `❌ CI failing — needs human review`. Do not close the PR.
@@ -134,10 +126,10 @@ Outcomes:
 - Any fix that would require editing source code beyond minor test adjustments tied to a specific bump. In that case, revert just the offending bump (and any pin added for it), regenerate the lockfile, re-push, and move the alert to "Could not auto-fix" in the PR description with the observed failure.
 
 **Constraints:**
-- Only modify the `Gemfile`, `*.gemspec`, `Gemfile.lock` — plus, when an alert belongs to another ecosystem: `package.json`/lockfile (npm alerts) or the `uses:` version references in `.github/workflows/*.yml` (github-actions alerts) — and test files that genuinely need to change. Don't touch source code to make a bump work — revert the bump instead.
+- Only modify the `Gemfile` and `*.gemspec` (never commit `Gemfile.lock` — it is gitignored) — plus, when an alert belongs to another ecosystem: `package.json`/lockfile (npm alerts) or the `uses:` version references in `.github/workflows/*.yml` (github-actions alerts) — and test files that genuinely need to change. Don't touch source code to make a bump work — revert the bump instead.
 - Never silence failures with `rubocop:disable`, skipped specs, or by marking a workflow required-status as optional.
 - Don't close, dismiss, or comment on Dependabot alerts from the API — merging the PR closes them.
-- Don't force-push. Only add commits to the security branch.
+- Don't force-push during CI fix cycles — only add commits to the security branch. Single exception: the same-day-rerun supersede in phase 7 uses `--force-with-lease` once, before the PR is (re)used or created.
 - Branch name must match `^security/\d{4}-\d{2}-\d{2}$` — no exceptions, no default-named branches. Create the branch via `git checkout -b` in a shell.
 - The PR must carry the `:lock: security` label before phase 7 exits — treat a labeling failure as hard-stop, not a warning.
 - The PR creation and label calls must go through `$GH_PAT` (a user PAT), never the in-Actions `$GITHUB_TOKEN` — GitHub suppresses workflow-triggered events (like `labeled`) from that token, so the Slack notification workflow would never fire.
