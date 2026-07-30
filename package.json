@@ -22,6 +22,7 @@
     "semantic-release-slack-bot": "4.0.2"
   },
   "resolutions": {
-    "semantic-release-slack-bot/**/micromatch": "^4.0.8"
+    "semantic-release-slack-bot/**/micromatch": "^4.0.8",
+    "brace-expansion": "^5.0.7"
   }
 }
