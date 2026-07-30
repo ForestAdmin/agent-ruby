@@ -48,8 +48,17 @@ Process one entry at a time, re-running `bundle install` between each. Record ev
 **7. Open the PR.** Create the branch with this exact shell command — do **not** use any built-in branch-creation tool that auto-generates names:
 ```
 BRANCH="security/$(date -u +%Y-%m-%d)"
-git checkout -b "$BRANCH"
+if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+  # Same-day rerun: resume the existing branch instead of colliding with it.
+  git stash -u
+  git fetch origin "$BRANCH"
+  git checkout -B "$BRANCH" "origin/$BRANCH"
+  git stash pop
+else
+  git checkout -b "$BRANCH"
+fi
 ```
+If `git stash pop` reports conflicts, resolve them in favor of **this run's** changes (the stashed versions), then continue. When resuming, check for an already-open PR whose head is `$BRANCH` (`GET /repos/$REPO/pulls?head=<owner>:$BRANCH&state=open`): if one exists, skip PR creation, reuse its `$PR_NUMBER`, and update its description instead of creating a new one.
 Before pushing, verify the branch name matches `^security/\d{4}-\d{2}-\d{2}$`:
 ```
 git rev-parse --abbrev-ref HEAD | grep -Eq '^security/[0-9]{4}-[0-9]{2}-[0-9]{2}$' || { echo "Branch name does not match required pattern; aborting"; exit 1; }
@@ -110,11 +119,11 @@ curl -sS -H "Authorization: Bearer $GH_PAT" \
 curl -sS -H "Authorization: Bearer $GH_PAT" \
   "https://api.github.com/repos/$REPO/commits/$SHA/status"
 ```
-Wait until every workflow run has a non-null `conclusion` and the combined status `state` is no longer `pending`. Cap one polling cycle at 45 minutes. (Exclude this security-fixes workflow's own run from the wait condition.)
+Wait until every workflow run has a non-null `conclusion` and — **only if the combined status reports at least one status context (`total_count > 0`)** — its `state` is no longer `pending`. An empty `statuses` array (`total_count: 0`) always reports `state: pending` on GitHub's side and must be treated as *no status gate*, not as pending CI. Cap one polling cycle at 45 minutes. (Exclude this security-fixes workflow's own run from the wait condition.)
 
 Outcomes:
 - **All green** → edit the PR description: replace `⏳ Awaiting CI` with `✅ CI green`. Stop.
-- **Any failure** → for each failing workflow run, fetch the logs (`GET /repos/$REPO/actions/runs/<id>/logs`) and the per-job breakdown (`GET /repos/$REPO/actions/runs/<id>/jobs`). Identify the root cause. Apply a fix, commit as `fix(security): address CI failure — <short reason>`, push to the same branch, and resume polling.
+- **Any failure** → for each failing workflow run, fetch the logs (`GET /repos/$REPO/actions/runs/<id>/logs`) and the per-job breakdown (`GET /repos/$REPO/actions/runs/<id>/jobs`). Identify the root cause. Apply a fix, commit as `fix(security): address CI failure — <short reason>`, push to the same branch, refresh the head SHA (`SHA=$(git rev-parse HEAD)`) so the polling calls inspect the new commit, and resume polling.
 - **Still pending after 45 minutes** → comment on the PR: "CI still pending after 45 minutes; stopping automated monitoring. Please review." Stop.
 
 **Retry cap: 3 fix-and-push cycles.** After the third failing cycle, stop. Comment on the PR with: the failure signatures seen each cycle, what fixes were attempted, and which alerts in the diff are most likely responsible. Update Validation to `❌ CI failing — needs human review`. Do not close the PR.
@@ -125,7 +134,7 @@ Outcomes:
 - Any fix that would require editing source code beyond minor test adjustments tied to a specific bump. In that case, revert just the offending bump (and any pin added for it), regenerate the lockfile, re-push, and move the alert to "Could not auto-fix" in the PR description with the observed failure.
 
 **Constraints:**
-- Only modify the `Gemfile`, `*.gemspec`, `Gemfile.lock` (and `package.json`/lockfile for npm-ecosystem alerts), plus test files that genuinely need to change. Don't touch source code to make a bump work — revert the bump instead.
+- Only modify the `Gemfile`, `*.gemspec`, `Gemfile.lock` — plus, when an alert belongs to another ecosystem: `package.json`/lockfile (npm alerts) or the `uses:` version references in `.github/workflows/*.yml` (github-actions alerts) — and test files that genuinely need to change. Don't touch source code to make a bump work — revert the bump instead.
 - Never silence failures with `rubocop:disable`, skipped specs, or by marking a workflow required-status as optional.
 - Don't close, dismiss, or comment on Dependabot alerts from the API — merging the PR closes them.
 - Don't force-push. Only add commits to the security branch.
