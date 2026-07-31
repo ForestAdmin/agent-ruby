@@ -19,13 +19,14 @@ module ForestAdminAgent
         return context_variables.get_value(full_reference[1]) if full_reference
 
         inject_context_in_value_custom(value) do |context_variable_key|
-          resolved_value = context_variables.get_value(context_variable_key)
-          if resolved_value.is_a?(Array) || resolved_value.is_a?(Hash)
-            JSON.generate(resolved_value)
-          else
-            resolved_value.to_s
-          end
+          serialize_for_injection(context_variables.get_value(context_variable_key))
         end
+      end
+
+      def self.serialize_for_injection(resolved_value)
+        return JSON.generate(resolved_value) if resolved_value.is_a?(Array) || resolved_value.is_a?(Hash)
+
+        resolved_value.to_s
       end
 
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
