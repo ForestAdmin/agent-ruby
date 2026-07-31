@@ -8,7 +8,8 @@ module ForestAdminAgent
 
       def self.inject_context_in_value(value, context_variables)
         inject_context_in_value_custom(value) do |context_variable_key|
-          context_variables.get_value(context_variable_key).to_s
+          resolved_value = context_variables.get_value(context_variable_key)
+          resolved_value.is_a?(Array) || resolved_value.is_a?(Hash) ? resolved_value.to_json : resolved_value.to_s
         end
       end
 

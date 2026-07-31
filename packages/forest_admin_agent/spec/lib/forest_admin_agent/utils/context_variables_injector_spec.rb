@@ -90,6 +90,7 @@ module ForestAdminAgent
             { key: 'permissionLevel', expected_value: user['permissionLevel'] },
             { key: 'roleId', expected_value: user['roleId'] },
             { key: 'tags.planet', expected_value: user['tags']['planet'] },
+            { key: 'tags', expected_value: user['tags'].to_json },
             { key: 'team.id', expected_value: team['id'] },
             { key: 'team.name', expected_value: team['name'] }
           ].each do |value|
