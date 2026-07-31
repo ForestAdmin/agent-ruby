@@ -1,3 +1,5 @@
+require 'json'
+
 module ForestAdminAgent
   module Utils
     class ContextVariablesInjector
@@ -5,11 +7,26 @@ module ForestAdminAgent
       include ForestAdminAgent::Builder
 
       REGEX = /{{([^}]+)}}/
+      FULL_REFERENCE_REGEX = /\A{{([^}]+)}}\z/
 
       def self.inject_context_in_value(value, context_variables)
+        return value unless value.is_a?(String)
+
+        # A value that is exactly one {{variable}} reference (no surrounding text) keeps the
+        # resolved object as-is, so a jsonb/array field gets typed-cast correctly by the
+        # datasource instead of being compared against a serialized string that can never match.
+        full_reference = FULL_REFERENCE_REGEX.match(value)
+        return context_variables.get_value(full_reference[1]) if full_reference
+
         inject_context_in_value_custom(value) do |context_variable_key|
-          context_variables.get_value(context_variable_key).to_s
+          serialize_for_injection(context_variables.get_value(context_variable_key))
         end
+      end
+
+      def self.serialize_for_injection(resolved_value)
+        return JSON.generate(resolved_value) if resolved_value.is_a?(Array) || resolved_value.is_a?(Hash)
+
+        resolved_value.to_s
       end
 
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
@@ -37,23 +54,17 @@ module ForestAdminAgent
       def self.inject_context_in_value_custom(value)
         return value unless value.is_a?(String)
 
-        value_with_context_variables_injected = value
-        encountered_variables = []
+        # Resolve every distinct {{key}} found in the ORIGINAL string upfront, then substitute
+        # in a single gsub pass. A resolved value can itself contain "{{...}}"-looking text (e.g.
+        # a tag whose data happens to include it); re-scanning a mutated string for placeholders
+        # (the previous while+gsub! approach) would misinterpret that text as a new reference, or
+        # loop forever if it matched an already-resolved key without ever changing the string.
+        keys = value.scan(REGEX).map(&:first).uniq
+        return value if keys.empty?
 
-        while (match = REGEX.match(value_with_context_variables_injected))
-          context_variable_key = match[1]
+        replacements = keys.to_h { |key| [key, yield(key)] }
 
-          unless encountered_variables.include?(context_variable_key)
-            value_with_context_variables_injected.gsub!(
-              /{{#{context_variable_key}}}/,
-              yield(context_variable_key)
-            )
-          end
-
-          encountered_variables.push(context_variable_key)
-        end
-
-        value_with_context_variables_injected
+        value.gsub(REGEX) { replacements[::Regexp.last_match(1)] }
       end
 
       def self.inject_context_in_filter(filter, context_variables)

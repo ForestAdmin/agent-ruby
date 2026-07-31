@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'timeout'
 
 module ForestAdminAgent
   module Utils
@@ -24,7 +25,11 @@ module ForestAdminAgent
           user,
           {
             'siths.selectedRecord.rank' => 3,
-            'siths.selectedRecord.power' => 'electrocute'
+            'siths.selectedRecord.power' => 'electrocute',
+            'siths.selectedRecord.ids' => [1, 2, 3],
+            'siths.selectedRecord.path' => 'C:\\eyes-of-the-dark',
+            'siths.selectedRecord.tricky' => [{ 'note' => 'looks like {{currentUser.id}} but is not' }],
+            'siths.selectedRecord.selfref' => [{ 'note' => 'ref: {{siths.selectedRecord.selfref}}' }]
           }
         )
       end
@@ -100,8 +105,54 @@ module ForestAdminAgent
                 "{{currentUser.#{key}}}",
                 context_variables
               )
-            ).to eq(expected_value.to_s)
+            ).to eq(expected_value)
           end
+        end
+
+        it 'returns the resolved object as-is when the value is exactly one reference, instead of a serialized string' do
+          result = described_class.inject_context_in_value('{{currentUser.tags}}', context_variables)
+
+          expect(result).to eq(user['tags'])
+          expect(result).to be_a(Hash)
+        end
+
+        it 'returns a resolved array as-is when the value is exactly one reference' do
+          result = described_class.inject_context_in_value('{{siths.selectedRecord.ids}}', context_variables)
+
+          expect(result).to eq([1, 2, 3])
+          expect(result).to be_an(Array)
+        end
+
+        it 'still serializes an Array/Hash value to JSON when the reference is embedded in a larger string' do
+          result = described_class.inject_context_in_value('tags: {{currentUser.tags}}', context_variables)
+
+          expect(result).to eq("tags: #{user["tags"].to_json}")
+        end
+
+        it 'does not corrupt backslashes when substituting a value embedded in a larger string' do
+          result = described_class.inject_context_in_value('path: {{siths.selectedRecord.path}}', context_variables)
+
+          expect(result).to eq('path: C:\eyes-of-the-dark')
+        end
+
+        it 'does not re-interpret "{{...}}"-looking text inside a resolved value as a new reference' do
+          expected_json = [{ 'note' => 'looks like {{currentUser.id}} but is not' }].to_json
+
+          result = Timeout.timeout(2) do
+            described_class.inject_context_in_value('leaked: {{siths.selectedRecord.tricky}}', context_variables)
+          end
+
+          expect(result).to eq("leaked: #{expected_json}")
+        end
+
+        it 'does not hang when a resolved value contains a literal reference to its own key' do
+          expected_json = [{ 'note' => 'ref: {{siths.selectedRecord.selfref}}' }].to_json
+
+          result = Timeout.timeout(2) do
+            described_class.inject_context_in_value('self: {{siths.selectedRecord.selfref}}', context_variables)
+          end
+
+          expect(result).to eq("self: #{expected_json}")
         end
       end
     end
