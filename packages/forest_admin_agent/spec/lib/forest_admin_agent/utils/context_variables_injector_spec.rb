@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'timeout'
 
 module ForestAdminAgent
   module Utils
@@ -26,7 +27,9 @@ module ForestAdminAgent
             'siths.selectedRecord.rank' => 3,
             'siths.selectedRecord.power' => 'electrocute',
             'siths.selectedRecord.ids' => [1, 2, 3],
-            'siths.selectedRecord.path' => 'C:\\eyes-of-the-dark'
+            'siths.selectedRecord.path' => 'C:\\eyes-of-the-dark',
+            'siths.selectedRecord.tricky' => [{ 'note' => 'looks like {{currentUser.id}} but is not' }],
+            'siths.selectedRecord.selfref' => [{ 'note' => 'ref: {{siths.selectedRecord.selfref}}' }]
           }
         )
       end
@@ -130,6 +133,26 @@ module ForestAdminAgent
           result = described_class.inject_context_in_value('path: {{siths.selectedRecord.path}}', context_variables)
 
           expect(result).to eq('path: C:\eyes-of-the-dark')
+        end
+
+        it 'does not re-interpret "{{...}}"-looking text inside a resolved value as a new reference' do
+          expected_json = [{ 'note' => 'looks like {{currentUser.id}} but is not' }].to_json
+
+          result = Timeout.timeout(2) do
+            described_class.inject_context_in_value('leaked: {{siths.selectedRecord.tricky}}', context_variables)
+          end
+
+          expect(result).to eq("leaked: #{expected_json}")
+        end
+
+        it 'does not hang when a resolved value contains a literal reference to its own key' do
+          expected_json = [{ 'note' => 'ref: {{siths.selectedRecord.selfref}}' }].to_json
+
+          result = Timeout.timeout(2) do
+            described_class.inject_context_in_value('self: {{siths.selectedRecord.selfref}}', context_variables)
+          end
+
+          expect(result).to eq("self: #{expected_json}")
         end
       end
     end
