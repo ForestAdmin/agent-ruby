@@ -1,3 +1,10 @@
+## [1.36.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.0...v1.36.1) (2026-07-31)
+
+
+### Bug Fixes
+
+* serialize Array/Hash context variables as JSON instead of Ruby #to_s ([#339](https://github.com/ForestAdmin/agent-ruby/issues/339)) ([64aea2b](https://github.com/ForestAdmin/agent-ruby/commit/64aea2bb04d7e36e5c8f522959eff6147e7e620f))
+
 # [1.36.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.35.4...v1.36.0) (2026-07-24)
 
 
