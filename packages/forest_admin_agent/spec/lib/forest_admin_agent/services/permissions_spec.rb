@@ -1208,7 +1208,7 @@ module ForestAdminAgent
                   {
                     field: 'id',
                     operator: 'equal',
-                    value: '1'
+                    value: 1
                   }
                 ]
               }

@@ -24,7 +24,9 @@ module ForestAdminAgent
           user,
           {
             'siths.selectedRecord.rank' => 3,
-            'siths.selectedRecord.power' => 'electrocute'
+            'siths.selectedRecord.power' => 'electrocute',
+            'siths.selectedRecord.ids' => [1, 2, 3],
+            'siths.selectedRecord.path' => 'C:\\eyes-of-the-dark'
           }
         )
       end
@@ -90,7 +92,6 @@ module ForestAdminAgent
             { key: 'permissionLevel', expected_value: user['permissionLevel'] },
             { key: 'roleId', expected_value: user['roleId'] },
             { key: 'tags.planet', expected_value: user['tags']['planet'] },
-            { key: 'tags', expected_value: user['tags'].to_json },
             { key: 'team.id', expected_value: team['id'] },
             { key: 'team.name', expected_value: team['name'] }
           ].each do |value|
@@ -101,8 +102,34 @@ module ForestAdminAgent
                 "{{currentUser.#{key}}}",
                 context_variables
               )
-            ).to eq(expected_value.to_s)
+            ).to eq(expected_value)
           end
+        end
+
+        it 'returns the resolved object as-is when the value is exactly one reference, instead of a serialized string' do
+          result = described_class.inject_context_in_value('{{currentUser.tags}}', context_variables)
+
+          expect(result).to eq(user['tags'])
+          expect(result).to be_a(Hash)
+        end
+
+        it 'returns a resolved array as-is when the value is exactly one reference' do
+          result = described_class.inject_context_in_value('{{siths.selectedRecord.ids}}', context_variables)
+
+          expect(result).to eq([1, 2, 3])
+          expect(result).to be_an(Array)
+        end
+
+        it 'still serializes an Array/Hash value to JSON when the reference is embedded in a larger string' do
+          result = described_class.inject_context_in_value('tags: {{currentUser.tags}}', context_variables)
+
+          expect(result).to eq("tags: #{user["tags"].to_json}")
+        end
+
+        it 'does not corrupt backslashes when substituting a value embedded in a larger string' do
+          result = described_class.inject_context_in_value('path: {{siths.selectedRecord.path}}', context_variables)
+
+          expect(result).to eq('path: C:\eyes-of-the-dark')
         end
       end
     end

@@ -1,3 +1,5 @@
+require 'json'
+
 module ForestAdminAgent
   module Utils
     class ContextVariablesInjector
@@ -5,11 +7,24 @@ module ForestAdminAgent
       include ForestAdminAgent::Builder
 
       REGEX = /{{([^}]+)}}/
+      FULL_REFERENCE_REGEX = /\A{{([^}]+)}}\z/
 
       def self.inject_context_in_value(value, context_variables)
+        return value unless value.is_a?(String)
+
+        # A value that is exactly one {{variable}} reference (no surrounding text) keeps the
+        # resolved object as-is, so a jsonb/array field gets typed-cast correctly by the
+        # datasource instead of being compared against a serialized string that can never match.
+        full_reference = FULL_REFERENCE_REGEX.match(value)
+        return context_variables.get_value(full_reference[1]) if full_reference
+
         inject_context_in_value_custom(value) do |context_variable_key|
           resolved_value = context_variables.get_value(context_variable_key)
-          resolved_value.is_a?(Array) || resolved_value.is_a?(Hash) ? resolved_value.to_json : resolved_value.to_s
+          if resolved_value.is_a?(Array) || resolved_value.is_a?(Hash)
+            JSON.generate(resolved_value)
+          else
+            resolved_value.to_s
+          end
         end
       end
 
@@ -45,10 +60,8 @@ module ForestAdminAgent
           context_variable_key = match[1]
 
           unless encountered_variables.include?(context_variable_key)
-            value_with_context_variables_injected.gsub!(
-              /{{#{context_variable_key}}}/,
-              yield(context_variable_key)
-            )
+            replacement = yield(context_variable_key)
+            value_with_context_variables_injected.gsub!(/{{#{context_variable_key}}}/) { replacement }
           end
 
           encountered_variables.push(context_variable_key)
