@@ -64,6 +64,17 @@ module ForestAdminDatasourceCustomizer
 
               expect(result).to eq({ countCurrent: 2 })
             end
+
+            it 'emits a chart.forest_admin notification' do
+              events = []
+              sub = ::ActiveSupport::Notifications.subscribe('chart.forest_admin') do |*a|
+                events << ::ActiveSupport::Notifications::Event.new(*a)
+              end
+              @decorated_book.render_chart(caller, 'new_chart', [123])
+              ::ActiveSupport::Notifications.unsubscribe(sub)
+
+              expect(events.map(&:payload)).to include(include(chart: 'new_chart'))
+            end
           end
         end
       end

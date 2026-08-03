@@ -12,7 +12,9 @@ module ForestAdminDatasourceCustomizer
       describe HookCollectionDecorator do
         subject(:hook_collection_decorator) { described_class }
 
-        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+        let(:caller) do
+          instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test')
+        end
         let(:aggregation) { instance_double(ForestAdminDatasourceToolkit::Components::Query::Aggregation) }
 
         before do
@@ -59,6 +61,19 @@ module ForestAdminDatasourceCustomizer
               @decorated_transaction.create(caller, [])
 
               expect(spy).to have_received(:call).once
+            end
+
+            it 'emits a hook.forest_admin notification for registered hooks' do
+              spy = instance_double(Proc, call: nil)
+              @decorated_transaction.add_hook('Before', 'Create', spy)
+              events = []
+              sub = ::ActiveSupport::Notifications.subscribe('hook.forest_admin') do |*a|
+                events << ::ActiveSupport::Notifications::Event.new(*a)
+              end
+              @decorated_transaction.create(caller, [])
+              ::ActiveSupport::Notifications.unsubscribe(sub)
+
+              expect(events.map(&:payload)).to include(include(operation: 'Create', position: 'before', collection: 'transaction'))
             end
           end
 

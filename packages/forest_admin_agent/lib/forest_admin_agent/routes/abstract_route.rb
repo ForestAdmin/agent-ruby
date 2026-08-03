@@ -28,7 +28,14 @@ module ForestAdminAgent
       end
 
       def add_route(name, method, uri, closure, format = 'json')
-        @routes[name] = { method: method, uri: uri, closure: closure, format: format }
+        instrumented = lambda do |args|
+          ForestAdminDatasourceToolkit::Monitoring.instrument(
+            'request',
+            { route: name, collection: args.dig(:params, 'collection_name'),
+              id: args.dig(:params, 'id'), method: method }
+          ) { closure.call(args) }
+        end
+        @routes[name] = { method: method, uri: uri, closure: instrumented, format: format }
       end
 
       def setup_routes

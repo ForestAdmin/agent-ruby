@@ -10,6 +10,10 @@ module ForestAdminDatasourceCustomizer
       include ForestAdminDatasourceToolkit::Schema
 
       describe SegmentCollectionDecorator do
+        let(:caller) do
+          instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test')
+        end
+
         before do
           datasource = Datasource.new
           @collection = build_collection(
@@ -58,6 +62,22 @@ module ForestAdminDatasourceCustomizer
 
           context 'when the segment is managed by this decorator' do
             describe 'refine_filter' do
+              it 'emits a segment.forest_admin notification when the definition is callable' do
+                @decorated_collection.add_segment('segment_name', proc do
+                  Nodes::ConditionTreeLeaf.new('name', Operators::EQUAL, 'foo')
+                end)
+                a_filter = Filter.new(segment: 'segment_name')
+
+                events = []
+                sub = ::ActiveSupport::Notifications.subscribe('segment.forest_admin') do |*a|
+                  events << ::ActiveSupport::Notifications::Event.new(*a)
+                end
+                @decorated_collection.refine_filter(caller, a_filter)
+                ::ActiveSupport::Notifications.unsubscribe(sub)
+
+                expect(events.map(&:payload)).to include(include(segment: 'segment_name'))
+              end
+
               it 'return the filter with the merged conditionTree' do
                 condition_tree_generator = Nodes::ConditionTreeLeaf.new('name', Operators::EQUAL, 'foo')
                 @decorated_collection.add_segment('segment_name', condition_tree_generator)

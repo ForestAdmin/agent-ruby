@@ -89,7 +89,9 @@ module ForestAdminDatasourceCustomizer
               raise Exceptions::ForestException, "Operator replacement cycle: #{sub_replacements.join(" -> ")}"
             end
 
-            result = handler.call(leaf.value, Context::CollectionCustomizationContext.new(self, caller))
+            result = ForestAdminDatasourceToolkit::Monitoring.instrument(
+              'operator_emulation', { collection: name, field: leaf.field, operator: leaf.operator }, caller: caller
+            ) { handler.call(leaf.value, Context::CollectionCustomizationContext.new(self, caller)) }
 
             if result
               equivalent = result.class < Nodes::ConditionTree ? result : ConditionTreeFactory.from_plain_object(result)

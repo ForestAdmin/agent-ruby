@@ -34,6 +34,7 @@ module ForestAdminRails
   setting :disable_route_cache, default: false
   setting :rpc_max_polling_threads, default: nil
   setting :workflow_executor_url, default: nil
+  setting :monitoring, default: {} # opt-in log subscriber; see ForestAdminRails::Monitoring::DEFAULTS
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

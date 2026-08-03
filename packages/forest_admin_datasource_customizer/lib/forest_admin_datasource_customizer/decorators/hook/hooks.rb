@@ -4,21 +4,34 @@ module ForestAdminDatasourceCustomizer
       class Hooks
         attr_reader :before, :after
 
-        def initialize
+        def initialize(type = nil)
+          @type = type
           @before = []
           @after = []
         end
 
         def execute_before(context)
-          @before.each { |hook| hook.call(context) }
+          instrument('before', context) { @before.each { |hook| hook.call(context) } }
         end
 
         def execute_after(context)
-          @after.each { |hook| hook.call(context) }
+          instrument('after', context) { @after.each { |hook| hook.call(context) } }
         end
 
         def add_handler(position, hook)
           position == 'After' ? @after << hook : @before << hook
+        end
+
+        private
+
+        def instrument(position, context, &block)
+          hooks = position == 'before' ? @before : @after
+          return yield if hooks.empty?
+
+          ForestAdminDatasourceToolkit::Monitoring.instrument(
+            'hook', { collection: context.collection.name, operation: @type, position: position },
+            caller: context.caller, &block
+          )
         end
       end
     end

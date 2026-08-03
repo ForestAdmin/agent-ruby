@@ -7,6 +7,8 @@ require 'forest_admin_datasource_customizer'
 require 'forest_admin_test_toolkit'
 require 'filecache'
 require 'singleton'
+require 'active_support/isolated_execution_state'
+require 'active_support/notifications'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
