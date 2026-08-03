@@ -28,6 +28,26 @@ module ForestAdminRpcAgent
 
           expect(datasource).to have_received(:build_binding_symbol).with(connection_name, [])
         end
+
+        it 'clamps a negative bind count to 0 instead of raising' do
+          route.handle_request(params: { 'connection_name' => connection_name, 'binds_count' => -1 })
+
+          expect(datasource).to have_received(:build_binding_symbol).with(connection_name, [])
+        end
+
+        it 'clamps an excessively large bind count instead of allocating it' do
+          route.handle_request(params: { 'connection_name' => connection_name, 'binds_count' => 10**12 })
+
+          expect(datasource).to have_received(:build_binding_symbol).with(connection_name,
+                                                                          Array.new(described_class::MAX_BINDS_COUNT))
+        end
+
+        it 'treats a non-numeric bind count as 0 instead of raising' do
+          route.handle_request(params: { 'connection_name' => connection_name,
+                                         'binds_count' => { 'not' => 'a number' } })
+
+          expect(datasource).to have_received(:build_binding_symbol).with(connection_name, [])
+        end
       end
     end
   end
