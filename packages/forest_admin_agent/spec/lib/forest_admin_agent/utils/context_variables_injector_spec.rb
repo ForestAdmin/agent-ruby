@@ -178,15 +178,31 @@ module ForestAdminAgent
           expect(result).to eq(8)
         end
 
-        it 'assigns a fresh bind per occurrence, even when the same key repeats' do
-          query = 'SELECT * FROM users WHERE id = {{siths.selectedRecord.rank}} OR id = {{siths.selectedRecord.rank}};'
+        it 'reuses a distinct key\'s bind when the driver\'s symbol changes with bind count, calling ' \
+           'build_binding_symbol only once per distinct key plus one classification probe' do
+          query = 'SELECT * FROM users WHERE id = {{siths.selectedRecord.rank}} ' \
+                  'OR id = {{siths.selectedRecord.rank}} OR id = {{siths.selectedRecord.rank}};'
 
           query_result, binds = described_class.inject_context_in_native_query(
             datasource, connection_name, query, context_variables
           )
 
-          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $2;')
-          expect(binds).to eq([3, 3])
+          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $1 OR id = $1;')
+          expect(binds).to eq([3])
+          expect(datasource).to have_received(:build_binding_symbol).exactly(2).times
+        end
+
+        it 'dedupes a key used both inside a quoted literal and outside it, on drivers that support ' \
+           'referencing a bind more than once' do
+          query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%' " \
+                  'AND code = {{siths.selectedRecord.power}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users WHERE name LIKE '%$1%' AND code = $1;")
+          expect(binds).to eq(['electrocute'])
         end
 
         it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do

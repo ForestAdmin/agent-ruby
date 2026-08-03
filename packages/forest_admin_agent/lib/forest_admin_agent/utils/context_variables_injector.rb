@@ -33,15 +33,31 @@ module ForestAdminAgent
         return query unless query.is_a?(String)
 
         binds = []
-        # One bind per occurrence, not per distinct key: positional ("?") drivers consume one
-        # bind slot per placeholder in the query text, even when the same {{key}} repeats, so
-        # reusing a single slot for a repeated key (safe for numbered $N placeholders) would
-        # leave a positional driver with fewer bind values than placeholders.
+        replacements = {}
+        # Whether a repeated key's existing bind can be reused (true, e.g. postgres' $N, safely
+        # referenced more than once) or needs a fresh slot per occurrence (false, e.g. "?", purely
+        # positional) — unknown until the first repeat, since build_binding_symbol has no way to
+        # declare it upfront. Reusing when unsafe would leave a positional driver with fewer bind
+        # values than placeholders; always assuming "fresh slot" would leave every repeat making
+        # its own build_binding_symbol call, which is a live network round-trip for RPC datasources.
+        reusable = nil
+
         injected_query = query.gsub(REGEX) do
           key = ::Regexp.last_match(1)
-          symbol = datasource.build_binding_symbol(connection_name, binds)
-          binds << context_variables.get_value(key)
-          symbol
+
+          if replacements.key?(key)
+            if reusable.nil?
+              probe = datasource.build_binding_symbol(connection_name, binds)
+              reusable = (probe != replacements[key])
+            end
+
+            binds << context_variables.get_value(key) unless reusable
+            replacements[key]
+          else
+            symbol = datasource.build_binding_symbol(connection_name, binds)
+            binds << context_variables.get_value(key)
+            replacements[key] = symbol
+          end
         end
 
         [injected_query, binds]
