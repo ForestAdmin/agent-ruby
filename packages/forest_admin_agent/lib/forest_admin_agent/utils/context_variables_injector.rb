@@ -32,23 +32,23 @@ module ForestAdminAgent
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
         return query unless query.is_a?(String)
 
-        query_with_context_variables_injected = query
+        # Resolve every distinct {{key}} from the ORIGINAL query upfront, then substitute in a
+        # single pass — rescanning a mutated string in a loop can hang if a dedup check ever
+        # short-circuits without changing the string (see inject_context_in_value_custom above).
+        # build_binding_symbol is still called once per distinct key, in order, since it derives
+        # postgres $N indices from how many binds have been registered so far.
+        keys = query.scan(REGEX).map(&:first).uniq
+        return [query, {}] if keys.empty?
+
         encountered_variables = {}
-
-        while (match = REGEX.match(query_with_context_variables_injected))
-          context_variable_key = match[1]
-
-          next if encountered_variables.value?(context_variable_key)
-
+        replacements = {}
+        keys.each do |key|
           index = datasource.build_binding_symbol(connection_name, encountered_variables)
-          query_with_context_variables_injected.gsub!(
-            /{{#{context_variable_key}}}/,
-            index
-          )
-          encountered_variables[index] = context_variables.get_value(context_variable_key)
+          replacements[key] = index
+          encountered_variables[index] = context_variables.get_value(key)
         end
 
-        [query_with_context_variables_injected, encountered_variables]
+        [query.gsub(REGEX) { replacements[::Regexp.last_match(1)] }, encountered_variables]
       end
 
       def self.inject_context_in_value_custom(value)

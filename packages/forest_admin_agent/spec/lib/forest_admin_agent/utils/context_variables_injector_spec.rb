@@ -155,6 +155,74 @@ module ForestAdminAgent
           expect(result).to eq("self: #{expected_json}")
         end
       end
+
+      context('when inject_context_in_native_query is called') do
+        let(:datasource) do
+          datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+          allow(datasource).to receive(:build_binding_symbol) { |_connection_name, binds| "$#{binds.size + 1}" }
+          datasource
+        end
+        let(:connection_name) { 'primary' }
+
+        it 'returns the query unchanged with an empty binds hash when there is no placeholder' do
+          result = described_class.inject_context_in_native_query(
+            datasource, connection_name, 'SELECT * FROM users;', context_variables
+          )
+
+          expect(result).to eq(['SELECT * FROM users;', {}])
+        end
+
+        it 'returns non-String query input untouched' do
+          result = described_class.inject_context_in_native_query(datasource, connection_name, 8, context_variables)
+
+          expect(result).to eq(8)
+        end
+
+        it 'dedupes repeated occurrences of the same key to a single bind symbol' do
+          query = 'SELECT * FROM users WHERE id = {{siths.selectedRecord.rank}} OR id = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $1;')
+          expect(binds).to eq({ '$1' => 3 })
+        end
+
+        it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
+          query = 'SELECT * FROM users WHERE rank = {{siths.selectedRecord.rank}} ' \
+                  'AND power = {{siths.selectedRecord.power}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE rank = $1 AND power = $2;')
+          expect(binds).to eq({ '$1' => 3, '$2' => 'electrocute' })
+        end
+
+        it 'does not hang when a resolved value happens to equal the literal name of another key' do
+          tricky_context_variables = ForestAdminAgent::Utils::ContextVariables.new(
+            team,
+            user,
+            {
+              'siths.selectedRecord.alias' => 'siths.selectedRecord.rank',
+              'siths.selectedRecord.rank' => 3
+            }
+          )
+          query = 'SELECT * FROM users WHERE a = {{siths.selectedRecord.alias}} ' \
+                  'AND b = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = Timeout.timeout(2) do
+            described_class.inject_context_in_native_query(
+              datasource, connection_name, query, tricky_context_variables
+            )
+          end
+
+          expect(query_result).to eq('SELECT * FROM users WHERE a = $1 AND b = $2;')
+          expect(binds).to eq({ '$1' => 'siths.selectedRecord.rank', '$2' => 3 })
+        end
+      end
     end
   end
 end
