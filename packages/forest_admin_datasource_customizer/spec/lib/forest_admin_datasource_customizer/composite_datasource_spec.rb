@@ -38,5 +38,28 @@ module ForestAdminDatasourceCustomizer
         end
       end
     end
+
+    describe '#build_binding_symbol' do
+      before { composite.add_data_source(datasource) }
+
+      context 'when the connection exists' do
+        it 'delegates to the right datasource' do
+          allow(datasource).to receive(:build_binding_symbol).with('main', {}).and_return('$1')
+
+          expect(composite.build_binding_symbol('main', {})).to eq('$1')
+        end
+      end
+
+      context 'when the connection does not exist' do
+        it 'raises an error with the correct connection name' do
+          expect do
+            composite.build_binding_symbol('unknown', {})
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /Native query connection 'unknown' is unknown\./
+          )
+        end
+      end
+    end
   end
 end
