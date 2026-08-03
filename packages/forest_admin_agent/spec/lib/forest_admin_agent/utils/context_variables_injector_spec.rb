@@ -186,7 +186,7 @@ module ForestAdminAgent
           )
 
           expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $1;')
-          expect(binds).to eq({ '$1' => 3 })
+          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3 })
         end
 
         it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
@@ -198,7 +198,8 @@ module ForestAdminAgent
           )
 
           expect(query_result).to eq('SELECT * FROM users WHERE rank = $1 AND power = $2;')
-          expect(binds).to eq({ '$1' => 3, '$2' => 'electrocute' })
+          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3, 'siths.selectedRecord.power' => 'electrocute' })
+          expect(binds.values).to eq([3, 'electrocute'])
         end
 
         it 'does not hang when a resolved value happens to equal the literal name of another key' do
@@ -220,7 +221,24 @@ module ForestAdminAgent
           end
 
           expect(query_result).to eq('SELECT * FROM users WHERE a = $1 AND b = $2;')
-          expect(binds).to eq({ '$1' => 'siths.selectedRecord.rank', '$2' => 3 })
+          expect(binds).to eq({ 'siths.selectedRecord.alias' => 'siths.selectedRecord.rank', 'siths.selectedRecord.rank' => 3 })
+        end
+
+        it 'keeps distinct keys separate in binds even when build_binding_symbol returns the same ' \
+           'symbol for every call, as non-Postgres drivers do' do
+          constant_symbol_datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+          allow(constant_symbol_datasource).to receive(:build_binding_symbol).and_return('?')
+
+          query = 'SELECT * FROM users WHERE rank = {{siths.selectedRecord.rank}} ' \
+                  'AND power = {{siths.selectedRecord.power}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            constant_symbol_datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE rank = ? AND power = ?;')
+          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3, 'siths.selectedRecord.power' => 'electrocute' })
+          expect(binds.values).to eq([3, 'electrocute'])
         end
       end
     end
