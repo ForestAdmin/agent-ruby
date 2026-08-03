@@ -35,11 +35,14 @@ module ForestAdminRpcAgent
           expect(datasource).to have_received(:build_binding_symbol).with(connection_name, [])
         end
 
-        it 'clamps an excessively large bind count instead of allocating it' do
-          route.handle_request(params: { 'connection_name' => connection_name, 'binds_count' => 10**12 })
-
-          expect(datasource).to have_received(:build_binding_symbol).with(connection_name,
-                                                                          Array.new(described_class::MAX_BINDS_COUNT))
+        it 'raises instead of silently clamping an excessively large bind count' do
+          expect do
+            route.handle_request(params: { 'connection_name' => connection_name, 'binds_count' => 10**12 })
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /binds_count \(1000000000000\) exceeds the maximum supported value/
+          )
+          expect(datasource).not_to have_received(:build_binding_symbol)
         end
 
         it 'treats a non-numeric bind count as 0 instead of raising' do

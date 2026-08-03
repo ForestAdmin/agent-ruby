@@ -17,7 +17,15 @@ module ForestAdminRpcAgent
       private
 
       def parse_binds_count(value)
-        (Integer(value, exception: false) || 0).clamp(0, MAX_BINDS_COUNT)
+        count = Integer(value, exception: false) || 0
+        return 0 if count.negative?
+
+        if count > MAX_BINDS_COUNT
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "binds_count (#{count}) exceeds the maximum supported value of #{MAX_BINDS_COUNT}."
+        end
+
+        count
       end
     end
   end
