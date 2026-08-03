@@ -40,6 +40,11 @@ module ForestAdminAgent
         expect(context_variables.get_value('currentUser.tags.foo')).to eq('bar')
         expect(context_variables.get_value('currentUser.team.id')).to eq(1)
       end
+
+      it 'returns nil instead of raising when request_context_variables is nil and the key is not a currentUser one' do
+        context_variables = described_class.new(team, user, nil)
+        expect(context_variables.get_value('foo.id')).to be_nil
+      end
     end
   end
 end

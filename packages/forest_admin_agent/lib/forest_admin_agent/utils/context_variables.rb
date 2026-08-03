@@ -12,7 +12,7 @@ module ForestAdminAgent
       def initialize(team, user, request_context_variables = nil)
         @team = team.transform_keys(&:to_sym)
         @user = user.transform_keys(&:to_sym)
-        @request_context_variables = request_context_variables
+        @request_context_variables = request_context_variables || {}
       end
 
       def get_value(context_variable_key)
