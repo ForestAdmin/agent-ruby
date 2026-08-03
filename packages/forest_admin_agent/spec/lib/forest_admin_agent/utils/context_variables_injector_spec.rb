@@ -164,12 +164,12 @@ module ForestAdminAgent
         end
         let(:connection_name) { 'primary' }
 
-        it 'returns the query unchanged with an empty binds hash when there is no placeholder' do
+        it 'returns the query unchanged with empty binds when there is no placeholder' do
           result = described_class.inject_context_in_native_query(
             datasource, connection_name, 'SELECT * FROM users;', context_variables
           )
 
-          expect(result).to eq(['SELECT * FROM users;', {}])
+          expect(result).to eq(['SELECT * FROM users;', []])
         end
 
         it 'returns non-String query input untouched' do
@@ -178,15 +178,15 @@ module ForestAdminAgent
           expect(result).to eq(8)
         end
 
-        it 'dedupes repeated occurrences of the same key to a single bind symbol' do
+        it 'assigns a fresh bind per occurrence, even when the same key repeats' do
           query = 'SELECT * FROM users WHERE id = {{siths.selectedRecord.rank}} OR id = {{siths.selectedRecord.rank}};'
 
           query_result, binds = described_class.inject_context_in_native_query(
             datasource, connection_name, query, context_variables
           )
 
-          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $1;')
-          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3 })
+          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $2;')
+          expect(binds).to eq([3, 3])
         end
 
         it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
@@ -198,8 +198,7 @@ module ForestAdminAgent
           )
 
           expect(query_result).to eq('SELECT * FROM users WHERE rank = $1 AND power = $2;')
-          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3, 'siths.selectedRecord.power' => 'electrocute' })
-          expect(binds.values).to eq([3, 'electrocute'])
+          expect(binds).to eq([3, 'electrocute'])
         end
 
         it 'does not hang when a resolved value happens to equal the literal name of another key' do
@@ -221,24 +220,23 @@ module ForestAdminAgent
           end
 
           expect(query_result).to eq('SELECT * FROM users WHERE a = $1 AND b = $2;')
-          expect(binds).to eq({ 'siths.selectedRecord.alias' => 'siths.selectedRecord.rank', 'siths.selectedRecord.rank' => 3 })
+          expect(binds).to eq(['siths.selectedRecord.rank', 3])
         end
 
-        it 'keeps distinct keys separate in binds even when build_binding_symbol returns the same ' \
-           'symbol for every call, as non-Postgres drivers do' do
+        it 'keeps one bind per occurrence, including repeats, on drivers whose build_binding_symbol ' \
+           'returns the same literal symbol for every call, as non-Postgres drivers do' do
           constant_symbol_datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
           allow(constant_symbol_datasource).to receive(:build_binding_symbol).and_return('?')
 
-          query = 'SELECT * FROM users WHERE rank = {{siths.selectedRecord.rank}} ' \
-                  'AND power = {{siths.selectedRecord.power}};'
+          query = 'SELECT * FROM users WHERE a = {{siths.selectedRecord.rank}} ' \
+                  'OR b = {{siths.selectedRecord.rank}} AND c = {{siths.selectedRecord.power}};'
 
           query_result, binds = described_class.inject_context_in_native_query(
             constant_symbol_datasource, connection_name, query, context_variables
           )
 
-          expect(query_result).to eq('SELECT * FROM users WHERE rank = ? AND power = ?;')
-          expect(binds).to eq({ 'siths.selectedRecord.rank' => 3, 'siths.selectedRecord.power' => 'electrocute' })
-          expect(binds.values).to eq([3, 'electrocute'])
+          expect(query_result).to eq('SELECT * FROM users WHERE a = ? OR b = ? AND c = ?;')
+          expect(binds).to eq([3, 3, 'electrocute'])
         end
       end
     end

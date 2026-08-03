@@ -32,14 +32,16 @@ module ForestAdminAgent
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
         return query unless query.is_a?(String)
 
-        binds = {}
-        # Keyed by the placeholder's own key, not by the bind symbol build_binding_symbol returns:
-        # non-postgres connections return the same literal '?' for every call, which would collide
-        # and silently drop values if binds were keyed by it instead.
-        injected_query = inject_context_in_value_custom(query) do |key|
-          index = datasource.build_binding_symbol(connection_name, binds)
-          binds[key] = context_variables.get_value(key)
-          index
+        binds = []
+        # One bind per occurrence, not per distinct key: positional ("?") drivers consume one
+        # bind slot per placeholder in the query text, even when the same {{key}} repeats, so
+        # reusing a single slot for a repeated key (safe for numbered $N placeholders) would
+        # leave a positional driver with fewer bind values than placeholders.
+        injected_query = query.gsub(REGEX) do
+          key = ::Regexp.last_match(1)
+          symbol = datasource.build_binding_symbol(connection_name, binds)
+          binds << context_variables.get_value(key)
+          symbol
         end
 
         [injected_query, binds]
