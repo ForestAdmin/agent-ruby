@@ -138,6 +138,17 @@ module ForestAdminDatasourceRpc
           expect(options[:payload]).to eq({ connection_name: 'primary', binds_count: 2 })
         end
       end
+
+      it 'raises a clear upgrade message when the Rpc agent does not implement the route yet' do
+        allow(rpc_client).to receive(:call_rpc).and_raise(ForestAdminAgent::Http::Exceptions::NotFoundError, 'Not Found')
+
+        expect do
+          datasource.build_binding_symbol('primary', [])
+        end.to raise_error(
+          ForestAdminDatasourceToolkit::Exceptions::ForestException,
+          /Upgrade forest_admin_rpc_agent.*does not support binding symbols yet/
+        )
+      end
     end
   end
 end
