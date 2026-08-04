@@ -376,6 +376,74 @@ module ForestAdminAgent
             end
           end
         end
+
+        describe 'inject_record_id' do
+          it 'binds record_id as a real parameter instead of substituting it into the query text' do
+            args[:params] = args[:params].merge(
+              {
+                query: 'SELECT COUNT(*) AS value FROM orders WHERE customer_id = ?;',
+                type: 'Value',
+                connectionName: 'primary',
+                record_id: '42',
+                timezone: 'Europe/Paris'
+              }
+            )
+
+            allow(datasource).to receive_messages(execute_native_query: [{ value: 10, previous: 10 }], build_binding_symbol: '$1')
+            native_query.handle_request(args)
+
+            expect(datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
+              expect(connection_name).to eq('primary')
+              expect(query).to eq('SELECT COUNT(*) AS value FROM orders WHERE customer_id = $1;')
+              expect(binds).to eq(['42'])
+            end
+          end
+
+          it 'does not let record_id inject SQL, since it is never embedded as text' do
+            args[:params] = args[:params].merge(
+              {
+                query: 'SELECT COUNT(*) AS value FROM orders WHERE customer_id = ?;',
+                type: 'Value',
+                connectionName: 'primary',
+                record_id: '1 UNION SELECT password FROM users --',
+                timezone: 'Europe/Paris'
+              }
+            )
+
+            allow(datasource).to receive_messages(execute_native_query: [{ value: 10, previous: 10 }], build_binding_symbol: '$1')
+            native_query.handle_request(args)
+
+            expect(datasource).to have_received(:execute_native_query) do |_connection_name, query, binds|
+              expect(query).to eq('SELECT COUNT(*) AS value FROM orders WHERE customer_id = $1;')
+              expect(binds).to eq(['1 UNION SELECT password FROM users --'])
+            end
+          end
+
+          it 'combines record_id and context variables into one ordered binds array' do
+            args[:params] = args[:params].merge(
+              {
+                query: 'SELECT COUNT(*) AS value FROM orders WHERE customer_id = ? ' \
+                       'AND status = {{dropdown1.selectedValue}};',
+                type: 'Value',
+                connectionName: 'primary',
+                record_id: '42',
+                contextVariables: { 'dropdown1.selectedValue' => 'shipped' },
+                timezone: 'Europe/Paris'
+              }
+            )
+
+            allow(datasource).to receive(:build_binding_symbol) { |_connection_name, binds| "$#{binds.size + 1}" }
+            allow(datasource).to receive(:execute_native_query).and_return([{ value: 10, previous: 10 }])
+            native_query.handle_request(args)
+
+            expect(datasource).to have_received(:execute_native_query) do |_connection_name, query, binds|
+              expect(query).to eq(
+                'SELECT COUNT(*) AS value FROM orders WHERE customer_id = $1 AND status = $2;'
+              )
+              expect(binds).to eq(%w[42 shipped])
+            end
+          end
+        end
       end
     end
   end
