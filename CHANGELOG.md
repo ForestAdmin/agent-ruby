@@ -1,3 +1,10 @@
+## [1.36.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.1...v1.36.2) (2026-08-04)
+
+
+### Bug Fixes
+
+* stop hanging on a dead dedup check in inject_context_in_native_query ([#340](https://github.com/ForestAdmin/agent-ruby/issues/340)) ([ec47152](https://github.com/ForestAdmin/agent-ruby/commit/ec4715234cd35ed78a008aea203964ed8761845a))
+
 ## [1.36.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.0...v1.36.1) (2026-07-31)
 
 
