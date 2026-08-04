@@ -223,6 +223,44 @@ module ForestAdminAgent
           expect(binds).to eq([3])
         end
 
+        it 'does not mistake an apostrophe inside a line comment for a literal boundary' do
+          query = "SELECT * FROM users -- user's note\nWHERE id = {{siths.selectedRecord.rank}};"
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users -- user's note\nWHERE id = $1;")
+          expect(binds).to eq([3])
+        end
+
+        it 'does not mistake an apostrophe inside a block comment for a literal boundary' do
+          query = "SELECT * FROM users /* it's fine */ WHERE id = {{siths.selectedRecord.rank}};"
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users /* it's fine */ WHERE id = $1;")
+          expect(binds).to eq([3])
+        end
+
+        it 'raises when a placeholder is inside a still-open line comment' do
+          query = 'SELECT * FROM users -- id = {{siths.selectedRecord.rank}}'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a SQL comment/)
+        end
+
+        it 'raises when a placeholder is inside a still-open block comment' do
+          query = 'SELECT * FROM users /* id = {{siths.selectedRecord.rank}}'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a SQL comment/)
+        end
+
         it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
           query = 'SELECT * FROM users WHERE rank = {{siths.selectedRecord.rank}} ' \
                   'AND power = {{siths.selectedRecord.power}};'

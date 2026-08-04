@@ -8,6 +8,7 @@ module ForestAdminAgent
 
       REGEX = /{{([^}]+)}}/
       FULL_REFERENCE_REGEX = /\A{{([^}]+)}}\z/
+      COMMENT_MARKERS = ['--', '/*'].freeze
 
       def self.inject_context_in_value(value, context_variables)
         return value unless value.is_a?(String)
@@ -36,7 +37,7 @@ module ForestAdminAgent
 
         injected_query = query.gsub(REGEX) do
           key = ::Regexp.last_match(1)
-          raise_if_inside_sql_string_literal(key, ::Regexp.last_match.pre_match)
+          raise_unless_live_sql(key, ::Regexp.last_match.pre_match)
           resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
         end
 
@@ -66,17 +67,51 @@ module ForestAdminAgent
         end
       end
 
-      # A single quote toggles in/out of a string literal, except a doubled '' which is SQL's
-      # escape for a literal quote character and never a boundary. Counting quotes in everything
-      # before the match (with escaped pairs removed) tells us which side of that toggle we're on.
-      def self.raise_if_inside_sql_string_literal(key, text_before_match)
-        return unless text_before_match.gsub("''", '').count("'").odd?
+      # A placeholder inside a quoted literal or SQL comment can never be a real bind, so scan
+      # everything before the match for one. Comments are skipped wholesale rather than scanned
+      # char by char - a naive quote count would misfire on an apostrophe inside one (e.g.
+      # -- user's note). A doubled '' inside a string is SQL's escape, never a boundary.
+      def self.sql_context_before(text)
+        in_string = false
+        i = 0
 
+        while i < text.length
+          if in_string
+            if text[i] == "'" && text[i + 1] == "'"
+              i += 1
+            elsif text[i] == "'"
+              in_string = false
+            end
+          elsif text[i] == "'"
+            in_string = true
+          elsif COMMENT_MARKERS.include?(text[i, 2])
+            i = skip_sql_comment(text, i)
+            return :comment if i.nil?
+
+            next
+          end
+
+          i += 1
+        end
+
+        in_string ? :string : :code
+      end
+
+      def self.skip_sql_comment(text, index)
+        return text.index("\n", index)&.succ if text[index, 2] == '--'
+
+        text.index('*/', index + 2)&.succ&.succ
+      end
+
+      def self.raise_unless_live_sql(key, text_before_match)
+        context = sql_context_before(text_before_match)
+        return if context == :code
+
+        where = context == :string ? 'a quoted string literal' : 'a SQL comment'
         raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "The '{{#{key}}}' placeholder is inside a quoted string literal, which native " \
-              'query bindings do not support - it would be treated as literal text, never ' \
-              'resolved. Build the value using your database\'s own string concatenation ' \
-              "instead of embedding {{#{key}}} inside the quotes."
+              "The '{{#{key}}}' placeholder is inside #{where}, which native query bindings do " \
+              "not support. Move it outside, or build the value using your database's own " \
+              'string concatenation.'
       end
 
       def self.inject_context_in_value_custom(value)
