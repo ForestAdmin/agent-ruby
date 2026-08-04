@@ -30,7 +30,7 @@ module ForestAdminAgent
             rescue ForestAdminDatasourceToolkit::Exceptions::ForestException
               false
             end || json_api_type
-            record[schema.foreign_key_type_field] = collection_name.gsub('__', '::')
+            record[schema.foreign_key_type_field] = collection_name&.gsub('__', '::')
           end
         end
 
