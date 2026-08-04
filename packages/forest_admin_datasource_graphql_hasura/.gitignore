@@ -1,0 +1,5 @@
+/coverage/
+/pkg/
+/tmp/
+Gemfile.lock
+Gemfile-test.lock

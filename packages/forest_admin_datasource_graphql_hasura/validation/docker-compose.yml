@@ -1,0 +1,29 @@
+# Local validation stack: Postgres seeded with a Rails-like banking schema + Hasura.
+# Usage: docker compose up -d, then ruby validate.rb
+services:
+  postgres:
+    image: postgres:15
+    ports:
+      - '55432:5432'
+    environment:
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: banking
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  hasura:
+    image: hasura/graphql-engine:v2.44.0
+    ports:
+      - '58080:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:postgrespassword@postgres:5432/banking
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'false'
+      HASURA_GRAPHQL_ADMIN_SECRET: hasura-validation-secret
