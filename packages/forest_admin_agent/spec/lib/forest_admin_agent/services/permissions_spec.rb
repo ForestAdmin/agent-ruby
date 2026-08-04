@@ -1214,6 +1214,43 @@ module ForestAdminAgent
               }
             ).to_h)
         end
+
+        it 'raises instead of silently resolving to nil when the caller\'s user data could not be resolved' do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114').and_return(
+            instance_double(
+              Faraday::Response,
+              status: 200,
+              body: {
+                'collections' => {
+                  'Book' => {
+                    'scope' => {
+                      aggregator: 'and',
+                      conditions: [
+                        {
+                          field: 'id',
+                          operator: 'equal',
+                          value: '{{currentUser.id}}'
+                        }
+                      ]
+                    },
+                    'segments' => [],
+                    'liveQuerySegments' => []
+                  }
+                },
+                'stats' => [],
+                'team' => {}
+              }.to_json
+            )
+          )
+          allow(@permissions).to receive(:get_user_data).and_return(nil)
+
+          expect do
+            @permissions.get_scope(@datasource.collections['Book'])
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /Unable to resolve the caller's team or user data/
+          )
+        end
       end
 
       context 'when can_smart_action? is called' do
