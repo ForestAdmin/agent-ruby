@@ -345,6 +345,62 @@ module ForestAdminAgent
               end
               expect(result[:name]).to eq('member')
             end
+
+            it 'stores the namespaced model name, not the formatted collection name' do
+              collection_account = build_collection(
+                name: 'Banking__Account',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'iban' => ColumnSchema.new(column_type: 'String')
+                  }
+                }
+              )
+
+              collection_member = build_collection(
+                name: 'member',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
+                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
+                      foreign_collections: ['Banking__Account'],
+                      foreign_key: 'memberable_id',
+                      foreign_key_type_field: 'memberable_type',
+                      foreign_key_targets: { 'Banking__Account' => 'id' }
+                    )
+                  }
+                }
+              )
+
+              @datasource.add_collection(collection_account)
+              @datasource.add_collection(collection_member)
+
+              args[:params][:data] = {
+                attributes: {},
+                relationships: { 'memberable' => { 'data' => { 'type' => 'Banking__Account', 'id' => 3 } } },
+                type: 'Member'
+              }
+              args[:params]['collection_name'] = 'member'
+              allow(@datasource.get_collection('member')).to receive_messages(
+                create: { 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Banking::Account' },
+                list: [{ 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Banking::Account' }]
+              )
+
+              store.handle_request(args)
+              expect(@datasource.get_collection('member')).to have_received(:create) do |_caller, data|
+                expect(data).to eq({ 'memberable_id' => 3, 'memberable_type' => 'Banking::Account' })
+              end
+            end
           end
         end
       end

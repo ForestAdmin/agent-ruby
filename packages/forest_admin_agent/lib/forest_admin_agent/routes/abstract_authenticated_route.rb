@@ -24,13 +24,13 @@ module ForestAdminAgent
             record[schema.foreign_key] = value.dig('data', 'id')
             json_api_type = value.dig('data', 'type')
             # Find matching collection from foreign_collections (handles both singular and plural forms)
-            model_name = schema.foreign_collections.find do |coll_name|
+            collection_name = schema.foreign_collections.find do |coll_name|
               coll = collection.datasource.get_collection(coll_name)
               coll.name == json_api_type || coll.name.pluralize == json_api_type
             rescue ForestAdminDatasourceToolkit::Exceptions::ForestException
               false
             end || json_api_type
-            record[schema.foreign_key_type_field] = model_name
+            record[schema.foreign_key_type_field] = collection_name.gsub('__', '::')
           end
         end
 
