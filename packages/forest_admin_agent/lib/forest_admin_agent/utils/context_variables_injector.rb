@@ -32,35 +32,51 @@ module ForestAdminAgent
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
         return query unless query.is_a?(String)
 
-        binds = []
-        replacements = {}
-        # Whether a repeated key's existing bind can be reused (true, e.g. postgres' $N, safely
-        # referenced more than once) or needs a fresh slot per occurrence (false, e.g. "?", purely
-        # positional) — unknown until the first repeat, since build_binding_symbol has no way to
-        # declare it upfront. Reusing when unsafe would leave a positional driver with fewer bind
-        # values than placeholders; always assuming "fresh slot" would leave every repeat making
-        # its own build_binding_symbol call, which is a live network round-trip for RPC datasources.
-        reusable = nil
+        state = { binds: [], replacements: {}, reusable: nil }
 
         injected_query = query.gsub(REGEX) do
           key = ::Regexp.last_match(1)
-
-          if replacements.key?(key)
-            if reusable.nil?
-              probe = datasource.build_binding_symbol(connection_name, binds)
-              reusable = (probe != replacements[key])
-            end
-
-            binds << context_variables.get_value(key) unless reusable
-            replacements[key]
-          else
-            symbol = datasource.build_binding_symbol(connection_name, binds)
-            binds << context_variables.get_value(key)
-            replacements[key] = symbol
-          end
+          raise_if_inside_sql_string_literal(key, ::Regexp.last_match.pre_match)
+          resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
         end
 
-        [injected_query, binds]
+        [injected_query, state[:binds]]
+      end
+
+      # A repeated key's bind can be reused (true, e.g. postgres' $N) or needs a fresh slot per
+      # occurrence (false, e.g. "?", purely positional) - unknown until the first repeat, since
+      # build_binding_symbol can't declare it upfront. Reusing when unsafe drops a bind value a
+      # positional driver needs; always assuming fresh costs an extra RPC round-trip.
+      def self.resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
+        replacements = state[:replacements]
+        binds = state[:binds]
+
+        if replacements.key?(key)
+          if state[:reusable].nil?
+            probe = datasource.build_binding_symbol(connection_name, binds)
+            state[:reusable] = (probe != replacements[key])
+          end
+
+          binds << context_variables.get_value(key) unless state[:reusable]
+          replacements[key]
+        else
+          symbol = datasource.build_binding_symbol(connection_name, binds)
+          binds << context_variables.get_value(key)
+          replacements[key] = symbol
+        end
+      end
+
+      # A single quote toggles in/out of a string literal, except a doubled '' which is SQL's
+      # escape for a literal quote character and never a boundary. Counting quotes in everything
+      # before the match (with escaped pairs removed) tells us which side of that toggle we're on.
+      def self.raise_if_inside_sql_string_literal(key, text_before_match)
+        return unless text_before_match.gsub("''", '').count("'").odd?
+
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "The '{{#{key}}}' placeholder is inside a quoted string literal, which native " \
+              'query bindings do not support - it would be treated as literal text, never ' \
+              'resolved. Build the value using your database\'s own string concatenation ' \
+              "instead of embedding {{#{key}}} inside the quotes."
       end
 
       def self.inject_context_in_value_custom(value)

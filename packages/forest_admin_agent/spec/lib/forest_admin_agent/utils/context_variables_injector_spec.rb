@@ -192,17 +192,35 @@ module ForestAdminAgent
           expect(datasource).to have_received(:build_binding_symbol).exactly(2).times
         end
 
-        it 'dedupes a key used both inside a quoted literal and outside it, on drivers that support ' \
-           'referencing a bind more than once' do
+        it 'raises when a placeholder is used inside a quoted string literal' do
+          query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%';"
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /'\{\{siths\.selectedRecord\.power\}\}' placeholder is inside a quoted string literal/
+          )
+        end
+
+        it 'raises even when the same key also appears outside a quoted literal elsewhere in the query' do
           query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%' " \
                   'AND code = {{siths.selectedRecord.power}};'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+        end
+
+        it 'does not mistake an escaped quote for a literal boundary' do
+          query = "SELECT * FROM users WHERE name = 'O''Brien' AND id = {{siths.selectedRecord.rank}};"
 
           query_result, binds = described_class.inject_context_in_native_query(
             datasource, connection_name, query, context_variables
           )
 
-          expect(query_result).to eq("SELECT * FROM users WHERE name LIKE '%$1%' AND code = $1;")
-          expect(binds).to eq(['electrocute'])
+          expect(query_result).to eq("SELECT * FROM users WHERE name = 'O''Brien' AND id = $1;")
+          expect(binds).to eq([3])
         end
 
         it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
