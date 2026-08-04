@@ -126,6 +126,29 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(request['query']).to include('insert_comments(objects: $objects)')
       expect(request['variables']['objects']).to eq([{ 'body' => 'hello', 'membership_id' => 1 }])
     end
+
+    # A column left empty must be written as null, not fall back to its database
+    # default — same as the ActiveRecord datasource.
+    it 'inserts an explicit nil instead of dropping the column' do
+      BankingSchema.stub_graphql_data(
+        { 'insert_comments' => { 'returning' => [{ 'id' => 7, 'body' => nil }] } }
+      )
+
+      comments.create(caller, { 'body' => nil, 'membership_id' => 1 })
+
+      expect(last_graphql_request['variables']['objects']).to eq([{ 'body' => nil, 'membership_id' => 1 }])
+    end
+
+    it 'keeps a jsonb value on insert' do
+      BankingSchema.stub_graphql_data(
+        { 'insert_comments' => { 'returning' => [{ 'id' => 7 }] } }
+      )
+
+      comments.create(caller, { 'body' => 'x', 'metadata' => { 'source' => 'api' } })
+
+      expect(last_graphql_request['variables']['objects'])
+        .to eq([{ 'body' => 'x', 'metadata' => { 'source' => 'api' } }])
+    end
   end
 
   describe '#update' do

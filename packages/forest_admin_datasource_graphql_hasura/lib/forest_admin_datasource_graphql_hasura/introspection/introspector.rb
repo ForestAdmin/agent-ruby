@@ -191,39 +191,32 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def parse_table(table_name, type)
-        columns = []
-        relationships = []
-
-        (type['fields'] || []).each do |field|
-          next if field['name'].start_with?('__')
-          # Hasura companion fields of array relationships, not relations
-          next if field['name'].end_with?('_aggregate')
-
-          type_name = base_type_name(field['type'])
-
-          if scalar?(type_name)
-            columns << parse_column(field, type_name)
-          else
-            relationships << parse_relationship(table_name, field, type_name)
-          end
-        end
+        fields = (type['fields'] || []).reject { |field| companion_field?(field['name']) }
+        scalars, relations = fields.partition { |field| scalar?(base_type_name(field['type'])) }
+        columns = scalars.map { |field| parse_column(field, base_type_name(field['type'])) }
 
         Table.new(
           name: table_name,
           columns: columns,
           primary_key: resolve_primary_key(table_name, columns),
-          relationships: relationships.compact,
+          relationships: relations.map { |field| parse_relationship(table_name, field) },
           polymorphics: []
         )
       end
 
-      def parse_relationship(table_name, field, remote_type_name)
+      # Introspection metadata and the `<relation>_aggregate` fields Hasura adds
+      # next to every array relationship — neither are columns or relations.
+      def companion_field?(name)
+        name.start_with?('__') || name.end_with?('_aggregate')
+      end
+
+      def parse_relationship(table_name, field)
         entry = @relationship_mappings["#{table_name}.#{field["name"]}"]
 
         Relationship.new(
           name: field['name'],
           kind: array_type?(field['type']) ? :array : :object,
-          remote_table: remote_type_name,
+          remote_table: base_type_name(field['type']),
           mapping: entry&.fetch(:mapping),
           manual: entry ? entry[:manual] : nil
         )
@@ -308,13 +301,7 @@ module ForestAdminDatasourceGraphqlHasura
         foreign_key = "#{base}_id"
 
         candidates = table.relationships.select do |rel|
-          next false unless rel.kind == :object
-          next configured_tables.include?(rel.remote_table) if configured_tables
-
-          # A relationship backed by a real foreign key constraint is monomorphic
-          # by definition: accepting one here would absorb a legitimate belongs_to
-          # whenever an unrelated `<base>_type` enum sits next to `<base>_id`.
-          rel.manual && rel.mapping&.keys == [foreign_key]
+          polymorphic_branch?(rel, foreign_key, configured_tables)
         end
 
         candidates.each_with_object({}) do |rel, memo|
@@ -328,6 +315,16 @@ module ForestAdminDatasourceGraphqlHasura
             primary_key: rel.mapping&.values&.first || target_table.primary_key.first || 'id'
           }
         end
+      end
+
+      def polymorphic_branch?(relationship, foreign_key, configured_tables)
+        return false unless relationship.kind == :object
+        return configured_tables.include?(relationship.remote_table) if configured_tables
+
+        # A relationship backed by a real foreign key constraint is monomorphic by
+        # definition: accepting one here would absorb a legitimate belongs_to
+        # whenever an unrelated `<base>_type` enum sits next to `<base>_id`.
+        relationship.manual && relationship.mapping&.keys == [foreign_key]
       end
 
       def scalar?(type_name)

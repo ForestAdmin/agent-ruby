@@ -57,11 +57,7 @@ module ForestAdminDatasourceGraphqlHasura
 
         table.columns.each { |column| fields[column.name] = convert_column(column) }
 
-        table.polymorphics.each do |polymorphic|
-          fields[polymorphic.name] = convert_polymorphic(polymorphic)
-          fields[polymorphic.foreign_key]&.is_read_only = true
-          fields[polymorphic.type_field]&.is_read_only = true
-        end
+        add_polymorphics(table, fields)
 
         table.relationships.each do |relationship|
           name, schema = convert_relationship(table, relationship)
@@ -90,6 +86,25 @@ module ForestAdminDatasourceGraphqlHasura
           default_value: nil,
           validation: column.nullable || column.is_primary_key ? [] : [{ operator: Operators::PRESENT }]
         )
+      end
+
+      def add_polymorphics(table, fields)
+        table.polymorphics.each do |polymorphic|
+          # A physical column of that name wins: replacing it would drop it from
+          # the schema, leaving it neither readable nor writable.
+          if fields.key?(polymorphic.name)
+            ForestAdminDatasourceGraphqlHasura.logger.warn(
+              "[forest_admin_datasource_graphql_hasura] '#{table.name}' has a column named " \
+              "'#{polymorphic.name}', so its polymorphic association is not exposed. Rename either the " \
+              'column or the association to surface both.'
+            )
+            next
+          end
+
+          fields[polymorphic.name] = convert_polymorphic(polymorphic)
+          fields[polymorphic.foreign_key]&.is_read_only = true
+          fields[polymorphic.type_field]&.is_read_only = true
+        end
       end
 
       def convert_polymorphic(polymorphic)
@@ -167,11 +182,22 @@ module ForestAdminDatasourceGraphqlHasura
       def covered_by_reverse_polymorphic?(table, relationship, remote)
         return false if relationship.mapping.nil?
 
+        remote.polymorphics.any? { |polymorphic| reverse_of?(relationship, table, polymorphic) }
+      end
+
+      # Both ends have to line up: an array relationship joining the polymorphic
+      # foreign key to another local column (`{ 'external_id' => 'commentable_id' }`)
+      # is a different relationship, and the PolymorphicOneToMany that would
+      # replace it queries by the primary key instead.
+      def reverse_of?(relationship, table, polymorphic)
         this_class_name = rails_class_name_of(table.name)
-        remote.polymorphics.any? do |polymorphic|
-          polymorphic.targets.key?(this_class_name) &&
-            relationship.mapping.values.first == polymorphic.foreign_key
-        end
+        target = polymorphic.targets[this_class_name]
+        return false if target.nil?
+        return false unless relationship.mapping&.values&.first == polymorphic.foreign_key
+
+        local_key = relationship.mapping.keys.first
+
+        local_key.nil? || local_key == target[:primary_key]
       end
 
       def single_column_mapping?(table, relationship)
@@ -208,8 +234,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def reverse_polymorphic_name(table, child, polymorphic, fields)
         array_relationship = table.relationships.find do |rel|
-          rel.kind == :array && rel.remote_table == child.name &&
-            rel.mapping&.values&.first == polymorphic.foreign_key
+          rel.kind == :array && rel.remote_table == child.name && reverse_of?(rel, table, polymorphic)
         end
 
         candidates = [array_relationship&.name, child.name, "#{child.name}_#{polymorphic.name}"].compact.uniq

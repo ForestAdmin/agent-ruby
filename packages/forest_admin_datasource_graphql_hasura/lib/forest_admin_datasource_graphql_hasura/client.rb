@@ -14,8 +14,8 @@ module ForestAdminDatasourceGraphqlHasura
     # Wrapped in GraphqlError so they reach the user as an actionable message
     # instead of an opaque 500.
     TRANSPORT_ERRORS = [
-      Net::OpenTimeout, Net::ReadTimeout, Net::HTTPBadResponse, IOError, SocketError, SystemCallError,
-      OpenSSL::SSL::SSLError, JSON::ParserError
+      Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, Net::HTTPBadResponse, IOError, SocketError,
+      SystemCallError, OpenSSL::SSL::SSLError, JSON::ParserError
     ].freeze
 
     def execute(query, variables = {})
@@ -65,6 +65,7 @@ module ForestAdminDatasourceGraphqlHasura
       http.use_ssl = uri.scheme == 'https'
       http.read_timeout = @configuration.timeout
       http.open_timeout = @configuration.timeout
+      http.write_timeout = @configuration.timeout
 
       request = Net::HTTP::Post.new(uri.request_uri)
       request['Content-Type'] = 'application/json'

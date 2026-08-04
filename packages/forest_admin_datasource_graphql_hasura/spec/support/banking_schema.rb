@@ -55,6 +55,7 @@ module BankingSchema
               'fields' => [
                 field('id', non_null(scalar('bigint'))),
                 field('body', scalar('String')),
+                field('metadata', scalar('jsonb')),
                 field('commentable_type', non_null(scalar('String'))),
                 field('commentable_id', non_null(scalar('bigint'))),
                 field('membership_id', scalar('bigint')),

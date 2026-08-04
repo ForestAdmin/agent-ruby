@@ -44,7 +44,7 @@ module ForestAdminDatasourceGraphqlHasura
             }
           GRAPHQL
 
-          { query: query, variables: { 'objects' => records.map { |record| clean_record(record) } } }
+          { query: query, variables: { 'objects' => records.map { |record| stringify_keys(record) } } }
         end
 
         def update(table, filter, patch)
@@ -60,7 +60,7 @@ module ForestAdminDatasourceGraphqlHasura
             query: query,
             variables: {
               'where' => FilterConverter.convert(filter.condition_tree) || {},
-              'set' => clean_record(patch, keep_nil: true)
+              'set' => stringify_keys(patch)
             }
           }
         end
@@ -178,14 +178,11 @@ module ForestAdminDatasourceGraphqlHasura
           end
         end
 
-        # Nils are dropped on insert so database defaults apply, and kept on
-        # update so a field can be cleared.
-        def clean_record(record, keep_nil: false)
-          record.each_with_object({}) do |(key, value), memo|
-            next if value.nil? && !keep_nil
-
-            memo[key.to_s] = value
-          end
+        # Values are kept as submitted, nil included: a column left empty has to
+        # be written as null rather than fall back to its database default. The
+        # caller already restricted the keys to real columns.
+        def stringify_keys(record)
+          record.to_h { |key, value| [key.to_s, value] }
         end
 
         def wrap(parts)

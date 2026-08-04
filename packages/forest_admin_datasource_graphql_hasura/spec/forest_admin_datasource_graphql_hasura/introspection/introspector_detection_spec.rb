@@ -217,6 +217,101 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
     end
   end
 
+  describe 'reverse polymorphic relations' do
+    before do
+      stub_schema(
+        [
+          {
+            'name' => 'comments', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('commentable_type', non_null(scalar('String'))),
+              field('commentable_id', non_null(scalar('bigint'))),
+              field('transfer', object('transfers'))
+            ]
+          },
+          {
+            'name' => 'transfers', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('external_id', non_null(scalar('bigint'))),
+              field('comments', non_null(list_of(non_null(object('comments')))))
+            ]
+          }
+        ],
+        [list_query('comments'), by_pk_query('comments'), list_query('transfers'), by_pk_query('transfers')]
+      )
+    end
+
+    # The array relationship joins `external_id`, while the polymorphic
+    # association targets `id`: it is a different relationship, so it must not be
+    # replaced by a PolymorphicOneToMany querying by `id`.
+    it 'does not absorb an array relationship whose local key is not the targeted primary key' do
+      stub_metadata(
+        [
+          { 'table' => { 'schema' => 'public', 'name' => 'comments' },
+            'object_relationships' => [manual_object_rel('transfer', 'transfers', { 'commentable_id' => 'id' })] },
+          { 'table' => { 'schema' => 'public', 'name' => 'transfers' },
+            'array_relationships' => [
+              manual_object_rel('comments', 'comments', { 'external_id' => 'commentable_id' })
+            ] }
+        ]
+      )
+
+      fields = build_datasource.get_collection('Transfer').schema[:fields]
+
+      expect(fields['comments'].type).to eq('OneToMany')
+      expect(fields['comments'].origin_key_target).to eq('external_id')
+      expect(fields['transfers']).to be_nil
+    end
+
+    it 'absorbs the array relationship that does join the targeted primary key' do
+      stub_metadata(
+        [
+          { 'table' => { 'schema' => 'public', 'name' => 'comments' },
+            'object_relationships' => [manual_object_rel('transfer', 'transfers', { 'commentable_id' => 'id' })] },
+          { 'table' => { 'schema' => 'public', 'name' => 'transfers' },
+            'array_relationships' => [manual_object_rel('comments', 'comments', { 'id' => 'commentable_id' })] }
+        ]
+      )
+
+      field = build_datasource.get_collection('Transfer').schema[:fields]['comments']
+
+      expect(field.type).to eq('PolymorphicOneToMany')
+      expect(field.origin_key_target).to eq('id')
+    end
+  end
+
+  describe 'a column named like the polymorphic association' do
+    it 'keeps the physical column and skips the association' do
+      stub_schema(
+        [
+          {
+            'name' => 'comments', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('commentable', scalar('String')),
+              field('commentable_type', non_null(scalar('String'))),
+              field('commentable_id', non_null(scalar('bigint'))),
+              field('transfer', object('transfers'))
+            ]
+          },
+          { 'name' => 'transfers', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('comments'), by_pk_query('comments'), list_query('transfers'), by_pk_query('transfers')]
+      )
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'comments' },
+           'object_relationships' => [manual_object_rel('transfer', 'transfers', { 'commentable_id' => 'id' })] }]
+      )
+
+      fields = build_datasource.get_collection('Comment').schema[:fields]
+
+      expect(fields['commentable'].type).to eq('Column')
+      expect(fields['commentable_type'].is_read_only).to be(false)
+    end
+  end
+
   describe 'operators advertised per column type' do
     before do
       stub_schema(

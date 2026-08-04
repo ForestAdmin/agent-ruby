@@ -98,18 +98,23 @@ module ForestAdminDatasourceGraphqlHasura
         raise ForestException, "Invalid aggregation field '#{field}' on collection '#{name}'."
       end
 
-      collection = self
-      path.each_with_index do |part, index|
-        schema = collection.schema[:fields][part]
-        raise ForestException, "Field '#{field}' not found on collection '#{collection.name}'." if schema.nil?
-        next if index == path.size - 1
+      *relations, last = path
+      collection = relations.reduce(self) { |current, part| collection_through(current, part, field) }
 
-        unless schema.type == 'ManyToOne'
-          raise ForestException, "Cannot aggregate through '#{part}' on collection '#{collection.name}'."
-        end
+      return unless collection.schema[:fields][last].nil?
 
-        collection = datasource.get_collection(schema.foreign_collection)
+      raise ForestException, "Field '#{field}' not found on collection '#{collection.name}'."
+    end
+
+    def collection_through(collection, relation_name, field)
+      schema = collection.schema[:fields][relation_name]
+      raise ForestException, "Field '#{field}' not found on collection '#{collection.name}'." if schema.nil?
+
+      unless schema.type == 'ManyToOne'
+        raise ForestException, "Cannot aggregate through '#{relation_name}' on collection '#{collection.name}'."
       end
+
+      datasource.get_collection(schema.foreign_collection)
     end
 
     def execute(operation_name, operation)

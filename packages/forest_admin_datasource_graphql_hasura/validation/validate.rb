@@ -359,6 +359,16 @@ ensure
   comments.delete(nil, filter(condition_tree: leaf('id', Operators::EQUAL, probe_id))) if probe_id
 end
 
+scenario 'an explicit nil is persisted as null rather than falling back to the column default' do
+  cards = datasource.get_collection('Card')
+  record = cards.create(nil, { 'last4' => nil, 'type' => 'Card' })
+  probe_id = record['id']
+
+  assert record['last4'].nil?, 'last4 stored as null'
+ensure
+  cards.delete(nil, filter(condition_tree: leaf('id', Operators::EQUAL, probe_id))) if probe_id
+end
+
 scenario 'an unknown polymorphic type value is left unresolved instead of breaking the page' do
   records = comments.list(nil, filter(condition_tree: leaf('body', Operators::EQUAL, 'legacy sti row')),
                           projection('id', 'body', 'commentable_type', 'commentable:*'))
