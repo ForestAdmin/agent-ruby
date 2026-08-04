@@ -203,6 +203,25 @@ module ForestAdminAgent
           )
         end
 
+        it 'raises when a placeholder is used as a quoted identifier instead of a value' do
+          query = 'SELECT "{{siths.selectedRecord.power}}" FROM users;'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a quoted identifier/)
+        end
+
+        it 'does not mistake a single quote inside a double-quoted identifier for a string boundary' do
+          query = 'SELECT "o\'clock" AS label, id FROM users WHERE id = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT "o\'clock" AS label, id FROM users WHERE id = $1;')
+          expect(binds).to eq([3])
+        end
+
         it 'raises even when the same key also appears outside a quoted literal elsewhere in the query' do
           query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%' " \
                   'AND code = {{siths.selectedRecord.power}};'

@@ -49,41 +49,40 @@ module ForestAdminAgent
       # build_binding_symbol can't declare it upfront. Reusing when unsafe drops a bind value a
       # positional driver needs; always assuming fresh costs an extra RPC round-trip.
       def self.resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
-        replacements = state[:replacements]
-        binds = state[:binds]
-
-        if replacements.key?(key)
+        if state[:replacements].key?(key)
           if state[:reusable].nil?
-            probe = datasource.build_binding_symbol(connection_name, binds)
-            state[:reusable] = (probe != replacements[key])
+            probe = datasource.build_binding_symbol(connection_name, state[:binds])
+            state[:reusable] = (probe != state[:replacements][key])
           end
 
-          binds << context_variables.get_value(key) unless state[:reusable]
-          replacements[key]
+          state[:binds] << context_variables.get_value(key) unless state[:reusable]
+          state[:replacements][key]
         else
-          symbol = datasource.build_binding_symbol(connection_name, binds)
-          binds << context_variables.get_value(key)
-          replacements[key] = symbol
+          symbol = datasource.build_binding_symbol(connection_name, state[:binds])
+          state[:binds] << context_variables.get_value(key)
+          state[:replacements][key] = symbol
         end
       end
 
-      # A placeholder inside a quoted literal or SQL comment can never be a real bind, so scan
-      # everything before the match for one. Comments are skipped wholesale rather than scanned
-      # char by char - a naive quote count would misfire on an apostrophe inside one (e.g.
-      # -- user's note). A doubled '' inside a string is SQL's escape, never a boundary.
+      # A placeholder inside a quoted string, a "quoted identifier", or a SQL comment can never
+      # be a real bind, so scan everything before the match for one. Both quote styles share the
+      # same escape convention (a doubled quote character, never a boundary) so one `quote`
+      # variable tracks whichever is currently open. Comments are skipped wholesale rather than
+      # scanned char by char - a naive quote count would misfire on an apostrophe inside one (e.g.
+      # -- user's note).
       def self.sql_context_before(text)
-        in_string = false
+        quote = nil
         i = 0
 
         while i < text.length
-          if in_string
-            if text[i] == "'" && text[i + 1] == "'"
+          if quote
+            if text[i] == quote && text[i + 1] == quote
               i += 1
-            elsif text[i] == "'"
-              in_string = false
+            elsif text[i] == quote
+              quote = nil
             end
-          elsif text[i] == "'"
-            in_string = true
+          elsif /['"]/.match?(text[i])
+            quote = text[i]
           elsif COMMENT_MARKERS.include?(text[i, 2])
             i = skip_sql_comment(text, i)
             return :comment if i.nil?
@@ -94,7 +93,9 @@ module ForestAdminAgent
           i += 1
         end
 
-        in_string ? :string : :code
+        return :code unless quote
+
+        quote == "'" ? :string : :identifier
       end
 
       def self.skip_sql_comment(text, index)
@@ -103,15 +104,18 @@ module ForestAdminAgent
         text.index('*/', index + 2)&.succ&.succ
       end
 
+      PLACEHOLDER_CONTEXT_ERRORS = {
+        string: 'is inside a quoted string literal, which native query bindings do not support',
+        comment: 'is inside a SQL comment, which native query bindings do not support',
+        identifier: 'is inside a quoted identifier - a bind can only ever be a value, never a column or table name'
+      }.freeze
+
       def self.raise_unless_live_sql(key, text_before_match)
         context = sql_context_before(text_before_match)
         return if context == :code
 
-        where = context == :string ? 'a quoted string literal' : 'a SQL comment'
         raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "The '{{#{key}}}' placeholder is inside #{where}, which native query bindings do " \
-              "not support. Move it outside, or build the value using your database's own " \
-              'string concatenation.'
+              "The '{{#{key}}}' placeholder #{PLACEHOLDER_CONTEXT_ERRORS[context]}."
       end
 
       def self.inject_context_in_value_custom(value)
