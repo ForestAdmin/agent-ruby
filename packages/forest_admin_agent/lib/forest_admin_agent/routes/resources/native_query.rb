@@ -36,7 +36,7 @@ module ForestAdminAgent
 
           context.permissions.can_chart?(args[:params])
 
-          query.gsub!('?', args[:params][:record_id].to_s) if args[:params][:record_id]
+          query, context_variables = inject_record_id(query, args[:params])
           type = validate_and_get_type(args[:params][:type])
           result = execute_query(
             context.datasource,
@@ -44,13 +44,26 @@ module ForestAdminAgent
             args[:params][:connectionName],
             context.permissions,
             context.caller,
-            args[:params][:contextVariables]
+            context_variables
           )
 
           { content: Serializer::ForestChartSerializer.serialize(send(:"make_#{type}", result)) }
         end
 
         private
+
+        # The developer's query template uses a literal '?' to mean "the record this chart is
+        # scoped to". Substituting record_id as text into the query (the previous approach) let
+        # an attacker inject arbitrary SQL through it - route it through the same {{...}} bind
+        # machinery used for context variables instead, so it's a real parameter, never SQL text.
+        def inject_record_id(query, params)
+          context_variables = params[:contextVariables]
+          context_variables = {} unless context_variables.is_a?(Hash)
+
+          return [query, context_variables] unless params[:record_id]
+
+          [query.gsub('?', '{{__record_id__}}'), context_variables.merge('__record_id__' => params[:record_id])]
+        end
 
         def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]

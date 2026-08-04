@@ -539,6 +539,32 @@ module ForestAdminAgent
             expect(result[:content][:data][:type]).to eq('stats')
           end
 
+          it 'does not raise when contextVariables is omitted and the filter references a placeholder' do
+            args[:params] = args[:params].merge(
+              {
+                type: 'Value',
+                sourceCollectionName: 'book',
+                aggregateFieldName: nil,
+                aggregator: 'Count',
+                filter: JSON.generate({
+                                        aggregator: 'and',
+                                        conditions: [
+                                          { operator: 'equal', value: '{{dropdown1.selectedValue}}', field: 'title' }
+                                        ]
+                                      }),
+                timezone: 'Europe/Paris'
+              }
+            )
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
+
+            result = chart.handle_request(args)
+
+            expect(@datasource.get_collection('book')).to have_received(:aggregate) do |_caller, filter, _aggregation|
+              expect(filter.condition_tree).to have_attributes(field: 'title', operator: Operators::EQUAL, value: nil)
+            end
+            expect(result[:content]).to be_a(Hash)
+          end
+
           it 'does not override the filter when there is no filter with a context variable' do
             args[:params] = args[:params].merge({
                                                   type: 'Value',

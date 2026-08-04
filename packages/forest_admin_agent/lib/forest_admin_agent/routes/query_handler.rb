@@ -16,14 +16,10 @@ module ForestAdminAgent
 
       def execute_query(datasource, query, connection_name, permissions, caller, context_variables)
         query = query.strip
-        query, context_variables = inject_context_variables(datasource, connection_name, query, permissions, caller,
-                                                            context_variables)
+        query, binds = inject_context_variables(datasource, connection_name, query, permissions, caller,
+                                                context_variables)
 
-        datasource.execute_native_query(
-          connection_name,
-          query,
-          context_variables.values
-        )
+        datasource.execute_native_query(connection_name, query, binds)
       end
 
       def parse_query_segment(collection, args, permissions, caller)

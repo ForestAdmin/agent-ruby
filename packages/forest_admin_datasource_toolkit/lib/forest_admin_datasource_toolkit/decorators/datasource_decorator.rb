@@ -36,6 +36,10 @@ module ForestAdminDatasourceToolkit
       def execute_native_query(connection_name, query, binds)
         @child_datasource.execute_native_query(connection_name, query, binds)
       end
+
+      def build_binding_symbol(connection_name, binds)
+        @child_datasource.build_binding_symbol(connection_name, binds)
+      end
     end
   end
 end

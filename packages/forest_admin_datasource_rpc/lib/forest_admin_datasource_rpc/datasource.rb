@@ -63,6 +63,24 @@ module ForestAdminDatasourceRpc
       ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(result.to_a)
     end
 
+    def build_binding_symbol(connection_name, binds)
+      url = 'forest/rpc-binding-symbol'
+
+      ForestAdminAgent::Facades::Container.logger&.log(
+        'Debug',
+        "Requesting a binding symbol for connection '#{connection_name}' from the Rpc agent on #{url}."
+      )
+
+      @shared_rpc_client.call_rpc(
+        url,
+        method: :post,
+        payload: { connection_name: connection_name, binds_count: binds.size }
+      )
+    rescue ForestAdminAgent::Http::Exceptions::NotFoundError
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'Upgrade forest_admin_rpc_agent: this version does not support binding symbols yet.'
+    end
+
     def refresh!(new_schema)
       # Replace collections with those from the new schema
       @collections = {}

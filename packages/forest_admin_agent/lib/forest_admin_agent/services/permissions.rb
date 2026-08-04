@@ -148,6 +148,12 @@ module ForestAdminAgent
         team = get_team(caller.rendering_id)
         user = get_user_data(caller.id)
 
+        if team.nil? || user.nil?
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Unable to resolve the caller's team or user data while computing the permission " \
+                "scope for '#{collection.name}'."
+        end
+
         context_variables = ContextVariables.new(team, user)
 
         ContextVariablesInjector.inject_context_in_filter(scope, context_variables)

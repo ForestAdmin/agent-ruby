@@ -10,13 +10,21 @@ module ForestAdminAgent
       USER_VALUE_TEAM_PREFIX = 'currentUser.team.'.freeze
 
       def initialize(team, user, request_context_variables = nil)
-        @team = team.transform_keys(&:to_sym)
-        @user = user.transform_keys(&:to_sym)
-        @request_context_variables = request_context_variables
+        @team = (team || {}).transform_keys(&:to_sym)
+        @user = (user || {}).transform_keys(&:to_sym)
+        @request_context_variables = request_context_variables.is_a?(Hash) ? request_context_variables : {}
       end
 
       def get_value(context_variable_key)
         return get_current_user_data(context_variable_key) if context_variable_key.start_with?(USER_VALUE_PREFIX)
+
+        if request_context_variables.empty?
+          ForestAdminAgent::Facades::Container.logger&.log(
+            'Warn',
+            "Context variable '#{context_variable_key}' could not be resolved: no request context " \
+            'variables were provided.'
+          )
+        end
 
         request_context_variables[context_variable_key]
       end

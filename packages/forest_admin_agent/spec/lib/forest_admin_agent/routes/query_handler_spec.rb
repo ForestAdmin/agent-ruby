@@ -138,6 +138,23 @@ module ForestAdminAgent
             expect(binds).to eq([1])
           end
         end
+
+        it 'does not raise when context_variables is nil and the query references a non-currentUser placeholder' do
+          dummy_class.execute_query(
+            collection.datasource,
+            'SELECT id FROM users WHERE id > {{foo.id}};',
+            'primary',
+            permission,
+            caller,
+            nil
+          )
+
+          expect(datasource).to have_received(:execute_native_query) do |connection_name, query, binds|
+            expect(connection_name).to eq('primary')
+            expect(query).to eq('SELECT id FROM users WHERE id > $1;')
+            expect(binds).to eq([nil])
+          end
+        end
       end
     end
   end

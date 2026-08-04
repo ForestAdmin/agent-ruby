@@ -124,5 +124,31 @@ module ForestAdminDatasourceRpc
         end
       end
     end
+
+    context 'when call build_binding_symbol' do
+      let(:rpc_client) { instance_double(Utils::RpcClient, call_rpc: '$1') }
+
+      it 'forwards the connection name and bind count to the server and returns the symbol' do
+        result = datasource.build_binding_symbol('primary', [1, 2])
+
+        expect(result).to eq('$1')
+        expect(rpc_client).to have_received(:call_rpc) do |url, options|
+          expect(url).to eq('forest/rpc-binding-symbol')
+          expect(options[:method]).to eq(:post)
+          expect(options[:payload]).to eq({ connection_name: 'primary', binds_count: 2 })
+        end
+      end
+
+      it 'raises a clear upgrade message when the Rpc agent does not implement the route yet' do
+        allow(rpc_client).to receive(:call_rpc).and_raise(ForestAdminAgent::Http::Exceptions::NotFoundError, 'Not Found')
+
+        expect do
+          datasource.build_binding_symbol('primary', [])
+        end.to raise_error(
+          ForestAdminDatasourceToolkit::Exceptions::ForestException,
+          /Upgrade forest_admin_rpc_agent.*does not support binding symbols yet/
+        )
+      end
+    end
   end
 end

@@ -155,6 +155,181 @@ module ForestAdminAgent
           expect(result).to eq("self: #{expected_json}")
         end
       end
+
+      context('when inject_context_in_native_query is called') do
+        let(:datasource) do
+          datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+          allow(datasource).to receive(:build_binding_symbol) { |_connection_name, binds| "$#{binds.size + 1}" }
+          datasource
+        end
+        let(:connection_name) { 'primary' }
+
+        it 'returns the query unchanged with empty binds when there is no placeholder' do
+          result = described_class.inject_context_in_native_query(
+            datasource, connection_name, 'SELECT * FROM users;', context_variables
+          )
+
+          expect(result).to eq(['SELECT * FROM users;', []])
+        end
+
+        it 'returns non-String query input untouched' do
+          result = described_class.inject_context_in_native_query(datasource, connection_name, 8, context_variables)
+
+          expect(result).to eq(8)
+        end
+
+        it 'reuses a distinct key\'s bind when the driver\'s symbol changes with bind count, calling ' \
+           'build_binding_symbol only once per distinct key plus one classification probe' do
+          query = 'SELECT * FROM users WHERE id = {{siths.selectedRecord.rank}} ' \
+                  'OR id = {{siths.selectedRecord.rank}} OR id = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE id = $1 OR id = $1 OR id = $1;')
+          expect(binds).to eq([3])
+          expect(datasource).to have_received(:build_binding_symbol).exactly(2).times
+        end
+
+        it 'raises when a placeholder is used inside a quoted string literal' do
+          query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%';"
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /'\{\{siths\.selectedRecord\.power\}\}' placeholder is inside a quoted string literal/
+          )
+        end
+
+        it 'raises when a placeholder is used as a quoted identifier instead of a value' do
+          query = 'SELECT "{{siths.selectedRecord.power}}" FROM users;'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a quoted identifier/)
+        end
+
+        it 'does not mistake a single quote inside a double-quoted identifier for a string boundary' do
+          query = 'SELECT "o\'clock" AS label, id FROM users WHERE id = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT "o\'clock" AS label, id FROM users WHERE id = $1;')
+          expect(binds).to eq([3])
+        end
+
+        it 'raises even when the same key also appears outside a quoted literal elsewhere in the query' do
+          query = "SELECT * FROM users WHERE name LIKE '%{{siths.selectedRecord.power}}%' " \
+                  'AND code = {{siths.selectedRecord.power}};'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+        end
+
+        it 'does not mistake an escaped quote for a literal boundary' do
+          query = "SELECT * FROM users WHERE name = 'O''Brien' AND id = {{siths.selectedRecord.rank}};"
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users WHERE name = 'O''Brien' AND id = $1;")
+          expect(binds).to eq([3])
+        end
+
+        it 'does not mistake an apostrophe inside a line comment for a literal boundary' do
+          query = "SELECT * FROM users -- user's note\nWHERE id = {{siths.selectedRecord.rank}};"
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users -- user's note\nWHERE id = $1;")
+          expect(binds).to eq([3])
+        end
+
+        it 'does not mistake an apostrophe inside a block comment for a literal boundary' do
+          query = "SELECT * FROM users /* it's fine */ WHERE id = {{siths.selectedRecord.rank}};"
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq("SELECT * FROM users /* it's fine */ WHERE id = $1;")
+          expect(binds).to eq([3])
+        end
+
+        it 'raises when a placeholder is inside a still-open line comment' do
+          query = 'SELECT * FROM users -- id = {{siths.selectedRecord.rank}}'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a SQL comment/)
+        end
+
+        it 'raises when a placeholder is inside a still-open block comment' do
+          query = 'SELECT * FROM users /* id = {{siths.selectedRecord.rank}}'
+
+          expect do
+            described_class.inject_context_in_native_query(datasource, connection_name, query, context_variables)
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /inside a SQL comment/)
+        end
+
+        it 'assigns sequential bind symbols to distinct keys in first-occurrence order' do
+          query = 'SELECT * FROM users WHERE rank = {{siths.selectedRecord.rank}} ' \
+                  'AND power = {{siths.selectedRecord.power}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE rank = $1 AND power = $2;')
+          expect(binds).to eq([3, 'electrocute'])
+        end
+
+        it 'does not hang when a resolved value happens to equal the literal name of another key' do
+          tricky_context_variables = ForestAdminAgent::Utils::ContextVariables.new(
+            team,
+            user,
+            {
+              'siths.selectedRecord.alias' => 'siths.selectedRecord.rank',
+              'siths.selectedRecord.rank' => 3
+            }
+          )
+          query = 'SELECT * FROM users WHERE a = {{siths.selectedRecord.alias}} ' \
+                  'AND b = {{siths.selectedRecord.rank}};'
+
+          query_result, binds = Timeout.timeout(2) do
+            described_class.inject_context_in_native_query(
+              datasource, connection_name, query, tricky_context_variables
+            )
+          end
+
+          expect(query_result).to eq('SELECT * FROM users WHERE a = $1 AND b = $2;')
+          expect(binds).to eq(['siths.selectedRecord.rank', 3])
+        end
+
+        it 'keeps one bind per occurrence, including repeats, on drivers whose build_binding_symbol ' \
+           'returns the same literal symbol for every call, as non-Postgres drivers do' do
+          constant_symbol_datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
+          allow(constant_symbol_datasource).to receive(:build_binding_symbol).and_return('?')
+
+          query = 'SELECT * FROM users WHERE a = {{siths.selectedRecord.rank}} ' \
+                  'OR b = {{siths.selectedRecord.rank}} AND c = {{siths.selectedRecord.power}};'
+
+          query_result, binds = described_class.inject_context_in_native_query(
+            constant_symbol_datasource, connection_name, query, context_variables
+          )
+
+          expect(query_result).to eq('SELECT * FROM users WHERE a = ? OR b = ? AND c = ?;')
+          expect(binds).to eq([3, 3, 'electrocute'])
+        end
+      end
     end
   end
 end

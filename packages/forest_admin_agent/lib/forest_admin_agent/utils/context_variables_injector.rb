@@ -8,6 +8,7 @@ module ForestAdminAgent
 
       REGEX = /{{([^}]+)}}/
       FULL_REFERENCE_REGEX = /\A{{([^}]+)}}\z/
+      COMMENT_MARKERS = ['--', '/*'].freeze
 
       def self.inject_context_in_value(value, context_variables)
         return value unless value.is_a?(String)
@@ -32,23 +33,89 @@ module ForestAdminAgent
       def self.inject_context_in_native_query(datasource, connection_name, query, context_variables)
         return query unless query.is_a?(String)
 
-        query_with_context_variables_injected = query
-        encountered_variables = {}
+        state = { binds: [], replacements: {}, reusable: nil }
 
-        while (match = REGEX.match(query_with_context_variables_injected))
-          context_variable_key = match[1]
-
-          next if encountered_variables.value?(context_variable_key)
-
-          index = datasource.build_binding_symbol(connection_name, encountered_variables)
-          query_with_context_variables_injected.gsub!(
-            /{{#{context_variable_key}}}/,
-            index
-          )
-          encountered_variables[index] = context_variables.get_value(context_variable_key)
+        injected_query = query.gsub(REGEX) do
+          key = ::Regexp.last_match(1)
+          raise_unless_live_sql(key, ::Regexp.last_match.pre_match)
+          resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
         end
 
-        [query_with_context_variables_injected, encountered_variables]
+        [injected_query, state[:binds]]
+      end
+
+      # A repeated key's bind can be reused (true, e.g. postgres' $N) or needs a fresh slot per
+      # occurrence (false, e.g. "?", purely positional) - unknown until the first repeat, since
+      # build_binding_symbol can't declare it upfront. Reusing when unsafe drops a bind value a
+      # positional driver needs; always assuming fresh costs an extra RPC round-trip.
+      def self.resolve_bind_symbol(key, datasource, connection_name, context_variables, state)
+        if state[:replacements].key?(key)
+          if state[:reusable].nil?
+            probe = datasource.build_binding_symbol(connection_name, state[:binds])
+            state[:reusable] = (probe != state[:replacements][key])
+          end
+
+          state[:binds] << context_variables.get_value(key) unless state[:reusable]
+          state[:replacements][key]
+        else
+          symbol = datasource.build_binding_symbol(connection_name, state[:binds])
+          state[:binds] << context_variables.get_value(key)
+          state[:replacements][key] = symbol
+        end
+      end
+
+      # A placeholder inside a quoted string, a "quoted identifier", or a SQL comment can never
+      # be a real bind, so scan everything before the match for one. Both quote styles share the
+      # same escape convention (a doubled quote character, never a boundary) so one `quote`
+      # variable tracks whichever is currently open. Comments are skipped wholesale rather than
+      # scanned char by char - a naive quote count would misfire on an apostrophe inside one (e.g.
+      # -- user's note).
+      def self.sql_context_before(text)
+        quote = nil
+        i = 0
+
+        while i < text.length
+          if quote
+            if text[i] == quote && text[i + 1] == quote
+              i += 1
+            elsif text[i] == quote
+              quote = nil
+            end
+          elsif /['"]/.match?(text[i])
+            quote = text[i]
+          elsif COMMENT_MARKERS.include?(text[i, 2])
+            i = skip_sql_comment(text, i)
+            return :comment if i.nil?
+
+            next
+          end
+
+          i += 1
+        end
+
+        return :code unless quote
+
+        quote == "'" ? :string : :identifier
+      end
+
+      def self.skip_sql_comment(text, index)
+        return text.index("\n", index)&.succ if text[index, 2] == '--'
+
+        text.index('*/', index + 2)&.succ&.succ
+      end
+
+      PLACEHOLDER_CONTEXT_ERRORS = {
+        string: 'is inside a quoted string literal, which native query bindings do not support',
+        comment: 'is inside a SQL comment, which native query bindings do not support',
+        identifier: 'is inside a quoted identifier - a bind can only ever be a value, never a column or table name'
+      }.freeze
+
+      def self.raise_unless_live_sql(key, text_before_match)
+        context = sql_context_before(text_before_match)
+        return if context == :code
+
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "The '{{#{key}}}' placeholder #{PLACEHOLDER_CONTEXT_ERRORS[context]}."
       end
 
       def self.inject_context_in_value_custom(value)
