@@ -206,10 +206,9 @@ module ForestAdminDatasourceGraphqlHasura
         config = table.dig('configuration', 'custom_root_fields')
         return {} unless config.is_a?(Hash)
 
-        config.each_with_object({}) do |(operation, value), memo|
-          value = value['name'] if value.is_a?(Hash)
-          memo[operation] = value if value.is_a?(String)
-        end
+        flattened = config.transform_values { |value| value.is_a?(Hash) ? value['name'] : value }
+
+        flattened.select { |_, value| value.is_a?(String) }
       end
 
       # A nil column stands for the primary key of that table: a foreign key

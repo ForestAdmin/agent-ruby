@@ -120,7 +120,7 @@ module ForestAdminDatasourceGraphqlHasura
         if field.type == 'PolymorphicManyToOne'
           materialize_placeholder(record, relation_name, field)
         else
-          materialize_nested(record, relation_name, field, relation_projection)
+          materialize_nested(record[relation_name], field, relation_projection)
         end
       end
 
@@ -149,8 +149,7 @@ module ForestAdminDatasourceGraphqlHasura
       record[relation_name] = resolvable && !record[field.foreign_key].nil? ? PLACEHOLDER_REFERENCE : nil
     end
 
-    def materialize_nested(record, relation_name, field, relation_projection)
-      nested = record[relation_name]
+    def materialize_nested(nested, field, relation_projection)
       target = datasource.get_collection(field.foreign_collection)
 
       case nested

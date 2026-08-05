@@ -73,22 +73,7 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         add_polymorphics(table, fields)
-
-        table.relationships.each do |relationship|
-          name, schema = convert_relationship(table, relationship)
-          next if schema.nil?
-
-          if fields.key?(name)
-            ForestAdminDatasourceGraphqlHasura.logger.warn(
-              "[forest_admin_datasource_graphql_hasura] Relationship '#{name}' on '#{table.name}' " \
-              'shares its name with another field, which wins; rename one of them to surface both.'
-            )
-            next
-          end
-
-          fields[name] = schema
-        end
-
+        add_relationships(table, fields)
         add_reverse_polymorphics(table, fields)
 
         fields
@@ -171,6 +156,23 @@ module ForestAdminDatasourceGraphqlHasura
             [type_value.gsub('::', '__'), target[:primary_key]]
           end
         )
+      end
+
+      def add_relationships(table, fields)
+        table.relationships.each do |relationship|
+          name, schema = convert_relationship(table, relationship)
+          next if schema.nil?
+
+          if fields.key?(name)
+            ForestAdminDatasourceGraphqlHasura.logger.warn(
+              "[forest_admin_datasource_graphql_hasura] Relationship '#{name}' on '#{table.name}' " \
+              'shares its name with another field, which wins; rename one of them to surface both.'
+            )
+            next
+          end
+
+          fields[name] = schema
+        end
       end
 
       def convert_relationship(table, relationship)

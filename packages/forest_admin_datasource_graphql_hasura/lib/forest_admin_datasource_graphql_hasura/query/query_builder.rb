@@ -172,26 +172,27 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: { 'where' => where, 'limit' => limit } }
         end
 
+        # row_count tells a group with no rows at all (SQL grouping omits it)
+        # from one whose rows exist but hold NULL in the aggregated column
+        # (SQL keeps it, at zero for a count and at NULL otherwise).
         def aggregation_selection(aggregation)
-          operation = aggregation.operation
+          "#{operation_selection(aggregation)}#{avg_merge_selection(aggregation)}\nrow_count: count"
+        end
 
-          selection = if operation == 'Count'
-                        aggregation.field ? "count(columns: #{aggregation.field})" : 'count'
-                      else
-                        "#{operation.downcase} { #{aggregation.field} }"
-                      end
-
-          # An average cannot be merged across parent rows sharing a group
-          # value; its sum and non-null count can, weighting it exactly.
-          if operation == 'Avg'
-            selection += "\navg_sum: sum { #{aggregation.field} }" \
-                         "\navg_count: count(columns: #{aggregation.field})"
+        def operation_selection(aggregation)
+          if aggregation.operation == 'Count'
+            aggregation.field ? "count(columns: #{aggregation.field})" : 'count'
+          else
+            "#{aggregation.operation.downcase} { #{aggregation.field} }"
           end
+        end
 
-          # row_count tells a group with no rows at all (SQL grouping omits it)
-          # from one whose rows exist but hold NULL in the aggregated column
-          # (SQL keeps it, at zero for a count and at NULL otherwise).
-          "#{selection}\nrow_count: count"
+        # An average cannot be merged across parent rows sharing a group value;
+        # its sum and non-null count can, weighting it exactly.
+        def avg_merge_selection(aggregation)
+          return '' unless aggregation.operation == 'Avg'
+
+          "\navg_sum: sum { #{aggregation.field} }\navg_count: count(columns: #{aggregation.field})"
         end
 
         private
