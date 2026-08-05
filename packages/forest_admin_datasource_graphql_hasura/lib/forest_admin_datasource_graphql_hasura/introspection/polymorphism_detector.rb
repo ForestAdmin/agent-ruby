@@ -48,7 +48,9 @@ module ForestAdminDatasourceGraphqlHasura
 
         detected = names.filter_map do |name|
           base = name.delete_suffix('_type')
-          base if name.end_with?('_type') && names.include?("#{base}_id")
+          # A column literally named `_type` leaves an empty base, which would
+          # emit an unnamed association absorbing whatever joins through `_id`.
+          base if name.end_with?('_type') && !base.empty? && names.include?("#{base}_id")
         end
 
         (detected + configured.select { |base| discriminators?(table, names, base) }).uniq

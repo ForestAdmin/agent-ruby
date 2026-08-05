@@ -685,6 +685,35 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
     end
   end
 
+  describe 'a column literally named _type' do
+    it 'does not detect an unnamed polymorphic base and keeps the relationship' do
+      stub_schema(
+        [
+          {
+            'name' => 'events', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('_type', scalar('String')),
+              field('_id', scalar('bigint')),
+              field('owner', object('owners'))
+            ]
+          },
+          { 'name' => 'owners', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('events'), by_pk_query('events'), list_query('owners'), by_pk_query('owners')]
+      )
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'events' },
+           'object_relationships' => [manual_object_rel('owner', 'owners', { '_id' => 'id' })] }]
+      )
+
+      fields = build_datasource.get_collection('Event').schema[:fields]
+
+      expect(fields).not_to have_key('')
+      expect(fields['owner'].type).to eq('ManyToOne')
+    end
+  end
+
   describe 'a column named like the polymorphic association' do
     it 'keeps the physical column and skips the association' do
       stub_schema(

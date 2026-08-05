@@ -73,6 +73,24 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(records[1]['commentable']).to be_nil
     end
 
+    # A projection can reach a polymorphic relation through an ordinary one;
+    # the nested records need their placeholders too.
+    it 'materializes polymorphics on nested records' do
+      BankingSchema.stub_graphql_data(
+        {
+          'transfers' => [
+            { 'id' => 1,
+              'comments' => [{ 'id' => 2, 'commentable_type' => 'Transfer', 'commentable_id' => 1 }] }
+          ]
+        }
+      )
+
+      transfers = datasource.get_collection('Transfer')
+      records = transfers.list(caller, filter, projection('id', 'comments:id', 'comments:commentable:*'))
+
+      expect(records[0]['comments'][0]['commentable']).to eq({ '*' => nil })
+    end
+
     it 'resolves regular relations through Hasura nested selections' do
       BankingSchema.stub_graphql_data(
         { 'comments' => [{ 'id' => 1, 'membership' => { 'full_name' => 'Jane' } }] }

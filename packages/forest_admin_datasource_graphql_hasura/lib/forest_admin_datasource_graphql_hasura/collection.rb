@@ -103,6 +103,29 @@ module ForestAdminDatasourceGraphqlHasura
       selection.empty? ? Array(@table.primary_key.first || column_names.first) : selection
     end
 
+    # The serializer reads the reference off the discriminator columns, so the
+    # relation key only carries a placeholder — which has to be non-empty, since
+    # an empty hash drops the relation from the JSON:API payload. A type matching
+    # no exposed collection stays unresolved: the serializer looks the collection
+    # up by that raw value and would fail the whole page. Nested records walk
+    # down to their own collection, mirroring build_selection: a projection can
+    # reach a polymorphic relation through an ordinary one. Protected, like
+    # build_selection, so target collections can be delegated to.
+    def materialize_polymorphics(record, projection)
+      projection.relations.each do |relation_name, relation_projection|
+        field = schema[:fields][relation_name]
+        next if field.nil?
+
+        if field.type == 'PolymorphicManyToOne'
+          materialize_placeholder(record, relation_name, field)
+        else
+          materialize_nested(record, relation_name, field, relation_projection)
+        end
+      end
+
+      record
+    end
+
     private
 
     def column_names
@@ -115,24 +138,22 @@ module ForestAdminDatasourceGraphqlHasura
       data.select { |key, _| column_names.include?(key.to_s) }
     end
 
-    # The serializer reads the reference off the discriminator columns, so the
-    # relation key only carries a placeholder — which has to be non-empty, since
-    # an empty hash drops the relation from the JSON:API payload. A type matching
-    # no exposed collection stays unresolved: the serializer looks the collection
-    # up by that raw value and would fail the whole page.
-    def materialize_polymorphics(record, projection)
-      projection.relations.each_key do |relation_name|
-        field = schema[:fields][relation_name]
-        next unless field&.type == 'PolymorphicManyToOne'
+    def materialize_placeholder(record, relation_name, field)
+      type_value = record[field.foreign_key_type_field]
+      resolvable = type_value && field.foreign_key_targets.key?(type_value.to_s.gsub('::', '__'))
+      warn_unknown_type(relation_name, type_value) if type_value && !resolvable
 
-        type_value = record[field.foreign_key_type_field]
-        resolvable = type_value && field.foreign_key_targets.key?(type_value.to_s.gsub('::', '__'))
-        warn_unknown_type(relation_name, type_value) if type_value && !resolvable
+      record[relation_name] = resolvable && record[field.foreign_key] ? PLACEHOLDER_REFERENCE : nil
+    end
 
-        record[relation_name] = resolvable && record[field.foreign_key] ? PLACEHOLDER_REFERENCE : nil
+    def materialize_nested(record, relation_name, field, relation_projection)
+      nested = record[relation_name]
+      target = datasource.get_collection(field.foreign_collection)
+
+      case nested
+      when Hash then target.materialize_polymorphics(nested, relation_projection)
+      when Array then nested.each { |row| target.materialize_polymorphics(row, relation_projection) }
       end
-
-      record
     end
 
     def warn_unknown_type(relation_name, type_value)
