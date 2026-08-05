@@ -69,22 +69,49 @@ module ForestAdminDatasourceGraphqlHasura
 
       # @return [Array<Table>]
       def introspect
-        schema = @client.execute(INTROSPECTION_QUERY)
-        raise IntrospectionError, 'Introspection query returned no schema' unless schema&.key?('__schema')
-
+        types, query_fields = introspection_payload
         metadata = @client.fetch_metadata
 
-        @type_map = build_type_map(schema['__schema']['types'])
-        @relationship_mappings = metadata ? parse_relationship_mappings(metadata) : {}
-        @primary_keys = parse_primary_keys(schema['__schema']['queryType']['fields'])
+        @type_map = build_type_map(types)
+        @relationship_mappings = metadata ? safe_relationship_mappings(metadata) : {}
+        @primary_keys = parse_primary_keys(query_fields)
 
-        tables = parse_tables(schema['__schema']['queryType']['fields'])
+        tables = parse_tables(query_fields)
         PolymorphismDetector.new(@configuration).detect(tables)
 
         tables
       end
 
       private
+
+      # A gateway can answer 200 with `__schema: null` or partial objects when
+      # introspection is disabled: better a named error than a NoMethodError.
+      def introspection_payload
+        response = @client.execute(INTROSPECTION_QUERY)
+        schema = response.is_a?(Hash) ? response['__schema'] : nil
+        types = schema.is_a?(Hash) ? schema['types'] : nil
+        query_fields = schema.is_a?(Hash) ? schema.dig('queryType', 'fields') : nil
+
+        unless types.is_a?(Array) && query_fields.is_a?(Array)
+          raise IntrospectionError,
+                'The introspection response carries no usable schema: is GraphQL introspection ' \
+                'enabled on this endpoint?'
+        end
+
+        [types, query_fields]
+      end
+
+      # The metadata is optional by design; one malformed entry must degrade to
+      # the same fallback as an unreachable endpoint, not crash the boot.
+      def safe_relationship_mappings(metadata)
+        parse_relationship_mappings(metadata)
+      rescue StandardError => e
+        ForestAdminDatasourceGraphqlHasura.logger.warn(
+          '[forest_admin_datasource_graphql_hasura] Hasura metadata could not be parsed ' \
+          "(#{e.class}: #{e.message}); falling back to configuration and naming conventions."
+        )
+        {}
+      end
 
       def build_type_map(types)
         types.each_with_object({}) { |type, memo| memo[type['name']] = type if type['name'] }
@@ -98,8 +125,8 @@ module ForestAdminDatasourceGraphqlHasura
         mappings = {}
         ambiguous = Set.new
 
-        metadata['sources'].each do |source|
-          source['tables'].each do |table|
+        (metadata['sources'] || []).each do |source|
+          (source['tables'] || []).each do |table|
             collect_table_mappings(table, mappings, ambiguous)
           end
         end
@@ -117,9 +144,15 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def collect_table_mappings(table, mappings, ambiguous)
-        schema_name = table.dig('table', 'schema')
-        table_name = table.dig('table', 'name')
-        prefixed = schema_name.nil? || schema_name == 'public' ? nil : "#{schema_name}_#{table_name}"
+        table_info = table['table']
+        return unless table_info.is_a?(Hash)
+
+        schema_name = table_info['schema']
+        table_name = table_info['name']
+        # Hasura derives the root field from the table name, prefixed by the
+        # schema outside of `public`: a bare name can only be the public table,
+        # so a non-public one must not claim it.
+        exposed = schema_name.nil? || schema_name == 'public' ? table_name : "#{schema_name}_#{table_name}"
 
         relationships = (table['object_relationships'] || []).map { |rel| [rel, :object] } +
                         (table['array_relationships'] || []).map { |rel| [rel, :array] }
@@ -128,11 +161,9 @@ module ForestAdminDatasourceGraphqlHasura
           entry = relationship_mapping(rel, kind)
           next if entry.nil?
 
-          [table_name, prefixed].compact.each do |name|
-            key = "#{name}.#{rel["name"]}"
-            ambiguous << key if mappings.key?(key) && mappings[key] != entry
-            mappings[key] = entry
-          end
+          key = "#{exposed}.#{rel["name"]}"
+          ambiguous << key if mappings.key?(key) && mappings[key] != entry
+          mappings[key] = entry
         end
       end
 
@@ -141,6 +172,8 @@ module ForestAdminDatasourceGraphqlHasura
       # resolvable once the tables are parsed.
       def relationship_mapping(rel, kind)
         using = rel['using']
+        return nil unless using.is_a?(Hash)
+
         constraint = using['foreign_key_constraint_on']
         manual = using['manual_configuration']
 
@@ -185,8 +218,10 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def skip_table?(name)
-        # An explicitly allow-listed table wins over the built-in exclusions, so a
-        # legitimate table whose name starts like a system one stays reachable.
+        # An explicit exclusion always wins; then an explicit allow-list wins over
+        # the built-in exclusions, so a legitimate table whose name starts like a
+        # system one stays reachable.
+        return true if @configuration.excluded_tables.include?(name)
         return false if @configuration.included_tables&.include?(name)
 
         EXCLUDED_PREFIXES.any? { |prefix| name.start_with?(prefix) } ||

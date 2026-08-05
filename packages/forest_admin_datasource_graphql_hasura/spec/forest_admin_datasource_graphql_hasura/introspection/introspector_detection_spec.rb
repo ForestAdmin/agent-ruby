@@ -242,12 +242,19 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       expect(build_datasource.collections).to be_empty
     end
 
-    it 'ignores relationship metadata of a table name tracked in several schemas' do
+    # The bare GraphQL field `transfers` can only be `public.transfers`; the
+    # `banking.transfers` metadata belongs to the `banking_transfers` field and
+    # must not shadow or invalidate the public mapping.
+    it 'keeps the public mapping when another schema tracks the same table name' do
       stub_schema(
         [
           {
             'name' => 'transfers', 'kind' => 'OBJECT',
-            'fields' => [field('id', non_null(scalar('bigint'))), field('account', object('accounts'))]
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('account_id', non_null(scalar('bigint'))),
+              field('account', object('accounts'))
+            ]
           },
           { 'name' => 'accounts', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
         ],
@@ -262,8 +269,69 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
         ]
       )
 
-      # Falls back to the naming convention, which finds no `account_id` column.
-      expect(build_datasource.get_collection('Transfer').schema[:fields]).not_to have_key('account')
+      account = build_datasource.get_collection('Transfer').schema[:fields]['account']
+
+      expect(account.type).to eq('ManyToOne')
+      expect(account.foreign_key).to eq('account_id')
+    end
+
+    it 'survives malformed metadata entries by falling back to naming conventions' do
+      stub_schema(
+        [{ 'name' => 'transfers', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }],
+        [list_query('transfers'), by_pk_query('transfers')]
+      )
+      stub_metadata(
+        [
+          'legacy-string-table-form',
+          { 'table' => { 'schema' => 'public', 'name' => 'transfers' },
+            'object_relationships' => [{ 'name' => 'broken' }] }
+        ]
+      )
+
+      expect(build_datasource.collections.keys).to eq(['Transfer'])
+    end
+
+    it 'raises a named error when introspection returns no usable schema' do
+      WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+             .with { |request| request.body.include?('IntrospectSchema') }
+             .to_return(status: 200, body: JSON.generate({ 'data' => { '__schema' => nil } }),
+                        headers: { 'Content-Type' => 'application/json' })
+      stub_metadata([])
+
+      expect { build_datasource }
+        .to raise_error(ForestAdminDatasourceGraphqlHasura::IntrospectionError, /introspection enabled/)
+    end
+
+    it 'lets an explicit exclusion win over the allow-list' do
+      stub_schema(
+        [
+          { 'name' => 'transfers', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] },
+          { 'name' => 'cards', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('transfers'), by_pk_query('transfers'), list_query('cards'), by_pk_query('cards')]
+      )
+      stub_metadata([])
+
+      datasource = build_datasource(included_tables: %w[transfers cards], excluded_tables: ['cards'])
+
+      expect(datasource.collections.keys).to eq(['Transfer'])
+    end
+
+    it 'keeps one collection and warns when two tables classify to the same name' do
+      stub_schema(
+        [
+          { 'name' => 'user_status', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] },
+          { 'name' => 'user_statuses', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('user_status'), by_pk_query('user_status'),
+         list_query('user_statuses'), by_pk_query('user_statuses')]
+      )
+      stub_metadata([])
+
+      datasource = build_datasource
+
+      expect(datasource.collections.keys).to eq(['UserStatus'])
+      expect(datasource.get_collection('UserStatus').table_name).to eq('user_status')
     end
   end
 
@@ -329,6 +397,37 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
 
       expect(field.type).to eq('PolymorphicOneToMany')
       expect(field.origin_key_target).to eq('id')
+    end
+  end
+
+  describe 'configured polymorphism without the Hasura metadata' do
+    # With every mapping unknown, two relationships towards the same configured
+    # target are indistinguishable — one may be a plain belongs_to whose
+    # absorption would silently delete it.
+    it 'refuses to guess between two relationships towards the same target' do
+      stub_schema(
+        [
+          {
+            'name' => 'comments', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('commentable_type', non_null(scalar('String'))),
+              field('commentable_id', non_null(scalar('bigint'))),
+              field('transfer', object('transfers')),
+              field('reviewed_transfer', object('transfers'))
+            ]
+          },
+          { 'name' => 'transfers', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('comments'), by_pk_query('comments'), list_query('transfers'), by_pk_query('transfers')]
+      )
+      WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(status: 403, body: '{}')
+
+      datasource = build_datasource(
+        polymorphic_relations: { 'comments' => { 'commentable' => %w[transfers] } }
+      )
+
+      expect(datasource.get_collection('Comment').schema[:fields]).not_to have_key('commentable')
     end
   end
 

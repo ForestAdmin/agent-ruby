@@ -64,6 +64,36 @@ module ForestAdminDatasourceGraphqlHasura
 
         expect { client.execute('query { ok }') }.to raise_error(TransportError, /Could not reach/)
       end
+
+      it 'raises TransportError on a JSON body that is not an object' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_return(status: 200, body: '[]')
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError, /unexpected body/)
+      end
+
+      it 'raises TransportError on a 200 carrying neither data nor errors' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+               .to_return(status: 200, body: JSON.generate({ 'data' => nil }))
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError, /no data/)
+      end
+    end
+
+    describe 'configuration' do
+      it 'does not share default objects across instances' do
+        first = Configuration.new(uri: BankingSchema::GRAPHQL_URI)
+        second = Configuration.new(uri: BankingSchema::GRAPHQL_URI)
+        first.headers['Authorization'] = 'leak'
+
+        expect(second.headers).to eq({})
+      end
+
+      it 'rejects a misshapen polymorphic_relations declaration by name' do
+        expect do
+          Configuration.new(uri: BankingSchema::GRAPHQL_URI,
+                            polymorphic_relations: { 'comments' => ['commentable'] })
+        end.to raise_error(ConfigurationError, /polymorphic_relations/)
+      end
     end
 
     describe '#fetch_metadata' do

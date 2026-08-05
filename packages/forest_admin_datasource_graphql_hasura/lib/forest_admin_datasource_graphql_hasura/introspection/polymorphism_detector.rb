@@ -69,16 +69,33 @@ module ForestAdminDatasourceGraphqlHasura
 
         candidates = table.relationships.select { |rel| branch?(rel, foreign_key, configured_tables) }
 
-        candidates.each_with_object({}) do |rel, memo|
-          target_table = tables_by_name[rel.remote_table]
+        candidates.group_by(&:remote_table).each_with_object({}) do |(remote_table, relationships), memo|
+          target_table = tables_by_name[remote_table]
           next unless target_table
+          next if ambiguous_branch?(table, base, remote_table, relationships)
 
-          memo[class_name_of(rel.remote_table)] = {
-            table: rel.remote_table,
-            hasura_field: rel.name,
-            primary_key: rel.mapping&.values&.first || target_table.primary_key.first || 'id'
+          relationship = relationships.first
+          memo[class_name_of(remote_table)] = {
+            table: remote_table,
+            hasura_field: relationship.name,
+            primary_key: relationship.mapping&.values&.first || target_table.primary_key.first || 'id'
           }
         end
+      end
+
+      # Without the Hasura metadata every mapping is unknown, so two object
+      # relationships towards the same configured target are indistinguishable:
+      # one may be a plain belongs_to, and absorbing it would silently delete a
+      # legitimate relation. Refuse to guess.
+      def ambiguous_branch?(table, base, remote_table, relationships)
+        return false if relationships.size == 1
+
+        ForestAdminDatasourceGraphqlHasura.logger.warn(
+          "[forest_admin_datasource_graphql_hasura] '#{table.name}.#{base}' cannot absorb a branch " \
+          "towards '#{remote_table}': the relationships #{relationships.map(&:name).join(", ")} are " \
+          'equally plausible and one may be a plain belongs_to. That target is skipped.'
+        )
+        true
       end
 
       def branch?(relationship, foreign_key, configured_tables)

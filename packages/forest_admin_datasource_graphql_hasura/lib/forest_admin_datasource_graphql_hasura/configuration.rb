@@ -24,7 +24,12 @@ module ForestAdminDatasourceGraphqlHasura
       raise ConfigurationError, "Unknown option(s): #{unknown.join(", ")}" if unknown.any?
 
       @uri = uri
-      DEFAULTS.each { |option, default| instance_variable_set("@#{option}", options.fetch(option, default)) }
+      # `default.dup` keeps the DEFAULTS hashes and arrays from being shared —
+      # and mutated — across Configuration instances.
+      DEFAULTS.each do |option, default|
+        instance_variable_set("@#{option}", options.key?(option) ? options[option] : default.dup)
+      end
+      validate_polymorphic_relations
       # Only derivable from the conventional endpoint path: substituting on any
       # other uri would silently post metadata commands to the GraphQL endpoint.
       @metadata_uri ||= uri.include?('/v1/graphql') ? uri.sub('/v1/graphql', '/v1/metadata') : nil
@@ -35,6 +40,21 @@ module ForestAdminDatasourceGraphqlHasura
       return included_tables.include?(table_name) unless included_tables.nil?
 
       true
+    end
+
+    private
+
+    # A misshapen declaration would otherwise crash deep inside introspection as
+    # an opaque NoMethodError instead of naming the option.
+    def validate_polymorphic_relations
+      valid = polymorphic_relations.is_a?(Hash) && polymorphic_relations.all? do |_, bases|
+        bases.is_a?(Hash) && bases.all? { |_, targets| targets.is_a?(Array) }
+      end
+
+      return if valid
+
+      raise ConfigurationError,
+            "polymorphic_relations must be { 'table' => { 'association' => ['target', ...] } }"
     end
   end
 end

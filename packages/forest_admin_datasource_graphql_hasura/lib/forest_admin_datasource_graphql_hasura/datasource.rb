@@ -15,6 +15,7 @@ module ForestAdminDatasourceGraphqlHasura
 
     def register_collections
       tables = Introspection::Introspector.new(@client, @configuration).introspect
+      tables = deduplicate_collection_names(tables)
       converter = Introspection::SchemaConverter.new(tables, @configuration)
 
       tables.each do |table|
@@ -27,6 +28,26 @@ module ForestAdminDatasourceGraphqlHasura
         "[forest_admin_datasource_graphql_hasura] #{tables.size} collections registered " \
         "(#{tables.sum { |table| table.polymorphics.size }} polymorphic relations detected)."
       )
+    end
+
+    # `user_status` and `user_statuses` both classify to `UserStatus`, and the
+    # toolkit refuses a duplicate collection name with an error that names
+    # neither table: keep the first (alphabetically, for determinism) and say
+    # which tables collided and how to fix it.
+    def deduplicate_collection_names(tables)
+      converter = Introspection::SchemaConverter.new(tables, @configuration)
+
+      tables.group_by { |table| converter.collection_name_of(table.name) }.flat_map do |name, group|
+        next group.first if group.size == 1
+
+        kept, *dropped = group.sort_by(&:name)
+        ForestAdminDatasourceGraphqlHasura.logger.warn(
+          "[forest_admin_datasource_graphql_hasura] Tables #{group.map(&:name).sort.join(", ")} all map " \
+          "to the collection name '#{name}'; only '#{kept.name}' is exposed " \
+          "(#{dropped.map(&:name).join(", ")} skipped). Disambiguate with the 'type_values' option."
+        )
+        kept
+      end
     end
 
     # The capabilities route publishes is_groupable, and grouping goes through the

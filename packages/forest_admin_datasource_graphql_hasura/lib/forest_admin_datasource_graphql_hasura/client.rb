@@ -26,13 +26,19 @@ module ForestAdminDatasourceGraphqlHasura
       raise TransportError, "GraphQL endpoint returned HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
 
       payload = JSON.parse(response.body)
+      raise TransportError, 'GraphQL endpoint returned an unexpected body' unless payload.is_a?(Hash)
 
       if payload['errors']&.any?
         messages = payload['errors'].map { |e| e['message'] }.join('; ')
         raise GraphqlError, messages
       end
 
-      payload['data']
+      # A 200 with neither data nor errors is malformed, and letting a nil out
+      # would crash the caller with an opaque NoMethodError.
+      data = payload['data']
+      raise TransportError, 'GraphQL endpoint returned no data' if data.nil?
+
+      data
     rescue *TRANSPORT_ERRORS => e
       raise TransportError, "Could not reach the GraphQL endpoint (#{e.class}): #{e.message}"
     end
