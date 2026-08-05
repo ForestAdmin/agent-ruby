@@ -65,7 +65,6 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         add_reverse_polymorphics(table, fields)
-        mark_groupable_foreign_keys(fields)
 
         fields
       end
@@ -249,15 +248,6 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         name
-      end
-
-      def mark_groupable_foreign_keys(fields)
-        fields.each_value do |field|
-          next unless field.type == 'ManyToOne'
-
-          foreign_key_field = fields[field.foreign_key]
-          foreign_key_field.is_groupable = true if foreign_key_field.respond_to?(:is_groupable=)
-        end
       end
 
       def primary_key_of(table)

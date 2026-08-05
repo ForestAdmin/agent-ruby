@@ -407,12 +407,41 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
   end
 
   describe 'groupable foreign keys' do
-    it 'marks a ManyToOne foreign key as groupable' do
+    it 'marks a ManyToOne foreign key as groupable when its reverse relationship is declared' do
       datasource = BankingSchema.build_datasource
       fields = datasource.get_collection('Comment').schema[:fields]
 
       expect(fields['membership_id'].is_groupable).to be(true)
       expect(fields['body'].is_groupable).to be(false)
+    end
+
+    # Grouping goes through the parent's nested `<relation>_aggregate`, which only
+    # exists when Hasura declares the reverse array relationship: advertising the
+    # foreign key would offer a group-by that the aggregator then rejects.
+    it 'does not mark a foreign key groupable when no reverse relationship is declared' do
+      stub_schema(
+        [
+          {
+            'name' => 'payments', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('account_id', non_null(scalar('bigint'))),
+              field('account', object('accounts'))
+            ]
+          },
+          { 'name' => 'accounts', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('payments'), by_pk_query('payments'), list_query('accounts'), by_pk_query('accounts')]
+      )
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'payments' },
+           'object_relationships' => [fk_object_rel('account', 'account_id')] }]
+      )
+
+      fields = build_datasource.get_collection('Payment').schema[:fields]
+
+      expect(fields['account'].type).to eq('ManyToOne')
+      expect(fields['account_id'].is_groupable).to be(false)
     end
   end
 end

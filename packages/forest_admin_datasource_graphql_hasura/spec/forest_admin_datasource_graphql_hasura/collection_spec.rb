@@ -29,13 +29,17 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
     toolkit_query::ConditionTree::Operators
   end
 
-  def last_graphql_request
-    request = nil
+  def graphql_requests
+    requests = []
     expect(WebMock).to(have_requested(:post, BankingSchema::GRAPHQL_URI).at_least_once.with do |req|
-      request = JSON.parse(req.body) unless req.body.include?('IntrospectSchema')
+      requests << JSON.parse(req.body) unless req.body.include?('IntrospectSchema')
       true
     end)
-    request
+    requests
+  end
+
+  def last_graphql_request
+    graphql_requests.last
   end
 
   describe '#list' do
@@ -281,6 +285,70 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       result = comments.aggregate(caller, filter, aggregation)
 
       expect(result).to eq([{ 'value' => 3, 'group' => { 'membership_id' => 1 } }])
+    end
+
+    it 'filters and orders the parent rows through the relationship predicate' do
+      BankingSchema.stub_graphql_data({ 'memberships' => [] })
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+      condition_tree = leaf('created_at', operators::GREATER_THAN, '2026-01-01')
+      comments.aggregate(caller, filter(condition_tree: condition_tree), aggregation)
+
+      parents_request = graphql_requests.find { |request| request['query'].include?('memberships(') }
+      expect(parents_request['query']).to include('where: { comments: $where }')
+      expect(parents_request['query']).to include('order_by: [{ id: asc }]')
+      expect(parents_request['variables']['where']).to eq({ 'created_at' => { '_gt' => '2026-01-01' } })
+    end
+
+    it 'paginates the parent rows instead of stopping at the first page' do
+      full_page = {
+        'memberships' => (1..1000).map do |id|
+          { 'id' => id, 'comments_aggregate' => { 'aggregate' => { 'count' => 1 } } }
+        end
+      }
+      last_page = { 'memberships' => [{ 'id' => 2000, 'comments_aggregate' => { 'aggregate' => { 'count' => 5 } } }] }
+      no_orphans = { 'comments_aggregate' => { 'aggregate' => { 'count' => 0 } } }
+      BankingSchema.stub_graphql_data(full_page, last_page, no_orphans)
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.size).to eq(1001)
+      expect(result.first).to eq({ 'value' => 5, 'group' => { 'membership_id' => 2000 } })
+      offsets = graphql_requests.filter_map { |request| request.dig('variables', 'parentOffset') }
+      expect(offsets).to eq([0, 1000])
+    end
+
+    it 'fails clearly instead of charting a subset when the parent rows exceed the cap' do
+      full_page = {
+        'memberships' => (1..1000).map do |id|
+          { 'id' => id, 'comments_aggregate' => { 'aggregate' => { 'count' => 1 } } }
+        end
+      }
+      BankingSchema.stub_graphql_data(*Array.new(10, full_page))
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /more than 10000/)
+    end
+
+    # SQL grouping would put comments whose membership_id is NULL in their own
+    # bucket; the parent-table detour cannot see them.
+    it 'adds a bucket for the rows whose foreign key is null' do
+      BankingSchema.stub_graphql_data(
+        { 'memberships' => [{ 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } }] },
+        { 'comments_aggregate' => { 'aggregate' => { 'count' => 2 } } }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([
+                             { 'value' => 3, 'group' => { 'membership_id' => 1 } },
+                             { 'value' => 2, 'group' => { 'membership_id' => nil } }
+                           ])
+      expect(last_graphql_request['variables']['where']).to eq({ 'membership_id' => { '_is_null' => true } })
     end
 
     it 'rejects grouping on the polymorphic foreign key with a clear error' do

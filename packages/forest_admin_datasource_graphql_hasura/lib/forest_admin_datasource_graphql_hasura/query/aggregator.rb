@@ -10,9 +10,11 @@ module ForestAdminDatasourceGraphqlHasura
     class Aggregator
       ForestException = ForestAdminDatasourceToolkit::Exceptions::ForestException
 
-      # Parent rows are read in one page because they are reduced in Ruby; beyond
-      # that the chart would be truncated anyway.
-      PARENT_LIMIT = 1000
+      # Parent rows are reduced in Ruby, so they are paginated by PARENT_PAGE and
+      # capped at MAX_PARENT_ROWS: past the cap the chart fails with a clear error
+      # rather than silently charting a subset.
+      PARENT_PAGE = 1000
+      MAX_PARENT_ROWS = 10_000
 
       def initialize(collection)
         @collection = collection
@@ -95,28 +97,63 @@ module ForestAdminDatasourceGraphqlHasura
       def grouped(filter, aggregation, limit)
         group_field = aggregation.groups.first[:field]
         relation = find_group_relation(group_field)
-        operation = QueryBuilder.grouped_aggregate(table_name, relation, filter, aggregation, PARENT_LIMIT)
+        values = collect_groups(fetch_parent_rows(relation, filter, aggregation), relation, aggregation)
+        add_null_group(values, relation, filter, aggregation)
 
-        rows = @collection.execute(:aggregate, operation)[relation[:parent_table]] || []
-        warn_truncated(relation[:parent_table]) if rows.size >= PARENT_LIMIT
-
-        results = collect_groups(rows, relation, aggregation, group_field)
+        results = values
+                  .map { |key, value| { 'value' => value, 'group' => { group_field => key } } }
+                  .sort_by { |row| comparable(row['value']) }
+                  .reverse
         limit ? results.first(limit) : results
       end
 
-      def collect_groups(rows, relation, aggregation, group_field)
-        values = rows.each_with_object({}) do |row, memo|
+      def fetch_parent_rows(relation, filter, aggregation)
+        rows = []
+        offset = 0
+
+        loop do
+          operation = QueryBuilder.grouped_aggregate(table_name, relation, filter, aggregation,
+                                                     { limit: PARENT_PAGE, offset: offset })
+          page = @collection.execute(:aggregate, operation)[relation[:parent_table]] || []
+          rows.concat(page)
+
+          return rows if page.size < PARENT_PAGE
+
+          if rows.size >= MAX_PARENT_ROWS
+            raise ForestException,
+                  "Grouped aggregation on '#{name}' spans more than #{MAX_PARENT_ROWS} " \
+                  "'#{relation[:parent_table]}' rows; narrow the chart filter."
+          end
+
+          offset += PARENT_PAGE
+        end
+      end
+
+      def collect_groups(rows, relation, aggregation)
+        rows.each_with_object({}) do |row, memo|
           value = extract_value(row.dig("#{relation[:relation_name]}_aggregate", 'aggregate'), aggregation)
           next if childless_parent?(value, aggregation)
 
           key = row[relation[:parent_field]]
           memo[key] = memo.key?(key) ? merge_values(memo[key], value, aggregation) : value
         end
+      end
 
-        values
-          .map { |key, value| { 'value' => value, 'group' => { group_field => key } } }
-          .sort_by { |row| comparable(row['value']) }
-          .reverse
+      # SQL grouping puts rows whose foreign key is NULL in a bucket of their own;
+      # the parent-table detour cannot see them, so they are aggregated apart. The
+      # nil key can pre-exist (a parent whose grouped column is null): both are the
+      # NULL group of a LEFT JOIN, so they merge.
+      def add_null_group(values, relation, filter, aggregation)
+        foreign_key = fields[relation[:foreign_key]]
+        return if foreign_key.nil? || foreign_key.validation.any? # non-nullable: no orphan rows
+
+        operation = QueryBuilder.aggregate(table_name, filter, aggregation,
+                                           extra_where: { relation[:foreign_key] => { '_is_null' => true } })
+        data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
+        value = extract_value(data, aggregation)
+        return if childless_parent?(value, aggregation)
+
+        values[nil] = values.key?(nil) ? merge_values(values[nil], value, aggregation) : value
       end
 
       # Two parent rows can share a group value — grouping by a name rather than by
@@ -175,8 +212,17 @@ module ForestAdminDatasourceGraphqlHasura
         {
           parent_table: parent.table_name,
           parent_field: parent_column || relation.foreign_key_target,
-          relation_name: reverse
+          relation_name: reverse,
+          foreign_key: foreign_key,
+          parent_order_fields: primary_keys_of(parent)
         }
+      end
+
+      # Offset pagination needs a stable order, which only the primary key gives.
+      def primary_keys_of(collection)
+        collection.schema[:fields]
+                  .select { |_, field| field.respond_to?(:is_primary_key) && field.is_primary_key }
+                  .keys
       end
 
       def resolve_group_relation(field_name)
@@ -198,13 +244,6 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         nil
-      end
-
-      def warn_truncated(parent_table)
-        ForestAdminDatasourceGraphqlHasura.logger.warn(
-          "[forest_admin_datasource_graphql_hasura] Grouped aggregation on '#{name}' stopped after " \
-          "#{PARENT_LIMIT} '#{parent_table}' rows; the result may be incomplete."
-        )
       end
 
       # Aggregate values are not necessarily numbers: Hasura sends bigint and

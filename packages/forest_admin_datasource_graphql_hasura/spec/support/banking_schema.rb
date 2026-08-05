@@ -195,11 +195,18 @@ module BankingSchema
     end
   end
 
-  def stub_graphql_data(data)
+  # Each argument is one response; WebMock repeats the last one when more
+  # requests come in (a grouped aggregation issues parent pages, then the
+  # null-bucket aggregate).
+  def stub_graphql_data(*data)
+    responses = data.map do |body|
+      { status: 200, body: JSON.generate({ 'data' => body }),
+        headers: { 'Content-Type' => 'application/json' } }
+    end
+
     WebMock::API.stub_request(:post, GRAPHQL_URI)
                 .with { |request| !request.body.include?('IntrospectSchema') }
-                .to_return(status: 200, body: JSON.generate({ 'data' => data }),
-                           headers: { 'Content-Type' => 'application/json' })
+                .to_return(*responses)
   end
 
   def build_datasource(**options)

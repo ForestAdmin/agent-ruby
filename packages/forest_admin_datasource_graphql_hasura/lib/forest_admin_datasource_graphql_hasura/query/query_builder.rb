@@ -77,12 +77,14 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: { 'where' => FilterConverter.convert(filter.condition_tree) || {} } }
         end
 
-        def aggregate(table, filter, aggregation)
+        # extra_where is a raw bool_exp and-combined with the converted filter
+        # (the null-bucket query adds `{ fk => { _is_null => true } }`).
+        def aggregate(table, filter, aggregation, extra_where: nil)
           args = []
           var_defs = []
           variables = {}
 
-          where = FilterConverter.convert(filter.condition_tree)
+          where = combine(FilterConverter.convert(filter.condition_tree), extra_where)
 
           if where
             var_defs << "$where: #{table}_bool_exp"
@@ -103,23 +105,29 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: variables }
         end
 
-        # relation is { parent_table:, parent_field:, relation_name: }.
-        def grouped_aggregate(child_table, relation, filter, aggregation, parent_limit)
+        # relation is { parent_table:, parent_field:, relation_name:, parent_order_fields: },
+        # page is { limit:, offset: }. Parents are ordered by their primary key so
+        # offset pagination is stable, and filtered by the chart's predicate through
+        # the relationship, so the pages only walk parents owning at least one
+        # matching child row.
+        def grouped_aggregate(child_table, relation, filter, aggregation, page)
           args = []
-          var_defs = ['$parentLimit: Int']
-          variables = { 'parentLimit' => parent_limit }
+          var_defs = ['$parentLimit: Int', '$parentOffset: Int']
+          variables = { 'parentLimit' => page[:limit], 'parentOffset' => page[:offset] }
+          parent_args = ['limit: $parentLimit', 'offset: $parentOffset', parent_order(relation)]
 
           where = FilterConverter.convert(filter.condition_tree)
 
           if where
             var_defs << "$where: #{child_table}_bool_exp"
             args << 'where: $where'
+            parent_args << "where: { #{relation[:relation_name]}: $where }"
             variables['where'] = where
           end
 
           query = <<~GRAPHQL
             query Aggregate#{camelize(relation[:parent_table])}#{wrap(var_defs)} {
-              #{relation[:parent_table]}(limit: $parentLimit) {
+              #{relation[:parent_table]}#{wrap(parent_args)} {
                 #{relation[:parent_field]}
                 #{relation[:relation_name]}_aggregate#{wrap(args)} {
                   aggregate {
@@ -183,6 +191,16 @@ module ForestAdminDatasourceGraphqlHasura
         # caller already restricted the keys to real columns.
         def stringify_keys(record)
           record.to_h { |key, value| [key.to_s, value] }
+        end
+
+        def parent_order(relation)
+          "order_by: [#{relation[:parent_order_fields].map { |field| "{ #{field}: asc }" }.join(", ")}]"
+        end
+
+        def combine(where, extra)
+          return where if extra.nil?
+
+          where ? { '_and' => [where, extra] } : extra
         end
 
         def wrap(parts)
