@@ -56,6 +56,13 @@ module ForestAdminDatasourceGraphqlHasura
       Query::Aggregator.new(self).run(filter, aggregation, limit)
     end
 
+    # Whether a relationship rests on a real foreign key constraint — only the
+    # Hasura metadata knows, and only introspection saw it. False when manual
+    # or when the metadata was unreachable (constraint unproven).
+    def constraint_backed?(relation_name)
+      @table.relationships.any? { |rel| rel.name == relation_name && rel.manual == false }
+    end
+
     # Wraps every Hasura call so the failing operation is named in the error,
     # keeping the class (GraphqlError or TransportError) and thus the status.
     def execute(operation_name, operation)

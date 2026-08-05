@@ -42,6 +42,13 @@ module ForestAdminDatasourceGraphqlHasura
       # request's `aggregateFieldName` straight through).
       def validate(aggregation)
         validate_field(aggregation.field) if aggregation.field
+
+        # Without a field, `sum { }` would be an empty GraphQL selection set.
+        if aggregation.field.nil? && aggregation.operation != 'Count'
+          raise ForestException,
+                "#{aggregation.operation} requires a field on collection '#{name}'."
+        end
+
         groups = aggregation.groups || []
 
         if groups.size > 1
@@ -117,15 +124,16 @@ module ForestAdminDatasourceGraphqlHasura
           page = @collection.execute(:aggregate, operation)[relation[:parent_table]] || []
           rows.concat(page)
 
-          # A partial page means the walk is complete, however close to the cap:
-          # the strict comparison lets exactly MAX_PARENT_ROWS rows through.
-          return rows if page.size < PARENT_PAGE
-
+          # The strict comparison lets exactly MAX_PARENT_ROWS through (a final
+          # empty page then closes the walk); anything beyond fails, even on a
+          # partial page, so the cap the README documents is the cap enforced.
           if rows.size > MAX_PARENT_ROWS
             raise ForestException,
                   "Grouped aggregation on '#{name}' spans more than #{MAX_PARENT_ROWS} " \
                   "'#{relation[:parent_table]}' rows; narrow the chart filter."
           end
+
+          return rows if page.size < PARENT_PAGE
 
           offset += PARENT_PAGE
         end
@@ -133,9 +141,10 @@ module ForestAdminDatasourceGraphqlHasura
 
       def collect_groups(rows, relation, aggregation)
         rows.each_with_object({}) do |row, memo|
-          value = extract_value(row.dig("#{relation[:relation_name]}_aggregate", 'aggregate'), aggregation)
-          next if childless_parent?(value, aggregation)
+          data = row.dig("#{relation[:relation_name]}_aggregate", 'aggregate')
+          next if childless?(data, aggregation)
 
+          value = extract_value(data, aggregation)
           key = row[relation[:parent_field]]
           memo[key] = memo.key?(key) ? merge_values(memo[key], value, aggregation) : value
         end
@@ -150,19 +159,25 @@ module ForestAdminDatasourceGraphqlHasura
       # The nil key can pre-exist (a parent whose grouped column is null): both
       # are the NULL group of a LEFT JOIN, so they merge.
       def add_null_group(values, relation, filter, aggregation)
+        return unless relation[:orphans_possible]
+
         operation = QueryBuilder.aggregate(table_name, filter, aggregation,
                                            extra_where: { '_not' => { relation[:child_relation_name] => {} } })
         data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
-        value = extract_value(data, aggregation)
-        return if childless_parent?(value, aggregation)
+        return if childless?(data, aggregation)
 
+        value = extract_value(data, aggregation)
         values[nil] = values.key?(nil) ? merge_values(values[nil], value, aggregation) : value
       end
 
       # Two parent rows can share a group value — grouping by a name rather than by
       # the primary key, as leaderboard charts do — and SQL would return them as a
-      # single group.
+      # single group. A NULL side is ignored, as SQL aggregates ignore NULLs, and
+      # two NULL sides stay NULL.
       def merge_values(current, value, aggregation)
+        return current if value.nil?
+        return value if current.nil?
+
         case aggregation.operation
         when 'Count', 'Sum' then add(current, value)
         when 'Max' then (comparable(value) <=> comparable(current)).positive? ? value : current
@@ -191,9 +206,16 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      # A parent with no child row is what SQL grouping would leave out. A zero
-      # `count(columns: field)` is different: rows exist, they just all hold null.
-      def childless_parent?(value, aggregation)
+      # A group with no rows at all is what SQL grouping leaves out. The
+      # `row_count` alias tells it from a group whose rows exist but hold NULL in
+      # the aggregated column — SQL keeps that one: a zero `count(columns: x)`,
+      # a NULL Sum/Max/Min. The value-based fallback covers a response missing
+      # the alias.
+      def childless?(data, aggregation)
+        return true if data.nil?
+        return data['row_count'].to_i.zero? if data.key?('row_count')
+
+        value = extract_value(data, aggregation)
         value.nil? || (aggregation.operation == 'Count' && aggregation.field.nil? && value.to_i.zero?)
       end
 
@@ -217,8 +239,20 @@ module ForestAdminDatasourceGraphqlHasura
           parent_field: parent_column || relation.foreign_key_target,
           relation_name: reverse,
           child_relation_name: relation_name,
-          parent_order_fields: primary_keys_of(parent)
+          parent_order_fields: primary_keys_of(parent),
+          orphans_possible: orphans_possible?(relation_name, relation)
         }
+      end
+
+      # A NOT NULL foreign key backed by a real constraint cannot reference a
+      # missing parent, so the orphan query would be a wasted round trip. A
+      # manual relationship (or one whose backing is unknown) can dangle even
+      # on a NOT NULL column.
+      def orphans_possible?(relation_name, relation)
+        foreign_key = fields[relation.foreign_key]
+        nullable = foreign_key.nil? || foreign_key.validation.empty?
+
+        nullable || !@collection.constraint_backed?(relation_name)
       end
 
       # Offset pagination needs a stable order, which only the primary key gives.
@@ -264,17 +298,17 @@ module ForestAdminDatasourceGraphqlHasura
         case value
         when Numeric then [0, value, '']
         when String then comparable_string(value)
-        else [2, 0.0, '']
+        # NULL groups (rows whose aggregated column is all NULL) sort last.
+        else [-1, 0.0, '']
         end
       end
 
+      # Strings reaching here belong to non-numeric columns — numeric ones were
+      # normalized at extraction. Dates order as instants, text lexically, like
+      # SQL would (a digit-only text value must not compare numerically).
       def comparable_string(value)
-        return [0, value.to_i, ''] if value.match?(/\A-?\d+\z/)
-
-        number = Float(value, exception: false)
-        return [0, number, ''] if number
-
         instant = time_value(value)
+
         instant ? [0, instant, ''] : [1, 0.0, value]
       end
 
@@ -284,14 +318,23 @@ module ForestAdminDatasourceGraphqlHasura
         nil
       end
 
+      # Hasura serializes bigint and numeric aggregates as JSON strings; a chart
+      # value must be a number, and one merged in Ruby must not differ in type
+      # from one straight off the wire, so numeric columns are normalized here.
       def extract_value(data, aggregation)
         return nil if data.nil?
 
-        if aggregation.operation == 'Count'
-          data['count']
-        else
-          data.dig(aggregation.operation.downcase, aggregation.field)
-        end
+        value = if aggregation.operation == 'Count'
+                  data['count']
+                else
+                  data.dig(aggregation.operation.downcase, aggregation.field)
+                end
+
+        value.is_a?(String) && number_field?(aggregation) ? numeric(value) : value
+      end
+
+      def number_field?(aggregation)
+        aggregation.field && fields[aggregation.field]&.column_type == 'Number'
       end
     end
   end

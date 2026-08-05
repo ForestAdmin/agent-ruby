@@ -48,6 +48,15 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         def update(table, filter, patch)
+          where = FilterConverter.convert(filter.condition_tree)
+
+          # Backstop behind the collection guard: `{}` is vacuously true for
+          # Hasura, so a filterless update would rewrite the whole table.
+          if where.nil?
+            raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                  "Refusing to update every row of '#{table}': the filter carries no condition."
+          end
+
           query = <<~GRAPHQL
             mutation Update#{camelize(table)}($where: #{table}_bool_exp!, $set: #{table}_set_input!) {
               update_#{table}(where: $where, _set: $set) {
@@ -56,13 +65,7 @@ module ForestAdminDatasourceGraphqlHasura
             }
           GRAPHQL
 
-          {
-            query: query,
-            variables: {
-              'where' => FilterConverter.convert(filter.condition_tree) || {},
-              'set' => stringify_keys(patch)
-            }
-          }
+          { query: query, variables: { 'where' => where, 'set' => stringify_keys(patch) } }
         end
 
         def delete(table, filter)
@@ -74,6 +77,8 @@ module ForestAdminDatasourceGraphqlHasura
             }
           GRAPHQL
 
+          # `{}` (match all) is deliberate here: a bulk delete with "select all"
+          # legitimately carries no condition, and wiping is the requested semantic.
           { query: query, variables: { 'where' => FilterConverter.convert(filter.condition_tree) || {} } }
         end
 
@@ -144,11 +149,16 @@ module ForestAdminDatasourceGraphqlHasura
         def aggregation_selection(aggregation)
           operation = aggregation.operation
 
-          if operation == 'Count'
-            aggregation.field ? "count(columns: #{aggregation.field})" : 'count'
-          else
-            "#{operation.downcase} { #{aggregation.field} }"
-          end
+          selection = if operation == 'Count'
+                        aggregation.field ? "count(columns: #{aggregation.field})" : 'count'
+                      else
+                        "#{operation.downcase} { #{aggregation.field} }"
+                      end
+
+          # row_count tells a group with no rows at all (SQL grouping omits it)
+          # from one whose rows exist but hold NULL in the aggregated column
+          # (SQL keeps it, at zero for a count and at NULL otherwise).
+          "#{selection}\nrow_count: count"
         end
 
         private

@@ -258,7 +258,8 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
                                                    groups: [{ field: 'membership:full_name' }])
       result = comments.aggregate(caller, filter, aggregation)
 
-      expect(result.first['value']).to eq('9007199254740993')
+      # Normalized to a number: a chart value should not be a string.
+      expect(result.first['value']).to eq(9_007_199_254_740_993)
     end
 
     it 'merges a Max over text lexically instead of keeping the first row' do
@@ -290,6 +291,68 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       result = comments.aggregate(caller, filter, aggregation)
 
       expect(result).to eq([{ 'value' => 0, 'group' => { 'membership_id' => 1 } }])
+    end
+
+    # SQL keeps a group whose rows exist with the column all NULL (count 0, Sum
+    # NULL), and omits a group with no rows: `row_count` tells them apart.
+    it 'drops a parent without rows but keeps one whose aggregated column is all null' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 0, 'row_count' => 0 } } },
+            { 'id' => 2, 'comments_aggregate' => { 'aggregate' => { 'count' => 0, 'row_count' => 3 } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', field: 'body',
+                                                   groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([{ 'value' => 0, 'group' => { 'membership_id' => 2 } }])
+    end
+
+    it 'keeps a null Sum group when its rows exist, sorted last' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'id' => 1,
+              'comments_aggregate' => { 'aggregate' => { 'sum' => { 'id' => nil }, 'row_count' => 2 } } },
+            { 'id' => 2,
+              'comments_aggregate' => { 'aggregate' => { 'sum' => { 'id' => '7' }, 'row_count' => 1 } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Sum', field: 'id',
+                                                   groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([
+                             { 'value' => 7, 'group' => { 'membership_id' => 2 } },
+                             { 'value' => nil, 'group' => { 'membership_id' => 1 } }
+                           ])
+    end
+
+    # SQL Max ignores NULLs: a parent row whose values are all NULL must not win
+    # the merge against a real value.
+    it 'ignores null values when merging parents that share a group value' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => nil }, 'row_count' => 2 } } },
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => 'pear' }, 'row_count' => 1 } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Max', field: 'body',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq('pear')
     end
 
     it 'runs simple counts against <table>_aggregate' do
@@ -397,6 +460,31 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
                              { 'value' => 2, 'group' => { 'membership_id' => nil } }
                            ])
       expect(last_graphql_request['variables']['where']).to eq({ '_not' => { 'membership' => {} } })
+    end
+
+    # `sum { }` would be an empty GraphQL selection set.
+    it 'rejects a Sum without a field with a clear error' do
+      aggregation = toolkit_query::Aggregation.new(operation: 'Sum')
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /requires a field/)
+    end
+
+    it 'enforces the cap even when the overflowing page is partial' do
+      full_page = {
+        'memberships' => (1..1000).map do |id|
+          { 'id' => id, 'comments_aggregate' => { 'aggregate' => { 'count' => 1 } } }
+        end
+      }
+      partial_page = {
+        'memberships' => [{ 'id' => 10_500, 'comments_aggregate' => { 'aggregate' => { 'count' => 1 } } }]
+      }
+      BankingSchema.stub_graphql_data(*Array.new(10, full_page), partial_page)
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /more than 10000/)
     end
 
     it 'rejects grouping on the polymorphic foreign key with a clear error' do
