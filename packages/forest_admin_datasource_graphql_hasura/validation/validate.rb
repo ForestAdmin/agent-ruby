@@ -195,7 +195,17 @@ scenario 'count grouped by foreign key (chart use case)' do
   aggregation = Query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
   result = comments.aggregate(nil, filter, aggregation)
   grouped = result.to_h { |row| [row['group']['membership_id'], row['value']] }
-  assert_equal({ 1 => 8, 2 => 2 }, grouped, 'counts per membership')
+  # The orphan comment (membership_id NULL) gets the bucket SQL grouping would give it.
+  assert_equal({ 1 => 8, 2 => 2, nil => 1 }, grouped, 'counts per membership, orphans in their own bucket')
+end
+
+scenario 'the NULL bucket respects the chart filter' do
+  aggregation = Query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+  condition = leaf('commentable_type', Operators::EQUAL, 'Card')
+  result = comments.aggregate(nil, filter(condition_tree: condition), aggregation)
+  grouped = result.to_h { |row| [row['group']['membership_id'], row['value']] }
+
+  assert_equal({ 1 => 1, nil => 1 }, grouped, 'card comments per membership, filtered orphan included')
 end
 
 puts "\n== Config modes =="
@@ -290,7 +300,8 @@ scenario 'leaderboard grouping through a relation path works' do
   result = comments.aggregate(nil, filter, aggregation)
   grouped = result.to_h { |row| [row['group']['membership:full_name'], row['value']] }
 
-  assert_equal({ 'Jane Doe' => 8, 'John Smith' => 2 }, grouped, 'counts per membership name')
+  # A LEFT JOIN groups the orphan comment under a NULL name.
+  assert_equal({ 'Jane Doe' => 8, 'John Smith' => 2, nil => 1 }, grouped, 'counts per membership name')
 end
 
 scenario 'Sum grouped by FK handles bigint values returned as JSON strings' do
@@ -384,7 +395,7 @@ rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
   assert e.message.include?('Refusing'), "unexpected message: #{e.message}"
 end
 
-scenario 'a transport failure surfaces as a Forest validation error, not an opaque crash' do
+scenario 'a transport failure surfaces as a 503 with an actionable message, not a client mistake' do
   unreachable = ForestAdminDatasourceGraphqlHasura::Client.new(
     ForestAdminDatasourceGraphqlHasura::Configuration.new(uri: 'http://127.0.0.1:1/v1/graphql', timeout: 2)
   )
@@ -392,8 +403,9 @@ scenario 'a transport failure surfaces as a Forest validation error, not an opaq
   begin
     unreachable.execute('query { __typename }')
     raise 'expected a transport failure'
-  rescue ForestAdminDatasourceGraphqlHasura::GraphqlError => e
+  rescue ForestAdminDatasourceGraphqlHasura::TransportError => e
     assert e.is_a?(ForestAdminDatasourceToolkit::Exceptions::ForestException), 'must be a ForestException'
+    assert_equal 503, e.status, 'transport failures carry a 503, not a 400'
     assert e.message.include?('Could not reach'), "unexpected message: #{e.message}"
   end
 end

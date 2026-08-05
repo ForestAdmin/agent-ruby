@@ -88,7 +88,9 @@ INSERT INTO comments (body, metadata, commentable_type, commentable_id, membersh
   (NULL, NULL, 'Transfer', 2, 1),
   -- Literal wildcards: a "contains 100%" search must not match these both.
   ('discount 100% applied', NULL, 'Transfer', 2, 1),
-  ('discount 1000 applied', NULL, 'Transfer', 2, 1);
+  ('discount 1000 applied', NULL, 'Transfer', 2, 1),
+  -- NULL foreign key: grouped charts must give it the bucket SQL grouping would.
+  ('orphan comment', NULL, 'Card', 1, NULL);
 
 INSERT INTO attachments (file_name, attachable_type, attachable_id, author_type, author_id) VALUES
   ('invoice.pdf', 'Transfer', 1, 'Membership', 1),
