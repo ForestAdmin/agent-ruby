@@ -60,7 +60,9 @@ module ForestAdminDatasourceGraphqlHasura
       TEXT_TYPES = %w[String ID text varchar char bpchar citext bytea].to_set.freeze
 
       EXCLUDED_PREFIXES = %w[__ hdb_ pg_ information_schema].freeze
-      EXCLUDED_SUFFIXES = %w[_aggregate _by_pk _stream _connection].freeze
+      # Camel variants cover the graphql-default naming convention; a genuine
+      # Postgres table name is lowercase and cannot end with them.
+      EXCLUDED_SUFFIXES = %w[_aggregate _by_pk _stream _connection Aggregate ByPk Stream Connection].freeze
 
       def initialize(client, configuration)
         @client = client
@@ -76,10 +78,7 @@ module ForestAdminDatasourceGraphqlHasura
         @relationship_mappings = metadata ? safe_relationship_mappings(metadata) : {}
         @primary_keys = parse_primary_keys(query_fields)
 
-        tables = parse_tables(query_fields)
-        PolymorphismDetector.new(@configuration).detect(tables)
-
-        tables
+        parse_tables(query_fields)
       end
 
       private
@@ -156,10 +155,28 @@ module ForestAdminDatasourceGraphqlHasura
           entry = relationship_mapping(rel, kind)
           next if entry.nil?
 
-          key = "#{exposed}.#{rel["name"]}"
-          ambiguous << key if mappings.key?(key) && mappings[key] != entry
-          mappings[key] = entry
+          # The graphql-default naming convention camelizes root fields,
+          # relationship fields and columns, while the metadata keeps the
+          # Postgres spellings; registering both makes the lookup match — and
+          # carry column names in — whichever spelling introspection exposes.
+          # When both spellings coincide the snake entry stands: a wrong-case
+          # mapping degrades to a skipped relationship, never a wrong one.
+          snake_key = "#{exposed}.#{rel["name"]}"
+          camel_key = "#{exposed.camelize(:lower)}.#{rel["name"].camelize(:lower)}"
+          register_mapping(mappings, ambiguous, snake_key, entry)
+          register_mapping(mappings, ambiguous, camel_key, camelized_entry(entry)) unless camel_key == snake_key
         end
+      end
+
+      def register_mapping(mappings, ambiguous, key, entry)
+        ambiguous << key if mappings.key?(key) && mappings[key] != entry
+        mappings[key] = entry
+      end
+
+      def camelized_entry(entry)
+        mapping = entry[:mapping]&.to_h { |local, remote| [local&.camelize(:lower), remote&.camelize(:lower)] }
+
+        { mapping: mapping, manual: entry[:manual] }
       end
 
       # The mapping key has to be the root field the introspection query will
@@ -168,9 +185,10 @@ module ForestAdminDatasourceGraphqlHasura
       # unless the metadata customizes it (`custom_root_fields.select` wins
       # over `custom_name`, which replaces the derived name).
       def exposed_root_field(table, table_info)
-        custom = table.dig('configuration', 'custom_root_fields', 'select') ||
-                 table.dig('configuration', 'custom_name')
-        return custom if custom
+        custom = table.dig('configuration', 'custom_root_fields', 'select')
+        custom = custom['name'] if custom.is_a?(Hash)
+        custom ||= table.dig('configuration', 'custom_name')
+        return custom if custom.is_a?(String)
 
         schema_name = table_info['schema']
         table_name = table_info['name']
@@ -202,7 +220,7 @@ module ForestAdminDatasourceGraphqlHasura
       # name from the `_by_pk` spelling would miss a customized select field.
       def parse_primary_keys(query_fields)
         query_fields.each_with_object({}) do |field, memo|
-          next unless field['name'].end_with?('_by_pk')
+          next unless field['name'].end_with?('_by_pk', 'ByPk')
 
           type_name = base_type_name(field['type'])
           pk_fields = (field['args'] || []).map { |arg| arg['name'] }
@@ -214,6 +232,9 @@ module ForestAdminDatasourceGraphqlHasura
         query_fields.filter_map do |field|
           table_name = field['name']
           next if skip_table?(table_name)
+          # Only the select root returns a list; a custom-named select_by_pk
+          # root returns the bare object and is not a table.
+          next unless array_type?(field['type'])
 
           type = @type_map[base_type_name(field['type'])]
           next unless type && type['kind'] == 'OBJECT'
@@ -339,7 +360,10 @@ module ForestAdminDatasourceGraphqlHasura
         {
           'Int' => 'Number', 'Float' => 'Number', 'numeric' => 'Number', 'bigint' => 'Number',
           'smallint' => 'Number', 'integer' => 'Number', 'real' => 'Number',
-          'double_precision' => 'Number', 'money' => 'Number',
+          'double_precision' => 'Number',
+          # Text, not Number: Hasura serializes money in its Postgres text form
+          # ("$1,100.00"), which no numeric aggregation can consume.
+          'money' => 'String',
           # Internal Postgres names, which is how Hasura names array element types
           'int2' => 'Number', 'int4' => 'Number', 'int8' => 'Number',
           'float4' => 'Number', 'float8' => 'Number', 'bool' => 'Boolean',

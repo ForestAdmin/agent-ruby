@@ -16,6 +16,9 @@ module ForestAdminDatasourceGraphqlHasura
     def register_collections
       tables = Introspection::Introspector.new(@client, @configuration).introspect
       tables = deduplicate_collection_names(tables)
+      # Detection runs on the surviving tables only, so a polymorphic target
+      # can never carry the primary key of a table dedup dropped.
+      Introspection::PolymorphismDetector.new(@configuration).detect(tables)
       converter = Introspection::SchemaConverter.new(tables, @configuration)
 
       tables.each do |table|

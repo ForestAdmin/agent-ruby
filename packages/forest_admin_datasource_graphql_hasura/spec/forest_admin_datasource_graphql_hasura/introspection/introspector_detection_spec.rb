@@ -422,10 +422,7 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
   end
 
   describe 'customized root fields' do
-    # The root select field is renamed to `people`, but relationships and the
-    # `_by_pk` query keep referencing the `person_table` GraphQL type: metadata
-    # and primary keys must follow what the schema actually exposes.
-    it 'applies the metadata and detects the primary key through the GraphQL type' do
+    def stub_people_schema(select_config: 'people')
       stub_schema(
         [
           {
@@ -446,12 +443,19 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       stub_metadata(
         [
           { 'table' => { 'schema' => 'public', 'name' => 'person_table' },
-            'configuration' => { 'custom_root_fields' => { 'select' => 'people' } },
+            'configuration' => { 'custom_root_fields' => { 'select' => select_config } },
             'object_relationships' => [
               manual_object_rel('best_friend', 'person_table', { 'best_friend_ref' => 'id' })
             ] }
         ]
       )
+    end
+
+    # The root select field is renamed to `people`, but relationships and the
+    # `_by_pk` query keep referencing the `person_table` GraphQL type: metadata
+    # and primary keys must follow what the schema actually exposes.
+    it 'applies the metadata and detects the primary key through the GraphQL type' do
+      stub_people_schema
 
       # The Rails class name follows the underlying type (person_table), not
       # the renamed root field (people).
@@ -461,6 +465,192 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       expect(fields['best_friend'].type).to eq('ManyToOne')
       expect(fields['best_friend'].foreign_key).to eq('best_friend_ref')
       expect(fields['best_friend'].foreign_collection).to eq('PersonTable')
+    end
+
+    it 'accepts the object form of custom_root_fields.select' do
+      stub_people_schema(select_config: { 'name' => 'people', 'comment' => 'renamed' })
+
+      field = build_datasource.get_collection('PersonTable').schema[:fields]['best_friend']
+
+      expect(field.foreign_key).to eq('best_friend_ref')
+    end
+
+    # Only the select root field is renamed: every other generated name —
+    # `<base>_bool_exp`, `insert_<base>`, `<base>_aggregate` — still derives
+    # from the type.
+    it 'derives type names and mutation roots from the type, the list root from the field' do
+      stub_people_schema
+      collection = build_datasource.get_collection('PersonTable')
+
+      BankingSchema.stub_graphql_data(
+        { 'people' => [] },
+        { 'insert_person_table' => { 'returning' => [{ 'id' => 1 }] } }
+      )
+
+      toolkit = ForestAdminDatasourceToolkit::Components::Query
+      condition = toolkit::ConditionTree::Nodes::ConditionTreeLeaf.new('id', 'equal', 1)
+      collection.list(nil, toolkit::Filter.new(condition_tree: condition), toolkit::Projection.new(['id']))
+      record = collection.create(nil, { 'best_friend_ref' => 1 })
+
+      expect(record).to eq({ 'id' => 1 })
+      queries = []
+      expect(WebMock).to(have_requested(:post, BankingSchema::GRAPHQL_URI).at_least_once.with do |req|
+        queries << JSON.parse(req.body)['query'] unless req.body.include?('IntrospectSchema')
+        true
+      end)
+      expect(queries[0]).to include('$where: person_table_bool_exp')
+      expect(queries[0]).to include('people(where: $where)')
+      expect(queries[1]).to include('insert_person_table(objects: $objects)')
+    end
+
+    # A custom-named select_by_pk root returns the bare object: it is a lookup,
+    # not a second table, and must not shadow the real collection.
+    it 'does not mistake a custom-named by_pk root field for a table' do
+      stub_schema(
+        [
+          { 'name' => 'users', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [
+          list_query('users'), by_pk_query('users'),
+          { 'name' => 'user', 'type' => object('users'),
+            'args' => [{ 'name' => 'id', 'type' => non_null(scalar('bigint')) }] }
+        ]
+      )
+      stub_metadata([])
+
+      datasource = build_datasource
+
+      expect(datasource.collections.keys).to eq(['User'])
+      expect(datasource.get_collection('User').table_name).to eq('users')
+    end
+
+    # Crossed renames: table A's type name equals table B's root field name.
+    # Each collection must still classify from its own underlying type.
+    it 'does not let one table type shadow another table root field' do
+      stub_schema(
+        [
+          { 'name' => 'accounts', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] },
+          { 'name' => 'team_accounts', 'kind' => 'OBJECT',
+            'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [
+          field('accounts_list', non_null(list_of(non_null(object('accounts'))))),
+          by_pk_query('accounts'),
+          field('accounts', non_null(list_of(non_null(object('team_accounts'))))),
+          by_pk_query('team_accounts')
+        ]
+      )
+      stub_metadata(
+        [
+          { 'table' => { 'schema' => 'public', 'name' => 'accounts' },
+            'configuration' => { 'custom_root_fields' => { 'select' => 'accounts_list' } } },
+          { 'table' => { 'schema' => 'public', 'name' => 'team_accounts' },
+            'configuration' => { 'custom_root_fields' => { 'select' => 'accounts' } } }
+        ]
+      )
+
+      datasource = build_datasource
+
+      expect(datasource.collections.keys.sort).to eq(%w[Account TeamAccount])
+      expect(datasource.get_collection('TeamAccount').table_name).to eq('accounts')
+      expect(datasource.get_collection('Account').table_name).to eq('accounts_list')
+    end
+
+    # The graphql-default naming convention camelizes root and relationship
+    # fields; the metadata keying must match either spelling, and ByPk-suffixed
+    # roots still drive primary key detection.
+    it 'matches camelized root and relationship fields' do
+      stub_schema(
+        [
+          {
+            'name' => 'userAddresses', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('ownerRef', scalar('bigint')),
+              field('bestFriend', object('userAddresses'))
+            ]
+          }
+        ],
+        [
+          field('userAddresses', non_null(list_of(non_null(object('userAddresses'))))),
+          { 'name' => 'userAddressesByPk', 'type' => object('userAddresses'),
+            'args' => [{ 'name' => 'id', 'type' => non_null(scalar('bigint')) }] }
+        ]
+      )
+      stub_metadata(
+        [
+          { 'table' => { 'schema' => 'public', 'name' => 'user_addresses' },
+            'configuration' => { 'custom_root_fields' => { 'select' => 'userAddresses' } },
+            'object_relationships' => [
+              manual_object_rel('best_friend', 'user_addresses', { 'owner_ref' => 'id' })
+            ] }
+        ]
+      )
+
+      fields = build_datasource.get_collection('UserAddress').schema[:fields]
+
+      expect(fields['id'].is_primary_key).to be(true)
+      expect(fields['bestFriend'].type).to eq('ManyToOne')
+      # The mapping columns are translated along with the key.
+      expect(fields['bestFriend'].foreign_key).to eq('ownerRef')
+    end
+  end
+
+  describe 'a polymorphic association inside a composite primary key' do
+    # Rails taggings: (tag_id, taggable_id, taggable_type) composite key with a
+    # polymorphic taggable. Locking the discriminators read-only would make the
+    # table impossible to create through.
+    it 'keeps the discriminator key members writable' do
+      stub_schema(
+        [
+          {
+            'name' => 'taggings', 'kind' => 'OBJECT',
+            'fields' => [
+              field('tag_id', non_null(scalar('bigint'))),
+              field('taggable_type', non_null(scalar('String'))),
+              field('taggable_id', non_null(scalar('bigint'))),
+              field('transfer', object('transfers'))
+            ]
+          },
+          { 'name' => 'transfers', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('taggings'), by_pk_query('taggings', %w[tag_id taggable_id taggable_type]),
+         list_query('transfers'), by_pk_query('transfers')]
+      )
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'taggings' },
+           'object_relationships' => [manual_object_rel('transfer', 'transfers', { 'taggable_id' => 'id' })] }]
+      )
+
+      fields = build_datasource.get_collection('Tagging').schema[:fields]
+
+      expect(fields['taggable'].type).to eq('PolymorphicManyToOne')
+      expect(fields['taggable_id'].is_read_only).to be(false)
+      expect(fields['taggable_type'].is_read_only).to be(false)
+    end
+
+    it 'locks non-key discriminators and clears their validation' do
+      fields = BankingSchema.build_datasource.get_collection('Comment').schema[:fields]
+
+      expect(fields['commentable_id'].is_read_only).to be(true)
+      # A read-only field must not demand a value the user cannot type in.
+      expect(fields['commentable_id'].validation).to eq([])
+      expect(fields['commentable_type'].validation).to eq([])
+    end
+  end
+
+  describe 'money columns' do
+    # Hasura serializes money in its Postgres text form ("$1,100.00"): as a
+    # Number it would aggregate to silently wrong charts.
+    it 'surfaces money as text' do
+      stub_schema(
+        [{ 'name' => 'invoices', 'kind' => 'OBJECT',
+           'fields' => [field('id', non_null(scalar('bigint'))), field('total', scalar('money'))] }],
+        [list_query('invoices'), by_pk_query('invoices')]
+      )
+      stub_metadata([])
+
+      expect(build_datasource.get_collection('Invoice').schema[:fields]['total'].column_type).to eq('String')
     end
   end
 

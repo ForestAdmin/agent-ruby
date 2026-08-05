@@ -97,7 +97,13 @@ type_values: { 'bank_accounts' => 'Banking::Account' }
   `jsonb`), never related records.
 - A `*_type` value matching no exposed collection (a legacy STI subclass name, an excluded
   target) leaves the reference empty and logs a warning, rather than failing the page.
-- `bytea` columns are surfaced as text (Hasura returns them hex-encoded).
+- `bytea` and `money` columns are surfaced as text (Hasura returns them hex-encoded and in
+  Postgres money form respectively).
+- Customized root fields (`custom_root_fields`, `custom_name`) and the `graphql-default`
+  naming convention are followed for introspection, metadata matching and query generation.
+  One gap: Rails polymorphism *detection* relies on snake_case `<base>_type`/`<base>_id`
+  column pairs, so camelized columns need the `polymorphic_relations` option. Renamed
+  aggregate or mutation root fields (`select_aggregate`, `insert`, …) are not supported.
 - Errors Hasura returns (a permission rule, an invalid value) surface as HTTP 400 with the
   original message; an unreachable endpoint (timeout, DNS, TLS, non-2xx response) surfaces
   as HTTP 503, so infrastructure incidents stay visible to monitoring.

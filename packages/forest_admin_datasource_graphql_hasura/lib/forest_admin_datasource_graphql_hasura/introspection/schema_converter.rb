@@ -39,18 +39,20 @@ module ForestAdminDatasourceGraphqlHasura
 
       def initialize(tables, configuration)
         @tables = tables
-        # Relationships reference the GraphQL type name, which only differs from
-        # the root field name when the Hasura metadata customizes root fields.
-        @tables_by_name = tables.to_h { |table| [table.name, table] }
-                                .merge(tables.to_h { |table| [table.type_name, table] })
+        # Two indexes rather than one merged map: a table's type_name may equal
+        # another table's root field name (crossed custom_root_fields renames),
+        # and each lookup knows which spelling it holds.
+        @tables_by_root = tables.to_h { |table| [table.name, table] }
+        @tables_by_type = tables.to_h { |table| [table.type_name, table] }
         @configuration = configuration
       end
 
       # Rails stores the class name derived from the Postgres table, which the
       # GraphQL type name follows — not the root field, which custom_root_fields
-      # can rename freely. type_values accepts either name.
+      # can rename freely. Callers pass root field names, so only the root index
+      # is consulted; type_values accepts either name.
       def rails_class_name_of(table_name)
-        table = @tables_by_name[table_name]
+        table = @tables_by_root[table_name]
 
         @configuration.type_values[table_name] ||
           (table && @configuration.type_values[table.type_name]) ||
@@ -74,7 +76,17 @@ module ForestAdminDatasourceGraphqlHasura
 
         table.relationships.each do |relationship|
           name, schema = convert_relationship(table, relationship)
-          fields[name] = schema if schema && !fields.key?(name)
+          next if schema.nil?
+
+          if fields.key?(name)
+            ForestAdminDatasourceGraphqlHasura.logger.warn(
+              "[forest_admin_datasource_graphql_hasura] Relationship '#{name}' on '#{table.name}' " \
+              'shares its name with another field, which wins; rename one of them to surface both.'
+            )
+            next
+          end
+
+          fields[name] = schema
         end
 
         add_reverse_polymorphics(table, fields)
@@ -83,6 +95,12 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       private
+
+      # A relationship references the GraphQL type; the root-field spelling is
+      # accepted as a fallback, and on a collision the type interpretation wins.
+      def resolve_table(reference)
+        @tables_by_type[reference] || @tables_by_root[reference]
+      end
 
       # A single-column key is database-generated in the schemas Hasura fronts
       # (serial, uuid default), and the writes persist explicit nils — which
@@ -121,8 +139,26 @@ module ForestAdminDatasourceGraphqlHasura
           end
 
           fields[polymorphic.name] = convert_polymorphic(polymorphic)
-          fields[polymorphic.foreign_key]&.is_read_only = true
-          fields[polymorphic.type_field]&.is_read_only = true
+          lock_discriminators(table, polymorphic, fields)
+        end
+      end
+
+      # The widget drives the discriminator columns, so they are read-only and
+      # cannot carry a Present validation the user could never satisfy. The
+      # exception is a discriminator belonging to a composite primary key (a
+      # Rails taggings table): locking it would make the row impossible to
+      # create, which the composite-key carve-out of convert_column exists to
+      # prevent.
+      def lock_discriminators(table, polymorphic, fields)
+        composite = table.primary_key.size > 1
+
+        [polymorphic.foreign_key, polymorphic.type_field].each do |column|
+          field = fields[column]
+          next if field.nil?
+          next if composite && table.primary_key.include?(column)
+
+          field.is_read_only = true
+          field.validation = []
         end
       end
 
@@ -146,7 +182,7 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def convert_object_relationship(table, relationship)
-        remote = @tables_by_name[relationship.remote_table]
+        remote = resolve_table(relationship.remote_table)
 
         # A relation towards a table the datasource does not expose (excluded, or
         # dropped for want of a primary key) breaks schema generation at boot.
@@ -174,7 +210,7 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def convert_array_relationship(table, relationship)
-        remote = @tables_by_name[relationship.remote_table]
+        remote = resolve_table(relationship.remote_table)
         return [relationship.name, nil] unless remote
         return [relationship.name, nil] if covered_by_reverse_polymorphic?(table, relationship, remote)
         return [relationship.name, nil] unless single_column_mapping?(table, relationship)
@@ -255,7 +291,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def reverse_polymorphic_name(table, child, polymorphic, fields)
         array_relationship = table.relationships.find do |rel|
-          rel.kind == :array && @tables_by_name[rel.remote_table] == child && reverse_of?(rel, table, polymorphic)
+          rel.kind == :array && resolve_table(rel.remote_table) == child && reverse_of?(rel, table, polymorphic)
         end
 
         candidates = [array_relationship&.name, child.name, "#{child.name}_#{polymorphic.name}"].compact.uniq

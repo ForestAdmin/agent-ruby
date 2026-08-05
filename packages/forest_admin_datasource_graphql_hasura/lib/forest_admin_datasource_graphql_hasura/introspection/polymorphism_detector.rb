@@ -14,8 +14,9 @@ module ForestAdminDatasourceGraphqlHasura
       # Fills `polymorphics` on each table and removes the per-target object
       # relationships it absorbs.
       def detect(tables)
-        # Relationships reference the GraphQL type name, which only differs from
-        # the root field name when the Hasura metadata customizes root fields.
+        # Relationships reference the GraphQL type name; the merge order makes
+        # the type interpretation win when it collides with another table's
+        # root field name (crossed custom_root_fields renames).
         tables_by_name = tables.to_h { |table| [table.name, table] }
                                .merge(tables.to_h { |table| [table.type_name, table] })
 
@@ -43,7 +44,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def bases_of(table)
         names = table.columns.map(&:name)
-        configured = @configuration.polymorphic_relations[table.name]&.keys || []
+        configured = configured_relations(table).keys
 
         detected = names.filter_map do |name|
           base = name.delete_suffix('_type')
@@ -67,7 +68,7 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def targets_of(table, base, tables_by_name)
-        configured_tables = @configuration.polymorphic_relations.dig(table.name, base)
+        configured_tables = configured_relations(table)[base]
         foreign_key = "#{base}_id"
 
         candidates = table.relationships.select do |rel|
@@ -123,6 +124,14 @@ module ForestAdminDatasourceGraphqlHasura
         # definition: accepting one here would absorb a legitimate belongs_to
         # whenever an unrelated `<base>_type` enum sits next to `<base>_id`.
         relationship.manual
+      end
+
+      # Like type_values, the configuration accepts the root field name or the
+      # underlying type name.
+      def configured_relations(table)
+        @configuration.polymorphic_relations[table.name] ||
+          @configuration.polymorphic_relations[table.type_name] ||
+          {}
       end
 
       def class_name_of(table)
