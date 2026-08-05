@@ -359,6 +359,7 @@ Metrics/ClassLength:
     - 'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/introspection/introspector.rb'
     - 'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/introspection/schema_converter.rb'
     - 'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/query/query_builder.rb'
+    - 'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/query/aggregator.rb'
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/collections/base_collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'

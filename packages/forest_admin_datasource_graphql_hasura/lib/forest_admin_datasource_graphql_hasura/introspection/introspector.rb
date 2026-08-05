@@ -79,7 +79,7 @@ module ForestAdminDatasourceGraphqlHasura
         @primary_keys = parse_primary_keys(schema['__schema']['queryType']['fields'])
 
         tables = parse_tables(schema['__schema']['queryType']['fields'])
-        detect_polymorphism(tables)
+        PolymorphismDetector.new(@configuration).detect(tables)
 
         tables
       end
@@ -259,72 +259,6 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         []
-      end
-
-      # Fills `polymorphics` and removes the per-target object relationships it
-      # absorbs.
-      def detect_polymorphism(tables)
-        tables_by_name = tables.to_h { |table| [table.name, table] }
-
-        tables.each do |table|
-          polymorphic_bases(table).each do |base|
-            targets = polymorphic_targets(table, base, tables_by_name)
-            next if targets.empty?
-
-            table.polymorphics << Polymorphic.new(
-              name: base,
-              foreign_key: "#{base}_id",
-              type_field: "#{base}_type",
-              targets: targets
-            )
-
-            consumed = targets.values.filter_map { |target| target[:hasura_field] }
-            table.relationships.reject! { |rel| consumed.include?(rel.name) }
-          end
-        end
-      end
-
-      def polymorphic_bases(table)
-        names = table.columns.map(&:name)
-        configured = @configuration.polymorphic_relations[table.name]&.keys || []
-
-        detected = names.filter_map do |name|
-          base = name.delete_suffix('_type')
-          base if name.end_with?('_type') && names.include?("#{base}_id")
-        end
-
-        (detected + configured).uniq
-      end
-
-      def polymorphic_targets(table, base, tables_by_name)
-        configured_tables = @configuration.polymorphic_relations.dig(table.name, base)
-        foreign_key = "#{base}_id"
-
-        candidates = table.relationships.select do |rel|
-          polymorphic_branch?(rel, foreign_key, configured_tables)
-        end
-
-        candidates.each_with_object({}) do |rel, memo|
-          target_table = tables_by_name[rel.remote_table]
-          next unless target_table
-
-          type_value = @configuration.type_values[rel.remote_table] || rel.remote_table.classify
-          memo[type_value] = {
-            table: rel.remote_table,
-            hasura_field: rel.name,
-            primary_key: rel.mapping&.values&.first || target_table.primary_key.first || 'id'
-          }
-        end
-      end
-
-      def polymorphic_branch?(relationship, foreign_key, configured_tables)
-        return false unless relationship.kind == :object
-        return configured_tables.include?(relationship.remote_table) if configured_tables
-
-        # A relationship backed by a real foreign key constraint is monomorphic by
-        # definition: accepting one here would absorb a legitimate belongs_to
-        # whenever an unrelated `<base>_type` enum sits next to `<base>_id`.
-        relationship.manual && relationship.mapping&.keys == [foreign_key]
       end
 
       def scalar?(type_name)
