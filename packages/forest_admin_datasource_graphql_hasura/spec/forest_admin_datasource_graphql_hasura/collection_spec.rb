@@ -101,6 +101,15 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       )
     end
 
+    # `comments { }` is not valid GraphQL.
+    it 'falls back to the primary key when the projection selects nothing' do
+      BankingSchema.stub_graphql_data({ 'comments' => [] })
+
+      comments.list(caller, filter, projection)
+
+      expect(last_graphql_request['query']).to match(/comments\s*\{\s*id\s*\}/)
+    end
+
     it 'applies sort and pagination' do
       BankingSchema.stub_graphql_data({ 'comments' => [] })
 
@@ -231,6 +240,27 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(result.first['value']).to eq(9_007_199_254_740_995)
     end
 
+    # Two bigints that round to the same Float must not tie: the comparison has
+    # to stay exact, or Max keeps whichever row came first.
+    it 'merges a Max over bigints without float rounding ties' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'id' => '9007199254740992' } } } },
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'id' => '9007199254740993' } } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Max', field: 'id',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq('9007199254740993')
+    end
+
     it 'merges a Max over text lexically instead of keeping the first row' do
       BankingSchema.stub_graphql_data(
         {
@@ -317,6 +347,23 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(result.first).to eq({ 'value' => 5, 'group' => { 'membership_id' => 2000 } })
       offsets = graphql_requests.filter_map { |request| request.dig('variables', 'parentOffset') }
       expect(offsets).to eq([0, 1000])
+    end
+
+    it 'completes an aggregation spanning exactly the parent cap' do
+      full_page = {
+        'memberships' => (1..1000).map do |id|
+          { 'id' => id, 'comments_aggregate' => { 'aggregate' => { 'count' => 1 } } }
+        end
+      }
+      empty_page = { 'memberships' => [] }
+      BankingSchema.stub_graphql_data(*Array.new(10, full_page), empty_page)
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      # The ten identical pages merge into one group per id, each summing to 10.
+      expect(result.size).to eq(1000)
+      expect(result.first['value']).to eq(10)
     end
 
     it 'fails clearly instead of charting a subset when the parent rows exceed the cap' do

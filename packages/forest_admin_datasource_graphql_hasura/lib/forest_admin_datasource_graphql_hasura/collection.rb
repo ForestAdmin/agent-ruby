@@ -87,7 +87,10 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      selection.uniq
+      selection = selection.uniq
+      # An empty projection is a valid toolkit input, but `table { }` is not
+      # valid GraphQL: fall back to the primary key.
+      selection.empty? ? Array(@table.primary_key.first || column_names.first) : selection
     end
 
     private

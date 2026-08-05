@@ -117,9 +117,11 @@ module ForestAdminDatasourceGraphqlHasura
           page = @collection.execute(:aggregate, operation)[relation[:parent_table]] || []
           rows.concat(page)
 
+          # A partial page means the walk is complete, however close to the cap:
+          # the strict comparison lets exactly MAX_PARENT_ROWS rows through.
           return rows if page.size < PARENT_PAGE
 
-          if rows.size >= MAX_PARENT_ROWS
+          if rows.size > MAX_PARENT_ROWS
             raise ForestException,
                   "Grouped aggregation on '#{name}' spans more than #{MAX_PARENT_ROWS} " \
                   "'#{relation[:parent_table]}' rows; narrow the chart filter."
@@ -249,16 +251,20 @@ module ForestAdminDatasourceGraphqlHasura
       # Aggregate values are not necessarily numbers: Hasura sends bigint and
       # numeric as strings, and Max/Min aggregate dates as well as text. The tuple
       # orders numbers and instants together, then text lexically, and stays
-      # comparable across rows so `sort_by` and Max/Min agree.
+      # comparable across rows so `sort_by` and Max/Min agree. Whole numbers are
+      # kept as Integers — Ruby compares them with Floats exactly — because a
+      # bigint rounded through a Float would tie with its neighbours.
       def comparable(value)
         case value
-        when Numeric then [0, value.to_f, '']
+        when Numeric then [0, value, '']
         when String then comparable_string(value)
         else [2, 0.0, '']
         end
       end
 
       def comparable_string(value)
+        return [0, value.to_i, ''] if value.match?(/\A-?\d+\z/)
+
         number = Float(value, exception: false)
         return [0, number, ''] if number
 
