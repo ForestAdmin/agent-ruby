@@ -73,6 +73,18 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(records[1]['commentable']).to be_nil
     end
 
+    # false is a legitimate key value on a boolean primary key; only nil means
+    # "no reference".
+    it 'materializes a phantom for a false foreign key value' do
+      BankingSchema.stub_graphql_data(
+        { 'comments' => [{ 'id' => 1, 'commentable_type' => 'Transfer', 'commentable_id' => false }] }
+      )
+
+      records = comments.list(caller, filter, projection('id', 'commentable:*'))
+
+      expect(records[0]['commentable']).to eq({ '*' => nil })
+    end
+
     # A projection can reach a polymorphic relation through an ordinary one;
     # the nested records need their placeholders too.
     it 'materializes polymorphics on nested records' do
@@ -420,6 +432,31 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
                              { 'value' => 7, 'group' => { 'membership_id' => 2 } },
                              { 'value' => nil, 'group' => { 'membership_id' => 1 } }
                            ])
+    end
+
+    # SQL AVG over the union weights by row count: merging (10, 10) with (40)
+    # gives 20, not the average of averages (25).
+    it 'merges an Avg over shared groups as a weighted average' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => {
+                'avg' => { 'id' => 10.0 }, 'avg_sum' => { 'id' => '20' }, 'avg_count' => 2, 'row_count' => 2
+              } } },
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => {
+                'avg' => { 'id' => 40.0 }, 'avg_sum' => { 'id' => '40' }, 'avg_count' => 1, 'row_count' => 1
+              } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Avg', field: 'id',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([{ 'value' => 20.0, 'group' => { 'membership:full_name' => 'Jane' } }])
     end
 
     # SQL Max ignores NULLs: a parent row whose values are all NULL must not win

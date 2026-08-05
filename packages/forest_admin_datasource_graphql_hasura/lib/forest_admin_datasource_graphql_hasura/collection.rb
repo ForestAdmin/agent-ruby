@@ -144,7 +144,9 @@ module ForestAdminDatasourceGraphqlHasura
       resolvable = type_value && field.foreign_key_targets.key?(type_value.to_s.gsub('::', '__'))
       warn_unknown_type(relation_name, type_value) if type_value && !resolvable
 
-      record[relation_name] = resolvable && record[field.foreign_key] ? PLACEHOLDER_REFERENCE : nil
+      # An explicit nil check: false is a legitimate key value on a boolean
+      # primary key, absent is not.
+      record[relation_name] = resolvable && !record[field.foreign_key].nil? ? PLACEHOLDER_REFERENCE : nil
     end
 
     def materialize_nested(record, relation_name, field, relation_projection)

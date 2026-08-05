@@ -181,6 +181,13 @@ module ForestAdminDatasourceGraphqlHasura
                         "#{operation.downcase} { #{aggregation.field} }"
                       end
 
+          # An average cannot be merged across parent rows sharing a group
+          # value; its sum and non-null count can, weighting it exactly.
+          if operation == 'Avg'
+            selection += "\navg_sum: sum { #{aggregation.field} }" \
+                         "\navg_count: count(columns: #{aggregation.field})"
+          end
+
           # row_count tells a group with no rows at all (SQL grouping omits it)
           # from one whose rows exist but hold NULL in the aggregated column
           # (SQL keeps it, at zero for a count and at NULL otherwise).

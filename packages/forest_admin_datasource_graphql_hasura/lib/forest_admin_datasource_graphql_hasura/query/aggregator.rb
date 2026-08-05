@@ -122,10 +122,11 @@ module ForestAdminDatasourceGraphqlHasura
         values = collect_groups(fetch_parent_rows(relation, filter, aggregation), relation, aggregation)
         add_orphan_groups(values, relation, filter, aggregation)
 
-        results = values
-                  .map { |key, value| { 'value' => value, 'group' => { group_field => key } } }
-                  .sort_by { |row| comparable(row['value']) }
-                  .reverse
+        rows = values.map do |key, value|
+          { 'value' => finalize_value(value, aggregation), 'group' => { group_field => key } }
+        end
+        results = rows.sort_by { |row| comparable(row['value']) }.reverse
+
         limit ? results.first(limit) : results
       end
 
@@ -159,7 +160,7 @@ module ForestAdminDatasourceGraphqlHasura
           data = row.dig("#{relation[:relation_name]}_aggregate", 'aggregate')
           next if childless?(data, aggregation)
 
-          value = extract_value(data, aggregation)
+          value = group_value(data, aggregation)
           key = row[relation[:parent_field]]
           memo[key] = memo.key?(key) ? merge_values(memo[key], value, aggregation) : value
         end
@@ -193,8 +194,25 @@ module ForestAdminDatasourceGraphqlHasura
         data = @collection.execute(:aggregate, operation).dig(names[:aggregate], 'aggregate')
         return if childless?(data, aggregation)
 
-        value = extract_value(data, aggregation)
+        value = group_value(data, aggregation)
         values[key] = values.key?(key) ? merge_values(values[key], value, aggregation) : value
+      end
+
+      # An average is carried as its sum and non-null count while groups merge —
+      # SQL AVG over the union weights by count, which the averages themselves
+      # cannot express — and divided once the groups are final.
+      def group_value(data, aggregation)
+        return extract_value(data, aggregation) unless aggregation.operation == 'Avg' && data.key?('avg_sum')
+
+        raw_sum = data.dig('avg_sum', aggregation.field)
+
+        { sum: raw_sum.nil? ? nil : numeric(raw_sum), count: data['avg_count'].to_i }
+      end
+
+      def finalize_value(value, aggregation)
+        return value unless aggregation.operation == 'Avg' && value.is_a?(Hash)
+
+        value[:count].zero? ? nil : numeric(value[:sum] || 0).fdiv(value[:count])
       end
 
       # One extra key is requested so that exactly DANGLING_KEYS_LIMIT distinct
@@ -225,6 +243,7 @@ module ForestAdminDatasourceGraphqlHasura
 
         case aggregation.operation
         when 'Count', 'Sum' then add(current, value)
+        when 'Avg' then merge_averages(current, value, aggregation)
         when 'Max' then (comparable(value) <=> comparable(current)).positive? ? value : current
         when 'Min' then (comparable(value) <=> comparable(current)).negative? ? value : current
         else
@@ -232,6 +251,16 @@ module ForestAdminDatasourceGraphqlHasura
                 "#{aggregation.operation} cannot be grouped on '#{name}' by a value several parent rows " \
                 'share: the result would not be exact. Group on the foreign key instead.'
         end
+      end
+
+      def merge_averages(current, value, aggregation)
+        unless current.is_a?(Hash) && value.is_a?(Hash)
+          raise ForestException,
+                "#{aggregation.operation} cannot be grouped on '#{name}' by a value several parent rows " \
+                'share: the result would not be exact. Group on the foreign key instead.'
+        end
+
+        { sum: add(current[:sum] || 0, value[:sum] || 0), count: current[:count] + value[:count] }
       end
 
       # Hasura sends bigint and numeric as JSON strings to keep a precision a Float
