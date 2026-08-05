@@ -208,6 +208,42 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(result).to eq([{ 'value' => 5, 'group' => { 'membership:full_name' => 'Jane' } }])
     end
 
+    # Hasura sends bigint as a string precisely because a Float would round it.
+    it 'merges large integer sums without losing precision' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'sum' => { 'id' => '9007199254740993' } } } },
+            { 'full_name' => 'Jane', 'comments_aggregate' => { 'aggregate' => { 'sum' => { 'id' => '2' } } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Sum', field: 'id',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq(9_007_199_254_740_995)
+    end
+
+    it 'merges a Max over text lexically instead of keeping the first row' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane', 'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => 'apple' } } } },
+            { 'full_name' => 'Jane', 'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => 'pear' } } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Max', field: 'body',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq('pear')
+    end
+
     # `count(columns: x)` returns zero when rows exist but every value is null,
     # which is not the same as a parent without children.
     it 'keeps a zero count on a specific column' do

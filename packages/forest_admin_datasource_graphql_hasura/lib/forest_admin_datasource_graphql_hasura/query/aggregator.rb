@@ -115,7 +115,7 @@ module ForestAdminDatasourceGraphqlHasura
 
         values
           .map { |key, value| { 'value' => value, 'group' => { group_field => key } } }
-          .sort_by { |row| sortable_value(row['value']) }
+          .sort_by { |row| comparable(row['value']) }
           .reverse
       end
 
@@ -124,13 +124,30 @@ module ForestAdminDatasourceGraphqlHasura
       # single group.
       def merge_values(current, value, aggregation)
         case aggregation.operation
-        when 'Count', 'Sum' then sortable_value(current) + sortable_value(value)
-        when 'Max' then sortable_value(value) > sortable_value(current) ? value : current
-        when 'Min' then sortable_value(value) < sortable_value(current) ? value : current
+        when 'Count', 'Sum' then add(current, value)
+        when 'Max' then (comparable(value) <=> comparable(current)).positive? ? value : current
+        when 'Min' then (comparable(value) <=> comparable(current)).negative? ? value : current
         else
           raise ForestException,
                 "#{aggregation.operation} cannot be grouped on '#{name}' by a value several parent rows " \
                 'share: the result would not be exact. Group on the foreign key instead.'
+        end
+      end
+
+      # Hasura sends bigint and numeric as JSON strings to keep a precision a Float
+      # would lose, so whole numbers are added as Integers, which Ruby does not cap.
+      def add(current, value)
+        left = numeric(current)
+        right = numeric(value)
+
+        left + right
+      end
+
+      def numeric(value)
+        case value
+        when Integer, Float then value
+        when String then value.match?(/\A-?\d+\z/) ? value.to_i : Float(value, exception: false) || 0
+        else 0
         end
       end
 
@@ -190,21 +207,30 @@ module ForestAdminDatasourceGraphqlHasura
         )
       end
 
-      # Hasura returns bigint/numeric/money as JSON strings to preserve precision,
-      # and Max/Min aggregate dates, which have to order by instant rather than
-      # collapse to zero.
-      def sortable_value(value)
+      # Aggregate values are not necessarily numbers: Hasura sends bigint and
+      # numeric as strings, and Max/Min aggregate dates as well as text. The tuple
+      # orders numbers and instants together, then text lexically, and stays
+      # comparable across rows so `sort_by` and Max/Min agree.
+      def comparable(value)
         case value
-        when Numeric then value
-        when String then Float(value, exception: false) || time_value(value)
-        else 0
+        when Numeric then [0, value.to_f, '']
+        when String then comparable_string(value)
+        else [2, 0.0, '']
         end
+      end
+
+      def comparable_string(value)
+        number = Float(value, exception: false)
+        return [0, number, ''] if number
+
+        instant = time_value(value)
+        instant ? [0, instant, ''] : [1, 0.0, value]
       end
 
       def time_value(value)
         Time.parse(value).to_f
       rescue ArgumentError, TypeError
-        0
+        nil
       end
 
       def extract_value(data, aggregation)
