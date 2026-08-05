@@ -1,3 +1,10 @@
+## [1.36.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.2...v1.36.3) (2026-08-05)
+
+
+### Bug Fixes
+
+* **agent:** store the model name in the polymorphic type column on create ([#342](https://github.com/ForestAdmin/agent-ruby/issues/342)) ([a810dab](https://github.com/ForestAdmin/agent-ruby/commit/a810daba9221f247cdac29711f8d2a7856b5aa93))
+
 ## [1.36.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.1...v1.36.2) (2026-08-04)
 
 
