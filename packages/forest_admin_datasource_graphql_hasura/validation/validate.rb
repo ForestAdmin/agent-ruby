@@ -182,6 +182,22 @@ scenario 'create / update / delete a comment' do
   assert gone.empty?, 'record deleted'
 end
 
+scenario 'a composite-key join table can be created and deleted' do
+  join = datasource.get_collection('CardMembership')
+  fields = join.schema[:fields]
+  assert_equal false, fields['card_id'].is_read_only, 'application-assigned keys must stay writable'
+
+  join.create(nil, { 'card_id' => 2, 'membership_id' => 1 })
+  condition = branch('And', [
+                       leaf('card_id', Operators::EQUAL, 2),
+                       leaf('membership_id', Operators::EQUAL, 1)
+                     ])
+  created = join.list(nil, filter(condition_tree: condition), projection('card_id', 'membership_id'))
+  assert_equal 1, created.size, 'join row created'
+ensure
+  join.delete(nil, filter(condition_tree: condition)) if condition
+end
+
 puts "\n== Runtime: aggregates =="
 
 scenario 'simple count with filter' do

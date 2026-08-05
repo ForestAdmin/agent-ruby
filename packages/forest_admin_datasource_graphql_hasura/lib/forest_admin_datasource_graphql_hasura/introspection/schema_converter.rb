@@ -64,8 +64,11 @@ module ForestAdminDatasourceGraphqlHasura
 
       def build_fields(table)
         fields = {}
+        composite_key = table.primary_key.size > 1
 
-        table.columns.each { |column| fields[column.name] = convert_column(column) }
+        table.columns.each do |column|
+          fields[column.name] = convert_column(column, composite_key: composite_key)
+        end
 
         add_polymorphics(table, fields)
 
@@ -81,19 +84,26 @@ module ForestAdminDatasourceGraphqlHasura
 
       private
 
-      def convert_column(column)
+      # A single-column key is database-generated in the schemas Hasura fronts
+      # (serial, uuid default), and the writes persist explicit nils — which
+      # would override that default — so it stays read-only. A composite key is
+      # application-assigned (a join table has no default to fall back on):
+      # keeping it read-only would make the table impossible to create through.
+      def convert_column(column, composite_key:)
+        read_only = column.is_primary_key && !composite_key
+
         ColumnSchema.new(
           column_type: column.is_array ? [column.type] : column.type,
           filter_operators: operators_for(column),
           is_primary_key: column.is_primary_key,
-          is_read_only: column.is_primary_key,
+          is_read_only: read_only,
           is_sortable: !column.is_array,
           # The capabilities route publishes this flag, so anything but the
           # foreign keys of mark_groupable_foreign_keys would have the UI offer a
           # group-by that grouped_aggregate then rejects.
           is_groupable: false,
           default_value: nil,
-          validation: column.nullable || column.is_primary_key ? [] : [{ operator: Operators::PRESENT }]
+          validation: column.nullable || read_only ? [] : [{ operator: Operators::PRESENT }]
         )
       end
 

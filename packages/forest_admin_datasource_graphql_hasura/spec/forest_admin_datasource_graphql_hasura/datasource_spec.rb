@@ -75,6 +75,9 @@ module ForestAdminDatasourceGraphqlHasura
 
           expect(fields['id'].is_primary_key).to be(true)
           expect(fields['body'].is_primary_key).to be(false)
+          # Single-column keys are database-generated: writable, our explicit-nil
+          # writes would override their default.
+          expect(fields['id'].is_read_only).to be(true)
         end
       end
 

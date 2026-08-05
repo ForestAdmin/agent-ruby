@@ -400,6 +400,27 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
     end
   end
 
+  describe 'composite primary keys' do
+    # A join table's key is application-assigned: read-only key columns would
+    # make the table impossible to create through Forest Admin.
+    it 'keeps composite key columns writable and required' do
+      stub_schema(
+        [{ 'name' => 'card_memberships', 'kind' => 'OBJECT',
+           'fields' => [field('card_id', non_null(scalar('bigint'))),
+                        field('membership_id', non_null(scalar('bigint')))] }],
+        [list_query('card_memberships'), by_pk_query('card_memberships', %w[card_id membership_id])]
+      )
+      stub_metadata([])
+
+      fields = build_datasource.get_collection('CardMembership').schema[:fields]
+
+      expect(fields['card_id'].is_read_only).to be(false)
+      expect(fields['membership_id'].is_read_only).to be(false)
+      expect(fields['card_id'].validation)
+        .to eq([{ operator: ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::PRESENT }])
+    end
+  end
+
   describe 'customized root fields' do
     # The root select field is renamed to `people`, but relationships and the
     # `_by_pk` query keep referencing the `person_table` GraphQL type: metadata
