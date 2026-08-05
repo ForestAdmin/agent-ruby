@@ -1,0 +1,93 @@
+require 'spec_helper'
+
+module ForestAdminDatasourceGraphqlHasura
+  RSpec.describe Client do
+    let(:configuration) { Configuration.new(uri: BankingSchema::GRAPHQL_URI) }
+    let(:client) { described_class.new(configuration) }
+
+    describe '#execute' do
+      it 'returns the data payload' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+               .to_return(status: 200, body: JSON.generate({ 'data' => { 'ok' => 1 } }))
+
+        expect(client.execute('query { ok }')).to eq({ 'ok' => 1 })
+      end
+
+      it 'sends the configured headers' do
+        configuration = Configuration.new(uri: BankingSchema::GRAPHQL_URI,
+                                          headers: { 'x-hasura-admin-secret' => 's3cret' })
+        stub = WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+                      .with(headers: { 'x-hasura-admin-secret' => 's3cret' })
+                      .to_return(status: 200, body: JSON.generate({ 'data' => {} }))
+
+        described_class.new(configuration).execute('query { ok }')
+
+        expect(stub).to have_been_requested
+      end
+
+      # Errors Hasura itself returns are the user's to act on: 400.
+      it 'raises GraphqlError carrying every message Hasura returns' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+               .to_return(status: 200,
+                          body: JSON.generate({ 'errors' => [{ 'message' => 'permission denied' },
+                                                             { 'message' => 'field unknown' }] }))
+
+        expect { client.execute('query { ok }') }
+          .to raise_error(GraphqlError, 'permission denied; field unknown')
+      end
+
+      # Infrastructure failures are not client mistakes: 503, message kept.
+      it 'raises TransportError with a 503 status on a non-2xx response' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_return(status: 502, body: 'bad gateway')
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError) do |error|
+          expect(error.status).to eq(503)
+          expect(error.message).to include('HTTP 502')
+        end
+      end
+
+      it 'raises TransportError on a timeout' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_timeout
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError, /Could not reach/)
+      end
+
+      it 'raises TransportError on a connection failure' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_raise(SocketError.new('getaddrinfo failed'))
+
+        expect { client.execute('query { ok }') }
+          .to raise_error(TransportError, /getaddrinfo failed/)
+      end
+
+      it 'raises TransportError on a body that is not JSON' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_return(status: 200, body: '<html>oops</html>')
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError, /Could not reach/)
+      end
+    end
+
+    describe '#fetch_metadata' do
+      it 'returns the metadata when the endpoint answers' do
+        WebMock.stub_request(:post, BankingSchema::METADATA_URI)
+               .to_return(status: 200, body: JSON.generate({ 'metadata' => { 'sources' => [] } }))
+
+        expect(client.fetch_metadata).to eq({ 'sources' => [] })
+      end
+
+      it 'returns nil when the endpoint is forbidden' do
+        WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(status: 403, body: '{}')
+
+        expect(client.fetch_metadata).to be_nil
+      end
+
+      # An uri without the conventional segment yields no derivable metadata
+      # endpoint: introspection must not post metadata commands to GraphQL.
+      it 'skips the call entirely when no metadata endpoint could be derived' do
+        configuration = Configuration.new(uri: 'http://hasura.test/custom-graphql')
+
+        expect(described_class.new(configuration).fetch_metadata).to be_nil
+        expect(WebMock).not_to have_requested(:post, 'http://hasura.test/custom-graphql')
+      end
+    end
+  end
+end

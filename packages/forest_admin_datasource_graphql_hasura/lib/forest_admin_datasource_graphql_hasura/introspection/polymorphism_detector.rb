@@ -47,7 +47,20 @@ module ForestAdminDatasourceGraphqlHasura
           base if name.end_with?('_type') && names.include?("#{base}_id")
         end
 
-        (detected + configured).uniq
+        (detected + configured.select { |base| discriminators?(table, names, base) }).uniq
+      end
+
+      # A configured association without its column pair would emit a relation
+      # referencing columns that do not exist, breaking the collection at boot.
+      def discriminators?(table, names, base)
+        missing = ["#{base}_type", "#{base}_id"].reject { |column| names.include?(column) }
+        return true if missing.empty?
+
+        ForestAdminDatasourceGraphqlHasura.logger.warn(
+          '[forest_admin_datasource_graphql_hasura] Ignoring the configured polymorphic relation ' \
+          "'#{table.name}.#{base}': column(s) #{missing.join(", ")} not found on '#{table.name}'."
+        )
+        false
       end
 
       def targets_of(table, base, tables_by_name)

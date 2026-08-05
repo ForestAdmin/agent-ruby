@@ -56,28 +56,20 @@ module ForestAdminDatasourceGraphqlHasura
       Query::Aggregator.new(self).run(filter, aggregation, limit)
     end
 
-    # Wraps every Hasura call so the failing operation is named in the error.
+    # Wraps every Hasura call so the failing operation is named in the error,
+    # keeping the class (GraphqlError or TransportError) and thus the status.
     def execute(operation_name, operation)
       @client.execute(operation[:query], operation[:variables])
-    rescue GraphqlError => e
-      raise GraphqlError, "GraphQL #{operation_name} failed on '#{name}': #{e.message}"
+    rescue GraphqlError, TransportError => e
+      raise e.class, "GraphQL #{operation_name} failed on '#{name}': #{e.message}"
     end
 
-    private
-
-    def column_names
-      @column_names ||= @table.columns.map(&:name)
-    end
-
-    # Selects on the schema rather than on the value type, so that a `jsonb`
-    # column — whose value is a hash, like a relation payload would be — is kept.
-    def writable_columns(data)
-      data.select { |key, _| column_names.include?(key.to_s) }
-    end
+    protected
 
     # A PolymorphicManyToOne cannot be joined by Hasura, so its discriminator
     # columns are selected instead and the relation is rebuilt by the serializer
-    # from those two values (see materialize_polymorphics).
+    # from those two values (see materialize_polymorphics). Protected: called on
+    # the target collection to resolve nested selections.
     def build_selection(projection)
       selection = projection.columns.reject { |column| column == '*' }
 
@@ -90,12 +82,24 @@ module ForestAdminDatasourceGraphqlHasura
           selection << field.foreign_key_type_field
         else
           target = datasource.get_collection(field.foreign_collection)
-          nested = target.send(:build_selection, relation_projection)
+          nested = target.build_selection(relation_projection)
           selection << "#{relation_name} { #{nested.join(" ")} }"
         end
       end
 
       selection.uniq
+    end
+
+    private
+
+    def column_names
+      @column_names ||= @table.columns.map(&:name)
+    end
+
+    # Selects on the schema rather than on the value type, so that a `jsonb`
+    # column — whose value is a hash, like a relation payload would be — is kept.
+    def writable_columns(data)
+      data.select { |key, _| column_names.include?(key.to_s) }
     end
 
     # The serializer reads the reference off the discriminator columns, so the

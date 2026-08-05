@@ -25,7 +25,9 @@ module ForestAdminDatasourceGraphqlHasura
 
       @uri = uri
       DEFAULTS.each { |option, default| instance_variable_set("@#{option}", options.fetch(option, default)) }
-      @metadata_uri ||= uri.sub('/v1/graphql', '/v1/metadata')
+      # Only derivable from the conventional endpoint path: substituting on any
+      # other uri would silently post metadata commands to the GraphQL endpoint.
+      @metadata_uri ||= uri.include?('/v1/graphql') ? uri.sub('/v1/graphql', '/v1/metadata') : nil
     end
 
     def table_allowed?(table_name)

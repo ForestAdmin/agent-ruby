@@ -96,6 +96,17 @@ module ForestAdminDatasourceGraphqlHasura
           expect(fields).not_to have_key('card')
         end
 
+        # A configured association without its column pair would emit a relation
+        # referencing columns that do not exist and break the collection.
+        it 'ignores a configured polymorphic relation whose discriminator columns are missing' do
+          datasource = BankingSchema.build_datasource(
+            metadata_blocked: true,
+            polymorphic_relations: { 'transfers' => { 'ownable' => %w[cards] } }
+          )
+
+          expect(datasource.get_collection('Transfer').schema[:fields]).not_to have_key('ownable')
+        end
+
         it 'still emits the polymorphic relations when declared in the configuration' do
           datasource = BankingSchema.build_datasource(
             metadata_blocked: true,
