@@ -161,18 +161,20 @@ module ForestAdminDatasourceGraphqlHasura
       def add_relationships(table, fields)
         table.relationships.each do |relationship|
           name, schema = convert_relationship(table, relationship)
-          next if schema.nil?
-
-          if fields.key?(name)
-            ForestAdminDatasourceGraphqlHasura.logger.warn(
-              "[forest_admin_datasource_graphql_hasura] Relationship '#{name}' on '#{table.name}' " \
-              'shares its name with another field, which wins; rename one of them to surface both.'
-            )
-            next
-          end
+          next if schema.nil? || shadowed_relationship?(table, name, fields)
 
           fields[name] = schema
         end
+      end
+
+      def shadowed_relationship?(table, name, fields)
+        return false unless fields.key?(name)
+
+        ForestAdminDatasourceGraphqlHasura.logger.warn(
+          "[forest_admin_datasource_graphql_hasura] Relationship '#{name}' on '#{table.name}' " \
+          'shares its name with another field, which wins; rename one of them to surface both.'
+        )
+        true
       end
 
       def convert_relationship(table, relationship)
