@@ -5,13 +5,16 @@ module ForestAdminDatasourceGraphqlHasura
 
     PLACEHOLDER_REFERENCE = { '*' => nil }.freeze
 
-    attr_reader :table_name
+    attr_reader :table_name, :names
 
     def initialize(datasource, table, client, converter)
       super(datasource, converter.collection_name_of(table.name))
 
       @table = table
       @table_name = table.name
+      # root is the select root field; base (the GraphQL type name) is what
+      # every other generated name derives from. See Query::QueryBuilder.
+      @names = { root: table.name, base: table.type_name }
       @client = client
       @converter = converter
 
@@ -22,17 +25,17 @@ module ForestAdminDatasourceGraphqlHasura
 
     def list(_caller, filter, projection)
       selection = build_selection(projection)
-      operation = Query::QueryBuilder.list(@table_name, filter, selection)
-      records = execute(:list, operation)[@table_name] || []
+      operation = Query::QueryBuilder.list(@names, filter, selection)
+      records = execute(:list, operation)[@names[:root]] || []
 
       records.map { |record| materialize_polymorphics(record, projection) }
     end
 
     def create(_caller, data)
-      operation = Query::QueryBuilder.create(@table_name, [writable_columns(data)], column_names)
-      returning = execute(:create, operation).dig("insert_#{@table_name}", 'returning')
+      operation = Query::QueryBuilder.create(@names, [writable_columns(data)], column_names)
+      returning = execute(:create, operation).dig("insert_#{@names[:base]}", 'returning')
 
-      raise GraphqlError, "No record returned by insert_#{@table_name}" if returning.nil? || returning.empty?
+      raise GraphqlError, "No record returned by insert_#{@names[:base]}" if returning.nil? || returning.empty?
 
       returning.first
     end
@@ -43,12 +46,12 @@ module ForestAdminDatasourceGraphqlHasura
               "Refusing to update every row of '#{name}': the filter carries no condition."
       end
 
-      operation = Query::QueryBuilder.update(@table_name, filter, writable_columns(data))
+      operation = Query::QueryBuilder.update(@names, filter, writable_columns(data))
       execute(:update, operation)
     end
 
     def delete(_caller, filter)
-      operation = Query::QueryBuilder.delete(@table_name, filter)
+      operation = Query::QueryBuilder.delete(@names, filter)
       execute(:delete, operation)
     end
 

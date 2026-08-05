@@ -310,6 +310,28 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
         .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not a column/)
     end
 
+    # `membership:comments` would emit a relation as a leaf selection.
+    it 'rejects a group path ending on a relation with a clear error' do
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count',
+                                                   groups: [{ field: 'membership:comments' }])
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not a column/)
+    end
+
+    # Charting 0 in place of a value the wire format hid would be silently
+    # wrong data.
+    it 'raises on an aggregate value that cannot be read as a number' do
+      BankingSchema.stub_graphql_data(
+        { 'comments_aggregate' => { 'aggregate' => { 'sum' => { 'id' => 'NaN' }, 'row_count' => 2 } } }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Sum', field: 'id')
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /Non-numeric/)
+    end
+
     it 'merges a Max over text lexically instead of keeping the first row' do
       BankingSchema.stub_graphql_data(
         {

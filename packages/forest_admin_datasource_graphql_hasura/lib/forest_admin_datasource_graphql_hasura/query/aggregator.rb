@@ -38,7 +38,7 @@ module ForestAdminDatasourceGraphqlHasura
       private
 
       def name = @collection.name
-      def table_name = @collection.table_name
+      def names = @collection.names
       def datasource = @collection.datasource
       def fields = @collection.schema[:fields]
 
@@ -67,7 +67,10 @@ module ForestAdminDatasourceGraphqlHasura
                   "Date grouping is not supported by the GraphQL datasource (collection '#{name}')."
           end
 
-          validate_field(group[:field], allow_relation: true)
+          # A two-segment path must end on a column: a relation as the leaf
+          # selection would be invalid GraphQL.
+          validate_field(group[:field], allow_relation: true,
+                                        column_only: group[:field].to_s.include?(':'))
         end
       end
 
@@ -105,8 +108,8 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def simple(filter, aggregation)
-        operation = QueryBuilder.aggregate(table_name, filter, aggregation)
-        data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
+        operation = QueryBuilder.aggregate(names, filter, aggregation)
+        data = @collection.execute(:aggregate, operation).dig("#{names[:base]}_aggregate", 'aggregate')
 
         # One row even when the aggregate is null: the charts route reads
         # `result[0]['value']` unguarded.
@@ -131,7 +134,7 @@ module ForestAdminDatasourceGraphqlHasura
         offset = 0
 
         loop do
-          operation = QueryBuilder.grouped_aggregate(table_name, relation, filter, aggregation,
+          operation = QueryBuilder.grouped_aggregate(names, relation, filter, aggregation,
                                                      { limit: PARENT_PAGE, offset: offset })
           page = @collection.execute(:aggregate, operation)[relation[:parent_table]] || []
           rows.concat(page)
@@ -186,21 +189,23 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def add_orphan_group(values, key, filter, aggregation, extra_where)
-        operation = QueryBuilder.aggregate(table_name, filter, aggregation, extra_where: extra_where)
-        data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
+        operation = QueryBuilder.aggregate(names, filter, aggregation, extra_where: extra_where)
+        data = @collection.execute(:aggregate, operation).dig("#{names[:base]}_aggregate", 'aggregate')
         return if childless?(data, aggregation)
 
         value = extract_value(data, aggregation)
         values[key] = values.key?(key) ? merge_values(values[key], value, aggregation) : value
       end
 
+      # One extra key is requested so that exactly DANGLING_KEYS_LIMIT distinct
+      # values complete instead of tripping the guard.
       def dangling_keys(relation, filter)
-        operation = QueryBuilder.orphan_keys(table_name, filter, relation[:foreign_key],
-                                             relation[:child_relation_name], DANGLING_KEYS_LIMIT)
-        rows = @collection.execute(:aggregate, operation)[table_name] || []
+        operation = QueryBuilder.orphan_keys(names, filter, relation[:foreign_key],
+                                             relation[:child_relation_name], DANGLING_KEYS_LIMIT + 1)
+        rows = @collection.execute(:aggregate, operation)[names[:root]] || []
         keys = rows.map { |row| row[relation[:foreign_key]] }
 
-        if keys.size >= DANGLING_KEYS_LIMIT
+        if keys.size > DANGLING_KEYS_LIMIT
           raise ForestException,
                 "Grouped aggregation on '#{name}': more than #{DANGLING_KEYS_LIMIT} distinct " \
                 "'#{relation[:foreign_key]}' values reference no parent row; clean the data up " \
@@ -241,9 +246,18 @@ module ForestAdminDatasourceGraphqlHasura
       def numeric(value)
         case value
         when Integer, Float then value
-        when String then value.match?(/\A-?\d+\z/) ? value.to_i : Float(value, exception: false) || 0
+        when String then parse_number(value)
         else 0
         end
+      end
+
+      # Charting 0 in place of a value the wire format hid would be silently
+      # wrong data; an unparseable aggregate deserves an error.
+      def parse_number(value)
+        return value.to_i if value.match?(/\A-?\d+\z/)
+
+        Float(value, exception: false) ||
+          raise(ForestException, "Non-numeric aggregate value #{value.inspect} on collection '#{name}'.")
       end
 
       # A group with no rows at all is what SQL grouping leaves out. The

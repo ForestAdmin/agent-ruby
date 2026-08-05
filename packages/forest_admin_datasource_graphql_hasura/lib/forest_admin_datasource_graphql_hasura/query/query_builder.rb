@@ -2,11 +2,17 @@ module ForestAdminDatasourceGraphqlHasura
   module Query
     # Builds Hasura GraphQL operations (queries and mutations) with variables.
     # All methods return { query:, variables: }.
+    #
+    # names is { root:, base: }: `root` is the select root field (which
+    # custom_root_fields can rename freely), `base` is what every other
+    # generated name derives from — `<base>_bool_exp`, `insert_<base>`,
+    # `<base>_aggregate`… — namely the GraphQL type name. They only differ when
+    # the Hasura metadata renames the select root field.
     class QueryBuilder
       class << self
         # selection holds resolved GraphQL fields, nested relations included
         # ("membership { id full_name }").
-        def list(table, filter, selection)
+        def list(names, filter, selection)
           args = []
           var_defs = []
           variables = {}
@@ -14,17 +20,17 @@ module ForestAdminDatasourceGraphqlHasura
           where = FilterConverter.convert(filter.condition_tree)
 
           if where
-            var_defs << "$where: #{table}_bool_exp"
+            var_defs << "$where: #{names[:base]}_bool_exp"
             args << 'where: $where'
             variables['where'] = where
           end
 
-          add_sort(table, filter, args, var_defs, variables)
+          add_sort(names, filter, args, var_defs, variables)
           add_pagination(filter, args, var_defs, variables)
 
           query = <<~GRAPHQL
-            query List#{camelize(table)}#{wrap(var_defs)} {
-              #{table}#{wrap(args)} {
+            query List#{camelize(names[:root])}#{wrap(var_defs)} {
+              #{names[:root]}#{wrap(args)} {
                 #{selection.join("\n    ")}
               }
             }
@@ -33,10 +39,10 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: variables }
         end
 
-        def create(table, records, selection)
+        def create(names, records, selection)
           query = <<~GRAPHQL
-            mutation Insert#{camelize(table)}($objects: [#{table}_insert_input!]!) {
-              insert_#{table}(objects: $objects) {
+            mutation Insert#{camelize(names[:base])}($objects: [#{names[:base]}_insert_input!]!) {
+              insert_#{names[:base]}(objects: $objects) {
                 returning {
                   #{selection.join("\n      ")}
                 }
@@ -47,19 +53,19 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: { 'objects' => records.map { |record| stringify_keys(record) } } }
         end
 
-        def update(table, filter, patch)
+        def update(names, filter, patch)
           where = FilterConverter.convert(filter.condition_tree)
 
           # Backstop behind the collection guard: `{}` is vacuously true for
           # Hasura, so a filterless update would rewrite the whole table.
           if where.nil?
             raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                  "Refusing to update every row of '#{table}': the filter carries no condition."
+                  "Refusing to update every row of '#{names[:root]}': the filter carries no condition."
           end
 
           query = <<~GRAPHQL
-            mutation Update#{camelize(table)}($where: #{table}_bool_exp!, $set: #{table}_set_input!) {
-              update_#{table}(where: $where, _set: $set) {
+            mutation Update#{camelize(names[:base])}($where: #{names[:base]}_bool_exp!, $set: #{names[:base]}_set_input!) {
+              update_#{names[:base]}(where: $where, _set: $set) {
                 affected_rows
               }
             }
@@ -68,10 +74,10 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: { 'where' => where, 'set' => stringify_keys(patch) } }
         end
 
-        def delete(table, filter)
+        def delete(names, filter)
           query = <<~GRAPHQL
-            mutation Delete#{camelize(table)}($where: #{table}_bool_exp!) {
-              delete_#{table}(where: $where) {
+            mutation Delete#{camelize(names[:base])}($where: #{names[:base]}_bool_exp!) {
+              delete_#{names[:base]}(where: $where) {
                 affected_rows
               }
             }
@@ -84,7 +90,7 @@ module ForestAdminDatasourceGraphqlHasura
 
         # extra_where is a raw bool_exp and-combined with the converted filter
         # (the null-bucket query adds `{ fk => { _is_null => true } }`).
-        def aggregate(table, filter, aggregation, extra_where: nil)
+        def aggregate(names, filter, aggregation, extra_where: nil)
           args = []
           var_defs = []
           variables = {}
@@ -92,14 +98,14 @@ module ForestAdminDatasourceGraphqlHasura
           where = combine(FilterConverter.convert(filter.condition_tree), extra_where)
 
           if where
-            var_defs << "$where: #{table}_bool_exp"
+            var_defs << "$where: #{names[:base]}_bool_exp"
             args << 'where: $where'
             variables['where'] = where
           end
 
           query = <<~GRAPHQL
-            query Aggregate#{camelize(table)}#{wrap(var_defs)} {
-              #{table}_aggregate#{wrap(args)} {
+            query Aggregate#{camelize(names[:base])}#{wrap(var_defs)} {
+              #{names[:base]}_aggregate#{wrap(args)} {
                 aggregate {
                   #{aggregation_selection(aggregation)}
                 }
@@ -115,7 +121,7 @@ module ForestAdminDatasourceGraphqlHasura
         # offset pagination is stable, and filtered by the chart's predicate through
         # the relationship, so the pages only walk parents owning at least one
         # matching child row.
-        def grouped_aggregate(child_table, relation, filter, aggregation, page)
+        def grouped_aggregate(names, relation, filter, aggregation, page)
           args = []
           var_defs = ['$parentLimit: Int', '$parentOffset: Int']
           variables = { 'parentLimit' => page[:limit], 'parentOffset' => page[:offset] }
@@ -124,7 +130,7 @@ module ForestAdminDatasourceGraphqlHasura
           where = FilterConverter.convert(filter.condition_tree)
 
           if where
-            var_defs << "$where: #{child_table}_bool_exp"
+            var_defs << "$where: #{names[:base]}_bool_exp"
             args << 'where: $where'
             parent_args << "where: { #{relation[:relation_name]}: $where }"
             variables['where'] = where
@@ -149,15 +155,15 @@ module ForestAdminDatasourceGraphqlHasura
         # Distinct values of `column` among rows without a matching parent — the
         # dangling foreign keys a grouped chart must keep as groups of their own.
         # distinct_on requires the matching order_by.
-        def orphan_keys(table, filter, column, relation_name, limit)
+        def orphan_keys(names, filter, column, relation_name, limit)
           where = combine(
             FilterConverter.convert(filter.condition_tree),
             { '_and' => [{ '_not' => { relation_name => {} } }, { column => { '_is_null' => false } }] }
           )
 
           query = <<~GRAPHQL
-            query OrphanKeys#{camelize(table)}($where: #{table}_bool_exp, $limit: Int) {
-              #{table}(where: $where, distinct_on: [#{column}], order_by: [{ #{column}: asc }], limit: $limit) {
+            query OrphanKeys#{camelize(names[:root])}($where: #{names[:base]}_bool_exp, $limit: Int) {
+              #{names[:root]}(where: $where, distinct_on: [#{column}], order_by: [{ #{column}: asc }], limit: $limit) {
                 #{column}
               }
             }
@@ -183,10 +189,10 @@ module ForestAdminDatasourceGraphqlHasura
 
         private
 
-        def add_sort(table, filter, args, var_defs, variables)
+        def add_sort(names, filter, args, var_defs, variables)
           return unless filter.respond_to?(:sort) && filter.sort&.any?
 
-          var_defs << "$orderBy: [#{table}_order_by!]"
+          var_defs << "$orderBy: [#{names[:base]}_order_by!]"
           args << 'order_by: $orderBy'
           variables['orderBy'] = convert_sort(filter.sort)
         end
