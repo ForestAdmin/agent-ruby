@@ -81,6 +81,29 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Query::FilterConverter do
     )
   end
 
+  # Hasura reads an empty `_and` as vacuously true, which would let a mutation
+  # through the empty-filter guard and touch every row.
+  it 'converts a branch that matches everything to nil rather than an empty _and' do
+    expect(described_class.convert(nodes::ConditionTreeBranch.new('And', []))).to be_nil
+    expect(described_class.convert(nodes::ConditionTreeBranch.new('Or', [
+                                                                    nodes::ConditionTreeBranch.new('And', []),
+                                                                    leaf('a', operators::EQUAL, 1)
+                                                                  ]))).to be_nil
+  end
+
+  it 'keeps an empty Or, which matches nothing' do
+    expect(described_class.convert(nodes::ConditionTreeBranch.new('Or', []))).to eq({ '_or' => [] })
+  end
+
+  it 'drops a match-everything branch nested in an And' do
+    tree = nodes::ConditionTreeBranch.new('And', [
+                                            nodes::ConditionTreeBranch.new('And', []),
+                                            leaf('a', operators::EQUAL, 1)
+                                          ])
+
+    expect(described_class.convert(tree)).to eq({ '_and' => [{ 'a' => { '_eq' => 1 } }] })
+  end
+
   it 'raises on unsupported operators' do
     expect { described_class.convert(leaf('a', operators::LONGER_THAN, 3)) }
       .to raise_error(ForestAdminDatasourceGraphqlHasura::GraphqlError, /Unsupported operator/)

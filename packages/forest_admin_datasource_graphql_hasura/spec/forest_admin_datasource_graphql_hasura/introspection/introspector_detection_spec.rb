@@ -181,6 +181,56 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       expect(build_datasource.get_collection('Transfer').schema[:fields]).not_to have_key('account')
     end
 
+    # Hasura only generates `_by_pk` for a real primary key, so an `id` column on a
+    # view or a tracked function carries no uniqueness to address records by.
+    it 'does not infer a primary key from an id column without a _by_pk query' do
+      stub_schema(
+        [{ 'name' => 'transfer_views', 'kind' => 'OBJECT',
+           'fields' => [field('id', scalar('bigint')), field('total', scalar('bigint'))] }],
+        [list_query('transfer_views')]
+      )
+      stub_metadata([])
+
+      expect(build_datasource.collections).to be_empty
+    end
+
+    it 'keeps a scalar column whose name ends with _aggregate' do
+      stub_schema(
+        [{ 'name' => 'transfers', 'kind' => 'OBJECT',
+           'fields' => [field('id', non_null(scalar('bigint'))), field('total_aggregate', scalar('bigint'))] }],
+        [list_query('transfers'), by_pk_query('transfers')]
+      )
+      stub_metadata([])
+
+      fields = build_datasource.get_collection('Transfer').schema[:fields]
+
+      expect(fields['total_aggregate'].type).to eq('Column')
+    end
+
+    it 'types a Postgres array after its element type' do
+      stub_schema(
+        [{ 'name' => 'transfers', 'kind' => 'OBJECT',
+           'fields' => [field('id', non_null(scalar('bigint'))), field('scores', scalar('_int4'))] }],
+        [list_query('transfers'), by_pk_query('transfers')]
+      )
+      stub_metadata([])
+
+      expect(build_datasource.get_collection('Transfer').schema[:fields]['scores'].column_type).to eq(['Number'])
+    end
+
+    it 'lets an explicit allow-list restore a table the built-in prefixes exclude' do
+      stub_schema(
+        [{ 'name' => 'pg_stat_activity', 'kind' => 'OBJECT',
+           'fields' => [field('id', non_null(scalar('bigint')))] }],
+        [list_query('pg_stat_activity'), by_pk_query('pg_stat_activity')]
+      )
+      stub_metadata([])
+
+      datasource = build_datasource(included_tables: ['pg_stat_activity'])
+
+      expect(datasource.collections.keys).to eq(['PgStatActivity'])
+    end
+
     it 'skips a table with no detectable primary key instead of exposing a broken collection' do
       stub_schema(
         [{ 'name' => 'transfer_stats', 'kind' => 'OBJECT',

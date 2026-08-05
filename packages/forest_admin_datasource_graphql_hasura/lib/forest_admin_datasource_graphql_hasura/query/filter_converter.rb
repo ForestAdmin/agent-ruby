@@ -14,8 +14,7 @@ module ForestAdminDatasourceGraphqlHasura
 
         case condition_tree
         when Nodes::ConditionTreeBranch
-          aggregator = condition_tree.aggregator == 'And' ? '_and' : '_or'
-          { aggregator => condition_tree.conditions.map { |condition| convert(condition) } }
+          convert_branch(condition_tree)
         when Nodes::ConditionTreeLeaf
           convert_leaf(condition_tree)
         else
@@ -24,6 +23,23 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       private
+
+      # A branch that matches every row converts to nil rather than to an empty
+      # `_and`, which Hasura reads as vacuously true: the mutation guards treat
+      # nil as "no filter" and refuse to run, whereas `{ _and: [] }` would slip
+      # through and touch the whole table.
+      def convert_branch(branch)
+        conditions = branch.conditions.map { |condition| convert(condition) }
+
+        if branch.aggregator == 'And'
+          kept = conditions.compact
+
+          kept.empty? ? nil : { '_and' => kept }
+        else
+          # A nil among the alternatives matches everything, so does the union.
+          conditions.include?(nil) ? nil : { '_or' => conditions }
+        end
+      end
 
       # `_and`/`_or` only exist at bool_exp level, never inside a comparison
       # expression, so an operator needing two comparisons on the same field is

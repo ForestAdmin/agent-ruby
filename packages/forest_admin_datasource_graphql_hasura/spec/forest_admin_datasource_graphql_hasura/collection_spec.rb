@@ -152,6 +152,13 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
   end
 
   describe '#update' do
+    it 'refuses a filter whose condition tree matches everything' do
+      empty_branch = branch('And', [])
+
+      expect { comments.update(caller, filter(condition_tree: empty_branch), { 'body' => 'x' }) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /Refusing/)
+    end
+
     it 'updates through Hasura with the converted filter' do
       BankingSchema.stub_graphql_data({ 'update_comments' => { 'affected_rows' => 1 } })
 
@@ -174,6 +181,47 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
   end
 
   describe '#aggregate' do
+    it 'rejects grouping on several fields rather than honouring only the first' do
+      aggregation = toolkit_query::Aggregation.new(
+        operation: 'Count',
+        groups: [{ field: 'membership_id' }, { field: 'commentable_type' }]
+      )
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /several fields/)
+    end
+
+    it 'merges parent rows that share the same group value' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane', 'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } },
+            { 'full_name' => 'Jane', 'comments_aggregate' => { 'aggregate' => { 'count' => 2 } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([{ 'value' => 5, 'group' => { 'membership:full_name' => 'Jane' } }])
+    end
+
+    # `count(columns: x)` returns zero when rows exist but every value is null,
+    # which is not the same as a parent without children.
+    it 'keeps a zero count on a specific column' do
+      BankingSchema.stub_graphql_data(
+        { 'memberships' => [{ 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 0 } } }] }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', field: 'body',
+                                                   groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([{ 'value' => 0, 'group' => { 'membership_id' => 1 } }])
+    end
+
     it 'runs simple counts against <table>_aggregate' do
       BankingSchema.stub_graphql_data({ 'comments_aggregate' => { 'aggregate' => { 'count' => 12 } } })
 

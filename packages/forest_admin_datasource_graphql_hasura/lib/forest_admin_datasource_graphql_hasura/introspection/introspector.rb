@@ -185,13 +185,17 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def skip_table?(name)
+        # An explicitly allow-listed table wins over the built-in exclusions, so a
+        # legitimate table whose name starts like a system one stays reachable.
+        return false if @configuration.included_tables&.include?(name)
+
         EXCLUDED_PREFIXES.any? { |prefix| name.start_with?(prefix) } ||
           EXCLUDED_SUFFIXES.any? { |suffix| name.end_with?(suffix) } ||
           !@configuration.table_allowed?(name)
       end
 
       def parse_table(table_name, type)
-        fields = (type['fields'] || []).reject { |field| companion_field?(field['name']) }
+        fields = (type['fields'] || []).reject { |field| companion_field?(field) }
         scalars, relations = fields.partition { |field| scalar?(base_type_name(field['type'])) }
         columns = scalars.map { |field| parse_column(field, base_type_name(field['type'])) }
 
@@ -204,10 +208,13 @@ module ForestAdminDatasourceGraphqlHasura
         )
       end
 
-      # Introspection metadata and the `<relation>_aggregate` fields Hasura adds
-      # next to every array relationship — neither are columns or relations.
-      def companion_field?(name)
-        name.start_with?('__') || name.end_with?('_aggregate')
+      # Introspection metadata and the `<relation>_aggregate` objects Hasura adds
+      # next to every array relationship. The suffix alone is not enough: a scalar
+      # column may legitimately be named `total_aggregate`.
+      def companion_field?(field)
+        return true if field['name'].start_with?('__')
+
+        field['name'].end_with?('_aggregate') && !scalar?(base_type_name(field['type']))
       end
 
       def parse_relationship(table_name, field)
@@ -238,9 +245,10 @@ module ForestAdminDatasourceGraphqlHasura
         )
       end
 
-      # Hasura only generates a `_by_pk` query for tables that have a primary
-      # key. Anything else is left without one: guessing a composite key out of
-      # the `*_id` columns produced wrong record ids.
+      # Hasura only generates a `_by_pk` query for a tracked table that has a
+      # primary key, which makes it the one trustworthy signal. Inferring a key
+      # from an `id` column would address records of a view — or of a tracked
+      # function — through a column that carries no uniqueness.
       def resolve_primary_key(table_name, columns)
         known = @primary_keys[table_name]
 
@@ -248,14 +256,6 @@ module ForestAdminDatasourceGraphqlHasura
           columns.each { |column| column.is_primary_key = known.include?(column.name) }
 
           return known
-        end
-
-        id_column = columns.find { |column| column.name == 'id' }
-
-        if id_column
-          id_column.is_primary_key = true
-
-          return ['id']
         end
 
         []
@@ -281,11 +281,18 @@ module ForestAdminDatasourceGraphqlHasura
         type_ref['name'] || base_type_name(type_ref['ofType'])
       end
 
+      # Hasura names a Postgres array scalar after its element type, prefixed with
+      # an underscore (`_int4`), so the element type drives the mapping.
       def map_column_type(graphql_type)
+        graphql_type = graphql_type.delete_prefix('_')
+
         {
           'Int' => 'Number', 'Float' => 'Number', 'numeric' => 'Number', 'bigint' => 'Number',
           'smallint' => 'Number', 'integer' => 'Number', 'real' => 'Number',
           'double_precision' => 'Number', 'money' => 'Number',
+          # Internal Postgres names, which is how Hasura names array element types
+          'int2' => 'Number', 'int4' => 'Number', 'int8' => 'Number',
+          'float4' => 'Number', 'float8' => 'Number', 'bool' => 'Boolean',
           'String' => 'String', 'text' => 'String', 'varchar' => 'String', 'char' => 'String',
           'bpchar' => 'String', 'citext' => 'String', 'inet' => 'String', 'ID' => 'String',
           'Boolean' => 'Boolean',

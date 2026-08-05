@@ -70,12 +70,16 @@ module ForestAdminDatasourceGraphqlHasura
 
       def branch?(relationship, foreign_key, configured_tables)
         return false unless relationship.kind == :object
+        # A known mapping is checked even when the target is configured: a table
+        # may hold both an ordinary relationship and a polymorphic branch towards
+        # the same target, and they must not be mistaken for one another.
+        return false unless relationship.mapping.nil? || relationship.mapping.keys == [foreign_key]
         return configured_tables.include?(relationship.remote_table) if configured_tables
 
         # A relationship backed by a real foreign key constraint is monomorphic by
         # definition: accepting one here would absorb a legitimate belongs_to
         # whenever an unrelated `<base>_type` enum sits next to `<base>_id`.
-        relationship.manual && relationship.mapping&.keys == [foreign_key]
+        relationship.manual
       end
 
       def class_name_of(table_name)
