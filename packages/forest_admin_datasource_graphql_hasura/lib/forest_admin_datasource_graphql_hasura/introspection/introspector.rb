@@ -147,12 +147,7 @@ module ForestAdminDatasourceGraphqlHasura
         table_info = table['table']
         return unless table_info.is_a?(Hash)
 
-        schema_name = table_info['schema']
-        table_name = table_info['name']
-        # Hasura derives the root field from the table name, prefixed by the
-        # schema outside of `public`: a bare name can only be the public table,
-        # so a non-public one must not claim it.
-        exposed = schema_name.nil? || schema_name == 'public' ? table_name : "#{schema_name}_#{table_name}"
+        exposed = exposed_root_field(table, table_info)
 
         relationships = (table['object_relationships'] || []).map { |rel| [rel, :object] } +
                         (table['array_relationships'] || []).map { |rel| [rel, :array] }
@@ -165,6 +160,22 @@ module ForestAdminDatasourceGraphqlHasura
           ambiguous << key if mappings.key?(key) && mappings[key] != entry
           mappings[key] = entry
         end
+      end
+
+      # The mapping key has to be the root field the introspection query will
+      # show. Hasura derives it from the table name — prefixed by the schema
+      # outside of `public`, so a bare name can only be the public table —
+      # unless the metadata customizes it (`custom_root_fields.select` wins
+      # over `custom_name`, which replaces the derived name).
+      def exposed_root_field(table, table_info)
+        custom = table.dig('configuration', 'custom_root_fields', 'select') ||
+                 table.dig('configuration', 'custom_name')
+        return custom if custom
+
+        schema_name = table_info['schema']
+        table_name = table_info['name']
+
+        schema_name.nil? || schema_name == 'public' ? table_name : "#{schema_name}_#{table_name}"
       end
 
       # A nil column stands for the primary key of that table: a foreign key
@@ -186,13 +197,16 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
+      # Keyed by the GraphQL OBJECT type the field returns, which the list root
+      # field shares whatever the root fields are renamed to — deriving a table
+      # name from the `_by_pk` spelling would miss a customized select field.
       def parse_primary_keys(query_fields)
         query_fields.each_with_object({}) do |field, memo|
           next unless field['name'].end_with?('_by_pk')
 
-          table_name = field['name'].delete_suffix('_by_pk')
+          type_name = base_type_name(field['type'])
           pk_fields = (field['args'] || []).map { |arg| arg['name'] }
-          memo[table_name] = pk_fields if pk_fields.any?
+          memo[type_name] = pk_fields if pk_fields.any?
         end
       end
 
@@ -236,8 +250,9 @@ module ForestAdminDatasourceGraphqlHasura
 
         Table.new(
           name: table_name,
+          type_name: type['name'],
           columns: columns,
-          primary_key: resolve_primary_key(table_name, columns),
+          primary_key: resolve_primary_key(type['name'], columns),
           relationships: relations.map { |field| parse_relationship(table_name, field) },
           polymorphics: []
         )
@@ -284,8 +299,8 @@ module ForestAdminDatasourceGraphqlHasura
       # primary key, which makes it the one trustworthy signal. Inferring a key
       # from an `id` column would address records of a view — or of a tracked
       # function — through a column that carries no uniqueness.
-      def resolve_primary_key(table_name, columns)
-        known = @primary_keys[table_name]
+      def resolve_primary_key(type_name, columns)
+        known = @primary_keys[type_name]
 
         if known
           columns.each { |column| column.is_primary_key = known.include?(column.name) }

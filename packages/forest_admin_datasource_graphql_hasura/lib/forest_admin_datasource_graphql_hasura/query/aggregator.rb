@@ -22,6 +22,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def run(filter, aggregation, limit)
         validate(aggregation)
+        @date_field = date_field?(aggregation)
 
         if aggregation.groups.nil? || aggregation.groups.empty?
           simple(filter, aggregation)
@@ -41,7 +42,7 @@ module ForestAdminDatasourceGraphqlHasura
       # one path the agent does not validate upstream (the charts route passes the
       # request's `aggregateFieldName` straight through).
       def validate(aggregation)
-        validate_field(aggregation.field) if aggregation.field
+        validate_field(aggregation.field, column_only: true) if aggregation.field
 
         # Without a field, `sum { }` would be an empty GraphQL selection set.
         if aggregation.field.nil? && aggregation.operation != 'Count'
@@ -66,7 +67,10 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      def validate_field(field, allow_relation: false)
+      # column_only rejects a relation as the aggregated field (`sum { membership }`
+      # is not valid GraphQL); a group field may end on a ManyToOne, which stands
+      # for its foreign key.
+      def validate_field(field, allow_relation: false, column_only: false)
         path = field.to_s.split(':')
 
         unless (allow_relation && path.size <= 2) || path.size == 1
@@ -75,10 +79,14 @@ module ForestAdminDatasourceGraphqlHasura
 
         *relations, last = path
         collection = relations.reduce(@collection) { |current, part| collection_through(current, part, field) }
+        target = collection.schema[:fields][last]
 
-        return unless collection.schema[:fields][last].nil?
+        raise ForestException, "Field '#{field}' not found on collection '#{collection.name}'." if target.nil?
 
-        raise ForestException, "Field '#{field}' not found on collection '#{collection.name}'."
+        return unless column_only && target.type != 'Column'
+
+        raise ForestException,
+              "Cannot aggregate on '#{field}': it is a relation, not a column (collection '#{name}')."
       end
 
       def collection_through(collection, relation_name, field)
@@ -304,10 +312,11 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       # Strings reaching here belong to non-numeric columns — numeric ones were
-      # normalized at extraction. Dates order as instants, text lexically, like
-      # SQL would (a digit-only text value must not compare numerically).
+      # normalized at extraction. Date columns order as instants (offsets make
+      # lexical ordering lie); anything else orders lexically, like SQL collates,
+      # even when a text value happens to look like a date or a number.
       def comparable_string(value)
-        instant = time_value(value)
+        instant = @date_field ? time_value(value) : nil
 
         instant ? [0, instant, ''] : [1, 0.0, value]
       end
@@ -335,6 +344,10 @@ module ForestAdminDatasourceGraphqlHasura
 
       def number_field?(aggregation)
         aggregation.field && fields[aggregation.field]&.column_type == 'Number'
+      end
+
+      def date_field?(aggregation)
+        aggregation.field && %w[Date Dateonly Time].include?(fields[aggregation.field]&.column_type)
       end
     end
   end

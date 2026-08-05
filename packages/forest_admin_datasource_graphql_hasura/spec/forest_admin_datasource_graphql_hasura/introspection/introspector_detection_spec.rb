@@ -400,6 +400,47 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
     end
   end
 
+  describe 'customized root fields' do
+    # The root select field is renamed to `people`, but relationships and the
+    # `_by_pk` query keep referencing the `person_table` GraphQL type: metadata
+    # and primary keys must follow what the schema actually exposes.
+    it 'applies the metadata and detects the primary key through the GraphQL type' do
+      stub_schema(
+        [
+          {
+            'name' => 'person_table', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('best_friend_ref', scalar('bigint')),
+              field('best_friend', object('person_table'))
+            ]
+          }
+        ],
+        [
+          field('people', non_null(list_of(non_null(object('person_table'))))),
+          { 'name' => 'person_table_by_pk', 'type' => object('person_table'),
+            'args' => [{ 'name' => 'id', 'type' => non_null(scalar('bigint')) }] }
+        ]
+      )
+      stub_metadata(
+        [
+          { 'table' => { 'schema' => 'public', 'name' => 'person_table' },
+            'configuration' => { 'custom_root_fields' => { 'select' => 'people' } },
+            'object_relationships' => [
+              manual_object_rel('best_friend', 'person_table', { 'best_friend_ref' => 'id' })
+            ] }
+        ]
+      )
+
+      fields = build_datasource.get_collection('Person').schema[:fields]
+
+      expect(fields['id'].is_primary_key).to be(true)
+      expect(fields['best_friend'].type).to eq('ManyToOne')
+      expect(fields['best_friend'].foreign_key).to eq('best_friend_ref')
+      expect(fields['best_friend'].foreign_collection).to eq('Person')
+    end
+  end
+
   describe 'configured polymorphism without the Hasura metadata' do
     # With every mapping unknown, two relationships towards the same configured
     # target are indistinguishable — one may be a plain belongs_to whose

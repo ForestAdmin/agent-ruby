@@ -24,6 +24,9 @@ module ForestAdminDatasourceGraphqlHasura
       response = post(@configuration.uri, body)
 
       raise TransportError, "GraphQL endpoint returned HTTP #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+      # A 204 is a success with a nil body, which JSON.parse would turn into an
+      # unwrapped TypeError.
+      raise TransportError, 'GraphQL endpoint returned an empty body' if response.body.nil? || response.body.empty?
 
       payload = JSON.parse(response.body)
       raise TransportError, 'GraphQL endpoint returned an unexpected body' unless payload.is_a?(Hash)

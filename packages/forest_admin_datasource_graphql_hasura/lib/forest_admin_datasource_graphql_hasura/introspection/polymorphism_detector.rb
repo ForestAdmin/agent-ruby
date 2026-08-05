@@ -14,7 +14,10 @@ module ForestAdminDatasourceGraphqlHasura
       # Fills `polymorphics` on each table and removes the per-target object
       # relationships it absorbs.
       def detect(tables)
+        # Relationships reference the GraphQL type name, which only differs from
+        # the root field name when the Hasura metadata customizes root fields.
         tables_by_name = tables.to_h { |table| [table.name, table] }
+                               .merge(tables.to_h { |table| [table.type_name, table] })
 
         tables.each do |table|
           bases_of(table).each { |base| absorb(table, base, tables_by_name) }
@@ -72,11 +75,11 @@ module ForestAdminDatasourceGraphqlHasura
         candidates.group_by(&:remote_table).each_with_object({}) do |(remote_table, relationships), memo|
           target_table = tables_by_name[remote_table]
           next unless target_table
-          next if ambiguous_branch?(table, base, remote_table, relationships)
+          next if ambiguous_branch?(table, base, target_table.name, relationships)
 
           relationship = relationships.first
-          memo[class_name_of(remote_table)] = {
-            table: remote_table,
+          memo[class_name_of(target_table.name)] = {
+            table: target_table.name,
             hasura_field: relationship.name,
             primary_key: relationship.mapping&.values&.first || target_table.primary_key.first || 'id'
           }

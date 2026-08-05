@@ -24,10 +24,11 @@ module ForestAdminDatasourceGraphqlHasura
       raise ConfigurationError, "Unknown option(s): #{unknown.join(", ")}" if unknown.any?
 
       @uri = uri
-      # `default.dup` keeps the DEFAULTS hashes and arrays from being shared —
-      # and mutated — across Configuration instances.
+      # An explicit nil means "the default" (`headers: nil` must not crash every
+      # request), and `default.dup` keeps the DEFAULTS hashes and arrays from
+      # being shared — and mutated — across Configuration instances.
       DEFAULTS.each do |option, default|
-        instance_variable_set("@#{option}", options.key?(option) ? options[option] : default.dup)
+        instance_variable_set("@#{option}", options[option].nil? ? default.dup : options[option])
       end
       validate_polymorphic_relations
       # Only derivable from the conventional endpoint path: substituting on any

@@ -262,6 +262,54 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
       expect(result.first['value']).to eq(9_007_199_254_740_993)
     end
 
+    # A text value that happens to parse as a date must still compare lexically,
+    # the way SQL collates a text column.
+    it 'merges date-looking text lexically, not chronologically' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => '2 Jan 2021' } } } },
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'body' => '3 Feb 2020' } } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Max', field: 'body',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq('3 Feb 2020')
+    end
+
+    # On a real date column, lexical ordering lies as soon as offsets differ.
+    it 'merges a Max over a date column by instant' do
+      BankingSchema.stub_graphql_data(
+        {
+          'memberships' => [
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'created_at' => '2026-08-05T23:00:00+00:00' } } } },
+            { 'full_name' => 'Jane',
+              'comments_aggregate' => { 'aggregate' => { 'max' => { 'created_at' => '2026-08-06T00:30:00+02:00' } } } }
+          ]
+        }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Max', field: 'created_at',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result.first['value']).to eq('2026-08-05T23:00:00+00:00')
+    end
+
+    it 'rejects a relation as the aggregated field with a clear error' do
+      aggregation = toolkit_query::Aggregation.new(operation: 'Sum', field: 'membership')
+
+      expect { comments.aggregate(caller, filter, aggregation) }
+        .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not a column/)
+    end
+
     it 'merges a Max over text lexically instead of keeping the first row' do
       BankingSchema.stub_graphql_data(
         {

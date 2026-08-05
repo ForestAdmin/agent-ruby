@@ -39,7 +39,10 @@ module ForestAdminDatasourceGraphqlHasura
 
       def initialize(tables, configuration)
         @tables = tables
+        # Relationships reference the GraphQL type name, which only differs from
+        # the root field name when the Hasura metadata customizes root fields.
         @tables_by_name = tables.to_h { |table| [table.name, table] }
+                                .merge(tables.to_h { |table| [table.type_name, table] })
         @configuration = configuration
       end
 
@@ -147,7 +150,7 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         [relationship.name, Relations::ManyToOneSchema.new(
-          foreign_collection: collection_name_of(relationship.remote_table),
+          foreign_collection: collection_name_of(remote.name),
           foreign_key: foreign_key,
           foreign_key_target: relationship.mapping&.values&.first || primary_key_of(remote)
         )]
@@ -169,7 +172,7 @@ module ForestAdminDatasourceGraphqlHasura
         end
 
         [relationship.name, Relations::OneToManySchema.new(
-          foreign_collection: collection_name_of(relationship.remote_table),
+          foreign_collection: collection_name_of(remote.name),
           origin_key: origin_key,
           origin_key_target: relationship.mapping&.keys&.first || primary_key_of(table)
         )]
@@ -233,7 +236,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def reverse_polymorphic_name(table, child, polymorphic, fields)
         array_relationship = table.relationships.find do |rel|
-          rel.kind == :array && rel.remote_table == child.name && reverse_of?(rel, table, polymorphic)
+          rel.kind == :array && @tables_by_name[rel.remote_table] == child && reverse_of?(rel, table, polymorphic)
         end
 
         candidates = [array_relationship&.name, child.name, "#{child.name}_#{polymorphic.name}"].compact.uniq

@@ -71,6 +71,14 @@ module ForestAdminDatasourceGraphqlHasura
         expect { client.execute('query { ok }') }.to raise_error(TransportError, /unexpected body/)
       end
 
+      # A 204 passes the Net::HTTPSuccess check with a nil body, which
+      # JSON.parse would turn into an unwrapped TypeError.
+      it 'raises TransportError on an empty body' do
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI).to_return(status: 204, body: nil)
+
+        expect { client.execute('query { ok }') }.to raise_error(TransportError, /empty body/)
+      end
+
       it 'raises TransportError on a 200 carrying neither data nor errors' do
         WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
                .to_return(status: 200, body: JSON.generate({ 'data' => nil }))
@@ -80,6 +88,14 @@ module ForestAdminDatasourceGraphqlHasura
     end
 
     describe 'configuration' do
+      it 'treats an explicit nil option as the default' do
+        configuration = Configuration.new(uri: BankingSchema::GRAPHQL_URI, headers: nil)
+        WebMock.stub_request(:post, BankingSchema::GRAPHQL_URI)
+               .to_return(status: 200, body: JSON.generate({ 'data' => {} }))
+
+        expect(described_class.new(configuration).execute('query { ok }')).to eq({})
+      end
+
       it 'does not share default objects across instances' do
         first = Configuration.new(uri: BankingSchema::GRAPHQL_URI)
         second = Configuration.new(uri: BankingSchema::GRAPHQL_URI)
