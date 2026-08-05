@@ -2,9 +2,11 @@ module ForestAdminDatasourceGraphqlHasura
   module Introspection
     # name is the root field records are queried through; type_name is the
     # GraphQL OBJECT type, which relationships reference. They only differ when
-    # the Hasura metadata customizes the root fields.
+    # the Hasura metadata customizes the root fields. root_fields resolves the
+    # other operation roots: { aggregate:, insert:, update:, delete: }, custom
+    # names applied when the metadata declares them, derived otherwise.
     Table = Struct.new(:name, :type_name, :columns, :primary_key, :relationships, :polymorphics,
-                       keyword_init: true)
+                       :root_fields, keyword_init: true)
 
     Column = Struct.new(:name, :type, :graphql_type, :nullable, :is_primary_key, :is_array, :is_text,
                         keyword_init: true)

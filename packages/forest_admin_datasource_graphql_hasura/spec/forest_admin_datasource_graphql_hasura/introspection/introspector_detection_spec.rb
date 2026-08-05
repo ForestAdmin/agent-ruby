@@ -422,7 +422,7 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
   end
 
   describe 'customized root fields' do
-    def stub_people_schema(select_config: 'people')
+    def stub_people_schema(select_config: 'people', extra_roots: {})
       stub_schema(
         [
           {
@@ -443,7 +443,7 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       stub_metadata(
         [
           { 'table' => { 'schema' => 'public', 'name' => 'person_table' },
-            'configuration' => { 'custom_root_fields' => { 'select' => select_config } },
+            'configuration' => { 'custom_root_fields' => { 'select' => select_config }.merge(extra_roots) },
             'object_relationships' => [
               manual_object_rel('best_friend', 'person_table', { 'best_friend_ref' => 'id' })
             ] }
@@ -501,6 +501,29 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
       expect(queries[0]).to include('$where: person_table_bool_exp')
       expect(queries[0]).to include('people(where: $where)')
       expect(queries[1]).to include('insert_person_table(objects: $objects)')
+    end
+
+    it 'follows renamed mutation and aggregate roots from the metadata' do
+      stub_people_schema(extra_roots: { 'insert' => 'createPerson', 'select_aggregate' => 'peopleStats' })
+      collection = build_datasource.get_collection('PersonTable')
+      BankingSchema.stub_graphql_data(
+        { 'createPerson' => { 'returning' => [{ 'id' => 1 }] } },
+        { 'peopleStats' => { 'aggregate' => { 'count' => 3, 'row_count' => 3 } } }
+      )
+
+      toolkit = ForestAdminDatasourceToolkit::Components::Query
+      record = collection.create(nil, { 'best_friend_ref' => 1 })
+      result = collection.aggregate(nil, toolkit::Filter.new, toolkit::Aggregation.new(operation: 'Count'))
+
+      expect(record).to eq({ 'id' => 1 })
+      expect(result).to eq([{ 'value' => 3, 'group' => {} }])
+      queries = []
+      expect(WebMock).to(have_requested(:post, BankingSchema::GRAPHQL_URI).at_least_once.with do |req|
+        queries << JSON.parse(req.body)['query'] unless req.body.include?('IntrospectSchema')
+        true
+      end)
+      expect(queries[0]).to include('createPerson(objects: $objects)')
+      expect(queries[1]).to include('peopleStats')
     end
 
     # A custom-named select_by_pk root returns the bare object: it is a lookup,

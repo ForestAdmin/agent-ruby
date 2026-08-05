@@ -109,7 +109,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def simple(filter, aggregation)
         operation = QueryBuilder.aggregate(names, filter, aggregation)
-        data = @collection.execute(:aggregate, operation).dig("#{names[:base]}_aggregate", 'aggregate')
+        data = @collection.execute(:aggregate, operation).dig(names[:aggregate], 'aggregate')
 
         # One row even when the aggregate is null: the charts route reads
         # `result[0]['value']` unguarded.
@@ -190,7 +190,7 @@ module ForestAdminDatasourceGraphqlHasura
 
       def add_orphan_group(values, key, filter, aggregation, extra_where)
         operation = QueryBuilder.aggregate(names, filter, aggregation, extra_where: extra_where)
-        data = @collection.execute(:aggregate, operation).dig("#{names[:base]}_aggregate", 'aggregate')
+        data = @collection.execute(:aggregate, operation).dig(names[:aggregate], 'aggregate')
         return if childless?(data, aggregation)
 
         value = extract_value(data, aggregation)

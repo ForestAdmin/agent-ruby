@@ -3,11 +3,11 @@ module ForestAdminDatasourceGraphqlHasura
     # Builds Hasura GraphQL operations (queries and mutations) with variables.
     # All methods return { query:, variables: }.
     #
-    # names is { root:, base: }: `root` is the select root field (which
-    # custom_root_fields can rename freely), `base` is what every other
-    # generated name derives from — `<base>_bool_exp`, `insert_<base>`,
-    # `<base>_aggregate`… — namely the GraphQL type name. They only differ when
-    # the Hasura metadata renames the select root field.
+    # names is { root:, base:, aggregate:, insert:, update:, delete: }: `root`
+    # is the select root field, `base` (the GraphQL type name) is what the
+    # generated type names derive from — `<base>_bool_exp`,
+    # `<base>_insert_input`… — and the operation roots carry their resolved
+    # names, custom_root_fields applied when the metadata declares them.
     class QueryBuilder
       class << self
         # selection holds resolved GraphQL fields, nested relations included
@@ -42,7 +42,7 @@ module ForestAdminDatasourceGraphqlHasura
         def create(names, records, selection)
           query = <<~GRAPHQL
             mutation Insert#{camelize(names[:base])}($objects: [#{names[:base]}_insert_input!]!) {
-              insert_#{names[:base]}(objects: $objects) {
+              #{names[:insert]}(objects: $objects) {
                 returning {
                   #{selection.join("\n      ")}
                 }
@@ -65,7 +65,7 @@ module ForestAdminDatasourceGraphqlHasura
 
           query = <<~GRAPHQL
             mutation Update#{camelize(names[:base])}($where: #{names[:base]}_bool_exp!, $set: #{names[:base]}_set_input!) {
-              update_#{names[:base]}(where: $where, _set: $set) {
+              #{names[:update]}(where: $where, _set: $set) {
                 affected_rows
               }
             }
@@ -77,7 +77,7 @@ module ForestAdminDatasourceGraphqlHasura
         def delete(names, filter)
           query = <<~GRAPHQL
             mutation Delete#{camelize(names[:base])}($where: #{names[:base]}_bool_exp!) {
-              delete_#{names[:base]}(where: $where) {
+              #{names[:delete]}(where: $where) {
                 affected_rows
               }
             }
@@ -105,7 +105,7 @@ module ForestAdminDatasourceGraphqlHasura
 
           query = <<~GRAPHQL
             query Aggregate#{camelize(names[:base])}#{wrap(var_defs)} {
-              #{names[:base]}_aggregate#{wrap(args)} {
+              #{names[:aggregate]}#{wrap(args)} {
                 aggregate {
                   #{aggregation_selection(aggregation)}
                 }

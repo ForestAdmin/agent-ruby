@@ -13,8 +13,9 @@ module ForestAdminDatasourceGraphqlHasura
       @table = table
       @table_name = table.name
       # root is the select root field; base (the GraphQL type name) is what
-      # every other generated name derives from. See Query::QueryBuilder.
-      @names = { root: table.name, base: table.type_name }
+      # generated type names derive from; the operation roots carry their own
+      # resolved names, custom or derived. See Query::QueryBuilder.
+      @names = { root: table.name, base: table.type_name }.merge(table.root_fields || {})
       @client = client
       @converter = converter
 
@@ -33,9 +34,9 @@ module ForestAdminDatasourceGraphqlHasura
 
     def create(_caller, data)
       operation = Query::QueryBuilder.create(@names, [writable_columns(data)], column_names)
-      returning = execute(:create, operation).dig("insert_#{@names[:base]}", 'returning')
+      returning = execute(:create, operation).dig(@names[:insert], 'returning')
 
-      raise GraphqlError, "No record returned by insert_#{@names[:base]}" if returning.nil? || returning.empty?
+      raise GraphqlError, "No record returned by #{@names[:insert]}" if returning.nil? || returning.empty?
 
       returning.first
     end

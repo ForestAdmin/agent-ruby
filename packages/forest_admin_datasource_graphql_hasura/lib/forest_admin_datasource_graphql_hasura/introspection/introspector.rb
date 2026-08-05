@@ -75,6 +75,7 @@ module ForestAdminDatasourceGraphqlHasura
         metadata = @client.fetch_metadata
 
         @type_map = build_type_map(types)
+        @custom_root_fields = {}
         @relationship_mappings = metadata ? safe_relationship_mappings(metadata) : {}
         @primary_keys = parse_primary_keys(query_fields)
 
@@ -109,6 +110,7 @@ module ForestAdminDatasourceGraphqlHasura
           '[forest_admin_datasource_graphql_hasura] Hasura metadata could not be parsed ' \
           "(#{e.class}: #{e.message}); falling back to configuration and naming conventions."
         )
+        @custom_root_fields = {}
         {}
       end
 
@@ -147,6 +149,8 @@ module ForestAdminDatasourceGraphqlHasura
         return unless table_info.is_a?(Hash)
 
         exposed = exposed_root_field(table, table_info)
+        custom = normalized_root_fields(table)
+        @custom_root_fields[exposed] = custom if custom.any?
 
         relationships = (table['object_relationships'] || []).map { |rel| [rel, :object] } +
                         (table['array_relationships'] || []).map { |rel| [rel, :array] }
@@ -194,6 +198,18 @@ module ForestAdminDatasourceGraphqlHasura
         table_name = table_info['name']
 
         schema_name.nil? || schema_name == 'public' ? table_name : "#{schema_name}_#{table_name}"
+      end
+
+      # Every custom root field, values flattened to their string form (the
+      # metadata also allows { name:, comment: } objects).
+      def normalized_root_fields(table)
+        config = table.dig('configuration', 'custom_root_fields')
+        return {} unless config.is_a?(Hash)
+
+        config.each_with_object({}) do |(operation, value), memo|
+          value = value['name'] if value.is_a?(Hash)
+          memo[operation] = value if value.is_a?(String)
+        end
       end
 
       # A nil column stands for the primary key of that table: a foreign key
@@ -275,8 +291,22 @@ module ForestAdminDatasourceGraphqlHasura
           columns: columns,
           primary_key: resolve_primary_key(type['name'], columns),
           relationships: relations.map { |field| parse_relationship(table_name, field) },
-          polymorphics: []
+          polymorphics: [],
+          root_fields: resolve_root_fields(table_name, type['name'])
         )
+      end
+
+      # The operation roots derive from the type name unless the metadata
+      # renames them — same resolution the select root already gets.
+      def resolve_root_fields(table_name, type_name)
+        custom = @custom_root_fields[table_name] || {}
+
+        {
+          aggregate: custom['select_aggregate'] || "#{type_name}_aggregate",
+          insert: custom['insert'] || "insert_#{type_name}",
+          update: custom['update'] || "update_#{type_name}",
+          delete: custom['delete'] || "delete_#{type_name}"
+        }
       end
 
       # Introspection metadata and the `<relation>_aggregate` objects Hasura adds
