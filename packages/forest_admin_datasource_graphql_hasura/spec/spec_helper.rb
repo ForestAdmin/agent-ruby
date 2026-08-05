@@ -10,7 +10,7 @@ end
 SimpleCov.start do
   add_filter '/spec/'
   enable_coverage :branch
-  minimum_coverage 80
+  minimum_coverage 90
 end
 
 SimpleCov.coverage_dir 'coverage'

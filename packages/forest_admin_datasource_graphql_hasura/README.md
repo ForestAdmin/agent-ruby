@@ -61,7 +61,7 @@ type_values: { 'bank_accounts' => 'Banking::Account' }
 | --- | --- |
 | `uri` | Hasura GraphQL endpoint (required) |
 | `headers` | HTTP headers, e.g. admin secret or JWT |
-| `metadata_uri` | Metadata endpoint (default: `uri` with `/v1/graphql` → `/v1/metadata`) |
+| `metadata_uri` | Metadata endpoint (default: `uri` with `/v1/graphql` → `/v1/metadata`; not derived — and detection skipped — when `uri` has no `/v1/graphql` segment) |
 | `included_tables` / `excluded_tables` | Allow/deny lists of table names |
 | `polymorphic_relations` | Explicit polymorphic declarations (see above) |
 | `type_values` | Table → Rails class name overrides |
@@ -76,9 +76,12 @@ type_values: { 'bank_accounts' => 'Banking::Account' }
   is left alone.
 - **Grouped aggregations** (charts) work on a foreign key, or on a `<relation>:<column>`
   path through a ManyToOne (leaderboard charts) whose reverse relationship is declared in
-  Hasura: Hasura exposes GROUP BY only through nested `<relation>_aggregate` fields. Other
-  columns are advertised as non-groupable, and date truncation is not supported. Grouped
-  aggregation reads at most 1000 parent rows and logs a warning beyond that.
+  Hasura: Hasura exposes GROUP BY only through nested `<relation>_aggregate` fields. A
+  foreign key without a declared reverse relationship is advertised as non-groupable, like
+  every other column, and date truncation is not supported. Rows whose foreign key is NULL
+  form a bucket of their own, as SQL grouping would. Parent rows are filtered by the
+  chart's predicate and paginated by 1000; a chart spanning more than 10 000 parent rows
+  fails with a clear error rather than returning partial numbers.
 - **Tables without a primary key** (typically untracked views) are skipped: Forest cannot
   address their records.
 - Filtering and sorting through a polymorphic relation is not possible (a Forest Admin
@@ -92,6 +95,9 @@ type_values: { 'bank_accounts' => 'Banking::Account' }
 - A `*_type` value matching no exposed collection (a legacy STI subclass name, an excluded
   target) leaves the reference empty and logs a warning, rather than failing the page.
 - `bytea` columns are surfaced as text (Hasura returns them hex-encoded).
+- Errors Hasura returns (a permission rule, an invalid value) surface as HTTP 400 with the
+  original message; an unreachable endpoint (timeout, DNS, TLS, non-2xx response) surfaces
+  as HTTP 503, so infrastructure incidents stay visible to monitoring.
 
 ## Validating against a real instance
 
