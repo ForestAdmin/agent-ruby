@@ -345,6 +345,117 @@ module ForestAdminAgent
               end
               expect(result[:name]).to eq('member')
             end
+
+            it 'stores the namespaced model name, not the formatted collection name' do
+              collection_account = build_collection(
+                name: 'Banking__Sepa__Transfer',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'iban' => ColumnSchema.new(column_type: 'String')
+                  }
+                }
+              )
+
+              collection_member = build_collection(
+                name: 'member',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
+                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
+                      foreign_collections: ['Banking__Sepa__Transfer'],
+                      foreign_key: 'memberable_id',
+                      foreign_key_type_field: 'memberable_type',
+                      foreign_key_targets: { 'Banking__Sepa__Transfer' => 'id' }
+                    )
+                  }
+                }
+              )
+
+              @datasource.add_collection(collection_account)
+              @datasource.add_collection(collection_member)
+
+              args[:params][:data] = {
+                attributes: {},
+                relationships: { 'memberable' => { 'data' => { 'type' => 'Banking__Sepa__Transfer', 'id' => 3 } } },
+                type: 'Member'
+              }
+              args[:params]['collection_name'] = 'member'
+              allow(@datasource.get_collection('member')).to receive_messages(
+                create: { 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Banking::Sepa::Transfer' },
+                list: [{ 'id' => 1, 'memberable_id' => 3, 'memberable_type' => 'Banking::Sepa::Transfer' }]
+              )
+
+              store.handle_request(args)
+              expect(@datasource.get_collection('member')).to have_received(:create) do |_caller, data|
+                expect(data).to eq({ 'memberable_id' => 3, 'memberable_type' => 'Banking::Sepa::Transfer' })
+              end
+            end
+
+            it 'clears both columns when the relationship carries no data' do
+              collection_company = build_collection(
+                name: 'company',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    )
+                  }
+                }
+              )
+
+              collection_member = build_collection(
+                name: 'member',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
+                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
+                      foreign_collections: ['company'],
+                      foreign_key: 'memberable_id',
+                      foreign_key_type_field: 'memberable_type',
+                      foreign_key_targets: { 'company' => 'id' }
+                    )
+                  }
+                }
+              )
+
+              @datasource.add_collection(collection_company)
+              @datasource.add_collection(collection_member)
+
+              args[:params][:data] = {
+                attributes: {},
+                relationships: { 'memberable' => { 'data' => nil } },
+                type: 'Member'
+              }
+              args[:params]['collection_name'] = 'member'
+              allow(@datasource.get_collection('member')).to receive_messages(
+                create: { 'id' => 1, 'memberable_id' => nil, 'memberable_type' => nil },
+                list: [{ 'id' => 1, 'memberable_id' => nil, 'memberable_type' => nil }]
+              )
+
+              store.handle_request(args)
+              expect(@datasource.get_collection('member')).to have_received(:create) do |_caller, data|
+                expect(data).to eq({ 'memberable_id' => nil, 'memberable_type' => nil })
+              end
+            end
           end
         end
       end
