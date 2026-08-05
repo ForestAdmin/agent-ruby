@@ -380,9 +380,10 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
         .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /more than 10000/)
     end
 
-    # SQL grouping would put comments whose membership_id is NULL in their own
-    # bucket; the parent-table detour cannot see them.
-    it 'adds a bucket for the rows whose foreign key is null' do
+    # SQL grouping would put comments without a matching membership — NULL or
+    # dangling foreign key — in the LEFT JOIN's NULL bucket; the parent-table
+    # detour cannot see them, so they are caught by negating the relationship.
+    it 'adds a bucket for the rows without a matching parent' do
       BankingSchema.stub_graphql_data(
         { 'memberships' => [{ 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } }] },
         { 'comments_aggregate' => { 'aggregate' => { 'count' => 2 } } }
@@ -395,7 +396,7 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
                              { 'value' => 3, 'group' => { 'membership_id' => 1 } },
                              { 'value' => 2, 'group' => { 'membership_id' => nil } }
                            ])
-      expect(last_graphql_request['variables']['where']).to eq({ 'membership_id' => { '_is_null' => true } })
+      expect(last_graphql_request['variables']['where']).to eq({ '_not' => { 'membership' => {} } })
     end
 
     it 'rejects grouping on the polymorphic foreign key with a clear error' do

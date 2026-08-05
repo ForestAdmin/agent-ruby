@@ -79,7 +79,8 @@ type_values: { 'bank_accounts' => 'Banking::Account' }
   Hasura: Hasura exposes GROUP BY only through nested `<relation>_aggregate` fields. A
   foreign key without a declared reverse relationship is advertised as non-groupable, like
   every other column, and date truncation is not supported. Rows whose foreign key is NULL
-  form a bucket of their own, as SQL grouping would. Parent rows are filtered by the
+  form a bucket of their own, as SQL grouping would — dangling foreign keys (possible on a
+  constraint-less relationship) join that bucket rather than being dropped. Parent rows are filtered by the
   chart's predicate and paginated by 1000; a chart spanning more than 10 000 parent rows
   fails with a clear error rather than returning partial numbers.
 - **Tables without a primary key** (typically untracked views) are skipped: Forest cannot

@@ -141,16 +141,17 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      # SQL grouping puts rows whose foreign key is NULL in a bucket of their own;
-      # the parent-table detour cannot see them, so they are aggregated apart. The
-      # nil key can pre-exist (a parent whose grouped column is null): both are the
-      # NULL group of a LEFT JOIN, so they merge.
+      # Rows without a matching parent — a NULL foreign key, or a dangling one on
+      # a constraint-less relationship — are invisible to the parent-table detour:
+      # `_not: { relation: {} }` is how Hasura selects them, and a LEFT JOIN would
+      # put them in its NULL group. When grouping by the foreign key itself, SQL
+      # would keep a dangling key as a group of its own; Hasura cannot enumerate
+      # those keys, so they land in the nil bucket too, rather than being dropped.
+      # The nil key can pre-exist (a parent whose grouped column is null): both
+      # are the NULL group of a LEFT JOIN, so they merge.
       def add_null_group(values, relation, filter, aggregation)
-        foreign_key = fields[relation[:foreign_key]]
-        return if foreign_key.nil? || foreign_key.validation.any? # non-nullable: no orphan rows
-
         operation = QueryBuilder.aggregate(table_name, filter, aggregation,
-                                           extra_where: { relation[:foreign_key] => { '_is_null' => true } })
+                                           extra_where: { '_not' => { relation[:child_relation_name] => {} } })
         data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
         value = extract_value(data, aggregation)
         return if childless_parent?(value, aggregation)
@@ -200,7 +201,7 @@ module ForestAdminDatasourceGraphqlHasura
       # (`membership:full_name`, what leaderboard charts request).
       def find_group_relation(group_field)
         field_name, parent_column = group_field.split(':')
-        relation, foreign_key = resolve_group_relation(field_name)
+        relation_name, relation, foreign_key = resolve_group_relation(field_name)
         reverse = relation && reverse_relation_name(relation, foreign_key)
 
         unless reverse
@@ -215,7 +216,7 @@ module ForestAdminDatasourceGraphqlHasura
           parent_table: parent.table_name,
           parent_field: parent_column || relation.foreign_key_target,
           relation_name: reverse,
-          foreign_key: foreign_key,
+          child_relation_name: relation_name,
           parent_order_fields: primary_keys_of(parent)
         }
       end
@@ -227,11 +228,16 @@ module ForestAdminDatasourceGraphqlHasura
                   .keys
       end
 
+      # Returns [relation_name, relation_schema, foreign_key]. The relation name
+      # is also the Hasura object relationship on the child table, which the
+      # orphan query of add_null_group negates.
       def resolve_group_relation(field_name)
         field = fields[field_name]
-        return [field, field.foreign_key] if field&.type == 'ManyToOne'
+        return [field_name, field, field.foreign_key] if field&.type == 'ManyToOne'
 
-        [fields.values.find { |f| f.type == 'ManyToOne' && f.foreign_key == field_name }, field_name]
+        name, relation = fields.find { |_, f| f.type == 'ManyToOne' && f.foreign_key == field_name }
+
+        [name, relation, field_name]
       end
 
       def reverse_relation_name(relation, foreign_key)
