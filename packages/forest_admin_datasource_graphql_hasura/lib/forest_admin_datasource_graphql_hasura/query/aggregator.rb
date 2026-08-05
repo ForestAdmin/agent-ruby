@@ -16,6 +16,10 @@ module ForestAdminDatasourceGraphqlHasura
       PARENT_PAGE = 1000
       MAX_PARENT_ROWS = 10_000
 
+      # At most this many distinct dangling foreign keys get a group of their
+      # own; beyond that the data is corrupt enough to deserve an error.
+      DANGLING_KEYS_LIMIT = 100
+
       def initialize(collection)
         @collection = collection
       end
@@ -113,7 +117,7 @@ module ForestAdminDatasourceGraphqlHasura
         group_field = aggregation.groups.first[:field]
         relation = find_group_relation(group_field)
         values = collect_groups(fetch_parent_rows(relation, filter, aggregation), relation, aggregation)
-        add_null_group(values, relation, filter, aggregation)
+        add_orphan_groups(values, relation, filter, aggregation)
 
         results = values
                   .map { |key, value| { 'value' => value, 'group' => { group_field => key } } }
@@ -158,24 +162,52 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      # Rows without a matching parent — a NULL foreign key, or a dangling one on
-      # a constraint-less relationship — are invisible to the parent-table detour:
-      # `_not: { relation: {} }` is how Hasura selects them, and a LEFT JOIN would
-      # put them in its NULL group. When grouping by the foreign key itself, SQL
-      # would keep a dangling key as a group of its own; Hasura cannot enumerate
-      # those keys, so they land in the nil bucket too, rather than being dropped.
-      # The nil key can pre-exist (a parent whose grouped column is null): both
-      # are the NULL group of a LEFT JOIN, so they merge.
-      def add_null_group(values, relation, filter, aggregation)
+      # Rows without a matching parent are invisible to the parent-table detour.
+      # Grouped by a parent column, they are the NULL group of a LEFT JOIN — nil
+      # and dangling foreign keys alike (`_not: { relation: {} }` selects both).
+      # Grouped by the foreign key itself, SQL keeps each dangling key as a group
+      # of its own: those keys are enumerated and aggregated one by one, and only
+      # truly NULL keys fall into the nil bucket.
+      def add_orphan_groups(values, relation, filter, aggregation)
         return unless relation[:orphans_possible]
 
-        operation = QueryBuilder.aggregate(table_name, filter, aggregation,
-                                           extra_where: { '_not' => { relation[:child_relation_name] => {} } })
+        if relation[:fk_grouping]
+          dangling_keys(relation, filter).each do |key|
+            add_orphan_group(values, key, filter, aggregation, { relation[:foreign_key] => { '_eq' => key } })
+          end
+          add_orphan_group(values, nil, filter, aggregation,
+                           { relation[:foreign_key] => { '_is_null' => true } })
+        else
+          # The nil key can pre-exist (a parent whose grouped column is null):
+          # both are the NULL group of a LEFT JOIN, so they merge.
+          add_orphan_group(values, nil, filter, aggregation,
+                           { '_not' => { relation[:child_relation_name] => {} } })
+        end
+      end
+
+      def add_orphan_group(values, key, filter, aggregation, extra_where)
+        operation = QueryBuilder.aggregate(table_name, filter, aggregation, extra_where: extra_where)
         data = @collection.execute(:aggregate, operation).dig("#{table_name}_aggregate", 'aggregate')
         return if childless?(data, aggregation)
 
         value = extract_value(data, aggregation)
-        values[nil] = values.key?(nil) ? merge_values(values[nil], value, aggregation) : value
+        values[key] = values.key?(key) ? merge_values(values[key], value, aggregation) : value
+      end
+
+      def dangling_keys(relation, filter)
+        operation = QueryBuilder.orphan_keys(table_name, filter, relation[:foreign_key],
+                                             relation[:child_relation_name], DANGLING_KEYS_LIMIT)
+        rows = @collection.execute(:aggregate, operation)[table_name] || []
+        keys = rows.map { |row| row[relation[:foreign_key]] }
+
+        if keys.size >= DANGLING_KEYS_LIMIT
+          raise ForestException,
+                "Grouped aggregation on '#{name}': more than #{DANGLING_KEYS_LIMIT} distinct " \
+                "'#{relation[:foreign_key]}' values reference no parent row; clean the data up " \
+                'or narrow the chart filter.'
+        end
+
+        keys
       end
 
       # Two parent rows can share a group value — grouping by a name rather than by
@@ -247,6 +279,8 @@ module ForestAdminDatasourceGraphqlHasura
           parent_field: parent_column || relation.foreign_key_target,
           relation_name: reverse,
           child_relation_name: relation_name,
+          foreign_key: foreign_key,
+          fk_grouping: parent_column.nil?,
           parent_order_fields: primary_keys_of(parent),
           orphans_possible: orphans_possible?(relation_name, relation)
         }

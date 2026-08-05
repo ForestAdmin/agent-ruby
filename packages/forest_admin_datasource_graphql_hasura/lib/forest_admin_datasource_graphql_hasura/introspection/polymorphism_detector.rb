@@ -70,7 +70,9 @@ module ForestAdminDatasourceGraphqlHasura
         configured_tables = @configuration.polymorphic_relations.dig(table.name, base)
         foreign_key = "#{base}_id"
 
-        candidates = table.relationships.select { |rel| branch?(rel, foreign_key, configured_tables) }
+        candidates = table.relationships.select do |rel|
+          branch?(rel, foreign_key, configured_tables, tables_by_name)
+        end
 
         candidates.group_by(&:remote_table).each_with_object({}) do |(remote_table, relationships), memo|
           target_table = tables_by_name[remote_table]
@@ -78,7 +80,7 @@ module ForestAdminDatasourceGraphqlHasura
           next if ambiguous_branch?(table, base, target_table.name, relationships)
 
           relationship = relationships.first
-          memo[class_name_of(target_table.name)] = {
+          memo[class_name_of(target_table)] = {
             table: target_table.name,
             hasura_field: relationship.name,
             primary_key: relationship.mapping&.values&.first || target_table.primary_key.first || 'id'
@@ -101,13 +103,21 @@ module ForestAdminDatasourceGraphqlHasura
         true
       end
 
-      def branch?(relationship, foreign_key, configured_tables)
+      def branch?(relationship, foreign_key, configured_tables, tables_by_name)
         return false unless relationship.kind == :object
         # A known mapping is checked even when the target is configured: a table
         # may hold both an ordinary relationship and a polymorphic branch towards
         # the same target, and they must not be mistaken for one another.
         return false unless relationship.mapping.nil? || relationship.mapping.keys == [foreign_key]
-        return configured_tables.include?(relationship.remote_table) if configured_tables
+
+        if configured_tables
+          # The configuration names tables; the relationship carries the GraphQL
+          # type name, which custom_root_fields can decouple from the root field.
+          target = tables_by_name[relationship.remote_table]
+
+          # & rather than intersect?, which needs Ruby >= 3.1.
+          return (configured_tables & [target&.name, target&.type_name].compact).any?
+        end
 
         # A relationship backed by a real foreign key constraint is monomorphic by
         # definition: accepting one here would absorb a legitimate belongs_to
@@ -115,8 +125,10 @@ module ForestAdminDatasourceGraphqlHasura
         relationship.manual
       end
 
-      def class_name_of(table_name)
-        @configuration.type_values[table_name] || table_name.classify
+      def class_name_of(table)
+        @configuration.type_values[table.name] ||
+          @configuration.type_values[table.type_name] ||
+          table.type_name.classify
       end
     end
   end

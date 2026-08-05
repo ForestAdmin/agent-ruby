@@ -432,12 +432,14 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
         ]
       )
 
-      fields = build_datasource.get_collection('Person').schema[:fields]
+      # The Rails class name follows the underlying type (person_table), not
+      # the renamed root field (people).
+      fields = build_datasource.get_collection('PersonTable').schema[:fields]
 
       expect(fields['id'].is_primary_key).to be(true)
       expect(fields['best_friend'].type).to eq('ManyToOne')
       expect(fields['best_friend'].foreign_key).to eq('best_friend_ref')
-      expect(fields['best_friend'].foreign_collection).to eq('Person')
+      expect(fields['best_friend'].foreign_collection).to eq('PersonTable')
     end
   end
 

@@ -46,8 +46,15 @@ module ForestAdminDatasourceGraphqlHasura
         @configuration = configuration
       end
 
+      # Rails stores the class name derived from the Postgres table, which the
+      # GraphQL type name follows — not the root field, which custom_root_fields
+      # can rename freely. type_values accepts either name.
       def rails_class_name_of(table_name)
-        @configuration.type_values[table_name] || table_name.classify
+        table = @tables_by_name[table_name]
+
+        @configuration.type_values[table_name] ||
+          (table && @configuration.type_values[table.type_name]) ||
+          (table&.type_name || table_name).classify
       end
 
       # 'Banking::Account' -> 'Banking__Account'
@@ -162,7 +169,9 @@ module ForestAdminDatasourceGraphqlHasura
         return [relationship.name, nil] if covered_by_reverse_polymorphic?(table, relationship, remote)
         return [relationship.name, nil] unless single_column_mapping?(table, relationship)
 
-        origin_key = relationship.mapping&.values&.first || "#{table.name.singularize}_id"
+        # The conventional foreign key follows the underlying table (type_name),
+        # not a root field custom_root_fields may have renamed.
+        origin_key = relationship.mapping&.values&.first || "#{table.type_name.singularize}_id"
 
         unless remote.columns.any? { |column| column.name == origin_key }
           skip_relationship(table, relationship, "origin key '#{origin_key}' does not exist on " \

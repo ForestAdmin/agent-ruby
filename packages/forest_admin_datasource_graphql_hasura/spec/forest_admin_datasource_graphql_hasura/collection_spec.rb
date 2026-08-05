@@ -491,12 +491,12 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
         .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /more than 10000/)
     end
 
-    # SQL grouping would put comments without a matching membership — NULL or
-    # dangling foreign key — in the LEFT JOIN's NULL bucket; the parent-table
-    # detour cannot see them, so they are caught by negating the relationship.
-    it 'adds a bucket for the rows without a matching parent' do
+    # Grouping by the foreign key, SQL gives rows whose key is NULL a bucket of
+    # their own; the parent-table detour cannot see them.
+    it 'adds a bucket for the rows whose foreign key is null' do
       BankingSchema.stub_graphql_data(
         { 'memberships' => [{ 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } }] },
+        { 'comments' => [] },
         { 'comments_aggregate' => { 'aggregate' => { 'count' => 2 } } }
       )
 
@@ -507,6 +507,45 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Collection do
                              { 'value' => 3, 'group' => { 'membership_id' => 1 } },
                              { 'value' => 2, 'group' => { 'membership_id' => nil } }
                            ])
+      expect(last_graphql_request['variables']['where']).to eq({ 'membership_id' => { '_is_null' => true } })
+    end
+
+    # SQL keeps a dangling key (a value referencing no parent row) as a group of
+    # its own when grouping by the foreign key — not merged into the NULL bucket.
+    it 'keeps each dangling foreign key as its own group' do
+      BankingSchema.stub_graphql_data(
+        { 'memberships' => [{ 'id' => 1, 'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } }] },
+        { 'comments' => [{ 'membership_id' => 42 }] },
+        { 'comments_aggregate' => { 'aggregate' => { 'count' => 5 } } },
+        { 'comments_aggregate' => { 'aggregate' => { 'count' => 0, 'row_count' => 0 } } }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count', groups: [{ field: 'membership_id' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to eq([
+                             { 'value' => 5, 'group' => { 'membership_id' => 42 } },
+                             { 'value' => 3, 'group' => { 'membership_id' => 1 } }
+                           ])
+      requests = graphql_requests
+      expect(requests[1]['query']).to include('distinct_on: [membership_id]')
+      expect(requests[2]['variables']['where']).to eq({ 'membership_id' => { '_eq' => 42 } })
+    end
+
+    # Grouping by a parent column, NULL and dangling keys alike are the NULL
+    # group of a LEFT JOIN: one negated-relationship aggregate covers both.
+    it 'adds a single null bucket when grouping through a parent column' do
+      BankingSchema.stub_graphql_data(
+        { 'memberships' => [{ 'full_name' => 'Jane',
+                              'comments_aggregate' => { 'aggregate' => { 'count' => 3 } } }] },
+        { 'comments_aggregate' => { 'aggregate' => { 'count' => 2 } } }
+      )
+
+      aggregation = toolkit_query::Aggregation.new(operation: 'Count',
+                                                   groups: [{ field: 'membership:full_name' }])
+      result = comments.aggregate(caller, filter, aggregation)
+
+      expect(result).to include({ 'value' => 2, 'group' => { 'membership:full_name' => nil } })
       expect(last_graphql_request['variables']['where']).to eq({ '_not' => { 'membership' => {} } })
     end
 

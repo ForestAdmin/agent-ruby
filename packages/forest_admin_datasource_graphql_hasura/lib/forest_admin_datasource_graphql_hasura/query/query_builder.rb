@@ -146,6 +146,26 @@ module ForestAdminDatasourceGraphqlHasura
           { query: query, variables: variables }
         end
 
+        # Distinct values of `column` among rows without a matching parent — the
+        # dangling foreign keys a grouped chart must keep as groups of their own.
+        # distinct_on requires the matching order_by.
+        def orphan_keys(table, filter, column, relation_name, limit)
+          where = combine(
+            FilterConverter.convert(filter.condition_tree),
+            { '_and' => [{ '_not' => { relation_name => {} } }, { column => { '_is_null' => false } }] }
+          )
+
+          query = <<~GRAPHQL
+            query OrphanKeys#{camelize(table)}($where: #{table}_bool_exp, $limit: Int) {
+              #{table}(where: $where, distinct_on: [#{column}], order_by: [{ #{column}: asc }], limit: $limit) {
+                #{column}
+              }
+            }
+          GRAPHQL
+
+          { query: query, variables: { 'where' => where, 'limit' => limit } }
+        end
+
         def aggregation_selection(aggregation)
           operation = aggregation.operation
 
