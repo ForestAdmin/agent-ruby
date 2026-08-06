@@ -211,6 +211,7 @@ module ForestAdminAgent
 
         begin
           response = client.post('/forest/apimaps/hashcheck', { schemaFileHash: hash }.to_json)
+          client.raise_for_response!(response)
           body = JSON.parse(response.body)
           body['sendSchema']
         rescue JSON::ParserError => e
@@ -281,7 +282,8 @@ module ForestAdminAgent
       def send_schema_to_server(api_map)
         ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
         client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        client.post('/forest/apimaps', api_map.to_json)
+        response = client.post('/forest/apimaps', api_map.to_json)
+        client.raise_for_response!(response)
       rescue Faraday::Error => e
         status = e.response[:status] if e.response
         if status

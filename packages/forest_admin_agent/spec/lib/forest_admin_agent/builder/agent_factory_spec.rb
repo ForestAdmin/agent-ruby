@@ -543,12 +543,15 @@ module ForestAdminAgent
           end
 
           it 'logs success message and posts schema when successful' do
-            allow(client).to receive(:post).with('/forest/apimaps', api_map.to_json)
+            response = instance_double(Faraday::Response)
+            allow(client).to receive(:post).with('/forest/apimaps', api_map.to_json).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
 
             instance.send(:send_schema_to_server, api_map)
 
             expect(logger).to have_received(:log).with('Info', 'schema was updated, sending new version')
             expect(client).to have_received(:post).with('/forest/apimaps', api_map.to_json)
+            expect(client).to have_received(:raise_for_response!).with(response)
           end
 
           context 'when error occurs with HTTP status' do
@@ -600,6 +603,68 @@ module ForestAdminAgent
 
               expect(logger).to have_received(:log).with('Error', 'Failed to send schema: cannot reach ForestAdmin server')
             end
+          end
+        end
+
+        describe 'do_server_want_schema' do
+          let(:instance) { described_class.instance }
+          let(:client) { instance_double(ForestAdminAgent::Http::ForestAdminApiRequester) }
+
+          before do
+            allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:new).and_return(client)
+          end
+
+          it 'returns true when the server asks for the schema' do
+            response = instance_double(Faraday::Response, body: { sendSchema: true }.to_json)
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect(instance.send(:do_server_want_schema, 'abc123')).to be true
+          end
+
+          it 'returns false when the server already has this schema' do
+            response = instance_double(Faraday::Response, body: { sendSchema: false }.to_json)
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect(instance.send(:do_server_want_schema, 'abc123')).to be false
+          end
+
+          it 'propagates the error raised by raise_for_response! (e.g. an invalid envSecret)' do
+            response = instance_double(Faraday::Response, status: 404, body: '{"errors":[]}')
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response).and_raise(
+              ForestAdminAgent::Http::Exceptions::NotFoundError.new(
+                'ForestAdmin server failed to find the project related to the envSecret you configured. ' \
+                'Can you check that you copied it properly in the Forest initialization?'
+              )
+            )
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, /envSecret/)
+          end
+
+          it 'raises InternalServerError when the response body is not valid JSON' do
+            response = instance_double(Faraday::Response, status: 200, body: 'not json')
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, /Invalid JSON response/)
+          end
+
+          it 'delegates to handle_response_error when the connection itself fails' do
+            error = Faraday::ConnectionFailed.new('Failed to open TCP connection')
+            allow(client).to receive(:post).and_raise(error)
+            allow(client).to receive(:handle_response_error).with(error).and_raise(
+              ForestAdminAgent::Http::Exceptions::BadGatewayError.new('Failed to reach ForestAdmin server. Are you online?')
+            )
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::BadGatewayError)
           end
         end
       end
