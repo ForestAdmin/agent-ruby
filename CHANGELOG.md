@@ -1,3 +1,10 @@
+## [1.37.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.0...v1.37.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* surface HTTP errors instead of silently skipping schema sync ([#344](https://github.com/ForestAdmin/agent-ruby/issues/344)) ([ac7a4a0](https://github.com/ForestAdmin/agent-ruby/commit/ac7a4a0b0feb749e0ddc8fb7e8953e0cf0630444))
+
 # [1.37.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.3...v1.37.0) (2026-08-06)
 
 
