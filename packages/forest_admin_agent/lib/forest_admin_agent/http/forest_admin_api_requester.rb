@@ -50,12 +50,12 @@ module ForestAdminAgent
       def raise_for_response!(response)
         return if response.success?
 
-        raise_for_status(response.status)
+        raise_for_status(response.status, message: response.reason_phrase)
       end
 
       private
 
-      def raise_for_status(status, cause: nil)
+      def raise_for_status(status, cause: nil, message: cause&.message)
         if status.zero? || status == 502
           raise BadGatewayError.new(
             'Failed to reach ForestAdmin server. Are you online?',
@@ -81,7 +81,7 @@ module ForestAdminAgent
 
         raise InternalServerError.new(
           'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.',
-          details: { status: status },
+          details: { status: status, message: message },
           cause: cause
         )
       end

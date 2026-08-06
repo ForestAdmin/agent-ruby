@@ -91,6 +91,12 @@ module ForestAdminAgent
             'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.'
           )
         end
+
+        it 'keeps the original error message in details for diagnostics' do
+          expect do
+            forest_admin_api_requester.handle_response_error(Faraday::ConnectionFailed.new('test', { status: 500 }))
+          end.to(raise_error { |error| expect(error.details[:message]).to eq('test') })
+        end
       end
 
       context 'when raise_for_response! is called' do
@@ -101,7 +107,7 @@ module ForestAdminAgent
         end
 
         it 'raises NotFoundError when the response status is 404 (e.g. an invalid envSecret)' do
-          response = instance_double(Faraday::Response, success?: false, status: 404)
+          response = instance_double(Faraday::Response, success?: false, status: 404, reason_phrase: 'Not Found')
 
           expect do
             forest_admin_api_requester.raise_for_response!(response)
@@ -112,7 +118,7 @@ module ForestAdminAgent
         end
 
         it 'raises BadGatewayError when the response status is 502' do
-          response = instance_double(Faraday::Response, success?: false, status: 502)
+          response = instance_double(Faraday::Response, success?: false, status: 502, reason_phrase: 'Bad Gateway')
 
           expect do
             forest_admin_api_requester.raise_for_response!(response)
@@ -123,7 +129,7 @@ module ForestAdminAgent
         end
 
         it 'raises ServiceUnavailableError when the response status is 503' do
-          response = instance_double(Faraday::Response, success?: false, status: 503)
+          response = instance_double(Faraday::Response, success?: false, status: 503, reason_phrase: 'Service Unavailable')
 
           expect do
             forest_admin_api_requester.raise_for_response!(response)
@@ -134,7 +140,7 @@ module ForestAdminAgent
         end
 
         it 'raises InternalServerError for any other error status' do
-          response = instance_double(Faraday::Response, success?: false, status: 500)
+          response = instance_double(Faraday::Response, success?: false, status: 500, reason_phrase: 'Internal Server Error')
 
           expect do
             forest_admin_api_requester.raise_for_response!(response)
@@ -142,6 +148,14 @@ module ForestAdminAgent
             ForestAdminAgent::Http::Exceptions::InternalServerError,
             'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.'
           )
+        end
+
+        it 'keeps the response reason phrase in details for diagnostics' do
+          response = instance_double(Faraday::Response, success?: false, status: 500, reason_phrase: 'Internal Server Error')
+
+          expect do
+            forest_admin_api_requester.raise_for_response!(response)
+          end.to(raise_error { |error| expect(error.details[:message]).to eq('Internal Server Error') })
         end
       end
     end
