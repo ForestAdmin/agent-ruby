@@ -34,32 +34,65 @@ module ForestAdminAgent
               }
             end
 
-            it 'raises a ValidationError when env_secret is too short' do
-              expect do
-                instance.setup(valid_options.merge(env_secret: 'abc123'))
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+            context 'when running in production' do
+              let(:prod_options) { valid_options.merge(is_production: true) }
+
+              it 'raises a ValidationError when env_secret is too short' do
+                expect do
+                  instance.setup(prod_options.merge(env_secret: 'abc123'))
+                end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+              end
+
+              it 'raises a ValidationError when env_secret contains the variable name (a common copy-paste mistake)' do
+                expect do
+                  instance.setup(prod_options.merge(env_secret: "FOREST_ENV_SECRET=#{valid_options[:env_secret]}"))
+                end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+              end
+
+              it 'raises a ValidationError when env_secret has uppercase characters' do
+                expect do
+                  instance.setup(prod_options.merge(env_secret: valid_options[:env_secret].upcase))
+                end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+              end
+
+              it 'raises a ValidationError when auth_secret is not a string' do
+                expect do
+                  instance.setup(prod_options.merge(auth_secret: 42))
+                end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.auth_secret is invalid/)
+              end
+
+              it 'does not raise when both secrets are well-formed' do
+                expect { instance.setup(prod_options) }.not_to raise_error
+              end
             end
 
-            it 'raises a ValidationError when env_secret contains the variable name (a common copy-paste mistake)' do
-              expect do
-                instance.setup(valid_options.merge(env_secret: "FOREST_ENV_SECRET=#{valid_options[:env_secret]}"))
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
-            end
+            context 'when running outside production' do
+              let(:dev_options) { valid_options.merge(is_production: false) }
 
-            it 'raises a ValidationError when env_secret has uppercase characters' do
-              expect do
-                instance.setup(valid_options.merge(env_secret: valid_options[:env_secret].upcase))
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
-            end
+              it 'does not raise, warns instead, and skips the schema sync' do
+                logger = instance_spy(Services::LoggerService)
+                allow(Services::LoggerService).to receive(:new).and_return(logger)
 
-            it 'raises a ValidationError when auth_secret is not a string' do
-              expect do
-                instance.setup(valid_options.merge(auth_secret: 42))
-              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.auth_secret is invalid/)
-            end
+                expect { instance.setup(dev_options.merge(env_secret: 'abc123')) }.not_to raise_error
 
-            it 'does not raise when both secrets are well-formed' do
-              expect { instance.setup(valid_options) }.not_to raise_error
+                expect(logger).to have_received(:log).with('Warn', /config\.env_secret is invalid/)
+                expect(logger).to have_received(:log).with('Warn', /Skipping schema sync/)
+
+                allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
+                allow(instance).to receive(:generate_schema_file)
+                instance.send_schema
+
+                expect(instance).not_to have_received(:generate_schema_file)
+              end
+
+              it 'does not raise and does not warn when both secrets are well-formed' do
+                logger = instance_spy(Services::LoggerService)
+                allow(Services::LoggerService).to receive(:new).and_return(logger)
+
+                expect { instance.setup(dev_options) }.not_to raise_error
+
+                expect(logger).not_to have_received(:log).with('Warn', /is invalid/)
+              end
             end
           end
         end

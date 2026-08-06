@@ -23,11 +23,12 @@ module ForestAdminAgent
       def setup(options)
         @options = options
         @has_env_secret = options.to_h.key?(:env_secret)
-        validate_secrets_format! if @has_env_secret
+        @secrets_format_invalid = false
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
         build_cache
         build_logger
+        validate_secrets_format! if @has_env_secret
       end
 
       def add_datasource(datasource, options = {})
@@ -118,6 +119,7 @@ module ForestAdminAgent
         end
 
         return unless @has_env_secret
+        return if @secrets_format_invalid
 
         schema = generate_schema_file
 
@@ -179,19 +181,33 @@ module ForestAdminAgent
       private
 
       def validate_secrets_format!
+        errors = secret_format_errors
+        return if errors.empty?
+
+        raise ForestAdminAgent::Http::Exceptions::ValidationError, errors.join(' ') if @options.to_h[:is_production]
+
+        # Don't block boot on a config mistake in dev: warn loudly and skip the schema
+        # sync instead, so the developer can still work on the rest of the app.
+        errors.each { |error| @logger.log('Warn', "[ForestAdmin] #{error}") }
+        @logger.log('Warn', '[ForestAdmin] Skipping schema sync until this is fixed.')
+        @secrets_format_invalid = true
+      end
+
+      def secret_format_errors
+        errors = []
         env_secret = @options.to_h[:env_secret]
 
         unless env_secret.is_a?(String) && env_secret.match?(ENV_SECRET_FORMAT)
-          raise ForestAdminAgent::Http::Exceptions::ValidationError,
-                'config.env_secret is invalid: it must be the 64-character hexadecimal secret from your ' \
-                'Forest Admin project settings.'
+          errors << 'config.env_secret is invalid: it must be the 64-character hexadecimal secret from your ' \
+                    'Forest Admin project settings.'
         end
 
         auth_secret = @options.to_h[:auth_secret]
-        return if auth_secret.is_a?(String)
+        unless auth_secret.is_a?(String)
+          errors << 'config.auth_secret is invalid: it must be a string. Any long random value works.'
+        end
 
-        raise ForestAdminAgent::Http::Exceptions::ValidationError,
-              'config.auth_secret is invalid: it must be a string. Any long random value works.'
+        errors
       end
 
       def container_replace(key, value)
