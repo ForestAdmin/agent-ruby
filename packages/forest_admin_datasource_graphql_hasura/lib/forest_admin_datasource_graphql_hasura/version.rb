@@ -1,3 +1,3 @@
 module ForestAdminDatasourceGraphqlHasura
-  VERSION = "1.0.0"
+  VERSION = "1.37.0"
 end

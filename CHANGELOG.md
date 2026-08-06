@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.3...v1.37.0) (2026-08-06)
+
+
+### Features
+
+* **datasource graphql hasura:** add Hasura datasource with Rails polymorphism support ([#343](https://github.com/ForestAdmin/agent-ruby/issues/343)) ([d0d6d9b](https://github.com/ForestAdmin/agent-ruby/commit/d0d6d9b14ac94119628cd997f133eb444efb3cf1))
+
 ## [1.36.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.2...v1.36.3) (2026-08-05)
 
 
