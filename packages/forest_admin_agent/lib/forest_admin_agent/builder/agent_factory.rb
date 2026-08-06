@@ -13,6 +13,8 @@ module ForestAdminAgent
       attr_reader :customizer, :container, :has_env_secret
       attr_accessor :schema_only_mode
 
+      ENV_SECRET_FORMAT = /\A[0-9a-f]{64}\z/
+
       def initialize
         super
         @reloading = false
@@ -21,6 +23,7 @@ module ForestAdminAgent
       def setup(options)
         @options = options
         @has_env_secret = options.to_h.key?(:env_secret)
+        validate_secrets_format! if @has_env_secret
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
         build_cache
@@ -174,6 +177,22 @@ module ForestAdminAgent
       end
 
       private
+
+      def validate_secrets_format!
+        env_secret = @options.to_h[:env_secret]
+
+        unless env_secret.is_a?(String) && env_secret.match?(ENV_SECRET_FORMAT)
+          raise ForestAdminAgent::Http::Exceptions::ValidationError,
+                'config.env_secret is invalid: it must be the 64-character hexadecimal secret from your ' \
+                'Forest Admin project settings.'
+        end
+
+        auth_secret = @options.to_h[:auth_secret]
+        return if auth_secret.is_a?(String)
+
+        raise ForestAdminAgent::Http::Exceptions::ValidationError,
+              'config.auth_secret is invalid: it must be a string. Any long random value works.'
+      end
 
       def container_replace(key, value)
         @container._container.delete(key.to_s)

@@ -24,6 +24,44 @@ module ForestAdminAgent
             expect(described_class.instance.container.resolve(:logger)).not_to be_nil
             expect(described_class.instance.container.resolve(:logger)).to be_instance_of Services::LoggerService
           end
+
+          context 'when env_secret is present but malformed' do
+            let(:instance) { described_class.instance }
+            let(:valid_options) do
+              {
+                auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb'
+              }
+            end
+
+            it 'raises a ValidationError when env_secret is too short' do
+              expect do
+                instance.setup(valid_options.merge(env_secret: 'abc123'))
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+            end
+
+            it 'raises a ValidationError when env_secret contains the variable name (a common copy-paste mistake)' do
+              expect do
+                instance.setup(valid_options.merge(env_secret: "FOREST_ENV_SECRET=#{valid_options[:env_secret]}"))
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+            end
+
+            it 'raises a ValidationError when env_secret has uppercase characters' do
+              expect do
+                instance.setup(valid_options.merge(env_secret: valid_options[:env_secret].upcase))
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/)
+            end
+
+            it 'raises a ValidationError when auth_secret is not a string' do
+              expect do
+                instance.setup(valid_options.merge(auth_secret: 42))
+              end.to raise_error(ForestAdminAgent::Http::Exceptions::ValidationError, /config\.auth_secret is invalid/)
+            end
+
+            it 'does not raise when both secrets are well-formed' do
+              expect { instance.setup(valid_options) }.not_to raise_error
+            end
+          end
         end
 
         describe 'add_datasource' do
