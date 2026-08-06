@@ -131,6 +131,14 @@ module ForestAdminAgent
         end
 
         post_schema(schema, force)
+      rescue StandardError => e
+        # A well-formed secret can still be rejected by the server (wrong project, revoked
+        # secret, network down, ...). Same rule as an invalid format: block boot in
+        # production, but never in dev - warn and move on instead.
+        raise e if Facades::Container.cache(:is_production)
+
+        @logger.log('Warn', "[ForestAdmin] #{e.message}")
+        @logger.log('Warn', '[ForestAdmin] Schema sync failed, continuing without it.')
       end
 
       # Generates or loads the schema and writes it to file (in development mode).
@@ -184,7 +192,9 @@ module ForestAdminAgent
         errors = secret_format_errors
         return true if errors.empty?
 
-        raise ForestAdminAgent::Http::Exceptions::ValidationError, errors.join(' ') if @options.to_h[:is_production]
+        if Facades::Container.cache(:is_production)
+          raise ForestAdminAgent::Http::Exceptions::ValidationError, errors.join(' ')
+        end
 
         # Don't block boot on a config mistake in dev: warn loudly and skip the schema
         # sync instead, so the developer can still work on the rest of the app.
