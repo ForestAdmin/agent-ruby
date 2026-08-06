@@ -23,12 +23,10 @@ module ForestAdminAgent
       def setup(options)
         @options = options
         @has_env_secret = !options.to_h[:env_secret].nil?
-        @secrets_format_invalid = false
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
         build_cache
         build_logger
-        validate_secrets_format! if @has_env_secret
       end
 
       def add_datasource(datasource, options = {})
@@ -119,7 +117,7 @@ module ForestAdminAgent
         end
 
         return unless @has_env_secret
-        return if @secrets_format_invalid
+        return unless secrets_format_valid?
 
         schema = generate_schema_file
 
@@ -180,9 +178,11 @@ module ForestAdminAgent
 
       private
 
-      def validate_secrets_format!
+      # Checked from send_schema rather than setup, so that schema-only mode (which never
+      # syncs to the server) never fails on a secret it doesn't actually need.
+      def secrets_format_valid?
         errors = secret_format_errors
-        return if errors.empty?
+        return true if errors.empty?
 
         raise ForestAdminAgent::Http::Exceptions::ValidationError, errors.join(' ') if @options.to_h[:is_production]
 
@@ -190,7 +190,7 @@ module ForestAdminAgent
         # sync instead, so the developer can still work on the rest of the app.
         errors.each { |error| @logger.log('Warn', "[ForestAdmin] #{error}") }
         @logger.log('Warn', '[ForestAdmin] Skipping schema sync until this is fixed.')
-        @secrets_format_invalid = true
+        false
       end
 
       def secret_format_errors
