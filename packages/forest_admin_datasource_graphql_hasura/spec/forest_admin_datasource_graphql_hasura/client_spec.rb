@@ -133,6 +133,25 @@ module ForestAdminDatasourceGraphqlHasura
         expect(client.fetch_metadata).to be_nil
       end
 
+      # Net::HTTPNoContent is a Net::HTTPSuccess whose body is nil.
+      it 'falls back on a 204 with an empty body instead of crashing the boot' do
+        WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(status: 204, body: nil)
+
+        expect(client.fetch_metadata).to be_nil
+      end
+
+      it 'falls back on a JSON body that is not an object' do
+        WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(status: 200, body: '[]')
+
+        expect(client.fetch_metadata).to be_nil
+      end
+
+      it 'falls back on a body that is not valid JSON' do
+        WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(status: 200, body: '<html>')
+
+        expect(client.fetch_metadata).to be_nil
+      end
+
       # An uri without the conventional segment yields no derivable metadata
       # endpoint: introspection must not post metadata commands to GraphQL.
       it 'skips the call entirely when no metadata endpoint could be derived' do

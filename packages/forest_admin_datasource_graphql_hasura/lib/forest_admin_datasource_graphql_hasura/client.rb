@@ -70,13 +70,24 @@ module ForestAdminDatasourceGraphqlHasura
 
     private
 
+    # Guards mirror Client#execute: a 204 passes the HTTPSuccess check with a
+    # nil body, and a JSON body need not be an object. Parse errors are caught
+    # here rather than by the transport rescue, whose "not reachable" message
+    # would be misleading — the endpoint did answer.
     def parse_metadata(body)
+      return metadata_fallback('the metadata endpoint returned an empty body') if body.nil? || body.empty?
+
       payload = JSON.parse(body)
+      return metadata_fallback("the metadata response is not a JSON object (#{payload.class})") unless
+        payload.is_a?(Hash)
+
       metadata = payload['metadata'] || payload
       return metadata if metadata.is_a?(Hash) && metadata['sources']
 
       shape = metadata.is_a?(Hash) ? "top-level keys: #{metadata.keys.first(5).join(", ")}" : metadata.class
       metadata_fallback("the metadata response carries no sources (#{shape})")
+    rescue JSON::ParserError
+      metadata_fallback('the metadata response is not valid JSON')
     end
 
     def metadata_fallback(reason)
