@@ -29,7 +29,7 @@ module ForestAdminRails
     end
 
     config.after_initialize do
-      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
+      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException, severity: :error) do
         agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
         agent_factory.setup(ForestAdminRails.config)
         load_configuration
