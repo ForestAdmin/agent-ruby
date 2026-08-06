@@ -25,6 +25,22 @@ module ForestAdminAgent
             expect(described_class.instance.container.resolve(:logger)).to be_instance_of Services::LoggerService
           end
 
+          context 'when env_secret key is present but nil (e.g. an unconfigured sibling agent, like ' \
+                  'ForestAdminRpcAgent bundled but never set up)' do
+            it 'sets @has_env_secret to false and skips validation entirely, without warning or raising' do
+              instance = described_class.instance
+              logger = instance_spy(Services::LoggerService)
+              allow(Services::LoggerService).to receive(:new).and_return(logger)
+
+              expect do
+                instance.setup(auth_secret: nil, env_secret: nil, is_production: true)
+              end.not_to raise_error
+
+              expect(instance.has_env_secret).to be false
+              expect(logger).not_to have_received(:log).with('Warn', anything)
+            end
+          end
+
           context 'when env_secret is present but malformed' do
             let(:instance) { described_class.instance }
             let(:valid_options) do

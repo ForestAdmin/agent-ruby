@@ -22,7 +22,7 @@ module ForestAdminAgent
 
       def setup(options)
         @options = options
-        @has_env_secret = options.to_h.key?(:env_secret)
+        @has_env_secret = !options.to_h[:env_secret].nil?
         @secrets_format_invalid = false
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
