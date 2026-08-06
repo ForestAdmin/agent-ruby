@@ -47,5 +47,5 @@ releases silently, not loudly:
    - the codecov step's `files:` list (`.../<package>/coverage.json`)
 
 After merging, verify the next release actually bumps the new `version.rb` —
-the sed in step 3 silently no-ops if the format from step 1 is off, with no
+the sed in step 4 silently no-ops if the format from step 1 is off, with no
 CI failure to catch it.
