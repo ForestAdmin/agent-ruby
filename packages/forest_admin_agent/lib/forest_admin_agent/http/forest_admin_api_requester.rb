@@ -41,33 +41,48 @@ module ForestAdminAgent
           )
         end
 
-        if error.response[:status].zero? || error.response[:status] == 502
+        raise_for_status(error.response[:status], cause: error)
+      end
+
+      # Faraday does not raise on HTTP error statuses here (no raise_error middleware
+      # configured), so a response has to be checked explicitly to turn e.g. an
+      # invalid envSecret (404) into the same typed errors as handle_response_error.
+      def raise_for_response!(response)
+        return if response.success?
+
+        raise_for_status(response.status, message: response.reason_phrase)
+      end
+
+      private
+
+      def raise_for_status(status, cause: nil, message: cause&.message)
+        if status.zero? || status == 502
           raise BadGatewayError.new(
             'Failed to reach ForestAdmin server. Are you online?',
-            details: { status: error.response[:status] },
-            cause: error
+            details: { status: status },
+            cause: cause
           )
         end
 
-        if error.response[:status] == 404
+        if status == 404
           raise NotFoundError.new(
             'ForestAdmin server failed to find the project related to the envSecret you configured. Can you check that you copied it properly in the Forest initialization?',
-            details: { status: error.response[:status] }
+            details: { status: status }
           )
         end
 
-        if error.response[:status] == 503
+        if status == 503
           raise ServiceUnavailableError.new(
             'Forest is in maintenance for a few minutes. We are upgrading your experience in the forest. We just need a few more minutes to get it right.',
-            details: { status: error.response[:status] },
-            cause: error
+            details: { status: status },
+            cause: cause
           )
         end
 
         raise InternalServerError.new(
           'An unexpected error occurred while contacting the ForestAdmin server. Please contact support@forestadmin.com for further investigations.',
-          details: { status: error.response[:status], message: error.message },
-          cause: error
+          details: { status: status, message: message },
+          cause: cause
         )
       end
     end

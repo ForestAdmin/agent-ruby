@@ -24,6 +24,189 @@ module ForestAdminAgent
             expect(described_class.instance.container.resolve(:logger)).not_to be_nil
             expect(described_class.instance.container.resolve(:logger)).to be_instance_of Services::LoggerService
           end
+
+          context 'when env_secret key is present but nil (e.g. an unconfigured sibling agent, like ' \
+                  'ForestAdminRpcAgent bundled but never set up)' do
+            it 'sets @has_env_secret to false and skips validation entirely, without warning or raising' do
+              instance = described_class.instance
+              logger = instance_spy(Services::LoggerService)
+              allow(Services::LoggerService).to receive(:new).and_return(logger)
+              allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
+
+              expect do
+                instance.setup(auth_secret: nil, env_secret: nil, is_production: true)
+              end.not_to raise_error
+
+              expect(instance.has_env_secret).to be false
+
+              instance.send_schema
+
+              expect(logger).not_to have_received(:log).with('Warn', anything)
+            end
+          end
+
+          context 'with schema_only_mode enabled (offline schema generation, e.g. ' \
+                  'rake forest_admin:schema:generate)' do
+            it 'never validates secrets, even a malformed env_secret in production' do
+              instance = described_class.instance
+
+              expect do
+                instance.setup(
+                  auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+                  env_secret: 'not-a-valid-secret',
+                  is_production: true
+                )
+              end.not_to raise_error
+
+              instance.schema_only_mode = true
+              allow(instance).to receive(:generate_schema_only)
+
+              expect { instance.build }.not_to raise_error
+              expect(instance).to have_received(:generate_schema_only)
+            ensure
+              instance.schema_only_mode = false
+            end
+          end
+        end
+
+        context 'when env_secret is present but malformed' do
+          let(:instance) { described_class.instance }
+          let(:valid_options) do
+            {
+              auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+              env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+              skip_schema_update: false,
+              append_schema_path: nil
+            }
+          end
+
+          context 'when running in production' do
+            let(:prod_options) { valid_options.merge(is_production: true) }
+
+            it 'raises a ValidationError when env_secret is too short' do
+              instance.setup(prod_options.merge(env_secret: 'abc123'))
+
+              expect { instance.send_schema }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/
+              )
+            end
+
+            it 'raises a ValidationError when env_secret contains the variable name (a common copy-paste mistake)' do
+              instance.setup(prod_options.merge(env_secret: "FOREST_ENV_SECRET=#{valid_options[:env_secret]}"))
+
+              expect { instance.send_schema }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/
+              )
+            end
+
+            it 'raises a ValidationError when env_secret has uppercase characters' do
+              instance.setup(prod_options.merge(env_secret: valid_options[:env_secret].upcase))
+
+              expect { instance.send_schema }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::ValidationError, /config\.env_secret is invalid/
+              )
+            end
+
+            it 'raises a ValidationError when auth_secret is not a string' do
+              instance.setup(prod_options.merge(auth_secret: 42))
+
+              expect { instance.send_schema }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::ValidationError, /config\.auth_secret is invalid/
+              )
+            end
+
+            it 'does not raise when both secrets are well-formed' do
+              instance.setup(prod_options)
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] }, post_schema: nil)
+
+              expect { instance.send_schema }.not_to raise_error
+            end
+          end
+
+          context 'when running outside production' do
+            let(:dev_options) { valid_options.merge(is_production: false) }
+
+            it 'does not raise, warns instead, and skips the schema sync' do
+              logger = instance_spy(Services::LoggerService)
+              allow(Services::LoggerService).to receive(:new).and_return(logger)
+              instance.setup(dev_options.merge(env_secret: 'abc123'))
+              allow(instance).to receive(:generate_schema_file)
+
+              expect { instance.send_schema }.not_to raise_error
+
+              expect(logger).to have_received(:log).with('Warn', /config\.env_secret is invalid/)
+              expect(logger).to have_received(:log).with('Warn', /Skipping schema sync/)
+              expect(instance).not_to have_received(:generate_schema_file)
+            end
+
+            it 'does not raise and does not warn when both secrets are well-formed' do
+              logger = instance_spy(Services::LoggerService)
+              allow(Services::LoggerService).to receive(:new).and_return(logger)
+              instance.setup(dev_options)
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] }, post_schema: nil)
+
+              expect { instance.send_schema }.not_to raise_error
+
+              expect(logger).not_to have_received(:log).with('Warn', /is invalid/)
+            end
+          end
+        end
+
+        context 'when the secret is well-formed but rejected by the server' do
+          let(:instance) { described_class.instance }
+          let(:valid_options) do
+            {
+              auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+              env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+              skip_schema_update: false,
+              append_schema_path: nil
+            }
+          end
+          let(:not_found_error) do
+            ForestAdminAgent::Http::Exceptions::NotFoundError.new(
+              'ForestAdmin server failed to find the project related to the envSecret you configured.'
+            )
+          end
+
+          context 'when running in production' do
+            it 'raises the error the server returned' do
+              instance.setup(valid_options.merge(is_production: true))
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] })
+              allow(instance).to receive(:post_schema).and_raise(not_found_error)
+
+              expect { instance.send_schema }.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
+            end
+          end
+
+          context 'when running outside production' do
+            it 'does not raise, warns instead, and continues without the schema' do
+              logger = instance_spy(Services::LoggerService)
+              allow(Services::LoggerService).to receive(:new).and_return(logger)
+              instance.setup(valid_options.merge(is_production: false))
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] })
+              allow(instance).to receive(:post_schema).and_raise(not_found_error)
+
+              expect { instance.send_schema }.not_to raise_error
+
+              expect(logger).to have_received(:log).with('Warn', /failed to find the project/)
+              expect(logger).to have_received(:log).with('Warn', /Schema sync failed/)
+            end
+          end
+        end
+
+        context 'when generate_schema_file raises a local error (e.g. a broken customization)' do
+          it 'still raises it outside production, instead of swallowing it as a Forest warning' do
+            instance = described_class.instance
+            instance.setup(
+              auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+              env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+              skip_schema_update: false,
+              is_production: false
+            )
+            allow(instance).to receive(:generate_schema_file).and_raise(ArgumentError, 'broken chart definition')
+
+            expect { instance.send_schema }.to raise_error(ArgumentError, 'broken chart definition')
+          end
         end
 
         describe 'add_datasource' do
@@ -313,7 +496,7 @@ module ForestAdminAgent
             expect(instance).to have_received(:post_schema).with(hash_including(collections: [{ name: 'Main' }, { name: 'Extra' }]), anything)
           end
 
-          it 'raises error if append_schema file cannot be loaded' do
+          it 'raises error if append_schema file cannot be loaded, regardless of environment' do
             instance = described_class.instance
             instance.instance_variable_set(:@has_env_secret, true)
 
@@ -543,12 +726,15 @@ module ForestAdminAgent
           end
 
           it 'logs success message and posts schema when successful' do
-            allow(client).to receive(:post).with('/forest/apimaps', api_map.to_json)
+            response = instance_double(Faraday::Response)
+            allow(client).to receive(:post).with('/forest/apimaps', api_map.to_json).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
 
             instance.send(:send_schema_to_server, api_map)
 
             expect(logger).to have_received(:log).with('Info', 'schema was updated, sending new version')
             expect(client).to have_received(:post).with('/forest/apimaps', api_map.to_json)
+            expect(client).to have_received(:raise_for_response!).with(response)
           end
 
           context 'when error occurs with HTTP status' do
@@ -600,6 +786,68 @@ module ForestAdminAgent
 
               expect(logger).to have_received(:log).with('Error', 'Failed to send schema: cannot reach ForestAdmin server')
             end
+          end
+        end
+
+        describe 'do_server_want_schema' do
+          let(:instance) { described_class.instance }
+          let(:client) { instance_double(ForestAdminAgent::Http::ForestAdminApiRequester) }
+
+          before do
+            allow(ForestAdminAgent::Http::ForestAdminApiRequester).to receive(:new).and_return(client)
+          end
+
+          it 'returns true when the server asks for the schema' do
+            response = instance_double(Faraday::Response, body: { sendSchema: true }.to_json)
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect(instance.send(:do_server_want_schema, 'abc123')).to be true
+          end
+
+          it 'returns false when the server already has this schema' do
+            response = instance_double(Faraday::Response, body: { sendSchema: false }.to_json)
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect(instance.send(:do_server_want_schema, 'abc123')).to be false
+          end
+
+          it 'propagates the error raised by raise_for_response! (e.g. an invalid envSecret)' do
+            response = instance_double(Faraday::Response, status: 404, body: '{"errors":[]}')
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response).and_raise(
+              ForestAdminAgent::Http::Exceptions::NotFoundError.new(
+                'ForestAdmin server failed to find the project related to the envSecret you configured. ' \
+                'Can you check that you copied it properly in the Forest initialization?'
+              )
+            )
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError, /envSecret/)
+          end
+
+          it 'raises InternalServerError when the response body is not valid JSON' do
+            response = instance_double(Faraday::Response, status: 200, body: 'not json')
+            allow(client).to receive(:post).and_return(response)
+            allow(client).to receive(:raise_for_response!).with(response)
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::InternalServerError, /Invalid JSON response/)
+          end
+
+          it 'delegates to handle_response_error when the connection itself fails' do
+            error = Faraday::ConnectionFailed.new('Failed to open TCP connection')
+            allow(client).to receive(:post).and_raise(error)
+            allow(client).to receive(:handle_response_error).with(error).and_raise(
+              ForestAdminAgent::Http::Exceptions::BadGatewayError.new('Failed to reach ForestAdmin server. Are you online?')
+            )
+
+            expect do
+              instance.send(:do_server_want_schema, 'abc123')
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::BadGatewayError)
           end
         end
       end
