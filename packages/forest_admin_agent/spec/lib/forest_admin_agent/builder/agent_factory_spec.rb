@@ -158,7 +158,8 @@ module ForestAdminAgent
             {
               auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
               env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
-              skip_schema_update: false
+              skip_schema_update: false,
+              append_schema_path: nil
             }
           end
           let(:not_found_error) do
@@ -170,7 +171,8 @@ module ForestAdminAgent
           context 'when running in production' do
             it 'raises the error the server returned' do
               instance.setup(valid_options.merge(is_production: true))
-              allow(instance).to receive(:generate_schema_file).and_raise(not_found_error)
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] })
+              allow(instance).to receive(:post_schema).and_raise(not_found_error)
 
               expect { instance.send_schema }.to raise_error(ForestAdminAgent::Http::Exceptions::NotFoundError)
             end
@@ -181,13 +183,29 @@ module ForestAdminAgent
               logger = instance_spy(Services::LoggerService)
               allow(Services::LoggerService).to receive(:new).and_return(logger)
               instance.setup(valid_options.merge(is_production: false))
-              allow(instance).to receive(:generate_schema_file).and_raise(not_found_error)
+              allow(instance).to receive_messages(generate_schema_file: { meta: {}, collections: [] })
+              allow(instance).to receive(:post_schema).and_raise(not_found_error)
 
               expect { instance.send_schema }.not_to raise_error
 
               expect(logger).to have_received(:log).with('Warn', /failed to find the project/)
               expect(logger).to have_received(:log).with('Warn', /Schema sync failed/)
             end
+          end
+        end
+
+        context 'when generate_schema_file raises a local error (e.g. a broken customization)' do
+          it 'still raises it outside production, instead of swallowing it as a Forest warning' do
+            instance = described_class.instance
+            instance.setup(
+              auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+              env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+              skip_schema_update: false,
+              is_production: false
+            )
+            allow(instance).to receive(:generate_schema_file).and_raise(ArgumentError, 'broken chart definition')
+
+            expect { instance.send_schema }.to raise_error(ArgumentError, 'broken chart definition')
           end
         end
 
@@ -478,30 +496,9 @@ module ForestAdminAgent
             expect(instance).to have_received(:post_schema).with(hash_including(collections: [{ name: 'Main' }, { name: 'Extra' }]), anything)
           end
 
-          it 'raises error if append_schema file cannot be loaded, in production' do
+          it 'raises error if append_schema file cannot be loaded, regardless of environment' do
             instance = described_class.instance
             instance.instance_variable_set(:@has_env_secret, true)
-
-            datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
-            instance.container.register(:datasource, datasource)
-
-            allow(Facades::Container).to receive(:cache).with(:skip_schema_update).and_return(false)
-            allow(Facades::Container).to receive(:cache).with(:schema_path).and_return('/path/to/schema.json')
-            allow(Facades::Container).to receive(:cache).with(:is_production).and_return(true)
-            allow(Facades::Container).to receive(:cache).with(:append_schema_path).and_return('/path/to/append.json')
-            allow(ForestAdminAgent::Utils::Schema::SchemaEmitter).to receive_messages(generate: [], meta: {})
-            allow(File).to receive(:exist?).with('/path/to/schema.json').and_return(true)
-            allow(File).to receive(:read).with('/path/to/schema.json').and_return({ meta: {}, collections: [] }.to_json)
-            allow(File).to receive(:read).with('/path/to/append.json').and_raise(Errno::ENOENT)
-
-            expect { instance.send_schema }.to raise_error(/Can't load additional schema/)
-          end
-
-          it 'warns instead of raising if append_schema file cannot be loaded, outside production' do
-            instance = described_class.instance
-            instance.instance_variable_set(:@has_env_secret, true)
-            logger = instance_spy(Services::LoggerService)
-            instance.instance_variable_set(:@logger, logger)
 
             datasource = instance_double(ForestAdminDatasourceToolkit::Datasource)
             instance.container.register(:datasource, datasource)
@@ -514,9 +511,7 @@ module ForestAdminAgent
             allow(File).to receive(:write)
             allow(File).to receive(:read).with('/path/to/append.json').and_raise(Errno::ENOENT)
 
-            expect { instance.send_schema }.not_to raise_error
-
-            expect(logger).to have_received(:log).with('Warn', /Can't load additional schema/)
+            expect { instance.send_schema }.to raise_error(/Can't load additional schema/)
           end
 
           context 'with skip_schema_update enabled' do

@@ -130,15 +130,19 @@ module ForestAdminAgent
           end
         end
 
-        post_schema(schema, force)
-      rescue StandardError => e
-        # A well-formed secret can still be rejected by the server (wrong project, revoked
-        # secret, network down, ...). Same rule as an invalid format: block boot in
-        # production, but never in dev - warn and move on instead.
-        raise e if Facades::Container.cache(:is_production)
+        begin
+          post_schema(schema, force)
+        rescue StandardError => e
+          # A well-formed secret can still be rejected by the server (wrong project, revoked
+          # secret, network down, ...). Same rule as an invalid format: block boot in
+          # production, but never in dev - warn and move on instead. Scoped to this call
+          # only, so a local bug (a broken customization, an unwritable schema_path, ...)
+          # still surfaces immediately instead of being logged as a generic warning.
+          raise e if Facades::Container.cache(:is_production)
 
-        @logger.log('Warn', "[ForestAdmin] #{e.message}")
-        @logger.log('Warn', '[ForestAdmin] Schema sync failed, continuing without it.')
+          @logger.log('Warn', "[ForestAdmin] #{e.message}")
+          @logger.log('Warn', '[ForestAdmin] Schema sync failed, continuing without it.')
+        end
       end
 
       # Generates or loads the schema and writes it to file (in development mode).
