@@ -400,6 +400,182 @@ RSpec.describe ForestAdminDatasourceGraphqlHasura::Introspection::Introspector d
     end
   end
 
+  describe 'relationships towards unexposed tables' do
+    # The guard exists specifically so a real production schema (excluded
+    # tables, PK-less views) cannot crash the boot.
+    it 'skips object and array relationships whose target is not exposed' do
+      stub_schema(
+        [
+          {
+            'name' => 'transfers', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('account', object('accounts')),
+              field('items', non_null(list_of(non_null(object('items')))))
+            ]
+          },
+          { 'name' => 'accounts', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] },
+          { 'name' => 'items', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        # accounts and items have no _by_pk: both are dropped for lack of a
+        # primary key, leaving transfers' relationships dangling.
+        [list_query('transfers'), by_pk_query('transfers'), list_query('accounts'), list_query('items')]
+      )
+      stub_metadata([])
+
+      datasource = build_datasource
+
+      expect(datasource.collections.keys).to eq(['Transfer'])
+      expect(datasource.get_collection('Transfer').schema[:fields].keys).to eq(['id'])
+    end
+  end
+
+  describe 'metadata mapping collisions' do
+    # Two sources claiming the same exposed root field with different mappings:
+    # neither can be trusted, so the mapping is dropped and the relationship
+    # falls back to naming conventions (which find no owner_id here).
+    it 'drops a mapping genuinely claimed twice with different definitions' do
+      stub_schema(
+        [
+          {
+            'name' => 'transfers', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('owner_ref', scalar('bigint')),
+              field('other_ref', scalar('bigint')),
+              field('owner', object('owners'))
+            ]
+          },
+          { 'name' => 'owners', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [list_query('transfers'), by_pk_query('transfers'), list_query('owners'), by_pk_query('owners')]
+      )
+      WebMock.stub_request(:post, BankingSchema::METADATA_URI).to_return(
+        status: 200,
+        body: JSON.generate(
+          { 'metadata' => { 'version' => 3, 'sources' => [
+            { 'name' => 'a', 'kind' => 'postgres', 'tables' => [
+              { 'table' => { 'schema' => 'public', 'name' => 'transfers' },
+                'object_relationships' => [manual_object_rel('owner', 'owners', { 'owner_ref' => 'id' })] }
+            ] },
+            { 'name' => 'b', 'kind' => 'postgres', 'tables' => [
+              { 'table' => { 'schema' => 'public', 'name' => 'transfers' },
+                'object_relationships' => [manual_object_rel('owner', 'owners', { 'other_ref' => 'id' })] }
+            ] }
+          ] } }
+        ),
+        headers: { 'Content-Type' => 'application/json' }
+      )
+
+      expect(build_datasource.get_collection('Transfer').schema[:fields]).not_to have_key('owner')
+    end
+  end
+
+  describe 'polymorphic name collisions' do
+    def stub_poly_schema(transfer_fields:, comment_extra_fields: [])
+      stub_schema(
+        [
+          {
+            'name' => 'comments', 'kind' => 'OBJECT',
+            'fields' => [
+              field('id', non_null(scalar('bigint'))),
+              field('commentable_type', non_null(scalar('String'))),
+              field('commentable_id', non_null(scalar('bigint'))),
+              field('transfer', object('transfers'))
+            ] + comment_extra_fields
+          },
+          { 'name' => 'transfers', 'kind' => 'OBJECT',
+            'fields' => [field('id', non_null(scalar('bigint')))] + transfer_fields }
+        ],
+        [list_query('comments'), by_pk_query('comments'), list_query('transfers'), by_pk_query('transfers')]
+      )
+    end
+
+    def poly_metadata(extra_comment_rels: [])
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'comments' },
+           'object_relationships' => [
+             manual_object_rel('transfer', 'transfers', { 'commentable_id' => 'id' })
+           ] + extra_comment_rels }]
+      )
+    end
+
+    # A relationship literally named like the polymorphic association must not
+    # overwrite it once the association is emitted.
+    it 'keeps the polymorphic association over a relationship sharing its name' do
+      stub_poly_schema(transfer_fields: [],
+                       comment_extra_fields: [field('other_ref', scalar('bigint')),
+                                              field('commentable', object('transfers'))])
+      poly_metadata(extra_comment_rels: [manual_object_rel('commentable', 'transfers', { 'other_ref' => 'id' })])
+
+      fields = build_datasource.get_collection('Comment').schema[:fields]
+
+      expect(fields['commentable'].type).to eq('PolymorphicManyToOne')
+    end
+
+    # No declared array relationship, and `comments` taken by a column: the
+    # reverse falls back to `<child>_<association>`.
+    it 'falls back to the combined name when the child table name is taken' do
+      stub_poly_schema(transfer_fields: [field('comments', scalar('String'))])
+      poly_metadata
+
+      fields = build_datasource.get_collection('Transfer').schema[:fields]
+
+      expect(fields['comments'].type).to eq('Column')
+      expect(fields['comments_commentable'].type).to eq('PolymorphicOneToMany')
+    end
+
+    it 'gives up with a warning when every reverse name candidate is taken' do
+      stub_poly_schema(transfer_fields: [field('comments', scalar('String')),
+                                         field('comments_commentable', scalar('String'))])
+      poly_metadata
+
+      fields = build_datasource.get_collection('Transfer').schema[:fields]
+
+      expect(fields['comments'].type).to eq('Column')
+      expect(fields['comments_commentable'].type).to eq('Column')
+      expect(fields.values.map(&:type)).not_to include('PolymorphicOneToMany')
+    end
+  end
+
+  describe 'table lists under renamed root fields' do
+    # An exclusion written with the real table name must hold when the select
+    # root is renamed: re-exposing an excluded table leaks data.
+    it 'excludes a renamed table by its underlying name' do
+      stub_schema(
+        [{ 'name' => 'secrets', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }],
+        [field('vault', non_null(list_of(non_null(object('secrets'))))), by_pk_query('secrets')]
+      )
+      stub_metadata(
+        [{ 'table' => { 'schema' => 'public', 'name' => 'secrets' },
+           'configuration' => { 'custom_root_fields' => { 'select' => 'vault' } } }]
+      )
+
+      expect(build_datasource(excluded_tables: ['secrets']).collections).to be_empty
+    end
+  end
+
+  describe 'stream root fields' do
+    # `<root>_stream` shares the select root's list shape; a genuine table
+    # merely named like one has no matching base root and must be kept.
+    it 'skips a stream companion but keeps a real table named like one' do
+      stub_schema(
+        [
+          { 'name' => 'users', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] },
+          { 'name' => 'data_stream', 'kind' => 'OBJECT', 'fields' => [field('id', non_null(scalar('bigint')))] }
+        ],
+        [
+          list_query('users'), by_pk_query('users'),
+          field('users_stream', non_null(list_of(non_null(object('users'))))),
+          list_query('data_stream'), by_pk_query('data_stream')
+        ]
+      )
+      stub_metadata([])
+
+      expect(build_datasource.collections.keys.sort).to eq(%w[DataStream User])
+    end
+  end
+
   describe 'composite primary keys' do
     # A join table's key is application-assigned: read-only key columns would
     # make the table impossible to create through Forest Admin.

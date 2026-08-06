@@ -48,34 +48,44 @@ module ForestAdminDatasourceGraphqlHasura
 
     # Returns nil when the endpoint is unreachable or forbidden, which is common
     # in production: introspection then falls back to the configuration and to
-    # naming conventions.
+    # naming conventions. Every fallback branch warns — losing the metadata
+    # silently disables polymorphism detection and custom root field
+    # resolution, and each cause deserves something to grep for.
     def fetch_metadata
       if @configuration.metadata_uri.nil?
-        ForestAdminDatasourceGraphqlHasura.logger.info(
-          '[forest_admin_datasource_graphql_hasura] No metadata endpoint could be derived from uri ' \
-          "(no '/v1/graphql' segment); set the 'metadata_uri' option to enable relationship detection."
-        )
-        return nil
+        return metadata_fallback("no metadata endpoint could be derived from uri (no '/v1/graphql' " \
+                                 "segment); set the 'metadata_uri' option")
       end
 
       body = JSON.generate({ type: 'export_metadata', version: 2, args: {} })
       response = post(@configuration.metadata_uri, body)
 
-      return nil unless response.is_a?(Net::HTTPSuccess)
+      return metadata_fallback("the metadata endpoint answered HTTP #{response.code}") unless
+        response.is_a?(Net::HTTPSuccess)
 
-      payload = JSON.parse(response.body)
+      parse_metadata(response.body)
+    rescue *TRANSPORT_ERRORS => e
+      metadata_fallback("the metadata endpoint is not reachable (#{e.class})")
+    end
+
+    private
+
+    def parse_metadata(body)
+      payload = JSON.parse(body)
       metadata = payload['metadata'] || payload
+      return metadata if metadata.is_a?(Hash) && metadata['sources']
 
-      metadata['sources'] ? metadata : nil
-    rescue StandardError => e
-      ForestAdminDatasourceGraphqlHasura.logger.info(
-        "[forest_admin_datasource_graphql_hasura] Hasura metadata API not available (#{e.class}); " \
+      shape = metadata.is_a?(Hash) ? "top-level keys: #{metadata.keys.first(5).join(", ")}" : metadata.class
+      metadata_fallback("the metadata response carries no sources (#{shape})")
+    end
+
+    def metadata_fallback(reason)
+      ForestAdminDatasourceGraphqlHasura.logger.warn(
+        "[forest_admin_datasource_graphql_hasura] Hasura metadata unavailable: #{reason}; " \
         'falling back to configuration and naming conventions.'
       )
       nil
     end
-
-    private
 
     def post(url, body)
       uri = URI.parse(url)

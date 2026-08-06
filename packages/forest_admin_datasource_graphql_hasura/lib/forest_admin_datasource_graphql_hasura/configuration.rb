@@ -31,19 +31,30 @@ module ForestAdminDatasourceGraphqlHasura
         instance_variable_set("@#{option}", options[option].nil? ? default.dup : options[option])
       end
       validate_polymorphic_relations
+      validate_table_lists
       # Only derivable from the conventional endpoint path: substituting on any
       # other uri would silently post metadata commands to the GraphQL endpoint.
       @metadata_uri ||= uri.include?('/v1/graphql') ? uri.sub('/v1/graphql', '/v1/metadata') : nil
     end
 
-    def table_allowed?(table_name)
-      return false if excluded_tables.include?(table_name)
-      return included_tables.include?(table_name) unless included_tables.nil?
+    # Accepts every spelling a table goes by (root field and type name): an
+    # exclusion must hold under renaming, or it would silently re-expose data.
+    def table_allowed?(*table_names)
+      return false if table_names.any? { |name| excluded_tables.include?(name) }
+      return (table_names & included_tables).any? unless included_tables.nil?
 
       true
     end
 
     private
+
+    # A String by mistake (`included_tables: "users"`) would silently become a
+    # substring check instead of a name match.
+    def validate_table_lists
+      return if excluded_tables.is_a?(Array) && (included_tables.nil? || included_tables.is_a?(Array))
+
+      raise ConfigurationError, 'included_tables and excluded_tables must be arrays of table names'
+    end
 
     # A misshapen declaration would otherwise crash deep inside introspection as
     # an opaque NoMethodError instead of naming the option.

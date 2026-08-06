@@ -60,9 +60,6 @@ module ForestAdminDatasourceGraphqlHasura
       TEXT_TYPES = %w[String ID text varchar char bpchar citext bytea].to_set.freeze
 
       EXCLUDED_PREFIXES = %w[__ hdb_ pg_ information_schema].freeze
-      # Camel variants cover the graphql-default naming convention; a genuine
-      # Postgres table name is lowercase and cannot end with them.
-      EXCLUDED_SUFFIXES = %w[_aggregate _by_pk _stream _connection Aggregate ByPk Stream Connection].freeze
 
       def initialize(client, configuration)
         @client = client
@@ -103,9 +100,10 @@ module ForestAdminDatasourceGraphqlHasura
 
       # The metadata is optional by design; one malformed entry must degrade to
       # the same fallback as an unreachable endpoint, not crash the boot.
+      # Only shape errors degrade: anything else is a bug that must fail loudly.
       def safe_relationship_mappings(metadata)
         parse_relationship_mappings(metadata)
-      rescue StandardError => e
+      rescue TypeError, NoMethodError, KeyError => e
         ForestAdminDatasourceGraphqlHasura.logger.warn(
           '[forest_admin_datasource_graphql_hasura] Hasura metadata could not be parsed ' \
           "(#{e.class}: #{e.message}); falling back to configuration and naming conventions."
@@ -244,15 +242,18 @@ module ForestAdminDatasourceGraphqlHasura
       end
 
       def parse_tables(query_fields)
+        root_names = query_fields.to_set { |query_field| query_field['name'] }
+
         query_fields.filter_map do |field|
           table_name = field['name']
-          next if skip_table?(table_name)
-          # Only the select root returns a list; a custom-named select_by_pk
-          # root returns the bare object and is not a table.
+          # Only the select root returns a list: _aggregate, _by_pk and Relay
+          # _connection roots all return bare objects and are rejected here.
           next unless array_type?(field['type'])
 
           type = @type_map[base_type_name(field['type'])]
           next unless type && type['kind'] == 'OBJECT'
+          next if skip_table?([table_name, type['name']].uniq)
+          next if stream_companion?(table_name, root_names)
 
           table = parse_table(table_name, type)
           next table unless table.primary_key.empty?
@@ -267,16 +268,27 @@ module ForestAdminDatasourceGraphqlHasura
         end
       end
 
-      def skip_table?(name)
+      # names carries the root field and the underlying type name: an exclusion
+      # (or inclusion) must hold whichever spelling the user wrote, or renaming
+      # a table would silently re-expose it.
+      def skip_table?(names)
         # An explicit exclusion always wins; then an explicit allow-list wins over
         # the built-in exclusions, so a legitimate table whose name starts like a
         # system one stays reachable.
-        return true if @configuration.excluded_tables.include?(name)
-        return false if @configuration.included_tables&.include?(name)
+        return true if names.any? { |name| @configuration.excluded_tables.include?(name) }
+        return false if @configuration.included_tables && (names & @configuration.included_tables).any?
 
-        EXCLUDED_PREFIXES.any? { |prefix| name.start_with?(prefix) } ||
-          EXCLUDED_SUFFIXES.any? { |suffix| name.end_with?(suffix) } ||
-          !@configuration.table_allowed?(name)
+        names.any? { |name| EXCLUDED_PREFIXES.any? { |prefix| name.start_with?(prefix) } } ||
+          !@configuration.table_allowed?(*names)
+      end
+
+      # `<select_root>_stream` returns the same list shape as its select root,
+      # so the structural check cannot tell them apart; a genuine table named
+      # `data_stream` has no `data` root field and is kept.
+      def stream_companion?(name, root_names)
+        base = name.sub(/(_stream|Stream)\z/, '')
+
+        base != name && root_names.include?(base)
       end
 
       def parse_table(table_name, type)

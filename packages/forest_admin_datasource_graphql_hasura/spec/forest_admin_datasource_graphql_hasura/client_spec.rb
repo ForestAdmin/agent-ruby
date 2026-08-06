@@ -104,6 +104,13 @@ module ForestAdminDatasourceGraphqlHasura
         expect(second.headers).to eq({})
       end
 
+      # A String would silently become a substring check instead of a name match.
+      it 'rejects table lists that are not arrays by name' do
+        expect do
+          Configuration.new(uri: BankingSchema::GRAPHQL_URI, included_tables: 'users')
+        end.to raise_error(ConfigurationError, /must be arrays/)
+      end
+
       it 'rejects a misshapen polymorphic_relations declaration by name' do
         expect do
           Configuration.new(uri: BankingSchema::GRAPHQL_URI,
