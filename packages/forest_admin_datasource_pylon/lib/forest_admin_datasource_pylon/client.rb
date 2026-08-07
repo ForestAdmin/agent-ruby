@@ -24,6 +24,9 @@ module ForestAdminDatasourcePylon
       yield
     rescue Faraday::Error => e
       raise api_error(operation, e)
+    rescue APIError
+      # Already mapped, with its status intact; re-wrapping would erase it.
+      raise
     rescue StandardError => e
       raise APIError, "Pylon API call failed: #{operation}: #{e.class}: #{e.message}"
     end

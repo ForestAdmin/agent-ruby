@@ -117,6 +117,19 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
 
       expect { client.me }.to raise_error(ForestAdminDatasourcePylon::APIError, /me: KeyError: nope/)
     end
+
+    # Callers branch on `status`, so an already-mapped error has to come back
+    # untouched rather than be re-wrapped by the generic StandardError arm.
+    it 'lets an already-mapped APIError through with its status intact' do
+      mapped = ForestAdminDatasourcePylon::APIError.new('boom', status: 404, body: { 'message' => 'boom' })
+      allow(client).to receive(:extract_data).and_raise(mapped)
+      stub_request(:get, "#{base}/me").to_return(json('data' => {}))
+
+      expect { client.me }.to raise_error(ForestAdminDatasourcePylon::APIError) { |error|
+        expect(error).to be(mapped)
+        expect(error.status).to eq(404)
+      }
+    end
   end
 
   describe 'rate limiting' do
