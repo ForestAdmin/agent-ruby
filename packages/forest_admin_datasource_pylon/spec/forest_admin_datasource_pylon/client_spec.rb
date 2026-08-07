@@ -65,6 +65,13 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
         .to raise_error(ForestAdminDatasourcePylon::APIError, /boom \(request_id: req_42\)/)
     end
 
+    it 'keeps the request_id even when the message is truncated' do
+      body = { 'message' => 'x' * 900, 'request_id' => 'req_42' }
+      stub_request(:get, "#{base}/me").to_return(json(body, 500))
+
+      expect { client.me }.to raise_error(ForestAdminDatasourcePylon::APIError, /\(request_id: req_42\)\z/)
+    end
+
     it 'reads the message out of a nested error object' do
       stub_request(:get, "#{base}/me").to_return(json({ 'error' => { 'message' => 'nested boom' } }, 422))
 
@@ -146,6 +153,39 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
 
       expect { client.me }.to raise_error(ForestAdminDatasourcePylon::APIError)
       expect(WebMock).to have_requested(:get, "#{base}/me").once
+    end
+
+    it 'retries a dropped connection' do
+      stub_request(:get, "#{base}/me").to_timeout.then.to_return(json('data' => { 'id' => 'org_1' }))
+
+      expect(client.me).to eq('id' => 'org_1')
+      expect(WebMock).to have_requested(:get, "#{base}/me").twice
+    end
+
+    # Regression: max_interval used to be hardcoded to 5s. faraday-retry gives up
+    # outright when Retry-After exceeds max_interval, so a Pylon 429 carrying a
+    # per-minute Retry-After silently performed zero retries.
+    describe 'Retry-After' do
+      it 'honours a Retry-After that fits within the cap' do
+        stub_request(:get, "#{base}/me")
+          .to_return(status: 429, headers: { 'Retry-After' => '0' })
+          .then.to_return(json('data' => { 'id' => 'org_1' }))
+
+        expect(client.me).to eq('id' => 'org_1')
+        expect(WebMock).to have_requested(:get, "#{base}/me").twice
+      end
+
+      it 'gives up without retrying when Retry-After exceeds the cap' do
+        impatient = ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', max_retry_interval: 1)
+        stub_request(:get, "#{base}/me").to_return(status: 429, headers: { 'Retry-After' => '5' })
+
+        expect { described_class.new(impatient).me }.to raise_error(ForestAdminDatasourcePylon::APIError)
+        expect(WebMock).to have_requested(:get, "#{base}/me").once
+      end
+
+      it 'defaults the cap above a full Pylon rate-limit window' do
+        expect(ForestAdminDatasourcePylon::Configuration::DEFAULT_MAX_RETRY_INTERVAL).to be >= 60
+      end
     end
 
     describe 'RETRY_IF' do

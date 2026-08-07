@@ -1,4 +1,5 @@
 require_relative 'forest_admin_datasource_pylon/version'
+require 'json'
 require 'logger'
 require 'zeitwerk'
 require 'faraday'

@@ -8,6 +8,14 @@ module ForestAdminDatasourcePylon
     IDEMPOTENT_METHODS = %i[delete get head options put].freeze
     RETRY_IF = ->(env, _exception) { env[:status] == 429 }
 
+    # faraday-retry's defaults plus ConnectionFailed: a dropped connection is
+    # exactly the transient failure a resilient client should absorb, and it is
+    # not retried out of the box.
+    RETRY_EXCEPTIONS = [
+      Errno::ETIMEDOUT, 'Timeout::Error', Faraday::TimeoutError,
+      Faraday::RetriableResponse, Faraday::ConnectionFailed
+    ].freeze
+
     def initialize(configuration)
       @configuration = configuration
     end
@@ -49,7 +57,7 @@ module ForestAdminDatasourcePylon
     def error_detail(status, body)
       return nil unless status
 
-      ["HTTP #{status}", error_message(body)].compact.join(' ').strip
+      "HTTP #{status} #{error_message(body)}".strip
     end
 
     def error_message(parsed)
@@ -59,8 +67,15 @@ module ForestAdminDatasourcePylon
       message = parsed['message'] || (nested.is_a?(Hash) ? nested['message'] : nested) ||
                 join_errors(parsed['errors'])
       message = parsed.to_json if message.to_s.empty?
-      message = "#{message} (request_id: #{parsed["request_id"]})" if parsed['request_id']
-      message.to_s[0, 500]
+      # Truncate before appending: the request_id is what support needs, so it
+      # must not be the first thing a long error body pushes out.
+      append_request_id(message.to_s[0, 500], parsed['request_id'])
+    end
+
+    def append_request_id(message, request_id)
+      return message unless request_id
+
+      "#{message} (request_id: #{request_id})"
     end
 
     def join_errors(errors)
@@ -84,7 +99,8 @@ module ForestAdminDatasourcePylon
         f.response :raise_error
         f.response :json
         f.request :retry, max: @configuration.max_retries, interval: @configuration.retry_interval,
-                          backoff_factor: 2, max_interval: 5, retry_statuses: RETRY_STATUSES,
+                          backoff_factor: 2, max_interval: @configuration.max_retry_interval,
+                          retry_statuses: RETRY_STATUSES, exceptions: RETRY_EXCEPTIONS,
                           methods: IDEMPOTENT_METHODS, retry_if: RETRY_IF
         f.headers['Authorization'] = "Bearer #{@configuration.api_key}"
         f.headers['Accept']        = 'application/json'
