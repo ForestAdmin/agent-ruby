@@ -25,16 +25,24 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       expect(config.base_url).to eq('https://example.test')
     end
 
-    it 'defaults the timeouts and retry budget' do
+    it 'defaults the timeouts' do
       config = described_class.new(**valid_args)
-      expect([config.open_timeout, config.timeout, config.max_retries, config.retry_interval])
-        .to eq([5, 30, 3, 0.5])
+      expect([config.open_timeout, config.timeout]).to eq([5, 30])
     end
 
-    it 'keeps configurable timeouts and retry budget' do
-      config = described_class.new(**valid_args, open_timeout: 1, timeout: 2, max_retries: 5, retry_interval: 0.1)
-      expect([config.open_timeout, config.timeout, config.max_retries, config.retry_interval])
-        .to eq([1, 2, 5, 0.1])
+    it 'keeps configurable timeouts' do
+      config = described_class.new(**valid_args, open_timeout: 1, timeout: 2)
+      expect([config.open_timeout, config.timeout]).to eq([1, 2])
+    end
+
+    it 'defaults to a standard retry policy' do
+      expect(described_class.new(**valid_args).retry_policy)
+        .to be_a(ForestAdminDatasourcePylon::RetryPolicy)
+    end
+
+    it 'accepts an injected retry policy' do
+      policy = ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 9)
+      expect(described_class.new(**valid_args, retry_policy: policy).retry_policy).to be(policy)
     end
   end
 

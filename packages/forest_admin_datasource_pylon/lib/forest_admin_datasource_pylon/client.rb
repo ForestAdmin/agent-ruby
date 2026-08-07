@@ -1,21 +1,5 @@
 module ForestAdminDatasourcePylon
   class Client
-    RETRY_STATUSES = [429, 502, 503, 504].freeze
-
-    # Faraday only retries these by default; a 429 is safe to retry on any verb
-    # because Pylon rejected the request before processing it, whereas a 502 on a
-    # POST /issues may well have created the issue.
-    IDEMPOTENT_METHODS = %i[delete get head options put].freeze
-    RETRY_IF = ->(env, _exception) { env[:status] == 429 }
-
-    # faraday-retry's defaults plus ConnectionFailed: a dropped connection is
-    # exactly the transient failure a resilient client should absorb, and it is
-    # not retried out of the box.
-    RETRY_EXCEPTIONS = [
-      Errno::ETIMEDOUT, 'Timeout::Error', Faraday::TimeoutError,
-      Faraday::RetriableResponse, Faraday::ConnectionFailed
-    ].freeze
-
     def initialize(configuration)
       @configuration = configuration
     end
@@ -98,10 +82,7 @@ module ForestAdminDatasourcePylon
         f.request :json
         f.response :raise_error
         f.response :json
-        f.request :retry, max: @configuration.max_retries, interval: @configuration.retry_interval,
-                          backoff_factor: 2, max_interval: @configuration.max_retry_interval,
-                          retry_statuses: RETRY_STATUSES, exceptions: RETRY_EXCEPTIONS,
-                          methods: IDEMPOTENT_METHODS, retry_if: RETRY_IF
+        f.request :retry, **@configuration.retry_policy.to_faraday_options
         f.headers['Authorization'] = "Bearer #{@configuration.api_key}"
         f.headers['Accept']        = 'application/json'
         f.headers['User-Agent']    = "forest_admin_datasource_pylon/#{VERSION}"

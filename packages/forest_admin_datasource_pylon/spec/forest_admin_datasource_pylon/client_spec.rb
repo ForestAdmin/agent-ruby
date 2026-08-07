@@ -1,7 +1,6 @@
 RSpec.describe ForestAdminDatasourcePylon::Client do
-  let(:configuration) do
-    ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', max_retries: 2, retry_interval: 0)
-  end
+  let(:retry_policy) { ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 2, interval: 0) }
+  let(:configuration) { ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', retry_policy: retry_policy) }
   let(:client) { described_class.new(configuration) }
   let(:base) { configuration.url }
 
@@ -176,26 +175,13 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       end
 
       it 'gives up without retrying when Retry-After exceeds the cap' do
-        impatient = ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', max_retry_interval: 1)
+        impatient = ForestAdminDatasourcePylon::Configuration.new(
+          api_key: 'k', retry_policy: ForestAdminDatasourcePylon::RetryPolicy.new(interval: 0, max_interval: 1)
+        )
         stub_request(:get, "#{base}/me").to_return(status: 429, headers: { 'Retry-After' => '5' })
 
         expect { described_class.new(impatient).me }.to raise_error(ForestAdminDatasourcePylon::APIError)
         expect(WebMock).to have_requested(:get, "#{base}/me").once
-      end
-
-      it 'defaults the cap above a full Pylon rate-limit window' do
-        expect(ForestAdminDatasourcePylon::Configuration::DEFAULT_MAX_RETRY_INTERVAL).to be >= 60
-      end
-    end
-
-    describe 'RETRY_IF' do
-      it 'allows retrying a non-idempotent verb when Pylon answered 429' do
-        expect(described_class::RETRY_IF.call({ status: 429 }, nil)).to be(true)
-      end
-
-      it 'refuses to retry a non-idempotent verb on any other failure' do
-        expect(described_class::RETRY_IF.call({ status: 502 }, nil)).to be(false)
-        expect(described_class::RETRY_IF.call({ status: nil }, nil)).to be(false)
       end
     end
   end
