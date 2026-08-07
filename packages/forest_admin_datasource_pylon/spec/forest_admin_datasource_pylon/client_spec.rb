@@ -132,6 +132,116 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  describe '#search_issues' do
+    it 'posts the limit and returns the records' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => [{ 'id' => 'i1' }]))
+
+      page = client.search_issues(limit: 2)
+
+      expect(page.records).to eq([{ 'id' => 'i1' }])
+      expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(body: { 'limit' => 2 })
+    end
+
+    it 'omits cursor, filter and search_text when they are not provided' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+      client.search_issues(limit: 5, cursor: nil, filter: nil, search_text: '')
+
+      expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(body: { 'limit' => 5 })
+    end
+
+    it 'forwards cursor, filter and search_text when provided' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+      filter = { 'field' => 'state', 'operator' => 'equals', 'values' => ['new'] }
+
+      client.search_issues(limit: 5, cursor: 'c1', filter: filter, search_text: 'boom')
+
+      expect(WebMock).to have_requested(:post, "#{base}/issues/search")
+        .with(body: { 'limit' => 5, 'cursor' => 'c1', 'filter' => filter, 'search_text' => 'boom' })
+    end
+
+    it 'clamps the limit to the API maximum' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+      client.search_issues(limit: 99_999)
+
+      expect(WebMock).to have_requested(:post, "#{base}/issues/search")
+        .with(body: { 'limit' => described_class::MAX_SEARCH_LIMIT })
+    end
+
+    it 'raises the limit to 1 when it is zero or negative' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+      client.search_issues(limit: 0)
+
+      expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(body: { 'limit' => 1 })
+    end
+
+    it 'exposes the cursor when a next page is advertised' do
+      stub_request(:post, "#{base}/issues/search")
+        .to_return(json('data' => [], 'pagination' => { 'cursor' => 'c2', 'has_next_page' => true }))
+
+      expect(client.search_issues(limit: 1).next_cursor).to eq('c2')
+    end
+
+    # Pylon omits the block entirely on the last page, so absence is the
+    # common case rather than the edge case.
+    it 'reports no next cursor when the pagination block is absent' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => [{ 'id' => 'i1' }]))
+
+      expect(client.search_issues(limit: 1).next_cursor).to be_nil
+    end
+
+    it 'reports no next cursor when has_next_page is false' do
+      stub_request(:post, "#{base}/issues/search")
+        .to_return(json('data' => [], 'pagination' => { 'cursor' => 'c2', 'has_next_page' => false }))
+
+      expect(client.search_issues(limit: 1).next_cursor).to be_nil
+    end
+
+    it 'reports no next cursor when the advertised cursor is empty' do
+      stub_request(:post, "#{base}/issues/search")
+        .to_return(json('data' => [], 'pagination' => { 'cursor' => '', 'has_next_page' => true }))
+
+      expect(client.search_issues(limit: 1).next_cursor).to be_nil
+    end
+
+    it 'returns no records when the payload carries none' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => nil))
+
+      expect(client.search_issues(limit: 1).records).to eq([])
+    end
+
+    it 'wraps a failure in an APIError naming the endpoint' do
+      stub_request(:post, "#{base}/issues/search").to_return(json({ 'message' => 'bad filter' }, 400))
+
+      expect { client.search_issues(limit: 1) }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, %r{issues/search: HTTP 400 bad filter})
+    end
+  end
+
+  describe '#fetch_issue' do
+    it 'unwraps the issue' do
+      stub_request(:get, "#{base}/issues/i1").to_return(json('data' => { 'id' => 'i1', 'number' => 1 }))
+
+      expect(client.fetch_issue('i1')).to eq('id' => 'i1', 'number' => 1)
+    end
+
+    it 'accepts an issue number as well as a uuid' do
+      stub_request(:get, "#{base}/issues/42").to_return(json('data' => { 'id' => 'i1', 'number' => 42 }))
+
+      expect(client.fetch_issue(42)).to include('number' => 42)
+    end
+
+    it 'wraps a missing issue in a 404 APIError' do
+      stub_request(:get, "#{base}/issues/nope").to_return(json({ 'message' => 'not found' }, 404))
+
+      expect { client.fetch_issue('nope') }.to raise_error(ForestAdminDatasourcePylon::APIError) { |error|
+        expect(error.status).to eq(404)
+      }
+    end
+  end
+
   describe 'rate limiting' do
     it 'retries a 429 and returns the eventual success' do
       stub_request(:get, "#{base}/me")

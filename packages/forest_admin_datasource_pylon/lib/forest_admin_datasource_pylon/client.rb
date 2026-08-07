@@ -1,5 +1,11 @@
 module ForestAdminDatasourcePylon
   class Client
+    MAX_SEARCH_LIMIT = 1000
+
+    # `next_cursor` is nil as soon as Pylon stops advertising a next page, so
+    # callers never have to know how the absence is spelled on the wire.
+    SearchPage = Struct.new(:records, :next_cursor, keyword_init: true)
+
     def initialize(configuration)
       @configuration = configuration
     end
@@ -10,7 +16,43 @@ module ForestAdminDatasourcePylon
       must_succeed('me') { extract_data(connection.get('me').body) }
     end
 
+    # POST /issues/search accepts an empty body and then returns the most recent
+    # issues, ordered by `created_at` descending.
+    def search_issues(limit:, cursor: nil, filter: nil, search_text: nil)
+      body = { 'limit' => clamp_limit(limit) }
+      body['cursor']      = cursor unless blank?(cursor)
+      body['filter']      = filter unless filter.nil?
+      body['search_text'] = search_text unless blank?(search_text)
+
+      must_succeed('issues/search') { to_search_page(connection.post('issues/search', body).body) }
+    end
+
+    # Accepts either the UUID or the issue number.
+    def fetch_issue(id)
+      must_succeed("issues/#{id}") { extract_data(connection.get("issues/#{id}").body) }
+    end
+
     private
+
+    def clamp_limit(limit)
+      value = limit.to_i
+      return 1 if value < 1
+
+      [value, MAX_SEARCH_LIMIT].min
+    end
+
+    # Pylon only includes the `pagination` block when a next page exists, so an
+    # absent block, `has_next_page: false` and an empty cursor all mean "done".
+    def to_search_page(body)
+      pagination = body.is_a?(Hash) ? body['pagination'] : nil
+      cursor = pagination.is_a?(Hash) && pagination['has_next_page'] ? pagination['cursor'] : nil
+
+      SearchPage.new(records: Array(extract_data(body)), next_cursor: blank?(cursor) ? nil : cursor)
+    end
+
+    def blank?(value)
+      value.nil? || value.to_s.empty?
+    end
 
     # Pylon wraps payloads in { "data": ..., "pagination": ..., "request_id": ... }.
     def extract_data(body)
