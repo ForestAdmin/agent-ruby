@@ -12,7 +12,7 @@ module ForestAdminDatasourceCustomizer
         describe WriteDatasourceDecorator do
           let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
           let(:write_datasource_decorator) { described_class }
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test') }
 
           before do
             @collection_price = instance_double(

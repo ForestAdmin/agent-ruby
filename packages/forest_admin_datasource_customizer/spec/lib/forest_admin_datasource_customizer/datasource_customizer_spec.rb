@@ -6,6 +6,9 @@ module ForestAdminDatasourceCustomizer
 
   describe DatasourceCustomizer do
     let(:datasource) { ForestAdminDatasourceToolkit::Datasource.new }
+    let(:caller) do
+      instance_double(ForestAdminDatasourceToolkit::Components::Caller, id: 1, rendering_id: 1, project: 'test')
+    end
 
     before do
       @collection = instance_double(

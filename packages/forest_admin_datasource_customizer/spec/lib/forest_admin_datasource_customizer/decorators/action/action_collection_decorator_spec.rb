@@ -91,6 +91,17 @@ module ForestAdminDatasourceCustomizer
             expect(result).to eq({ response_headers: {}, type: 'Success', message: 'Success', invalidated: [], html: nil })
           end
 
+          it 'emits an action.forest_admin notification' do
+            events = []
+            sub = ::ActiveSupport::Notifications.subscribe('action.forest_admin') do |*a|
+              events << ::ActiveSupport::Notifications::Event.new(*a)
+            end
+            @decorated_book.execute(caller, 'make photocopy', {}, Filter.new)
+            ::ActiveSupport::Notifications.unsubscribe(sub)
+
+            expect(events.map(&:payload)).to include(include(action: 'make photocopy'))
+          end
+
           it 'generate empty form' do
             form = @decorated_book.get_form(caller, 'make photocopy', {}, Filter.new)
             expect(form).to eq([])
