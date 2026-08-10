@@ -58,6 +58,7 @@ module ForestAdminAgent
       end
 
       def build
+        install_audit_trail
         @container.register(:datasource, @customizer.datasource(@logger))
 
         # Reset route cache to ensure routes are computed with all customizations
@@ -289,10 +290,28 @@ module ForestAdminAgent
         @options[:customize_error_message] =
           clean_option_value(@options[:customize_error_message], 'config.customize_error_message =')
         @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
+        build_audit_trail_store
 
         @container.register(:config, @options.to_h)
 
         configure_rpc_polling_pool if @options[:rpc_max_polling_threads]
+      end
+
+      # The audit trail switches on as soon as a database is configured. The store is built here
+      # (cheap: the connection only opens on the first write) and shared through the config, so the
+      # record-history routes read the very table the capture layer writes to.
+      def build_audit_trail_store
+        options = @options[:audit_trail]
+        return unless options && options[:database]
+
+        options[:store] = AuditTrail::Store.new(**options.slice(:database, :schema, :table_name).compact)
+      end
+
+      def install_audit_trail
+        options = @options[:audit_trail]
+        return if options.nil? || options[:store].nil?
+
+        @customizer.use(AuditTrail::Capture, { store: options[:store], redact: options[:redact] })
       end
 
       def configure_rpc_polling_pool

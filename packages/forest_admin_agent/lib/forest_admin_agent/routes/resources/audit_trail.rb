@@ -5,8 +5,8 @@ module ForestAdminAgent
     module Resources
       # Record-history route, mirroring the Node agent's `/_audit-trail/{collection}/:id`.
       #
-      # Registered only when an `audit_trail` option carrying a readable store was provided to the
-      # agent. The store is expected to respond to `list_by_record` and `count_by_record`.
+      # Registered only when `config.audit_trail[:database]` is set, in which case the agent factory
+      # built the store the capture layer writes to.
       class AuditTrail < AbstractAuthenticatedRoute
         include ForestAdminAgent::Utils
 

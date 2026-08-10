@@ -1,19 +1,17 @@
 require 'time'
 
-module ForestAdminAuditTrail
-  module Stores
-    # SQL-backed store that both writes every audited change and reads the per-record history back.
+module ForestAdminAgent
+  module AuditTrail
+    # SQL-backed storage that both writes every audited change and reads the per-record history back.
     #
     # Construction is cheap; the connection is opened lazily on the first append or read, at which
     # point the `forest` schema and the `audit_logs` table are created/evolved through migrations.
-    # Pass the SAME instance to the plugin (`store:`) and to the agent (`audit_trail: { store: }`) so
-    # writes and the record-history route agree on storage.
-    class SqlStore
+    class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
 
-      def initialize(connection_string:, schema: DEFAULT_SCHEMA, table_name: DEFAULT_TABLE)
-        @connection_string = connection_string
+      def initialize(database:, schema: DEFAULT_SCHEMA, table_name: DEFAULT_TABLE)
+        @database = database
         @schema = schema
         @table_name = table_name
         @mutex = Mutex.new
@@ -81,7 +79,7 @@ module ForestAdminAuditTrail
         @mutex.synchronize do
           return if @ready
 
-          Sql::AuditConnectionBase.establish_connection(@connection_string)
+          Sql::AuditConnectionBase.establish_connection(@database)
           connection = Sql::AuditConnectionBase.connection
           Sql::Migrator.new(connection, schema: schema_for(connection), table_name: @table_name).run
           @model = build_model(qualified(connection))

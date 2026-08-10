@@ -1,4 +1,6 @@
 require 'filecache'
+require 'active_record'
+require 'sqlite3'
 require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'

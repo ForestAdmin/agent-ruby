@@ -2,9 +2,8 @@ module ForestAdminAgent
   module Routes
     module Resources
       # Correlation-scoped record-history routes, mirroring the Node agent's
-      # `/_audit-trail/correlation/:key` and `/_audit-trail/correlations`. Registered only when an
-      # `audit_trail` store is configured; the store must respond to `list_by_correlation` and
-      # `list_by_correlations`. All three routes are scoped to a single record through the
+      # `/_audit-trail/correlation/:key` and `/_audit-trail/correlations`. Registered only when
+      # `config.audit_trail[:database]` is set. All three routes are scoped to a single record through the
       # `collection`/`recordId` query (GET) or body (POST) params and share the per-record auth.
       class AuditTrailCorrelation < AbstractAuthenticatedRoute
         def setup_routes

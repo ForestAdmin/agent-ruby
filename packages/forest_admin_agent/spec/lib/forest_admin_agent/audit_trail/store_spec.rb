@@ -1,14 +1,14 @@
 require 'spec_helper'
 require 'tempfile'
 
-module ForestAdminAuditTrail
-  module Stores
-    describe SqlStore do
+module ForestAdminAgent
+  module AuditTrail
+    describe Store do
       let(:db) { Tempfile.new(['audit', '.sqlite3']) }
-      let(:store) { described_class.new(connection_string: { adapter: 'sqlite3', database: db.path }) }
+      let(:store) { described_class.new(database: { adapter: 'sqlite3', database: db.path }) }
 
       after do
-        ForestAdminAuditTrail::Sql::AuditConnectionBase.remove_connection
+        Sql::AuditConnectionBase.remove_connection
         db.close!
       end
 
@@ -21,7 +21,7 @@ module ForestAdminAuditTrail
       end
 
       def connection
-        ForestAdminAuditTrail::Sql::AuditConnectionBase.connection
+        Sql::AuditConnectionBase.connection
       end
 
       it 'creates the audit table with the expected columns on first write' do
@@ -114,19 +114,19 @@ module ForestAdminAuditTrail
 
       it 'tracks applied migrations and is idempotent across stores' do
         store.append(record)
-        described_class.new(connection_string: { adapter: 'sqlite3', database: db.path }).append(record)
+        described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
         expect(names).to eq(['001-create-audit-logs', '002-index-record-and-correlation'])
       end
 
       it 'binds each store to its own model class instead of mutating a shared one' do
-        other = described_class.new(connection_string: { adapter: 'sqlite3', database: db.path })
+        other = described_class.new(database: { adapter: 'sqlite3', database: db.path })
         store.append(record(correlation_key: 'main'))
         other.append(record(correlation_key: 'other'))
 
         # No shared mutable model: AuditLog is an abstract template, each store owns a distinct subclass.
-        expect(ForestAdminAuditTrail::Sql::AuditLog.abstract_class?).to be(true)
+        expect(Sql::AuditLog.abstract_class?).to be(true)
         expect(store.send(:model)).not_to equal(other.send(:model))
         expect(store.send(:model).table_name).to eq('audit_logs')
         expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:correlation_key))

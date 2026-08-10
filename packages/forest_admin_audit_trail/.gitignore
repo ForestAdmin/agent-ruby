@@ -1,7 +1,0 @@
-/.bundle/
-/coverage/
-/pkg/
-/tmp/
-Gemfile.lock
-*.gem
-*.sqlite3

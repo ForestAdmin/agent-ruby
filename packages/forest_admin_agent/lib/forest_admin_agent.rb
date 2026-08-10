@@ -4,6 +4,7 @@ require 'zeitwerk'
 
 loader = Zeitwerk::Loader.for_gem
 loader.inflector.inflect('oauth2' => 'OAuth2')
+loader.inflector.inflect('sql' => 'Sql')
 loader.inflector.inflect('sse_cache_invalidation' => 'SSECacheInvalidation')
 loader.setup
 
