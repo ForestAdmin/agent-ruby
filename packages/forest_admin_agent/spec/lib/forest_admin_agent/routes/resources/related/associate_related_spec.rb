@@ -126,14 +126,25 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('user_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
               result = associate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address_user'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(field: 'user_id', operator: Operators::NOT_EQUAL, value: 99)
+                    ]
+                  ),
                   page: nil,
                   search: nil,
                   search_extended: nil,
@@ -158,6 +169,8 @@ module ForestAdminAgent
               allow(@datasource.get_collection('address_user')).to receive(:create).and_return(true)
               result = associate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).not_to have_received(:get_scope)
               expect(@datasource.get_collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
@@ -172,14 +185,25 @@ module ForestAdminAgent
               args[:params]['relation_name'] = 'addresses_poly'
               args[:params]['data'] = [{ 'id' => 1, 'type' => 'user' }]
               args[:params]['id'] = 1
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
               result = associate.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris')
+                    ]
+                  ),
                   page: nil,
                   search: nil,
                   search_extended: nil,

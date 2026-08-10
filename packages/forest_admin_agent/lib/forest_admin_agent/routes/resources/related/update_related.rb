@@ -22,7 +22,6 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             context = build(args)
-            context.permissions.can?(:edit, context.collection)
 
             relation = context.collection.schema[:fields][args[:params]['relation_name']]
             parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'])
@@ -48,16 +47,27 @@ module ForestAdminAgent
           private
 
           def update_many_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+            context.permissions.can?(:edit, context.collection)
+
             foreign_value = if linked_primary_key_values
                               Collection.get_value(context.child_collection, context.caller, linked_primary_key_values,
                                                    relation.foreign_key_target)
                             end
             fk_owner = ConditionTree::ConditionTreeFactory.match_ids(context.collection, [parent_primary_key_values])
-            context.collection.update(context.caller, Filter.new(condition_tree: fk_owner),
-                                      { relation.foreign_key => foreign_value })
+            filter = Filter.new(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  context.permissions.get_scope(context.collection),
+                  fk_owner
+                ]
+              )
+            )
+            context.collection.update(context.caller, filter, { relation.foreign_key => foreign_value })
           end
 
           def update_polymorphic_many_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+            context.permissions.can?(:edit, context.collection)
+
             foreign_value = if linked_primary_key_values
                               Collection.get_value(
                                 context.child_collection,
@@ -69,9 +79,17 @@ module ForestAdminAgent
 
             polymorphic_type = context.child_collection.name.gsub('__', '::')
             fk_owner = ConditionTree::ConditionTreeFactory.match_ids(context.collection, [parent_primary_key_values])
+            filter = Filter.new(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  context.permissions.get_scope(context.collection),
+                  fk_owner
+                ]
+              )
+            )
             context.collection.update(
               context.caller,
-              Filter.new(condition_tree: fk_owner),
+              filter,
               {
                 relation.foreign_key => foreign_value,
                 relation.foreign_key_type_field => polymorphic_type
@@ -80,6 +98,8 @@ module ForestAdminAgent
           end
 
           def update_polymorphic_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+            context.permissions.can?(:edit, context.child_collection)
+
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                                 relation.origin_key_target)
 
@@ -88,6 +108,8 @@ module ForestAdminAgent
           end
 
           def update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+            context.permissions.can?(:edit, context.child_collection)
+
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                                 relation.origin_key_target)
 
@@ -101,7 +123,7 @@ module ForestAdminAgent
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  context.permissions.get_scope(context.collection),
+                  context.permissions.get_scope(context.child_collection),
                   ConditionTree::Nodes::ConditionTreeBranch.new(
                     'And',
                     [
@@ -150,7 +172,7 @@ module ForestAdminAgent
               Filter.new(
                 condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                   [
-                    context.permissions.get_scope(context.collection), new_fk_owner
+                    context.permissions.get_scope(context.child_collection), new_fk_owner
                   ]
                 )
               ),
@@ -164,7 +186,7 @@ module ForestAdminAgent
             old_fk_owner_filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  context.permissions.get_scope(context.collection),
+                  context.permissions.get_scope(context.child_collection),
                   ConditionTree::Nodes::ConditionTreeLeaf.new(
                     relation.origin_key,
                     ConditionTree::Operators::EQUAL,
@@ -198,7 +220,7 @@ module ForestAdminAgent
               context.caller,
               Filter.new(condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  context.permissions.get_scope(context.collection),
+                  context.permissions.get_scope(context.child_collection),
                   new_fk_owner
                 ]
               )),
