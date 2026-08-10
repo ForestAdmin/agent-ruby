@@ -16,13 +16,20 @@ module ForestAdminDatasourcePylon
 
       def fetch_records(filter)
         ids = extract_id_lookup(filter&.condition_tree)
-        return fetch_by_ids(ids) if ids
+        return page_window(fetch_by_ids(ids), filter) if ids
 
         warn_ignored_filter(filter)
         offset, limit = translate_page(filter&.page)
         walker.walk(offset: offset, limit: limit) do |batch, cursor|
           datasource.client.search_issues(limit: batch, cursor: cursor)
         end
+      end
+
+      # Sliced after the lookup, not before, so ids that resolved to nothing
+      # (404) do not eat into the requested window.
+      def page_window(records, filter)
+        offset, limit = translate_page(filter&.page)
+        records[offset, limit] || []
       end
 
       # A record the operator can no longer reach — deleted, or outside the

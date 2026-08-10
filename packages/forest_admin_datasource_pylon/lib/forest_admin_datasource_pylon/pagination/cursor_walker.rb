@@ -25,7 +25,7 @@ module ForestAdminDatasourcePylon
         pages = 0
 
         loop do
-          page = yield(batch_size(needed - records.size), cursor)
+          page = yield(batch_size(needed, records.size), cursor)
           records.concat(page.records)
           pages += 1
 
@@ -55,8 +55,10 @@ module ForestAdminDatasourcePylon
         pages >= @max_pages || collected >= @max_records
       end
 
-      def batch_size(remaining)
-        remaining.clamp(1, Client::MAX_SEARCH_LIMIT)
+      # Bounded by the window still missing and by the record budget left, so
+      # the walk never collects past @max_records.
+      def batch_size(needed, collected)
+        [needed - collected, @max_records - collected].min.clamp(1, Client::MAX_SEARCH_LIMIT)
       end
 
       def log_truncation(offset:, limit:, pages:, collected:)

@@ -175,6 +175,25 @@ module ForestAdminDatasourcePylon
         expect(rows).to eq([{ 'id' => 'i1' }, { 'id' => 'i2' }])
       end
 
+      it 'applies the requested page to an in lookup' do
+        %w[i1 i2 i3].each do |id|
+          stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id)))
+        end
+        query = filter(condition_tree: id_leaf(operators::IN, %w[i1 i2 i3]), page: page(1, 1))
+
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i2' }])
+      end
+
+      it 'slices the page over the records that still exist' do
+        stub_request(:get, "#{base}/issues/gone").to_return(json({ 'message' => 'not found' }, 404))
+        %w[i2 i3].each do |id|
+          stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id)))
+        end
+        query = filter(condition_tree: id_leaf(operators::IN, %w[gone i2 i3]), page: page(0, 2))
+
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i2' }, { 'id' => 'i3' }])
+      end
+
       it 'skips an issue that no longer exists' do
         stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
         stub_request(:get, "#{base}/issues/gone").to_return(json({ 'message' => 'not found' }, 404))
@@ -189,6 +208,29 @@ module ForestAdminDatasourcePylon
 
         expect { collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, 'i1')), %w[id]) }
           .to raise_error(APIError)
+      end
+    end
+
+    describe 'custom fields' do
+      let(:column) { ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(column_type: 'String') }
+      let(:collection) do
+        described_class.new(datasource, custom_fields: [{ column_name: 'severity', schema: column },
+                                                        { column_name: 'zones', schema: column }])
+      end
+
+      it 'serializes single- and multi-value custom fields' do
+        fields = { 'severity' => { 'slug' => 'severity', 'value' => 'high' },
+                   'zones' => { 'slug' => 'zones', 'values' => %w[eu us] } }
+        stub_request(:post, "#{base}/issues/search")
+          .to_return(json('data' => [issue_payload('i1', 'custom_fields' => fields)]))
+
+        expect(collection.list(nil, filter, nil).first).to include('severity' => 'high', 'zones' => %w[eu us])
+      end
+
+      it 'yields nil for a custom field the issue does not carry' do
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => [issue_payload('i1')]))
+
+        expect(collection.list(nil, filter, nil).first).to include('severity' => nil, 'zones' => nil)
       end
     end
 

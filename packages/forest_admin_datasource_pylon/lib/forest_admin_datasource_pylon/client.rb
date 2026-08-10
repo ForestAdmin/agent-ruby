@@ -27,9 +27,11 @@ module ForestAdminDatasourcePylon
       must_succeed('issues/search') { to_search_page(connection.post('issues/search', body).body) }
     end
 
-    # Accepts either the UUID or the issue number.
+    # Accepts either the UUID or the issue number. The id comes from
+    # operator-supplied filter values, so it is escaped before joining the path.
     def fetch_issue(id)
-      must_succeed("issues/#{id}") { extract_data(connection.get("issues/#{id}").body) }
+      path = "issues/#{Faraday::Utils.escape(id)}"
+      must_succeed(path) { extract_data(connection.get(path).body) }
     end
 
     private

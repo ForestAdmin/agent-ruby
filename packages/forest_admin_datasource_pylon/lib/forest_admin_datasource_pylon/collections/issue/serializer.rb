@@ -17,11 +17,27 @@ module ForestAdminDatasourcePylon
           attrs = issue.is_a?(Hash) ? issue : {}
           record = NATIVE_FIELDS.to_h { |field| [field, attrs[field]] }
           PARTY_FIELDS.each { |column, source| record[column] = nested_id(attrs[source]) }
+          add_custom_field_values(record, attrs['custom_fields'])
           record
         end
 
         def nested_id(value)
           value['id'] if value.is_a?(Hash)
+        end
+
+        def add_custom_field_values(record, values)
+          custom_fields.each do |cf|
+            entry = values.is_a?(Hash) ? values[cf[:column_name]] : nil
+            record[cf[:column_name]] = custom_field_value(entry)
+          end
+        end
+
+        # Pylon spells a custom field as `slug => {"slug": ..., "value": ...}`,
+        # with `"values": [...]` instead of `"value"` for multi-value fields.
+        def custom_field_value(entry)
+          return entry unless entry.is_a?(Hash)
+
+          entry.key?('value') ? entry['value'] : entry['values']
         end
       end
     end

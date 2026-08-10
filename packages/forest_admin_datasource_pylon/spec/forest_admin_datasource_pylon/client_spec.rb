@@ -233,6 +233,14 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       expect(client.fetch_issue(42)).to include('number' => 42)
     end
 
+    it 'escapes an id that would otherwise alter the request path' do
+      stub_request(:get, "#{base}/issues/..%2Fme").to_return(json('data' => nil))
+
+      client.fetch_issue('../me')
+
+      expect(WebMock).to have_requested(:get, "#{base}/issues/..%2Fme")
+    end
+
     it 'wraps a missing issue in a 404 APIError' do
       stub_request(:get, "#{base}/issues/nope").to_return(json({ 'message' => 'not found' }, 404))
 

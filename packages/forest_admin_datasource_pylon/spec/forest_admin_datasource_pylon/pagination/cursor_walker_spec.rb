@@ -80,6 +80,14 @@ RSpec.describe ForestAdminDatasourcePylon::Pagination::CursorWalker do
       expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/4 record\(s\)/)
     end
 
+    it 'never asks for more than the remaining record budget' do
+      pages = [search_page(%w[a b], 'c1'), search_page(%w[c], 'c2')]
+
+      walk(pages, offset: 0, limit: 100, walker: described_class.new(max_records: 3))
+
+      expect(calls.map { |call| call[:limit] }).to eq([3, 1])
+    end
+
     it 'does not warn when the walk ends naturally' do
       walk([search_page(%w[a b], nil)], offset: 0, limit: 100)
 
