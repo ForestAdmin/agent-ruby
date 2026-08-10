@@ -114,6 +114,30 @@ module ForestAdminAgent
               expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_category_export_\d{8}_\d{6}\.csv"/)
             end
 
+            it 'authorizes and scopes on the related collection, not the parent' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('label', Operators::EQUAL, 'active'))
+
+              captured_filter = nil
+              allow(csv_generator_stream).to receive(:stream) do |_header, filter, _projection, _list_records, _limit|
+                captured_filter = filter
+                ["id,label\n"].to_enum
+              end
+
+              csv.handle_request(args)
+
+              expect(permissions).to have_received(:can?).with(:browse, having_attributes(name: 'category'))
+              expect(permissions).to have_received(:can?).with(:export, having_attributes(name: 'category'))
+              expect(permissions).not_to have_received(:can?).with(anything, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'category'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
+              expect(captured_filter.condition_tree).to have_attributes(
+                field: 'label', operator: Operators::EQUAL, value: 'active'
+              )
+            end
+
             it 'passes a lambda to stream that calls list_relation with correct parameters' do
               args[:params]['relation_name'] = 'category'
               args[:params]['id'] = 1
