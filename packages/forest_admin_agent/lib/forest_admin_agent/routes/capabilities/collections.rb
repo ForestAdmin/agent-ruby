@@ -2,7 +2,7 @@ require 'json'
 module ForestAdminAgent
   module Routes
     module Capabilities
-      class Collections < AbstractRoute
+      class Collections < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Schema::Relations
 
@@ -16,6 +16,7 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
+          build(args)
           datasource = ForestAdminAgent::Facades::Container.datasource
           collections = args[:params]['collectionNames'] || []
 
