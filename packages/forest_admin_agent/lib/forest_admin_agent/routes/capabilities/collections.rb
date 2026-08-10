@@ -16,8 +16,8 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          build(args)
-          datasource = ForestAdminAgent::Facades::Container.datasource
+          context = build(args)
+          datasource = context.datasource
           collections = args[:params]['collectionNames'] || []
 
           connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
