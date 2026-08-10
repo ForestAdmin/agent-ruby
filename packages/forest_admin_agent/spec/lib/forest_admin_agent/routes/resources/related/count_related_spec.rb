@@ -102,6 +102,29 @@ module ForestAdminAgent
             end
           end
 
+          context 'when checking permissions and scope' do
+            it 'authorizes and scopes on the related collection, not the parent' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              ForestAdminAgent::Facades::Container.datasource.get_collection('category').enable_count
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('label', Operators::EQUAL, 'active'))
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation)
+                .and_return([{ value: 1 }])
+              count.handle_request(args)
+
+              expect(permissions).to have_received(:can?).with(:browse, having_attributes(name: 'category'))
+              expect(permissions).not_to have_received(:can?).with(:browse, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'category'))
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:aggregate_relation) do
+              |_collection, _id, _relation_name, _caller, foreign_filter, _aggregation|
+                expect(foreign_filter.condition_tree).to have_attributes(
+                  field: 'label', operator: Operators::EQUAL, value: 'active'
+                )
+              end
+            end
+          end
+
           context 'when collection is not countable' do
             it 'return response without call aggregate_relation' do
               args[:params]['relation_name'] = 'category'

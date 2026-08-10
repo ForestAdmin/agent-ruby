@@ -21,13 +21,13 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             context = build(args)
-            context.permissions.can?(:browse, context.collection)
-            context.permissions.can?(:export, context.collection)
+            context.permissions.can?(:browse, context.child_collection)
+            context.permissions.can?(:export, context.child_collection)
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [
-                  context.permissions.get_scope(context.collection),
+                  context.permissions.get_scope(context.child_collection),
                   ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.child_collection, args)
                 ]
               )
