@@ -132,6 +132,7 @@ module ForestAdminAgent
               expect(permissions).to have_received(:can?).with(:export, having_attributes(name: 'category'))
               expect(permissions).not_to have_received(:can?).with(anything, having_attributes(name: 'user'))
               expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'category'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(captured_filter.condition_tree).to have_attributes(
                 field: 'label', operator: Operators::EQUAL, value: 'active'
               )

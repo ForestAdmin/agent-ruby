@@ -117,6 +117,7 @@ module ForestAdminAgent
               expect(permissions).to have_received(:can?).with(:browse, having_attributes(name: 'category'))
               expect(permissions).not_to have_received(:can?).with(:browse, having_attributes(name: 'user'))
               expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'category'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
               |_collection, _id, _relation_name, _caller, foreign_filter, _projection|
                 expect(foreign_filter.condition_tree).to have_attributes(
