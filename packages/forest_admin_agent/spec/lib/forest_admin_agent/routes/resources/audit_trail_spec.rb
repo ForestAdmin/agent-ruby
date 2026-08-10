@@ -3,8 +3,26 @@ require 'spec_helper'
 module ForestAdminAgent
   module Routes
     module Resources
+      include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       describe AuditTrail do
         let(:store) { double('store') }
+        let(:permissions) { double('permissions', can?: true, get_scope: nil) }
+        let(:collection) do
+          build_collection(
+            name: 'projects',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number', is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                )
+              }
+            },
+            list: [{ 'id' => 4 }]
+          )
+        end
 
         def route_with_store(records: [])
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
@@ -12,8 +30,7 @@ module ForestAdminAgent
           allow(store).to receive_messages(list_by_record: records, count_by_record: records.length)
 
           route = described_class.new
-          context = double('context', collection: double('collection', name: 'projects'),
-                                      permissions: double('permissions', can?: true))
+          context = double('context', collection: collection, caller: build_caller, permissions: permissions)
           allow(route).to receive(:build).and_return(context)
           route
         end
@@ -48,6 +65,29 @@ module ForestAdminAgent
               meta: { count: 1 }
             }
           )
+        end
+
+        it 'intersects the record with the permission scope before reading any history' do
+          scope = Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4)
+          allow(permissions).to receive(:get_scope).and_return(scope)
+          route = route_with_store
+
+          route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(collection).to have_received(:list) do |_caller, filter, _projection|
+            expect(filter.condition_tree.conditions).to include(scope)
+          end
+        end
+
+        it 'returns 404 without touching the store when the record is out of the caller scope' do
+          allow(collection).to receive(:list).and_return([])
+          route = route_with_store
+
+          expect do
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+          end.to raise_error(Http::Exceptions::NotFoundError)
+
+          expect(store).not_to have_received(:list_by_record)
         end
 
         it 'defaults to newest-first and switches to oldest-first on sort=timestamp' do

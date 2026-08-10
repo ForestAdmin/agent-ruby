@@ -31,6 +31,12 @@ module ForestAdminAgent
       let(:collection) { double('collection') }
       let(:caller_double) { double('caller', id: 42, request_id: 'req-xyz') }
 
+      # What a hook context really hands out: the caller is already bound, so `list` takes
+      # (filter, projection). A verifying double keeps that contract honest.
+      let(:relaxed_collection) do
+        instance_double(ForestAdminDatasourceCustomizer::Context::RelaxedWrappers::RelaxedCollection)
+      end
+
       let(:collection_customizer) do
         customizer = double('CollectionCustomizer', name: 'companies', collection: collection)
         allow(customizer).to receive(:add_hook) { |position, type, &block| hooks["#{position}_#{type}"] = block }
@@ -42,6 +48,7 @@ module ForestAdminAgent
       end
 
       before do
+        Thread.current[:forest_audit_trail_snapshots] = nil
         allow(collection).to receive(:schema).and_return({ fields: fields })
         described_class.new.run(datasource_customizer, nil, store: store)
       end
@@ -60,28 +67,34 @@ module ForestAdminAgent
         expect(audit.new_values).to eq({ 'name' => 'Acme', 'address' => { 'city' => 'Paris' } })
       end
 
+      def before_hook(type, patch: nil)
+        hooks["Before_#{type}"].call(
+          double('before', caller: caller_double, filter: Object.new,
+                           collection: relaxed_collection, patch: patch)
+        )
+      end
+
+      def after_hook(type)
+        hooks["After_#{type}"].call(double('after', caller: caller_double, filter: Object.new))
+      end
+
       it "shares the caller's request id as the correlation key across records of one operation" do
-        filter = Object.new
-        allow(collection).to receive(:list).and_return(
+        allow(relaxed_collection).to receive(:list).and_return(
           [{ 'id' => 1, 'name' => 'A' }, { 'id' => 2, 'name' => 'B' }]
         )
 
-        hooks['Before_Update'].call(double('before', caller: caller_double, filter: filter, collection: collection))
-        hooks['After_Update'].call(double('after', caller: caller_double, filter: filter, patch: { 'name' => 'Z' }))
+        before_hook('Update', patch: { 'name' => 'Z' })
+        after_hook('Update')
 
         expect(store.records.map(&:correlation_key)).to eq(%w[req-xyz req-xyz])
       end
 
       it 'records an update with the minimal nested diff' do
-        filter = Object.new
         before_record = { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris', 'zip' => '1' } }
-        allow(collection).to receive(:list).and_return([before_record])
+        allow(relaxed_collection).to receive(:list).and_return([before_record])
 
-        hooks['Before_Update'].call(double('before', caller: caller_double, filter: filter, collection: collection))
-        hooks['After_Update'].call(
-          double('after', caller: caller_double, filter: filter,
-                          patch: { 'address' => { 'city' => 'Lyon', 'zip' => '1' } })
-        )
+        before_hook('Update', patch: { 'address' => { 'city' => 'Lyon', 'zip' => '1' } })
+        after_hook('Update')
 
         audit = store.records.last
         expect(audit.operation).to eq('update')
@@ -90,21 +103,51 @@ module ForestAdminAgent
       end
 
       it 'does not record an update when nothing writable changed' do
-        filter = Object.new
-        allow(collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
 
-        hooks['Before_Update'].call(double('before', caller: caller_double, filter: filter, collection: collection))
-        hooks['After_Update'].call(double('after', caller: caller_double, filter: filter, patch: { 'name' => 'Acme' }))
+        before_hook('Update', patch: { 'name' => 'Acme' })
+        after_hook('Update')
 
         expect(store.records).to be_empty
       end
 
-      it 'records a delete with the previous values' do
-        filter = Object.new
-        allow(collection).to receive(:list).and_return([{ 'id' => 7, 'name' => 'Gone', 'address' => nil }])
+      # The before and after hooks are handed different filter objects (the after context always
+      # carries the caller's original), so pairing must not depend on that object.
+      it 'pairs the snapshot with its after hook without relying on the filter object' do
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
 
-        hooks['Before_Delete'].call(double('before', caller: caller_double, filter: filter, collection: collection))
-        hooks['After_Delete'].call(double('after', caller: caller_double, filter: filter))
+        before_hook('Update', patch: { 'name' => 'Effective' })
+        after_hook('Update')
+
+        expect(store.records.last.new_values).to eq({ 'name' => 'Effective' })
+      end
+
+      it 'still audits the next write after one raised between its hooks' do
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
+
+        before_hook('Update', patch: { 'name' => 'Never written' })
+        before_hook('Update', patch: { 'name' => 'Z' })
+        after_hook('Update')
+
+        expect(store.records.map { |record| record.new_values['name'] }).to eq(['Z'])
+      end
+
+      it 'drops the oldest stranded snapshots instead of growing the thread-local without bound' do
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
+
+        (described_class::MAX_SNAPSHOTS + 4).times { before_hook('Update', patch: { 'name' => 'stranded' }) }
+        before_hook('Update', patch: { 'name' => 'Z' })
+        after_hook('Update')
+
+        expect(Thread.current[:forest_audit_trail_snapshots].size).to eq(described_class::MAX_SNAPSHOTS - 1)
+        expect(store.records.map { |record| record.new_values['name'] }).to eq(['Z'])
+      end
+
+      it 'records a delete with the previous values' do
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 7, 'name' => 'Gone', 'address' => nil }])
+
+        before_hook('Delete')
+        after_hook('Delete')
 
         audit = store.records.last
         expect(audit.operation).to eq('delete')

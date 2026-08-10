@@ -18,6 +18,20 @@ module ForestAdminAgent
           )
         end
 
+        it 'reports a key that disappeared, even when its value was nil' do
+          expect(described_class.diff({ 'flag' => nil }, {})).to eq(
+            previous: { 'flag' => nil },
+            next: { 'flag' => nil }
+          )
+        end
+
+        it 'reports a key that appeared holding nil' do
+          expect(described_class.diff({}, { 'flag' => nil })).to eq(
+            previous: { 'flag' => nil },
+            next: { 'flag' => nil }
+          )
+        end
+
         it 'diffs an array of objects index by index' do
           before = [{ 'name' => 'a' }, { 'name' => 'b' }]
           after = [{ 'name' => 'a' }, { 'name' => 'c' }]

@@ -3,9 +3,26 @@ require 'spec_helper'
 module ForestAdminAgent
   module Routes
     module Resources
+      include ForestAdminDatasourceToolkit::Schema
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       describe AuditTrailCorrelation do
         let(:store) { double('store') }
-        let(:collection) { double('collection', name: 'books') }
+        let(:permissions) { double('permissions', can?: true, get_scope: nil) }
+        let(:collection) do
+          build_collection(
+            name: 'books',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(
+                  column_type: 'Number', is_primary_key: true,
+                  filter_operators: [Operators::IN, Operators::EQUAL]
+                )
+              }
+            },
+            list: [{ 'id' => 2 }]
+          )
+        end
 
         def route_with_store(history: [])
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
@@ -15,10 +32,22 @@ module ForestAdminAgent
           route = described_class.new
           datasource = double('datasource')
           allow(datasource).to receive(:get_collection).with('books').and_return(collection)
-          context = double('context', datasource: datasource,
-                                      permissions: double('permissions', can?: true))
+          context = double('context', datasource: datasource, caller: build_caller, permissions: permissions)
           allow(route).to receive(:build).and_return(context)
           route
+        end
+
+        it 'returns 404 without touching the store when the record is out of the caller scope' do
+          allow(collection).to receive(:list).and_return([])
+          route = route_with_store
+
+          expect do
+            route.handle_history(
+              { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }
+            )
+          end.to raise_error(Http::Exceptions::NotFoundError)
+
+          expect(store).not_to have_received(:list_by_correlation)
         end
 
         it 'registers the correlation routes when a store is configured' do

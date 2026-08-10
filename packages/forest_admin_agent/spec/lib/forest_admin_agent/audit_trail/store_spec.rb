@@ -117,7 +117,16 @@ module ForestAdminAgent
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
-        expect(names).to eq(['001-create-audit-logs', '002-index-record-and-correlation'])
+        expect(names).to eq(['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation'])
+      end
+
+      it 'migrates a second table in the same database instead of reading the first one as done' do
+        store.append(record)
+        other = described_class.new(database: { adapter: 'sqlite3', database: db.path }, table_name: 'other_logs')
+
+        expect { other.append(record) }.not_to raise_error
+        expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
+        expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
       end
 
       it 'binds each store to its own model class instead of mutating a shared one' do

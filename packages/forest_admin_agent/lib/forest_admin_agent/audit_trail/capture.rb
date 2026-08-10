@@ -9,6 +9,8 @@ module ForestAdminAgent
     # minimal before/after diff for each change and appends an {AuditRecord} to the store.
     class Capture
       REDACTED = '[redacted]'.freeze
+      # ponytail: 16 deep is far past any legitimate nesting; raise it if one ever gets that far.
+      MAX_SNAPSHOTS = 16
 
       # Signature imposed by DatasourceCustomizer#use; the agent always instruments the whole datasource.
       def run(datasource_customizer, _collection_customizer = nil, options = {})
@@ -51,15 +53,16 @@ module ForestAdminAgent
 
       def add_update_hooks(collection_customizer, columns, primary_keys, name, projection)
         collection_customizer.add_hook('Before', 'Update') do |context|
-          pending[context.filter] = context.collection.list(context.filter, projection)
+          # Snapshot the patch here: installed last, this hook sees what actually gets written, while
+          # the after-context is handed the original patch the caller sent.
+          push_snapshot(records: context.collection.list(context.filter, projection), patch: context.patch)
         end
 
         collection_customizer.add_hook('After', 'Update') do |context|
-          before = pending.delete(context.filter) || []
-          patch = context.patch
+          snapshot = snapshots.pop
 
-          before.each do |record|
-            delta = Diff.changed_values(record, patch, columns)
+          snapshot&.fetch(:records)&.each do |record|
+            delta = Diff.changed_values(record, snapshot[:patch], columns)
             next if delta[:new_values].empty?
 
             emit(
@@ -72,13 +75,13 @@ module ForestAdminAgent
 
       def add_delete_hooks(collection_customizer, columns, primary_keys, name, projection)
         collection_customizer.add_hook('Before', 'Delete') do |context|
-          pending[context.filter] = context.collection.list(context.filter, projection)
+          push_snapshot(records: context.collection.list(context.filter, projection))
         end
 
         collection_customizer.add_hook('After', 'Delete') do |context|
-          before = pending.delete(context.filter) || []
+          snapshot = snapshots.pop
 
-          before.each do |record|
+          snapshot&.fetch(:records)&.each do |record|
             emit(
               context.caller, 'delete', name, record_id(record, primary_keys),
               pick(record, columns), {}
@@ -87,10 +90,17 @@ module ForestAdminAgent
         end
       end
 
-      # Snapshots taken in a "before" hook and consumed in the matching "after" hook. Keyed by the
-      # filter object, which the hook decorator passes unchanged to both hooks within the same thread.
-      def pending
-        Thread.current[:forest_audit_trail_snapshots] ||= {}.compare_by_identity
+      # Snapshots taken in a "before" hook and consumed in the matching "after" hook. Both bracket one
+      # operation on one thread, so a LIFO stack pairs them without relying on the filter object
+      # reaching both hooks unchanged. An operation raising in between strands its entry, hence the cap.
+      def push_snapshot(snapshot)
+        stack = snapshots
+        stack.shift while stack.size >= MAX_SNAPSHOTS
+        stack.push(snapshot)
+      end
+
+      def snapshots
+        Thread.current[:forest_audit_trail_snapshots] ||= []
       end
 
       def emit(caller, operation, collection, record_id, previous_values, new_values)

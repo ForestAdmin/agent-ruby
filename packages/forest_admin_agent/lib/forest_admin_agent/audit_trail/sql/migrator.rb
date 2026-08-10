@@ -90,12 +90,18 @@ module ForestAdminAgent
           table = qualified(@table_name)
 
           MIGRATIONS.each do |migration|
-            next if done.include?(migration[:name])
+            # The tracking table is shared by every audit table of the database/schema, so the target
+            # table belongs in the key: a store configured with another `table_name` must still get its
+            # own table created instead of reading someone else's migration as done. Rows written by
+            # earlier versions (bare migration name) simply replay, which the `if_not_exists` DDL above
+            # makes a no-op.
+            key = "#{table}:#{migration[:name]}"
+            next if done.include?(key)
 
             migration[:up].call(@connection, table)
             @connection.execute(
               "INSERT INTO #{@connection.quote_table_name(migrations_table)} (name) " \
-              "VALUES (#{@connection.quote(migration[:name])})"
+              "VALUES (#{@connection.quote(key)})"
             )
           end
         end

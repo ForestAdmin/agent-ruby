@@ -52,7 +52,7 @@ module ForestAdminAgent
         next_values = {}
 
         (before.keys | after.keys).each do |key|
-          sub = diff(before[key], after[key])
+          sub = diff_at(before, after, key)
           next unless sub
 
           previous[key] = sub[:previous]
@@ -60,6 +60,14 @@ module ForestAdminAgent
         end
 
         { previous: previous, next: next_values }
+      end
+
+      # A key held with a nil value is not the same thing as a missing key: recursing on the values
+      # alone reads both as nil and reports no change at all.
+      def diff_at(before, after, key)
+        return diff(before[key], after[key]) if before.key?(key) == after.key?(key)
+
+        { previous: before[key], next: after[key] }
       end
 
       def diff_object_arrays(before, after)
@@ -77,7 +85,7 @@ module ForestAdminAgent
         { previous: previous, next: next_values }
       end
 
-      private_class_method :diff_hashes, :diff_object_arrays
+      private_class_method :diff_hashes, :diff_at, :diff_object_arrays
     end
   end
 end

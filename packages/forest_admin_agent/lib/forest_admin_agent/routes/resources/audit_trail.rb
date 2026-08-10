@@ -9,6 +9,7 @@ module ForestAdminAgent
       # built the store the capture layer writes to.
       class AuditTrail < AbstractAuthenticatedRoute
         include ForestAdminAgent::Utils
+        include ScopedRecord
 
         DEFAULT_PAGE_SIZE = 20
         MAX_PAGE_SIZE = 100
@@ -32,6 +33,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
+          assert_record_in_scope(context, context.collection, args[:params]['id'])
 
           skip, limit = parse_pagination(args)
           filters = {
