@@ -1,14 +1,19 @@
 module ForestAdminDatasourcePylon
   RSpec.describe Collections::Issue do
-    def filter(condition_tree: nil, search: nil, page: nil)
+    def filter(condition_tree: nil, search: nil, page: nil, sort: nil)
       ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-        condition_tree: condition_tree, search: search, page: page
+        condition_tree: condition_tree, search: search, page: page, sort: sort
       )
     end
 
     def leaf(field, operator, value)
       ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
         .new(field, operator, value)
+    end
+
+    def branch(aggregator, conditions)
+      ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+        .new(aggregator, conditions)
     end
 
     def id_leaf(operator, value)
@@ -78,9 +83,36 @@ module ForestAdminDatasourcePylon
         expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
       end
 
-      it 'leaves search and count disabled' do
-        expect(collection.is_searchable?).to be(false)
+      # `search_text` is native on /issues/search, while Pylon exposes neither a
+      # count endpoint nor a total, so Count stays out until it can be throttled.
+      it 'enables search and leaves count disabled' do
+        expect(collection.is_searchable?).to be(true)
         expect(collection.is_countable?).to be(false)
+      end
+
+      it 'advertises only the operators the search allow-list accepts' do
+        expect(collection.fields['state'].filter_operators).to eq([operators::EQUAL, operators::IN,
+                                                                   operators::NOT_IN])
+        expect(collection.fields['assignee_id'].filter_operators)
+          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+        expect(collection.fields['title'].filter_operators)
+          .to eq([operators::CONTAINS, operators::I_CONTAINS, operators::NOT_CONTAINS])
+      end
+
+      # Declaring the bare comparisons is what lets the toolkit rewrite Today /
+      # PreviousWeek / ... into a pair of bounds Pylon understands.
+      it 'advertises the date columns with the two bounds Pylon accepts' do
+        expect(collection.fields['created_at'].filter_operators)
+          .to eq([operators::GREATER_THAN, operators::LESS_THAN])
+      end
+
+      # /issues/search cannot filter on them, so offering the filter would only
+      # produce an error once the operator used it.
+      it 'advertises no operator on the columns Pylon cannot filter' do
+        %w[number source number_of_touches first_response_time link
+           customer_portal_visible time_in_status_seconds].each do |field|
+          expect(collection.fields[field].filter_operators).to eq([])
+        end
       end
     end
 
@@ -212,7 +244,10 @@ module ForestAdminDatasourcePylon
     end
 
     describe 'custom fields' do
-      let(:column) { ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(column_type: 'String') }
+      let(:column) do
+        ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(column_type: 'String',
+                                                               filter_operators: [operators::EQUAL])
+      end
       let(:collection) do
         described_class.new(datasource, custom_fields: [{ column_name: 'severity', schema: column },
                                                         { column_name: 'zones', schema: column }])
@@ -232,44 +267,112 @@ module ForestAdminDatasourcePylon
 
         expect(collection.list(nil, filter, nil).first).to include('severity' => nil, 'zones' => nil)
       end
+
+      # Pylon accepts a custom-field slug as a filter field, with the operators
+      # the integrator declared on the column.
+      it 'filters a custom field through its slug' do
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+        collection.list(nil, filter(condition_tree: leaf('severity', operators::EQUAL, 'high')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search")
+          .with(body: hash_including('filter' => { 'field' => 'severity', 'operator' => 'equals',
+                                                   'value' => 'high' }))
+      end
+
+      it 'refuses an operator the custom field does not declare' do
+        expect { collection.list(nil, filter(condition_tree: leaf('severity', operators::CONTAINS, 'hi')), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /not supported on field 'severity'/)
+      end
     end
 
-    describe 'filters it cannot honour yet' do
+    describe '#list with a filter' do
+      before { stub_request(:post, "#{base}/issues/search").to_return(json('data' => [issue_payload('i1')])) }
+
+      it 'sends the translated condition tree to the search endpoint' do
+        collection.list(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'closed')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(
+          body: { 'limit' => Client::MAX_SEARCH_LIMIT,
+                  'filter' => { 'field' => 'state', 'operator' => 'equals', 'value' => 'closed' } }
+        )
+      end
+
+      it 'sends a free-text search as search_text, intersected with the filter' do
+        query = filter(condition_tree: leaf('team_id', operators::EQUAL, 'team-1'), search: 'boom')
+
+        collection.list(nil, query, %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(
+          body: { 'limit' => Client::MAX_SEARCH_LIMIT, 'search_text' => 'boom',
+                  'filter' => { 'field' => 'team_id', 'operator' => 'equals', 'value' => 'team-1' } }
+        )
+      end
+
+      # The whole point of translating rather than dropping: a predicate Pylon
+      # cannot express fails loudly instead of returning unfiltered rows.
+      it 'raises rather than returning unfiltered rows for a predicate Pylon refuses' do
+        expect { collection.list(nil, filter(condition_tree: leaf('number', operators::EQUAL, 12)), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter on 'number'/)
+        expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      it 'keeps the same filter across every page of the walk' do
+        stub_request(:post, "#{base}/issues/search")
+          .with(body: hash_including('limit' => 3))
+          .to_return(json('data' => [issue_payload('i1'), issue_payload('i2')],
+                          'pagination' => { 'cursor' => 'c1', 'has_next_page' => true }))
+        stub_request(:post, "#{base}/issues/search")
+          .with(body: hash_including('cursor' => 'c1'))
+          .to_return(json('data' => [issue_payload('i3')]))
+        query = filter(condition_tree: leaf('state', operators::EQUAL, 'new'), page: page(2, 1))
+
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i3' }])
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search")
+          .with(body: hash_including('filter' => { 'field' => 'state', 'operator' => 'equals',
+                                                   'value' => 'new' })).twice
+      end
+    end
+
+    describe '#list on a primary-key lookup carrying more conditions' do
+      # Forest sends `AND(id equal X, <scope>)` on a record detail as soon as a
+      # scope or a segment is set; `id` is not a Pylon filter field, so the
+      # lookup has to survive the extra conditions.
+      it 'reads the issue by id and applies the leftover conditions in memory' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('state', operators::EQUAL, 'new')])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([{ 'id' => 'i1' }])
+        expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      it 'drops the record when a leftover condition does not match' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('state', operators::EQUAL, 'closed')])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([])
+      end
+    end
+
+    describe '#list with a sort' do
       before do
         allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
         stub_request(:post, "#{base}/issues/search").to_return(json('data' => [issue_payload('i1')]))
       end
 
-      it 'warns and returns unfiltered records for a non primary-key condition' do
-        tree = leaf('state', operators::EQUAL, 'closed')
+      # /issues/search has no sort parameter, so the order is reported instead of
+      # being silently swallowed.
+      it 'warns that the requested order cannot be honoured' do
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort
+               .new([{ field: 'created_at', ascending: true }])
 
-        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([{ 'id' => 'i1' }])
-        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/ignored the condition tree/)
+        collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/cannot honour the requested order/)
       end
 
-      it 'warns when a free-text search is supplied' do
-        collection.list(nil, filter(search: 'boom'), %w[id])
-
-        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/ignored the search/)
-      end
-
-      it 'names both when a condition tree and a search are supplied' do
-        tree = leaf('state', operators::EQUAL, 'closed')
-
-        collection.list(nil, filter(condition_tree: tree, search: 'boom'), %w[id])
-
-        expect(ForestAdminDatasourcePylon.logger)
-          .to have_received(:warn).with(/ignored the condition tree and search/)
-      end
-
-      it 'stays quiet when nothing was dropped' do
+      it 'stays quiet when Forest asks for no order' do
         collection.list(nil, filter, %w[id])
-
-        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
-      end
-
-      it 'stays quiet on an empty search string' do
-        collection.list(nil, filter(search: ''), %w[id])
 
         expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
       end

@@ -4,25 +4,59 @@ module ForestAdminDatasourcePylon
       include SchemaDefinition
       include Serializer
 
+      # `/issues/search` exposes no sort parameter, so the allow-list is empty and
+      # every requested order is reported instead of being silently swallowed.
+      # The mechanism stays in place for the collections whose endpoint sorts.
+      PYLON_SORTABLE = {}.freeze
+
       def initialize(datasource, custom_fields: [])
-        super(datasource, 'PylonIssue', custom_fields: custom_fields)
+        super(datasource, 'PylonIssue', custom_fields: custom_fields, searchable: true)
       end
 
-      def list(_caller, filter, projection)
-        fetch_records(filter).map { |issue| project(serialize(issue), projection) }
+      def list(caller, filter, projection)
+        fetch_records(caller, filter).map { |record| project(record, projection) }
+      end
+
+      protected
+
+      # A custom field is filtered through its Pylon slug, with the operators the
+      # integrator declared on the column.
+      def api_filters
+        @api_filters ||= custom_fields.each_with_object(ApiFilters::API_FILTERS.dup) do |cf, filters|
+          filters[cf[:column_name]] = ApiFilters.for_custom_field(cf[:schema])
+        end
       end
 
       private
 
-      def fetch_records(filter)
-        ids = extract_id_lookup(filter&.condition_tree)
-        return page_window(fetch_by_ids(ids), filter) if ids
+      def fetch_records(caller, filter)
+        lookup = extract_id_lookup(filter&.condition_tree)
+        return page_window(records_by_id(caller, lookup), filter) if lookup
 
-        warn_ignored_filter(filter)
+        search_records(caller, filter)
+      end
+
+      def search_records(caller, filter)
+        warn_unsortable(filter&.sort)
+        pylon_filter  = build_pylon_filter(caller, filter)
+        search_text   = filter&.search
         offset, limit = translate_page(filter&.page)
-        walker.walk(offset: offset, limit: limit) do |batch, cursor|
-          datasource.client.search_issues(limit: batch, cursor: cursor)
+
+        issues = walker.walk(offset: offset, limit: limit) do |batch, cursor|
+          datasource.client.search_issues(limit: batch, cursor: cursor,
+                                          filter: pylon_filter, search_text: search_text)
         end
+        issues.map { |issue| serialize(issue) }
+      end
+
+      # The records are already narrowed to the ids the filter asked for, so
+      # applying the conditions left over by the short-circuit in memory cannot
+      # return a record the API would have excluded.
+      def records_by_id(caller, lookup)
+        records = fetch_by_ids(lookup.ids).map { |issue| serialize(issue) }
+        return records if lookup.residual.nil?
+
+        lookup.residual.apply(records, self, timezone_for(caller))
       end
 
       # Sliced after the lookup, not before, so ids that resolved to nothing
@@ -44,18 +78,13 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      # Condition-tree translation and free-text search land in a later story.
-      # Until then a filter the collection cannot honour is dropped, which would
-      # otherwise silently return unfiltered rows.
-      def warn_ignored_filter(filter)
-        ignored = []
-        ignored << 'condition tree' unless filter&.condition_tree.nil?
-        ignored << 'search' unless filter&.search.nil? || filter.search.to_s.empty?
-        return if ignored.empty?
+      def warn_unsortable(sort)
+        return if sort.nil? || sort.empty?
+        return if translate_sort(sort, PYLON_SORTABLE).first
 
         ForestAdminDatasourcePylon.logger.warn(
-          "[forest_admin_datasource_pylon] PylonIssue ignored the #{ignored.join(" and ")} of this query; " \
-          'filtering is not implemented yet, so the returned records are unfiltered.'
+          '[forest_admin_datasource_pylon] PylonIssue cannot honour the requested order; ' \
+          'POST /issues/search always returns issues from the most recent to the oldest.'
         )
       end
 

@@ -1,15 +1,15 @@
 module ForestAdminDatasourcePylon
   module Collections
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
-      ColumnSchema = ForestAdminDatasourceToolkit::Schema::ColumnSchema
-      Operators    = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
-      Leaf         = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+      ColumnSchema         = ForestAdminDatasourceToolkit::Schema::ColumnSchema
+      Operators            = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
+      Branch               = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+      Leaf                 = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+      ConditionTreeFactory = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeFactory
 
-      STRING_OPS = [Operators::EQUAL, Operators::NOT_EQUAL, Operators::IN, Operators::NOT_IN,
-                    Operators::PRESENT, Operators::BLANK].freeze
-      NUMBER_OPS = (STRING_OPS + [Operators::GREATER_THAN, Operators::LESS_THAN]).freeze
-      DATE_OPS   = [Operators::EQUAL, Operators::BEFORE, Operators::AFTER,
-                    Operators::PRESENT, Operators::BLANK].freeze
+      # `residual` holds the conditions left over once the primary-key leaf has
+      # been taken out of the tree, for the caller to apply in memory.
+      IdLookup = Struct.new(:ids, :residual, keyword_init: true)
 
       attr_reader :custom_fields
 
@@ -31,12 +31,51 @@ module ForestAdminDatasourcePylon
       # Pylon has no `id` filter operator on /issues/search, so collections
       # short-circuit primary-key lookups to /resource/{id}. Ids are UUID
       # strings — unlike Zendesk, nothing has to be coerced to an integer.
+      #
+      # The leaf is also pulled out of a top-level AND, because Forest sends
+      # `AND(id equal X, <scope>)` on a record detail as soon as a scope or a
+      # segment is set, and `id` is not a field Pylon can filter on.
       def extract_id_lookup(node)
-        return nil unless node.is_a?(Leaf) && node.field == 'id'
+        ids = id_values(node)
+        return IdLookup.new(ids: ids, residual: nil) if ids
+        return nil unless and_branch?(node)
 
-        return unless [Operators::EQUAL, Operators::IN].include?(node.operator)
+        conditions = Array(node.conditions)
+        id_index = conditions.index { |condition| id_values(condition) }
+        return nil if id_index.nil?
 
-        Array(node.value).map(&:to_s).reject(&:empty?)
+        residual = conditions.reject.with_index { |_, index| index == id_index }
+        IdLookup.new(ids: id_values(conditions[id_index]), residual: ConditionTreeFactory.intersect(residual))
+      end
+
+      def build_pylon_filter(caller, filter)
+        Query::ConditionTreeTranslator.call(filter&.condition_tree,
+                                            api_filters: api_filters,
+                                            timezone: timezone_for(caller))
+      end
+
+      # Overridden by collections whose endpoint can filter server-side.
+      def api_filters
+        {}
+      end
+
+      # An unknown field silently disables sorting: a Pylon endpoint only honours
+      # the fixed allow-list its collection declares.
+      def translate_sort(sort, allow_list)
+        return [nil, nil] if sort.nil? || sort.empty?
+
+        field, ascending = sort_field_and_direction(sort.first)
+        pylon_field = allow_list[field.to_s]
+        return [nil, nil] unless pylon_field
+
+        [pylon_field, ascending ? 'asc' : 'desc']
+      end
+
+      def timezone_for(caller)
+        return 'UTC' unless caller.respond_to?(:timezone)
+
+        timezone = caller.timezone
+        timezone.nil? || timezone.to_s.empty? ? 'UTC' : timezone
       end
 
       def project(record, projection)
@@ -78,6 +117,25 @@ module ForestAdminDatasourcePylon
 
       def define_schema    = raise(NotImplementedError, "#{self.class} did not implement define_schema")
       def define_relations = raise(NotImplementedError, "#{self.class} did not implement define_relations")
+
+      def id_values(node)
+        return nil unless node.is_a?(Leaf) && node.field == 'id'
+        return nil unless [Operators::EQUAL, Operators::IN].include?(node.operator)
+
+        Array(node.value).map(&:to_s).reject(&:empty?)
+      end
+
+      def and_branch?(node)
+        node.is_a?(Branch) && node.aggregator.to_s.casecmp('and').zero?
+      end
+
+      def sort_field_and_direction(entry)
+        return [entry.field, entry.ascending] if entry.respond_to?(:field)
+
+        field     = entry.key?(:field)     ? entry[:field]     : entry['field']
+        ascending = entry.key?(:ascending) ? entry[:ascending] : entry['ascending']
+        [field, ascending]
+      end
     end
   end
 end
