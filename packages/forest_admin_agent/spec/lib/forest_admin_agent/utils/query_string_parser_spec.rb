@@ -71,6 +71,46 @@ module ForestAdminAgent
             'You must be logged in to access at this resource.'
           )
         end
+
+        it 'raise an unauthorized error if the token is signed with the wrong secret' do
+          forged = JWT.encode({ 'id' => '1', 'email' => 'foo@bar.com' }, 'not-the-auth-secret', 'HS256')
+          args = {
+            headers: {
+              'HTTP_AUTHORIZATION' => "Bearer #{forged}"
+            },
+            params: {
+              'timezone' => 'Europe/Paris'
+            }
+          }
+          expect do
+            described_class.parse_caller(args)
+          end.to raise_error(
+            Http::Exceptions::UnauthorizedError,
+            'Invalid or expired authentication token.'
+          )
+        end
+
+        it 'raise an unauthorized error if the token is expired' do
+          expired = JWT.encode(
+            { 'id' => '1', 'email' => 'foo@bar.com', 'exp' => Time.now.to_i - 3600 },
+            'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+            'HS256'
+          )
+          args = {
+            headers: {
+              'HTTP_AUTHORIZATION' => "Bearer #{expired}"
+            },
+            params: {
+              'timezone' => 'Europe/Paris'
+            }
+          }
+          expect do
+            described_class.parse_caller(args)
+          end.to raise_error(
+            Http::Exceptions::UnauthorizedError,
+            'Invalid or expired authentication token.'
+          )
+        end
       end
 
       describe 'parse_projection' do

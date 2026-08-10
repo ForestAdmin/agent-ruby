@@ -51,6 +51,8 @@ module ForestAdminAgent
           true,
           { algorithm: 'HS256' }
         )[0].tap { |data| data.delete('exp') }
+      rescue JWT::DecodeError
+        raise Http::Exceptions::UnauthorizedError, 'Invalid or expired authentication token.'
       end
 
       def extract_forest_context
