@@ -1,3 +1,10 @@
+## [1.37.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.1...v1.37.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **agent:** authorize and scope related read routes on the target collection ([#348](https://github.com/ForestAdmin/agent-ruby/issues/348)) ([4492b60](https://github.com/ForestAdmin/agent-ruby/commit/4492b60703835c37fdf5ed9b6a2904fe3167182c)), closes [#823](https://github.com/ForestAdmin/agent-ruby/issues/823)
+
 ## [1.37.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.0...v1.37.1) (2026-08-06)
 
 
