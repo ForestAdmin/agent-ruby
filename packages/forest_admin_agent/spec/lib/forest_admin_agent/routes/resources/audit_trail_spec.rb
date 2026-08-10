@@ -79,8 +79,10 @@ module ForestAdminAgent
           end
         end
 
-        it 'returns 404 without touching the store when the record is out of the caller scope' do
-          allow(collection).to receive(:list).and_return([])
+        it 'returns 404 without touching the store when the record exists outside the caller scope' do
+          allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+          # Empty under the scope, found without it: the record is someone else's, not a deleted one.
+          allow(collection).to receive(:list).and_return([], [{ 'id' => 4 }])
           route = route_with_store
 
           expect do
@@ -88,6 +90,16 @@ module ForestAdminAgent
           end.to raise_error(Http::Exceptions::NotFoundError)
 
           expect(store).not_to have_received(:list_by_record)
+        end
+
+        it 'still serves the history of a deleted record, which is much of the point of an audit trail' do
+          allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+          allow(collection).to receive(:list).and_return([])
+          route = route_with_store(records: [double('entry', to_h: { operation: 'delete', record_id: '4' })])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data]).to eq([{ 'operation' => 'delete', 'recordId' => '4' }])
         end
 
         it 'defaults to newest-first and switches to oldest-first on sort=timestamp' do
@@ -104,6 +116,13 @@ module ForestAdminAgent
                                            'page' => { 'size' => '500', 'number' => '3' } } })
 
           expect(store).to have_received(:list_by_record).with(hash_including(skip: 200, limit: 100))
+        end
+
+        it 'falls back to the default page when page is not a hash' do
+          route = route_with_store
+          route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'page' => 'foo' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_including(skip: 0, limit: 20))
         end
 
         it 'parses userIds, dropping non-numeric tokens' do

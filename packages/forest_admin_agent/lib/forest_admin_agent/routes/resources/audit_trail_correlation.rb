@@ -6,7 +6,7 @@ module ForestAdminAgent
       # `config.audit_trail[:database]` is set. All three routes are scoped to a single record through the
       # `collection`/`recordId` query (GET) or body (POST) params and share the per-record auth.
       class AuditTrailCorrelation < AbstractAuthenticatedRoute
-        include ScopedRecord
+        include AuditTrailRoute
 
         def setup_routes
           return self unless store
@@ -43,7 +43,7 @@ module ForestAdminAgent
             correlation_key: args[:params]['correlation_key']
           )
 
-          { name: collection.name, content: { data: history.map(&:to_h) } }
+          { name: collection.name, content: { data: history.map { |record| serialize_record(record) } } }
         end
 
         def handle_batch(args = {})
@@ -60,7 +60,7 @@ module ForestAdminAgent
                       )
                     end
 
-          { name: collection.name, content: { data: history.map(&:to_h) } }
+          { name: collection.name, content: { data: history.map { |record| serialize_record(record) } } }
         end
 
         private

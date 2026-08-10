@@ -37,8 +37,9 @@ module ForestAdminAgent
           route
         end
 
-        it 'returns 404 without touching the store when the record is out of the caller scope' do
-          allow(collection).to receive(:list).and_return([])
+        it 'returns 404 without touching the store when the record exists outside the caller scope' do
+          allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+          allow(collection).to receive(:list).and_return([], [{ 'id' => 2 }])
           route = route_with_store
 
           expect do
@@ -66,7 +67,8 @@ module ForestAdminAgent
         end
 
         it 'reads a single correlation history scoped to the record' do
-          route = route_with_store(history: [double('entry', to_h: { operation: 'update' })])
+          entry = { operation: 'update', record_id: '2', new_values: { 'first_name' => 'Jo' } }
+          route = route_with_store(history: [double('entry', to_h: entry)])
 
           result = route.handle_history(
             { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }
@@ -75,7 +77,10 @@ module ForestAdminAgent
           expect(store).to have_received(:list_by_correlation).with(
             collection: 'books', record_id: '2', correlation_key: 'req-1'
           )
-          expect(result[:content]).to eq({ data: [{ operation: 'update' }] })
+          # Same serialization as the per-record route: camelCase on top, column names left alone.
+          expect(result[:content]).to eq(
+            { data: [{ 'operation' => 'update', 'recordId' => '2', 'newValues' => { 'first_name' => 'Jo' } }] }
+          )
         end
 
         it 'reads a batch history from comma-separated query keys (GET)' do

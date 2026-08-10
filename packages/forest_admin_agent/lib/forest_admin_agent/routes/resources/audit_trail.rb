@@ -9,7 +9,7 @@ module ForestAdminAgent
       # built the store the capture layer writes to.
       class AuditTrail < AbstractAuthenticatedRoute
         include ForestAdminAgent::Utils
-        include ScopedRecord
+        include AuditTrailRoute
 
         DEFAULT_PAGE_SIZE = 20
         MAX_PAGE_SIZE = 100
@@ -49,16 +49,11 @@ module ForestAdminAgent
 
           {
             name: args[:params]['collection_name'],
-            content: { data: history.map { |record| serialize(record) }, meta: { count: count } }
+            content: { data: history.map { |record| serialize_record(record) }, meta: { count: count } }
           }
         end
 
         private
-
-        # Camelize only the top-level keys; previous/new value hashes keep the record's own column names.
-        def serialize(record)
-          record.to_h.transform_keys { |key| key.to_s.camelize(:lower) }
-        end
 
         # JSON:API `sort`: `timestamp` → oldest first, anything else (absent/unsupported) → newest first.
         def parse_sort(args)
@@ -68,11 +63,15 @@ module ForestAdminAgent
         # JSON:API pagination: 1-based page[number] (default 1) and page[size] (default 20, capped at
         # 100). Out-of-bound or non-numeric values fall back to the defaults rather than erroring.
         def parse_pagination(args)
-          size = args.dig(:params, 'page', 'size').to_i
+          # `?page=foo` reaches us as a bare String, which `dig` refuses to walk into.
+          page = args.dig(:params, 'page')
+          page = {} unless page.is_a?(Hash)
+
+          size = page['size'].to_i
           size = DEFAULT_PAGE_SIZE if size < 1
           size = MAX_PAGE_SIZE if size > MAX_PAGE_SIZE
 
-          number = args.dig(:params, 'page', 'number').to_i
+          number = page['number'].to_i
           number = 1 if number < 1
 
           [(number - 1) * size, size]

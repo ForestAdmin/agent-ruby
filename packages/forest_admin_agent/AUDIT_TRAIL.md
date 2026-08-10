@@ -98,6 +98,14 @@ erroring. Sorting follows JSON:API `sort` on `timestamp`: `sort=-timestamp` (or 
 is newest first, `sort=timestamp` is oldest first. Ties on equal timestamps fall back to insertion
 order (the auto-increment `id`), so paging is deterministic in either direction.
 
+All three routes serialize audit records the same way: top-level keys are camelCased
+(`recordId`, `userId`, `correlationKey`, `previousValues`, `new_values` → `newValues`), while the
+`previousValues` / `newValues` hashes keep the audited record's own column names.
+
+A record that no longer exists keeps its history: only a record that still exists *outside* the
+caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
+audit trail, and the delete event itself is the last thing recorded.
+
 ### Correlation route
 
 `GET /forest/_audit-trail/correlation/{correlationKey}` returns `{ "data": [...] }` — the
