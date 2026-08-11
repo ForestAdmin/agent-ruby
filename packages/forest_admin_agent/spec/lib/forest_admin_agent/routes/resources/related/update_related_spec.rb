@@ -105,6 +105,21 @@ module ForestAdminAgent
               stub_const('Book', book_class)
             end
 
+            it 'checks the edit permission before parsing any id' do
+              allow(permissions).to receive(:can?)
+                .and_raise(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+              allow(Utils::Id).to receive(:unpack_id)
+
+              args[:params]['collection_name'] = 'book'
+              args[:params]['relation_name'] = 'author'
+              args[:params]['data'] = { 'id' => 'malformed|id' }
+              args[:params]['id'] = 'malformed|id'
+
+              expect { update.handle_request(args) }
+                .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+              expect(Utils::Id).not_to have_received(:unpack_id)
+            end
+
             it 'call handle_request on a many_to_one relation' do
               allow(permissions).to receive(:get_scope)
                 .and_return(Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 99))
