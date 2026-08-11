@@ -237,6 +237,50 @@ module ForestAdminAgent
           end
         end
 
+        context 'when the request is not authenticated' do
+          let(:args) do
+            {
+              headers: {},
+              params: {
+                'collectionNames' => ['user'],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          it 'rejects the request with no Authorization header' do
+            expect { capabilities_collections.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::UnauthorizedError,
+              'You must be logged in to access at this resource.'
+            )
+          end
+
+          it 'does not instantiate permissions' do
+            expect { capabilities_collections.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::UnauthorizedError
+            )
+            expect(ForestAdminAgent::Services::Permissions).not_to have_received(:new)
+          end
+        end
+
+        context 'when the request carries a remote ip' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer, 'action_dispatch.remote_ip' => '10.0.0.1' },
+              params: {
+                'collectionNames' => [],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          it 'checks the ip against the whitelist' do
+            allow(ForestAdminAgent::Facades::Whitelist).to receive(:check_ip)
+            capabilities_collections.handle_request(args)
+            expect(ForestAdminAgent::Facades::Whitelist).to have_received(:check_ip).with('10.0.0.1')
+          end
+        end
+
         it 'throws an error when th collection does not exist' do
           args = {
             headers: { 'HTTP_AUTHORIZATION' => bearer },
