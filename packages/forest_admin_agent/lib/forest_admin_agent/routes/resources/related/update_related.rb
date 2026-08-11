@@ -25,9 +25,7 @@ module ForestAdminAgent
 
             relation = context.collection.schema[:fields][args[:params]['relation_name']]
 
-            # Authorize on the collection the relation type mutates, before any
-            # id parsing, so unauthorized callers get a 403 rather than a
-            # validation error on their input.
+            # Must run before unpack_id: unauthorized callers get a 403, not a validation error
             context.permissions.can?(:edit, mutated_collection(relation, context))
 
             parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'])
