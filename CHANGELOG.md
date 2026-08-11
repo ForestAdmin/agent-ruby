@@ -1,3 +1,10 @@
+## [1.37.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.2...v1.37.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **security:** enforce authentication and IP whitelist on private routes [PRD-896] ([#349](https://github.com/ForestAdmin/agent-ruby/issues/349)) ([26fcec9](https://github.com/ForestAdmin/agent-ruby/commit/26fcec9144a147156a5fd400ca6d2a9968071bbf)), closes [#281](https://github.com/ForestAdmin/agent-ruby/issues/281)
+
 ## [1.37.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.1...v1.37.2) (2026-08-10)
 
 

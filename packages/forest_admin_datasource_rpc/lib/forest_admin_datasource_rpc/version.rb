@@ -1,3 +1,3 @@
 module ForestAdminDatasourceRpc
-  VERSION = "1.37.2"
+  VERSION = "1.37.3"
 end
