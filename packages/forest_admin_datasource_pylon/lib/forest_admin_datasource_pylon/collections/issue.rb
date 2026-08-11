@@ -9,6 +9,14 @@ module ForestAdminDatasourcePylon
       # The mechanism stays in place for the collections whose endpoint sorts.
       PYLON_SORTABLE = {}.freeze
 
+      # A primary-key lookup spends one `GET /issues/{id}` per id, against the
+      # same 20 requests/minute budget the cursor walk is capped for, and the
+      # retry policy only absorbs three 429s. The fan-out is therefore bounded
+      # like the walk: truncated with a warning rather than turned into a rate
+      # limit error halfway through the page. Story 9 (EXT-13) owns the
+      # throttling that would let this cap grow.
+      MAX_ID_LOOKUPS = 20
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonIssue', custom_fields: custom_fields, searchable: true)
       end
@@ -36,14 +44,15 @@ module ForestAdminDatasourcePylon
       private
 
       def fetch_records(caller, filter)
+        warn_unsortable(filter&.sort)
         lookup = extract_id_lookup(filter&.condition_tree)
-        return page_window(records_by_id(caller, lookup), filter) if lookup
+        return search_records(caller, filter) unless lookup
 
-        search_records(caller, filter)
+        ensure_searchless_lookup!(filter)
+        page_window(records_by_id(caller, lookup), filter)
       end
 
       def search_records(caller, filter)
-        warn_unsortable(filter&.sort)
         pylon_filter  = build_pylon_filter(caller, filter)
         search_text   = filter&.search
         offset, limit = translate_page(filter&.page)
@@ -77,13 +86,24 @@ module ForestAdminDatasourcePylon
       # A record the operator can no longer reach — deleted, or outside the
       # token's scope — reads as "no record" rather than as a failed page.
       def fetch_by_ids(ids)
-        ids.filter_map do |id|
+        wanted = ids.first(MAX_ID_LOOKUPS)
+        warn_truncated_lookup(ids.size) if ids.size > wanted.size
+
+        wanted.filter_map do |id|
           datasource.client.fetch_issue(id)
         rescue APIError => e
           raise unless e.status == 404
 
           nil
         end
+      end
+
+      def warn_truncated_lookup(asked)
+        ForestAdminDatasourcePylon.logger.warn(
+          "[forest_admin_datasource_pylon] Asked for #{asked} issues by id, reading the first " \
+          "#{MAX_ID_LOOKUPS}: one request per id would exhaust the rate limit of the agent. " \
+          'Narrow the selection to reach the records past this point.'
+        )
       end
 
       def warn_unsortable(sort)

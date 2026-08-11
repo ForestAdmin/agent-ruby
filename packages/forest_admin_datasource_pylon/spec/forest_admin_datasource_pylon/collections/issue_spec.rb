@@ -96,7 +96,7 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['assignee_id'].filter_operators)
           .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
         expect(collection.fields['title'].filter_operators)
-          .to eq([operators::CONTAINS, operators::I_CONTAINS, operators::NOT_CONTAINS])
+          .to eq([operators::CONTAINS, operators::I_CONTAINS, operators::NOT_CONTAINS, operators::NOT_I_CONTAINS])
       end
 
       # Declaring the bare comparisons is what lets the toolkit rewrite Today /
@@ -376,6 +376,70 @@ module ForestAdminDatasourcePylon
           .to raise_error(UnsupportedOperatorError, /cannot be combined with a primary-key lookup/)
         expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
       end
+
+      # An unresolved issue carries `resolution_time: nil`, and a bare `nil >
+      # value` raises: a scope or a segment dated on that column used to turn
+      # every record detail it did not match into a 500.
+      it 'excludes the record instead of raising when a dated condition meets a null column' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        tree = branch('And', [id_leaf(operators::EQUAL, 'i1'),
+                              leaf('resolution_time', operators::GREATER_THAN, '2026-01-01T00:00:00Z')])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([])
+      end
+
+      it 'keeps the record when the dated condition matches' do
+        stub_request(:get, "#{base}/issues/i1")
+          .to_return(json('data' => issue_payload('i1', 'resolution_time' => '2026-08-07T13:06:22Z')))
+        tree = branch('And', [id_leaf(operators::EQUAL, 'i1'),
+                              leaf('resolution_time', operators::GREATER_THAN, '2026-01-01T00:00:00Z')])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([{ 'id' => 'i1' }])
+      end
+    end
+
+    describe '#list on a primary-key lookup carrying a search' do
+      # The short-circuit never reaches /issues/search, so honouring the search
+      # is impossible: returning the record unsearched would be a result that
+      # looks searched and is not.
+      it 'refuses to answer rather than dropping the search' do
+        query = filter(condition_tree: id_leaf(operators::EQUAL, 'i1'), search: 'boom')
+
+        expect { collection.list(nil, query, %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /search cannot be combined with a filter on 'id'/)
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
+
+      it 'still serves the lookup when the search is empty' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        query = filter(condition_tree: id_leaf(operators::EQUAL, 'i1'), search: '')
+
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i1' }])
+      end
+    end
+
+    describe '#list on a primary-key lookup of many ids' do
+      # One GET per id against the same 20 req/min budget the cursor walk is
+      # capped for, so the fan-out is bounded the same way.
+      it 'reads at most the capped number of ids and warns' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        ids = Array.new(Collections::Issue::MAX_ID_LOOKUPS + 5) { |i| "i#{i}" }
+        ids.each { |id| stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id))) }
+
+        rows = collection.list(nil, filter(condition_tree: id_leaf(operators::IN, ids)), %w[id])
+
+        expect(rows.size).to eq(Collections::Issue::MAX_ID_LOOKUPS)
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/reading the first 20/)
+      end
+
+      it 'stays quiet and reads every id under the cap' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        %w[i1 i2].each { |id| stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id))) }
+
+        collection.list(nil, filter(condition_tree: id_leaf(operators::IN, %w[i1 i2])), %w[id])
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
     end
 
     describe '#list with a sort' do
@@ -415,6 +479,18 @@ module ForestAdminDatasourcePylon
         sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'id', ascending: false }])
 
         collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/cannot honour the requested order/)
+      end
+
+      # The lookup returns the records in the order of the ids, so an order the
+      # operator chose is just as unhonoured there as on the search path.
+      it 'warns on the primary-key path too' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort
+               .new([{ field: 'created_at', ascending: true }])
+
+        collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, 'i1'), sort: sort), %w[id])
 
         expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/cannot honour the requested order/)
       end

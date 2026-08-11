@@ -10,8 +10,8 @@ module ForestAdminDatasourcePylon
         .new(aggregator, conditions)
     end
 
-    def filter(condition_tree: nil)
-      ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree)
+    def filter(condition_tree: nil, search: nil)
+      ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree, search: search)
     end
 
     def page(offset, limit)
@@ -39,12 +39,14 @@ module ForestAdminDatasourcePylon
           add_field('state', column.new(column_type: 'String'))
           add_field('type', column.new(column_type: 'String'))
           add_field('tags', column.new(column_type: 'Json'))
+          add_field('resolved_at', column.new(column_type: 'Date'))
         end
 
         def define_relations; end
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
-               :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?
+               :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?,
+               :ensure_searchless_lookup!
       end
     end
 
@@ -168,6 +170,59 @@ module ForestAdminDatasourcePylon
         expect { collection.extract_id_lookup(node) }
           .to raise_error(UnsupportedOperatorError, /field 'ghost'/)
       end
+
+      # `ConditionTreeLeaf#match` compares with a bare `>`, which raises a
+      # NoMethodError on the nil Pylon returns for an unresolved issue. The
+      # guard pairs the comparison with a presence check, the way a database
+      # excludes a NULL row from a comparison.
+      describe 'guarding a comparison against a null column' do
+        let(:comparison) { leaf('resolved_at', operators::GREATER_THAN, '2026-01-01T00:00:00Z') }
+        let(:residual) do
+          collection.extract_id_lookup(branch('And', [leaf('id', operators::EQUAL, 'uuid-1'), comparison])).residual
+        end
+
+        it 'pairs the comparison with a presence check' do
+          expect(residual.to_h).to eq(
+            aggregator: 'And',
+            conditions: [{ field: 'resolved_at', operator: operators::PRESENT, value: nil }, comparison.to_h]
+          )
+        end
+
+        it 'excludes the record instead of raising when the column is null' do
+          expect { residual.apply([{ 'id' => 'uuid-1', 'resolved_at' => nil }], collection, 'UTC') }
+            .not_to raise_error
+          expect(residual.apply([{ 'id' => 'uuid-1', 'resolved_at' => nil }], collection, 'UTC')).to eq([])
+        end
+
+        it 'still keeps a record the comparison matches' do
+          record = { 'id' => 'uuid-1', 'resolved_at' => '2026-08-07T13:06:22Z' }
+
+          expect(residual.apply([record], collection, 'UTC')).to eq([record])
+        end
+
+        it 'leaves an operator that needs no guard untouched' do
+          equality = leaf('state', operators::EQUAL, 'new')
+          node = branch('And', [leaf('id', operators::EQUAL, 'uuid-1'), equality])
+
+          expect(collection.extract_id_lookup(node).residual.to_h).to eq(equality.to_h)
+        end
+      end
+    end
+
+    describe '#ensure_searchless_lookup!' do
+      # Pylon searches through its search endpoint, which cannot filter on id,
+      # and reads an id through its own, which cannot search: honouring both at
+      # once is impossible, and honouring one silently is what this refuses.
+      it 'refuses a lookup carrying a free-text search' do
+        expect { collection.ensure_searchless_lookup!(filter(search: 'boom')) }
+          .to raise_error(UnsupportedOperatorError, /search cannot be combined with a filter on 'id'/)
+      end
+
+      it 'accepts a lookup carrying no search' do
+        expect { collection.ensure_searchless_lookup!(filter) }.not_to raise_error
+        expect { collection.ensure_searchless_lookup!(nil) }.not_to raise_error
+        expect { collection.ensure_searchless_lookup!(filter(search: '  ')) }.not_to raise_error
+      end
     end
 
     describe '#default_pk_sort?' do
@@ -236,6 +291,16 @@ module ForestAdminDatasourcePylon
       it 'returns no filter when there is no condition tree' do
         expect(collection.build_pylon_filter(nil, filter)).to be_nil
         expect(collection.build_pylon_filter(nil, nil)).to be_nil
+      end
+
+      # The UI offers both an `id equals` filter and the and/or toggle, so this
+      # is reachable by an operator and deserves better than the translator's
+      # "add it to the collection's api_filters".
+      it 'reports an id the short-circuit could not reach with an actionable error' do
+        node = branch('Or', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('state', operators::EQUAL, 'new')])
+
+        expect { collection.build_pylon_filter(nil, filter(condition_tree: node)) }
+          .to raise_error(UnsupportedOperatorError, /has to be combined with 'and' conditions only/)
       end
     end
 

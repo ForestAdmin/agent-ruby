@@ -21,6 +21,11 @@ module ForestAdminDatasourcePylon
                              Operators::LONGER_THAN, Operators::SHORTER_THAN, Operators::INCLUDES_ALL,
                              Operators::NOT_IN, Operators::NOT_EQUAL, Operators::NOT_CONTAINS].freeze
 
+      # The operators `ConditionTreeLeaf#match` evaluates by dereferencing the
+      # column value without a nil guard, unlike the string operators which all
+      # test `is_a?(String)` first. They need the guard added here.
+      NIL_UNSAFE_OPERATORS = [Operators::LESS_THAN, Operators::GREATER_THAN, Operators::INCLUDES_ALL].freeze
+
       attr_reader :custom_fields
 
       # Template method: subclasses implement `define_schema` and
@@ -56,13 +61,28 @@ module ForestAdminDatasourcePylon
 
         residual = ConditionTreeFactory.intersect(conditions.reject.with_index { |_, index| index == id_index })
         ensure_residual_appliable!(residual)
-        IdLookup.new(ids: id_values(conditions[id_index]), residual: residual)
+        IdLookup.new(ids: id_values(conditions[id_index]), residual: guard_nil_comparisons(residual))
+      end
+
+      # Pylon runs the free-text search inside its search endpoint, which the
+      # primary-key short-circuit does not go through, and neither the fields it
+      # covers nor its fuzziness can be reproduced in memory. Answering with the
+      # unsearched record would be the very thing this datasource refuses: a
+      # result that looks filtered and is not.
+      def ensure_searchless_lookup!(filter)
+        search = filter&.search
+        return if search.nil? || search.to_s.strip.empty?
+
+        raise UnsupportedOperatorError,
+              "A search cannot be combined with a filter on 'id': Pylon searches through its search endpoint, " \
+              'which cannot filter on id, while an id is read through its own endpoint, which cannot search. ' \
+              'Clear the search or drop the id condition.'
       end
 
       def build_pylon_filter(caller, filter)
-        Query::ConditionTreeTranslator.call(filter&.condition_tree,
-                                            api_filters: api_filters,
-                                            timezone: timezone_for(caller))
+        tree = filter&.condition_tree
+        ensure_no_stray_id!(tree)
+        Query::ConditionTreeTranslator.call(tree, api_filters: api_filters, timezone: timezone_for(caller))
       end
 
       # Overridden by collections whose endpoint can filter server-side.
@@ -158,6 +178,22 @@ module ForestAdminDatasourcePylon
         node.is_a?(Branch) && node.aggregator.to_s.casecmp('and').zero?
       end
 
+      # An `id` the short-circuit could not take out of the tree has no
+      # translation left: Pylon filters no id server-side, and an id under an OR
+      # cannot be narrowed to a lookup because the other side of the union would
+      # bring in records the lookup never fetched. The UI does offer both an
+      # `id equals` filter and the or/and toggle, so this is worth an error an
+      # operator can act on rather than the translator's "add it to api_filters".
+      def ensure_no_stray_id!(node)
+        return if node.nil?
+        return unless node.some_leaf { |leaf| leaf.field == 'id' }
+
+        raise UnsupportedOperatorError,
+              "A filter on 'id' has to be combined with 'and' conditions only: Pylon cannot filter on id, so the " \
+              'agent reads the records by id and applies the rest in memory, which an id inside an `or` would ' \
+              'silently widen. Rewrite the filter with `and`, or filter on another field.'
+      end
+
       def clamp_custom_field_operators(column_name, schema)
         declared = Array(schema.filter_operators)
         dropped  = declared - allowed_custom_field_operators
@@ -187,6 +223,21 @@ module ForestAdminDatasourcePylon
         return false if column.nil? || column.column_type == 'Json'
 
         Equivalent.equivalent_tree?(leaf.operator, IN_MEMORY_OPERATORS, column.column_type)
+      end
+
+      # `ConditionTreeLeaf#match` compares with a bare `<` / `>`, which raises a
+      # NoMethodError on a column Pylon leaves null -- `resolution_time` on an
+      # unresolved issue, for one. Pairing the comparison with a presence check
+      # reproduces what a database does with NULL, excluding the record, and
+      # rides on the in-memory equivalence PRESENT already has for every type.
+      def guard_nil_comparisons(node)
+        return nil if node.nil?
+
+        node.replace_leafs do |leaf|
+          next leaf unless NIL_UNSAFE_OPERATORS.include?(leaf.operator)
+
+          ConditionTreeFactory.intersect([Leaf.new(leaf.field, Operators::PRESENT), leaf])
+        end
       end
 
       def raise_unappliable_residual(leaf)

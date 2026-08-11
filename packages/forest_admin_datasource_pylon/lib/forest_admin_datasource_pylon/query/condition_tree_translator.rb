@@ -1,5 +1,3 @@
-require 'active_support/core_ext/time/zones'
-
 module ForestAdminDatasourcePylon
   module Query
     # See https://docs.usepylon.com/pylon-docs/developer/api/api-reference/issues
@@ -14,11 +12,11 @@ module ForestAdminDatasourcePylon
     # translated natively instead of being rejected.
     #
     # Anything the API cannot express raises UnsupportedOperatorError: a filter
-    # that is dropped returns unfiltered rows which look filtered.
+    # that is dropped returns unfiltered rows which look filtered. The wire
+    # format of the values, and the refusals that go with it, live in FilterValue.
     class ConditionTreeTranslator
-      Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
-      Branch    = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
-      Leaf      = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+      Branch = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+      Leaf   = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
 
       # Pylon rejects sub-filters nested deeper than three levels.
       MAX_DEPTH = 3
@@ -34,7 +32,7 @@ module ForestAdminDatasourcePylon
 
       def initialize(api_filters: {}, timezone: nil)
         @api_filters = api_filters || {}
-        @timezone = timezone.to_s.strip.empty? ? 'UTC' : timezone
+        @value = FilterValue.new(timezone: timezone)
       end
 
       def translate(node, depth = 1)
@@ -54,13 +52,17 @@ module ForestAdminDatasourcePylon
           raise UnsupportedOperatorError, "Condition tree aggregator '#{branch.aggregator}' carries no condition."
         end
 
+        # Validated before the unwrap below, so a branch is refused on the
+        # aggregator it carries rather than on how many conditions it holds.
+        operator = aggregator(branch)
+
         # A lone condition needs no wrapper, and spending no nesting level on it
         # keeps trees the agent builds one branch at a time under Pylon's cap.
         return translate(conditions.first, depth) if conditions.size == 1
 
         raise_too_deep(depth) if depth > MAX_DEPTH
 
-        { 'operator' => aggregator(branch),
+        { 'operator' => operator,
           'subfilters' => conditions.map { |condition| translate(condition, depth + 1) } }
       end
 
@@ -84,47 +86,9 @@ module ForestAdminDatasourcePylon
 
       def with_value(filter, operator, leaf)
         return filter if VALUELESS_OPERATORS.include?(operator)
-        return filter.merge('values' => list_value(leaf)) if LIST_OPERATORS.include?(operator)
+        return filter.merge('values' => @value.list(leaf)) if LIST_OPERATORS.include?(operator)
 
-        filter.merge('value' => single_value(leaf))
-      end
-
-      def single_value(leaf)
-        raise_nil_value(leaf.field) if leaf.value.nil?
-
-        format_value(leaf.value)
-      end
-
-      # An empty list would translate to a filter matching everything, turning
-      # "match nothing" into its exact opposite.
-      def list_value(leaf)
-        values = Array(leaf.value).reject { |value| value.nil? || value.to_s.empty? }
-        if values.empty?
-          raise UnsupportedOperatorError,
-                "Operator '#{leaf.operator}' on field '#{leaf.field}' was given an empty list; " \
-                'pass at least one value, or use the PRESENT / BLANK operators.'
-        end
-
-        values.map { |value| format_value(value) }
-      end
-
-      # Numbers and booleans travel as they are: the filter is JSON, not a query
-      # string, so only the date types need a wire format.
-      def format_value(value)
-        case value
-        when Time, DateTime then value.to_time.utc.iso8601
-        when Date           then format_date(value)
-        else                     value
-        end
-      end
-
-      def format_date(value)
-        Time.use_zone(@timezone) { Time.zone.local(value.year, value.month, value.day).utc.iso8601 }
-      rescue ArgumentError
-        ForestAdminDatasourcePylon.logger.warn(
-          "[forest_admin_datasource_pylon] unknown timezone '#{@timezone}', falling back to UTC"
-        )
-        value.strftime('%Y-%m-%dT00:00:00Z')
+        filter.merge('value' => @value.single(leaf))
       end
 
       def raise_too_deep(depth)
@@ -143,13 +107,6 @@ module ForestAdminDatasourcePylon
         raise UnsupportedOperatorError,
               "Operator '#{leaf.operator}' is not supported on field '#{leaf.field}'. " \
               "Supported: #{spec[:ops].keys.join(", ")}."
-      end
-
-      # A filter carrying a nil value reads as a presence check on most APIs,
-      # which is silently the wrong query.
-      def raise_nil_value(field)
-        raise UnsupportedOperatorError,
-              "Filter value on '#{field}' is nil; use the PRESENT or BLANK operator to filter for absence."
       end
     end
   end

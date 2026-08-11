@@ -26,11 +26,14 @@ module ForestAdminDatasourcePylon
         TIME = { Operators::GREATER_THAN => 'time_is_after',
                  Operators::LESS_THAN => 'time_is_before' }.freeze
 
-        # Pylon exposes a single substring operator, so both Forest spellings of
-        # "contains" map onto it.
+        # Pylon exposes a single substring operator per direction and documents
+        # no case semantics for either, so both Forest spellings map onto the
+        # one operator -- in both directions, or the UI would offer a
+        # case-insensitive "contains" with no way to negate it.
         FULL_TEXT = { Operators::CONTAINS => 'string_contains',
                       Operators::I_CONTAINS => 'string_contains',
-                      Operators::NOT_CONTAINS => 'string_does_not_contain' }.freeze
+                      Operators::NOT_CONTAINS => 'string_does_not_contain',
+                      Operators::NOT_I_CONTAINS => 'string_does_not_contain' }.freeze
 
         # `tags` holds a list: `contains` asks whether one tag belongs to it,
         # while `in` matches it against several candidates at once.

@@ -78,9 +78,14 @@ module ForestAdminDatasourcePylon
           .to eq('field' => 'body_html', 'operator' => 'string_contains', 'value' => 'boom')
       end
 
-      it 'translates not_contains to string_does_not_contain' do
+      # Symmetrically with contains: Pylon documents no case semantics for its
+      # single substring operator, so leaving not_i_contains out would offer a
+      # case-insensitive "contains" the UI could not negate.
+      it 'maps both spellings of not_contains onto the single negated operator' do
         expect(translate(leaf('title', operators::NOT_CONTAINS, 'boom')))
           .to eq('field' => 'title', 'operator' => 'string_does_not_contain', 'value' => 'boom')
+        expect(translate(leaf('body_html', operators::NOT_I_CONTAINS, 'boom')))
+          .to eq('field' => 'body_html', 'operator' => 'string_does_not_contain', 'value' => 'boom')
       end
 
       it 'refuses equal on a text field, which Pylon cannot match exactly' do
@@ -202,6 +207,13 @@ module ForestAdminDatasourcePylon
 
         expect { translate(tree) }.to raise_error(UnsupportedOperatorError, /Unknown condition tree aggregator/)
       end
+
+      # The toolkit validates no aggregator, so the unwrap is the one place an
+      # unknown one could have slipped through unnoticed.
+      it 'refuses an aggregator it does not know even when it carries a lone condition' do
+        expect { translate(branch('Xor', [leaf('state', operators::EQUAL, 'new')])) }
+          .to raise_error(UnsupportedOperatorError, /Unknown condition tree aggregator/)
+      end
     end
 
     describe 'guards' do
@@ -215,8 +227,24 @@ module ForestAdminDatasourcePylon
       it 'refuses an empty list of values' do
         expect { translate(leaf('state', operators::IN, [])) }
           .to raise_error(UnsupportedOperatorError, /was given an empty list/)
+      end
+
+      # Dropping the blanks would answer a different question: `not_in [nil,
+      # 'open']` was asked to exclude the blank records, and a narrowed
+      # `not_in ['open']` comes back including them.
+      it 'refuses a list holding a blank value rather than narrowing it' do
+        expect { translate(leaf('state', operators::IN, [nil, 'open'])) }
+          .to raise_error(UnsupportedOperatorError, /holding a blank value/)
+        expect { translate(leaf('state', operators::NOT_IN, ['open', ''])) }
+          .to raise_error(UnsupportedOperatorError, /holding a blank value/)
+      end
+
+      # `blank` on a String column is rewritten by the toolkit into `in [nil,
+      # '']`, so the message has to point at the presence operators rather than
+      # blame the caller for an empty list.
+      it 'points a list of blanks at the presence operators' do
         expect { translate(leaf('state', operators::IN, [nil, ''])) }
-          .to raise_error(UnsupportedOperatorError, /was given an empty list/)
+          .to raise_error(UnsupportedOperatorError, /PRESENT or BLANK operator/)
       end
 
       it 'refuses a nil value and points at the presence operators' do
