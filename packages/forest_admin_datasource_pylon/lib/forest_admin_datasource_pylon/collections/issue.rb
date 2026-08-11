@@ -27,6 +27,12 @@ module ForestAdminDatasourcePylon
         end
       end
 
+      # Declarations outside this list are dropped at registration, so the
+      # schema never advertises an operator the translator would refuse.
+      def allowed_custom_field_operators
+        ApiFilters::CUSTOM_FIELD_OPS.keys
+      end
+
       private
 
       def fetch_records(caller, filter)
@@ -51,7 +57,9 @@ module ForestAdminDatasourcePylon
 
       # The records are already narrowed to the ids the filter asked for, so
       # applying the conditions left over by the short-circuit in memory cannot
-      # return a record the API would have excluded.
+      # return a record the API would have excluded. The reverse — dropping a
+      # record over a condition memory evaluates differently from Pylon — is
+      # ruled out by `extract_id_lookup`, which refuses such residuals.
       def records_by_id(caller, lookup)
         records = fetch_by_ids(lookup.ids).map { |issue| serialize(issue) }
         return records if lookup.residual.nil?
@@ -79,7 +87,7 @@ module ForestAdminDatasourcePylon
       end
 
       def warn_unsortable(sort)
-        return if sort.nil? || sort.empty?
+        return if sort.nil? || sort.empty? || default_pk_sort?(sort)
         return if translate_sort(sort, PYLON_SORTABLE).first
 
         ForestAdminDatasourcePylon.logger.warn(

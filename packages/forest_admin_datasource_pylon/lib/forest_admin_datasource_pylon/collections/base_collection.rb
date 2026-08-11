@@ -6,10 +6,20 @@ module ForestAdminDatasourcePylon
       Branch               = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
       Leaf                 = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
       ConditionTreeFactory = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeFactory
+      Equivalent           = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeEquivalent
+      SortFactory          = ForestAdminDatasourceToolkit::Components::Query::SortUtils::SortFactory
 
       # `residual` holds the conditions left over once the primary-key leaf has
       # been taken out of the tree, for the caller to apply in memory.
       IdLookup = Struct.new(:ids, :residual, keyword_init: true)
+
+      # Mirrors the operators `ConditionTreeLeaf#match` evaluates natively; any
+      # other operator needs an equivalence for the column's type to be
+      # evaluable in memory.
+      IN_MEMORY_OPERATORS = [Operators::IN, Operators::EQUAL, Operators::LESS_THAN, Operators::GREATER_THAN,
+                             Operators::MATCH, Operators::STARTS_WITH, Operators::ENDS_WITH,
+                             Operators::LONGER_THAN, Operators::SHORTER_THAN, Operators::INCLUDES_ALL,
+                             Operators::NOT_IN, Operators::NOT_EQUAL, Operators::NOT_CONTAINS].freeze
 
       attr_reader :custom_fields
 
@@ -44,8 +54,9 @@ module ForestAdminDatasourcePylon
         id_index = conditions.index { |condition| id_values(condition) }
         return nil if id_index.nil?
 
-        residual = conditions.reject.with_index { |_, index| index == id_index }
-        IdLookup.new(ids: id_values(conditions[id_index]), residual: ConditionTreeFactory.intersect(residual))
+        residual = ConditionTreeFactory.intersect(conditions.reject.with_index { |_, index| index == id_index })
+        ensure_residual_appliable!(residual)
+        IdLookup.new(ids: id_values(conditions[id_index]), residual: residual)
       end
 
       def build_pylon_filter(caller, filter)
@@ -69,6 +80,13 @@ module ForestAdminDatasourcePylon
         return [nil, nil] unless pylon_field
 
         [pylon_field, ascending ? 'asc' : 'desc']
+      end
+
+      # The agent injects an ascending primary-key sort whenever the request
+      # asks for no order, so the default cannot be told apart from a chosen
+      # order by presence alone.
+      def default_pk_sort?(sort)
+        normalized_sort_clauses(sort) == normalized_sort_clauses(SortFactory.by_primary_keys(self))
       end
 
       def timezone_for(caller)
@@ -95,22 +113,33 @@ module ForestAdminDatasourcePylon
       end
 
       # Adds custom fields, skipping any whose column name collides with a
-      # field already declared on the collection. Returns the subset actually
-      # added so callers can keep their serializer in sync with the schema.
+      # field already declared on the collection, and clamping the declared
+      # operators to those the API accepts on a custom field — so the schema
+      # never advertises a filter the translator would then refuse. Returns
+      # the subset actually added, carrying the clamped schemas, so callers
+      # can keep their serializer and api_filters in sync with the schema.
       def add_custom_fields(custom_fields)
-        custom_fields.reject do |cf|
+        custom_fields.filter_map do |cf|
           column_name = cf[:column_name]
           if schema[:fields].key?(column_name)
             ForestAdminDatasourcePylon.logger.warn(
               "[forest_admin_datasource_pylon] Custom field '#{column_name}' on collection " \
               "'#{name}' conflicts with an existing field; skipping."
             )
-            true
+            nil
           else
-            add_field(column_name, cf[:schema])
-            false
+            clamped = clamp_custom_field_operators(column_name, cf[:schema])
+            add_field(column_name, clamped)
+            cf.merge(schema: clamped)
           end
         end
+      end
+
+      # Operators a custom field may advertise. The empty default matches the
+      # empty `api_filters`: a collection that filters nothing server-side
+      # must not advertise custom-field filters either.
+      def allowed_custom_field_operators
+        []
       end
 
       private
@@ -129,12 +158,57 @@ module ForestAdminDatasourcePylon
         node.is_a?(Branch) && node.aggregator.to_s.casecmp('and').zero?
       end
 
+      def clamp_custom_field_operators(column_name, schema)
+        declared = Array(schema.filter_operators)
+        dropped  = declared - allowed_custom_field_operators
+        return schema if dropped.empty?
+
+        ForestAdminDatasourcePylon.logger.warn(
+          "[forest_admin_datasource_pylon] Custom field '#{column_name}' on collection '#{name}' declares " \
+          "operators the API cannot honour on a custom field (#{dropped.join(", ")}); they are not advertised."
+        )
+        schema.dup.tap { |clamped| clamped.filter_operators = declared - dropped }
+      end
+
+      # A residual is evaluated by `ConditionTree#apply`, which compares scalar
+      # values: a Json column holds a list whose Pylon membership semantics
+      # have no in-memory counterpart, and an operator without an equivalence
+      # for the column's type has no in-memory evaluation at all. Both would
+      # silently corrupt the lookup's result, so they are refused instead.
+      def ensure_residual_appliable!(node)
+        case node
+        when Branch then node.conditions.each { |condition| ensure_residual_appliable!(condition) }
+        when Leaf   then raise_unappliable_residual(node) unless residual_leaf_appliable?(node)
+        end
+      end
+
+      def residual_leaf_appliable?(leaf)
+        column = schema[:fields][leaf.field]
+        return false if column.nil? || column.column_type == 'Json'
+
+        Equivalent.equivalent_tree?(leaf.operator, IN_MEMORY_OPERATORS, column.column_type)
+      end
+
+      def raise_unappliable_residual(leaf)
+        raise UnsupportedOperatorError,
+              "Operator '#{leaf.operator}' on field '#{leaf.field}' cannot be combined with a primary-key " \
+              'lookup: Pylon cannot filter on id server-side, so the other conditions run in memory, ' \
+              'which this one does not support.'
+      end
+
       def sort_field_and_direction(entry)
         return [entry.field, entry.ascending] if entry.respond_to?(:field)
 
         field     = entry.key?(:field)     ? entry[:field]     : entry['field']
         ascending = entry.key?(:ascending) ? entry[:ascending] : entry['ascending']
         [field, ascending]
+      end
+
+      def normalized_sort_clauses(sort)
+        Array(sort).map do |entry|
+          field, ascending = sort_field_and_direction(entry)
+          [field.to_s, ascending]
+        end
       end
     end
   end

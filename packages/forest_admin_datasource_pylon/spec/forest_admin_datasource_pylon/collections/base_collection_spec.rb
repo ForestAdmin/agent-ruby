@@ -31,11 +31,20 @@ module ForestAdminDatasourcePylon
 
     let(:subclass) do
       Class.new(described_class) do
-        def define_schema; end
+        # Minimal schema: the residual guard looks the columns up, and the
+        # default-sort check needs a primary key to compare against.
+        def define_schema
+          column = Collections::BaseCollection::ColumnSchema
+          add_field('id', column.new(column_type: 'String', is_primary_key: true))
+          add_field('state', column.new(column_type: 'String'))
+          add_field('type', column.new(column_type: 'String'))
+          add_field('tags', column.new(column_type: 'Json'))
+        end
+
         def define_relations; end
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
-               :translate_sort, :timezone_for, :build_pylon_filter, :api_filters
+               :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?
       end
     end
 
@@ -142,6 +151,34 @@ module ForestAdminDatasourcePylon
         node = branch('And', [leaf('state', operators::EQUAL, 'new'), leaf('type', operators::EQUAL, 'ticket')])
 
         expect(collection.extract_id_lookup(node)).to be_nil
+      end
+
+      # A Json column holds a list whose Pylon membership semantics have no
+      # in-memory counterpart: the lookup is refused rather than mis-filtered.
+      it 'refuses a lookup whose residual it cannot evaluate in memory' do
+        node = branch('And', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('tags', operators::CONTAINS, 'vip')])
+
+        expect { collection.extract_id_lookup(node) }
+          .to raise_error(UnsupportedOperatorError, /cannot be combined with a primary-key lookup/)
+      end
+
+      it 'refuses a residual on a field the schema does not declare' do
+        node = branch('And', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('ghost', operators::EQUAL, 'x')])
+
+        expect { collection.extract_id_lookup(node) }
+          .to raise_error(UnsupportedOperatorError, /field 'ghost'/)
+      end
+    end
+
+    describe '#default_pk_sort?' do
+      # The agent injects this exact sort whenever the request asks for no order.
+      it 'recognises the ascending primary-key sort the agent injects' do
+        expect(collection.default_pk_sort?(sort('id'))).to be(true)
+      end
+
+      it 'does not mistake a chosen order for the default' do
+        expect(collection.default_pk_sort?(sort('id', ascending: false))).to be(false)
+        expect(collection.default_pk_sort?(sort('state'))).to be(false)
       end
     end
 
@@ -258,6 +295,33 @@ module ForestAdminDatasourcePylon
 
         expect(added).to be_empty
         expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/conflicts with an existing field/)
+      end
+
+      # The safe default matches the empty api_filters: a collection that
+      # filters nothing server-side must not advertise custom-field filters
+      # either, or the translator would refuse at query time what the schema
+      # offered.
+      it 'clamps the declared operators to the collection allow-list and warns' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        declared = ForestAdminDatasourceToolkit::Schema::ColumnSchema
+                   .new(column_type: 'String', filter_operators: [operators::EQUAL])
+
+        added = collection.add_custom_fields([{ column_name: 'severity', schema: declared }])
+
+        expect(collection.fields['severity'].filter_operators).to eq([])
+        expect(added.first[:schema].filter_operators).to eq([])
+        expect(ForestAdminDatasourcePylon.logger)
+          .to have_received(:warn).with(/cannot honour on a custom field \(equal\)/)
+      end
+
+      it 'clamps a copy, leaving the integrator schema object untouched' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        declared = ForestAdminDatasourceToolkit::Schema::ColumnSchema
+                   .new(column_type: 'String', filter_operators: [operators::EQUAL])
+
+        collection.add_custom_fields([{ column_name: 'severity', schema: declared }])
+
+        expect(declared.filter_operators).to eq([operators::EQUAL])
       end
     end
   end

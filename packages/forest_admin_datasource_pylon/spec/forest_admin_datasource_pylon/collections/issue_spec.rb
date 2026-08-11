@@ -284,6 +284,20 @@ module ForestAdminDatasourcePylon
         expect { collection.list(nil, filter(condition_tree: leaf('severity', operators::CONTAINS, 'hi')), %w[id]) }
           .to raise_error(UnsupportedOperatorError, /not supported on field 'severity'/)
       end
+
+      # Clamped at registration, so the schema never advertises an operator
+      # the translator would refuse at query time.
+      it 'drops a declared operator Pylon cannot honour on a custom field and warns' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        declared = ForestAdminDatasourceToolkit::Schema::ColumnSchema
+                   .new(column_type: 'String', filter_operators: [operators::EQUAL, operators::STARTS_WITH])
+
+        clamped = described_class.new(datasource, custom_fields: [{ column_name: 'severity', schema: declared }])
+
+        expect(clamped.fields['severity'].filter_operators).to eq([operators::EQUAL])
+        expect(ForestAdminDatasourcePylon.logger)
+          .to have_received(:warn).with(/cannot honour on a custom field \(starts_with\)/)
+      end
     end
 
     describe '#list with a filter' do
@@ -352,6 +366,16 @@ module ForestAdminDatasourcePylon
 
         expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([])
       end
+
+      # `tags` holds a list whose Pylon membership semantics have no in-memory
+      # counterpart: the lookup is refused rather than silently mis-filtered.
+      it 'refuses a leftover condition it cannot evaluate in memory' do
+        tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('tags', operators::CONTAINS, 'urgent')])
+
+        expect { collection.list(nil, filter(condition_tree: tree), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /cannot be combined with a primary-key lookup/)
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
     end
 
     describe '#list with a sort' do
@@ -375,6 +399,24 @@ module ForestAdminDatasourcePylon
         collection.list(nil, filter, %w[id])
 
         expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
+
+      # The agent injects an ascending primary-key sort whenever the request
+      # asks for no order; only an order someone actually chose is reported.
+      it 'stays quiet on the default primary-key sort the agent injects' do
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'id', ascending: true }])
+
+        collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
+
+      it 'warns on a chosen order, even one on the primary key' do
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'id', ascending: false }])
+
+        collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/cannot honour the requested order/)
       end
     end
   end
