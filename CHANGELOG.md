@@ -1,3 +1,10 @@
+## [1.37.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.3...v1.37.4) (2026-08-11)
+
+
+### Bug Fixes
+
+* **agent:** scope and authorize related write routes on the mutated collection ([#350](https://github.com/ForestAdmin/agent-ruby/issues/350)) ([021deac](https://github.com/ForestAdmin/agent-ruby/commit/021deac91be338a8d8362f3803d0ff6e72d93608)), closes [#348](https://github.com/ForestAdmin/agent-ruby/issues/348)
+
 ## [1.37.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.2...v1.37.3) (2026-08-11)
 
 
