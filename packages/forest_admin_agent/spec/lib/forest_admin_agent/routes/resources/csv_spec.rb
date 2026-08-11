@@ -82,11 +82,12 @@ module ForestAdminAgent
 
             args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
             args[:params][:fields] = { 'user' => 'last_name' }
-            args[:params][:header] = 'first_name'
+            args[:params][:header] = 'First name'
             csv.handle_request(args)
 
-            expect(csv_generator_stream).to have_received(:stream) do |_header, _filter, projection, _list, _limit|
+            expect(csv_generator_stream).to have_received(:stream) do |header, _filter, projection, _list, _limit|
               expect(projection).to eq(%w[first_name])
+              expect(header).to eq('First name')
             end
           end
 

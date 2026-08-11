@@ -105,6 +105,35 @@ module ForestAdminAgent
             end
           end
 
+          context 'when the Forest-Projection header is sent' do
+            it 'call list_relation with the projection read from the header' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:headers]['HTTP_FOREST_PROJECTION'] = 'label'
+              args[:params][:fields] = { 'category' => 'id' }
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+              list.handle_request(args)
+
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
+              |_collection, _id, _relation_name, _caller, _foreign_filter, projection|
+                expect(projection).to eq(%w[label id])
+              end
+            end
+
+            it 'validates the header against the foreign collection, not the parent' do
+              args[:params]['relation_name'] = 'category'
+              args[:params]['id'] = 1
+              args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+              expect { list.handle_request(args) }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::BadRequestError,
+                /Invalid Forest-Projection header:.*category\.first_name/
+              )
+            end
+          end
+
           context 'when checking permissions and scope' do
             it 'authorizes and scopes on the related collection, not the parent' do
               args[:params]['relation_name'] = 'category'

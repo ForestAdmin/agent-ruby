@@ -115,6 +115,28 @@ module ForestAdminAgent
             end
           end
 
+          it 'call collection.list with the projection read from the Forest-Projection header' do
+            args[:params]['id'] = 1
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
+            args[:params][:fields] = { 'user' => 'last_name' }
+            show.handle_request(args)
+
+            expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to eq(%w[first_name id])
+            end
+          end
+
+          it 'does not fall back to the query params when the Forest-Projection header is invalid' do
+            args[:params]['id'] = 1
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'field-that-do-not-exist'
+            args[:params][:fields] = { 'user' => 'last_name' }
+
+            expect { show.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+
           it 'raises NotFoundError when collection does not exist' do
             args[:params]['collection_name'] = 'non_existent_collection'
             args[:params]['id'] = 1

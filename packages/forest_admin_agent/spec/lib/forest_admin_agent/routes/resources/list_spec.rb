@@ -97,15 +97,6 @@ module ForestAdminAgent
         end
 
         context 'when the Forest-Projection header is sent' do
-          it 'call list with the projection read from the header' do
-            args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
-            list.handle_request(args)
-
-            expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
-              expect(projection).to eq(%w[first_name id])
-            end
-          end
-
           it 'gives precedence to the header over the fields params' do
             args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
             args[:params][:fields] = { 'user' => 'last_name' }

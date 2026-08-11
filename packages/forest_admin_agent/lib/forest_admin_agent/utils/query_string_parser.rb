@@ -52,7 +52,7 @@ module ForestAdminAgent
 
         return if header.nil? || header.empty?
 
-        projection_fields = build_header_projection_fields(collection, header.split(',').map(&:strip))
+        projection_fields = build_header_projection_fields(collection, header.split(',', -1).map(&:strip))
 
         ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection_fields)
 
@@ -102,15 +102,23 @@ module ForestAdminAgent
       end
 
       def self.build_header_projection_fields(collection, requested_paths)
+        if requested_paths.any? { |path| path.empty? || path.split(':', -1).any?(&:empty?) }
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, 'The projection contains an empty field.'
+        end
+
         root_field_names = requested_paths.map { |path| path.split(':').first }
         root_field_names_with_types = root_field_names.dup
         add_polymorphic_type_fields(collection, root_field_names_with_types)
 
         projection_fields = requested_paths.map do |path|
-          field_name = path.split(':').first
+          field_name, nested_path = path.split(':', 2)
           field = get_field(collection, field_name)
 
-          field.type == 'PolymorphicManyToOne' ? "#{field_name}:*" : path
+          if field.type == 'PolymorphicManyToOne' && (nested_path.nil? || nested_path == '*')
+            "#{field_name}:*"
+          else
+            path
+          end
         end
 
         projection_fields | (root_field_names_with_types - root_field_names)

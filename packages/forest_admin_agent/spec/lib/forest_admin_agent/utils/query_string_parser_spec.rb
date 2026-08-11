@@ -387,6 +387,91 @@ module ForestAdminAgent
               /Invalid Forest-Projection header:/
             )
           end
+
+          it 'raise when a nested field does not exist on the foreign collection' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:nope' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*Person\.nope/
+            )
+          end
+
+          it 'raise when a nested field is requested under a column' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title:sub' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*Book\.title/
+            )
+          end
+
+          it 'raise when a relation is requested without any subfield' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+
+          it 'raise when the header only contains separators instead of returning an empty projection' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => ',' }, params: { fields: { 'Book' => 'title' } } }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header: The projection contains an empty field/
+            )
+          end
+
+          it 'raise when a field is empty' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,,id' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header: The projection contains an empty field/
+            )
+          end
+
+          it 'raise when the header ends with a separator' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header: The projection contains an empty field/
+            )
+          end
+
+          it 'raise when a path has an empty segment' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header: The projection contains an empty field/
+            )
+          end
+
+          it 'deduplicate repeated fields' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,title,author:name,author:name' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:name])
+            )
+          end
         end
 
         context 'when the collection has a PolymorphicManyToOne' do
@@ -444,11 +529,30 @@ module ForestAdminAgent
             )
           end
 
-          it 'ignore any nested field asked under a polymorphic relation' do
-            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable:email' }, params: {} }
+          it 'keep an explicit polymorphic_relation:* as is and add the type field' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable:*' }, params: {} }
 
             expect(described_class.parse_projection_from_header(collection, args)).to eq(
               Projection.new(%w[id addressable:* addressable_type])
+            )
+          end
+
+          it 'deduplicate a polymorphic relation asked both bare and with the star' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable,addressable:*' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[id addressable:* addressable_type])
+            )
+          end
+
+          it 'raise instead of silently widening a nested field asked under a polymorphic relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable:email' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*Unexpected nested field email under generic relation/
             )
           end
         end
