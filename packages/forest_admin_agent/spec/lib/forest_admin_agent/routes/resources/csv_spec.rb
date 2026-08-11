@@ -76,6 +76,30 @@ module ForestAdminAgent
             expect(result[:content][:headers]['Content-Disposition']).to match(/attachment; filename="user_export_\d{8}_\d{6}\.csv"/)
           end
 
+          it 'exports the projection read from the Forest-Projection header, without adding the primary keys' do
+            mock_enumerator = ["first_name\n", "foo\n"].to_enum
+            allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)
+
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
+            args[:params][:fields] = { 'user' => 'last_name' }
+            args[:params][:header] = 'first_name'
+            csv.handle_request(args)
+
+            expect(csv_generator_stream).to have_received(:stream) do |_header, _filter, projection, _list, _limit|
+              expect(projection).to eq(%w[first_name])
+            end
+          end
+
+          it 'does not fall back to the fields params when the header is invalid' do
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'field-that-do-not-exist'
+            args[:params][:fields] = { 'user' => 'last_name' }
+
+            expect { csv.handle_request(args) }.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+
           it 'with a filename should return an export csv with the filename provided' do
             mock_enumerator = ["id,first_name,last_name\n", "1,foo,foo\n"].to_enum
             allow(csv_generator_stream).to receive(:stream).and_return(mock_enumerator)

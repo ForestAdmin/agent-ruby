@@ -65,6 +65,8 @@ module ForestAdminAgent
               nativeQueryConnections: connections,
               agentCapabilities: {
                 canUseProjectionOnGetOne: true,
+                canUseProjectionViaHeader: true,
+                canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true
               }
             },

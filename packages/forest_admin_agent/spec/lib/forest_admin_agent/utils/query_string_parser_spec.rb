@@ -312,6 +312,148 @@ module ForestAdminAgent
         end
       end
 
+      describe 'parse_projection_from_header' do
+        context 'when the collection has no polymorphic relation' do
+          let(:collection) do
+            datasource = Datasource.new
+            collection_person = Collection.new(datasource, 'Person')
+            collection_person.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'name' => ColumnSchema.new(column_type: 'String')
+              }
+            )
+            collection = Collection.new(datasource, 'Book')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'title' => ColumnSchema.new(column_type: 'String'),
+                'author_id' => ColumnSchema.new(column_type: 'Number'),
+                'author' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'author_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Person'
+                )
+              }
+            )
+
+            datasource.add_collection(collection)
+            datasource.add_collection(collection_person)
+
+            return collection
+          end
+
+          it 'return nil when the header is missing' do
+            args = { headers: {}, params: { fields: { 'Book' => 'title' } } }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to be_nil
+          end
+
+          it 'return nil when the header is empty' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => '' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to be_nil
+          end
+
+          it 'return nil when the header only contains whitespace' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => '  ' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to be_nil
+          end
+
+          it 'convert the header to a valid projection' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:name' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:name])
+            )
+          end
+
+          it 'strip the whitespace around each field' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => ' title , author:name ' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:name])
+            )
+          end
+
+          it 'raise a dedicated error when the header contains an unknown field' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'field-that-do-not-exist' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+        end
+
+        context 'when the collection has a PolymorphicManyToOne' do
+          let(:collection) do
+            datasource = Datasource.new
+            collection = Collection.new(datasource, 'Address')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'addressable_id' => ColumnSchema.new(column_type: 'Number'),
+                'addressable_type' => ColumnSchema.new(column_type: 'String'),
+                'addressable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'addressable_type',
+                  foreign_collections: ['User'],
+                  foreign_key_targets: { 'User' => 'id' },
+                  foreign_key: 'addressable_id'
+                )
+              }
+            )
+            collection_user = Collection.new(datasource, 'User')
+            collection_user.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'email' => ColumnSchema.new(column_type: 'String')
+              }
+            )
+
+            datasource.add_collection(collection)
+            datasource.add_collection(collection_user)
+
+            return collection
+          end
+
+          it 'convert the polymorphic relation to polymorphic_relation:* and add the type field' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[id addressable:* addressable_type])
+            )
+          end
+
+          it 'automatically adds the type field when the foreign key is requested' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable_id' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[id addressable_id addressable_type])
+            )
+          end
+
+          it 'does not duplicate the type field if already requested' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable_id,addressable_type' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[id addressable_id addressable_type])
+            )
+          end
+
+          it 'ignore any nested field asked under a polymorphic relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'id,addressable:email' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[id addressable:* addressable_type])
+            )
+          end
+        end
+      end
+
       describe 'parse_projection_with_pks' do
         let(:collection) do
           datasource = Datasource.new
@@ -386,6 +528,49 @@ module ForestAdminAgent
 
           expect(described_class.parse_projection_with_pks(collection,
                                                            args)).to eq(Projection.new(%w[id author:id author:name]))
+        end
+
+        it 'gives precedence to the Forest-Projection header over the fields params' do
+          args = {
+            headers: { 'HTTP_FOREST_PROJECTION' => 'title' },
+            params: { fields: { 'Book' => 'author_id' } }
+          }
+
+          expect(described_class.parse_projection_with_pks(collection, args)).to eq(Projection.new(%w[title id]))
+        end
+
+        it 'falls back to the fields params when the header is empty' do
+          args = {
+            headers: { 'HTTP_FOREST_PROJECTION' => '' },
+            params: { fields: { 'Book' => 'title' } }
+          }
+
+          expect(described_class.parse_projection_with_pks(collection, args)).to eq(Projection.new(%w[title id]))
+        end
+
+        it 'adds the primary keys of the collection and of its relations to a header projection' do
+          args = {
+            headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:name' },
+            params: {}
+          }
+
+          expect(described_class.parse_projection_with_pks(collection, args)).to eq(
+            Projection.new(%w[title author:name id author:id])
+          )
+        end
+
+        it 'does not fall back to the fields params when the header is invalid' do
+          args = {
+            headers: { 'HTTP_FOREST_PROJECTION' => 'field-that-do-not-exist' },
+            params: { fields: { 'Book' => 'title' } }
+          }
+
+          expect do
+            described_class.parse_projection_with_pks(collection, args)
+          end.to raise_error(
+            Http::Exceptions::BadRequestError,
+            /Invalid Forest-Projection header:/
+          )
         end
       end
 
