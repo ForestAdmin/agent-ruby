@@ -29,7 +29,7 @@ module ForestAdminAgent
             if is_delete_mode
               context.permissions.can?(:delete, context.child_collection)
             else
-              context.permissions.can?(:edit, context.collection)
+              context.permissions.can?(:edit, context.child_collection)
             end
 
             filter = get_base_foreign_filter(args, context)

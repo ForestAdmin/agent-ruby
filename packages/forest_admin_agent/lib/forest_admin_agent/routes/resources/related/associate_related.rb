@@ -50,7 +50,7 @@ module ForestAdminAgent
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
                   ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value),
-                  context.permissions.get_scope(context.collection)
+                  context.permissions.get_scope(context.child_collection)
                 ]
               )
             )
@@ -67,7 +67,7 @@ module ForestAdminAgent
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
                   ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value),
-                  context.permissions.get_scope(context.collection)
+                  context.permissions.get_scope(context.child_collection)
                 ]
               )
             )
