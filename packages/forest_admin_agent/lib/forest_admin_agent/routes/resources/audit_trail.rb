@@ -137,11 +137,6 @@ module ForestAdminAgent
             end
           end
         end
-
-        def store
-          config = ForestAdminAgent::Facades::Container.config_from_cache
-          config && config[:audit_trail] && config[:audit_trail][:store]
-        end
       end
     end
   end

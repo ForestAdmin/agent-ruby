@@ -31,6 +31,10 @@ module ForestAdminAgent
           record.to_h.transform_keys { |key| key.to_s.camelize(:lower) }
         end
 
+        def store
+          ::ForestAdminAgent::AuditTrail.store
+        end
+
         def any_record?(context, collection, condition_tree)
           collection.list(
             context.caller,

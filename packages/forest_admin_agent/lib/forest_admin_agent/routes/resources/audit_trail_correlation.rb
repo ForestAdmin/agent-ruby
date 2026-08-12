@@ -95,11 +95,6 @@ module ForestAdminAgent
 
           keys.map { |key| key.to_s.strip }.reject(&:empty?)
         end
-
-        def store
-          config = ForestAdminAgent::Facades::Container.config_from_cache
-          config && config[:audit_trail] && config[:audit_trail][:store]
-        end
       end
     end
   end

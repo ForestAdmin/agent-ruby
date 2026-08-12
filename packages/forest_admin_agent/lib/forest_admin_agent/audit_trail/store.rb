@@ -111,6 +111,7 @@ module ForestAdminAgent
           record_id: record.record_id,
           user_id: record.user_id,
           correlation_key: record.correlation_key,
+          action_name: record.action_name,
           previous_values: record.previous_values,
           new_values: record.new_values
         }
@@ -124,6 +125,7 @@ module ForestAdminAgent
           record_id: row.record_id,
           user_id: row.user_id,
           correlation_key: row.correlation_key,
+          action_name: row.action_name,
           previous_values: row.previous_values || {},
           new_values: row.new_values || {}
         )

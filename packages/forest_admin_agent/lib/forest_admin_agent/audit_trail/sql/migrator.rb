@@ -38,6 +38,12 @@ module ForestAdminAgent
               connection.add_index(table, :correlation_key, name: "#{base}_correlation_key", if_not_exists: true)
               connection.add_index(table, :user_id, name: "#{base}_user_id", if_not_exists: true)
             end
+          },
+          {
+            name: '003-add-action-name',
+            up: lambda do |connection, table|
+              connection.add_column(table, :action_name, :string, if_not_exists: true)
+            end
           }
         ].freeze
 

@@ -1,6 +1,3 @@
-require 'securerandom'
-require 'time'
-
 module ForestAdminAgent
   module AuditTrail
     # Datasource-agnostic capture layer, installed by the agent factory as soon as an audit-trail
@@ -8,7 +5,8 @@ module ForestAdminAgent
     # it behaves the same whatever the audited datasource is (ActiveRecord, Mongoid, ...), computes the
     # minimal before/after diff for each change and appends an {AuditRecord} to the store.
     class Capture
-      REDACTED = '[redacted]'.freeze
+      include Recording
+
       # ponytail: 16 deep is far past any legitimate nesting; raise it if one ever gets that far.
       MAX_SNAPSHOTS = 16
 
@@ -108,22 +106,16 @@ module ForestAdminAgent
 
         @store.append(
           AuditRecord.new(
-            timestamp: Time.now.utc.iso8601(3),
+            timestamp: now,
             operation: operation,
             collection: collection,
             record_id: record_id,
             user_id: caller&.id,
-            # Same id for every change made within one request — set on the caller by the agent
-            # (see CallerParser), mirroring the Node agent's caller.requestId.
             correlation_key: correlation_key_for(caller),
             previous_values: redact(previous_values, redacted),
             new_values: redact(new_values, redacted)
           )
         )
-      end
-
-      def correlation_key_for(caller)
-        (caller.respond_to?(:request_id) && caller.request_id) || SecureRandom.uuid
       end
 
       def record_id(record, primary_keys)
@@ -132,14 +124,6 @@ module ForestAdminAgent
 
       def pick(record, columns)
         columns.to_h { |column| [column, record[column]] }
-      end
-
-      def redact(values, redacted_fields)
-        return values if redacted_fields.empty?
-
-        values.each_with_object({}) do |(field, value), result|
-          result[field] = redacted_fields.include?(field) ? REDACTED : value
-        end
       end
     end
   end
