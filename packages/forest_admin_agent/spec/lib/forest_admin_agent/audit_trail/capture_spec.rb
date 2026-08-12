@@ -37,9 +37,13 @@ module ForestAdminAgent
         instance_double(ForestAdminDatasourceCustomizer::Context::RelaxedWrappers::RelaxedCollection)
       end
 
+      let(:registrations) { [] }
       let(:collection_customizer) do
         customizer = double('CollectionCustomizer', name: 'companies', collection: collection)
-        allow(customizer).to receive(:add_hook) { |position, type, &block| hooks["#{position}_#{type}"] = block }
+        allow(customizer).to receive(:add_hook) do |position, type, prepend: false, &block|
+          registrations << [position, type, prepend]
+          hooks["#{position}_#{type}"] = block
+        end
         customizer
       end
 
@@ -51,6 +55,15 @@ module ForestAdminAgent
         Thread.current[:forest_audit_trail_snapshots] = nil
         allow(collection).to receive(:schema).and_return({ fields: fields })
         described_class.new.run(datasource_customizer, nil, store: store)
+      end
+
+      # execute_after stops at the first exception, so being last would mean losing the record of a write
+      # that already happened whenever another customization raises in its own after hook.
+      it 'registers its after hooks ahead of the ones already there, and its before hooks after them' do
+        expect(registrations).to contain_exactly(
+          ['After', 'Create', true], ['Before', 'Update', false], ['After', 'Update', true],
+          ['Before', 'Delete', false], ['After', 'Delete', true]
+        )
       end
 
       it 'records a create with only the writable columns' do

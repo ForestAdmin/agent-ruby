@@ -40,8 +40,12 @@ module ForestAdminAgent
         add_delete_hooks(collection_customizer, columns, primary_keys, name, projection)
       end
 
+      # The "after" hooks are prepended: `execute_after` stops at the first exception, so a customization
+      # raising in its own after hook would otherwise drop the record of a write that already happened.
+      # The "before" hooks stay appended, so they read the filter and patch every other customization
+      # has had its say on.
       def add_create_hook(collection_customizer, columns, primary_keys, name)
-        collection_customizer.add_hook('After', 'Create') do |context|
+        collection_customizer.add_hook('After', 'Create', prepend: true) do |context|
           emit(
             context.caller, 'create', name, record_id(context.record, primary_keys),
             {}, pick(context.record, columns)
@@ -56,7 +60,7 @@ module ForestAdminAgent
           push_snapshot(records: snapshot(context, projection), patch: context.patch)
         end
 
-        collection_customizer.add_hook('After', 'Update') do |context|
+        collection_customizer.add_hook('After', 'Update', prepend: true) do |context|
           snapshot = snapshots.pop
 
           snapshot&.fetch(:records)&.each do |record|
@@ -76,7 +80,7 @@ module ForestAdminAgent
           push_snapshot(records: snapshot(context, projection))
         end
 
-        collection_customizer.add_hook('After', 'Delete') do |context|
+        collection_customizer.add_hook('After', 'Delete', prepend: true) do |context|
           snapshot = snapshots.pop
 
           snapshot&.fetch(:records)&.each do |record|

@@ -183,6 +183,10 @@ The `correlation_key` is the agent's per-request id (`caller.request_id`), gener
 echoed back to the client in the `X-Forest-Correlation-Id` response header — so every change made in
 one request shares a key, and the caller can tie it to its own activity log.
 
+The capture layer registers its **after** hooks ahead of any other customization's (`prepend: true`,
+since `execute_after` stops at the first exception, and by then the write has already happened) and its
+**before** hooks after them, so the snapshot sees the filter and patch everyone else has had their say on.
+
 ## Concurrent writes to one record
 
 The before/after values are captured around the write, not inside it: the customizer hooks bracket the
