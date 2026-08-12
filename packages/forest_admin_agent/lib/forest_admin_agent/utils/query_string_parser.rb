@@ -47,6 +47,24 @@ module ForestAdminAgent
         raise BadRequestError, "Invalid projection: #{e.message}"
       end
 
+      def self.parse_projection_from_header(collection, args)
+        header = args.dig(:headers, 'HTTP_FOREST_PROJECTION')&.to_s&.strip
+
+        return if header.nil? || header.empty?
+
+        projection_fields = build_header_projection_fields(collection, header.split(',', -1).map(&:strip))
+
+        ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection_fields)
+
+        Projection.new(projection_fields)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        raise BadRequestError, "Invalid Forest-Projection header: #{e.message}"
+      end
+
+      def self.parse_projection_from_request(collection, args)
+        parse_projection_from_header(collection, args) || parse_projection(collection, args)
+      end
+
       def self.add_polymorphic_type_fields(collection, requested_field_names)
         polymorphic_relations = collection.schema[:fields].select { |_, field| field.type == 'PolymorphicManyToOne' }
 
@@ -83,6 +101,29 @@ module ForestAdminAgent
         end
       end
 
+      def self.build_header_projection_fields(collection, requested_paths)
+        if requested_paths.any? { |path| path.empty? || path.split(':', -1).any?(&:empty?) }
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, 'The projection contains an empty field.'
+        end
+
+        root_field_names = requested_paths.map { |path| path.split(':').first }
+        root_field_names_with_types = root_field_names.dup
+        add_polymorphic_type_fields(collection, root_field_names_with_types)
+
+        projection_fields = requested_paths.map do |path|
+          field_name, nested_path = path.split(':', 2)
+          field = get_field(collection, field_name)
+
+          if field.type == 'PolymorphicManyToOne' && (nested_path.nil? || nested_path == '*')
+            "#{field_name}:*"
+          else
+            path
+          end
+        end
+
+        projection_fields | (root_field_names_with_types - root_field_names)
+      end
+
       def self.get_field(collection, field_name)
         field = collection.schema[:fields][field_name]
         return field unless field.nil?
@@ -93,12 +134,11 @@ module ForestAdminAgent
               "Available fields are: [#{available_fields}]. " \
               'Please check if the field name is correct.'
       end
-      private_class_method :add_polymorphic_type_fields, :build_projection_fields, :get_field
+      private_class_method :add_polymorphic_type_fields, :build_projection_fields,
+                           :build_header_projection_fields, :get_field
 
       def self.parse_projection_with_pks(collection, args)
-        projection = parse_projection(collection, args)
-
-        projection.with_pks(collection)
+        parse_projection_from_request(collection, args).with_pks(collection)
       end
 
       def self.parse_pagination(args)

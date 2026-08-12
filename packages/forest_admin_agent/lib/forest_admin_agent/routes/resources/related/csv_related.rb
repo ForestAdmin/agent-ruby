@@ -32,8 +32,9 @@ module ForestAdminAgent
                 ]
               )
             )
-            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(context.child_collection,
-                                                                                              args)
+            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_from_request(
+              context.child_collection, args
+            )
 
             # Get the parent record primary keys
             primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)

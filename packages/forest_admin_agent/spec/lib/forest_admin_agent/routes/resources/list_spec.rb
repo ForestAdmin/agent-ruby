@@ -96,6 +96,28 @@ module ForestAdminAgent
           )
         end
 
+        context 'when the Forest-Projection header is sent' do
+          it 'gives precedence to the header over the fields params' do
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
+            args[:params][:fields] = { 'user' => 'last_name' }
+            list.handle_request(args)
+
+            expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to eq(%w[first_name id])
+            end
+          end
+
+          it 'does not fall back to the fields params when the header is invalid' do
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'field-that-do-not-exist'
+            args[:params][:fields] = { 'user' => 'last_name' }
+
+            expect { list.handle_request(args) }.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+        end
+
         context 'when call list with simple condition tree leaf' do
           it 'call list with expected filters arg' do
             args[:params][:filters] = JSON.generate({ field: 'id', operator: 'greater_than', value: 7 })

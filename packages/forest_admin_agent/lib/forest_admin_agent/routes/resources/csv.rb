@@ -37,7 +37,7 @@ module ForestAdminAgent
             sort: QueryStringParser.parse_sort(context.collection, args),
             segment: QueryStringParser.parse_segment(context.collection, args)
           )
-          projection = QueryStringParser.parse_projection(context.collection, args)
+          projection = QueryStringParser.parse_projection_from_request(context.collection, args)
           filename = args[:params][:filename] || args[:params]['collection_name']
           filename += '.csv' unless /\.csv$/i.match?(filename)
           header = args[:params][:header]
