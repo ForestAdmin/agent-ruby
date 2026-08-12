@@ -2,6 +2,8 @@ module ForestAdminDatasourcePylon
   module Collections
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
       ColumnSchema         = ForestAdminDatasourceToolkit::Schema::ColumnSchema
+      ManyToOneSchema      = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
+      OneToManySchema      = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
       Operators            = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
       Branch               = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
       Leaf                 = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
@@ -39,6 +41,17 @@ module ForestAdminDatasourcePylon
         @custom_fields = add_custom_fields(custom_fields)
         enable_search if searchable
         enable_count if countable
+      end
+
+      # How a collection another one points at with a ManyToOne is read in bulk:
+      # the serialized records of `ids`, indexed by id, missing ids left out.
+      #
+      # Public because the caller is the pointing collection, a different object:
+      # going through the collection rather than through the client is what keeps
+      # a related record serialized by the collection owning its shape, instead
+      # of by a second field list kept in the embedder.
+      def records_indexed_by_id(_ids)
+        raise NotImplementedError, "#{self.class} did not implement records_indexed_by_id"
       end
 
       protected
@@ -79,6 +92,33 @@ module ForestAdminDatasourcePylon
               'Clear the search or drop the id condition.'
       end
 
+      # Forest asks for an offset/limit window, Pylon hands out cursor pages: the
+      # walker bridges the two, `search_page` performs one call, and the records
+      # it collected are serialized by the collection.
+      def search_records(caller, filter)
+        pylon_filter  = build_pylon_filter(caller, filter)
+        search_text   = filter&.search
+        offset, limit = translate_page(filter&.page)
+
+        records = walker.walk(offset: offset, limit: limit) do |batch, cursor|
+          search_page(limit: batch, cursor: cursor, filter: pylon_filter, search_text: search_text)
+        end
+        records.map { |record| serialize(record) }
+      end
+
+      # One page of the walk, as a Client::SearchPage: the endpoint and its
+      # parameter names belong to the collection, the walk does not.
+      def search_page(limit:, cursor:, filter:, search_text:)
+        raise NotImplementedError, "#{self.class} did not implement search_page"
+      end
+
+      # Sliced after the lookup, not before, so ids that resolved to nothing
+      # (404) do not eat into the requested window.
+      def page_window(records, filter)
+        offset, limit = translate_page(filter&.page)
+        records[offset, limit] || []
+      end
+
       def build_pylon_filter(caller, filter)
         tree = filter&.condition_tree
         ensure_no_stray_id!(tree)
@@ -88,6 +128,26 @@ module ForestAdminDatasourcePylon
       # Overridden by collections whose endpoint can filter server-side.
       def api_filters
         {}
+      end
+
+      # An order no endpoint honours is reported rather than silently swallowed:
+      # the rows come back in whatever order the API imposes.
+      def warn_unsortable(sort)
+        return if sort.nil? || sort.empty? || default_pk_sort?(sort)
+        return if translate_sort(sort, sortable_fields).first
+
+        ForestAdminDatasourcePylon.logger.warn(unsortable_warning)
+      end
+
+      # Overridden by collections whose endpoint can sort server-side.
+      def sortable_fields
+        {}
+      end
+
+      # Overridden to name the order the endpoint imposes instead, which is what
+      # tells the operator what they got in place of the order they asked for.
+      def unsortable_warning
+        "[forest_admin_datasource_pylon] #{name} cannot honour the requested order."
       end
 
       # An unknown field silently disables sorting: a Pylon endpoint only honours
@@ -167,6 +227,10 @@ module ForestAdminDatasourcePylon
       def define_schema    = raise(NotImplementedError, "#{self.class} did not implement define_schema")
       def define_relations = raise(NotImplementedError, "#{self.class} did not implement define_relations")
 
+      def walker
+        @walker ||= Pagination::CursorWalker.new
+      end
+
       def id_values(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
         return nil unless [Operators::EQUAL, Operators::IN].include?(node.operator)
@@ -179,13 +243,17 @@ module ForestAdminDatasourcePylon
       end
 
       # An `id` the short-circuit could not take out of the tree has no
-      # translation left: Pylon filters no id server-side, and an id under an OR
-      # cannot be narrowed to a lookup because the other side of the union would
-      # bring in records the lookup never fetched. The UI does offer both an
-      # `id equals` filter and the or/and toggle, so this is worth an error an
+      # translation left: the endpoint filters no id server-side, and an id under
+      # an OR cannot be narrowed to a lookup because the other side of the union
+      # would bring in records the lookup never fetched. The UI does offer both
+      # an `id equals` filter and the or/and toggle, so this is worth an error an
       # operator can act on rather than the translator's "add it to api_filters".
+      #
+      # A collection whose endpoint does filter id declares it in `api_filters`
+      # and never short-circuits, so the translator handles its ids like any
+      # other field and there is nothing to refuse.
       def ensure_no_stray_id!(node)
-        return if node.nil?
+        return if node.nil? || api_filters.key?('id')
         return unless node.some_leaf { |leaf| leaf.field == 'id' }
 
         raise UnsupportedOperatorError,

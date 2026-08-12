@@ -10,8 +10,10 @@ module ForestAdminDatasourcePylon
         .new(aggregator, conditions)
     end
 
-    def filter(condition_tree: nil, search: nil)
-      ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree, search: search)
+    def filter(condition_tree: nil, search: nil, page: nil)
+      ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+        condition_tree: condition_tree, search: search, page: page
+      )
     end
 
     def page(offset, limit)
@@ -46,11 +48,47 @@ module ForestAdminDatasourcePylon
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
                :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?,
-               :ensure_searchless_lookup!
+               :ensure_searchless_lookup!, :search_records, :page_window, :warn_unsortable
+      end
+    end
+
+    # Implements the two hooks the read pipeline leaves to the collection: one
+    # page of the cursor walk, and the serialization of what it collected.
+    let(:searching_subclass) do
+      Class.new(subclass) do
+        attr_accessor :pages
+        attr_reader :calls
+
+        # A field the endpoint filters, so the translated filter handed to
+        # `search_page` can be observed.
+        def api_filters
+          operators = Collections::BaseCollection::Operators
+          { 'state' => { ops: { operators::EQUAL => 'equals' } } }
+        end
+
+        protected
+
+        def search_page(limit:, cursor:, filter:, search_text:)
+          @calls ||= []
+          @calls << { limit: limit, cursor: cursor, filter: filter, search_text: search_text }
+          @pages.shift || Client::SearchPage.new(records: [], next_cursor: nil)
+        end
+
+        private
+
+        def serialize(record) = record.merge('serialized' => true)
       end
     end
 
     let(:collection) { subclass.new(datasource, 'X') }
+
+    def searching(*pages)
+      searching_subclass.new(datasource, 'X').tap { |collection| collection.pages = pages }
+    end
+
+    def search_page(records, next_cursor = nil)
+      Client::SearchPage.new(records: records, next_cursor: next_cursor)
+    end
 
     describe 'subclass contract' do
       it 'raises NotImplementedError naming define_schema when the hook is missing' do
@@ -62,6 +100,17 @@ module ForestAdminDatasourcePylon
         incomplete = Class.new(described_class) { def define_schema; end }
 
         expect { incomplete.new(datasource, 'X') }.to raise_error(NotImplementedError, /define_relations/)
+      end
+
+      it 'raises NotImplementedError naming search_page when the walk reaches the endpoint hook' do
+        expect { collection.search_records(nil, filter) }.to raise_error(NotImplementedError, /search_page/)
+      end
+
+      # Reached only by a collection declaring a ManyToOne to this one: an
+      # unresolvable relation names the missing hook rather than embedding nil.
+      it 'raises NotImplementedError naming records_indexed_by_id when a relation points here' do
+        expect { collection.records_indexed_by_id(%w[uuid-1]) }
+          .to raise_error(NotImplementedError, /records_indexed_by_id/)
       end
     end
 
@@ -301,6 +350,106 @@ module ForestAdminDatasourcePylon
 
         expect { collection.build_pylon_filter(nil, filter(condition_tree: node)) }
           .to raise_error(UnsupportedOperatorError, /has to be combined with 'and' conditions only/)
+      end
+
+      # A collection whose endpoint filters id server-side never short-circuits,
+      # so there is nothing an `or` could widen: id is translated like any other
+      # field, including under an aggregator.
+      it 'translates an id the collection declares in api_filters, even inside an or' do
+        filtering = Class.new(subclass) do
+          def api_filters
+            operators = Collections::BaseCollection::Operators
+            { 'id' => { ops: { operators::EQUAL => 'equals' } },
+              'state' => { ops: { operators::EQUAL => 'equals' } } }
+          end
+        end.new(datasource, 'X')
+        node = branch('Or', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('state', operators::EQUAL, 'new')])
+
+        expect(filtering.build_pylon_filter(nil, filter(condition_tree: node))).to eq(
+          'operator' => 'or',
+          'subfilters' => [{ 'field' => 'id', 'operator' => 'equals', 'value' => 'uuid-1' },
+                           { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' }]
+        )
+      end
+    end
+
+    describe '#search_records' do
+      it 'walks a single page and serializes what it collected' do
+        collection = searching(search_page([{ 'id' => 'a' }, { 'id' => 'b' }]))
+
+        expect(collection.search_records(nil, filter))
+          .to eq([{ 'id' => 'a', 'serialized' => true }, { 'id' => 'b', 'serialized' => true }])
+        expect(collection.calls)
+          .to eq([{ limit: Client::MAX_SEARCH_LIMIT, cursor: nil, filter: nil, search_text: nil }])
+      end
+
+      # The walker asks for the window still missing and hands back the cursor of
+      # the previous page; the filter and the search stay the same throughout.
+      it 'follows the cursor until the requested window is covered' do
+        collection = searching(search_page([{ 'id' => 'a' }, { 'id' => 'b' }], 'c1'),
+                               search_page([{ 'id' => 'c' }]))
+        query = filter(condition_tree: leaf('state', operators::EQUAL, 'new'), search: 'boom', page: page(2, 1))
+
+        expect(collection.search_records(nil, query)).to eq([{ 'id' => 'c', 'serialized' => true }])
+        expect(collection.calls).to eq(
+          [{ limit: 3, cursor: nil, filter: { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' },
+             search_text: 'boom' },
+           { limit: 1, cursor: 'c1', filter: { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' },
+             search_text: 'boom' }]
+        )
+      end
+
+      it 'refuses a predicate the endpoint cannot express instead of searching unfiltered' do
+        collection = searching(search_page([{ 'id' => 'a' }]))
+
+        expect { collection.search_records(nil, filter(condition_tree: leaf('type', operators::EQUAL, 'x'))) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter on 'type'/)
+        expect(collection.calls).to be_nil
+      end
+    end
+
+    describe '#page_window' do
+      let(:records) { [{ 'id' => 'a' }, { 'id' => 'b' }, { 'id' => 'c' }] }
+
+      it 'slices the requested window out of the records' do
+        expect(collection.page_window(records, filter(page: page(1, 1)))).to eq([{ 'id' => 'b' }])
+      end
+
+      it 'returns every record when Forest asks for no page' do
+        expect(collection.page_window(records, nil)).to eq(records)
+      end
+
+      it 'reports an empty window rather than nil past the last record' do
+        expect(collection.page_window(records, filter(page: page(10, 5)))).to eq([])
+      end
+    end
+
+    describe '#warn_unsortable' do
+      before { allow(ForestAdminDatasourcePylon.logger).to receive(:warn) }
+
+      # The empty default matches an endpoint exposing no sort parameter: the
+      # order is reported instead of being silently swallowed.
+      it 'reports a chosen order the collection cannot honour, naming it' do
+        collection.warn_unsortable(sort('state'))
+
+        expect(ForestAdminDatasourcePylon.logger)
+          .to have_received(:warn).with('[forest_admin_datasource_pylon] X cannot honour the requested order.')
+      end
+
+      it 'stays quiet on no order and on the default primary-key sort the agent injects' do
+        collection.warn_unsortable(nil)
+        collection.warn_unsortable([])
+        collection.warn_unsortable(sort('id'))
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
+
+      it 'stays quiet on an order the endpoint does sort by' do
+        sorting = Class.new(subclass) { def sortable_fields = { 'state' => 'state' } }.new(datasource, 'X')
+
+        sorting.warn_unsortable(sort('state'))
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
       end
     end
 

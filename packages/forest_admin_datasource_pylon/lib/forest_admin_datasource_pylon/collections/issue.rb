@@ -3,6 +3,7 @@ module ForestAdminDatasourcePylon
     class Issue < BaseCollection
       include SchemaDefinition
       include Serializer
+      include RelationEmbedder
 
       # `/issues/search` exposes no sort parameter, so the allow-list is empty and
       # every requested order is reported instead of being silently swallowed.
@@ -22,7 +23,10 @@ module ForestAdminDatasourcePylon
       end
 
       def list(caller, filter, projection)
-        fetch_records(caller, filter).map { |record| project(record, projection) }
+        records = fetch_records(caller, filter)
+        rows = records.map { |record| project(record, projection) }
+        embed_relations(records, rows, projection)
+        rows
       end
 
       protected
@@ -41,6 +45,19 @@ module ForestAdminDatasourcePylon
         ApiFilters::CUSTOM_FIELD_OPS.keys
       end
 
+      def sortable_fields
+        PYLON_SORTABLE
+      end
+
+      def unsortable_warning
+        '[forest_admin_datasource_pylon] PylonIssue cannot honour the requested order; ' \
+          'POST /issues/search always returns issues from the most recent to the oldest.'
+      end
+
+      def search_page(limit:, cursor:, filter:, search_text:)
+        datasource.client.search_issues(limit: limit, cursor: cursor, filter: filter, search_text: search_text)
+      end
+
       private
 
       def fetch_records(caller, filter)
@@ -50,18 +67,6 @@ module ForestAdminDatasourcePylon
 
         ensure_searchless_lookup!(filter)
         page_window(records_by_id(caller, lookup), filter)
-      end
-
-      def search_records(caller, filter)
-        pylon_filter  = build_pylon_filter(caller, filter)
-        search_text   = filter&.search
-        offset, limit = translate_page(filter&.page)
-
-        issues = walker.walk(offset: offset, limit: limit) do |batch, cursor|
-          datasource.client.search_issues(limit: batch, cursor: cursor,
-                                          filter: pylon_filter, search_text: search_text)
-        end
-        issues.map { |issue| serialize(issue) }
       end
 
       # The records are already narrowed to the ids the filter asked for, so
@@ -74,13 +79,6 @@ module ForestAdminDatasourcePylon
         return records if lookup.residual.nil?
 
         lookup.residual.apply(records, self, timezone_for(caller))
-      end
-
-      # Sliced after the lookup, not before, so ids that resolved to nothing
-      # (404) do not eat into the requested window.
-      def page_window(records, filter)
-        offset, limit = translate_page(filter&.page)
-        records[offset, limit] || []
       end
 
       def fetch_by_ids(ids)
@@ -106,20 +104,6 @@ module ForestAdminDatasourcePylon
           "#{MAX_ID_LOOKUPS}: one request per id would exhaust the rate limit of the agent. " \
           'Narrow the selection to reach the records past this point.'
         )
-      end
-
-      def warn_unsortable(sort)
-        return if sort.nil? || sort.empty? || default_pk_sort?(sort)
-        return if translate_sort(sort, PYLON_SORTABLE).first
-
-        ForestAdminDatasourcePylon.logger.warn(
-          '[forest_admin_datasource_pylon] PylonIssue cannot honour the requested order; ' \
-          'POST /issues/search always returns issues from the most recent to the oldest.'
-        )
-      end
-
-      def walker
-        @walker ||= Pagination::CursorWalker.new
       end
     end
   end

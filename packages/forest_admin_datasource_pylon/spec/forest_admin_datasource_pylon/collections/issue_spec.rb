@@ -44,6 +44,11 @@ module ForestAdminDatasourcePylon
       }.merge(overrides)
     end
 
+    # Relations are fields too; the assertions on the columns select them out.
+    def columns
+      collection.fields.select { |_name, field| field.type == 'Column' }
+    end
+
     let(:datasource) { ForestAdminDatasourcePylon::Datasource.new(api_key: 'k') }
     let(:collection) { datasource.get_collection('PylonIssue') }
     let(:base) { datasource.configuration.url }
@@ -79,8 +84,8 @@ module ForestAdminDatasourcePylon
 
       # /issues/search exposes no sort parameter, and writes land in a later story.
       it 'declares every column read-only and non-sortable' do
-        expect(collection.fields.values.map(&:is_read_only).uniq).to eq([true])
-        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+        expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
       # `search_text` is native on /issues/search, while Pylon exposes neither a
@@ -113,6 +118,36 @@ module ForestAdminDatasourcePylon
            customer_portal_visible time_in_status_seconds].each do |field|
           expect(collection.fields[field].filter_operators).to eq([])
         end
+      end
+    end
+
+    describe 'relations' do
+      let(:many_to_one) { ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema }
+
+      it 'declares a ManyToOne for each of the four parties of an issue' do
+        expect(collection.fields.values_at('account', 'requester', 'assignee', 'team'))
+          .to all(be_a(many_to_one))
+      end
+
+      it 'points each one at the collection owning its shape, through the flattened foreign key' do
+        expect(collection.fields['account'])
+          .to have_attributes(foreign_collection: 'PylonAccount', foreign_key: 'account_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['requester'])
+          .to have_attributes(foreign_collection: 'PylonContact', foreign_key: 'requester_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['assignee'])
+          .to have_attributes(foreign_collection: 'PylonUser', foreign_key: 'assignee_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['team'])
+          .to have_attributes(foreign_collection: 'PylonTeam', foreign_key: 'team_id',
+                              foreign_key_target: 'id')
+      end
+
+      # The key is what `/issues/search` filters, on this side and on the reverse
+      # one, so it stays a column of its own next to the relation.
+      it 'keeps the foreign keys as columns' do
+        expect(columns.keys).to include('account_id', 'requester_id', 'assignee_id', 'team_id')
       end
     end
 

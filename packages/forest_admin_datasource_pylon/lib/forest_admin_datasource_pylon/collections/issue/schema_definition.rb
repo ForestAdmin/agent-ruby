@@ -12,8 +12,9 @@ module ForestAdminDatasourcePylon
       # column missing from that table gets no operator, so the UI never offers
       # a filter Pylon would refuse.
       module SchemaDefinition
-        ColumnSchema = BaseCollection::ColumnSchema
-        Operators    = BaseCollection::Operators
+        ColumnSchema    = BaseCollection::ColumnSchema
+        ManyToOneSchema = BaseCollection::ManyToOneSchema
+        Operators       = BaseCollection::Operators
 
         private
 
@@ -24,9 +25,23 @@ module ForestAdminDatasourcePylon
           define_time_fields
         end
 
-        # Relations are declared in a later story, once the Account / Contact /
-        # User / Team collections exist to point at.
-        def define_relations; end
+        # The four parties of an issue, each pointing at the collection owning its
+        # shape: the flattened `*_id` columns stay, as the keys the relation is
+        # read through and as the columns the search endpoint filters.
+        #
+        # RelationEmbedder resolves them at read time, in bulk. The reverse sides
+        # are declared by the collections they belong to; `/issues/search`
+        # filters every one of these keys, so they are answered server-side.
+        def define_relations
+          add_field('account', ManyToOneSchema.new(foreign_collection: 'PylonAccount',
+                                                   foreign_key: 'account_id', foreign_key_target: 'id'))
+          add_field('requester', ManyToOneSchema.new(foreign_collection: 'PylonContact',
+                                                     foreign_key: 'requester_id', foreign_key_target: 'id'))
+          add_field('assignee', ManyToOneSchema.new(foreign_collection: 'PylonUser',
+                                                    foreign_key: 'assignee_id', foreign_key_target: 'id'))
+          add_field('team', ManyToOneSchema.new(foreign_collection: 'PylonTeam',
+                                                foreign_key: 'team_id', foreign_key_target: 'id'))
+        end
 
         def define_identity_fields
           # Only equal/in: these are the two the primary-key short-circuit can
@@ -53,8 +68,9 @@ module ForestAdminDatasourcePylon
           add_column('number_of_touches', 'Number')
         end
 
-        # Flattened from the nested `{id: …}` objects Pylon returns. They stay
-        # plain columns until the story that adds the related collections.
+        # Flattened from the nested `{id: …}` objects Pylon returns, and kept as
+        # columns next to the relations they are the keys of: they are what the
+        # search endpoint filters, on this side and on the reverse one.
         def define_party_fields
           %w[account_id requester_id assignee_id team_id].each { |field| add_column(field, 'String') }
         end
