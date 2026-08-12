@@ -50,6 +50,12 @@ module ForestAdminAgent
           { name: 'charts', handler: -> { Charts::Charts.new.routes } },
           { name: 'collections', handler: -> { Capabilities::Collections.new.routes } },
           { name: 'native_query', handler: -> { Resources::NativeQuery.new.routes } },
+          # Both must come before the routes matching on `:collection_name`: Rails matches in
+          # definition order, so `/_audit-trail/correlations` would otherwise be read as
+          # `/:collection_name/:id` and 404 on a collection named `_audit-trail`. Correlation first, so
+          # `/_audit-trail/correlations` wins over the per-record `/_audit-trail/:collection_name/:id`.
+          { name: 'audit_trail_correlation', handler: -> { Resources::AuditTrailCorrelation.new.routes } },
+          { name: 'audit_trail', handler: -> { Resources::AuditTrail.new.routes } },
           { name: 'count', handler: -> { Resources::Count.new.routes } },
           { name: 'delete', handler: -> { Resources::Delete.new.routes } },
           { name: 'csv', handler: -> { Resources::Csv.new.routes } },
@@ -64,10 +70,6 @@ module ForestAdminAgent
           { name: 'dissociate_related', handler: -> { Resources::Related::DissociateRelated.new.routes } },
           { name: 'update_related', handler: -> { Resources::Related::UpdateRelated.new.routes } },
           { name: 'update_field', handler: -> { Resources::UpdateField.new.routes } },
-          # Registered before `audit_trail` so `/_audit-trail/correlation(s)` matches here instead of
-          # the per-record `/_audit-trail/:collection_name/:id` (Rails matches in definition order).
-          { name: 'audit_trail_correlation', handler: -> { Resources::AuditTrailCorrelation.new.routes } },
-          { name: 'audit_trail', handler: -> { Resources::AuditTrail.new.routes } },
           { name: 'workflow_executor_proxy', handler: -> { Workflow::WorkflowExecutorProxy.new.routes } }
         ]
 
