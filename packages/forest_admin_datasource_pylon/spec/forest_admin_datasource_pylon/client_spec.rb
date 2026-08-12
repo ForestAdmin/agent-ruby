@@ -250,6 +250,222 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  describe '#search_accounts' do
+    it 'posts the full search envelope and returns the records' do
+      stub_request(:post, "#{base}/accounts/search").to_return(json('data' => [{ 'id' => 'a1' }]))
+      filter = { 'field' => 'name', 'operator' => 'equals', 'values' => ['Acme'] }
+
+      page = client.search_accounts(limit: 2, cursor: 'c1', filter: filter, search_text: 'acme')
+
+      expect(page.records).to eq([{ 'id' => 'a1' }])
+      expect(WebMock).to have_requested(:post, "#{base}/accounts/search")
+        .with(body: { 'limit' => 2, 'cursor' => 'c1', 'filter' => filter, 'search_text' => 'acme' })
+    end
+
+    it 'omits cursor, filter and search_text when they are not provided' do
+      stub_request(:post, "#{base}/accounts/search").to_return(json('data' => []))
+
+      client.search_accounts(limit: 5, cursor: nil, filter: nil, search_text: '')
+
+      expect(WebMock).to have_requested(:post, "#{base}/accounts/search").with(body: { 'limit' => 5 })
+    end
+
+    it 'wraps a failure in an APIError naming the endpoint' do
+      body = { 'message' => 'bad filter', 'request_id' => 'req_7' }
+      stub_request(:post, "#{base}/accounts/search").to_return(json(body, 400))
+
+      expect { client.search_accounts(limit: 1) }.to raise_error(ForestAdminDatasourcePylon::APIError) { |error|
+        expect(error.status).to eq(400)
+        expect(error.message)
+          .to eq('Pylon API call failed: accounts/search: HTTP 400 bad filter (request_id: req_7)')
+      }
+    end
+  end
+
+  describe '#search_contacts' do
+    it 'posts to the contacts endpoint, clamps the limit and exposes the next cursor' do
+      stub_request(:post, "#{base}/contacts/search")
+        .to_return(json('data' => [{ 'id' => 'ct1' }], 'pagination' => { 'cursor' => 'c2', 'has_next_page' => true }))
+
+      page = client.search_contacts(limit: 99_999)
+
+      expect(page.records).to eq([{ 'id' => 'ct1' }])
+      expect(page.next_cursor).to eq('c2')
+      expect(WebMock).to have_requested(:post, "#{base}/contacts/search")
+        .with(body: { 'limit' => described_class::MAX_SEARCH_LIMIT })
+    end
+  end
+
+  describe '#list_accounts' do
+    # Unlike POST /accounts/search, the paginated GET rejects a request that
+    # does not carry a limit.
+    it 'sends the mandatory limit as a query parameter' do
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '2' })
+                                            .to_return(json('data' => [{ 'id' => 'a1' }]))
+
+      page = client.list_accounts(limit: 2)
+
+      expect(page.records).to eq([{ 'id' => 'a1' }])
+      expect(page.next_cursor).to be_nil
+    end
+
+    it 'forwards the cursor and clamps the limit' do
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '1000', 'cursor' => 'c1' })
+                                            .to_return(json('data' => []))
+
+      client.list_accounts(limit: 99_999, cursor: 'c1')
+
+      expect(WebMock).to have_requested(:get, "#{base}/accounts")
+        .with(query: { 'limit' => '1000', 'cursor' => 'c1' })
+    end
+
+    it 'omits an empty cursor' do
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '5' }).to_return(json('data' => []))
+
+      client.list_accounts(limit: 5, cursor: '')
+
+      expect(WebMock).to have_requested(:get, "#{base}/accounts").with(query: { 'limit' => '5' })
+    end
+
+    it 'exposes the cursor when a next page is advertised' do
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '1' })
+                                            .to_return(json('data' => [],
+                                                            'pagination' => {
+                                                              'cursor' => 'c2', 'has_next_page' => true
+                                                            }))
+
+      expect(client.list_accounts(limit: 1).next_cursor).to eq('c2')
+    end
+
+    it 'reports no next cursor when has_next_page is false' do
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '1' })
+                                            .to_return(json('data' => [],
+                                                            'pagination' => {
+                                                              'cursor' => 'c2', 'has_next_page' => false
+                                                            }))
+
+      expect(client.list_accounts(limit: 1).next_cursor).to be_nil
+    end
+
+    it 'wraps a failure in an APIError carrying status, body and request_id' do
+      body = { 'message' => 'limit is required', 'request_id' => 'req_9' }
+      stub_request(:get, "#{base}/accounts").with(query: { 'limit' => '1' }).to_return(json(body, 400))
+
+      expect { client.list_accounts(limit: 1) }.to raise_error(ForestAdminDatasourcePylon::APIError) { |error|
+        expect(error.status).to eq(400)
+        expect(error.body).to eq(body)
+        expect(error.message)
+          .to eq('Pylon API call failed: accounts: HTTP 400 limit is required (request_id: req_9)')
+      }
+    end
+  end
+
+  describe '#list_contacts' do
+    # The OpenAPI spec omits the query parameters of GET /contacts, but the
+    # endpoint paginates exactly like GET /accounts.
+    it 'paginates like the accounts listing' do
+      stub_request(:get, "#{base}/contacts").with(query: { 'limit' => '2', 'cursor' => 'c1' })
+                                            .to_return(json('data' => [{ 'id' => 'ct1' }],
+                                                            'pagination' => {
+                                                              'cursor' => 'c2', 'has_next_page' => true
+                                                            }))
+
+      page = client.list_contacts(limit: 2, cursor: 'c1')
+
+      expect(page.records).to eq([{ 'id' => 'ct1' }])
+      expect(page.next_cursor).to eq('c2')
+    end
+  end
+
+  describe '#fetch_account' do
+    it 'unwraps the account' do
+      stub_request(:get, "#{base}/accounts/a1").to_return(json('data' => { 'id' => 'a1', 'name' => 'Acme' }))
+
+      expect(client.fetch_account('a1')).to eq('id' => 'a1', 'name' => 'Acme')
+    end
+
+    it 'accepts an external id as well as a uuid' do
+      stub_request(:get, "#{base}/accounts/ext%2F42").to_return(json('data' => { 'id' => 'a1' }))
+
+      expect(client.fetch_account('ext/42')).to eq('id' => 'a1')
+    end
+
+    it 'wraps a missing account in a 404 APIError naming the endpoint' do
+      stub_request(:get, "#{base}/accounts/nope").to_return(json({ 'message' => 'not found' }, 404))
+
+      expect { client.fetch_account('nope') }.to raise_error(ForestAdminDatasourcePylon::APIError) { |error|
+        expect(error.status).to eq(404)
+        expect(error.message).to match(%r{accounts/nope: HTTP 404 not found})
+      }
+    end
+  end
+
+  describe '#fetch_contact' do
+    it 'unwraps the contact' do
+      stub_request(:get, "#{base}/contacts/ct1").to_return(json('data' => { 'id' => 'ct1', 'email' => 'a@b.c' }))
+
+      expect(client.fetch_contact('ct1')).to eq('id' => 'ct1', 'email' => 'a@b.c')
+    end
+  end
+
+  describe '#fetch_users' do
+    it 'includes deactivated users by default' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true' })
+                                         .to_return(json('data' => [{ 'id' => 'u1' }, { 'id' => 'u2' }]))
+
+      expect(client.fetch_users).to eq([{ 'id' => 'u1' }, { 'id' => 'u2' }])
+    end
+
+    it 'can ask for active users only' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'false' })
+                                         .to_return(json('data' => []))
+
+      client.fetch_users(include_deactivated: false)
+
+      expect(WebMock).to have_requested(:get, "#{base}/users").with(query: { 'include_deactivated' => 'false' })
+    end
+
+    it 'returns an empty array when the payload carries no data' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true' })
+                                         .to_return(json('data' => nil))
+
+      expect(client.fetch_users).to eq([])
+    end
+
+    it 'wraps a failure in an APIError naming the endpoint' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true' })
+                                         .to_return(json({ 'message' => 'boom' }, 500))
+
+      expect { client.fetch_users }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /users: HTTP 500 boom/)
+    end
+  end
+
+  describe '#fetch_user' do
+    it 'unwraps the user' do
+      stub_request(:get, "#{base}/users/u1").to_return(json('data' => { 'id' => 'u1', 'name' => 'Ada' }))
+
+      expect(client.fetch_user('u1')).to eq('id' => 'u1', 'name' => 'Ada')
+    end
+  end
+
+  describe '#fetch_teams' do
+    it 'returns every team without sending any query parameter' do
+      stub_request(:get, "#{base}/teams").to_return(json('data' => [{ 'id' => 't1' }]))
+
+      expect(client.fetch_teams).to eq([{ 'id' => 't1' }])
+      expect(WebMock).to have_requested(:get, "#{base}/teams")
+    end
+  end
+
+  describe '#fetch_team' do
+    it 'unwraps the team' do
+      stub_request(:get, "#{base}/teams/t1").to_return(json('data' => { 'id' => 't1', 'name' => 'Support' }))
+
+      expect(client.fetch_team('t1')).to eq('id' => 't1', 'name' => 'Support')
+    end
+  end
+
   describe 'rate limiting' do
     it 'retries a 429 and returns the eventual success' do
       stub_request(:get, "#{base}/me")
