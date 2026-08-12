@@ -183,6 +183,18 @@ The `correlation_key` is the agent's per-request id (`caller.request_id`), gener
 echoed back to the client in the `X-Forest-Correlation-Id` response header — so every change made in
 one request shares a key, and the caller can tie it to its own activity log.
 
+## Concurrent writes to one record
+
+The before/after values are captured around the write, not inside it: the customizer hooks bracket the
+write as separate calls, and the data layer deliberately exposes no lock or transaction primitive since
+it spans ActiveRecord, Mongoid, HTTP APIs and more.
+
+So when two writes race on the same record, both snapshot the same state and the one that lands second
+records a `previousValues` that had already been overwritten. `newValues` is always exact — it is the
+patch that was written — and no row is ever lost; only the prior state of an overlapping write can be
+stale. Exact before-images under concurrency need the database itself (triggers, or CDC), not an agent
+hook.
+
 ## Schema migrations & concurrency
 
 The table is created/evolved through an ordered, append-only migration list tracked in a dedicated

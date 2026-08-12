@@ -88,6 +88,11 @@ module ForestAdminAgent
         end
       end
 
+      # Read outside the write's transaction — hooks bracket the write as separate calls and the data layer
+      # exposes no lock, on purpose, since it spans ActiveRecord, Mongoid, HTTP APIs... So two updates
+      # racing on the same record both snapshot the same state, and the one that lands second records a
+      # `previous_values` that was already overwritten. `new_values` stays exact (it is the patch).
+      #
       # An empty snapshot on failure rather than no snapshot at all: the after hook pops unconditionally,
       # so skipping the push would pair it with an unrelated entry.
       def snapshot(context, projection)
