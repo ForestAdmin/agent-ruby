@@ -358,6 +358,7 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/collections/base_collection.rb'
+    - 'packages/forest_admin_datasource_pylon/lib/forest_admin_datasource_pylon/collections/base_collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/utils/query.rb'
