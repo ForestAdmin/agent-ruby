@@ -83,19 +83,21 @@ module ForestAdminDatasourcePylon
         records[offset, limit] || []
       end
 
-      # A record the operator can no longer reach — deleted, or outside the
-      # token's scope — reads as "no record" rather than as a failed page.
       def fetch_by_ids(ids)
         wanted = ids.first(MAX_ID_LOOKUPS)
         warn_truncated_lookup(ids.size) if ids.size > wanted.size
 
-        wanted.filter_map do |id|
-          datasource.client.fetch_issue(id)
-        rescue APIError => e
-          raise unless e.status == 404
+        wanted.filter_map { |id| fetch_issue(id) }
+      end
 
-          nil
-        end
+      # A record the operator can no longer reach — deleted, or outside the
+      # token's scope — reads as "no record" rather than as a failed page.
+      def fetch_issue(id)
+        datasource.client.fetch_issue(id)
+      rescue APIError => e
+        raise unless e.status == 404
+
+        nil
       end
 
       def warn_truncated_lookup(asked)
