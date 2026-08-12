@@ -139,7 +139,6 @@ module ForestAdminAgent
           capture.record(
             caller: context.caller,
             collection: context.collection.name,
-            action_name: @action_name,
             form_values: data,
             record_ids: audited_record_ids(args, context),
             failed: failed

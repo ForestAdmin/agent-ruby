@@ -28,18 +28,15 @@ module ForestAdminAgent
         store.append(record)
 
         expect(store.send(:model).column_names.sort).to eq(
-          %w[action_name collection correlation_key id new_values operation previous_values record_id
-             timestamp user_id]
+          %w[collection correlation_key id new_values operation previous_values record_id timestamp user_id]
         )
       end
 
-      it 'persists the action name of a smart-action row' do
-        store.append(record(operation: 'action', action_name: 'Refund', previous_values: {},
-                            new_values: { 'amount' => 30 }))
+      it 'persists a smart-action row, form values included' do
+        store.append(record(operation: 'action', previous_values: {}, new_values: { 'amount' => 30 }))
 
         audit = store.list_by_record(collection: 'accounts', record_id: '1').first
         expect(audit.operation).to eq('action')
-        expect(audit.action_name).to eq('Refund')
         expect(audit.new_values).to eq({ 'amount' => 30 })
       end
 
@@ -129,8 +126,7 @@ module ForestAdminAgent
 
         names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
         expect(names).to eq(
-          ['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation',
-           'audit_logs:003-add-action-name']
+          ['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation']
         )
       end
 

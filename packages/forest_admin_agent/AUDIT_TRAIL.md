@@ -140,12 +140,14 @@ the store. A missing `collection` or `recordId` returns **HTTP 400** (`Validatio
 
 Running a smart action writes one row per selected record, in the same table:
 
-| column       | value                                                                     |
-| ------------ | ------------------------------------------------------------------------- |
-| `operation`  | `action` when it ran, `action_failed` when it raised                      |
-| `actionName` | the action's name                                                         |
-| `newValues`  | the submitted form values (redacted with the same `redact` config)        |
-| `recordId`   | each selected record — empty for a global action or a select-all selection |
+| column      | value                                                                      |
+| ----------- | -------------------------------------------------------------------------- |
+| `operation` | `action` when it ran, `action_failed` when it raised                       |
+| `newValues` | the submitted form values (redacted with the same `redact` config)          |
+| `recordId`  | each selected record — empty for a global action or a select-all selection  |
+
+**Which** action ran is not stored: the Forest activity logs already record it, and
+`correlationKey` is the join between the two.
 
 A **global** action targets no record, and a **select-all** selection only tells the agent which ids were
 *excluded*, so naming the targets would mean querying the whole selection: those runs are recorded once,
@@ -170,7 +172,6 @@ breaking the action.
 | `record_id`       | packed record id (primary keys joined by `\|`)              |
 | `user_id`         | the Forest user who made the change                         |
 | `correlation_key` | per-request id; groups every change made within one request |
-| `action_name`     | smart-action rows only: the action that was run              |
 | `previous_values` | values before the change (JSON)                             |
 | `new_values`      | values after the change (JSON)                              |
 

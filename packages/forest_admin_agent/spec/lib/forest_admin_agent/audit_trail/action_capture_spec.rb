@@ -20,7 +20,7 @@ module ForestAdminAgent
       let(:caller_double) { double('caller', id: 42, request_id: 'req-xyz') }
 
       def record(capture: described_class.new(store), **over)
-        invocation = { caller: caller_double, collection: 'orders', action_name: 'Refund',
+        invocation = { caller: caller_double, collection: 'orders',
                        form_values: { 'amount' => 30, 'reason' => 'damaged' }, record_ids: ['4'] }
         invocation.update(over)
 
@@ -32,7 +32,6 @@ module ForestAdminAgent
         audit = record.last
 
         expect(audit.operation).to eq('action')
-        expect(audit.action_name).to eq('Refund')
         expect(audit.collection).to eq('orders')
         expect(audit.record_id).to eq('4')
         expect(audit.user_id).to eq(42)

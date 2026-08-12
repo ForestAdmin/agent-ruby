@@ -5,7 +5,8 @@ module ForestAdminAgent
     # {Capture} cannot see them: the customizer has no `Execute` hook, and an action's writes are only
     # audited when it goes through the Forest data layer — a direct ORM write (`Customer.find(id).update!`)
     # is invisible to the agent and is therefore not recorded at all. What lands here is the invocation
-    # itself: who ran which action, on which records, with which form values, and whether it raised.
+    # itself: on which records, with which form values, and whether it raised. Which action it was lives in
+    # the Forest activity logs — `correlation_key` is the join.
     class ActionCapture
       include Recording
 
@@ -20,7 +21,7 @@ module ForestAdminAgent
         @redact = redact || {}
       end
 
-      def record(caller:, collection:, action_name:, form_values:, record_ids:, failed: false)
+      def record(caller:, collection:, form_values:, record_ids:, failed: false)
         timestamp = now
         correlation_key = correlation_key_for(caller)
         values = redact(form_values || {}, @redact[collection] || [])
@@ -33,7 +34,6 @@ module ForestAdminAgent
               operation: failed ? FAILED : EXECUTED,
               collection: collection,
               record_id: record_id,
-              action_name: action_name,
               user_id: caller&.id,
               correlation_key: correlation_key,
               previous_values: {},
