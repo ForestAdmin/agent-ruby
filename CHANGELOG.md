@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.4...v1.38.0) (2026-08-12)
+
+
+### Features
+
+* **agent:** accept the Forest-Projection header on record routes ([#352](https://github.com/ForestAdmin/agent-ruby/issues/352)) ([ff25d09](https://github.com/ForestAdmin/agent-ruby/commit/ff25d09171325458441a80bcfa304b9cb12eb1b1)), closes [#1813](https://github.com/ForestAdmin/agent-ruby/issues/1813) [#1822](https://github.com/ForestAdmin/agent-ruby/issues/1822)
+
 ## [1.37.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.3...v1.37.4) (2026-08-11)
 
 
