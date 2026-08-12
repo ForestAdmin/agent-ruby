@@ -458,6 +458,7 @@ RSpec/VerifiedDoubles:
   Exclude:
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/audit_trail/action_capture_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/audit_trail/capture_spec.rb'
+    - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/audit_trail/sql/migrator_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/action/actions_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/audit_trail_spec.rb'
     - 'packages/forest_admin_agent/spec/lib/forest_admin_agent/routes/resources/audit_trail_correlation_spec.rb'

@@ -40,6 +40,46 @@ module ForestAdminAgent
           expect(audited_ids({ ids: ['4'], all_records: true, all_records_ids_excluded: ['9'] })).to eq([])
         end
 
+        describe 'auditing the run' do
+          let(:store) { double('store', append: nil) }
+          let(:context) { double('context', collection: collection, caller: build_caller) }
+          let(:args) { { params: { data: { attributes: { ids: %w[4 7] } } } } }
+
+          before do
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
+              .and_return({ audit_trail: { store: store, redact: { 'orders' => ['reason'] } } })
+          end
+
+          def execute(result: 'ok', &raising)
+            allow(collection).to receive(:execute, &(raising || proc { result }))
+            route.send(:execute_and_audit, context, args, { 'amount' => 30, 'reason' => 'damaged' }, nil)
+          end
+
+          it 'records one row per selected record and returns the action result' do
+            expect(execute).to eq('ok')
+
+            expect(store).to have_received(:append).twice
+            expect(store).to have_received(:append).with(
+              having_attributes(operation: 'action', collection: 'orders', record_id: '4',
+                                new_values: { 'amount' => 30, 'reason' => '[redacted]' })
+            )
+          end
+
+          it 'records the attempt and re-raises when the action fails' do
+            expect { execute { raise StandardError, 'boom' } }.to raise_error(StandardError, 'boom')
+
+            expect(store).to have_received(:append)
+              .with(having_attributes(operation: 'action_failed', record_id: '4')).once
+          end
+
+          it 'records nothing when no audit database is configured' do
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({})
+
+            expect(execute).to eq('ok')
+            expect(store).not_to have_received(:append)
+          end
+        end
+
         context 'with a global action' do
           let(:action_scope) { ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL }
 

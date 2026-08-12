@@ -21,25 +21,30 @@ module ForestAdminAgent
         @redact = redact || {}
       end
 
+      # No-op unless an audit database was configured, and best-effort: the action has already run.
       def record(caller:, collection:, form_values:, record_ids:, failed: false)
-        timestamp = now
-        correlation_key = correlation_key_for(caller)
-        values = redact(form_values || {}, @redact[collection] || [])
-        ids = record_ids.empty? ? [NO_RECORD] : record_ids
+        return unless @store
 
-        ids.each do |record_id|
-          @store.append(
-            AuditRecord.new(
-              timestamp: timestamp,
-              operation: failed ? FAILED : EXECUTED,
-              collection: collection,
-              record_id: record_id,
-              user_id: caller&.id,
-              correlation_key: correlation_key,
-              previous_values: {},
-              new_values: values
+        audit_safely do
+          timestamp = now
+          correlation_key = correlation_key_for(caller)
+          values = redact(form_values || {}, @redact[collection] || [])
+          ids = record_ids.empty? ? [NO_RECORD] : record_ids
+
+          ids.each do |record_id|
+            @store.append(
+              AuditRecord.new(
+                timestamp: timestamp,
+                operation: failed ? FAILED : EXECUTED,
+                collection: collection,
+                record_id: record_id,
+                user_id: caller&.id,
+                correlation_key: correlation_key,
+                previous_values: {},
+                new_values: values
+              )
             )
-          )
+          end
         end
       end
     end

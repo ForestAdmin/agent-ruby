@@ -118,7 +118,6 @@ module ForestAdminAgent
         private
 
         # A failed run is worth recording too: "who tried to run this" is usually the interesting part.
-        # The audit row is best-effort — a broken audit database must not fail the action itself.
         def execute_and_audit(context, args, data, filter)
           result = context.collection.execute(context.caller, @action_name, data, filter)
           audit_action(context, args, data)
@@ -130,12 +129,10 @@ module ForestAdminAgent
         end
 
         def audit_action(context, args, data, failed: false)
-          store = ForestAdminAgent::AuditTrail.store
-          return unless store
-
           capture = ForestAdminAgent::AuditTrail::ActionCapture.new(
-            store, ForestAdminAgent::AuditTrail.options[:redact]
+            ForestAdminAgent::AuditTrail.store, ForestAdminAgent::AuditTrail.options[:redact]
           )
+
           capture.record(
             caller: context.caller,
             collection: context.collection.name,
@@ -143,8 +140,6 @@ module ForestAdminAgent
             record_ids: audited_record_ids(args, context),
             failed: failed
           )
-        rescue StandardError => e
-          Facades::Container.logger.log('Error', "[ForestAdmin] Could not audit action: #{e.message}")
         end
 
         # Packed ids, the form the audit store keys on. A global action targets nothing, and a select-all

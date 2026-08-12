@@ -25,6 +25,17 @@ module ForestAdminAgent
       def now
         Time.now.utc.iso8601(3)
       end
+
+      # Auditing must never take the request down with it. By the time a change is recorded the write has
+      # already happened, so raising would report a failure for an operation that succeeded (and invite a
+      # retry that duplicates it); a snapshot read failing must not block the write either. Losing the row
+      # is the lesser evil, so it is logged and dropped.
+      def audit_safely
+        yield
+      rescue StandardError => e
+        Facades::Container.logger.log('Error', "[ForestAdmin] Audit trail unavailable, skipping: #{e.message}")
+        nil
+      end
     end
   end
 end

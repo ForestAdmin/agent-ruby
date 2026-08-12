@@ -68,6 +68,21 @@ module ForestAdminAgent
         expect(audit.new_values).to eq({ 'amount' => 30, 'reason' => Recording::REDACTED })
       end
 
+      it 'does nothing without a configured store' do
+        expect { record(capture: described_class.new(nil)) }.not_to raise_error
+      end
+
+      # The action already ran: reporting a failure for it because the audit database is down would be
+      # worse than losing the row.
+      it 'logs and swallows a store failure instead of breaking the action' do
+        logger = instance_spy(Services::LoggerService)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+        allow(store).to receive(:append).and_raise(StandardError, 'audit db is down')
+
+        expect { record }.not_to raise_error
+        expect(logger).to have_received(:log).with('Error', /audit db is down/)
+      end
+
       it 'falls back to a generated correlation key when the caller carries none' do
         audit = record(caller: double('caller', id: 42, request_id: nil)).last
 

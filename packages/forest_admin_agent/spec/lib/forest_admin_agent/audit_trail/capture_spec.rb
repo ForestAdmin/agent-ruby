@@ -156,6 +156,31 @@ module ForestAdminAgent
         expect(audit.new_values).to eq({})
       end
 
+      # The write already happened when the after hook runs, so a broken audit database must not turn a
+      # successful change into a client-visible error.
+      it 'logs and swallows a store failure instead of failing the write' do
+        logger = instance_spy(Services::LoggerService)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+        allow(store).to receive(:append).and_raise(StandardError, 'audit db is down')
+
+        expect do
+          hooks['After_Create'].call(double('ctx', caller: caller_double, record: { 'id' => 1, 'name' => 'Acme' }))
+        end.not_to raise_error
+        expect(logger).to have_received(:log).with('Error', /audit db is down/)
+      end
+
+      it 'does not block the write when the before-hook snapshot cannot be read' do
+        logger = instance_spy(Services::LoggerService)
+        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+        allow(relaxed_collection).to receive(:list).and_raise(StandardError, 'read failed')
+
+        expect do
+          before_hook('Update', patch: { 'name' => 'Z' })
+          after_hook('Update')
+        end.not_to raise_error
+        expect(store.records).to be_empty
+      end
+
       it 'masks redacted fields while still recording the change' do
         described_class.new.run(datasource_customizer, nil, store: store, redact: { 'companies' => ['name'] })
 

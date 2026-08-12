@@ -53,7 +53,7 @@ module ForestAdminAgent
         collection_customizer.add_hook('Before', 'Update') do |context|
           # Snapshot the patch here: installed last, this hook sees what actually gets written, while
           # the after-context is handed the original patch the caller sent.
-          push_snapshot(records: context.collection.list(context.filter, projection), patch: context.patch)
+          push_snapshot(records: snapshot(context, projection), patch: context.patch)
         end
 
         collection_customizer.add_hook('After', 'Update') do |context|
@@ -73,7 +73,7 @@ module ForestAdminAgent
 
       def add_delete_hooks(collection_customizer, columns, primary_keys, name, projection)
         collection_customizer.add_hook('Before', 'Delete') do |context|
-          push_snapshot(records: context.collection.list(context.filter, projection))
+          push_snapshot(records: snapshot(context, projection))
         end
 
         collection_customizer.add_hook('After', 'Delete') do |context|
@@ -86,6 +86,12 @@ module ForestAdminAgent
             )
           end
         end
+      end
+
+      # An empty snapshot on failure rather than no snapshot at all: the after hook pops unconditionally,
+      # so skipping the push would pair it with an unrelated entry.
+      def snapshot(context, projection)
+        audit_safely { context.collection.list(context.filter, projection) } || []
       end
 
       # Snapshots taken in a "before" hook and consumed in the matching "after" hook. Both bracket one
@@ -104,18 +110,20 @@ module ForestAdminAgent
       def emit(caller, operation, collection, record_id, previous_values, new_values)
         redacted = @redact[collection] || []
 
-        @store.append(
-          AuditRecord.new(
-            timestamp: now,
-            operation: operation,
-            collection: collection,
-            record_id: record_id,
-            user_id: caller&.id,
-            correlation_key: correlation_key_for(caller),
-            previous_values: redact(previous_values, redacted),
-            new_values: redact(new_values, redacted)
+        audit_safely do
+          @store.append(
+            AuditRecord.new(
+              timestamp: now,
+              operation: operation,
+              collection: collection,
+              record_id: record_id,
+              user_id: caller&.id,
+              correlation_key: correlation_key_for(caller),
+              previous_values: redact(previous_values, redacted),
+              new_values: redact(new_values, redacted)
+            )
           )
-        )
+        end
       end
 
       def record_id(record, primary_keys)

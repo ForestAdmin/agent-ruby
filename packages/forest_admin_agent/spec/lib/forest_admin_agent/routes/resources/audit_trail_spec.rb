@@ -52,7 +52,10 @@ module ForestAdminAgent
           entry = { operation: 'update', record_id: '4', previous_values: { 'first_name' => 'Jo' } }
           route = route_with_store(records: [double('entry', to_h: entry)])
 
-          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+          # Through the registered closure rather than the handler, so the wiring is covered too.
+          result = route.routes['forest_audit_trail'][:closure].call(
+            { headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } }
+          )
 
           expect(store).to have_received(:list_by_record).with(
             collection: 'projects', record_id: '4', skip: 0, limit: 20, order: 'desc'
@@ -153,6 +156,42 @@ module ForestAdminAgent
 
           # 2026-01-02 00:00 in New York (UTC-5) is 05:00 UTC.
           expect(store).to have_received(:list_by_record).with(hash_including(start_timestamp: '2026-01-02T05:00:00.000Z'))
+        end
+
+        it 'reads a wall-clock datetime, completing a minutes-only end boundary to :59.999' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'startDate' => '2026-01-02T08:30', 'endDate' => '2026-01-02 09:30' } })
+
+          expect(store).to have_received(:list_by_record).with(
+            hash_including(start_timestamp: '2026-01-02T08:30:00.000Z',
+                           end_timestamp: '2026-01-02T09:30:59.999Z')
+          )
+        end
+
+        it 'keeps explicit seconds as given on both bounds' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'startDate' => '2026-01-02T08:30:15',
+                                           'endDate' => '2026-01-02T09:30:45' } })
+
+          expect(store).to have_received(:list_by_record).with(
+            hash_including(start_timestamp: '2026-01-02T08:30:15.000Z',
+                           end_timestamp: '2026-01-02T09:30:45.000Z')
+          )
+        end
+
+        # Right shape, impossible instant: the regex accepts it, the zone refuses to parse it.
+        it 'rejects a well-formed datetime that is out of range' do
+          route = route_with_store
+
+          expect do
+            route.handle_request({ headers: {},
+                                   params: { 'collection_name' => 'projects', 'id' => '4',
+                                             'startDate' => '2026-01-02T99:00' } })
+          end.to raise_error(Http::Exceptions::ValidationError, /Invalid date/)
         end
 
         it 'rejects an unparsable date' do

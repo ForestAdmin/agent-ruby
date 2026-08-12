@@ -70,7 +70,8 @@ module ForestAdminAgent
           entry = { operation: 'update', record_id: '2', new_values: { 'first_name' => 'Jo' } }
           route = route_with_store(history: [double('entry', to_h: entry)])
 
-          result = route.handle_history(
+          # Through the registered closure rather than the handler, so the wiring is covered too.
+          result = route.routes['forest_audit_trail_correlation'][:closure].call(
             { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }
           )
 
@@ -86,7 +87,7 @@ module ForestAdminAgent
         it 'reads a batch history from comma-separated query keys (GET)' do
           route = route_with_store(history: [double('entry', to_h: { operation: 'update' })])
 
-          route.handle_batch(
+          route.routes['forest_audit_trail_correlations'][:closure].call(
             { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlationKeys' => 'a, b' } }
           )
 
@@ -98,7 +99,7 @@ module ForestAdminAgent
         it 'reads a batch history from a body array (POST)' do
           route = route_with_store
 
-          route.handle_batch(
+          route.routes['forest_audit_trail_correlations_batch'][:closure].call(
             { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlationKeys' => %w[a b] } }
           )
 
@@ -114,6 +115,40 @@ module ForestAdminAgent
 
           expect(store).not_to have_received(:list_by_correlations)
           expect(result[:content]).to eq({ data: [] })
+        end
+
+        it 'answers 404 for a collection the datasource does not know' do
+          route = route_with_store
+          datasource = double('datasource')
+          allow(datasource).to receive(:get_collection).with('ghosts')
+                                                       .and_raise(ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                                                                  "Collection 'ghosts' not found")
+          allow(route).to receive(:build).and_return(
+            double('context', datasource: datasource, caller: build_caller, permissions: permissions)
+          )
+
+          expect do
+            route.handle_history(
+              { headers: {}, params: { 'collection' => 'ghosts', 'recordId' => '2', 'correlation_key' => 'req-1' } }
+            )
+          end.to raise_error(Http::Exceptions::NotFoundError, /not found/)
+        end
+
+        it 'passes through a datasource error that is not a missing collection' do
+          route = route_with_store
+          datasource = double('datasource')
+          allow(datasource).to receive(:get_collection).with('books')
+                                                       .and_raise(ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                                                                  'connection lost')
+          allow(route).to receive(:build).and_return(
+            double('context', datasource: datasource, caller: build_caller, permissions: permissions)
+          )
+
+          expect do
+            route.handle_history(
+              { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }
+            )
+          end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /connection lost/)
         end
 
         it 'rejects a missing collection' do
