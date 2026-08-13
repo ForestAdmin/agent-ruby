@@ -1,3 +1,10 @@
+## [1.38.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.1...v1.38.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **agent:** authorize associate-related on the foreign collection and scope the many-to-many link ([#356](https://github.com/ForestAdmin/agent-ruby/issues/356)) ([2f618b9](https://github.com/ForestAdmin/agent-ruby/commit/2f618b96eabca2b70392792dcedc744809a16282)), closes [#350](https://github.com/ForestAdmin/agent-ruby/issues/350)
+
 ## [1.38.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.0...v1.38.1) (2026-08-13)
 
 
