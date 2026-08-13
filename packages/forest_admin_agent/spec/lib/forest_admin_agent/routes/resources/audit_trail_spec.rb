@@ -17,7 +17,8 @@ module ForestAdminAgent
                 'id' => ColumnSchema.new(
                   column_type: 'Number', is_primary_key: true,
                   filter_operators: [Operators::IN, Operators::EQUAL]
-                )
+                ),
+                'status' => ColumnSchema.new(column_type: 'String')
               }
             },
             list: [{ 'id' => 4 }]
@@ -40,7 +41,7 @@ module ForestAdminAgent
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
               .and_return({ audit_trail: { store: store } })
             allow(store).to receive(:list_since).and_return(entries)
-            allow(collection).to receive(:list).and_return([{ 'id' => 4 }], [record].compact)
+            allow(collection).to receive(:list).and_return([record].compact)
 
             route = described_class.new
             context = double('context', collection: collection, caller: build_caller, permissions: permissions)
@@ -77,6 +78,42 @@ module ForestAdminAgent
 
             expect(result[:content][:data]).to eq({ 'id' => 4, 'status' => 'paid' })
             expect(result[:content][:meta]).to eq({ timestamp: '2026-01-02T10:00:00.000Z', reverted: 1 })
+          end
+
+          # Authorization and read are one query: a scoped check followed by an unscoped read would hand
+          # back a row the check never covered.
+          it 'reads the record through the caller scope, in a single query' do
+            scope = Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4)
+            allow(permissions).to receive(:get_scope).and_return(scope)
+            route = state_route
+
+            get_state(route)
+
+            expect(collection).to have_received(:list).once
+            expect(collection).to have_received(:list) do |_caller, filter, projection|
+              expect(filter.condition_tree.conditions).to include(scope)
+              expect(projection).to include('status')
+            end
+          end
+
+          it 'refuses a record that exists outside the caller scope' do
+            allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id',
+                                                                                              Operators::EQUAL, 9))
+            route = state_route(record: nil)
+            # Nothing in scope, but the record does exist without it: someone else's.
+            allow(collection).to receive(:list).and_return([], [{ 'id' => 4 }])
+
+            expect { get_state(route) }.to raise_error(Http::Exceptions::NotFoundError)
+            expect(store).not_to have_received(:list_since)
+          end
+
+          it 'rebuilds a deleted record from its history' do
+            allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id',
+                                                                                              Operators::EQUAL, 4))
+            route = state_route(entries: [entry('delete', { 'status' => 'shipped' }, {})], record: nil)
+            allow(collection).to receive(:list).and_return([], [])
+
+            expect(get_state(route)[:content][:data]).to eq({ 'status' => 'shipped' })
           end
 
           # Strictly after the requested instant: an entry stamped exactly at it belongs to that state.

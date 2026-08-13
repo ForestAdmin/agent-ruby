@@ -64,14 +64,16 @@ module ForestAdminAgent
         def handle_state(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
-          assert_record_in_scope(context, context.collection, args[:params]['id'])
+          # Authorizes and reads in one query: the record it hands back is the one the scope covered.
+          current = scoped_record(
+            context, context.collection, args[:params]['id'], column_projection(context.collection)
+          )
 
           timestamp = parse_state_timestamp(args)
           entries = store.list_since(
             collection: context.collection.name, record_id: args[:params]['id'], timestamp: timestamp
           )
           # Fully qualified: inside this class, `AuditTrail` is the route itself.
-          current = current_record(context, context.collection, args[:params]['id'])
           state = ::ForestAdminAgent::AuditTrail::RecordState.at(current, entries)
 
           {

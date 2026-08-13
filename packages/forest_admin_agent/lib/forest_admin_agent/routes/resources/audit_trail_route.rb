@@ -10,18 +10,29 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Components::Query
 
         def assert_record_in_scope(context, collection, packed_id)
+          scoped_record(context, collection, packed_id)
+
+          nil
+        end
+
+        # The record as it stands, read through the caller's permission scope. nil when it no longer exists
+        # — a deleted record keeps its history readable, which is much of the point of an audit trail — and
+        # a 404 when it does exist outside that scope.
+        #
+        # Authorizing and reading are the same query on purpose: a scoped check followed by an unscoped read
+        # would hand back a row the check never covered, the moment the two drifted apart.
+        def scoped_record(context, collection, packed_id, projection = nil)
           condition = ConditionTree::ConditionTreeFactory.match_records(
             collection, [Utils::Id.unpack_id(collection, packed_id, with_key: true)]
           )
           scope = context.permissions.get_scope(collection)
+          in_scope = ConditionTree::ConditionTreeFactory.intersect([condition, scope])
+          record = first_record(context, collection, in_scope, projection || key_projection(collection))
 
-          return if any_record?(context, collection, ConditionTree::ConditionTreeFactory.intersect([condition, scope]))
-
-          # Nothing in scope means the record is either outside it or gone for good. A deleted record
-          # keeps its history readable — inspecting what was deleted is much of the point of an audit
-          # trail — so only a record that still exists outside the scope is refused. Without a scope
-          # the first query already answered the question.
-          return if scope.nil? || !any_record?(context, collection, condition)
+          return record if record
+          # Nothing in scope: either gone for good, or someone else's record. Without a scope the query
+          # above already answered the question.
+          return nil if scope.nil? || first_record(context, collection, condition, key_projection(collection)).nil?
 
           raise Http::Exceptions::NotFoundError, 'Record does not exists'
         end
@@ -35,24 +46,17 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
-        # The audited columns as they stand now — the starting point of a state reconstruction. No scope in
-        # the filter: the caller was already authorized against it, and a record that is simply gone has to
-        # come back as nil so the history can restore it.
-        def current_record(context, collection, packed_id)
-          columns = collection.schema[:fields].select { |_name, field| field.type == 'Column' }.keys
-          condition = ConditionTree::ConditionTreeFactory.match_records(
-            collection, [Utils::Id.unpack_id(collection, packed_id, with_key: true)]
-          )
-
-          collection.list(context.caller, Filter.new(condition_tree: condition), Projection.new(columns)).first
+        # Every column, the starting point of a state reconstruction.
+        def column_projection(collection)
+          Projection.new(collection.schema[:fields].select { |_name, field| field.type == 'Column' }.keys)
         end
 
-        def any_record?(context, collection, condition_tree)
-          collection.list(
-            context.caller,
-            Filter.new(condition_tree: condition_tree),
-            Projection.new(ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection))
-          ).any?
+        def key_projection(collection)
+          Projection.new(ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection))
+        end
+
+        def first_record(context, collection, condition_tree, projection)
+          collection.list(context.caller, Filter.new(condition_tree: condition_tree), projection).first
         end
       end
     end
