@@ -189,6 +189,94 @@ module ForestAdminAgent
             end
           end
         end
+
+        describe ListRelated, 'with a projection deeper than one relation' do
+          include_context 'with caller'
+          subject(:list) { described_class.new }
+          let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer, 'HTTP_FOREST_PROJECTION' => 'label,owner:company:name' },
+              params: {
+                'collection_name' => 'user',
+                'relation_name' => 'categories',
+                'id' => 1,
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          before do
+            datasource = Datasource.new
+            datasource.add_collection(
+              build_collection(
+                name: 'company',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'name' => ColumnSchema.new(column_type: 'String')
+                } }
+              )
+            )
+            datasource.add_collection(
+              build_collection(
+                name: 'owner',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'company_id' => ColumnSchema.new(column_type: 'Number'),
+                  'company' => Relations::ManyToOneSchema.new(foreign_key: 'company_id',
+                                                              foreign_key_target: 'id',
+                                                              foreign_collection: 'company')
+                } }
+              )
+            )
+            datasource.add_collection(
+              build_collection(
+                name: 'category',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'label' => ColumnSchema.new(column_type: 'String'),
+                  'user_id' => ColumnSchema.new(column_type: 'Number'),
+                  'owner_id' => ColumnSchema.new(column_type: 'Number'),
+                  'owner' => Relations::ManyToOneSchema.new(foreign_key: 'owner_id',
+                                                            foreign_key_target: 'id',
+                                                            foreign_collection: 'owner')
+                } }
+              )
+            )
+            datasource.add_collection(
+              build_collection(
+                name: 'user',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'categories' => Relations::OneToManySchema.new(origin_key: 'user_id',
+                                                                 origin_key_target: 'id',
+                                                                 foreign_collection: 'category')
+                } }
+              )
+            )
+
+            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+            allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+            allow(permissions).to receive_messages(can?: true, get_scope: nil)
+            allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return(
+              [{ 'id' => 5, 'label' => 'active',
+                 'owner' => { 'id' => 50, 'company' => { 'id' => 500, 'name' => 'Gnome Press' } } }]
+            )
+          end
+
+          context 'when the projection goes through more than one relation' do
+            it 'serializes the record at the end of the path' do
+              result = list.handle_request(args)
+
+              included = result[:content]['included']
+              expect(included.map { |resource| resource['type'] }).to contain_exactly('owner', 'company')
+              expect(included.find { |resource| resource['type'] == 'company' }['attributes']['name'])
+                .to eq('Gnome Press')
+            end
+          end
+        end
       end
     end
   end

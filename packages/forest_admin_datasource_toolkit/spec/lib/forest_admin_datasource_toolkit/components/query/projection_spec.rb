@@ -102,6 +102,42 @@ module ForestAdminDatasourceToolkit
           end
         end
 
+        describe 'relation_include_paths' do
+          it 'returns an empty list when the projection has no relation' do
+            projection = described_class.new(%w[id name])
+
+            expect(projection.relation_include_paths).to eq([])
+          end
+
+          it 'returns the relation when the projection is one hop deep' do
+            projection = described_class.new(%w[id name category:label])
+
+            expect(projection.relation_include_paths).to eq(['category'])
+          end
+
+          it 'returns every intermediate hop when the projection is more than one hop deep' do
+            projection = described_class.new(%w[id name category:owner:country:code])
+
+            expect(projection.relation_include_paths).to eq(
+              ['category', 'category.owner', 'category.owner.country']
+            )
+          end
+
+          it 'does not duplicate a hop shared by several deep paths' do
+            projection = described_class.new(%w[category:label category:owner:name category:owner:country:code])
+
+            expect(projection.relation_include_paths).to eq(
+              ['category', 'category.owner', 'category.owner.country']
+            )
+          end
+
+          it 'returns the relation itself for the wildcard projection of a polymorphic relation' do
+            projection = described_class.new(%w[id polymorphic_relation:*])
+
+            expect(projection.relation_include_paths).to eq(['polymorphic_relation'])
+          end
+        end
+
         describe 'apply' do
           it 're_projects a list of records' do
             projection = described_class.new(%w[id name author:name other:id])

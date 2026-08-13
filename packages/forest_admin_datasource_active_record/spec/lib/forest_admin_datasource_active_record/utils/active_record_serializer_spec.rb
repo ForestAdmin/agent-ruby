@@ -55,5 +55,38 @@ module ForestAdminDatasourceActiveRecord
         expect(result.find { |r| r['id'] == account.id }['note']['notable_type']).to eq('Api::Topic')
       end
     end
+
+    describe 'a polymorphic relation nested under another relation', :db_truncation do
+      let(:datasource) do
+        Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }, support_polymorphic_relations: true)
+      end
+
+      before do
+        Address.delete_all
+        User.delete_all
+        Car.unscoped.delete_all
+        Category.delete_all
+        car = Car.unscoped.create!(id: 11, reference: 'CAR11', category: Category.create!(label: 'Compact'))
+        @user = User.create!(first_name: 'Alice', last_name: 'Smith', car: car)
+        Address.create!(addressable: @user, street: '1 rue de la Paix')
+      end
+
+      it 'carries the type and foreign key that the linkage of the phantom target is rebuilt from' do
+        projection = Projection.new(['id', 'address:addressable:*', 'address:addressable_type',
+                                     'address:addressable_id'])
+
+        result = datasource.get_collection('User').list(nil, Filter.new, projection)
+
+        expect(result.first['address']).to include(
+          'addressable_type' => 'User', 'addressable_id' => @user.id, 'addressable' => { '*' => nil }
+        )
+      end
+
+      it 'hydrates a plain field through a polymorphic one-to-one hop' do
+        result = datasource.get_collection('User').list(nil, Filter.new, Projection.new(['id', 'address:street']))
+
+        expect(result.first['address']['street']).to eq('1 rue de la Paix')
+      end
+    end
   end
 end

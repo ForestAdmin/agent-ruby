@@ -9,6 +9,7 @@ module ForestAdminAgent
 
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
+      POLYMORPHIC_TARGET_WILDCARD = '*'.freeze
 
       def self.parse_condition_tree(collection, args)
         filters = begin
@@ -110,18 +111,56 @@ module ForestAdminAgent
         root_field_names_with_types = root_field_names.dup
         add_polymorphic_type_fields(collection, root_field_names_with_types)
 
-        projection_fields = requested_paths.map do |path|
-          field_name, nested_path = path.split(':', 2)
-          field = get_field(collection, field_name)
+        projection_fields = requested_paths.map { |path| expand_polymorphic_leaf(collection, path) }
 
-          if field.type == 'PolymorphicManyToOne' && (nested_path.nil? || nested_path == '*')
-            "#{field_name}:*"
-          else
-            path
-          end
+        projection_fields |
+          (root_field_names_with_types - root_field_names) |
+          nested_polymorphic_linkage_fields(collection, projection_fields)
+      end
+
+      def self.expand_polymorphic_leaf(collection, path)
+        segments = path.split(':')
+        leaf_index = segments.size - 1
+
+        each_field_along_path(collection, segments) do |field, index|
+          return "#{path}:#{POLYMORPHIC_TARGET_WILDCARD}" if polymorphic_many_to_one?(field) && index == leaf_index
         end
 
-        projection_fields | (root_field_names_with_types - root_field_names)
+        path
+      end
+
+      def self.nested_polymorphic_linkage_fields(collection, projection_fields)
+        projection_fields.flat_map do |path|
+          segments = path.split(':')
+
+          each_field_along_path(collection, segments).flat_map do |field, index|
+            next [] unless polymorphic_many_to_one?(field) && index.positive?
+
+            relation_path = segments[0...index]
+            [field.foreign_key_type_field, field.foreign_key].map { |column| (relation_path + [column]).join(':') }
+          end
+        end
+      end
+
+      def self.each_field_along_path(collection, segments)
+        return to_enum(:each_field_along_path, collection, segments) unless block_given?
+
+        current_collection = collection
+
+        segments.each_with_index do |segment, index|
+          field = index.zero? ? get_field(current_collection, segment) : current_collection.schema[:fields][segment]
+          break if field.nil?
+
+          yield field, index
+
+          break unless field.respond_to?(:foreign_collection)
+
+          current_collection = collection.datasource.get_collection(field.foreign_collection)
+        end
+      end
+
+      def self.polymorphic_many_to_one?(field)
+        field.type == 'PolymorphicManyToOne'
       end
 
       def self.get_field(collection, field_name)

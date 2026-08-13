@@ -105,6 +105,45 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    describe 'a projection path more than one relation deep (account:account_history:order)' do
+      let(:collection) { Collection.new(datasource, Account) }
+      let(:projection) { Projection.new(['id', 'account_history:id', 'account_history:order:reference']) }
+
+      before do
+        order = Order.create!(reference: 'ORD-1')
+        Account.first.account_history.update!(order: order)
+      end
+
+      it 'folds every hop of the path into ONE JOINed query' do
+        queries = capture_sql do
+          result = collection.list(caller, filter, projection)
+          expect(result.first['account_history']['order']['reference']).to eq('ORD-1')
+        end
+
+        expect(queries.size).to eq(1)
+        expect(queries.first.scan(/LEFT OUTER JOIN/i).size).to eq(2)
+      end
+
+      it 'restricts each level of the path to its projected columns' do
+        result = collection.list(caller, filter, projection)
+
+        expect(result.first['account_history'].keys).to contain_exactly('id', 'order')
+        expect(result.first['account_history']['order'].keys).to contain_exactly('reference')
+      end
+
+      it 'carries the primary key of every level when the projection went through with_pks' do
+        result = collection.list(caller, filter, Projection.new(['account_history:order:reference']).with_pks(collection))
+
+        expect(result.first['account_history']['order']).to include('id', 'reference')
+      end
+
+      it 'leaves the whole path nil when the intermediate record is absent' do
+        result = collection.list(caller, filter, Projection.new(['id', 'secondary_history:order:reference']))
+
+        expect(result.first['secondary_history']).to be_nil
+      end
+    end
+
     describe 'a has_one :through of belongs_to hops (account -> account_history -> order)' do
       let(:collection) { Collection.new(datasource, Account) }
       let(:projection) { Projection.new(['id', 'order:reference']) }
