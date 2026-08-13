@@ -1,3 +1,10 @@
+## [1.38.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.0...v1.38.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **agent:** authorize create with a linked one-to-one on the foreign collection ([#353](https://github.com/ForestAdmin/agent-ruby/issues/353)) ([9577d80](https://github.com/ForestAdmin/agent-ruby/commit/9577d808a0a00181c34efa34fa4785d05a683334)), closes [#350](https://github.com/ForestAdmin/agent-ruby/issues/350)
+
 # [1.38.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.4...v1.38.0) (2026-08-12)
 
 
