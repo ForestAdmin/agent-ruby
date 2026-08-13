@@ -50,13 +50,13 @@ module ForestAdminAgent
               .and_return({ audit_trail: { store: store, redact: { 'orders' => ['reason'] } } })
           end
 
-          def execute(result: 'ok', &raising)
+          def execute(result: { type: 'Success', message: 'done' }, &raising)
             allow(collection).to receive(:execute, &(raising || proc { result }))
             route.send(:execute_and_audit, context, args, { 'amount' => 30, 'reason' => 'damaged' }, nil)
           end
 
           it 'records one row per selected record and returns the action result' do
-            expect(execute).to eq('ok')
+            expect(execute).to eq({ type: 'Success', message: 'done' })
 
             expect(store).to have_received(:append).twice
             expect(store).to have_received(:append).with(
@@ -75,8 +75,24 @@ module ForestAdminAgent
           it 'records nothing when no audit database is configured' do
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return({})
 
-            expect(execute).to eq('ok')
+            expect(execute).to eq({ type: 'Success', message: 'done' })
             expect(store).not_to have_received(:append)
+          end
+
+          # An action reporting failure through result_builder.error never raises, so only the result says so.
+          it 'records an Error result as a failed run, and still returns it' do
+            result = execute(result: { type: 'Error', message: 'not allowed' })
+
+            expect(result).to eq({ type: 'Error', message: 'not allowed' })
+            expect(store).to have_received(:append)
+              .with(having_attributes(operation: 'action_failed', record_id: '4')).once
+          end
+
+          it 'records any other result type as a run that went through' do
+            execute(result: { type: 'Webhook', url: 'https://example.test' })
+
+            expect(store).to have_received(:append)
+              .with(having_attributes(operation: 'action', record_id: '4')).once
           end
         end
 

@@ -166,7 +166,7 @@ Running a smart action writes one row per selected record, in the same table:
 
 | column      | value                                                                      |
 | ----------- | -------------------------------------------------------------------------- |
-| `operation` | `action` when it ran, `action_failed` when it raised                       |
+| `operation` | `action` when it went through, `action_failed` when it raised or answered with an `Error` result |
 | `newValues` | the submitted form values (redacted with the same `redact` config)          |
 | `recordId`  | each selected record — empty for a global action or a select-all selection  |
 

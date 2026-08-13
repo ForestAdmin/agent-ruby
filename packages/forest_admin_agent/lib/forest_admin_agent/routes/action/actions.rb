@@ -117,15 +117,21 @@ module ForestAdminAgent
 
         private
 
-        # A failed run is worth recording too: "who tried to run this" is usually the interesting part.
+        # A failed run is worth recording too: "who tried to run this" is usually the interesting part. An
+        # action that answers with an Error result failed just as much as one that raised — it simply chose
+        # to say so through `result_builder.error` instead.
         def execute_and_audit(context, args, data, filter)
           result = context.collection.execute(context.caller, @action_name, data, filter)
-          audit_action(context, args, data)
+          audit_action(context, args, data, failed: error_result?(result))
 
           result
         rescue StandardError
           audit_action(context, args, data, failed: true)
           raise
+        end
+
+        def error_result?(result)
+          result.is_a?(Hash) && result[:type] == 'Error'
         end
 
         def audit_action(context, args, data, failed: false)
