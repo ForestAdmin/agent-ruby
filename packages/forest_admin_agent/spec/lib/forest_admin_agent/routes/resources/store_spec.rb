@@ -321,6 +321,72 @@ module ForestAdminAgent
                 .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
             end
 
+            it 'creates nothing when the linked id is malformed' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'john' },
+                relationships: { 'passport' => { 'data' => { 'type' => 'passports', 'id' => 'malformed|id' } } },
+                type: 'persons'
+              }
+              args[:params]['collection_name'] = 'person'
+
+              expect { store.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+              expect(@datasource.get_collection('person')).not_to have_received(:create)
+              expect(@datasource.get_collection('passport')).not_to have_received(:update)
+            end
+
+            it 'creates nothing when the scope cannot be resolved' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'john' },
+                relationships: { 'passport' => { 'data' => { 'type' => 'passports', 'id' => 1 } } },
+                type: 'persons'
+              }
+              args[:params]['collection_name'] = 'person'
+              allow(permissions).to receive(:get_scope) do |collection|
+                raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'boom' if collection.name == 'passport'
+              end
+
+              expect { store.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException)
+              expect(@datasource.get_collection('person')).not_to have_received(:create)
+              expect(@datasource.get_collection('passport')).not_to have_received(:update)
+            end
+
+            it 'drops the link silently when the scope excludes the linked record' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'john' },
+                relationships: { 'passport' => { 'data' => { 'type' => 'passports', 'id' => 1 } } },
+                type: 'persons'
+              }
+              args[:params]['collection_name'] = 'person'
+              allow(permissions).to receive(:get_scope) do |collection|
+                Nodes::ConditionTreeLeaf.new('person_id', Operators::EQUAL, 99) if collection.name == 'passport'
+              end
+              allow(@datasource.get_collection('person')).to receive_messages(
+                create: { 'id' => 1, 'name' => 'john' },
+                list: [{ 'id' => 1, 'name' => 'john' }]
+              )
+              # The ORM no-ops on a filter matching no row, so the caller gets a created parent
+              # and no relation, with nothing reporting the excluded target.
+              allow(@datasource.get_collection('passport')).to receive(:update).and_return(nil)
+
+              result = store.handle_request(args)
+
+              expect(result[:content]['data']['id']).to eq('1')
+              expect(@datasource.get_collection('person')).to have_received(:create)
+              expect(@datasource.get_collection('passport')).to have_received(:update) do |_caller, filter, _data|
+                expect(filter.condition_tree.to_h).to eq(
+                  {
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'person_id', operator: Operators::EQUAL, value: 99 },
+                      { field: 'id', operator: Operators::EQUAL, value: 1 }
+                    ]
+                  }
+                )
+              end
+            end
+
             it 'ignores a one to one relationship carrying no data' do
               args[:params][:data] = {
                 attributes: { 'name' => 'john' },
@@ -367,7 +433,7 @@ module ForestAdminAgent
                   origin_key_target: 'id',
                   foreign_collection: 'address',
                   origin_type_field: 'addressable_type',
-                  origin_type_value: 'person'
+                  origin_type_value: 'Person::Legacy'
                 )
             end
 

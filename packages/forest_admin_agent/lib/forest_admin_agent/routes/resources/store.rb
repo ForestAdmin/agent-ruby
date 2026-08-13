@@ -17,8 +17,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:add, context.collection)
-          relations = linked_one_to_one_relations(args, context)
-          assert_can_edit_linked_collections(relations, context)
+          relations = resolve_linked_one_to_one_relations(args, context)
           data = format_attributes(args, context.collection)
           record = context.collection.create(context.caller, data)
           link_one_to_one_relations(relations, record, context)
@@ -41,43 +40,63 @@ module ForestAdminAgent
 
         private
 
-        def assert_can_edit_linked_collections(relations, context)
-          relations.each { |relation| context.permissions.can?(:edit, relation[:foreign_collection]) }
+        # Everything the linking pass needs is authorized and resolved before the parent record is
+        # created: a denied edit, an unresolvable scope or a malformed linked id must leave no
+        # committed parent row behind.
+        def resolve_linked_one_to_one_relations(args, context)
+          linked_one_to_one_relations(args, context).map do |relation|
+            foreign_collection = relation[:foreign_collection]
+
+            # Must run before unpack_id: unauthorized callers get a 403, not a validation error
+            context.permissions.can?(:edit, foreign_collection)
+
+            relation.merge(
+              scope: context.permissions.get_scope(foreign_collection),
+              primary_key_values: Utils::Id.unpack_id(foreign_collection, relation[:id], with_key: true)
+            )
+          end
         end
 
         def linked_one_to_one_relations(args, context)
-          args[:params][:data][:relationships]&.filter_map do |field, value|
-            schema = context.collection.schema[:fields][field]
-            next unless %w[OneToOne PolymorphicOneToOne].include?(schema.type)
+          relationships = args.dig(:params, :data, :relationships) || {}
 
-            id = value.dig('data', 'id')
-            next if id.nil?
-
-            {
-              schema: schema,
-              foreign_collection: context.datasource.get_collection(schema.foreign_collection),
-              id: id
-            }
-          end || []
+          relationships.filter_map { |field, value| linked_one_to_one_relation(field, value, context) }
         end
 
+        def linked_one_to_one_relation(field, value, context)
+          schema = context.collection.schema[:fields][field]
+          return unless %w[OneToOne PolymorphicOneToOne].include?(schema.type)
+
+          id = value.dig('data', 'id')
+          return if id.nil?
+
+          {
+            schema: schema,
+            foreign_collection: context.datasource.get_collection(schema.foreign_collection),
+            id: id
+          }
+        end
+
+        # A foreign record excluded by the caller's scope matches no row, so the link is silently
+        # dropped, as on the update_related route and in agent-nodejs.
         def link_one_to_one_relations(relations, record, context)
           relations.each do |relation|
             schema = relation[:schema]
             foreign_collection = relation[:foreign_collection]
-            primary_key_values = Utils::Id.unpack_id(foreign_collection, relation[:id], with_key: true)
-            origin_value = record[schema.origin_key_target]
 
-            patch = { schema.origin_key => origin_value }
+            patch = { schema.origin_key => record[schema.origin_key_target] }
             if schema.type == 'PolymorphicOneToOne'
               patch[schema.origin_type_field] =
                 context.collection.name.gsub('__', '::')
             end
-            new_fk_owner = ConditionTree::ConditionTreeFactory.match_records(foreign_collection, [primary_key_values])
+
+            new_fk_owner = ConditionTree::ConditionTreeFactory.match_records(
+              foreign_collection, [relation[:primary_key_values]]
+            )
             filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
-                  context.permissions.get_scope(foreign_collection),
+                  relation[:scope],
                   new_fk_owner
                 ]
               )
