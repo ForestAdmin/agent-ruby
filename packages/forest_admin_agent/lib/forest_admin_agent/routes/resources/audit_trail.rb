@@ -60,7 +60,8 @@ module ForestAdminAgent
         end
 
         # Record as it stood at `timestamp`: the current record with every later entry undone. `data` is
-        # null when the record did not exist yet (or not any more) at that instant.
+        # null when the record did not exist yet (or not any more) at that instant. Shape matches the Node
+        # agent's handleStateAt — `data` and nothing else.
         def handle_state(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
@@ -76,10 +77,7 @@ module ForestAdminAgent
           # Fully qualified: inside this class, `AuditTrail` is the route itself.
           state = ::ForestAdminAgent::AuditTrail::RecordState.at(current, entries)
 
-          {
-            name: args[:params]['collection_name'],
-            content: { data: state, meta: { timestamp: timestamp, reverted: entries.size } }
-          }
+          { name: args[:params]['collection_name'], content: { data: state } }
         end
 
         private

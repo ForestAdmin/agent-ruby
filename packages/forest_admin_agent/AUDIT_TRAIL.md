@@ -119,7 +119,7 @@ that instant, rebuilt by taking the record as it stands now and undoing every en
 after** the timestamp — an entry stamped exactly at it counts as part of that state:
 
 ```json
-{ "data": { "status": "paid", "address": { "city": "Paris" } }, "meta": { "timestamp": "…", "reverted": 3 } }
+{ "data": { "status": "paid", "address": { "city": "Paris" } } }
 ```
 
 `timestamp` accepts an ISO-8601 instant, or the same wall-clock forms as the filters above read in the
@@ -129,8 +129,6 @@ that instant — either created later, or deleted and never recreated.
 Walking back stops being able to help where the trail stops: only audited (writable) columns are
 reconstructed, and a `create` means the record did not exist before it, while a `delete` restores the whole
 row it recorded and the walk carries on into any earlier life of the same id.
-
-> The exact response shape is not yet pinned against a consumer — no frontend reads this endpoint today.
 
 ### Correlation route
 

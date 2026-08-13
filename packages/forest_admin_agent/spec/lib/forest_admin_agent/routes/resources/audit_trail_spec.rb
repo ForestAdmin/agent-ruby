@@ -76,8 +76,7 @@ module ForestAdminAgent
 
             result = get_state(route)
 
-            expect(result[:content][:data]).to eq({ 'id' => 4, 'status' => 'paid' })
-            expect(result[:content][:meta]).to eq({ timestamp: '2026-01-02T10:00:00.000Z', reverted: 1 })
+            expect(result[:content]).to eq({ data: { 'id' => 4, 'status' => 'paid' } })
           end
 
           # Authorization and read are one query: a scoped check followed by an unscoped read would hand
