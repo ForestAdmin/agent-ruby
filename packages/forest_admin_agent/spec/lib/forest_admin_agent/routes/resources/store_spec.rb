@@ -366,8 +366,6 @@ module ForestAdminAgent
                 create: { 'id' => 1, 'name' => 'john' },
                 list: [{ 'id' => 1, 'name' => 'john' }]
               )
-              # The ORM no-ops on a filter matching no row, so the caller gets a created parent
-              # and no relation, with nothing reporting the excluded target.
               allow(@datasource.get_collection('passport')).to receive(:update).and_return(nil)
 
               result = store.handle_request(args)

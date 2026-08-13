@@ -17,7 +17,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:add, context.collection)
-          relations = resolve_linked_one_to_one_relations(args, context)
+          relations = authorized_linked_one_to_one_relations(args, context)
           data = format_attributes(args, context.collection)
           record = context.collection.create(context.caller, data)
           link_one_to_one_relations(relations, record, context)
@@ -40,14 +40,10 @@ module ForestAdminAgent
 
         private
 
-        # Everything the linking pass needs is authorized and resolved before the parent record is
-        # created: a denied edit, an unresolvable scope or a malformed linked id must leave no
-        # committed parent row behind.
-        def resolve_linked_one_to_one_relations(args, context)
+        def authorized_linked_one_to_one_relations(args, context)
           linked_one_to_one_relations(args, context).map do |relation|
             foreign_collection = relation[:foreign_collection]
 
-            # Must run before unpack_id: unauthorized callers get a 403, not a validation error
             context.permissions.can?(:edit, foreign_collection)
 
             relation.merge(
@@ -77,8 +73,6 @@ module ForestAdminAgent
           }
         end
 
-        # A foreign record excluded by the caller's scope matches no row, so the link is silently
-        # dropped, as on the update_related route and in agent-nodejs.
         def link_one_to_one_relations(relations, record, context)
           relations.each do |relation|
             schema = relation[:schema]
