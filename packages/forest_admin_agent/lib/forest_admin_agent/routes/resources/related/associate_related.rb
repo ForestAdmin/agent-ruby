@@ -83,21 +83,21 @@ module ForestAdminAgent
           end
 
           def associate_many_to_many(relation, parent_primary_key_values, target_primary_key_values, context)
-            foreign_id = Schema.primary_keys(context.child_collection)[0]
-            target = find_target_in_scope(target_primary_key_values, foreign_id, context)
+            target = find_target_in_scope(target_primary_key_values, relation.foreign_key_target, context)
             return if target.nil?
 
-            foreign_value = target[foreign_id]
-            origin_id = Schema.primary_keys(context.collection)[0]
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
-                                                origin_id)
-            record = { relation.origin_key => origin_value, relation.foreign_key => foreign_value }
+                                                relation.origin_key_target)
+            record = {
+              relation.origin_key => origin_value,
+              relation.foreign_key => target[relation.foreign_key_target]
+            }
 
             through_collection = context.datasource.get_collection(relation.through_collection)
             through_collection.create(context.caller, record)
           end
 
-          def find_target_in_scope(target_primary_key_values, foreign_id, context)
+          def find_target_in_scope(target_primary_key_values, foreign_key_target, context)
             filter = Filter.new(
               condition_tree: ConditionTree::ConditionTreeFactory.intersect(
                 [
@@ -108,7 +108,7 @@ module ForestAdminAgent
               )
             )
 
-            context.child_collection.list(context.caller, filter, Projection.new([foreign_id])).first
+            context.child_collection.list(context.caller, filter, Projection.new([foreign_key_target])).first
           end
         end
       end

@@ -37,8 +37,10 @@ module ForestAdminAgent
               name: 'user',
               schema: {
                 fields: {
-                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
                   'name' => ColumnSchema.new(column_type: 'String'),
+                  'reference' => ColumnSchema.new(column_type: 'String'),
                   'addresses' => Relations::ManyToManySchema.new(
                     foreign_key: 'address_id',
                     foreign_collection: 'address',
@@ -46,6 +48,14 @@ module ForestAdminAgent
                     through_collection: 'address_user',
                     origin_key: 'user_id',
                     origin_key_target: 'id'
+                  ),
+                  'addresses_by_code' => Relations::ManyToManySchema.new(
+                    foreign_key: 'address_code',
+                    foreign_collection: 'address',
+                    foreign_key_target: 'code',
+                    through_collection: 'address_user',
+                    origin_key: 'user_reference',
+                    origin_key_target: 'reference'
                   ),
                   'address_users' => Relations::OneToManySchema.new(
                     origin_key: 'user_id',
@@ -70,6 +80,8 @@ module ForestAdminAgent
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
                   'address_id' => ColumnSchema.new(column_type: 'Number'),
                   'user_id' => ColumnSchema.new(column_type: 'Number'),
+                  'address_code' => ColumnSchema.new(column_type: 'String'),
+                  'user_reference' => ColumnSchema.new(column_type: 'String'),
                   'address' => Relations::ManyToOneSchema.new(
                     foreign_key: 'address_id',
                     foreign_collection: 'address',
@@ -91,6 +103,7 @@ module ForestAdminAgent
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
                                            filter_operators: [Operators::IN, Operators::EQUAL]),
                   'location' => ColumnSchema.new(column_type: 'String'),
+                  'code' => ColumnSchema.new(column_type: 'String'),
                   'addressable_id' => ColumnSchema.new(column_type: 'Number'),
                   'addressable_type' => ColumnSchema.new(column_type: 'String'),
                   'addressable' => Relations::PolymorphicManyToOneSchema.new(
@@ -240,6 +253,32 @@ module ForestAdminAgent
               expect(@datasource.get_collection('address_user')).not_to have_received(:create)
               expect(result[:content]).to be_nil
               expect(result[:status]).to eq 204
+            end
+
+            context 'when the relation keys target a column that is not the primary key' do
+              before do
+                args[:params]['relation_name'] = 'addresses_by_code'
+                allow(@datasource.get_collection('user')).to receive(:list)
+                  .and_return([{ 'reference' => 'REF-1' }])
+                allow(@datasource.get_collection('address')).to receive(:list)
+                  .and_return([{ 'code' => 'A1' }])
+              end
+
+              it 'writes the target keys in the through record, not the primary keys' do
+                associate.handle_request(args)
+
+                expect(@datasource.get_collection('address_user')).to have_received(:create) do |_caller, data|
+                  expect(data).to eq({ 'user_reference' => 'REF-1', 'address_code' => 'A1' })
+                end
+              end
+
+              it 'projects the foreign key target on the scoped target' do
+                associate.handle_request(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:list) do |_caller, _filter, projection|
+                  expect(projection).to eq(['code'])
+                end
+              end
             end
           end
 
