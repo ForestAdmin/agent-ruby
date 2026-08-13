@@ -34,6 +34,20 @@ module ForestAdminAgent
           )
         end
 
+        it 'leaves an appended index out of the previous side' do
+          expect(described_class.diff([{ 'x' => 1 }], [{ 'x' => 1 }, { 'y' => 2 }])).to eq(
+            previous: {},
+            next: { 1 => { 'y' => 2 } }
+          )
+        end
+
+        it 'leaves a dropped index out of the new side' do
+          expect(described_class.diff([{ 'x' => 1 }, { 'y' => 2 }], [{ 'x' => 1 }])).to eq(
+            previous: { 1 => { 'y' => 2 } },
+            next: {}
+          )
+        end
+
         it 'diffs an array of objects index by index' do
           before = [{ 'name' => 'a' }, { 'name' => 'b' }]
           after = [{ 'name' => 'a' }, { 'name' => 'c' }]
@@ -97,22 +111,34 @@ module ForestAdminAgent
           )
         end
 
-        it 'drops an element the change had appended' do
+        it 'drops an element the change had appended, rather than leaving a nil behind' do
           current = [{ 'name' => 'a' }, { 'name' => 'b' }]
 
           expect(described_class.revert(current, {}, { '1' => { 'name' => 'b' } })).to eq([{ 'name' => 'a' }])
+        end
+
+        it 'brings back an element the change had dropped' do
+          expect(described_class.revert([{ 'name' => 'a' }], { '1' => { 'name' => 'b' } }, {})).to eq(
+            [{ 'name' => 'a' }, { 'name' => 'b' }]
+          )
         end
 
         it 'replaces the value as a whole when the change was not structural' do
           expect(described_class.revert({ 'city' => 'Lyon' }, nil, { 'city' => 'Lyon' })).to be_nil
         end
 
-        # A round trip is the property that matters: diff then revert gives the original back.
+        # A round trip is the property that matters: diff then revert gives the original back. The array
+        # cases carry a length change on purpose — an appended element has to disappear again rather than
+        # revert to nil, and a dropped one has to come back.
         it 'undoes any diff it is given' do
           [
             [{ 'a' => 1, 'b' => { 'c' => 2, 'd' => nil } }, { 'a' => 1, 'b' => { 'c' => 3 } }],
             [{ 'a' => nil }, { 'a' => 'set' }],
             [{ 'list' => [{ 'x' => 1 }, { 'x' => 2 }] }, { 'list' => [{ 'x' => 1 }, { 'x' => 9 }] }],
+            [[{ 'x' => 1 }], [{ 'x' => 1 }, { 'y' => 2 }]],
+            [[{ 'x' => 1 }, { 'y' => 2 }], [{ 'x' => 1 }]],
+            [[{ 'x' => 1 }, { 'y' => 2 }, { 'z' => 3 }], [{ 'x' => 9 }]],
+            [{ 'list' => [{ 'x' => 1 }] }, { 'list' => [{ 'x' => 1 }, { 'y' => 2 }] }],
             ['plain', 'changed']
           ].each do |before, after|
             delta = described_class.diff(before, after)

@@ -86,8 +86,10 @@ module ForestAdminAgent
           sub = diff(before[index], after[index])
           next unless sub
 
-          previous[index] = sub[:previous]
-          next_values[index] = sub[:next]
+          # Same rule as for hash keys: an index one side does not reach is left out of that side, so a
+          # revert can tell an appended element (drop it) from one whose value became nil (keep it).
+          previous[index] = sub[:previous] if index < before.length
+          next_values[index] = sub[:next] if index < after.length
         end
 
         { previous: previous, next: next_values }
@@ -125,23 +127,30 @@ module ForestAdminAgent
       end
 
       # Arrays of objects are diffed index by index, and JSON turns those indexes into strings on the way
-      # back out. An element the change appended is dropped, which can only ever shorten the tail.
+      # back out. Highest index first, so dropping an element the change appended leaves the lower ones
+      # where the diff expects them.
       def revert_array(current, previous, changed)
-        result = current.dup
+        indexes = (previous.keys | changed.keys).map(&:to_i).sort.reverse
 
-        (previous.keys | changed.keys).map(&:to_i).sort.reverse_each do |index|
-          key = index.to_s
-          if previous.key?(key) || previous.key?(index)
-            result[index] = revert(current[index], previous[key] || previous[index], changed[key] || changed[index])
+        indexes.each_with_object(current.dup) do |index, result|
+          if index?(previous, index)
+            result[index] = revert(current[index], at(previous, index), at(changed, index))
           else
             result.delete_at(index)
           end
         end
-
-        result
       end
 
-      private_class_method :diff_hashes, :diff_at, :diff_object_arrays, :partial?, :revert_hash, :revert_array
+      def index?(hash, index)
+        hash.key?(index) || hash.key?(index.to_s)
+      end
+
+      def at(hash, index)
+        hash.key?(index) ? hash[index] : hash[index.to_s]
+      end
+
+      private_class_method :diff_hashes, :diff_at, :diff_object_arrays, :partial?, :revert_hash,
+                           :revert_array, :index?, :at
     end
   end
 end

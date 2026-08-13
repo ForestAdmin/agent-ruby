@@ -87,12 +87,19 @@ module ForestAdminAgent
         def parse_state_timestamp(args)
           raw = args.dig(:params, 'timestamp').to_s
           raise Http::Exceptions::ValidationError, 'Missing timestamp' if raw.empty?
+          # A wall-clock value carries no offset, so it belongs to the request timezone. Handing it to
+          # Time.iso8601 would read it in the server's instead — silently, since it parses just fine.
+          return parse_date_boundary(raw, request_timezone(args), :start) if wall_clock?(raw)
 
           begin
             Time.iso8601(raw).utc.iso8601(3)
           rescue ArgumentError
             parse_date_boundary(raw, request_timezone(args), :start)
           end
+        end
+
+        def wall_clock?(raw)
+          DATE_ONLY.match?(raw) || DATE_TIME.match?(raw)
         end
 
         # JSON:API `sort`: `timestamp` → oldest first, anything else (absent/unsupported) → newest first.

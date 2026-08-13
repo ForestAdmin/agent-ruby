@@ -102,6 +102,28 @@ module ForestAdminAgent
             expect(store).to have_received(:list_since).with(hash_including(timestamp: '2026-01-02T13:30:00.000Z'))
           end
 
+          # Seconds make it parse as ISO-8601, which would silently read it in the server's timezone.
+          it 'reads a wall-clock instant carrying seconds in the request timezone too' do
+            route = state_route
+            get_state(route, timestamp: '2026-01-02T08:30:15', extra: { 'timezone' => 'America/New_York' })
+
+            expect(store).to have_received(:list_since).with(hash_including(timestamp: '2026-01-02T13:30:15.000Z'))
+          end
+
+          it 'reads a bare day in the request timezone' do
+            route = state_route
+            get_state(route, timestamp: '2026-01-02', extra: { 'timezone' => 'America/New_York' })
+
+            expect(store).to have_received(:list_since).with(hash_including(timestamp: '2026-01-02T05:00:00.000Z'))
+          end
+
+          it 'honours an explicit offset instead of the request timezone' do
+            route = state_route
+            get_state(route, timestamp: '2026-01-02T08:30:15+02:00', extra: { 'timezone' => 'America/New_York' })
+
+            expect(store).to have_received(:list_since).with(hash_including(timestamp: '2026-01-02T06:30:15.000Z'))
+          end
+
           it 'rejects a missing timestamp' do
             route = state_route
 
