@@ -96,6 +96,21 @@ module ForestAdminAgent
             expect { migrator.run }.not_to raise_error
           end
 
+          it 'falls back to the message when reading the SQLSTATE itself blows up' do
+            stub_const('PG::Result', Class.new { const_set(:PG_DIAG_SQLSTATE, 67) }) unless defined?(PG::Result)
+            cause = double('PG::Error')
+            allow(cause).to receive(:result).and_raise(StandardError, 'connection already closed')
+            error = ActiveRecord::StatementInvalid.new('ERROR: schema "forest" already exists')
+            allow(error).to receive(:cause).and_return(cause)
+            allow(connection).to receive(:execute) do |sql|
+              raise error if sql.include?('CREATE SCHEMA')
+
+              executed << sql
+            end
+
+            expect { migrator.run }.not_to raise_error
+          end
+
           it 'reports anything else, however its message reads' do
             raise_with_sql_state('42501', 'ERROR: permission denied, object already exists elsewhere')
 

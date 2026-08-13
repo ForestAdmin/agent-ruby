@@ -55,8 +55,9 @@ module ForestAdminAgent
             )
           end
 
+          # Through the registered closure rather than the handler, so the wiring is covered too.
           def get_state(route, timestamp: '2026-01-02T10:00:00.000Z', extra: {})
-            route.handle_state(
+            route.routes['forest_audit_trail_state'][:closure].call(
               { headers: {},
                 params: { 'collection_name' => 'projects', 'id' => '4', 'timestamp' => timestamp }.merge(extra) }
             )
