@@ -48,7 +48,9 @@ module ForestAdminRails
       middleware = ForestAdminAgent::Http::CorrelationIdMiddleware
 
       begin
-        config.middleware.insert_before ActionDispatch::ShowExceptions, middleware
+        # The application's stack, not the engine's: ShowExceptions lives there, and an
+        # insert_before recorded on the engine's own (empty) proxy raises when it is applied.
+        Rails.application.config.middleware.insert_before ActionDispatch::ShowExceptions, middleware
       rescue StandardError
         # No ShowExceptions in this stack (or already gone): the id still reaches every response the app
         # returns normally.

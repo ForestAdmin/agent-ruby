@@ -276,32 +276,44 @@ module ForestAdminRails
     let(:engine_class) { ForestAdminRails::Engine }
     let(:engine_instance) { engine_class.allocate }
     # rubocop:disable RSpec/VerifiedDoubles
-    let(:config) { double('config') }
-    let(:middleware) { double('middleware') }
+    let(:engine_middleware) { double('engine middleware') }
+    let(:app_middleware) { double('application middleware') }
+    let(:application) { double('application', config: double('app config', middleware: app_middleware)) }
+    let(:engine_config) { double('engine config', middleware: engine_middleware) }
     # rubocop:enable RSpec/VerifiedDoubles
 
     before do
-      allow(engine_instance).to receive(:config).and_return(config)
-      allow(config).to receive(:middleware).and_return(middleware)
+      allow(engine_instance).to receive(:config).and_return(engine_config)
+      allow(Rails).to receive(:application).and_return(application)
     end
 
-    # Under the exception handlers, the 500 they build on the way out would never carry the header.
-    it 'inserts the middleware ahead of the exception handlers' do
-      allow(middleware).to receive(:insert_before)
+    # The application's stack, not the engine's: ShowExceptions lives there, and under the exception
+    # handlers the 500s they build would never carry the header.
+    it 'inserts the middleware ahead of the exception handlers of the application stack' do
+      allow(app_middleware).to receive(:insert_before)
 
       engine_instance.load_correlation_id
 
-      expect(middleware).to have_received(:insert_before)
+      expect(app_middleware).to have_received(:insert_before)
         .with(ActionDispatch::ShowExceptions, ForestAdminAgent::Http::CorrelationIdMiddleware)
     end
 
     it 'falls back to appending when the stack has no exception handler to insert before' do
-      allow(middleware).to receive(:insert_before).and_raise(RuntimeError, 'no such middleware')
-      allow(middleware).to receive(:use)
+      allow(app_middleware).to receive(:insert_before).and_raise(RuntimeError, 'no such middleware')
+      allow(engine_middleware).to receive(:use)
 
       engine_instance.load_correlation_id
 
-      expect(middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
+      expect(engine_middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+
+    it 'falls back to appending when there is no application to reach' do
+      allow(Rails).to receive(:application).and_return(nil)
+      allow(engine_middleware).to receive(:use)
+
+      engine_instance.load_correlation_id
+
+      expect(engine_middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
     end
   end
 
