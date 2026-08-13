@@ -22,7 +22,7 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             context = build(args)
-            context.permissions.can?(:edit, context.collection)
+            context.permissions.can?(:edit, context.child_collection)
 
             parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             target_primary_key_values = Utils::Id.unpack_id(context.child_collection, args[:params]['data'][0]['id'],
@@ -83,15 +83,32 @@ module ForestAdminAgent
           end
 
           def associate_many_to_many(relation, parent_primary_key_values, target_primary_key_values, context)
-            id = Schema.primary_keys(context.child_collection)[0]
-            foreign_value = Collection.get_value(context.child_collection, context.caller, target_primary_key_values,
-                                                 id)
-            id = Schema.primary_keys(context.collection)[0]
-            origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values, id)
+            foreign_id = Schema.primary_keys(context.child_collection)[0]
+            target = find_target_in_scope(target_primary_key_values, foreign_id, context)
+            return if target.nil?
+
+            foreign_value = target[foreign_id]
+            origin_id = Schema.primary_keys(context.collection)[0]
+            origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
+                                                origin_id)
             record = { relation.origin_key => origin_value, relation.foreign_key => foreign_value }
 
             through_collection = context.datasource.get_collection(relation.through_collection)
             through_collection.create(context.caller, record)
+          end
+
+          def find_target_in_scope(target_primary_key_values, foreign_id, context)
+            filter = Filter.new(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  ConditionTree::ConditionTreeFactory.match_ids(context.child_collection,
+                                                                [target_primary_key_values]),
+                  context.permissions.get_scope(context.child_collection)
+                ]
+              )
+            )
+
+            context.child_collection.list(context.caller, filter, Projection.new([foreign_id])).first
           end
         end
       end

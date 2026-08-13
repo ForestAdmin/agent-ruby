@@ -88,7 +88,8 @@ module ForestAdminAgent
               name: 'address',
               schema: {
                 fields: {
-                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
                   'location' => ColumnSchema.new(column_type: 'String'),
                   'addressable_id' => ColumnSchema.new(column_type: 'Number'),
                   'addressable_type' => ColumnSchema.new(column_type: 'String'),
@@ -121,8 +122,24 @@ module ForestAdminAgent
             expect(associate.routes.length).to eq 1
           end
 
+          it 'checks the edit permission on the foreign collection before parsing any id' do
+            allow(permissions).to receive(:can?)
+              .and_raise(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+
+            args[:params]['relation_name'] = 'addresses'
+            args[:params]['data'] = [{ 'id' => 'malformed|id' }]
+            args[:params]['id'] = 'malformed|id'
+
+            expect { associate.handle_request(args) }
+              .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+            expect(permissions).to have_received(:can?) do |action, collection|
+              expect(action).to eq(:edit)
+              expect(collection.name).to eq('address')
+            end
+          end
+
           context 'when call on one to many relation' do
-            it 'call associate_one_to_many' do
+            before do
               args[:params]['relation_name'] = 'address_users'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
@@ -130,11 +147,18 @@ module ForestAdminAgent
                 .and_return(Nodes::ConditionTreeLeaf.new('user_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
+            end
+
+            it 'call associate_one_to_many' do
               result = associate.handle_request(args)
 
-              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
-              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address_user'))
-              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
+              expect(permissions).to have_received(:can?) do |action, collection|
+                expect(action).to eq(:edit)
+                expect(collection.name).to eq('address_user')
+              end
+              expect(permissions).to have_received(:get_scope) do |collection|
+                expect(collection.name).to eq('address_user')
+              end
               expect(@datasource.get_collection('address_user')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
@@ -159,18 +183,28 @@ module ForestAdminAgent
           end
 
           context 'when call on many to many relation' do
-            it 'call associate_many_to_many' do
+            before do
               args[:params]['relation_name'] = 'addresses'
               args[:params]['data'] = [{ 'id' => 1 }]
               args[:params]['id'] = 1
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
-              allow(@datasource.get_collection('address')).to receive(:list)
-                .and_return([Address.new(1, 'foo location')])
               allow(@datasource.get_collection('address_user')).to receive(:create).and_return(true)
+            end
+
+            it 'call associate_many_to_many' do
+              allow(@datasource.get_collection('address')).to receive(:list)
+                .and_return([{ 'id' => 1, 'location' => 'paris' }])
               result = associate.handle_request(args)
 
-              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
-              expect(permissions).not_to have_received(:get_scope)
+              expect(permissions).to have_received(:can?) do |action, collection|
+                expect(action).to eq(:edit)
+                expect(collection.name).to eq('address')
+              end
+              expect(permissions).to have_received(:get_scope) do |collection|
+                expect(collection.name).to eq('address')
+              end
               expect(@datasource.get_collection('address_user')).to have_received(:create) do |caller, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(data).to eq({ 'address_id' => 1, 'user_id' => 1 })
@@ -178,10 +212,39 @@ module ForestAdminAgent
               expect(result[:content]).to be_nil
               expect(result[:status]).to eq 204
             end
+
+            it 'searches the target with the scope of the foreign collection' do
+              allow(@datasource.get_collection('address')).to receive(:list)
+                .and_return([{ 'id' => 1, 'location' => 'paris' }])
+              associate.handle_request(args)
+
+              expect(@datasource.get_collection('address')).to have_received(:list) do |caller, filter, projection|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(filter).to have_attributes(
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                      have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris')
+                    ]
+                  )
+                )
+                expect(projection).to eq(['id'])
+              end
+            end
+
+            it 'does not create the through record when the target is out of scope' do
+              allow(@datasource.get_collection('address')).to receive(:list).and_return([])
+              result = associate.handle_request(args)
+
+              expect(@datasource.get_collection('address_user')).not_to have_received(:create)
+              expect(result[:content]).to be_nil
+              expect(result[:status]).to eq 204
+            end
           end
 
           context 'when call on polymorphic one to many relation' do
-            it 'call associate_polymorphic_one_to_many' do
+            before do
               args[:params]['relation_name'] = 'addresses_poly'
               args[:params]['data'] = [{ 'id' => 1, 'type' => 'user' }]
               args[:params]['id'] = 1
@@ -189,11 +252,18 @@ module ForestAdminAgent
                 .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
+            end
+
+            it 'call associate_polymorphic_one_to_many' do
               result = associate.handle_request(args)
 
-              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'user'))
-              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address'))
-              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
+              expect(permissions).to have_received(:can?) do |action, collection|
+                expect(action).to eq(:edit)
+                expect(collection.name).to eq('address')
+              end
+              expect(permissions).to have_received(:get_scope) do |collection|
+                expect(collection.name).to eq('address')
+              end
               expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
