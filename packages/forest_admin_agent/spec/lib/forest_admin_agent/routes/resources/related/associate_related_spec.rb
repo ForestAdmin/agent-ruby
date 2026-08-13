@@ -67,6 +67,14 @@ module ForestAdminAgent
                     origin_key_target: 'id',
                     foreign_collection: 'note'
                   ),
+                  'notes_by_chapter' => Relations::ManyToManySchema.new(
+                    foreign_key: 'note_chapter',
+                    foreign_collection: 'note',
+                    foreign_key_target: 'chapter',
+                    through_collection: 'note_user',
+                    origin_key: 'user_id',
+                    origin_key_target: 'id'
+                  ),
                   'addresses_poly' => Relations::PolymorphicOneToManySchema.new(
                     origin_key: 'addressable_id',
                     foreign_collection: 'address',
@@ -135,9 +143,21 @@ module ForestAdminAgent
               }
             )
 
+            collection_note_user = build_collection(
+              name: 'note_user',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'user_id' => ColumnSchema.new(column_type: 'Number'),
+                  'note_chapter' => ColumnSchema.new(column_type: 'String')
+                }
+              }
+            )
+
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
             datasource.add_collection(collection_user)
             datasource.add_collection(collection_note)
+            datasource.add_collection(collection_note_user)
             datasource.add_collection(collection_address_user)
             datasource.add_collection(collection_address)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
@@ -293,6 +313,36 @@ module ForestAdminAgent
               expect(@datasource.get_collection('address_user')).not_to have_received(:create)
               expect(result[:content]).to be_nil
               expect(result[:status]).to eq 204
+            end
+
+            context 'when the target has a composite primary key' do
+              before do
+                args[:params]['relation_name'] = 'notes_by_chapter'
+                args[:params]['data'] = [{ 'id' => '7|intro' }]
+                allow(permissions).to receive(:get_scope)
+                  .and_return(Nodes::ConditionTreeLeaf.new('user_id', Operators::NOT_EQUAL, 99))
+                allow(@datasource.get_collection('note')).to receive(:list).and_return([{ 'chapter' => 'intro' }])
+                allow(@datasource.get_collection('note_user')).to receive(:create).and_return(true)
+              end
+
+              it 'matches every key column of the target before linking it' do
+                associate.handle_request(args)
+
+                expect(@datasource.get_collection('note')).to have_received(:list) do |_caller, filter, projection|
+                  expect(filter.condition_tree).to have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'book_id', operator: Operators::EQUAL, value: 7),
+                      have_attributes(field: 'chapter', operator: Operators::EQUAL, value: 'intro'),
+                      have_attributes(field: 'user_id', operator: Operators::NOT_EQUAL, value: 99)
+                    ]
+                  )
+                  expect(projection).to eq(['chapter'])
+                end
+                expect(@datasource.get_collection('note_user')).to have_received(:create) do |_caller, data|
+                  expect(data).to eq({ 'user_id' => 1, 'note_chapter' => 'intro' })
+                end
+              end
             end
 
             context 'when the relation keys target a column that is not the primary key' do
