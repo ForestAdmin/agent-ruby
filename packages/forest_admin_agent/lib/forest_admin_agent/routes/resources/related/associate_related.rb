@@ -22,7 +22,7 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             context = build(args)
-            context.permissions.can?(:edit, context.collection)
+            context.permissions.can?(:edit, context.child_collection)
 
             parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             target_primary_key_values = Utils::Id.unpack_id(context.child_collection, args[:params]['data'][0]['id'],
@@ -44,16 +44,7 @@ module ForestAdminAgent
           private
 
           def associate_one_to_many(relation, parent_primary_key_values, target_primary_key_values, context)
-            id = Schema.primary_keys(context.child_collection)[0]
-            value = Collection.get_value(context.child_collection, context.caller, target_primary_key_values, id)
-            filter = Filter.new(
-              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-                [
-                  ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value),
-                  context.permissions.get_scope(context.child_collection)
-                ]
-              )
-            )
+            filter = target_in_scope_filter(target_primary_key_values, context)
             value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                          relation.origin_key_target)
 
@@ -61,17 +52,7 @@ module ForestAdminAgent
           end
 
           def associate_polymorphic_one_to_many(relation, parent_primary_key_values, target_primary_key_values, context)
-            id = Schema.primary_keys(context.child_collection)[0]
-            value = Collection.get_value(context.child_collection, context.caller, target_primary_key_values, id)
-            filter = Filter.new(
-              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-                [
-                  ConditionTree::Nodes::ConditionTreeLeaf.new(id, 'Equal', value),
-                  context.permissions.get_scope(context.child_collection)
-                ]
-              )
-            )
-
+            filter = target_in_scope_filter(target_primary_key_values, context)
             value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                          relation.origin_key_target)
 
@@ -83,15 +64,38 @@ module ForestAdminAgent
           end
 
           def associate_many_to_many(relation, parent_primary_key_values, target_primary_key_values, context)
-            id = Schema.primary_keys(context.child_collection)[0]
-            foreign_value = Collection.get_value(context.child_collection, context.caller, target_primary_key_values,
-                                                 id)
-            id = Schema.primary_keys(context.collection)[0]
-            origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values, id)
-            record = { relation.origin_key => origin_value, relation.foreign_key => foreign_value }
+            target = find_target_in_scope(target_primary_key_values, relation.foreign_key_target, context)
+            return if target.nil?
+
+            origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
+                                                relation.origin_key_target)
+            record = {
+              relation.origin_key => origin_value,
+              relation.foreign_key => target[relation.foreign_key_target]
+            }
 
             through_collection = context.datasource.get_collection(relation.through_collection)
             through_collection.create(context.caller, record)
+          end
+
+          def find_target_in_scope(target_primary_key_values, foreign_key_target, context)
+            context.child_collection.list(
+              context.caller,
+              target_in_scope_filter(target_primary_key_values, context),
+              Projection.new([foreign_key_target])
+            ).first
+          end
+
+          def target_in_scope_filter(target_primary_key_values, context)
+            Filter.new(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+                [
+                  ConditionTree::ConditionTreeFactory.match_ids(context.child_collection,
+                                                                [target_primary_key_values]),
+                  context.permissions.get_scope(context.child_collection)
+                ]
+              )
+            )
           end
         end
       end
