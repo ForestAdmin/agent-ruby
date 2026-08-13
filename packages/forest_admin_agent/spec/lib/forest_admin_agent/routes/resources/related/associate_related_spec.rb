@@ -62,6 +62,11 @@ module ForestAdminAgent
                     origin_key_target: 'id',
                     foreign_collection: 'address_user'
                   ),
+                  'notes' => Relations::OneToManySchema.new(
+                    origin_key: 'user_id',
+                    origin_key_target: 'id',
+                    foreign_collection: 'note'
+                  ),
                   'addresses_poly' => Relations::PolymorphicOneToManySchema.new(
                     origin_key: 'addressable_id',
                     foreign_collection: 'address',
@@ -77,7 +82,8 @@ module ForestAdminAgent
               name: 'address_user',
               schema: {
                 fields: {
-                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
                   'address_id' => ColumnSchema.new(column_type: 'Number'),
                   'user_id' => ColumnSchema.new(column_type: 'Number'),
                   'address_code' => ColumnSchema.new(column_type: 'String'),
@@ -116,8 +122,22 @@ module ForestAdminAgent
               }
             )
 
+            collection_note = build_collection(
+              name: 'note',
+              schema: {
+                fields: {
+                  'book_id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                                filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'chapter' => ColumnSchema.new(column_type: 'String', is_primary_key: true,
+                                                filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'user_id' => ColumnSchema.new(column_type: 'Number')
+                }
+              }
+            )
+
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
             datasource.add_collection(collection_user)
+            datasource.add_collection(collection_note)
             datasource.add_collection(collection_address_user)
             datasource.add_collection(collection_address)
             ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
@@ -160,6 +180,26 @@ module ForestAdminAgent
                 .and_return(Nodes::ConditionTreeLeaf.new('user_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo')])
               allow(@datasource.get_collection('address_user')).to receive(:update).and_return(true)
+            end
+
+            it 'matches every key column when the target has a composite primary key' do
+              args[:params]['relation_name'] = 'notes'
+              args[:params]['data'] = [{ 'id' => '7|intro' }]
+              allow(@datasource.get_collection('note')).to receive(:update).and_return(true)
+
+              associate.handle_request(args)
+
+              expect(@datasource.get_collection('note')).to have_received(:update) do |_caller, filter, data|
+                expect(filter.condition_tree).to have_attributes(
+                  aggregator: 'And',
+                  conditions: [
+                    have_attributes(field: 'book_id', operator: Operators::EQUAL, value: 7),
+                    have_attributes(field: 'chapter', operator: Operators::EQUAL, value: 'intro'),
+                    have_attributes(field: 'user_id', operator: Operators::NOT_EQUAL, value: 99)
+                  ]
+                )
+                expect(data).to eq({ 'user_id' => 1 })
+              end
             end
 
             it 'call associate_one_to_many' do
