@@ -8,6 +8,11 @@ module ForestAdminAgent
     # Ruby's `==` already performs deep, key-order-independent equality on Hash and (ordered) equality
     # on Array, so it is used directly as the equality primitive.
     module Diff
+      # A key that does not exist on one side of the diff. It is never stored: the key is simply left out
+      # of that side's hash, so `{"flag" => nil}` (a key holding nil) and `{}` (no key) stay tellable
+      # apart in the database — which a revert needs and a string sentinel would only fake.
+      ABSENT = Object.new.freeze
+
       module_function
 
       # @return [Hash{Symbol=>Object}, nil] { previous:, next: } of the changed leaves, or nil when equal.
@@ -55,19 +60,22 @@ module ForestAdminAgent
           sub = diff_at(before, after, key)
           next unless sub
 
-          previous[key] = sub[:previous]
-          next_values[key] = sub[:next]
+          previous[key] = sub[:previous] unless sub[:previous].equal?(ABSENT)
+          next_values[key] = sub[:next] unless sub[:next].equal?(ABSENT)
         end
 
         { previous: previous, next: next_values }
       end
 
-      # A key held with a nil value is not the same thing as a missing key: recursing on the values
-      # alone reads both as nil and reports no change at all.
+      # A key held with a nil value is not the same thing as a missing key: recursing on the values alone
+      # reads both as nil and reports no change at all.
       def diff_at(before, after, key)
         return diff(before[key], after[key]) if before.key?(key) == after.key?(key)
 
-        { previous: before[key], next: after[key] }
+        {
+          previous: before.key?(key) ? before[key] : ABSENT,
+          next: after.key?(key) ? after[key] : ABSENT
+        }
       end
 
       def diff_object_arrays(before, after)
@@ -85,7 +93,55 @@ module ForestAdminAgent
         { previous: previous, next: next_values }
       end
 
-      private_class_method :diff_hashes, :diff_at, :diff_object_arrays
+      # Undo one recorded change: given the value as it stands now and the two sides of the diff that
+      # produced it, return the value as it was before. Nested hashes are walked so untouched keys keep
+      # their current value; a key missing from `previous` was added by the change, so it goes away.
+      #
+      # @param current [Object] the value as it stands now (may be nil when the record is gone)
+      # @param previous [Object] the `previous_values` side of the recorded diff
+      # @param changed [Object] the `new_values` side of the recorded diff
+      def revert(current, previous, changed)
+        return revert_array(current, previous, changed) if current.is_a?(Array) && partial?(previous, changed)
+        return revert_hash(current, previous, changed) if current.is_a?(Hash) && partial?(previous, changed)
+
+        previous
+      end
+
+      # Both sides being hashes is what `diff` emits for a structural diff; anything else replaced the
+      # value as a whole.
+      def partial?(previous, changed)
+        previous.is_a?(Hash) && changed.is_a?(Hash)
+      end
+
+      def revert_hash(current, previous, changed)
+        (previous.keys | changed.keys).each_with_object(current.dup) do |key, result|
+          if previous.key?(key)
+            result[key] = revert(current[key], previous[key], changed[key])
+          else
+            # Only the change introduced this key, so before the change there was none.
+            result.delete(key)
+          end
+        end
+      end
+
+      # Arrays of objects are diffed index by index, and JSON turns those indexes into strings on the way
+      # back out. An element the change appended is dropped, which can only ever shorten the tail.
+      def revert_array(current, previous, changed)
+        result = current.dup
+
+        (previous.keys | changed.keys).map(&:to_i).sort.reverse_each do |index|
+          key = index.to_s
+          if previous.key?(key) || previous.key?(index)
+            result[index] = revert(current[index], previous[key] || previous[index], changed[key] || changed[index])
+          else
+            result.delete_at(index)
+          end
+        end
+
+        result
+      end
+
+      private_class_method :diff_hashes, :diff_at, :diff_object_arrays, :partial?, :revert_hash, :revert_array
     end
   end
 end

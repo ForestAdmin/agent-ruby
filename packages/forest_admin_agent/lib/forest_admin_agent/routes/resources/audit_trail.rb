@@ -26,6 +26,12 @@ module ForestAdminAgent
             '/_audit-trail/:collection_name/:id',
             ->(args) { handle_request(args) }
           )
+          add_route(
+            'forest_audit_trail_state',
+            'get',
+            '/_audit-trail/:collection_name/:id/state',
+            ->(args) { handle_state(args) }
+          )
 
           self
         end
@@ -53,7 +59,41 @@ module ForestAdminAgent
           }
         end
 
+        # Record as it stood at `timestamp`: the current record with every later entry undone. `data` is
+        # null when the record did not exist yet (or not any more) at that instant.
+        def handle_state(args = {})
+          context = build(args)
+          context.permissions.can?(:read, context.collection)
+          assert_record_in_scope(context, context.collection, args[:params]['id'])
+
+          timestamp = parse_state_timestamp(args)
+          entries = store.list_since(
+            collection: context.collection.name, record_id: args[:params]['id'], timestamp: timestamp
+          )
+          # Fully qualified: inside this class, `AuditTrail` is the route itself.
+          current = current_record(context, context.collection, args[:params]['id'])
+          state = ::ForestAdminAgent::AuditTrail::RecordState.at(current, entries)
+
+          {
+            name: args[:params]['collection_name'],
+            content: { data: state, meta: { timestamp: timestamp, reverted: entries.size } }
+          }
+        end
+
         private
+
+        # An ISO-8601 instant, or the same wall-clock forms the history filters accept, read in the request
+        # timezone.
+        def parse_state_timestamp(args)
+          raw = args.dig(:params, 'timestamp').to_s
+          raise Http::Exceptions::ValidationError, 'Missing timestamp' if raw.empty?
+
+          begin
+            Time.iso8601(raw).utc.iso8601(3)
+          rescue ArgumentError
+            parse_date_boundary(raw, request_timezone(args), :start)
+          end
+        end
 
         # JSON:API `sort`: `timestamp` → oldest first, anything else (absent/unsupported) → newest first.
         def parse_sort(args)
@@ -77,15 +117,29 @@ module ForestAdminAgent
           [(number - 1) * size, size]
         end
 
-        def parse_filters(args)
+        def request_timezone(args)
           timezone = args.dig(:params, 'timezone').to_s
-          timezone = 'UTC' if timezone.empty?
+
+          timezone.empty? ? 'UTC' : timezone
+        end
+
+        def parse_filters(args)
+          timezone = request_timezone(args)
 
           {
             user_ids: parse_user_ids(args.dig(:params, 'userIds')),
+            fields: parse_fields(args.dig(:params, 'fields')),
             start_timestamp: parse_date_boundary(args.dig(:params, 'startDate'), timezone, :start),
             end_timestamp: parse_date_boundary(args.dig(:params, 'endDate'), timezone, :end)
           }.compact
+        end
+
+        # Comma-separated field names, kept verbatim (a name may hold a dot). Empty after parsing → no filter.
+        def parse_fields(raw)
+          return nil if raw.nil?
+
+          names = (raw.is_a?(Array) ? raw : raw.to_s.split(',')).map { |name| name.to_s.strip }.reject(&:empty?)
+          names.empty? ? nil : names
         end
 
         # Comma-separated integer ids; non-numeric tokens are dropped. Empty after parsing → no filter.

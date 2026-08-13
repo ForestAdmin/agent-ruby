@@ -20,6 +20,10 @@ module ForestAdminAgent
         )
       end
 
+      def matching_fields(fields)
+        store.list_by_record(collection: 'accounts', record_id: '1', fields: fields).map(&:new_values)
+      end
+
       def connection
         Sql::AuditConnectionBase.connection
       end
@@ -150,6 +154,66 @@ module ForestAdminAgent
         expect(store.send(:model).table_name).to eq('audit_logs')
         expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:correlation_key))
           .to eq(%w[main other])
+      end
+
+      it 'lists only entries whose diff touched one of the given fields' do
+        store.append(record(previous_values: { 'status' => 'open' }, new_values: { 'status' => 'closed' }))
+        store.append(record(previous_values: { 'note' => 'a' }, new_values: { 'note' => 'b' }))
+        # Added key: it exists on the new side only, so both sides have to be searched.
+        store.append(record(previous_values: {}, new_values: { 'tags' => ['x'] }))
+
+        expect(matching_fields(%w[status])).to eq([{ 'status' => 'closed' }])
+        expect(matching_fields(%w[tags])).to eq([{ 'tags' => ['x'] }])
+        expect(matching_fields(%w[status note]).size).to eq(2)
+        expect(matching_fields(%w[missing])).to eq([])
+      end
+
+      it 'treats a field name holding a dot as a whole key, not a path' do
+        store.append(record(previous_values: { 'address.city' => 'Paris' },
+                            new_values: { 'address.city' => 'Lyon' }))
+        store.append(record(previous_values: { 'address' => { 'city' => 'Paris' } },
+                            new_values: { 'address' => { 'city' => 'Lyon' } }))
+
+        expect(matching_fields(['address.city'])).to eq([{ 'address.city' => 'Lyon' }])
+        expect(matching_fields(['address'])).to eq([{ 'address' => { 'city' => 'Lyon' } }])
+      end
+
+      it 'counts with the field filter applied' do
+        store.append(record(previous_values: { 'status' => 'open' }, new_values: { 'status' => 'closed' }))
+        store.append(record(previous_values: { 'note' => 'a' }, new_values: { 'note' => 'b' }))
+
+        expect(store.count_by_record(collection: 'accounts', record_id: '1', fields: %w[status])).to eq(1)
+      end
+
+      it 'refuses to filter by field on an adapter it has no JSON test for' do
+        store.append(record)
+        allow(store.send(:model).connection).to receive(:adapter_name).and_return('Informix')
+
+        expect { store.list_by_record(collection: 'accounts', record_id: '1', fields: %w[status]) }
+          .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not supported on informix/)
+      end
+
+      describe '#list_since' do
+        it 'returns entries strictly newer than the instant, newest first' do
+          store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'older'))
+          store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'at'))
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'newer'))
+
+          history = store.list_since(collection: 'accounts', record_id: '1',
+                                     timestamp: '2026-01-02T03:04:06.000Z')
+
+          expect(history.map(&:correlation_key)).to eq(['newer'])
+        end
+
+        it 'breaks ties on equal timestamps by reverse insertion order' do
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'first'))
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'second'))
+
+          history = store.list_since(collection: 'accounts', record_id: '1',
+                                     timestamp: '2026-01-02T03:04:06.000Z')
+
+          expect(history.map(&:correlation_key)).to eq(%w[second first])
+        end
       end
 
       it 'indexes record_id, correlation_key and user_id' do

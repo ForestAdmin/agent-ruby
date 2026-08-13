@@ -12,6 +12,8 @@ module ForestAdminAgent
         MIGRATIONS_TABLE = 'audit_migrations'.freeze
         # Arbitrary but stable key pair identifying the audit-trail migration critical section.
         ADVISORY_LOCK = [0x464f, 0x5254].freeze # "FO", "RT"
+        # duplicate_schema, and the unique violation on pg_namespace the same race can raise instead.
+        DUPLICATE_SCHEMA_STATES = %w[42P06 23505].freeze
 
         MIGRATIONS = [
           {
@@ -80,9 +82,30 @@ module ForestAdminAgent
           return unless schema?
 
           @connection.execute("CREATE SCHEMA IF NOT EXISTS #{@connection.quote_schema_name(@schema)}")
+        rescue ActiveRecord::RecordNotUnique
+          # 23505 on pg_namespace, already mapped to its own class by ActiveRecord: another instance
+          # created the schema between our IF NOT EXISTS check and the create itself.
+          nil
         rescue ActiveRecord::StatementInvalid => e
-          # Another instance created it concurrently — CREATE SCHEMA is not fully race-free.
-          raise unless /already exists|duplicate/i.match?(e.message)
+          raise unless duplicate_schema?(e)
+        end
+
+        # By SQLSTATE where the adapter exposes one, so an unrelated failure (no permission to create a
+        # schema, say) is not read as a lost race just because its message says "exists".
+        def duplicate_schema?(error)
+          state = sql_state(error)
+          return DUPLICATE_SCHEMA_STATES.include?(state) if state
+
+          /already exists|duplicate/i.match?(error.message)
+        end
+
+        def sql_state(error)
+          cause = error.cause
+          return nil unless cause.respond_to?(:result) && defined?(PG::Result)
+
+          cause.result.error_field(PG::Result::PG_DIAG_SQLSTATE)
+        rescue StandardError
+          nil
         end
 
         def apply_pending

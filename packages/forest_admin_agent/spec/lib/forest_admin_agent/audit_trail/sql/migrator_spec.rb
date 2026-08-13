@@ -65,6 +65,44 @@ module ForestAdminAgent
           expect { migrator.run }.to raise_error(ActiveRecord::StatementInvalid, /permission denied/)
         end
 
+        it 'treats the unique violation on pg_namespace as a lost race' do
+          allow(connection).to receive(:execute) do |sql|
+            raise ActiveRecord::RecordNotUnique, 'duplicate key value' if sql.include?('CREATE SCHEMA')
+
+            executed << sql
+          end
+
+          expect { migrator.run }.not_to raise_error
+        end
+
+        # A message match alone would read "role ... already exists" as a lost race; the SQLSTATE does not.
+        context 'when the adapter exposes a SQLSTATE' do
+          def raise_with_sql_state(state, message)
+            stub_const('PG::Result', Class.new { const_set(:PG_DIAG_SQLSTATE, 67) }) unless defined?(PG::Result)
+            cause = double('PG::Error', result: double('result', error_field: state))
+            error = ActiveRecord::StatementInvalid.new(message)
+            allow(error).to receive(:cause).and_return(cause)
+
+            allow(connection).to receive(:execute) do |sql|
+              raise error if sql.include?('CREATE SCHEMA')
+
+              executed << sql
+            end
+          end
+
+          it 'accepts duplicate_schema' do
+            raise_with_sql_state('42P06', 'ERROR: schema "forest" already exists')
+
+            expect { migrator.run }.not_to raise_error
+          end
+
+          it 'reports anything else, however its message reads' do
+            raise_with_sql_state('42501', 'ERROR: permission denied, object already exists elsewhere')
+
+            expect { migrator.run }.to raise_error(ActiveRecord::StatementInvalid)
+          end
+        end
+
         it 'skips migrations already applied to this table' do
           migrator.run
 

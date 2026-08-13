@@ -22,11 +22,11 @@ module ForestAdminAgent
         model.create!(to_row(record))
       end
 
-      def list_by_record(collection:, record_id:, skip: 0, limit: nil,
-                         user_ids: nil, start_timestamp: nil, end_timestamp: nil, order: 'asc')
+      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil,
+                         start_timestamp: nil, end_timestamp: nil, fields: nil, order: 'asc')
         # `id` (insertion order) breaks ties on equal timestamps in both directions, keeping pages
         # deterministic and stable.
-        relation = scope(collection, record_id, user_ids, start_timestamp, end_timestamp)
+        relation = scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields)
                    .order(timestamp: order.to_s == 'desc' ? :desc : :asc, id: :asc)
                    .offset(skip || 0)
         relation = relation.limit(limit) unless limit.nil?
@@ -34,14 +34,23 @@ module ForestAdminAgent
         relation.map { |row| from_row(row) }
       end
 
-      def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil, end_timestamp: nil)
-        scope(collection, record_id, user_ids, start_timestamp, end_timestamp).count
+      def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+                          end_timestamp: nil, fields: nil)
+        scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields).count
+      end
+
+      # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
+      # Strictly after, so an entry stamped exactly at the requested instant counts as part of that state
+      # instead of being reverted out of it.
+      def list_since(collection:, record_id:, timestamp:)
+        model.where(collection: collection, record_id: record_id)
+             .where('timestamp > ?', as_time(timestamp))
+             .order(timestamp: :desc, id: :desc)
+             .map { |row| from_row(row) }
       end
 
       def list_by_correlation(collection:, record_id:, correlation_key:)
-        model.where(collection: collection, record_id: record_id, correlation_key: correlation_key)
-             .order(:timestamp, :id)
-             .map { |row| from_row(row) }
+        list_by_correlations(collection: collection, record_id: record_id, correlation_keys: [correlation_key])
       end
 
       def list_by_correlations(collection:, record_id:, correlation_keys:)
@@ -54,9 +63,10 @@ module ForestAdminAgent
 
       private
 
-      def scope(collection, record_id, user_ids, start_timestamp, end_timestamp)
+      def scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields = nil)
         relation = model.where(collection: collection, record_id: record_id)
         relation = relation.where(user_id: user_ids) if user_ids
+        relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
         # Compare as Time so ActiveRecord casts the bound to the datetime column's storage format
         # (raw ISO strings with a `Z` would compare lexically against the cast rows and never match).
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp

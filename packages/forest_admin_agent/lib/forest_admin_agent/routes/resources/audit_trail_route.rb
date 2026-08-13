@@ -35,6 +35,18 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
+        # The audited columns as they stand now — the starting point of a state reconstruction. No scope in
+        # the filter: the caller was already authorized against it, and a record that is simply gone has to
+        # come back as nil so the history can restore it.
+        def current_record(context, collection, packed_id)
+          columns = collection.schema[:fields].select { |_name, field| field.type == 'Column' }.keys
+          condition = ConditionTree::ConditionTreeFactory.match_records(
+            collection, [Utils::Id.unpack_id(collection, packed_id, with_key: true)]
+          )
+
+          collection.list(context.caller, Filter.new(condition_tree: condition), Projection.new(columns)).first
+        end
+
         def any_record?(context, collection, condition_tree)
           collection.list(
             context.caller,

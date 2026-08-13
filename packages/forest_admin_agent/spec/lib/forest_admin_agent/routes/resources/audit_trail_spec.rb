@@ -35,6 +35,87 @@ module ForestAdminAgent
           route
         end
 
+        describe 'state reconstruction' do
+          def state_route(entries: [], record: { 'id' => 4, 'status' => 'shipped' })
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
+              .and_return({ audit_trail: { store: store } })
+            allow(store).to receive(:list_since).and_return(entries)
+            allow(collection).to receive(:list).and_return([{ 'id' => 4 }], [record].compact)
+
+            route = described_class.new
+            context = double('context', collection: collection, caller: build_caller, permissions: permissions)
+            allow(route).to receive(:build).and_return(context)
+            route
+          end
+
+          def entry(operation, previous_values = {}, new_values = {})
+            ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: operation, collection: 'projects', record_id: '4',
+              previous_values: previous_values, new_values: new_values
+            )
+          end
+
+          def get_state(route, timestamp: '2026-01-02T10:00:00.000Z', extra: {})
+            route.handle_state(
+              { headers: {},
+                params: { 'collection_name' => 'projects', 'id' => '4', 'timestamp' => timestamp }.merge(extra) }
+            )
+          end
+
+          it 'registers the state route' do
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
+              .and_return({ audit_trail: { store: Object.new } })
+
+            expect(described_class.new.routes).to include('forest_audit_trail_state')
+          end
+
+          it 'returns the record with every later entry undone' do
+            route = state_route(entries: [entry('update', { 'status' => 'paid' }, { 'status' => 'shipped' })])
+
+            result = get_state(route)
+
+            expect(result[:content][:data]).to eq({ 'id' => 4, 'status' => 'paid' })
+            expect(result[:content][:meta]).to eq({ timestamp: '2026-01-02T10:00:00.000Z', reverted: 1 })
+          end
+
+          # Strictly after the requested instant: an entry stamped exactly at it belongs to that state.
+          it 'asks the store for entries strictly newer than the instant' do
+            route = state_route
+            get_state(route)
+
+            expect(store).to have_received(:list_since).with(
+              collection: 'projects', record_id: '4', timestamp: '2026-01-02T10:00:00.000Z'
+            )
+          end
+
+          it 'returns no data when the record did not exist yet' do
+            route = state_route(entries: [entry('create', {}, { 'status' => 'draft' })])
+
+            expect(get_state(route)[:content][:data]).to be_nil
+          end
+
+          it 'reads a wall-clock instant in the request timezone' do
+            route = state_route
+            get_state(route, timestamp: '2026-01-02T08:30', extra: { 'timezone' => 'America/New_York' })
+
+            expect(store).to have_received(:list_since).with(hash_including(timestamp: '2026-01-02T13:30:00.000Z'))
+          end
+
+          it 'rejects a missing timestamp' do
+            route = state_route
+
+            expect { get_state(route, timestamp: '') }.to raise_error(
+              Http::Exceptions::ValidationError, /Missing timestamp/
+            )
+          end
+
+          it 'rejects an unparsable timestamp' do
+            route = state_route
+
+            expect { get_state(route, timestamp: 'yesterday') }.to raise_error(Http::Exceptions::ValidationError)
+          end
+        end
+
         it 'registers the record-history route when an audit_trail store is configured' do
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: Object.new } })
@@ -126,6 +207,24 @@ module ForestAdminAgent
           route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'page' => 'foo' } })
 
           expect(store).to have_received(:list_by_record).with(hash_including(skip: 0, limit: 20))
+        end
+
+        it 'passes a fields filter through, keeping names that hold a dot' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'fields' => 'status, address.city ,' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_including(fields: ['status', 'address.city']))
+          expect(store).to have_received(:count_by_record).with(hash_including(fields: ['status', 'address.city']))
+        end
+
+        it 'sends no fields filter when the param is absent or empty' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4', 'fields' => ' , ' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_excluding(:fields))
         end
 
         it 'parses userIds, dropping non-numeric tokens' do

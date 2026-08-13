@@ -79,6 +79,12 @@ independent of the page. Optional filters (all combine with `AND`; omit them for
 | `userIds`   | comma-separated integers `12,45` | keep only entries whose `user_id` is in the list |
 | `startDate` | `YYYY-MM-DD` or datetime (incl.) | keep entries from this lower bound onward       |
 | `endDate`   | `YYYY-MM-DD` or datetime (incl.) | keep entries up to this upper bound             |
+| `fields`    | comma-separated field names      | keep only entries whose diff touched one of them |
+
+`fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
+reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
+only and one it removed in `previousValues` only. The JSON test is per adapter (Postgres, SQLite, MySQL /
+MariaDB); on any other adapter the filter raises rather than silently returning everything.
 
 `startDate` / `endDate` are read as **local wall-clock time** in the request `timezone` query param
 (e.g. `Europe/Paris`, default `UTC`) and converted to a UTC instant before querying, so filtering
@@ -105,6 +111,26 @@ All three routes serialize audit records the same way: top-level keys are camelC
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
 audit trail, and the delete event itself is the last thing recorded.
+
+### State route
+
+`GET /forest/_audit-trail/{collection}/{recordId}/state?timestamp=…` returns the record as it stood at
+that instant, rebuilt by taking the record as it stands now and undoing every entry recorded **strictly
+after** the timestamp — an entry stamped exactly at it counts as part of that state:
+
+```json
+{ "data": { "status": "paid", "address": { "city": "Paris" } }, "meta": { "timestamp": "…", "reverted": 3 } }
+```
+
+`timestamp` accepts an ISO-8601 instant, or the same wall-clock forms as the filters above read in the
+request `timezone`; it is required (**400** otherwise). `data` is `null` when the record did not exist at
+that instant — either created later, or deleted and never recreated.
+
+Walking back stops being able to help where the trail stops: only audited (writable) columns are
+reconstructed, and a `create` means the record did not exist before it, while a `delete` restores the whole
+row it recorded and the walk carries on into any earlier life of the same id.
+
+> The exact response shape is not yet pinned against a consumer — no frontend reads this endpoint today.
 
 ### Correlation route
 

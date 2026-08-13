@@ -40,8 +40,20 @@ module ForestAdminRails
 
     # Echo the agent-generated correlation id on every response (mirrors the Node agent's
     # router.use(correlationIdMiddleware)); CORS exposure of the header is handled in load_cors.
+    #
+    # Ahead of ShowExceptions rather than at the end of the stack: a Rack middleware can only add a header
+    # to a response it sees returned, so sitting under the exception handlers meant error responses they
+    # build on the way out never carried the id.
     def load_correlation_id
-      config.middleware.use ForestAdminAgent::Http::CorrelationIdMiddleware
+      middleware = ForestAdminAgent::Http::CorrelationIdMiddleware
+
+      begin
+        config.middleware.insert_before ActionDispatch::ShowExceptions, middleware
+      rescue StandardError
+        # No ShowExceptions in this stack (or already gone): the id still reaches every response the app
+        # returns normally.
+        config.middleware.use middleware
+      end
     end
 
     def load_configuration

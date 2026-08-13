@@ -272,6 +272,39 @@ module ForestAdminRails
     end
   end
 
+  RSpec.describe 'load_correlation_id' do
+    let(:engine_class) { ForestAdminRails::Engine }
+    let(:engine_instance) { engine_class.allocate }
+    # rubocop:disable RSpec/VerifiedDoubles
+    let(:config) { double('config') }
+    let(:middleware) { double('middleware') }
+    # rubocop:enable RSpec/VerifiedDoubles
+
+    before do
+      allow(engine_instance).to receive(:config).and_return(config)
+      allow(config).to receive(:middleware).and_return(middleware)
+    end
+
+    # Under the exception handlers, the 500 they build on the way out would never carry the header.
+    it 'inserts the middleware ahead of the exception handlers' do
+      allow(middleware).to receive(:insert_before)
+
+      engine_instance.load_correlation_id
+
+      expect(middleware).to have_received(:insert_before)
+        .with(ActionDispatch::ShowExceptions, ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+
+    it 'falls back to appending when the stack has no exception handler to insert before' do
+      allow(middleware).to receive(:insert_before).and_raise(RuntimeError, 'no such middleware')
+      allow(middleware).to receive(:use)
+
+      engine_instance.load_correlation_id
+
+      expect(middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+  end
+
   RSpec.describe 'Engine autoload behaviour' do
     it 'does not register an initializer that adds the host lib/ to autoload_paths' do
       initializer_names = ForestAdminRails::Engine.initializers.map(&:name)
