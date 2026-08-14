@@ -1,3 +1,10 @@
+## [1.38.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.2...v1.38.3) (2026-08-14)
+
+
+### Bug Fixes
+
+* **agent:** serialize every level of a projection deeper than one relation ([#357](https://github.com/ForestAdmin/agent-ruby/issues/357)) ([a1e8cbd](https://github.com/ForestAdmin/agent-ruby/commit/a1e8cbde08321f368a4cabd46d8096ba2e8f80ca))
+
 ## [1.38.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.1...v1.38.2) (2026-08-13)
 
 
