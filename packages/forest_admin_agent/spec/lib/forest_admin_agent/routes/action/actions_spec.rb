@@ -61,7 +61,7 @@ module ForestAdminAgent
             expect(store).to have_received(:append).twice
             expect(store).to have_received(:append).with(
               having_attributes(operation: 'action', collection: 'orders', record_id: '4',
-                                new_values: { 'amount' => 30, 'reason' => '[redacted]' })
+                                previous_values: { 'amount' => 30, 'reason' => '[redacted]' })
             )
           end
 
@@ -80,6 +80,20 @@ module ForestAdminAgent
           end
 
           # An action reporting failure through result_builder.error never raises, so only the result says so.
+          it 'records what the action answered' do
+            execute(result: { type: 'Success', message: 'done', response_headers: { 'X-Token' => 'x' } })
+
+            expect(store).to have_received(:append).with(
+              having_attributes(operation: 'action', new_values: { 'type' => 'Success', 'message' => 'done' })
+            ).twice
+          end
+
+          it 'records no answer when the action raised' do
+            expect { execute { raise StandardError, 'boom' } }.to raise_error(StandardError)
+
+            expect(store).to have_received(:append).with(having_attributes(new_values: {})).twice
+          end
+
           it 'records an Error result as a failed run, and still returns it' do
             result = execute(result: { type: 'Error', message: 'not allowed' })
 

@@ -36,12 +36,15 @@ module ForestAdminAgent
         )
       end
 
-      it 'persists a smart-action row, form values included' do
-        store.append(record(operation: 'action', previous_values: {}, new_values: { 'amount' => 30 }))
+      # An action row uses the two sides for what went in and what came back.
+      it 'persists a smart-action row, submitted form and answer included' do
+        store.append(record(operation: 'action', previous_values: { 'amount' => 30 },
+                            new_values: { 'type' => 'Success', 'message' => 'Refunded' }))
 
         audit = store.list_by_record(collection: 'accounts', record_id: '1').first
         expect(audit.operation).to eq('action')
-        expect(audit.new_values).to eq({ 'amount' => 30 })
+        expect(audit.previous_values).to eq({ 'amount' => 30 })
+        expect(audit.new_values).to eq({ 'type' => 'Success', 'message' => 'Refunded' })
       end
 
       it 'persists and reads back a record, decoding the JSON columns' do

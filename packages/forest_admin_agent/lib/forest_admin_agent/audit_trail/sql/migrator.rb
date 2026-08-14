@@ -1,8 +1,8 @@
 module ForestAdminAgent
   module AuditTrail
     module Sql
-      # Creates and evolves the audit table through an ordered, append-only list of migrations, tracked
-      # in a dedicated `audit_migrations` table (namespaced in the `forest` schema on Postgres).
+      # Applies {Migrations::ALL} to the audit table, tracking what has run in a dedicated
+      # `audit_migrations` table (namespaced in the `forest` schema on Postgres).
       #
       # On Postgres the migrations run inside a transaction-scoped advisory lock, so several agent
       # instances booting at once apply them one after another instead of racing on the same DDL. The
@@ -14,34 +14,6 @@ module ForestAdminAgent
         ADVISORY_LOCK = [0x464f, 0x5254].freeze # "FO", "RT"
         # duplicate_schema, and the unique violation on pg_namespace the same race can raise instead.
         DUPLICATE_SCHEMA_STATES = %w[42P06 23505].freeze
-
-        MIGRATIONS = [
-          {
-            name: '001-create-audit-logs',
-            up: lambda do |connection, table|
-              # if_not_exists: a non-PG race (no advisory lock) can let two instances both reach here.
-              connection.create_table(table, if_not_exists: true) do |t|
-                t.datetime :timestamp, null: false
-                t.string :operation, null: false
-                t.string :collection, null: false
-                t.string :record_id, null: false
-                t.integer :user_id
-                t.string :correlation_key
-                t.json :previous_values
-                t.json :new_values
-              end
-            end
-          },
-          {
-            name: '002-index-record-and-correlation',
-            up: lambda do |connection, table|
-              base = table.split('.').last
-              connection.add_index(table, :record_id, name: "#{base}_record_id", if_not_exists: true)
-              connection.add_index(table, :correlation_key, name: "#{base}_correlation_key", if_not_exists: true)
-              connection.add_index(table, :user_id, name: "#{base}_user_id", if_not_exists: true)
-            end
-          }
-        ].freeze
 
         def initialize(connection, schema:, table_name:)
           @connection = connection
@@ -112,7 +84,7 @@ module ForestAdminAgent
           done = applied_migrations
           table = qualified(@table_name)
 
-          MIGRATIONS.each do |migration|
+          Migrations::ALL.each do |migration|
             # The tracking table is shared by every audit table of the database/schema, so the target
             # table belongs in the key: a store configured with another `table_name` must still get its
             # own table created instead of reading someone else's migration as done. Rows written by

@@ -12,6 +12,12 @@ module ForestAdminAgent
 
       EXECUTED = 'action'.freeze
       FAILED = 'action_failed'.freeze
+      # What of the action's answer is worth keeping — an allowlist, not a denylist: a result also carries
+      # the file's contents, a webhook's body and headers and arbitrary response headers. File bytes have no
+      # business in an audit table and the other two routinely hold credentials, and an allowlist means a
+      # field added to a result later is not stored until someone decides it should be. `html` is left out
+      # too: operator-facing markup, sometimes large, and the message already says what happened.
+      RESULT_FIELDS = %i[type message name mime_type method url path].freeze
       # Bulk runs over a select-all selection, and global actions, target no id we can name without
       # querying the whole selection: they get one row attached to no record rather than none at all.
       NO_RECORD = ''.freeze
@@ -22,7 +28,7 @@ module ForestAdminAgent
       end
 
       # No-op unless an audit database was configured, and best-effort: the action has already run.
-      def record(caller:, collection:, form_values:, record_ids:, failed: false)
+      def record(caller:, collection:, form_values:, record_ids:, result: nil, failed: false)
         return unless @store
 
         audit_safely do
@@ -40,12 +46,20 @@ module ForestAdminAgent
                 record_id: record_id,
                 user_id: caller&.id,
                 correlation_key: correlation_key,
-                previous_values: {},
-                new_values: values
+                previous_values: values,
+                new_values: summarize(result) || {}
               )
             )
           end
         end
+      end
+
+      private
+
+      def summarize(result)
+        return nil unless result.is_a?(Hash)
+
+        result.slice(*RESULT_FIELDS).compact.transform_keys(&:to_s)
       end
     end
   end

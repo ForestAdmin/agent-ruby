@@ -36,8 +36,8 @@ module ForestAdminAgent
         expect(audit.record_id).to eq('4')
         expect(audit.user_id).to eq(42)
         expect(audit.correlation_key).to eq('req-xyz')
-        expect(audit.previous_values).to eq({})
-        expect(audit.new_values).to eq({ 'amount' => 30, 'reason' => 'damaged' })
+        expect(audit.previous_values).to eq({ 'amount' => 30, 'reason' => 'damaged' })
+        expect(audit.new_values).to eq({})
       end
 
       it 'writes one row per selected record, sharing timestamp and correlation key' do
@@ -65,7 +65,50 @@ module ForestAdminAgent
 
         audit = record(capture: capture).last
 
-        expect(audit.new_values).to eq({ 'amount' => 30, 'reason' => Recording::REDACTED })
+        expect(audit.previous_values).to eq({ 'amount' => 30, 'reason' => Recording::REDACTED })
+      end
+
+      describe 'the action answer' do
+        it 'keeps the type and the message of a success' do
+          audit = record(result: { response_headers: {}, type: 'Success', message: 'Refunded', invalidated: [] }).last
+
+          expect(audit.new_values).to eq({ 'type' => 'Success', 'message' => 'Refunded' })
+        end
+
+        it 'keeps the type and the message of an error' do
+          audit = record(result: { type: 'Error', message: 'not allowed', html: nil }, failed: true).last
+
+          expect(audit.new_values).to eq({ 'type' => 'Error', 'message' => 'not allowed' })
+        end
+
+        # A file result carries the whole file; a webhook carries its body and headers, which is where
+        # credentials live. None of that belongs in an audit table.
+        it 'never keeps a file stream, nor a webhook body or headers' do
+          file = record(result: { type: 'File', name: 'refunds.csv', mime_type: 'text/csv',
+                                  stream: 'id,amount\n1,30' }).last
+          webhook = record(result: { type: 'Webhook', url: 'https://pay.test/refund', method: 'POST',
+                                     body: { 'secret' => 'x' }, headers: { 'Authorization' => 'Bearer t' } }).last
+
+          expect(file.new_values).to eq({ 'type' => 'File', 'name' => 'refunds.csv', 'mime_type' => 'text/csv' })
+          expect(webhook.new_values).to eq({ 'type' => 'Webhook', 'url' => 'https://pay.test/refund',
+                                             'method' => 'POST' })
+        end
+
+        it 'drops the response headers of any result' do
+          audit = record(result: { response_headers: { 'Set-Cookie' => 'session=x' }, type: 'Success' }).last
+
+          expect(audit.new_values).to eq({ 'type' => 'Success' })
+        end
+
+        it 'keeps where a redirect pointed' do
+          audit = record(result: { type: 'Redirect', path: '/orders/4' }).last
+
+          expect(audit.new_values).to eq({ 'type' => 'Redirect', 'path' => '/orders/4' })
+        end
+
+        it 'stores no answer at all when the action raised' do
+          expect(record(failed: true).last.new_values).to eq({})
+        end
       end
 
       it 'does nothing without a configured store' do

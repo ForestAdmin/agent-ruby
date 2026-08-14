@@ -164,11 +164,21 @@ the store. A missing `collection` or `recordId` returns **HTTP 400** (`Validatio
 
 Running a smart action writes one row per selected record, in the same table:
 
-| column      | value                                                                      |
-| ----------- | -------------------------------------------------------------------------- |
-| `operation` | `action` when it went through, `action_failed` when it raised or answered with an `Error` result |
-| `newValues` | the submitted form values (redacted with the same `redact` config)          |
-| `recordId`  | each selected record — empty for a global action or a select-all selection  |
+| column           | value                                                                      |
+| ---------------- | -------------------------------------------------------------------------- |
+| `operation`      | `action` when it went through, `action_failed` when it raised or answered with an `Error` result |
+| `previousValues` | the submitted form values (redacted with the same `redact` config)          |
+| `newValues`      | what the action answered — an allowlist of the result: `type`, `message`, `name`, `mimeType`, `method`, `url`, `path`. Empty when it raised |
+| `recordId`       | each selected record — empty for a global action or a select-all selection  |
+
+The two value columns carry what went in and what came back, rather than a record's before and after. A
+result also holds the file's contents, a webhook's body and headers, and arbitrary response headers: file
+bytes have no business in an audit table and the other two routinely hold credentials, so the stored answer
+is an allowlist — a field added to a result later is not recorded until someone decides it should be. `html`
+is left out too, being operator-facing markup the message already summarises.
+
+Because these are the same columns the field filter searches, filtering by a field named like a result key
+(`message`, `type`) also matches action rows.
 
 **Which** action ran is not stored: the Forest activity logs already record it, and
 `correlationKey` is the join between the two.

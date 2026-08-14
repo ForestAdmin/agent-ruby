@@ -9,6 +9,8 @@ module ForestAdminAgent
     class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
+      COLUMNS = %i[timestamp operation collection record_id user_id correlation_key
+                   previous_values new_values].freeze
 
       def initialize(database:, schema: DEFAULT_SCHEMA, table_name: DEFAULT_TABLE)
         @database = database
@@ -113,30 +115,18 @@ module ForestAdminAgent
         schema ? "#{schema}.#{@table_name}" : @table_name
       end
 
+      # An AuditRecord is a Struct and a row answers to `[]` too, so the mapping is the column list itself.
       def to_row(record)
-        {
-          timestamp: record.timestamp,
-          operation: record.operation,
-          collection: record.collection,
-          record_id: record.record_id,
-          user_id: record.user_id,
-          correlation_key: record.correlation_key,
-          previous_values: record.previous_values,
-          new_values: record.new_values
-        }
+        COLUMNS.to_h { |column| [column, record[column]] }
       end
 
       def from_row(row)
-        AuditRecord.new(
-          timestamp: row.timestamp.respond_to?(:iso8601) ? row.timestamp.iso8601(3) : row.timestamp.to_s,
-          operation: row.operation,
-          collection: row.collection,
-          record_id: row.record_id,
-          user_id: row.user_id,
-          correlation_key: row.correlation_key,
-          previous_values: row.previous_values || {},
-          new_values: row.new_values || {}
-        )
+        values = COLUMNS.to_h { |column| [column, row[column]] }
+        values[:timestamp] = row.timestamp.respond_to?(:iso8601) ? row.timestamp.iso8601(3) : row.timestamp.to_s
+        values[:previous_values] ||= {}
+        values[:new_values] ||= {}
+
+        AuditRecord.new(**values)
       end
     end
   end

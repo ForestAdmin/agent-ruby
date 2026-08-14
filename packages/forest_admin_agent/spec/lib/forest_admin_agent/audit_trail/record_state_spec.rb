@@ -65,10 +65,16 @@ module ForestAdminAgent
         expect(described_class.at({ 'status' => 'draft' }, entries)).to eq({ 'status' => 'archived' })
       end
 
-      it 'ignores smart-action rows, which carry no field change' do
+      # An action row's two value columns hold the submitted form and the action's answer, not a record's
+      # before and after: applying either would corrupt the rebuild.
+      it 'ignores smart-action rows, whichever way they went' do
         current = { 'status' => 'shipped' }
+        entries = [
+          entry('action', { 'status' => 'submitted value' }, { 'type' => 'Success' }),
+          entry('action_failed', { 'status' => 'submitted value' }, {})
+        ]
 
-        expect(described_class.at(current, [entry('action', {}, { 'amount' => 30 })])).to eq(current)
+        expect(described_class.at(current, entries)).to eq(current)
       end
 
       it 'undoes a nested change without disturbing the rest of the object' do

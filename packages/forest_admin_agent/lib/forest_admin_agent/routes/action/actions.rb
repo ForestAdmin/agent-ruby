@@ -122,7 +122,7 @@ module ForestAdminAgent
         # to say so through `result_builder.error` instead.
         def execute_and_audit(context, args, data, filter)
           result = context.collection.execute(context.caller, @action_name, data, filter)
-          audit_action(context, args, data, failed: error_result?(result))
+          audit_action(context, args, data, result: result, failed: error_result?(result))
 
           result
         rescue StandardError
@@ -134,7 +134,7 @@ module ForestAdminAgent
           result.is_a?(Hash) && result[:type] == 'Error'
         end
 
-        def audit_action(context, args, data, failed: false)
+        def audit_action(context, args, data, result: nil, failed: false)
           capture = ForestAdminAgent::AuditTrail::ActionCapture.new(
             ForestAdminAgent::AuditTrail.store, ForestAdminAgent::AuditTrail.options[:redact]
           )
@@ -144,6 +144,7 @@ module ForestAdminAgent
             collection: context.collection.name,
             form_values: data,
             record_ids: audited_record_ids(args, context),
+            result: result,
             failed: failed
           )
         end

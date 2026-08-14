@@ -27,7 +27,8 @@ module ForestAdminAgent
         when 'update'
           revert_columns(state, entry)
         else
-          # Action rows carry no field change.
+          # Action rows carry no field change: their two value columns hold what was submitted to the action
+          # and what it answered, so applying either as a column change would corrupt the rebuild.
           state
         end
       end
