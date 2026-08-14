@@ -316,11 +316,24 @@ module ForestAdminAgent
         context 'when the collection has no polymorphic relation' do
           let(:collection) do
             datasource = Datasource.new
+            collection_company = Collection.new(datasource, 'Company')
+            collection_company.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'name' => ColumnSchema.new(column_type: 'String')
+              }
+            )
             collection_person = Collection.new(datasource, 'Person')
             collection_person.add_fields(
               {
                 'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                'name' => ColumnSchema.new(column_type: 'String')
+                'name' => ColumnSchema.new(column_type: 'String'),
+                'company_id' => ColumnSchema.new(column_type: 'Number'),
+                'company' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'company_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Company'
+                )
               }
             )
             collection = Collection.new(datasource, 'Book')
@@ -339,6 +352,7 @@ module ForestAdminAgent
 
             datasource.add_collection(collection)
             datasource.add_collection(collection_person)
+            datasource.add_collection(collection_company)
 
             return collection
           end
@@ -366,6 +380,36 @@ module ForestAdminAgent
 
             expect(described_class.parse_projection_from_header(collection, args)).to eq(
               Projection.new(%w[title author:name])
+            )
+          end
+
+          it 'keep a path going through more than one relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:company:name' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:company:name])
+            )
+          end
+
+          it 'validate the last field of a path going through more than one relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:company:nope' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*Company\.nope/
+            )
+          end
+
+          it 'rejects a path that traverses a column instead of a relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:name:nope' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
             )
           end
 
@@ -470,6 +514,116 @@ module ForestAdminAgent
 
             expect(described_class.parse_projection_from_header(collection, args)).to eq(
               Projection.new(%w[title author:name])
+            )
+          end
+        end
+
+        context 'when a polymorphic relation is nested under another relation' do
+          let(:collection) do
+            datasource = Datasource.new
+            collection_car = Collection.new(datasource, 'Car')
+            collection_car.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'brand' => ColumnSchema.new(column_type: 'String')
+              }
+            )
+            collection_person = Collection.new(datasource, 'Person')
+            collection_person.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'name' => ColumnSchema.new(column_type: 'String'),
+                'documentable_id' => ColumnSchema.new(column_type: 'Number'),
+                'documentable_type' => ColumnSchema.new(column_type: 'String'),
+                'documentable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key: 'documentable_id',
+                  foreign_key_type_field: 'documentable_type',
+                  foreign_collections: %w[Car],
+                  foreign_key_targets: { 'Car' => 'id' }
+                ),
+                'documents' => Relations::PolymorphicOneToManySchema.new(
+                  origin_key: 'documentable_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'Car',
+                  origin_type_field: 'documentable_type',
+                  origin_type_value: 'Person'
+                )
+              }
+            )
+            collection = Collection.new(datasource, 'Book')
+            collection.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'title' => ColumnSchema.new(column_type: 'String'),
+                'author_id' => ColumnSchema.new(column_type: 'Number'),
+                'author' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'author_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Person'
+                )
+              }
+            )
+
+            [collection, collection_person, collection_car].each { |c| datasource.add_collection(c) }
+
+            return collection
+          end
+
+          it 'adds the type and key columns next to the nested polymorphic relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:documentable:*' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:documentable:* author:documentable_type author:documentable_id])
+            )
+          end
+
+          it 'does not add a column twice when it is already requested' do
+            args = {
+              headers: { 'HTTP_FOREST_PROJECTION' => 'author:documentable:*,author:documentable_type' },
+              params: {}
+            }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[author:documentable:* author:documentable_type author:documentable_id])
+            )
+          end
+
+          it 'normalizes a bare nested polymorphic relation like a bare root one' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:documentable' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(%w[title author:documentable:* author:documentable_type author:documentable_id])
+            )
+          end
+
+          it 'gives a bare and a starred nested polymorphic relation the same projection' do
+            bare = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:documentable' }, params: {} }
+            starred = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:documentable:*' }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, bare)).to eq(
+              described_class.parse_projection_from_header(collection, starred)
+            )
+          end
+
+          it 'rejects a field nested under a nested polymorphic relation' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:documentable:brand' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Unexpected nested field brand under generic relation/
+            )
+          end
+
+          it 'rejects a to-many hop at any depth' do
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => 'author:documents:title' }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Unexpected field type: 'Person.documents'/
             )
           end
         end

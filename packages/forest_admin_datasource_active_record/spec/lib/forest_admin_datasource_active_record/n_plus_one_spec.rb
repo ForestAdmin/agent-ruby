@@ -114,6 +114,38 @@ module ForestAdminDatasourceActiveRecord
       end
     end
 
+    describe 'User collection with a projection more than one relation deep' do
+      let(:collection) { Collection.new(datasource, User) }
+
+      before do
+        User.delete_all
+        @car_above_default_scope = Car.unscoped.create!(id: 11, reference: 'CAR11', category: Category.first)
+        User.create!(first_name: 'Carol', last_name: 'King', car: @car_above_default_scope)
+      end
+
+      it 'hydrates every level of the chain' do
+        projection = Projection.new(['id', 'car:reference', 'car:category:label'])
+
+        result = collection.list(caller, filter, projection)
+
+        expect(result.first['car']['reference']).to eq('CAR11')
+        expect(result.first['car']['category']['label']).to eq('Test Category')
+      end
+
+      it 'preloads each level of the chain in one batched query, whatever the number of rows' do
+        projection = Projection.new(['id', 'car:category:label'])
+
+        5.times { |i| User.create!(first_name: "User#{i}", last_name: 'Test', car: @car_above_default_scope) }
+
+        query_count = count_queries do
+          result = collection.list(caller, filter, projection)
+          expect(result.first['car']['category']).to have_key('label')
+        end
+
+        expect(query_count).to eq(3)
+      end
+    end
+
     describe 'verification that eager loading is applied' do
       let(:collection) { Collection.new(datasource, Car) }
 

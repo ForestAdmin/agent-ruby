@@ -147,6 +147,104 @@ module ForestAdminAgent
             )
           end
         end
+
+        describe 'handle_request with a projection deeper than one relation' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer, 'HTTP_FOREST_PROJECTION' => 'title,author:company:name' },
+              params: {
+                'collection_name' => 'book',
+                'id' => 1,
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          before do
+            datasource = Datasource.new
+
+            company_collection = build_collection(
+              name: 'company',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'name' => ColumnSchema.new(column_type: 'String')
+                }
+              }
+            )
+
+            author_collection = build_collection(
+              name: 'author',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'name' => ColumnSchema.new(column_type: 'String'),
+                  'company_id' => ColumnSchema.new(column_type: 'Number'),
+                  'company' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'company_id',
+                    foreign_key_target: 'id',
+                    foreign_collection: 'company'
+                  )
+                }
+              }
+            )
+
+            book_collection = build_collection(
+              name: 'book',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::IN, Operators::EQUAL]),
+                  'title' => ColumnSchema.new(column_type: 'String'),
+                  'author_id' => ColumnSchema.new(column_type: 'Number'),
+                  'author' => Relations::ManyToOneSchema.new(
+                    foreign_key: 'author_id',
+                    foreign_key_target: 'id',
+                    foreign_collection: 'author'
+                  )
+                }
+              }
+            )
+
+            allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+            [company_collection, author_collection, book_collection].each { |c| datasource.add_collection(c) }
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+            @datasource = ForestAdminAgent::Facades::Container.datasource
+            allow(@datasource.get_collection('book')).to receive(:list).and_return(
+              [
+                {
+                  'id' => 1,
+                  'title' => 'Foundation',
+                  'author' => {
+                    'id' => 10,
+                    'company' => { 'id' => 100, 'name' => 'Gnome Press' }
+                  }
+                }
+              ]
+            )
+          end
+
+          it 'reads the two-hop path from the Forest-Projection header' do
+            show.handle_request(args)
+
+            expect(@datasource.get_collection('book')).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to include('title', 'author:company:name')
+            end
+          end
+
+          it 'serializes the record at the end of the two-hop path' do
+            result = show.handle_request(args)
+
+            included = result[:content]['included'].to_h { |resource| [resource['type'], resource] }
+
+            expect(included.keys).to contain_exactly('author', 'company')
+            expect(included['company']['id']).to eq('100')
+            expect(included['company']['attributes']['name']).to eq('Gnome Press')
+          end
+        end
       end
     end
   end

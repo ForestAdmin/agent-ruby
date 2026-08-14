@@ -53,7 +53,7 @@ module ForestAdminAgent
                 is_collection: true,
                 class_name: context.child_collection.name,
                 serializer: Serializer::ForestSerializer,
-                include: projection.relations.keys
+                include: projection.relation_include_paths
               )
             }
           end

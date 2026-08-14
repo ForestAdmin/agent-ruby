@@ -82,6 +82,44 @@ module ForestAdminDatasourceToolkit
           end
         end
 
+        context 'when validating fields under a generic relation' do
+          before do
+            @collection_documents = Collection.new(@datasource, 'documents')
+            @collection_documents.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER, is_primary_key: true),
+                'documentable_id' => ColumnSchema.new(column_type: Concerns::PrimitiveTypes::NUMBER),
+                'documentable_type' => ColumnSchema.new(column_type: Concerns::PrimitiveTypes::STRING),
+                'documentable' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'documentable_type',
+                  foreign_collections: ['cars'],
+                  foreign_key_targets: { 'cars' => 'id' },
+                  foreign_key: 'documentable_id'
+                )
+              }
+            )
+            @datasource.add_collection(@collection_documents)
+          end
+
+          it 'allows the wildcard' do
+            expect { described_class.validate(@collection_documents, 'documentable:*') }.not_to raise_error
+          end
+
+          it 'throws on a field nested under the relation' do
+            expect do
+              described_class.validate(@collection_documents, 'documentable:brand')
+            end.to raise_error(ValidationError,
+                               'Unexpected nested field brand under generic relation: documents.documentable')
+          end
+
+          it 'throws on a field nested under the wildcard' do
+            expect do
+              described_class.validate(@collection_documents, 'documentable:*:brand')
+            end.to raise_error(ValidationError,
+                               'Unexpected nested field *:brand under generic relation: documents.documentable')
+          end
+        end
+
         context 'when validating a json field with an array value' do
           it 'allows the array as a value' do
             collection = Collection.new(@datasource, 'owner')
