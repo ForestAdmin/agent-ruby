@@ -1,3 +1,4 @@
+require 'jsonapi-serializers'
 require 'openid_connect'
 
 module ForestAdminRails

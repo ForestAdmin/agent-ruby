@@ -217,6 +217,27 @@ module ForestAdminRails
           expect(logger).not_to have_received(:log)
         end
       end
+
+      context 'with a serializer error, which descends from Exception and not StandardError' do
+        it 'names a constant the rescue clause can resolve' do
+          expect(defined?(JSONAPI::Serializer::Error)).to eq('constant')
+          expect(JSONAPI::Serializer::Error.superclass).to eq(Exception)
+        end
+
+        it 'reports and logs it instead of letting it escape' do
+          exception = JSONAPI::Serializer::InvalidIncludeError.new("'*' is not a valid include.")
+          allow(exception).to receive(:full_message).and_return('Full error trace')
+
+          begin
+            raise exception
+          rescue StandardError, JSONAPI::Serializer::Error => e
+            controller.send(:exception_handler, e)
+          end
+
+          expect(response_mock.status).to eq(500)
+          expect(logger).to have_received(:log).with('Error', 'Full error trace')
+        end
+      end
     end
 
     describe '#forest_response' do
