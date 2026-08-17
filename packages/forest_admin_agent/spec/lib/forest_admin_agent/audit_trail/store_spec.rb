@@ -128,25 +128,28 @@ module ForestAdminAgent
         expect(store.list_by_correlations(collection: 'accounts', record_id: '1', correlation_keys: [])).to eq([])
       end
 
-      it 'tracks applied migrations and is idempotent across stores' do
+      it 'tracks applied migrations beside the table they built, and is idempotent across stores' do
         store.append(record)
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
-        names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
-        expect(names).to eq(
-          ['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation',
-           'audit_logs:003-add-user-identity', 'audit_logs:004-add-action-name', 'audit_logs:005-add-status',
-           'audit_logs:006-record-id-nullable-text']
-        )
+        names = connection.select_values('SELECT name FROM audit_logs_migration ORDER BY name')
+        expect(names).to eq(['001-create-audit-logs'])
       end
 
-      it 'migrates a second table in the same database instead of reading the first one as done' do
+      # One tracker per audited table, so a second store does not read the first one's history as its own.
+      it 'migrates a second table in the same database, tracking it separately' do
         store.append(record)
         other = described_class.new(database: { adapter: 'sqlite3', database: db.path }, table_name: 'other_logs')
 
         expect { other.append(record) }.not_to raise_error
         expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
         expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
+        expect(connection.select_values('SELECT name FROM other_logs_migration')).to eq(['001-create-audit-logs'])
+      end
+
+      # Every write sets it, so a row without one is a bug rather than a row quietly claiming to be done.
+      it 'refuses a row with no status' do
+        expect { store.append(record(status: nil)) }.to raise_error(ActiveRecord::NotNullViolation)
       end
 
       it 'binds each store to its own model class instead of mutating a shared one' do

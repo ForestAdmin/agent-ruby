@@ -1,15 +1,16 @@
 module ForestAdminAgent
   module AuditTrail
     module Sql
-      # Applies {Migrations::ALL} to the audit table, tracking what has run in a dedicated
-      # `audit_migrations` table (namespaced in the `forest` schema on Postgres).
+      # Applies {Migrations::ALL} to the audit table, tracking what has run in a companion table named after
+      # it — `audit_logs_migration` beside `audit_logs` (both namespaced in the `forest` schema on Postgres).
+      # One tracker per audited table, so two stores configured with different `table_name`s each get their
+      # own schema history instead of reading each other's as done.
       #
       # On Postgres the migrations run inside a transaction-scoped advisory lock, so several agent
       # instances booting at once apply them one after another instead of racing on the same DDL. The
       # schema is created (and committed) first, made idempotent (CREATE SCHEMA IF NOT EXISTS +
       # tolerating a concurrent create), because the lock cannot cover a not-yet-existing schema.
       class Migrator
-        MIGRATIONS_TABLE = 'audit_migrations'.freeze
         # Arbitrary but stable key pair identifying the audit-trail migration critical section.
         ADVISORY_LOCK = [0x464f, 0x5254].freeze # "FO", "RT"
         # duplicate_schema, and the unique violation on pg_namespace the same race can raise instead.
@@ -85,18 +86,12 @@ module ForestAdminAgent
           table = qualified(@table_name)
 
           Migrations::ALL.each do |migration|
-            # The tracking table is shared by every audit table of the database/schema, so the target
-            # table belongs in the key: a store configured with another `table_name` must still get its
-            # own table created instead of reading someone else's migration as done. Rows written by
-            # earlier versions (bare migration name) simply replay, which the `if_not_exists` DDL above
-            # makes a no-op.
-            key = "#{table}:#{migration[:name]}"
-            next if done.include?(key)
+            next if done.include?(migration[:name])
 
             migration[:up].call(@connection, table)
             @connection.execute(
               "INSERT INTO #{@connection.quote_table_name(migrations_table)} (name) " \
-              "VALUES (#{@connection.quote(key)})"
+              "VALUES (#{@connection.quote(migration[:name])})"
             )
           end
         end
@@ -114,7 +109,7 @@ module ForestAdminAgent
         end
 
         def migrations_table
-          qualified(MIGRATIONS_TABLE)
+          qualified("#{@table_name}_migration")
         end
       end
     end

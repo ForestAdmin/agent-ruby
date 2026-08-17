@@ -275,7 +275,11 @@ hook.
 
 ## Schema migrations & concurrency
 
-The table is created/evolved through an ordered, append-only migration list tracked in a dedicated
-`forest.audit_migrations` table. On Postgres the migrations run inside a transaction-scoped advisory
-lock so several agents booting at once apply them one after another; the schema is created (and
-committed, idempotently) first since the lock can't cover a not-yet-existing schema.
+The table is created and evolved through an ordered, append-only migration list, tracked in a companion table
+named after the audited one — `forest.audit_logs_migration` beside `forest.audit_logs`. One tracker per audited
+table, so two stores configured with different `table_name`s each keep their own schema history rather than
+reading the other's as done.
+
+On Postgres the migrations run inside a transaction-scoped advisory lock, so several agents booting at once
+apply them one after another; the schema is created (and committed, idempotently) first, since the lock cannot
+cover a schema that does not exist yet.
