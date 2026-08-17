@@ -555,6 +555,61 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  describe '#fetch_custom_fields' do
+    let(:logger) { instance_double(Logger, warn: nil) }
+
+    def definitions(records, cursor: nil)
+      body = { 'data' => records }
+      body['pagination'] = { 'cursor' => cursor, 'has_next_page' => true } if cursor
+      json(body)
+    end
+
+    # `object_type` is mandatory: Pylon answers 400 without it, so the schema of
+    # each collection is read by its own call.
+    it 'asks for the definitions of one object type' do
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
+                                                 .to_return(definitions([{ 'slug' => 'severity' }]))
+
+      expect(client.fetch_custom_fields('issue')).to eq([{ 'slug' => 'severity' }])
+    end
+
+    # The mandatory parameter has to survive the walk: dropped on the second
+    # page, it would answer with the fields of another object type or with a 400.
+    it 'keeps the object type on every page of the walk' do
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
+                                                 .to_return(definitions([{ 'slug' => 'severity' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue', 'cursor' => 'c1' })
+                                                 .to_return(definitions([{ 'slug' => 'tier' }]))
+
+      expect(client.fetch_custom_fields('issue')).to eq([{ 'slug' => 'severity' }, { 'slug' => 'tier' }])
+    end
+
+    it 'returns an empty list when the organization defined no custom field' do
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'account' })
+                                                 .to_return(definitions(nil))
+
+      expect(client.fetch_custom_fields('account')).to eq([])
+    end
+
+    # Read while the agent boots: the datasource has to come up on its native
+    # schema rather than fail to come up at all.
+    it 'degrades to an empty list and reports the failure' do
+      allow(ForestAdminDatasourcePylon).to receive(:logger).and_return(logger)
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
+                                                 .to_return(json({ 'message' => 'boom' }, 500))
+
+      expect(client.fetch_custom_fields('issue')).to eq([])
+      expect(logger).to have_received(:warn).with(/fetch_custom_fields\(issue\) failed; degrading.*HTTP 500 boom/)
+    end
+
+    it 'degrades when the token is not allowed to read the definitions' do
+      stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
+                                                 .to_return(json({ 'message' => 'forbidden' }, 403))
+
+      expect(client.fetch_custom_fields('issue')).to eq([])
+    end
+  end
+
   describe 'rate limiting' do
     it 'retries a 429 and returns the eventual success' do
       stub_request(:get, "#{base}/me")

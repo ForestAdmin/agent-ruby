@@ -98,6 +98,21 @@ module ForestAdminDatasourcePylon
       fetch_resource('teams', id)
     end
 
+    # The custom-field definitions of one object type. `object_type` is
+    # mandatory on this endpoint, so a schema spanning several collections costs
+    # one call per collection rather than one call in total.
+    #
+    # Degrades to an empty list: this is read while the agent boots, and a token
+    # missing the permission — or a Pylon that happens to be down right then —
+    # has to cost the operator the custom columns, not the whole datasource.
+    def fetch_custom_fields(object_type)
+      params = { 'object_type' => object_type }
+
+      best_effort("fetch_custom_fields(#{object_type})", default: []) do
+        must_succeed('custom-fields') { collect_pages('custom-fields', params) }
+      end
+    end
+
     private
 
     def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)
@@ -126,15 +141,19 @@ module ForestAdminDatasourcePylon
     # sent. `CursorWalker` answers the other question — the offset/limit window a
     # list view asks for — and is not what this needs.
     #
+    # `params` ride along on every page, cursor included: a mandatory parameter
+    # dropped on the second request answers a different question than the first.
+    #
     # An empty page and a cursor that does not move both stop the loop: neither
     # happens today, but a walk driven by a remote value stops on its own terms.
-    def collect_pages(path)
+    def collect_pages(path, params = {})
       records = []
       cursor = nil
       pages = 0
 
       loop do
-        page = to_search_page(connection.get(path, cursor.nil? ? {} : { 'cursor' => cursor }).body)
+        query = cursor.nil? ? params : params.merge('cursor' => cursor)
+        page = to_search_page(connection.get(path, query).body)
         records.concat(page.records)
         pages += 1
         break if page.next_cursor.nil? || page.next_cursor == cursor || page.records.empty?
