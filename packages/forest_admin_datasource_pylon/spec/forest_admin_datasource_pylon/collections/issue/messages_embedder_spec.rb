@@ -39,6 +39,8 @@ module ForestAdminDatasourcePylon
     let(:base) { datasource.configuration.url }
     let(:logger) { instance_double(Logger, warn: nil) }
 
+    before { stub_custom_fields }
+
     describe 'the schema of the column' do
       it 'declares messages as an array of message shapes' do
         expect(issues.fields['messages'].column_type).to eq([Collections::Issue::MESSAGE_THREAD_SCHEMA])

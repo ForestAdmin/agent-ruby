@@ -24,7 +24,26 @@ require 'forest_admin_datasource_pylon'
 
 WebMock.disable_net_connect!(allow_localhost: true)
 
+# A datasource introspects the custom fields of its three object types while it
+# registers its collections. A spec building one declares what those calls
+# answer -- most of them, having nothing to do with custom fields, answer
+# nothing. The base url is not taken from the datasource on purpose: reading it
+# would build the datasource, and boot the introspection this stubs.
+module PylonCustomFieldStubs
+  def stub_custom_fields(issue: [], account: [], contact: [],
+                         base: ForestAdminDatasourcePylon::Configuration::DEFAULT_BASE_URL)
+    { 'issue' => issue, 'account' => account, 'contact' => contact }.each do |object_type, definitions|
+      stub_request(:get, "#{base}/custom-fields")
+        .with(query: { 'object_type' => object_type })
+        .to_return(status: 200, body: { 'data' => definitions }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+    end
+  end
+end
+
 RSpec.configure do |config|
+  config.include PylonCustomFieldStubs
+
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end

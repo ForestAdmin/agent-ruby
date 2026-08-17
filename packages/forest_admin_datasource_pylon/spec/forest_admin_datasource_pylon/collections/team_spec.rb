@@ -57,6 +57,8 @@ module ForestAdminDatasourcePylon
     let(:base) { datasource.configuration.url }
     let(:operators) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators }
 
+    before { stub_custom_fields }
+
     describe 'schema' do
       it 'is named PylonTeam' do
         expect(collection.name).to eq('PylonTeam')
