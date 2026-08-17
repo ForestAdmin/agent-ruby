@@ -297,14 +297,15 @@ module ForestAdminAgent
         configure_rpc_polling_pool if @options[:rpc_max_polling_threads]
       end
 
-      # The audit trail switches on as soon as a database is configured. The store is built here
-      # (cheap: the connection only opens on the first write) and shared through the config, so the
-      # record-history routes read the very table the capture layer writes to.
+      # The audit trail switches on as soon as a database is configured. The store connects and migrates here,
+      # at boot, rather than on the first write: an audit database the agent cannot reach should stop it
+      # starting, not leave it looking healthy while recording nothing — and under `critical: true` it would
+      # otherwise refuse every write from the moment somebody first tried to save something.
       def build_audit_trail_store
         options = @options[:audit_trail]
         return unless options && options[:database]
 
-        options[:store] = AuditTrail::Store.new(**options.slice(:database, :schema, :table_name).compact)
+        options[:store] = AuditTrail::Store.new(**options.slice(:database, :schema, :table_name).compact).connect!
       end
 
       def install_audit_trail

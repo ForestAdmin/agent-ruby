@@ -117,48 +117,74 @@ module ForestAdminAgent
 
         private
 
-        # A failed run is worth recording too: "who tried to run this" is usually the interesting part. An
-        # action that answers with an Error result failed just as much as one that raised — it simply chose
-        # to say so through `result_builder.error` instead.
-        def execute_and_audit(context, args, data, filter)
-          result = context.collection.execute(context.caller, @action_name, data, filter)
-          audit_action(context, args, data, result: result, failed: error_result?(result))
+        # Recorded as pending before the action runs and confirmed after, so an action that takes the process
+        # down with it still leaves evidence that it started. A failed run is worth recording too — "who tried
+        # to run this" is usually the interesting part — and an action answering with an Error result failed
+        # just as much as one that raised, it simply said so through `result_builder.error`.
+        def execute_and_audit(context, _args, data, filter)
+          pending = audit_pending(context, data, filter)
+
+          begin
+            result = context.collection.execute(context.caller, @action_name, data, filter)
+          rescue StandardError
+            audit_confirm(pending, failed: true)
+            raise
+          end
+
+          audit_confirm(pending, result: result, failed: error_result?(result))
 
           result
-        rescue StandardError
-          audit_action(context, args, data, failed: true)
-          raise
         end
 
         def error_result?(result)
           result.is_a?(Hash) && result[:type] == 'Error'
         end
 
-        def audit_action(context, args, data, result: nil, failed: false)
-          capture = ForestAdminAgent::AuditTrail::ActionCapture.new(
-            ForestAdminAgent::AuditTrail.store, ForestAdminAgent::AuditTrail.options[:redact]
-          )
+        # Everything audit-related sits inside the gate, the record selection included: without an audit
+        # database none of it runs at all, and a failure refuses the action only under `critical: true` — which
+        # is safe here, since the action has not run yet.
+        def audit_pending(context, data, filter)
+          store = ForestAdminAgent::AuditTrail.store
+          return [] unless store
 
-          capture.record(
-            caller: context.caller,
-            collection: context.collection.name,
-            form_values: data,
-            record_ids: audited_record_ids(args, context),
-            result: result,
-            failed: failed
-          )
+          ForestAdminAgent::AuditTrail.gate do
+            action_capture(store).pending(
+              caller: context.caller,
+              collection: context.collection.name,
+              action_name: @action_name,
+              form_values: data,
+              record_ids: audited_record_ids(context, filter)
+            )
+          end || []
         end
 
-        # Packed ids, the form the audit store keys on. A global action targets nothing, and a select-all
-        # selection only tells us which ids were *excluded*: naming the targets would mean querying the
-        # whole selection, so those runs are recorded once, attached to no record.
-        def audited_record_ids(args, context)
+        def audit_confirm(pending, result: nil, failed: false)
+          store = ForestAdminAgent::AuditTrail.store
+
+          action_capture(store).confirm(pending, result: result, failed: failed) if store && pending.any?
+        end
+
+        def action_capture(store)
+          ForestAdminAgent::AuditTrail::ActionCapture.new(store, ForestAdminAgent::AuditTrail.options[:redact])
+        end
+
+        # Packed ids, the form the audit store keys on — read back through the caller's own filter rather than
+        # taken from the request. The ids a client sends are a claim: in a compliance record, asserting that an
+        # operator acted on a record their scope excludes is worse than a missing row. A global action targets
+        # no record, and a selection wider than the cap is recorded as one row attached to none.
+        def audited_record_ids(context, filter)
           return [] if context.collection.schema[:actions][@action_name].scope == Types::ActionScope::GLOBAL
 
-          selection = Utils::Id.parse_selection_ids(context.collection, args[:params], with_key: true)
-          return [] if selection[:are_excluded]
+          cap = ForestAdminAgent::AuditTrail::MAX_RECORDS_PER_OPERATION
+          primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(context.collection)
+          records = context.collection.list(
+            context.caller, filter.override(page: Page.new(offset: 0, limit: cap + 1)), Projection.new(primary_keys)
+          )
 
-          selection[:ids].map { |record| Utils::Id.pack_id(context.collection, record) }
+          return records.map { |record| Utils::Id.pack_id(context.collection, record) } if records.size <= cap
+
+          ForestAdminAgent::AuditTrail.log_truncation(0, nil)
+          []
         end
 
         def middleware_custom_action_approval_request_data(args)

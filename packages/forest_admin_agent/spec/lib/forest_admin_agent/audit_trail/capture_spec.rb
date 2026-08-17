@@ -5,16 +5,30 @@ module ForestAdminAgent
     describe Capture do
       let(:column_schema) { ForestAdminDatasourceToolkit::Schema::ColumnSchema }
 
+      # Rows keyed by position, which stands in for the row id the store hands back.
       let(:store) do
         Class.new do
-          attr_reader :records
+          attr_reader :records, :discarded
 
           def initialize
             @records = []
+            @discarded = []
           end
 
-          def append(record)
-            @records << record
+          def append_all(rows)
+            first = @records.size
+            @records.concat(rows)
+
+            (first...@records.size).to_a
+          end
+
+          def confirm(id, attributes)
+            attributes.each { |key, value| @records[id][key] = value }
+            @records[id][:status] = ForestAdminAgent::AuditTrail::Recording::DONE
+          end
+
+          def discard(ids)
+            @discarded.concat(ids)
           end
         end.new
       end
@@ -28,8 +42,11 @@ module ForestAdminAgent
       end
 
       let(:hooks) { {} }
+      let(:registrations) { [] }
       let(:collection) { double('collection') }
-      let(:caller_double) { double('caller', id: 42, request_id: 'req-xyz') }
+      let(:caller_double) do
+        double('caller', id: 42, first_name: 'Ada', last_name: 'L', email: 'ada@test', request_id: 'req-xyz')
+      end
 
       # What a hook context really hands out: the caller is already bound, so `list` takes
       # (filter, projection). A verifying double keeps that contract honest.
@@ -37,7 +54,6 @@ module ForestAdminAgent
         instance_double(ForestAdminDatasourceCustomizer::Context::RelaxedWrappers::RelaxedCollection)
       end
 
-      let(:registrations) { [] }
       let(:collection_customizer) do
         customizer = double('CollectionCustomizer', name: 'companies', collection: collection)
         allow(customizer).to receive(:add_hook) do |position, type, prepend: false, &block|
@@ -57,151 +73,213 @@ module ForestAdminAgent
         described_class.new.run(datasource_customizer, nil, store: store)
       end
 
-      # execute_after stops at the first exception, so being last would mean losing the record of a write
-      # that already happened whenever another customization raises in its own after hook.
+      def filter
+        ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: nil)
+      end
+
+      def before_hook(type, patch: nil, data: nil)
+        hooks["Before_#{type}"].call(
+          double('before', caller: caller_double, filter: filter, collection: relaxed_collection,
+                           patch: patch, data: data)
+        )
+      end
+
+      def after_hook(type, record: nil)
+        hooks["After_#{type}"].call(
+          double('after', caller: caller_double, filter: filter, collection: relaxed_collection, record: record)
+        )
+      end
+
+      # execute_after stops at the first exception, so being last would mean losing the record of a write that
+      # already happened whenever another customization raises in its own after hook.
       it 'registers its after hooks ahead of the ones already there, and its before hooks after them' do
         expect(registrations).to contain_exactly(
-          ['After', 'Create', true], ['Before', 'Update', false], ['After', 'Update', true],
+          ['Before', 'Create', false], ['After', 'Create', true],
+          ['Before', 'Update', false], ['After', 'Update', true],
           ['Before', 'Delete', false], ['After', 'Delete', true]
         )
       end
 
-      it 'records a create with only the writable columns' do
-        record = { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris' } }
+      describe 'creating a record' do
+        it 'records the attempt before the write, with no id yet' do
+          before_hook('Create', data: { 'name' => 'Acme' })
 
-        hooks['After_Create'].call(double('ctx', caller: caller_double, record: record))
+          row = store.records.last
+          expect(row.status).to eq(Recording::PENDING)
+          expect(row.operation).to eq('create')
+          expect(row.record_id).to be_nil
+          expect(row.new_values).to eq({ 'name' => 'Acme', 'address' => nil })
+        end
 
-        audit = store.records.last
-        expect(audit.operation).to eq('create')
-        expect(audit.record_id).to eq('1')
-        expect(audit.user_id).to eq(42)
-        expect(audit.correlation_key).to eq('req-xyz')
-        expect(audit.previous_values).to eq({})
-        expect(audit.new_values).to eq({ 'name' => 'Acme', 'address' => { 'city' => 'Paris' } })
+        it 'confirms it with the id and the record that landed' do
+          before_hook('Create', data: { 'name' => 'Acme' })
+          after_hook('Create', record: { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris' } })
+
+          row = store.records.last
+          expect(row.status).to eq(Recording::DONE)
+          expect(row.record_id).to eq('1')
+          expect(row.new_values).to eq({ 'name' => 'Acme', 'address' => { 'city' => 'Paris' } })
+        end
+
+        it 'denormalises who acted' do
+          before_hook('Create', data: { 'name' => 'Acme' })
+
+          expect(store.records.last.user_email).to eq('ada@test')
+          expect(store.records.last.correlation_key).to eq('req-xyz')
+        end
       end
 
-      def before_hook(type, patch: nil)
-        hooks["Before_#{type}"].call(
-          double('before', caller: caller_double, filter: Object.new,
-                           collection: relaxed_collection, patch: patch)
-        )
-      end
-
-      def after_hook(type)
-        hooks["After_#{type}"].call(double('after', caller: caller_double, filter: Object.new))
-      end
-
-      it "shares the caller's request id as the correlation key across records of one operation" do
-        allow(relaxed_collection).to receive(:list).and_return(
-          [{ 'id' => 1, 'name' => 'A' }, { 'id' => 2, 'name' => 'B' }]
-        )
-
-        before_hook('Update', patch: { 'name' => 'Z' })
-        after_hook('Update')
-
-        expect(store.records.map(&:correlation_key)).to eq(%w[req-xyz req-xyz])
-      end
-
-      it 'records an update with the minimal nested diff' do
-        before_record = { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris', 'zip' => '1' } }
-        allow(relaxed_collection).to receive(:list).and_return([before_record])
-
-        before_hook('Update', patch: { 'address' => { 'city' => 'Lyon', 'zip' => '1' } })
-        after_hook('Update')
-
-        audit = store.records.last
-        expect(audit.operation).to eq('update')
-        expect(audit.previous_values).to eq({ 'address' => { 'city' => 'Paris' } })
-        expect(audit.new_values).to eq({ 'address' => { 'city' => 'Lyon' } })
-      end
-
-      it 'does not record an update when nothing writable changed' do
-        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
-
-        before_hook('Update', patch: { 'name' => 'Acme' })
-        after_hook('Update')
-
-        expect(store.records).to be_empty
-      end
-
-      # The before and after hooks are handed different filter objects (the after context always
-      # carries the caller's original), so pairing must not depend on that object.
-      it 'pairs the snapshot with its after hook without relying on the filter object' do
-        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
-
-        before_hook('Update', patch: { 'name' => 'Effective' })
-        after_hook('Update')
-
-        expect(store.records.last.new_values).to eq({ 'name' => 'Effective' })
-      end
-
-      it 'still audits the next write after one raised between its hooks' do
-        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
-
-        before_hook('Update', patch: { 'name' => 'Never written' })
-        before_hook('Update', patch: { 'name' => 'Z' })
-        after_hook('Update')
-
-        expect(store.records.map { |record| record.new_values['name'] }).to eq(['Z'])
-      end
-
-      it 'drops the oldest stranded snapshots instead of growing the thread-local without bound' do
-        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' }])
-
-        (described_class::MAX_SNAPSHOTS + 4).times { before_hook('Update', patch: { 'name' => 'stranded' }) }
-        before_hook('Update', patch: { 'name' => 'Z' })
-        after_hook('Update')
-
-        expect(Thread.current[:forest_audit_trail_snapshots].size).to eq(described_class::MAX_SNAPSHOTS - 1)
-        expect(store.records.map { |record| record.new_values['name'] }).to eq(['Z'])
-      end
-
-      it 'records a delete with the previous values' do
-        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 7, 'name' => 'Gone', 'address' => nil }])
-
-        before_hook('Delete')
-        after_hook('Delete')
-
-        audit = store.records.last
-        expect(audit.operation).to eq('delete')
-        expect(audit.record_id).to eq('7')
-        expect(audit.previous_values).to eq({ 'name' => 'Gone', 'address' => nil })
-        expect(audit.new_values).to eq({})
-      end
-
-      # The write already happened when the after hook runs, so a broken audit database must not turn a
-      # successful change into a client-visible error.
-      it 'logs and swallows a store failure instead of failing the write' do
-        logger = instance_spy(Services::LoggerService)
-        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
-        allow(store).to receive(:append).and_raise(StandardError, 'audit db is down')
-
-        expect do
-          hooks['After_Create'].call(double('ctx', caller: caller_double, record: { 'id' => 1, 'name' => 'Acme' }))
-        end.not_to raise_error
-        expect(logger).to have_received(:log).with('Error', /audit db is down/)
-      end
-
-      it 'does not block the write when the before-hook snapshot cannot be read' do
-        logger = instance_spy(Services::LoggerService)
-        allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
-        allow(relaxed_collection).to receive(:list).and_raise(StandardError, 'read failed')
-
-        expect do
-          before_hook('Update', patch: { 'name' => 'Z' })
+      describe 'updating records' do
+        def update(before:, persisted:, patch:)
+          allow(relaxed_collection).to receive(:list).and_return(before, persisted)
+          before_hook('Update', patch: patch)
           after_hook('Update')
-        end.not_to raise_error
-        expect(store.records).to be_empty
+
+          store.records
+        end
+
+        it 'records one pending row per matched record before the write' do
+          allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'Acme' },
+                                                                  { 'id' => 2, 'name' => 'Other' }])
+          before_hook('Update', patch: { 'name' => 'Z' })
+
+          expect(store.records.map(&:record_id)).to eq(%w[1 2])
+          expect(store.records.map(&:status).uniq).to eq([Recording::PENDING])
+        end
+
+        # The diff is taken against the record as persisted, so normalisation and decorator side effects are
+        # what gets recorded — not merely what was asked for.
+        it 'diffs against the record as persisted, not the requested patch' do
+          rows = update(before: [{ 'id' => 1, 'name' => 'acme' }],
+                        persisted: [{ 'id' => 1, 'name' => 'ACME NORMALISED' }],
+                        patch: { 'name' => 'Acme' })
+
+          expect(rows.last.status).to eq(Recording::DONE)
+          expect(rows.last.previous_values).to eq({ 'name' => 'acme' })
+          expect(rows.last.new_values).to eq({ 'name' => 'ACME NORMALISED' })
+        end
+
+        # Otherwise the row would be filed under an id History never queries.
+        context 'when the primary key itself is writable' do
+          let(:fields) do
+            {
+              'id' => column_schema.new(column_type: 'Number', is_primary_key: true),
+              'name' => column_schema.new(column_type: 'String')
+            }
+          end
+
+          it 'files the row under the id the record ended up with' do
+            rows = update(before: [{ 'id' => 1, 'name' => 'Acme' }],
+                          persisted: [{ 'id' => 7, 'name' => 'Acme' }],
+                          patch: { 'id' => 7 })
+
+            expect(rows.last.record_id).to eq('7')
+            expect(rows.last.new_values).to eq({ 'id' => 7 })
+          end
+        end
+
+        it 'falls back to the patch when the record cannot be read back' do
+          rows = update(before: [{ 'id' => 1, 'name' => 'Acme' }], persisted: [], patch: { 'name' => 'Z' })
+
+          expect(rows.last.new_values).to eq({ 'name' => 'Z' })
+        end
+
+        # Nothing changed, so nothing is audited: the pending row goes rather than sitting there implying the
+        # write is unaccounted for.
+        it 'discards the pending row when the write changed nothing' do
+          update(before: [{ 'id' => 1, 'name' => 'Acme' }],
+                 persisted: [{ 'id' => 1, 'name' => 'Acme' }],
+                 patch: { 'name' => 'Acme' })
+
+          expect(store.discarded).to eq([0])
+        end
+      end
+
+      describe 'deleting records' do
+        it 'records the rows before the write and settles them after' do
+          allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 7, 'name' => 'Gone',
+                                                                    'address' => nil }])
+
+          before_hook('Delete')
+          expect(store.records.last.status).to eq(Recording::PENDING)
+
+          after_hook('Delete')
+          row = store.records.last
+          expect(row.status).to eq(Recording::DONE)
+          expect(row.operation).to eq('delete')
+          expect(row.previous_values).to eq({ 'name' => 'Gone', 'address' => nil })
+        end
+      end
+
+      describe 'when the audit database is unreachable' do
+        before { allow(store).to receive(:append_all).and_raise(StandardError, 'audit db is down') }
+
+        it 'lets the write through, logging the failure, when critical is off' do
+          logger = instance_spy(Services::LoggerService)
+          allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+          expect { before_hook('Create', data: { 'name' => 'Acme' }) }.not_to raise_error
+          expect(logger).to have_received(:log).with('Error', /audit db is down/)
+        end
+
+        # Nothing has been written yet, so refusing costs nothing to repair.
+        it 'refuses the operation when critical is on' do
+          allow(ForestAdminAgent::AuditTrail).to receive(:critical?).and_return(true)
+
+          expect { before_hook('Create', data: { 'name' => 'Acme' }) }
+            .to raise_error(StandardError, 'audit db is down')
+        end
+      end
+
+      describe 'a selection wider than the cap' do
+        let(:cap) { ForestAdminAgent::AuditTrail::MAX_RECORDS_PER_OPERATION }
+
+        it 'audits up to the cap and says how many it left out' do
+          logger = instance_spy(Services::LoggerService)
+          allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+          matched = (1..(cap + 1)).map { |id| { 'id' => id, 'name' => "n#{id}" } }
+          allow(relaxed_collection).to receive_messages(list: matched, aggregate: [{ 'value' => cap + 25 }])
+
+          before_hook('Delete')
+
+          expect(store.records.size).to eq(cap)
+          expect(logger).to have_received(:log).with('Warn', /#{cap} records audited, 25 skipped/)
+        end
+
+        it 'asks for one more than the cap, so it can tell it was truncated' do
+          allow(relaxed_collection).to receive(:list).and_return([])
+
+          before_hook('Delete')
+
+          expect(relaxed_collection).to have_received(:list) do |filter, _projection|
+            expect(filter.page.limit).to eq(cap + 1)
+          end
+        end
       end
 
       it 'masks redacted fields while still recording the change' do
         described_class.new.run(datasource_customizer, nil, store: store, redact: { 'companies' => ['name'] })
+        before_hook('Create', data: { 'name' => 'Secret' })
 
-        hooks['After_Create'].call(
-          double('ctx', caller: caller_double, record: { 'id' => 1, 'name' => 'Secret', 'address' => nil })
+        expect(store.records.last.new_values['name']).to eq(Recording::REDACTED)
+      end
+
+      # The after hook settles its own operation's rows, not whichever pending row happens to be around.
+      it 'pairs the after hook with the write that raised between the two, not the stranded one' do
+        allow(relaxed_collection).to receive(:list).and_return(
+          [{ 'id' => 1, 'name' => 'stranded' }],
+          [{ 'id' => 2, 'name' => 'before' }],
+          [{ 'id' => 2, 'name' => 'after' }]
         )
 
-        expect(store.records.last.new_values['name']).to eq(described_class::REDACTED)
+        before_hook('Update', patch: { 'name' => 'never written' })
+        before_hook('Update', patch: { 'name' => 'after' })
+        after_hook('Update')
+
+        settled = store.records.select { |row| row.status == Recording::DONE }
+        expect(settled.map(&:record_id)).to eq(['2'])
+        expect(settled.last.new_values).to eq({ 'name' => 'after' })
+        expect(store.records.first.status).to eq(Recording::PENDING)
       end
     end
   end

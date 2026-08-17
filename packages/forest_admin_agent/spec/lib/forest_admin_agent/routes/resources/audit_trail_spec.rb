@@ -28,7 +28,8 @@ module ForestAdminAgent
         def route_with_store(records: [])
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
-          allow(store).to receive_messages(list_by_record: records, count_by_record: records.length)
+          allow(store).to receive_messages(list_by_record: records, count_by_record: records.length,
+                                           authors_by_record: [])
 
           route = described_class.new
           context = double('context', collection: collection, caller: build_caller, permissions: permissions)
@@ -205,7 +206,7 @@ module ForestAdminAgent
           expect(result[:content]).to eq(
             {
               data: [{ 'operation' => 'update', 'recordId' => '4', 'previousValues' => { 'first_name' => 'Jo' } }],
-              meta: { count: 1 }
+              meta: { count: 1, availableUsers: [] }
             }
           )
         end
@@ -243,6 +244,50 @@ module ForestAdminAgent
           result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
           expect(result[:content][:data]).to eq([{ 'operation' => 'delete', 'recordId' => '4' }])
+        end
+
+        describe 'meta.availableUsers' do
+          let(:authors) do
+            [{ user_id: 12, user_first_name: 'Ada', user_last_name: 'L', user_email: 'ada@test' }]
+          end
+
+          # The distinct authors of what the filters match, whatever page was asked for, in the shape the
+          # filter dropdown wants.
+          it 'lists the authors of the matching entries on the first fetch' do
+            route = route_with_store
+            allow(store).to receive(:authors_by_record).and_return(authors)
+
+            result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+            expect(result[:content][:meta][:availableUsers]).to eq(
+              [{ id: 12, firstName: 'Ada', lastName: 'L', email: 'ada@test' }]
+            )
+            expect(store).to have_received(:authors_by_record).with(collection: 'projects', record_id: '4')
+          end
+
+          # The front keeps the list it saw, so later pages leave it out.
+          it 'leaves it out past the first page, and does not even ask for it' do
+            route = route_with_store
+            allow(store).to receive(:authors_by_record).and_return(authors)
+
+            result = route.handle_request(
+              { headers: {},
+                params: { 'collection_name' => 'projects', 'id' => '4', 'page' => { 'number' => '2' } } }
+            )
+
+            expect(result[:content][:meta]).to eq({ count: 0 })
+            expect(store).not_to have_received(:authors_by_record)
+          end
+
+          it 'answers the active filters, not the whole history' do
+            route = route_with_store
+            allow(store).to receive(:authors_by_record).and_return(authors)
+
+            route.handle_request({ headers: {},
+                                   params: { 'collection_name' => 'projects', 'id' => '4', 'userIds' => '12' } })
+
+            expect(store).to have_received(:authors_by_record).with(hash_including(user_ids: [12]))
+          end
         end
 
         it 'defaults to newest-first and switches to oldest-first on sort=timestamp' do

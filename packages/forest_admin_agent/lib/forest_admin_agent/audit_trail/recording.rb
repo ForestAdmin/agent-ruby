@@ -4,9 +4,23 @@ require 'time'
 module ForestAdminAgent
   module AuditTrail
     # Shared by the two capture layers: {Capture} for the changes Forest writes, {ActionCapture} for the
-    # smart actions it runs.
+    # smart actions it runs. Holds the write protocol's vocabulary and its failure policy.
     module Recording
       REDACTED = '[redacted]'.freeze
+      # A row is inserted before the write and confirmed after it. One left PENDING means the write may or
+      # may not have landed — that residue is evidence, and it is the point.
+      PENDING = 'pending'.freeze
+      DONE = 'done'.freeze
+
+      IDENTITY = { user_id: :id, user_first_name: :first_name,
+                   user_last_name: :last_name, user_email: :email }.freeze
+
+      # Denormalised at write time, so the row says who acted then rather than whoever holds that id today.
+      # Read defensively: a caller built by another code path need not carry a full identity, and a
+      # NoMethodError here would refuse the write outright under `critical: true`.
+      def identity_of(caller)
+        IDENTITY.transform_values { |reader| caller.respond_to?(reader) ? caller.public_send(reader) : nil }
+      end
 
       # Same id for every change made within one request — set on the caller by the agent (see
       # CallerParser), mirroring the Node agent's caller.requestId.
@@ -26,14 +40,14 @@ module ForestAdminAgent
         Time.now.utc.iso8601(3)
       end
 
-      # Auditing must never take the request down with it. By the time a change is recorded the write has
-      # already happened, so raising would report a failure for an operation that succeeded (and invite a
-      # retry that duplicates it); a snapshot read failing must not block the write either. Losing the row
-      # is the lesser evil, so it is logged and dropped.
+      # Everything after the pending insert is best-effort: by then the write has happened, so raising would
+      # report a failure for an operation that succeeded (and invite a retry that duplicates it). Losing the
+      # row is the lesser evil, so it is logged and dropped. Only the pending insert itself can refuse an
+      # operation, and only under `critical: true` — see {AuditTrail.critical?}.
       def audit_safely
         yield
       rescue StandardError => e
-        Facades::Container.logger.log('Error', "[ForestAdmin] Audit trail unavailable, skipping: #{e.message}")
+        AuditTrail.log_failure(e)
         nil
       end
     end

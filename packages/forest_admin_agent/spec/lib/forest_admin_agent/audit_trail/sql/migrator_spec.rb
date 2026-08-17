@@ -18,6 +18,8 @@ module ForestAdminAgent
             create_table: nil,
             add_index: nil,
             add_column: nil,
+            remove_index: nil,
+            change_column: nil,
             select_values: ['forest.audit_logs:001-create-audit-logs',
                             'forest.audit_logs:002-index-record-and-correlation'],
             quote_schema_name: '"forest"',

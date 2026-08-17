@@ -37,7 +37,9 @@ module ForestAdminAgent
           raise Http::Exceptions::NotFoundError, 'Record does not exists'
         end
 
-        # Camelize only the top-level keys; previous/new value hashes keep the record's own column names.
+        # Camelize only the top-level keys — the row `id` included, which the front uses as the tiebreaker when
+        # merging pages ordered by (timestamp, id). Value hashes keep the keys they were stored with: a record's
+        # own column names, or an action answer's camelCase Forest names.
         def serialize_record(record)
           record.to_h.transform_keys { |key| key.to_s.camelize(:lower) }
         end
@@ -46,9 +48,15 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
-        # Every column, the starting point of a state reconstruction.
-        def column_projection(collection)
-          Projection.new(collection.schema[:fields].select { |_name, field| field.type == 'Column' }.keys)
+        # What the audit trail actually records: primary keys, so a state can be identified, plus the writable
+        # columns. Reading read-only ones would hand them back at their present value inside an answer that
+        # claims to describe a past instant.
+        def audited_projection(collection)
+          writable = collection.schema[:fields].select do |_name, field|
+            field.type == 'Column' && !field.is_read_only
+          end.keys
+
+          Projection.new((ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection) + writable).uniq)
         end
 
         def key_projection(collection)

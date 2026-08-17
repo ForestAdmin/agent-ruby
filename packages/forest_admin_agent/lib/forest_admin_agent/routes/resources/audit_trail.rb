@@ -55,7 +55,7 @@ module ForestAdminAgent
 
           {
             name: args[:params]['collection_name'],
-            content: { data: history.map { |record| serialize_record(record) }, meta: { count: count } }
+            content: { data: history.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
           }
         end
 
@@ -67,7 +67,7 @@ module ForestAdminAgent
           context.permissions.can?(:read, context.collection)
           # Authorizes and reads in one query: the record it hands back is the one the scope covered.
           current = scoped_record(
-            context, context.collection, args[:params]['id'], column_projection(context.collection)
+            context, context.collection, args[:params]['id'], audited_projection(context.collection)
           )
 
           timestamp = parse_state_timestamp(args)
@@ -81,6 +81,28 @@ module ForestAdminAgent
         end
 
         private
+
+        # `availableUsers` rides along on the first fetch only — the front keeps the list it saw — and lists the
+        # distinct authors of the entries the current filters match, whatever page was asked for. The identity
+        # comes from the rows, so someone since renamed or removed still reads as they were when they acted.
+        def meta(args, filters, count)
+          return { count: count } unless first_fetch?(args)
+
+          { count: count, availableUsers: available_users(filters) }
+        end
+
+        def first_fetch?(args)
+          page = args.dig(:params, 'page')
+
+          (page.is_a?(Hash) ? page['number'].to_i : 0) <= 1
+        end
+
+        def available_users(filters)
+          store.authors_by_record(**filters).map do |author|
+            { id: author[:user_id], firstName: author[:user_first_name],
+              lastName: author[:user_last_name], email: author[:user_email] }
+          end
+        end
 
         # An ISO-8601 instant, or the same wall-clock forms the history filters accept, read in the request
         # timezone.

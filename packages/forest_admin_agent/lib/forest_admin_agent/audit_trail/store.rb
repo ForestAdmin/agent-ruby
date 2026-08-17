@@ -4,13 +4,16 @@ module ForestAdminAgent
   module AuditTrail
     # SQL-backed storage that both writes every audited change and reads the per-record history back.
     #
-    # Construction is cheap; the connection is opened lazily on the first append or read, at which
-    # point the `forest` schema and the `audit_logs` table are created/evolved through migrations.
+    # {#connect!} opens the connection and migrates; the agent factory calls it at boot rather than leaving it
+    # to the first write, so a database the agent cannot reach is a startup failure instead of an agent that
+    # looks healthy while recording nothing — and, under `critical: true`, instead of one that refuses every
+    # write the moment somebody first tries to save something.
     class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
-      COLUMNS = %i[timestamp operation collection record_id user_id correlation_key
-                   previous_values new_values].freeze
+      COLUMNS = %i[timestamp operation collection record_id status user_id user_first_name user_last_name
+                   user_email action_name correlation_key previous_values new_values].freeze
+      AUTHOR_COLUMNS = %i[user_id user_first_name user_last_name user_email].freeze
 
       def initialize(database:, schema: DEFAULT_SCHEMA, table_name: DEFAULT_TABLE)
         @database = database
@@ -20,8 +23,39 @@ module ForestAdminAgent
         @ready = false
       end
 
+      def connect!
+        ensure_ready
+
+        self
+      end
+
       def append(record)
-        model.create!(to_row(record))
+        append_all([record]).first
+      end
+
+      # Inserts rows and returns their ids, in the order given. Batched, because a "delete all" snapshot can
+      # be thousands of records and the pending/confirm protocol writes each of them twice.
+      def append_all(records)
+        return [] if records.empty?
+
+        rows = records.map { |record| to_row(record) }
+
+        return model.insert_all(rows, returning: %w[id]).rows.flatten if model.connection.supports_insert_returning?
+
+        # MySQL has no RETURNING: fall back to one insert per row, which does hand the id back.
+        rows.map { |row| model.create!(row).id }
+      end
+
+      def confirm(id, attributes)
+        row = model.find_by(id: id)
+
+        row&.update!(**attributes, status: Recording::DONE)
+      end
+
+      # A write that turned out to change nothing leaves no trace: the pending row goes rather than sitting
+      # there implying the write is unaccounted for.
+      def discard(ids)
+        model.where(id: ids).delete_all unless ids.empty?
       end
 
       def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil,
@@ -39,6 +73,19 @@ module ForestAdminAgent
       def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
                           end_timestamp: nil, fields: nil)
         scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields).count
+      end
+
+      # The distinct authors of the entries the current filters match, whatever page is being asked for. The
+      # identity comes from the rows themselves, so a user who has since been renamed or removed still reads
+      # as they were when they acted.
+      def authors_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+                            end_timestamp: nil, fields: nil)
+        scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields)
+          .where.not(user_id: nil)
+          .distinct
+          .pluck(*AUTHOR_COLUMNS)
+          .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
+          .uniq { |author| author[:user_id] }
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
@@ -91,7 +138,7 @@ module ForestAdminAgent
         @mutex.synchronize do
           return if @ready
 
-          Sql::AuditConnectionBase.establish_connection(@database)
+          Sql::AuditConnectionBase.connect_to(@database)
           connection = Sql::AuditConnectionBase.connection
           Sql::Migrator.new(connection, schema: schema_for(connection), table_name: @table_name).run
           @model = build_model(qualified(connection))
@@ -122,6 +169,7 @@ module ForestAdminAgent
 
       def from_row(row)
         values = COLUMNS.to_h { |column| [column, row[column]] }
+        values[:id] = row.id
         values[:timestamp] = row.timestamp.respond_to?(:iso8601) ? row.timestamp.iso8601(3) : row.timestamp.to_s
         values[:previous_values] ||= {}
         values[:new_values] ||= {}

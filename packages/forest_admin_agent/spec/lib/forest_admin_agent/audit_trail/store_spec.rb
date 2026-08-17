@@ -8,13 +8,13 @@ module ForestAdminAgent
       let(:store) { described_class.new(database: { adapter: 'sqlite3', database: db.path }) }
 
       after do
-        Sql::AuditConnectionBase.remove_connection
+        Sql::AuditConnectionBase.disconnect!
         db.close!
       end
 
       def record(over = {})
         AuditRecord.new(
-          operation: 'update', collection: 'accounts', record_id: '1',
+          operation: 'update', collection: 'accounts', record_id: '1', status: Recording::DONE,
           previous_values: { 'status' => 'open' }, new_values: { 'status' => 'closed' },
           timestamp: '2026-01-02T03:04:05.000Z', user_id: 42, correlation_key: 'req-1', **over
         )
@@ -32,7 +32,8 @@ module ForestAdminAgent
         store.append(record)
 
         expect(store.send(:model).column_names.sort).to eq(
-          %w[collection correlation_key id new_values operation previous_values record_id timestamp user_id]
+          %w[action_name collection correlation_key id new_values operation previous_values record_id status
+             timestamp user_email user_first_name user_id user_last_name]
         )
       end
 
@@ -133,7 +134,9 @@ module ForestAdminAgent
 
         names = connection.select_values('SELECT name FROM audit_migrations ORDER BY name')
         expect(names).to eq(
-          ['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation']
+          ['audit_logs:001-create-audit-logs', 'audit_logs:002-index-record-and-correlation',
+           'audit_logs:003-add-user-identity', 'audit_logs:004-add-action-name', 'audit_logs:005-add-status',
+           'audit_logs:006-record-id-nullable-text']
         )
       end
 
@@ -217,6 +220,90 @@ module ForestAdminAgent
 
           expect(history.map(&:correlation_key)).to eq(%w[second first])
         end
+      end
+
+      describe 'the pending/confirm protocol' do
+        it 'inserts rows and hands their ids back, in order' do
+          ids = store.append_all([record(correlation_key: 'a'), record(correlation_key: 'b')])
+
+          expect(ids.size).to eq(2)
+          expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:id)).to eq(ids)
+        end
+
+        it 'confirms a pending row into a done one, values included' do
+          id = store.append(record(status: Recording::PENDING, previous_values: {}, new_values: {}))
+
+          store.confirm(id, record_id: '9', new_values: { 'status' => 'closed' })
+
+          audit = store.list_by_record(collection: 'accounts', record_id: '9').first
+          expect(audit.status).to eq(Recording::DONE)
+          expect(audit.new_values).to eq({ 'status' => 'closed' })
+        end
+
+        # A write that changed nothing leaves no trace, rather than a row implying it is unaccounted for.
+        it 'discards rows by id' do
+          ids = store.append_all([record, record])
+
+          store.discard(ids)
+
+          expect(store.list_by_record(collection: 'accounts', record_id: '1')).to be_empty
+        end
+
+        it 'accepts a pending create row with no record id yet' do
+          id = store.append(record(operation: 'create', record_id: nil, status: Recording::PENDING))
+
+          expect { store.confirm(id, record_id: '7') }.not_to raise_error
+          expect(store.list_by_record(collection: 'accounts', record_id: '7').first.operation).to eq('create')
+        end
+
+        it 'stores a packed composite id far longer than a varchar would hold' do
+          long_id = (1..40).map { |part| "part-#{part}-#{"x" * 20}" }.join('|')
+          store.append(record(record_id: long_id))
+
+          expect(store.list_by_record(collection: 'accounts', record_id: long_id).size).to eq(1)
+        end
+      end
+
+      describe '#authors_by_record' do
+        it 'lists the distinct authors of the matching entries, as they were when they acted' do
+          store.append(record(user_id: 7, user_first_name: 'Ada', user_last_name: 'L', user_email: 'ada@test'))
+          store.append(record(user_id: 7, user_first_name: 'Ada', user_last_name: 'L', user_email: 'ada@test'))
+          store.append(record(user_id: 9, user_first_name: 'Bob', user_last_name: 'K', user_email: 'bob@test'))
+          store.append(record(record_id: '2', user_id: 11, user_first_name: 'Other'))
+
+          authors = store.authors_by_record(collection: 'accounts', record_id: '1')
+
+          expect(authors).to contain_exactly(
+            { user_id: 7, user_first_name: 'Ada', user_last_name: 'L', user_email: 'ada@test' },
+            { user_id: 9, user_first_name: 'Bob', user_last_name: 'K', user_email: 'bob@test' }
+          )
+        end
+
+        it 'stays inside the active filters but ignores paging' do
+          store.append(record(user_id: 7, timestamp: '2026-01-02T03:04:05.000Z'))
+          store.append(record(user_id: 9, timestamp: '2026-01-09T03:04:05.000Z'))
+
+          authors = store.authors_by_record(collection: 'accounts', record_id: '1',
+                                            end_timestamp: '2026-01-03T00:00:00.000Z')
+
+          expect(authors.map { |author| author[:user_id] }).to eq([7])
+        end
+
+        it 'leaves out entries with no author' do
+          store.append(record(user_id: nil))
+
+          expect(store.authors_by_record(collection: 'accounts', record_id: '1')).to be_empty
+        end
+      end
+
+      # establish_connection is class-level: two stores on different databases would silently share one pool.
+      it 'refuses a second audit database rather than clobbering the first' do
+        store.append(record)
+        other = described_class.new(database: { adapter: 'sqlite3', database: ':memory:' })
+
+        expect { other.append(record) }.to raise_error(
+          ForestAdminDatasourceToolkit::Exceptions::ForestException, /One agent, one audit database/
+        )
       end
 
       it 'indexes record_id, correlation_key and user_id' do

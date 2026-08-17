@@ -52,10 +52,32 @@ ForestAdminAgent::Builder::AgentFactory.instance.setup(
 | `schema`     | Postgres schema holding the table (default `forest`; ignored on other adapters)      |
 | `table_name` | default `audit_logs`                                                                 |
 | `redact`     | `{ 'collection_name' => ['field', ...] }` — values masked while recording the change |
+| `critical`   | default `false`. `true` refuses an operation the audit trail cannot record — see below |
 
-On the first write or read the store ensures the schema exists and runs any pending migrations; every
-create / update / delete performed through Forest then writes one row per record, and the **Historic**
-tab in the UI reads from the same table.
+The store connects and migrates **at boot**, not on the first write: an audit database the agent cannot
+reach stops it starting, rather than leaving it looking healthy while recording nothing. Every create /
+update / delete performed through Forest then writes one row per record, and the **Historic** tab in the UI
+reads from the same table.
+
+## The write protocol, and `critical`
+
+Every operation is recorded twice: a `pending` row **before** the write, confirmed `done` **after** it. One
+code path either way, so `status` always means the same thing.
+
+| `critical` | a pending row that cannot be written                                                       |
+| ---------- | ------------------------------------------------------------------------------------------ |
+| `false`    | is logged and dropped; the operation goes ahead unaudited (the default, today's behaviour)   |
+| `true`     | **refuses the operation**. Nothing was written, so there is nothing to repair and no compensating write ever happens |
+
+What this buys is **no unaudited write** — not that every row holds exact after-values. A row left `pending`
+means the write may or may not have landed: that residue is evidence, and it is the point. Everything after
+the pending insert stays best-effort in both modes, because by then the write has happened and raising would
+report a failure for an operation that succeeded.
+
+Two consequences worth knowing. A write that turns out to change nothing has its pending row **discarded**
+rather than confirmed, so no-op updates leave no trace. And one operation audits at most 500 records: a
+wider selection is truncated, with `N records audited, M skipped` logged at `Warn` — an incomplete audit
+somebody knows about beats an OOM, and beats silence.
 
 ## Routes
 
@@ -71,8 +93,11 @@ by default) together with the filtered total:
 { "data": [ /* current page rows */ ], "meta": { "count": 137 } }
 ```
 
-`meta.count` is the number of rows matching the active filters (not the absolute total) and is
-independent of the page. Optional filters (all combine with `AND`; omit them for the full history):
+`meta.count` is the number of rows matching the active filters (not the absolute total) and is independent of
+the page. `meta.availableUsers` rides along **on the first fetch only** — the front keeps the list it saw —
+and holds the distinct authors of the entries the current filters match, as `{ id, firstName, lastName,
+email }`, whatever page was asked for. The identity comes from the rows themselves, so someone since renamed
+or removed still reads as they were when they acted. Optional filters (all combine with `AND`; omit them for the full history):
 
 | query param | format                           | effect                                          |
 | ----------- | -------------------------------- | ----------------------------------------------- |
@@ -104,9 +129,13 @@ erroring. Sorting follows JSON:API `sort` on `timestamp`: `sort=-timestamp` (or 
 is newest first, `sort=timestamp` is oldest first. Ties on equal timestamps fall back to insertion
 order (the auto-increment `id`), so paging is deterministic in either direction.
 
-All three routes serialize audit records the same way: top-level keys are camelCased
-(`recordId`, `userId`, `correlationKey`, `previousValues`, `new_values` → `newValues`), while the
-`previousValues` / `newValues` hashes keep the audited record's own column names.
+All routes serialize audit records the same way: top-level keys are camelCased — `id`, `recordId`, `userId`,
+`userFirstName`, `userLastName`, `userEmail`, `actionName`, `status`, `correlationKey`, `previousValues`,
+`newValues`. The row `id` is exposed because both agents order by `(timestamp, id)` and the front uses it as
+the merge tiebreaker.
+
+Inside the value objects: a record's column names pass through untouched, while an action answer's keys are
+Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent transforms them on write.
 
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
@@ -188,6 +217,14 @@ A **global** action targets no record, and a **select-all** selection only tells
 attached to no record. Recording is best-effort — a failing audit database logs an error rather than
 breaking the action.
 
+The targeted records are read back through the caller's own filter rather than taken from the request: the ids
+a client sends are a claim, and in a compliance record asserting that an operator acted on a record their
+scope excludes is worse than a missing row.
+
+`url` and `path` are sanitised before storage — credentials in the userinfo and anything in a query string or
+fragment come off, since either can carry a signed one-time token that would otherwise sit permanently in the
+one table nobody deletes from.
+
 > **What an action changes is only audited when it goes through Forest.** `context.collection.update(...)`
 > passes through the same hooks as any other write, so it produces the usual field-level rows sharing the
 > action's `correlationKey`. A direct ORM write (`Customer.find(id).update!(...)`) is invisible to the
@@ -199,12 +236,15 @@ breaking the action.
 
 | column            | description                                                 |
 | ----------------- | ----------------------------------------------------------- |
-| `id`              | auto-increment primary key                                  |
+| `id`              | auto-increment primary key, exposed in the payload           |
+| `status`          | `pending` before the write, `done` once confirmed            |
 | `timestamp`       | when the change happened                                    |
 | `operation`       | `create` / `update` / `delete`                              |
 | `collection`      | audited collection name                                     |
-| `record_id`       | packed record id (primary keys joined by `\|`)              |
+| `record_id`       | packed record id (primary keys joined by `\|`), TEXT and nullable — a create's pending row has none yet, and a composite id outgrows a varchar |
 | `user_id`         | the Forest user who made the change                         |
+| `user_first_name`, `user_last_name`, `user_email` | denormalised from the caller at write time: who acted then, not whoever holds that id today |
+| `action_name`     | smart-action rows only                                       |
 | `correlation_key` | per-request id; groups every change made within one request |
 | `previous_values` | values before the change (JSON)                             |
 | `new_values`      | values after the change (JSON)                              |
