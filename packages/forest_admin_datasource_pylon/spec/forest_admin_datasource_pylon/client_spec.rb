@@ -250,6 +250,95 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  describe '#fetch_issue_messages' do
+    let(:logger) { instance_double(Logger, warn: nil) }
+
+    def page(records, cursor: nil)
+      body = { 'data' => records }
+      body['pagination'] = { 'cursor' => cursor, 'has_next_page' => true } if cursor
+      json(body)
+    end
+
+    it 'returns the whole thread of an issue' do
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(page([{ 'id' => 'm1' }, { 'id' => 'm2' }]))
+
+      expect(client.fetch_issue_messages('i1')).to eq([{ 'id' => 'm1' }, { 'id' => 'm2' }])
+    end
+
+    # Omitting `limit` is what makes Pylon answer with every message at once;
+    # asking for a page would hand back the oldest ones and cut off the rest.
+    it 'sends no limit, so Pylon answers with every message in one request' do
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(page([]))
+
+      client.fetch_issue_messages('i1')
+
+      expect(WebMock).to have_requested(:get, "#{base}/issues/i1/messages").with(query: {}).once
+    end
+
+    it 'escapes an id that would otherwise alter the request path' do
+      stub_request(:get, "#{base}/issues/..%2Fme/messages").to_return(page([]))
+
+      client.fetch_issue_messages('../me')
+
+      expect(WebMock).to have_requested(:get, "#{base}/issues/..%2Fme/messages")
+    end
+
+    it 'follows the cursor when Pylon paginates the thread anyway' do
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: {})
+                                                      .to_return(page([{ 'id' => 'm1' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: { 'cursor' => 'c1' })
+                                                      .to_return(page([{ 'id' => 'm2' }]))
+
+      expect(client.fetch_issue_messages('i1')).to eq([{ 'id' => 'm1' }, { 'id' => 'm2' }])
+    end
+
+    it 'stops on a cursor that does not move' do
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: { 'cursor' => 'c1' })
+                                                      .to_return(page([{ 'id' => 'm2' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: {})
+                                                      .to_return(page([{ 'id' => 'm1' }], cursor: 'c1'))
+
+      expect(client.fetch_issue_messages('i1').size).to eq(2)
+    end
+
+    it 'stops on an empty page' do
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(page([], cursor: 'c1'))
+
+      expect(client.fetch_issue_messages('i1')).to eq([])
+      expect(WebMock).to have_requested(:get, "#{base}/issues/i1/messages").once
+    end
+
+    it 'caps a thread Pylon never stops paginating, and says so' do
+      allow(ForestAdminDatasourcePylon).to receive(:logger).and_return(logger)
+      served = 0
+      stub_request(:get, %r{/issues/i1/messages}).to_return do
+        served += 1
+        page([{ 'id' => "m#{served}" }], cursor: "c#{served}")
+      end
+
+      client.fetch_issue_messages('i1')
+
+      expect(served).to eq(described_class::MAX_COLLECTED_PAGES)
+      expect(logger).to have_received(:warn).with(/Stopped paginating/)
+    end
+
+    # The thread enriches a page rather than being it: a failure costs the
+    # operator the column, not the records they opened.
+    it 'degrades to nil and reports the failure when the thread cannot be read' do
+      allow(ForestAdminDatasourcePylon).to receive(:logger).and_return(logger)
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(json({ 'message' => 'boom' }, 500))
+
+      expect(client.fetch_issue_messages('i1')).to be_nil
+      expect(logger).to have_received(:warn).with(/fetch_issue_messages\(i1\) failed; degrading.*HTTP 500 boom/)
+    end
+
+    it 'degrades on a missing issue rather than raising a 404' do
+      stub_request(:get, "#{base}/issues/nope/messages").to_return(json({ 'message' => 'not found' }, 404))
+
+      expect(client.fetch_issue_messages('nope')).to be_nil
+    end
+  end
+
   describe '#search_accounts' do
     it 'posts the full search envelope and returns the records' do
       stub_request(:post, "#{base}/accounts/search").to_return(json('data' => [{ 'id' => 'a1' }]))

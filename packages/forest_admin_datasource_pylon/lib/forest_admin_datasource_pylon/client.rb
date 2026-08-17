@@ -4,6 +4,12 @@ module ForestAdminDatasourcePylon
   class Client # rubocop:disable Metrics/ClassLength
     MAX_SEARCH_LIMIT = 1000
 
+    # Bounds `collect_pages`, which asks for a whole dataset rather than a
+    # window: the endpoints it reads answer in one response, so reaching this
+    # many pages means the API started paginating on its own and the walk is
+    # spending more of the per-minute budget than the answer is worth.
+    MAX_COLLECTED_PAGES = 10
+
     # `next_cursor` is nil as soon as Pylon stops advertising a next page, so
     # callers never have to know how the absence is spelled on the wire.
     SearchPage = Struct.new(:records, :next_cursor, keyword_init: true)
@@ -27,6 +33,23 @@ module ForestAdminDatasourcePylon
     # Accepts either the UUID or the issue number.
     def fetch_issue(id)
       fetch_resource('issues', id)
+    end
+
+    # The whole conversation of an issue, oldest message first, or nil when the
+    # thread could not be read.
+    #
+    # `limit` is left out on purpose: Pylon then answers with every message in a
+    # single response. Asking for a page would hand back the OLDEST messages and
+    # cut the most recent ones off, which is the half of a conversation nobody
+    # opens a ticket to read.
+    #
+    # The cursor is still followed, defensively: Pylon paginates this endpoint
+    # when asked to, so a future default page size stays handled rather than
+    # silently truncating the thread.
+    def fetch_issue_messages(issue_id)
+      path = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+
+      best_effort("fetch_issue_messages(#{issue_id})", default: nil) { must_succeed(path) { collect_pages(path) } }
     end
 
     def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
@@ -99,6 +122,41 @@ module ForestAdminDatasourcePylon
       must_succeed(path) { Array(extract_data(connection.get(path, params).body)) }
     end
 
+    # Every record of a cursor-paginated GET, no window asked for and no limit
+    # sent. `CursorWalker` answers the other question — the offset/limit window a
+    # list view asks for — and is not what this needs.
+    #
+    # An empty page and a cursor that does not move both stop the loop: neither
+    # happens today, but a walk driven by a remote value stops on its own terms.
+    def collect_pages(path)
+      records = []
+      cursor = nil
+      pages = 0
+
+      loop do
+        page = to_search_page(connection.get(path, cursor.nil? ? {} : { 'cursor' => cursor }).body)
+        records.concat(page.records)
+        pages += 1
+        break if page.next_cursor.nil? || page.next_cursor == cursor || page.records.empty?
+
+        if pages >= MAX_COLLECTED_PAGES
+          log_pagination_cap(path, pages, records.size)
+          break
+        end
+
+        cursor = page.next_cursor
+      end
+
+      records
+    end
+
+    def log_pagination_cap(path, pages, collected)
+      ForestAdminDatasourcePylon.logger.warn(
+        "[forest_admin_datasource_pylon] Stopped paginating #{path} after #{pages} page(s) / " \
+        "#{collected} record(s); the rest is left out."
+      )
+    end
+
     # The id comes from operator-supplied filter values, so it is escaped before
     # being joined to the path.
     def fetch_resource(resource, id)
@@ -143,6 +201,18 @@ module ForestAdminDatasourcePylon
       raise
     rescue StandardError => e
       raise APIError, "Pylon API call failed: #{operation}: #{e.class}: #{e.message}"
+    end
+
+    # For the calls whose result enriches a page rather than being the page: the
+    # failure is reported and the default returned, so a degraded thread or a
+    # missing enrichment costs the operator a column, not the record they opened.
+    def best_effort(operation, default:)
+      yield
+    rescue StandardError => e
+      ForestAdminDatasourcePylon.logger.warn(
+        "[forest_admin_datasource_pylon] #{operation} failed; degrading: #{e.class}: #{e.message}"
+      )
+      default
     end
 
     # Builds an APIError preserving the HTTP status and Pylon's own error body so
