@@ -112,7 +112,7 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
 
     it 'lets a text field be matched, listed, checked for presence and searched' do
       expect(operators_of('text')).to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
-                                          operators::PRESENT, operators::BLANK,
+                                          operators::PRESENT, operators::BLANK, operators::MISSING,
                                           operators::CONTAINS, operators::I_CONTAINS,
                                           operators::NOT_CONTAINS, operators::NOT_I_CONTAINS])
     end
@@ -123,14 +123,19 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
 
     # Pylon spells the bare comparisons `time_is_after` / `time_is_before` and
     # documents nothing else, so a numeric range would travel as a time filter.
+    #
+    # The presence family carries MISSING next to PRESENT and BLANK: Pylon spells
+    # absence through `is_unset` alone, and a field left without MISSING would
+    # refuse the very filter its endpoint can answer.
     it 'gives a number no comparison, only equality and presence' do
       expect(operators_of('number'))
-        .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+        .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
+                operators::PRESENT, operators::BLANK, operators::MISSING])
     end
 
     it 'gives a boolean equality and presence' do
       expect(operators_of('boolean')).to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
-                                             operators::PRESENT, operators::BLANK])
+                                             operators::PRESENT, operators::BLANK, operators::MISSING])
     end
 
     # A membership filter is not part of what a custom field accepts, and no
@@ -141,7 +146,8 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
 
     it 'keeps an enum to equality and presence' do
       expect(operators_of('select', **select_metadata('p1')))
-        .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+        .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
+                operators::PRESENT, operators::BLANK, operators::MISSING])
     end
   end
 
