@@ -63,6 +63,14 @@ module ForestAdminDatasourcePylon
           .to eq('field' => 'assignee_id', 'operator' => 'is_unset')
       end
 
+      # Left out of the map, `missing` is rewritten by the toolkit into
+      # `equal nil`, which no Pylon operator expresses: the field would refuse
+      # the very absence check it is one of the few to accept.
+      it 'translates missing to the same is_unset as blank' do
+        expect(translate(leaf('assignee_id', operators::MISSING)))
+          .to eq('field' => 'assignee_id', 'operator' => 'is_unset')
+      end
+
       # Pylon lists is_set / is_unset for the party ids and issue_type only.
       it 'refuses presence on a field Pylon does not accept it for' do
         expect { translate(leaf('state', operators::PRESENT)) }
@@ -239,17 +247,29 @@ module ForestAdminDatasourcePylon
           .to raise_error(UnsupportedOperatorError, /holding a blank value/)
       end
 
-      # `blank` on a String column is rewritten by the toolkit into `in [nil,
-      # '']`, so the message has to point at the presence operators rather than
-      # blame the caller for an empty list.
-      it 'points a list of blanks at the presence operators' do
+      # The agent advertises `present`, `blank` and `missing` on every field
+      # carrying an equality filter, and rewrites them into `not_in [nil, '']`,
+      # `in [nil, '']` and `equal nil`. On a field Pylon accepts no is_set /
+      # is_unset on, the refusal has to name the absence filter the operator set
+      # rather than the empty value it was rewritten into.
+      it 'refuses an absence filter on a field carrying no presence operator' do
         expect { translate(leaf('state', operators::IN, [nil, ''])) }
-          .to raise_error(UnsupportedOperatorError, /PRESENT or BLANK operator/)
+          .to raise_error(UnsupportedOperatorError, /cannot filter 'state' for absence/)
+        expect { translate(leaf('state', operators::NOT_IN, [nil, ''])) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter 'state' for absence/)
+        expect { translate(leaf('state', operators::EQUAL, nil)) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter 'state' for absence/)
       end
 
-      it 'refuses a nil value and points at the presence operators' do
-        expect { translate(leaf('state', operators::EQUAL, nil)) }
+      # `assignee_id` does carry is_set / is_unset, so a nil reaching the value
+      # comes from a scope or a segment written in Ruby rather than from a
+      # rewritten absence filter: the message names the operators to write it
+      # with instead.
+      it 'points a nil on a presence-filtered field at the presence operators' do
+        expect { translate(leaf('assignee_id', operators::EQUAL, nil)) }
           .to raise_error(UnsupportedOperatorError, /use the PRESENT or BLANK operator/)
+        expect { translate(leaf('assignee_id', operators::IN, [nil, ''])) }
+          .to raise_error(UnsupportedOperatorError, /holding a blank value/)
       end
 
       it 'refuses every filter when the collection declares none' do

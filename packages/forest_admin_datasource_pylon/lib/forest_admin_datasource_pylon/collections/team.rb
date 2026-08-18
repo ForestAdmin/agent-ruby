@@ -1,8 +1,8 @@
 module ForestAdminDatasourcePylon
   module Collections
     class Team < FetchAllCollection
-      def initialize(datasource, custom_fields: [])
-        super(datasource, 'PylonTeam', custom_fields: custom_fields)
+      def initialize(datasource)
+        super(datasource, 'PylonTeam')
       end
 
       protected

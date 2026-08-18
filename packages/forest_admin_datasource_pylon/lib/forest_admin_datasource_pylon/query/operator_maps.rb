@@ -17,8 +17,13 @@ module ForestAdminDatasourcePylon
                    Operators::IN => 'in',
                    Operators::NOT_IN => 'not_in' }.freeze
 
+      # MISSING is mapped as well although Pylon spells absence one way only:
+      # the toolkit rewrites it into `equal nil` when it is left out, which the
+      # translator cannot express, so a field the API does check for absence
+      # would refuse the very filter it can answer.
       PRESENCE = { Operators::PRESENT => 'is_set',
-                   Operators::BLANK => 'is_unset' }.freeze
+                   Operators::BLANK => 'is_unset',
+                   Operators::MISSING => 'is_unset' }.freeze
 
       # Declaring the bare comparisons rather than before/after is what lets
       # the toolkit rewrite Today / PreviousWeek / ... into a pair of bounds,
@@ -54,16 +59,40 @@ module ForestAdminDatasourcePylon
 
       # Extended by a collection's `ApiFilters` module, whose `API_FILTERS` is
       # the single source of truth for what its endpoint filters: the schema
-      # derives every column's `filter_operators` from it, so it cannot
-      # advertise a filter the translator would then refuse.
+      # derives every column's `filter_operators` from it, so no collection
+      # declares a filter the translator would then refuse.
+      #
+      # One family escapes those tables. The agent derives `present`, `blank` and
+      # `missing` from an equality or a membership filter, above the datasource,
+      # and rewrites them into a comparison with an empty value. Only a field
+      # carrying PRESENCE can answer one -- Pylon matches an absent value through
+      # `is_set` / `is_unset` alone -- so on every other field the translator
+      # refuses the rewritten condition and names the filter to change, rather
+      # than sending a comparison Pylon would answer as if the empty value were
+      # a value of its own.
       module Table
         def forest_operators(field)
           self::API_FILTERS.dig(field, :ops)&.keys || []
         end
 
+        # Read off the extending module rather than off this one, so the
+        # `CUSTOM_FIELD_OPS` a collection declares is the single source both
+        # this spelling and `allowed_custom_field_operators` come from: an
+        # endpoint accepting less on a custom field narrows one constant.
         def for_custom_field(schema)
-          { ops: CUSTOM_FIELD_OPS.slice(*Array(schema&.filter_operators)) }
+          { ops: self::CUSTOM_FIELD_OPS.slice(*Array(schema&.filter_operators)) }
         end
+      end
+
+      # The table of a collection whose endpoint filters nothing server-side: no
+      # field, and no operator on a custom field either. It is the default of
+      # `BaseCollection#filter_table`, so a collection read whole and filtered
+      # in memory needs no table of its own.
+      module EmptyTable
+        extend Table
+
+        API_FILTERS      = {}.freeze
+        CUSTOM_FIELD_OPS = {}.freeze
       end
     end
   end

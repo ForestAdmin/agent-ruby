@@ -15,6 +15,12 @@ module ForestAdminDatasourcePylon
       ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: offset, limit: limit)
     end
 
+    def aggregation(operation, field: nil, groups: [])
+      ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(
+        operation: operation, field: field, groups: groups
+      )
+    end
+
     def sort(*clauses)
       ForestAdminDatasourceToolkit::Components::Query::Sort.new(clauses)
     end
@@ -122,6 +128,24 @@ module ForestAdminDatasourcePylon
         expect(collection.is_searchable?).to be(false)
         expect(collection.is_countable?).to be(false)
       end
+
+      # A group is computed over the complete dataset here, unlike every other
+      # Pylon collection: a chart grouped by a scalar column is exact.
+      it 'declares the scalar columns groupable and the json one not' do
+        expect(collection.fields['name'].is_groupable).to be(true)
+        expect(collection.fields['list'].is_groupable).to be(false)
+      end
+
+      # Pylon defines custom fields on issues, accounts and contacts only, and
+      # nothing here reads a custom-field value nor clamps its operators: the
+      # column would read nil on every row forever.
+      it 'refuses a custom field rather than registering a column nothing fills' do
+        declared = { column_name: 'tier',
+                     schema: ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(column_type: 'String') }
+
+        expect { subclass.new(datasource, 'X', custom_fields: [declared]) }
+          .to raise_error(ConfigurationError, /takes no custom field/)
+      end
     end
 
     # How a collection pointing here with a ManyToOne resolves its foreign keys.
@@ -135,6 +159,54 @@ module ForestAdminDatasourcePylon
 
       it 'leaves out an id the endpoint no longer returns rather than indexing a blank record' do
         expect(collection.records_indexed_by_id(%w[u1 gone]).keys).to eq(%w[u1])
+      end
+
+      # A page of the pointing collection asks for a handful of ids against every
+      # record the organization has: serializing the whole dataset to slice it
+      # afterwards would pay for all of them, on every page.
+      it 'serializes the wanted records only' do
+        counting = Class.new(subclass) do
+          attr_reader :serialized
+
+          protected
+
+          def serialize(entity)
+            (@serialized ||= []) << entity['id']
+            entity
+          end
+        end.new(datasource, 'X')
+        counting.entities = entities
+
+        counting.records_indexed_by_id(%w[u1])
+
+        expect(counting.serialized).to eq(%w[u1])
+      end
+    end
+
+    # Exact where every other Pylon collection has to refuse: the records in
+    # hand are every record Pylon holds, so a count over them is the count a
+    # server-side aggregation would have answered.
+    describe '#aggregate' do
+      it 'counts the records the filter keeps' do
+        expect(collection.aggregate(nil, filter, aggregation('Count')))
+          .to eq([{ 'group' => {}, 'value' => 3 }])
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('name', operators::PRESENT)),
+                                    aggregation('Count')))
+          .to eq([{ 'group' => {}, 'value' => 2 }])
+      end
+
+      it 'groups by a column' do
+        rows = collection.aggregate(nil, filter, aggregation('Count', groups: [{ field: 'flag' }]))
+
+        expect(rows).to contain_exactly({ 'group' => { 'flag' => false }, 'value' => 1 },
+                                        { 'group' => { 'flag' => true }, 'value' => 1 },
+                                        { 'group' => { 'flag' => nil }, 'value' => 1 })
+      end
+
+      it 'honours the limit the chart asks for' do
+        rows = collection.aggregate(nil, filter, aggregation('Count', groups: [{ field: 'name' }]), 1)
+
+        expect(rows.size).to eq(1)
       end
     end
 

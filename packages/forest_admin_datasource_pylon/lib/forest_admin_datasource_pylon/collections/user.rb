@@ -3,8 +3,8 @@ module ForestAdminDatasourcePylon
     class User < FetchAllCollection
       NATIVE_FIELDS = %w[id name email emails avatar_url status role_id is_deactivated].freeze
 
-      def initialize(datasource, custom_fields: [])
-        super(datasource, 'PylonUser', custom_fields: custom_fields)
+      def initialize(datasource)
+        super(datasource, 'PylonUser')
       end
 
       protected

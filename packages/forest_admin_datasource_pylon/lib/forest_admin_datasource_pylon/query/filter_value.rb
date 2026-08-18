@@ -22,8 +22,8 @@ module ForestAdminDatasourcePylon
       # translating to a filter matching everything.
       def list(leaf)
         values = Array(leaf.value)
-        raise_blank_in_list(leaf) if values.any? { |value| value.nil? || value.to_s.empty? }
         raise_empty_list(leaf) if values.empty?
+        raise_blank_in_list(leaf) if values.any? { |value| value.nil? || value.to_s.empty? }
 
         values.map { |value| format(value) }
       end

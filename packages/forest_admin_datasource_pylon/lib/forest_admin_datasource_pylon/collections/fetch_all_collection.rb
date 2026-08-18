@@ -40,34 +40,66 @@ module ForestAdminDatasourcePylon
       end
 
       def list(caller, filter, projection)
-        records = fetch_all.map { |entity| serialize(entity) }
-        records = filter_in_memory(records, caller, filter)
-        records = sort_in_memory(records, filter&.sort)
+        records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
 
         page_window(records, filter).map { |record| project(record, projection) }
+      end
+
+      # Exact, like the filter and the sort above it: the records in hand are
+      # every record Pylon holds, so a count or a group computed over them is
+      # the one a server-side aggregation would have answered — which is why
+      # these columns stay groupable where every other Pylon column is not.
+      #
+      # The rows are keyed with strings because that is how the agent reads
+      # them, while `Aggregation#apply` hands them back keyed with symbols.
+      def aggregate(caller, filter, aggregation, limit = nil)
+        aggregation.apply(filtered_records(caller, filter), timezone_for(caller), limit)
+                   .map { |row| { 'group' => row[:group], 'value' => row[:value] } }
       end
 
       # One request answers any number of ids: the endpoint hands back the
       # complete dataset, so the ids only pick rows out of it. Read again on
       # every pass, like `list` — the freshness this collection trades bandwidth
       # for is not worth losing to a cache of related records.
+      #
+      # Only the wanted entities are serialized: a page of a pointing collection
+      # asks for a handful of ids, against every record the organization has.
       def records_indexed_by_id(ids)
-        fetch_all.map { |entity| serialize(entity) }.to_h { |record| [record['id'], record] }.slice(*ids)
+        wanted = Array(ids)
+
+        fetch_all.each_with_object({}) do |entity, indexed|
+          next unless entity.is_a?(Hash) && wanted.include?(entity['id'])
+
+          indexed[entity['id']] = serialize(entity)
+        end
       end
 
       protected
 
       # Every column is read-only in this story: writes land in a later one.
-      # Scalar columns are sortable because the in-memory sort honours any order
-      # asked of them; a Json column is neither sortable nor filterable, as it
-      # holds a list whose Pylon semantics have no in-memory counterpart — the
-      # same reason the primary-key residual guard refuses one.
+      # Scalar columns are sortable and groupable because the in-memory sort and
+      # aggregation honour anything asked of them; a Json column is none of the
+      # three, as it holds a list whose Pylon semantics have no in-memory
+      # counterpart — the same reason the primary-key residual guard refuses one.
       def add_column(name, type, is_primary_key: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: self.class.operators_for(type),
                                          is_primary_key: is_primary_key,
                                          is_sortable: type != 'Json',
+                                         is_groupable: type != 'Json',
                                          is_read_only: true))
+      end
+
+      # Pylon defines custom fields on issues, accounts and contacts only, so
+      # neither collection read this way has any. Refused rather than ignored:
+      # `serialize` has no hook here to read a custom-field value with, and the
+      # in-memory pass no table to clamp the declared operators against, so a
+      # declaration would register a column reading nil on every row forever.
+      def add_custom_fields(custom_fields)
+        return [] if custom_fields.empty?
+
+        raise ConfigurationError,
+              "#{name} takes no custom field: Pylon defines them on issues, accounts and contacts only."
       end
 
       # The complete collection, straight from its unpaginated endpoint.
@@ -77,6 +109,12 @@ module ForestAdminDatasourcePylon
       def serialize(_entity) = raise(NotImplementedError, "#{self.class} did not implement serialize")
 
       private
+
+      # The complete dataset, serialized and narrowed to the rows the filter
+      # keeps: what `list` pages and what `aggregate` counts are the same rows.
+      def filtered_records(caller, filter)
+        filter_in_memory(fetch_all.map { |entity| serialize(entity) }, caller, filter)
+      end
 
       # The tree is applied over the complete dataset, so the rows it keeps are
       # the rows Pylon would have kept. `guard_nil_comparisons` is still worth

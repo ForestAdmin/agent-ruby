@@ -54,6 +54,21 @@ module ForestAdminDatasourcePylon
         raise NotImplementedError, "#{self.class} did not implement records_indexed_by_id"
       end
 
+      # Pylon exposes no aggregate endpoint, and the pages of a cursor walk are
+      # not the dataset: a count or a group computed over them would look exact
+      # while answering a fraction. Every column is registered with
+      # `is_groupable: false` so the UI never offers one, and a chart built
+      # through the API anyway is refused here rather than through the
+      # contract's NotImplementedError, which reads as an oversight.
+      #
+      # FetchAllCollection, which does hold every record Pylon has, overrides
+      # this and answers exactly.
+      def aggregate(_caller, _filter, _aggregation, _limit = nil)
+        raise UnsupportedOperatorError,
+              "#{name} cannot be aggregated: Pylon exposes no aggregate endpoint, and counting or grouping the " \
+              'pages the agent walked would answer a fraction of the collection as if it were the whole of it.'
+      end
+
       protected
 
       # Pylon has no `id` filter operator on /issues/search, so collections
@@ -64,6 +79,7 @@ module ForestAdminDatasourcePylon
       # `AND(id equal X, <scope>)` on a record detail as soon as a scope or a
       # segment is set, and `id` is not a field Pylon can filter on.
       def extract_id_lookup(node)
+        ensure_no_relation_leaf!(node)
         ids = id_values(node)
         return IdLookup.new(ids: ids, residual: nil) if ids
         return nil unless and_branch?(node)
@@ -121,13 +137,49 @@ module ForestAdminDatasourcePylon
 
       def build_pylon_filter(caller, filter)
         tree = filter&.condition_tree
+        ensure_no_relation_leaf!(tree)
         ensure_no_stray_id!(tree)
         Query::ConditionTreeTranslator.call(tree, api_filters: api_filters, timezone: timezone_for(caller))
       end
 
-      # Overridden by collections whose endpoint can filter server-side.
+      # The `ApiFilters` module of the collection, whose table is the single
+      # source of truth for what its endpoint filters. The empty table is the
+      # default: a collection read whole and filtered in memory filters nothing
+      # server-side.
+      def filter_table = Query::OperatorMaps::EmptyTable
+
+      # What the endpoint filters server-side: the table of the collection, plus
+      # one entry per custom field — filtered through the very Pylon slug it is
+      # read by, with the operators the integrator declared on the column.
       def api_filters
-        {}
+        @api_filters ||= custom_fields.each_with_object(filter_table::API_FILTERS.dup) do |cf, filters|
+          filters[cf[:column_name]] = filter_table.for_custom_field(cf[:schema])
+        end
+      end
+
+      # A native column: read-only in this story — writes land in a later one —
+      # and never groupable, as no Pylon endpoint aggregates. It is not sortable
+      # either, the ColumnSchema default, because no search endpoint takes a sort
+      # parameter. Filter operators are not chosen here: they come from
+      # `filter_table`, which mirrors the allow-list of the API, so a column
+      # missing from it gets none and the UI offers no filter Pylon would refuse.
+      def add_column(name, type, is_primary_key: false)
+        add_field(name, ColumnSchema.new(column_type: type,
+                                         filter_operators: filter_table.forest_operators(name),
+                                         is_primary_key: is_primary_key,
+                                         is_groupable: false,
+                                         is_read_only: true))
+      end
+
+      # A record read through the endpoint of an id that is not the primary key
+      # it answered with. `GET /accounts/{id}` takes an external id and
+      # `GET /issues/{id}` an issue number, so the record a lookup hands back
+      # can carry an `id` other than the one the filter asked for: keeping it
+      # would answer `id equals <alias>` with a row that does not match, where
+      # the same filter combined with a scope — which goes through the search
+      # endpoint instead — answers nothing at all.
+      def matches_id?(record, id)
+        record['id'].to_s == id.to_s
       end
 
       # An order no endpoint honours is reported rather than silently swallowed:
@@ -215,11 +267,13 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      # Operators a custom field may advertise. The empty default matches the
-      # empty `api_filters`: a collection that filters nothing server-side
-      # must not advertise custom-field filters either.
+      # Operators a custom field may advertise: the ones the endpoint accepts on
+      # one, read off the same table the native columns come from. Declarations
+      # outside this list are dropped at registration, so the schema never
+      # advertises an operator the translator would refuse — and the empty table
+      # of a collection filtering nothing server-side advertises none.
       def allowed_custom_field_operators
-        []
+        filter_table::CUSTOM_FIELD_OPS.keys
       end
 
       private
@@ -260,6 +314,36 @@ module ForestAdminDatasourcePylon
               "A filter on 'id' has to be combined with 'and' conditions only: Pylon cannot filter on id, so the " \
               'agent reads the records by id and applies the rest in memory, which an id inside an `or` would ' \
               'silently widen. Rewrite the filter with `and`, or filter on another field.'
+      end
+
+      # Forest offers a filter on a related field as soon as a ManyToOne is
+      # declared, and sends it as a `relation:field` leaf. Pylon has no join and
+      # no include parameter, so there is nothing to translate it into: the
+      # matching records would have to be read from the foreign collection and
+      # their keys matched here, which is a read of its own, not a filter.
+      #
+      # Refused with the foreign key of the relation, which is the filter the
+      # operator can set instead — and the one the reverse side is listed by.
+      def ensure_no_relation_leaf!(node)
+        return if node.nil?
+
+        field = nil
+        node.some_leaf { |leaf| field = leaf.field if leaf.field.to_s.include?(':') }
+        raise_unfilterable_relation(field) if field
+      end
+
+      def raise_unfilterable_relation(field)
+        relation = schema[:fields][field.to_s.split(':').first]
+        instead = if relation.respond_to?(:foreign_key)
+                    "Filter on '#{relation.foreign_key}' instead, or set the filter from the " \
+                      "#{relation.foreign_collection} list."
+                  else
+                    'Filter on a column of this collection instead.'
+                  end
+
+        raise UnsupportedOperatorError,
+              "Pylon cannot filter on the related field '#{field}': it has no join, so a condition on a " \
+              "relation has no server-side translation. #{instead}"
       end
 
       def clamp_custom_field_operators(column_name, schema)

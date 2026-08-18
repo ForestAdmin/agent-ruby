@@ -40,8 +40,9 @@ module ForestAdminDatasourcePylon
 
       protected
 
-      # The `ApiFilters` module of the collection, whose table is the single
-      # source of truth for what its search endpoint filters.
+      # Every collection read this way has a search endpoint, hence a table of
+      # its own: the empty default of the base would silently turn each of its
+      # filters into a refusal.
       def filter_table = raise(NotImplementedError, "#{self.class} did not implement filter_table")
 
       # One page of the listing endpoint, as a Client::SearchPage.
@@ -49,20 +50,6 @@ module ForestAdminDatasourcePylon
 
       # One record straight from its own endpoint.
       def fetch_one(id) = raise(NotImplementedError, "#{self.class} did not implement fetch_one")
-
-      # A custom field is filtered through its Pylon slug, with the operators the
-      # integrator declared on the column.
-      def api_filters
-        @api_filters ||= custom_fields.each_with_object(filter_table::API_FILTERS.dup) do |cf, filters|
-          filters[cf[:column_name]] = filter_table.for_custom_field(cf[:schema])
-        end
-      end
-
-      # Declarations outside this list are dropped at registration, so the
-      # schema never advertises an operator the translator would refuse.
-      def allowed_custom_field_operators
-        filter_table::CUSTOM_FIELD_OPS.keys
-      end
 
       private
 
@@ -126,7 +113,10 @@ module ForestAdminDatasourcePylon
       # token's scope — reads as "no record" rather than as a failed page.
       def records_by_id(id)
         record = fetch_one(id)
-        record.nil? ? [] : [serialize(record)]
+        return [] if record.nil?
+
+        serialized = serialize(record)
+        matches_id?(serialized, id) ? [serialized] : []
       rescue APIError => e
         raise unless e.status == 404
 

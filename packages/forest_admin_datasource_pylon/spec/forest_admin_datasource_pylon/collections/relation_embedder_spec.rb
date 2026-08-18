@@ -162,6 +162,26 @@ module ForestAdminDatasourcePylon
           .with(body: hash_including('filter' => id_filter(%w[acc-1])))
       end
 
+      # A blank key would otherwise reach the `in` filter of the read, which
+      # refuses a blank inside a list: one malformed key would fail the page.
+      it 'leaves a blank key out of the ids it asks for, like a null one' do
+        stub_issues(issue_payload('i1'), issue_payload('i2', 'account' => { 'id' => '' }))
+        stub_accounts(account_payload('acc-1'))
+
+        rows = issues.list(nil, filter, %w[id account:name])
+
+        expect(rows.map { |row| row['account'] }).to eq([rows.first['account'], nil])
+        expect(WebMock).to have_requested(:post, "#{base}/accounts/search")
+          .with(body: hash_including('filter' => id_filter(%w[acc-1])))
+      end
+
+      it 'sends no request at all when every foreign key of the page is blank' do
+        stub_issues(issue_payload('i1', 'team' => { 'id' => '' }))
+
+        expect(issues.list(nil, filter, %w[id team:name]).first).to eq('id' => 'i1', 'team' => nil)
+        expect(WebMock).not_to have_requested(:get, "#{base}/teams")
+      end
+
       # Deleted, merged, or outside the scope of the token: the row says so
       # rather than carrying a blank record the panel would offer to open.
       it 'embeds no record for a foreign key the endpoint no longer answers' do

@@ -8,10 +8,11 @@ module ForestAdminDatasourcePylon
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
-      # column missing from that table gets no operator, so the UI never offers
-      # a filter Pylon would refuse.
+      # column missing from that table gets no operator, so the UI offers no
+      # filter of this collection's own that Pylon would refuse — the absence
+      # family the agent derives above the datasource being the exception
+      # `Query::OperatorMaps::Table` describes.
       module SchemaDefinition
-        ColumnSchema    = BaseCollection::ColumnSchema
         OneToManySchema = BaseCollection::OneToManySchema
 
         private
@@ -39,9 +40,7 @@ module ForestAdminDatasourcePylon
         end
 
         def define_identity_fields
-          add_field('id', ColumnSchema.new(column_type: 'String',
-                                           filter_operators: ApiFilters.forest_operators('id'),
-                                           is_primary_key: true, is_read_only: true))
+          add_column('id', 'String', is_primary_key: true)
           add_column('name', 'String')
           # Left as String rather than Enum: Pylon ships customer / partner /
           # prospect but lets an organization define its own account types.
@@ -72,12 +71,6 @@ module ForestAdminDatasourcePylon
 
         def define_time_fields
           %w[created_at updated_at latest_customer_activity_time].each { |field| add_column(field, 'Date') }
-        end
-
-        def add_column(name, type)
-          add_field(name, ColumnSchema.new(column_type: type,
-                                           filter_operators: ApiFilters.forest_operators(name),
-                                           is_read_only: true))
         end
       end
     end

@@ -36,11 +36,16 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      # A null foreign key asks for nothing, and the same id is asked for once
-      # however many rows point at it.
+      # A foreign key Pylon left empty asks for nothing — a blank one no more
+      # than a null one, and it would reach the `in` filter of the read below,
+      # which refuses a blank inside a list and would fail the whole page over
+      # one malformed key. The same id is asked for once however many rows point
+      # at it.
       def foreign_ids(records, relations)
         keys = relations.map { |_name, relation| relation.foreign_key }
-        records.flat_map { |record| keys.map { |key| record[key] } }.compact.uniq
+        records.flat_map { |record| keys.map { |key| record[key] } }
+               .reject { |id| id.nil? || id.to_s.empty? }
+               .uniq
       end
 
       # `account:name` asks for the `account` relation; a projected column, and a

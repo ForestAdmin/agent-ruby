@@ -88,6 +88,13 @@ module ForestAdminDatasourcePylon
         expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
+      # No Pylon endpoint aggregates, and the pages of a cursor walk are not the
+      # dataset: a chart grouped by one of these columns would answer a fraction
+      # as if it were the whole collection.
+      it 'declares no column groupable' do
+        expect(columns.values.map(&:is_groupable).uniq).to eq([false])
+      end
+
       # `search_text` is native on /issues/search, while Pylon exposes neither a
       # count endpoint nor a total, so Count stays out until it can be throttled.
       it 'enables search and leaves count disabled' do
@@ -99,7 +106,8 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['state'].filter_operators).to eq([operators::EQUAL, operators::IN,
                                                                    operators::NOT_IN])
         expect(collection.fields['assignee_id'].filter_operators)
-          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
+                  operators::PRESENT, operators::BLANK, operators::MISSING])
         expect(collection.fields['title'].filter_operators)
           .to eq([operators::CONTAINS, operators::I_CONTAINS, operators::NOT_CONTAINS, operators::NOT_I_CONTAINS])
       end
@@ -276,6 +284,15 @@ module ForestAdminDatasourcePylon
         expect { collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, 'i1')), %w[id]) }
           .to raise_error(APIError)
       end
+
+      # `GET /issues/{id}` accepts the issue number as well as the UUID and
+      # answers with the issue carrying its own id: keeping it would answer
+      # `id equals 42` with a row whose id is not 42.
+      it 'reports no record when the endpoint answered an alias of the primary key' do
+        stub_request(:get, "#{base}/issues/42").to_return(json('data' => issue_payload('i1')))
+
+        expect(collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, '42')), %w[id])).to eq([])
+      end
     end
 
     describe 'custom fields' do
@@ -364,6 +381,28 @@ module ForestAdminDatasourcePylon
         expect { collection.list(nil, filter(condition_tree: leaf('number', operators::EQUAL, 12)), %w[id]) }
           .to raise_error(UnsupportedOperatorError, /cannot filter on 'number'/)
         expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      # Declaring the four ManyToOne relations is what makes a filter on a
+      # related field reachable, and Pylon has no join to answer it with. The
+      # refusal names the foreign key, which is the filter that does the same
+      # job on the side the operator is already on.
+      it 'refuses a filter on a related field, naming the foreign key to use instead' do
+        query = filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme'))
+
+        expect { collection.list(nil, query, %w[id]) }
+          .to raise_error(UnsupportedOperatorError,
+                          /related field 'account:name'.*Filter on 'account_id' instead.*PylonAccount list/m)
+        expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      # The same filter alongside an id: the short-circuit sees the tree first,
+      # and would otherwise report the relation as a residual it cannot evaluate.
+      it 'refuses a filter on a related field combined with an id' do
+        conditions = [id_leaf(operators::EQUAL, 'i1'), leaf('account:name', operators::CONTAINS, 'Acme')]
+
+        expect { collection.list(nil, filter(condition_tree: branch('And', conditions)), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /related field 'account:name'/)
       end
 
       it 'keeps the same filter across every page of the walk' do

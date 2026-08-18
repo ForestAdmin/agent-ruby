@@ -42,9 +42,17 @@ module ForestAdminDatasourcePylon
           add_field('type', column.new(column_type: 'String'))
           add_field('tags', column.new(column_type: 'Json'))
           add_field('resolved_at', column.new(column_type: 'Date'))
+          add_field('account_id', column.new(column_type: 'String'))
         end
 
-        def define_relations; end
+        # One ManyToOne, so the relation guard can be observed both on a relation
+        # the collection declares and on a prefix naming none.
+        def define_relations
+          add_field('account', Collections::BaseCollection::ManyToOneSchema.new(
+                                 foreign_collection: 'PylonAccount', foreign_key: 'account_id',
+                                 foreign_key_target: 'id'
+                               ))
+        end
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
                :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?,
@@ -127,6 +135,52 @@ module ForestAdminDatasourcePylon
 
         expect(opted_in.is_searchable?).to be(true)
         expect(opted_in.is_countable?).to be(true)
+      end
+    end
+
+    describe 'refusals' do
+      # The agent answers 400 carrying the message for a ValidationError, and 500
+      # "Unexpected error" for anything else. Every refusal of this datasource
+      # names a filter the operator set and can change, and the message is the
+      # only place they learn which one.
+      it 'refuses through an error the agent answers 400 for' do
+        expect(UnsupportedOperatorError.new('nope'))
+          .to be_a(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+      end
+
+      # No Pylon endpoint aggregates, and a count over the pages the agent walked
+      # would answer a fraction of the collection as if it were all of it. The
+      # contract's NotImplementedError would read as an oversight instead.
+      it 'refuses to aggregate, naming the collection' do
+        expect { collection.aggregate(nil, nil, nil) }
+          .to raise_error(UnsupportedOperatorError, /X cannot be aggregated/)
+      end
+
+      # Forest offers a filter on a related field as soon as a ManyToOne is
+      # declared; Pylon has no join to answer it with, and the foreign key does
+      # the same job on the side the operator is already on.
+      it 'refuses a filter on a related field, naming the foreign key to use instead' do
+        query = filter(condition_tree: leaf('account:name', operators::EQUAL, 'Acme'))
+
+        expect { collection.build_pylon_filter(nil, query) }
+          .to raise_error(UnsupportedOperatorError,
+                          /related field 'account:name'.*Filter on 'account_id' instead.*PylonAccount list/m)
+      end
+
+      it 'refuses one whose prefix names no relation of the collection' do
+        query = filter(condition_tree: leaf('nope:name', operators::EQUAL, 'Acme'))
+
+        expect { collection.build_pylon_filter(nil, query) }
+          .to raise_error(UnsupportedOperatorError, /Filter on a column of this collection instead/)
+      end
+
+      # Before the short-circuit reads it as a residual it cannot evaluate: the
+      # message names the relation rather than the in-memory pass.
+      it 'refuses one carried alongside an id' do
+        conditions = [leaf('id', operators::EQUAL, 'uuid-1'), leaf('account:name', operators::EQUAL, 'Acme')]
+
+        expect { collection.extract_id_lookup(branch('And', conditions)) }
+          .to raise_error(UnsupportedOperatorError, /related field 'account:name'/)
       end
     end
 

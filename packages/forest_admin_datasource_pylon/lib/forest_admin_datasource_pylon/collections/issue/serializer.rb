@@ -2,8 +2,6 @@ module ForestAdminDatasourcePylon
   module Collections
     class Issue < BaseCollection
       module Serializer
-        include RecordSerialization
-
         PARTY_FIELDS = { 'account_id' => 'account', 'requester_id' => 'requester',
                          'assignee_id' => 'assignee', 'team_id' => 'team' }.freeze
 

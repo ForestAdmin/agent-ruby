@@ -9,8 +9,10 @@ module ForestAdminDatasourcePylon
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
-      # column missing from that table gets no operator, so the UI never offers
-      # a filter Pylon would refuse.
+      # column missing from that table gets no operator, so the UI offers no
+      # filter of this collection's own that Pylon would refuse — the absence
+      # family the agent derives above the datasource being the exception
+      # `Query::OperatorMaps::Table` describes.
       module SchemaDefinition
         ColumnSchema    = BaseCollection::ColumnSchema
         ManyToOneSchema = BaseCollection::ManyToOneSchema
@@ -49,7 +51,7 @@ module ForestAdminDatasourcePylon
           # search allow-list, so it never reaches the translator.
           add_field('id', ColumnSchema.new(column_type: 'String',
                                            filter_operators: [Operators::EQUAL, Operators::IN],
-                                           is_primary_key: true, is_read_only: true))
+                                           is_primary_key: true, is_groupable: false, is_read_only: true))
           add_column('number', 'Number')
           add_column('link', 'String')
         end
@@ -82,12 +84,6 @@ module ForestAdminDatasourcePylon
           %w[time_in_status_seconds business_hours_time_in_status_seconds].each do |field|
             add_column(field, 'Json')
           end
-        end
-
-        def add_column(name, type)
-          add_field(name, ColumnSchema.new(column_type: type,
-                                           filter_operators: ApiFilters.forest_operators(name),
-                                           is_read_only: true))
         end
       end
     end

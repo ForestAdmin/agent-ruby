@@ -110,6 +110,13 @@ module ForestAdminDatasourcePylon
         expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
+      # No Pylon endpoint aggregates, and the pages of a cursor walk are not the
+      # dataset: a chart grouped by one of these columns would answer a fraction
+      # as if it were the whole collection.
+      it 'declares no column groupable' do
+        expect(columns.values.map(&:is_groupable).uniq).to eq([false])
+      end
+
       it 'enables search and leaves count disabled' do
         expect(collection.is_searchable?).to be(true)
         expect(collection.is_countable?).to be(false)

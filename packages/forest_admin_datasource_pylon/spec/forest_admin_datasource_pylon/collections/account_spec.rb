@@ -106,6 +106,13 @@ module ForestAdminDatasourcePylon
         expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
+      # No Pylon endpoint aggregates, and the pages of a cursor walk are not the
+      # dataset: a chart grouped by one of these columns would answer a fraction
+      # as if it were the whole collection.
+      it 'declares no column groupable' do
+        expect(columns.values.map(&:is_groupable).uniq).to eq([false])
+      end
+
       # `search_text` is native on /accounts/search, while Pylon exposes neither a
       # count endpoint nor a total, so Count stays out until it can be throttled.
       it 'enables search and leaves count disabled' do
@@ -117,7 +124,8 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['name'].filter_operators)
           .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::CONTAINS, operators::I_CONTAINS])
         expect(collection.fields['owner_id'].filter_operators)
-          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
+                  operators::PRESENT, operators::BLANK, operators::MISSING])
         expect(collection.fields['tags'].filter_operators)
           .to eq([operators::CONTAINS, operators::NOT_CONTAINS, operators::IN, operators::NOT_IN])
         expect(collection.fields['domains'].filter_operators)
@@ -389,6 +397,17 @@ module ForestAdminDatasourcePylon
         stub_request(:get, "#{base}/accounts/acc-1").to_return(status: 200, body: '')
 
         expect(collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, 'acc-1')), %w[id])).to eq([])
+      end
+
+      # `GET /accounts/{id}` accepts an external id in place of the primary key
+      # and answers with the account carrying its own UUID. The row would not
+      # match the filter that asked for it, and the same filter combined with a
+      # scope — which goes through the search endpoint — answers nothing.
+      it 'reports no record when the endpoint answered an alias of the primary key' do
+        stub_request(:get, "#{base}/accounts/crm-1").to_return(json('data' => account_payload('acc-1')))
+        query = filter(condition_tree: id_leaf(operators::EQUAL, 'crm-1'))
+
+        expect(collection.list(nil, query, %w[id name])).to eq([])
       end
 
       it 'propagates a failure that is not a missing record' do

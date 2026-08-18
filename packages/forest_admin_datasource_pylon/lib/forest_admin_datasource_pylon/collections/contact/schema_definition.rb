@@ -8,11 +8,12 @@ module ForestAdminDatasourcePylon
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
-      # column missing from that table gets no operator, so the UI never offers
-      # a filter Pylon would refuse. A contact carries no timestamp at all —
+      # column missing from that table gets no operator, so the UI offers no
+      # filter of this collection's own that Pylon would refuse — the absence
+      # family the agent derives above the datasource being the exception
+      # `Query::OperatorMaps::Table` describes. A contact carries no timestamp at all —
       # Pylon returns none.
       module SchemaDefinition
-        ColumnSchema    = BaseCollection::ColumnSchema
         ManyToOneSchema = BaseCollection::ManyToOneSchema
         OneToManySchema = BaseCollection::OneToManySchema
 
@@ -39,9 +40,7 @@ module ForestAdminDatasourcePylon
         end
 
         def define_identity_fields
-          add_field('id', ColumnSchema.new(column_type: 'String',
-                                           filter_operators: ApiFilters.forest_operators('id'),
-                                           is_primary_key: true, is_read_only: true))
+          add_column('id', 'String', is_primary_key: true)
           add_column('name', 'String')
           # Flattened from the nested `{ id: ..., external_ids: ... }` object
           # Pylon returns, and kept as a column next to the `account` relation
@@ -71,12 +70,6 @@ module ForestAdminDatasourcePylon
           add_column('portal_role', 'String')
           add_column('portal_role_id', 'String')
           add_column('integration_user_ids', 'Json')
-        end
-
-        def add_column(name, type)
-          add_field(name, ColumnSchema.new(column_type: type,
-                                           filter_operators: ApiFilters.forest_operators(name),
-                                           is_read_only: true))
         end
       end
     end

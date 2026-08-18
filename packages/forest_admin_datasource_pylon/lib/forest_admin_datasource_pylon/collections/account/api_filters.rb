@@ -6,8 +6,10 @@ module ForestAdminDatasourcePylon
       # an operator absent from a field's map is rejected by Pylon.
       #
       # It is the single source of truth for filtering — `define_schema` derives
-      # every column's `filter_operators` from it, so the schema cannot
-      # advertise a filter the translator would then refuse.
+      # every column's `filter_operators` from it, so this collection declares no
+      # filter the translator would then refuse; the absence family the agent
+      # derives on top of it is the exception `Query::OperatorMaps::Table`
+      # describes.
       module ApiFilters
         Maps = Query::OperatorMaps
 
