@@ -287,6 +287,100 @@ module ForestAdminAgent
         end
       end
 
+      describe 'searching free text' do
+        def matching_search(term)
+          store.list_by_record(collection: 'accounts', record_id: '1', search: term).map(&:correlation_key)
+        end
+
+        it 'matches a value, case-insensitively and as a substring' do
+          store.append(record(correlation_key: 'lyon', new_values: { 'city' => 'Lyon' }))
+          store.append(record(correlation_key: 'paris', new_values: { 'city' => 'Paris' }))
+
+          expect(matching_search('lyo')).to eq(['lyon'])
+          expect(matching_search('LYON')).to eq(['lyon'])
+        end
+
+        # Only the changed leaves of a JSON column are stored, so the match has to reach them.
+        it 'reaches a value nested at any depth' do
+          store.append(record(correlation_key: 'nested',
+                              new_values: { 'address' => { 'city' => 'Lyon', 'zip' => '69001' } }))
+
+          expect(matching_search('Lyon')).to eq(['nested'])
+          expect(matching_search('69001')).to eq(['nested'])
+        end
+
+        it 'matches a key as well as a value' do
+          store.append(record(correlation_key: 'keyed', new_values: { 'first_name' => 'Jo' }))
+
+          expect(matching_search('first_name')).to eq(['keyed'])
+        end
+
+        it 'matches the previous side too, not only the new one' do
+          store.append(record(correlation_key: 'was', previous_values: { 'city' => 'Lyon' }, new_values: {}))
+
+          expect(matching_search('Lyon')).to eq(['was'])
+        end
+
+        it 'matches the action name and who acted' do
+          store.append(record(correlation_key: 'refund', operation: 'action', action_name: 'Refund order',
+                              previous_values: {}, new_values: {}))
+          store.append(record(correlation_key: 'ada', user_first_name: 'Ada', user_last_name: 'Lovelace',
+                              user_email: 'ada@test', previous_values: {}, new_values: {}))
+
+          expect(matching_search('refund ord')).to eq(['refund'])
+          expect(matching_search('lovelace')).to eq(['ada'])
+          expect(matching_search('ada@')).to eq(['ada'])
+        end
+
+        # Machine identifiers nobody searches for: matching them turns one term into confusing hits.
+        it 'ignores the operation, the correlation key, the record id and the status' do
+          store.append(record(correlation_key: 'searchable-key', operation: 'update', record_id: '1',
+                              previous_values: {}, new_values: {}))
+
+          expect(matching_search('searchable-key')).to be_empty
+          expect(matching_search('update')).to be_empty
+          expect(matching_search('done')).to be_empty
+        end
+
+        # A search must never confirm a value the trail refused to record.
+        it 'never matches a redacted field, by its mask or by the value it hid' do
+          store.append(record(correlation_key: 'masked', previous_values: { 'email' => '[redacted]' },
+                              new_values: { 'email' => '[redacted]' }))
+
+          expect(matching_search('redacted')).to be_empty
+          expect(matching_search('[redacted]')).to be_empty
+          expect(matching_search('secret@test')).to be_empty
+        end
+
+        it 'treats LIKE wildcards in the term as ordinary characters' do
+          store.append(record(correlation_key: 'literal', new_values: { 'code' => '50%_off' }))
+          store.append(record(correlation_key: 'other', new_values: { 'code' => 'anything' }))
+
+          expect(matching_search('50%_')).to eq(['literal'])
+          expect(matching_search('%')).to eq(['literal'])
+        end
+
+        it 'composes with the other filters, and the count agrees with it' do
+          store.append(record(correlation_key: 'keep', user_id: 7, new_values: { 'city' => 'Lyon' }))
+          store.append(record(correlation_key: 'wrong-user', user_id: 9, new_values: { 'city' => 'Lyon' }))
+          store.append(record(correlation_key: 'wrong-term', user_id: 7, new_values: { 'city' => 'Paris' }))
+
+          expect(store.list_by_record(collection: 'accounts', record_id: '1', search: 'lyon',
+                                      user_ids: [7]).map(&:correlation_key)).to eq(['keep'])
+          expect(store.count_by_record(collection: 'accounts', record_id: '1', search: 'lyon',
+                                       user_ids: [7])).to eq(1)
+        end
+
+        it 'narrows the authors it offers to those the term matches' do
+          store.append(record(user_id: 7, new_values: { 'city' => 'Lyon' }))
+          store.append(record(user_id: 9, new_values: { 'city' => 'Paris' }))
+
+          authors = store.authors_by_record(collection: 'accounts', record_id: '1', search: 'lyon')
+
+          expect(authors.map { |author| author[:user_id] }).to eq([7])
+        end
+      end
+
       describe '#authors_by_record' do
         it 'lists the distinct authors of the matching entries, as they were when they acted' do
           store.append(record(user_id: 7, user_first_name: 'Ada', user_last_name: 'L', user_email: 'ada@test'))

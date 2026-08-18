@@ -58,11 +58,12 @@ module ForestAdminAgent
         model.where(id: ids).delete_all unless ids.empty?
       end
 
-      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil,
-                         start_timestamp: nil, end_timestamp: nil, fields: nil, order: 'asc')
+      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, start_timestamp: nil,
+                         end_timestamp: nil, fields: nil, search: nil, order: 'asc')
         # `id` (insertion order) breaks ties on equal timestamps in both directions, keeping pages
         # deterministic and stable.
-        relation = scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields)
+        relation = scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+                                                end_timestamp: end_timestamp, fields: fields, search: search)
                    .order(timestamp: order.to_s == 'desc' ? :desc : :asc, id: :asc)
                    .offset(skip || 0)
         relation = relation.limit(limit) unless limit.nil?
@@ -71,16 +72,18 @@ module ForestAdminAgent
       end
 
       def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
-                          end_timestamp: nil, fields: nil)
-        scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields).count
+                          end_timestamp: nil, fields: nil, search: nil)
+        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+                                     end_timestamp: end_timestamp, fields: fields, search: search).count
       end
 
       # The distinct authors of the entries the current filters match, whatever page is being asked for. The
       # identity comes from the rows themselves, so a user who has since been renamed or removed still reads
       # as they were when they acted.
       def authors_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
-                            end_timestamp: nil, fields: nil)
-        scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields)
+                            end_timestamp: nil, fields: nil, search: nil)
+        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+                                     end_timestamp: end_timestamp, fields: fields, search: search)
           .where.not(user_id: nil)
           .distinct
           .pluck(*AUTHOR_COLUMNS)
@@ -116,10 +119,13 @@ module ForestAdminAgent
 
       private
 
-      def scope(collection, record_id, user_ids, start_timestamp, end_timestamp, fields = nil)
+      # Every filter is an AND, so the count matches exactly what a page of this history holds.
+      def scope(collection, record_id, user_ids: nil, start_timestamp: nil, end_timestamp: nil,
+                fields: nil, search: nil)
         relation = model.where(collection: collection, record_id: record_id)
         relation = relation.where(user_id: user_ids) if user_ids
         relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
+        relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
         # Compare as Time so ActiveRecord casts the bound to the datetime column's storage format
         # (raw ISO strings with a `Z` would compare lexically against the cast rows and never match).
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp

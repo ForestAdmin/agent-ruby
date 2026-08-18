@@ -313,6 +313,36 @@ module ForestAdminAgent
           expect(store).to have_received(:list_by_record).with(hash_including(skip: 0, limit: 20))
         end
 
+        it 'passes a search term through, trimmed' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'search' => '  Lyon  ' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_including(search: 'Lyon'))
+          # The count has to agree with the filter, like every other one.
+          expect(store).to have_received(:count_by_record).with(hash_including(search: 'Lyon'))
+        end
+
+        it 'sends no search when the term is blank' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4', 'search' => '   ' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_excluding(:search))
+        end
+
+        it 'combines a search with the other filters as one AND' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4', 'search' => 'Lyon',
+                                           'userIds' => '12', 'fields' => 'address.city' } })
+
+          expect(store).to have_received(:list_by_record).with(
+            hash_including(search: 'Lyon', user_ids: [12], fields: ['address.city'])
+          )
+        end
+
         it 'passes a fields filter through, keeping names that hold a dot' do
           route = route_with_store
           route.handle_request({ headers: {},

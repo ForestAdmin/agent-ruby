@@ -158,9 +158,17 @@ module ForestAdminAgent
           {
             user_ids: parse_user_ids(args.dig(:params, 'userIds')),
             fields: parse_fields(args.dig(:params, 'fields')),
+            search: parse_search(args.dig(:params, 'search')),
             start_timestamp: parse_date_boundary(args.dig(:params, 'startDate'), timezone, :start),
             end_timestamp: parse_date_boundary(args.dig(:params, 'endDate'), timezone, :end)
           }.compact
+        end
+
+        # Free text, trimmed; blank means no filter rather than a term that matches everything.
+        def parse_search(raw)
+          term = raw.to_s.strip
+
+          term.empty? ? nil : term
         end
 
         # Comma-separated field names, kept verbatim (a name may hold a dot). Empty after parsing → no filter.

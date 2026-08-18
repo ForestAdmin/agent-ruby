@@ -113,6 +113,19 @@ or removed still reads as they were when they acted. Optional filters (all combi
 | `startDate` | `YYYY-MM-DD` or datetime (incl.) | keep entries from this lower bound onward       |
 | `endDate`   | `YYYY-MM-DD` or datetime (incl.) | keep entries up to this upper bound             |
 | `fields`    | comma-separated field names      | keep only entries whose diff touched one of them |
+| `search`    | free text, trimmed               | keep only entries the term matches               |
+
+`search` is matched case-insensitively, as a substring, against the action's name, the actor's first name,
+last name and email, and the **keys and values of both value objects at any depth** — searching `Lyon` finds
+`{"address": {"city": "Lyon"}}`, which is what only the agent can answer, since it is the only side holding
+the recorded values. It is matched in SQL, not in memory, so it composes with pagination and `meta.count`
+like every other filter.
+
+It deliberately does **not** match `operation`, `correlationKey`, `recordId`, `collection`, `status` or
+`timestamp`: machine identifiers nobody searches for, whose matches read as noise.
+
+A field masked by `redact` never matches — neither by its `[redacted]` mask nor by the value it hid, which
+was never recorded. A search must not confirm a value the trail refused to keep.
 
 `fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
 reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
