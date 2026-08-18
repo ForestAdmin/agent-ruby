@@ -5,6 +5,7 @@ module ForestAdminDatasourcePylon
       include RecordSerialization
       include Serializer
       include RelationEmbedder
+      include MessagesEmbedder
 
       # `/issues/search` exposes no sort parameter, so the allow-list is empty and
       # every requested order is reported instead of being silently swallowed.
@@ -19,6 +20,32 @@ module ForestAdminDatasourcePylon
       # throttling that would let this cap grow.
       MAX_ID_LOOKUPS = 20
 
+      # The shape of one message inside the `messages` column. Field names follow
+      # the columns of this collection rather than the payload: Pylon spells them
+      # `message_html` and `timestamp`, which would put two conventions in the
+      # same schema for the operator to reconcile.
+      MESSAGE_THREAD_SCHEMA = {
+        'id' => 'String',
+        'body_html' => 'String',
+        'is_private' => 'Boolean',
+        'source' => 'String',
+        'thread_id' => 'String',
+        'file_urls' => 'Json',
+        'created_at' => 'Date',
+        'author_name' => 'String',
+        'author_email' => 'String',
+        'author_avatar_url' => 'String',
+        'author_contact_id' => 'String',
+        'author_user_id' => 'String'
+      }.freeze
+
+      # One thread is one `GET /issues/{id}/messages`, an endpoint allowing 20
+      # requests per minute: a page asking for more threads than this reads the
+      # first ones and reports the rest, for the same reason MAX_ID_LOOKUPS
+      # bounds the primary-key fan-out. Story 9 (EXT-13) owns the throttling
+      # that would let this cap grow.
+      MAX_MESSAGE_EMBEDS = 10
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonIssue', custom_fields: custom_fields, searchable: true)
       end
@@ -27,6 +54,7 @@ module ForestAdminDatasourcePylon
         records = fetch_records(caller, filter)
         rows = records.map { |record| project(record, projection) }
         embed_relations(records, rows, projection)
+        embed_messages(records, rows) if want_messages?(projection)
         rows
       end
 

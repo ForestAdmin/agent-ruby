@@ -68,6 +68,23 @@ module ForestAdminDatasourcePylon
           add_column('customer_portal_visible', 'Boolean')
           add_column('author_unverified', 'Boolean')
           add_column('number_of_touches', 'Number')
+          define_thread_field
+        end
+
+        # The conversation, embedded at read time by MessagesEmbedder. Declared
+        # by hand rather than through `add_column`: its type is the shape of one
+        # message, not a primitive.
+        #
+        # Neither filterable nor sortable — `POST /issues/search` covers no
+        # message field, and the thread is not even part of the payload the
+        # search endpoint returns — and not groupable either: `ColumnSchema`
+        # defaults that flag to true, where the `add_column` of the base passes
+        # false for every Pylon column, a thread being both an array and a value
+        # the pages of a cursor walk do not carry.
+        def define_thread_field
+          add_field('messages', ColumnSchema.new(column_type: [Issue::MESSAGE_THREAD_SCHEMA],
+                                                 filter_operators: [], is_groupable: false,
+                                                 is_read_only: true))
         end
 
         # Flattened from the nested `{id: …}` objects Pylon returns, and kept as
