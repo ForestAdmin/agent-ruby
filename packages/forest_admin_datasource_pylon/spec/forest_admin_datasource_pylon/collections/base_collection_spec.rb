@@ -42,21 +42,29 @@ module ForestAdminDatasourcePylon
           add_field('type', column.new(column_type: 'String'))
           add_field('tags', column.new(column_type: 'Json'))
           add_field('resolved_at', column.new(column_type: 'Date'))
-          add_field('account_id', column.new(column_type: 'String'))
+          add_field('account_id', column.new(column_type: 'String',
+                                             filter_operators: [Collections::BaseCollection::Operators::IN]))
+          add_field('owner_id', column.new(column_type: 'String'))
         end
 
-        # One ManyToOne, so the relation guard can be observed both on a relation
-        # the collection declares and on a prefix naming none.
+        # Two ManyToOne, so the resolution can be observed on a relation whose
+        # foreign key this collection filters and on one whose foreign key it
+        # does not -- alongside a prefix naming no relation at all.
         def define_relations
           add_field('account', Collections::BaseCollection::ManyToOneSchema.new(
                                  foreign_collection: 'PylonAccount', foreign_key: 'account_id',
                                  foreign_key_target: 'id'
                                ))
+          add_field('owner', Collections::BaseCollection::ManyToOneSchema.new(
+                               foreign_collection: 'PylonUser', foreign_key: 'owner_id',
+                               foreign_key_target: 'id'
+                             ))
         end
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
                :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?,
-               :ensure_searchless_lookup!, :search_records, :page_window, :warn_unsortable
+               :ensure_searchless_lookup!, :search_records, :page_window, :warn_unsortable,
+               :with_resolved_relations
       end
     end
 
@@ -156,31 +164,117 @@ module ForestAdminDatasourcePylon
           .to raise_error(UnsupportedOperatorError, /X cannot be aggregated/)
       end
 
-      # Forest offers a filter on a related field as soon as a ManyToOne is
-      # declared; Pylon has no join to answer it with, and the foreign key does
-      # the same job on the side the operator is already on.
-      it 'refuses a filter on a related field, naming the foreign key to use instead' do
-        query = filter(condition_tree: leaf('account:name', operators::EQUAL, 'Acme'))
+      # A relation whose foreign key this collection does not filter cannot be
+      # resolved: the keys read from the foreign collection would have nothing
+      # to be matched against.
+      it 'refuses a filter on a relation whose foreign key it cannot filter' do
+        query = filter(condition_tree: leaf('owner:name', operators::EQUAL, 'Bob'))
 
-        expect { collection.build_pylon_filter(nil, query) }
+        expect { collection.with_resolved_relations(nil, query) { |q| q } }
           .to raise_error(UnsupportedOperatorError,
-                          /related field 'account:name'.*Filter on 'account_id' instead.*PylonAccount list/m)
+                          /related field 'owner:name'.*Filter on 'owner_id' instead.*PylonUser list/m)
       end
 
       it 'refuses one whose prefix names no relation of the collection' do
         query = filter(condition_tree: leaf('nope:name', operators::EQUAL, 'Acme'))
 
-        expect { collection.build_pylon_filter(nil, query) }
+        expect { collection.with_resolved_relations(nil, query) { |q| q } }
           .to raise_error(UnsupportedOperatorError, /Filter on a column of this collection instead/)
       end
+    end
 
-      # Before the short-circuit reads it as a residual it cannot evaluate: the
-      # message names the relation rather than the in-memory pass.
-      it 'refuses one carried alongside an id' do
-        conditions = [leaf('id', operators::EQUAL, 'uuid-1'), leaf('account:name', operators::EQUAL, 'Acme')]
+    # Pylon has no join, so a condition on a related field is answered by reading
+    # the foreign collection for the keys matching it.
+    describe '#with_resolved_relations' do
+      let(:foreign) { instance_double(Collections::Account) }
 
-        expect { collection.extract_id_lookup(branch('And', conditions)) }
-          .to raise_error(UnsupportedOperatorError, /related field 'account:name'/)
+      before { allow(datasource).to receive(:get_collection).with('PylonAccount').and_return(foreign) }
+
+      def resolved(tree)
+        collection.with_resolved_relations(nil, filter(condition_tree: tree), &:condition_tree)
+      end
+
+      def returning(*ids)
+        allow(foreign).to receive(:list) { ids.map { |id| { 'id' => id } } }
+      end
+
+      it 'leaves a filter naming no relation untouched, without reading anything' do
+        tree = leaf('state', operators::EQUAL, 'new')
+
+        expect(resolved(tree)).to be(tree)
+        expect(datasource).not_to have_received(:get_collection)
+      end
+
+      it 'rewrites the leaf into the foreign keys of the matching records' do
+        returning('acc-1', 'acc-2')
+
+        expect(resolved(leaf('account:name', operators::EQUAL, 'Acme')).to_h)
+          .to eq(field: 'account_id', operator: operators::IN, value: %w[acc-1 acc-2])
+      end
+
+      # The condition reaches the foreign collection unnested, asking only for
+      # the key it is matched against, and bounded so an overflow is seen.
+      it 'reads the foreign collection for the target key alone' do
+        returning('acc-1')
+        resolved(leaf('account:name', operators::EQUAL, 'Acme'))
+
+        expect(foreign).to have_received(:list) do |_caller, query, projection|
+          expect(query.condition_tree.to_h).to eq(field: 'name', operator: operators::EQUAL, value: 'Acme')
+          expect(query.page.to_h).to eq(offset: 0, limit: Collections::BaseCollection::MAX_RELATION_KEYS + 1)
+          expect(projection).to eq(['id'])
+        end
+      end
+
+      it 'resolves a relation nested inside a branch, leaving the other conditions in place' do
+        returning('acc-1')
+        tree = branch('And', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(resolved(tree).to_h[:conditions].last)
+          .to eq(field: 'account_id', operator: operators::IN, value: %w[acc-1])
+      end
+
+      # No foreign record matched, so no record of this collection can: answered
+      # without a request, rather than with an empty `in` reading as "everything".
+      it 'answers with no record when nothing matched, without running the read' do
+        returning
+        ran = false
+        query = filter(condition_tree: leaf('account:name', operators::EQUAL, 'Acme'))
+
+        expect(collection.with_resolved_relations(nil, query) { ran = true }).to eq([])
+        expect(ran).to be(false)
+      end
+
+      it 'empties an and whose relation matched nothing' do
+        returning
+        tree = branch('And', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(collection.with_resolved_relations(nil, filter(condition_tree: tree)) { |q| q }).to eq([])
+      end
+
+      # The other side of the union still selects records, so the unmatchable
+      # branch drops out instead of emptying the read.
+      it 'drops an unmatchable branch out of an or' do
+        returning
+        tree = branch('Or', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(resolved(tree).to_h)
+          .to eq(aggregator: 'Or', conditions: [{ field: 'state', operator: operators::EQUAL, value: 'new' }])
+      end
+
+      it 'answers with no record when every branch of an or matched nothing' do
+        returning
+        tree = branch('Or', [leaf('account:name', operators::EQUAL, 'A'), leaf('account:name', operators::EQUAL, 'B')])
+
+        expect(collection.with_resolved_relations(nil, filter(condition_tree: tree)) { |q| q }).to eq([])
+      end
+
+      # Truncating would answer a narrower question than the one asked, without
+      # saying so.
+      it 'refuses to truncate a relation matching more records than the cap' do
+        returning(*Array.new(Collections::BaseCollection::MAX_RELATION_KEYS + 1) { |i| "acc-#{i}" })
+
+        expect { resolved(leaf('account:name', operators::EQUAL, 'Acme')) }
+          .to raise_error(UnsupportedOperatorError, /matches more than 500 PylonAccount records/)
       end
     end
 

@@ -269,6 +269,27 @@ module ForestAdminDatasourcePylon
       it 'slices the requested page out of the ordered records' do
         expect(ids(collection.list(nil, filter(sort: sort(by('id')), page: page(1, 1)), nil))).to eq(%w[u2])
       end
+
+      # A read asking for no page asks for the whole dataset, which is the read
+      # `SortCollectionDecorator` performs to build its reference order: capping
+      # it at the search limit would drop every record past the thousandth and
+      # leave the decorator without a position for them.
+      it 'answers a page-less read with every record, past the search limit' do
+        collection.entities = Array.new(Client::MAX_SEARCH_LIMIT + 5) { |i| { 'id' => "u#{i}" } }
+
+        expect(collection.list(nil, filter, nil).size).to eq(Client::MAX_SEARCH_LIMIT + 5)
+        expect(collection.list(nil, nil, nil).size).to eq(Client::MAX_SEARCH_LIMIT + 5)
+      end
+
+      # The same read with an offset and no limit -- which `Page#apply` reads as
+      # "to the end of the records" too: the offset is honoured, the tail is not
+      # cut.
+      it 'honours an offset carrying no limit without capping the tail' do
+        collection.entities = Array.new(Client::MAX_SEARCH_LIMIT + 5) { |i| { 'id' => "u#{i}" } }
+        query = filter(page: page(2, nil))
+
+        expect(collection.list(nil, query, nil).size).to eq(Client::MAX_SEARCH_LIMIT + 3)
+      end
     end
 
     describe '#list with a filter' do

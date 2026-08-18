@@ -101,14 +101,21 @@ module ForestAdminDatasourcePylon
           .to raise_error(UnsupportedOperatorError, /not supported on field 'title'/)
       end
 
-      # `tags` holds a list, so membership has its own pair of operators.
+      # `tags` holds a list, so membership is matched against candidates rather
+      # than compared.
       it 'translates tag membership with the list operators' do
-        expect(translate(leaf('tags', operators::CONTAINS, 'urgent')))
-          .to eq('field' => 'tags', 'operator' => 'contains', 'value' => 'urgent')
-        expect(translate(leaf('tags', operators::NOT_CONTAINS, 'urgent')))
-          .to eq('field' => 'tags', 'operator' => 'does_not_contain', 'value' => 'urgent')
         expect(translate(leaf('tags', operators::IN, %w[urgent vip])))
           .to eq('field' => 'tags', 'operator' => 'in', 'values' => %w[urgent vip])
+        expect(translate(leaf('tags', operators::NOT_IN, %w[urgent])))
+          .to eq('field' => 'tags', 'operator' => 'not_in', 'values' => %w[urgent])
+      end
+
+      # Pylon accepts `contains` on a list field, and the map leaves it out: the
+      # column is typed Json, on which the toolkit refuses the operator before
+      # the translator ever sees it.
+      it 'refuses the substring operators on a list column' do
+        expect { translate(leaf('tags', operators::CONTAINS, 'urgent')) }
+          .to raise_error(UnsupportedOperatorError, /not supported on field 'tags'/)
       end
     end
 

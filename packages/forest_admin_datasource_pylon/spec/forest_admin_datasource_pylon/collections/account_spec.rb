@@ -127,9 +127,23 @@ module ForestAdminDatasourcePylon
           .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
                   operators::PRESENT, operators::BLANK, operators::MISSING])
         expect(collection.fields['tags'].filter_operators)
-          .to eq([operators::CONTAINS, operators::NOT_CONTAINS, operators::IN, operators::NOT_IN])
+          .to eq([operators::IN, operators::NOT_IN])
         expect(collection.fields['domains'].filter_operators)
-          .to eq([operators::CONTAINS, operators::NOT_CONTAINS, operators::IN, operators::NOT_IN])
+          .to eq([operators::IN, operators::NOT_IN])
+      end
+
+      # `POST /accounts/search` does filter a list column with `contains`, and
+      # the schema still must not advertise it: the column is typed Json, the
+      # only type the toolkit has for a list, and it allows no substring
+      # operator on one -- the filter would be refused on the way in.
+      it 'advertises no substring operator on a list column' do
+        allowed = ForestAdminDatasourceToolkit::Validations::Rules.get_allowed_operators_for_column_type('Json')
+
+        %w[domains tags].each do |field|
+          expect(collection.fields[field].filter_operators)
+            .not_to include(operators::CONTAINS, operators::NOT_CONTAINS, operators::I_CONTAINS)
+          expect(allowed).to include(*collection.fields[field].filter_operators)
+        end
       end
 
       # /accounts/search accepts `string_contains` on a name but documents no
@@ -281,10 +295,10 @@ module ForestAdminDatasourcePylon
       end
 
       it 'translates a membership filter on a list column' do
-        collection.list(nil, filter(condition_tree: leaf('tags', operators::CONTAINS, 'vip')), %w[id])
+        collection.list(nil, filter(condition_tree: leaf('tags', operators::IN, %w[vip])), %w[id])
 
         expect(WebMock).to have_requested(:post, "#{base}/accounts/search").with(
-          body: hash_including('filter' => { 'field' => 'tags', 'operator' => 'contains', 'value' => 'vip' })
+          body: hash_including('filter' => { 'field' => 'tags', 'operator' => 'in', 'values' => %w[vip] })
         )
       end
 
@@ -356,12 +370,12 @@ module ForestAdminDatasourcePylon
         stub_request(:post, "#{base}/accounts/search")
           .with(body: hash_including('cursor' => 'c1'))
           .to_return(json('data' => [account_payload('acc-3')]))
-        query = filter(condition_tree: leaf('tags', operators::CONTAINS, 'vip'), page: page(2, 1))
+        query = filter(condition_tree: leaf('tags', operators::IN, %w[vip]), page: page(2, 1))
 
         expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'acc-3' }])
         expect(WebMock).to have_requested(:post, "#{base}/accounts/search")
-          .with(body: hash_including('filter' => { 'field' => 'tags', 'operator' => 'contains',
-                                                   'value' => 'vip' })).twice
+          .with(body: hash_including('filter' => { 'field' => 'tags', 'operator' => 'in',
+                                                   'values' => %w[vip] })).twice
       end
     end
 
@@ -444,14 +458,14 @@ module ForestAdminDatasourcePylon
       # which no in-memory pass could evaluate, is answered rather than refused.
       it 'searches instead when the filter carries more conditions' do
         stub_search
-        tree = branch('And', [id_leaf(operators::EQUAL, 'acc-1'), leaf('tags', operators::CONTAINS, 'vip')])
+        tree = branch('And', [id_leaf(operators::EQUAL, 'acc-1'), leaf('tags', operators::IN, %w[vip])])
 
         expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([{ 'id' => 'acc-1' }])
         expect(WebMock).to have_requested(:post, "#{base}/accounts/search").with(
           body: hash_including(
             'filter' => { 'operator' => 'and',
                           'subfilters' => [{ 'field' => 'id', 'operator' => 'equals', 'value' => 'acc-1' },
-                                           { 'field' => 'tags', 'operator' => 'contains', 'value' => 'vip' }] }
+                                           { 'field' => 'tags', 'operator' => 'in', 'values' => %w[vip] }] }
           )
         )
       end

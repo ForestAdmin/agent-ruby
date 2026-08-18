@@ -10,6 +10,9 @@ module ForestAdminDatasourcePylon
       ConditionTreeFactory = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeFactory
       Equivalent           = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeEquivalent
       SortFactory          = ForestAdminDatasourceToolkit::Components::Query::SortUtils::SortFactory
+      Filter               = ForestAdminDatasourceToolkit::Components::Query::Filter
+      Page                 = ForestAdminDatasourceToolkit::Components::Query::Page
+      Projection           = ForestAdminDatasourceToolkit::Components::Query::Projection
 
       # `residual` holds the conditions left over once the primary-key leaf has
       # been taken out of the tree, for the caller to apply in memory.
@@ -27,6 +30,18 @@ module ForestAdminDatasourcePylon
       # column value without a nil guard, unlike the string operators which all
       # test `is_a?(String)` first. They need the guard added here.
       NIL_UNSAFE_OPERATORS = [Operators::LESS_THAN, Operators::GREATER_THAN, Operators::INCLUDES_ALL].freeze
+
+      # How many foreign keys a resolved relation condition may carry. Past this
+      # the condition is refused rather than truncated: keeping the first keys
+      # would answer a narrower question than the one asked, which is the very
+      # thing this datasource refuses — a result that looks filtered and is not.
+      MAX_RELATION_KEYS = 500
+
+      # What a resolved relation condition leaves behind when no foreign record
+      # matched it. It is not expressible as a filter — `FilterValue` refuses an
+      # empty `in`, whose Pylon meaning is undocumented and would read as "match
+      # everything" — so it travels as a marker the read answers with no record.
+      MATCHES_NOTHING = :pylon_matches_nothing
 
       attr_reader :custom_fields
 
@@ -79,7 +94,6 @@ module ForestAdminDatasourcePylon
       # `AND(id equal X, <scope>)` on a record detail as soon as a scope or a
       # segment is set, and `id` is not a field Pylon can filter on.
       def extract_id_lookup(node)
-        ensure_no_relation_leaf!(node)
         ids = id_values(node)
         return IdLookup.new(ids: ids, residual: nil) if ids
         return nil unless and_branch?(node)
@@ -108,6 +122,23 @@ module ForestAdminDatasourcePylon
               'Clear the search or drop the id condition.'
       end
 
+      # Yields the filter with every relation condition resolved into a condition
+      # on this collection's own columns, so the routes below — the search and
+      # the primary-key lookup, which applies its leftovers in memory — never see
+      # a `relation:field` leaf.
+      #
+      # Answers with no record at all, and no request, when the resolution found
+      # nothing to match: see `MATCHES_NOTHING`.
+      def with_resolved_relations(caller, filter)
+        tree = filter&.condition_tree
+        return yield(filter) unless tree&.some_leaf { |leaf| leaf.field.to_s.include?(':') }
+
+        resolved = resolve_relation_conditions(caller, tree)
+        return [] if resolved == MATCHES_NOTHING
+
+        yield(filter.override(condition_tree: resolved))
+      end
+
       # Forest asks for an offset/limit window, Pylon hands out cursor pages: the
       # walker bridges the two, `search_page` performs one call, and the records
       # it collected are serialized by the collection.
@@ -130,14 +161,26 @@ module ForestAdminDatasourcePylon
 
       # Sliced after the lookup, not before, so ids that resolved to nothing
       # (404) do not eat into the requested window.
+      #
+      # A filter carrying no page — or a page naming no limit — asks for every
+      # record it matched, and the records are already in hand: there is no
+      # window to cut. The `MAX_SEARCH_LIMIT` fallback of `translate_page` is a
+      # cap on how far a walk of the API goes, which is a different question,
+      # and applying it here would answer a page-less read with the first
+      # thousand records of a larger set as if they were all of it.
       def page_window(records, filter)
-        offset, limit = translate_page(filter&.page)
+        page = filter&.page
+        return records if page.nil?
+
+        offset = page.offset.to_i.clamp(0, nil)
+        limit = page.limit.to_i
+        return records.drop(offset) unless limit.positive?
+
         records[offset, limit] || []
       end
 
       def build_pylon_filter(caller, filter)
         tree = filter&.condition_tree
-        ensure_no_relation_leaf!(tree)
         ensure_no_stray_id!(tree)
         Query::ConditionTreeTranslator.call(tree, api_filters: api_filters, timezone: timezone_for(caller))
       end
@@ -316,20 +359,69 @@ module ForestAdminDatasourcePylon
               'silently widen. Rewrite the filter with `and`, or filter on another field.'
       end
 
-      # Forest offers a filter on a related field as soon as a ManyToOne is
-      # declared, and sends it as a `relation:field` leaf. Pylon has no join and
-      # no include parameter, so there is nothing to translate it into: the
-      # matching records would have to be read from the foreign collection and
-      # their keys matched here, which is a read of its own, not a filter.
-      #
-      # Refused with the foreign key of the relation, which is the filter the
-      # operator can set instead — and the one the reverse side is listed by.
-      def ensure_no_relation_leaf!(node)
-        return if node.nil?
+      def resolve_relation_conditions(caller, node)
+        return resolve_relation_branch(caller, node) if node.is_a?(Branch)
+        return node unless node.field.to_s.include?(':')
 
-        field = nil
-        node.some_leaf { |leaf| field = leaf.field if leaf.field.to_s.include?(':') }
-        raise_unfilterable_relation(field) if field
+        resolve_relation_leaf(caller, node)
+      end
+
+      # An unmatchable condition empties an `and` and drops out of an `or`, which
+      # is how it would behave had it been sent as a condition on a column no
+      # record answers.
+      def resolve_relation_branch(caller, branch)
+        resolved = Array(branch.conditions).map { |condition| resolve_relation_conditions(caller, condition) }
+        return MATCHES_NOTHING if and_branch?(branch) && resolved.include?(MATCHES_NOTHING)
+        return Branch.new(branch.aggregator, resolved) if and_branch?(branch)
+
+        kept = resolved.reject { |condition| condition == MATCHES_NOTHING }
+        kept.empty? ? MATCHES_NOTHING : Branch.new(branch.aggregator, kept)
+      end
+
+      # Pylon has neither a join nor an include parameter, so a `relation:field`
+      # leaf — which Forest offers as soon as a ManyToOne is declared, and which
+      # the schema therefore advertises as filterable — has no translation as it
+      # stands. It is resolved instead, the way `RelationCollectionDecorator`
+      # resolves one on a relation the customizer added: the foreign collection
+      # is read for the keys of the records matching the condition, and the leaf
+      # becomes the `foreign_key in [...]` this collection does filter.
+      #
+      # The read is the foreign collection's own, so its endpoint, its operators
+      # and its refusals apply — and a relation no condition names costs nothing,
+      # only a filter mentioning it triggers the read.
+      def resolve_relation_leaf(caller, leaf)
+        relation = schema[:fields][leaf.field.to_s.split(':').first]
+        raise_unfilterable_relation(leaf.field) unless resolvable_relation?(relation)
+
+        keys = foreign_keys_matching(caller, relation, leaf)
+        keys.empty? ? MATCHES_NOTHING : Leaf.new(relation.foreign_key, Operators::IN, keys)
+      end
+
+      # A relation is resolvable when its foreign key is a column this collection
+      # filters with `in` — server-side through `api_filters` for the collections
+      # that search, in memory for the ones read whole. Nothing else is: a
+      # OneToMany would have to be matched the other way round, which the schema
+      # never advertises as filterable, and a leaf reaching further than one
+      # relation is left to the foreign collection, which resolves its own.
+      def resolvable_relation?(relation)
+        return false unless relation.is_a?(ManyToOneSchema)
+
+        column = schema[:fields][relation.foreign_key]
+        column.is_a?(ColumnSchema) && column.filter_operators.include?(Operators::IN)
+      end
+
+      # One record past the cap is asked for, so an overflow is seen rather than
+      # guessed from a full page.
+      def foreign_keys_matching(caller, relation, leaf)
+        foreign = datasource.get_collection(relation.foreign_collection)
+        target  = relation.foreign_key_target
+        query   = Filter.new(condition_tree: leaf.unnest,
+                             page: Page.new(offset: 0, limit: MAX_RELATION_KEYS + 1))
+
+        records = foreign.list(caller, query, Projection.new([target]))
+        raise_too_many_relation_keys(leaf.field, relation) if records.size > MAX_RELATION_KEYS
+
+        records.filter_map { |record| record[target] }.uniq
       end
 
       def raise_unfilterable_relation(field)
@@ -343,7 +435,16 @@ module ForestAdminDatasourcePylon
 
         raise UnsupportedOperatorError,
               "Pylon cannot filter on the related field '#{field}': it has no join, so a condition on a " \
-              "relation has no server-side translation. #{instead}"
+              'relation is answered by reading the foreign collection for its keys, which this relation ' \
+              "does not allow. #{instead}"
+      end
+
+      def raise_too_many_relation_keys(field, relation)
+        raise UnsupportedOperatorError,
+              "The filter on '#{field}' matches more than #{MAX_RELATION_KEYS} #{relation.foreign_collection} " \
+              'records: Pylon has no join, so the condition travels as the list of their keys, and a list this ' \
+              'long is one the endpoint cannot carry. Narrow the condition on the related field, or filter on ' \
+              "'#{relation.foreign_key}' directly."
       end
 
       def clamp_custom_field_operators(column_name, schema)

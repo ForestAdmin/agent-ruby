@@ -51,11 +51,14 @@ module ForestAdminDatasourcePylon
 
       def fetch_records(caller, filter)
         warn_unsortable(filter&.sort)
-        lookup = extract_id_lookup(filter&.condition_tree)
-        return search_records(caller, filter) unless lookup
 
-        ensure_searchless_lookup!(filter)
-        page_window(records_by_id(caller, lookup), filter)
+        with_resolved_relations(caller, filter) do |query|
+          lookup = extract_id_lookup(query&.condition_tree)
+          next search_records(caller, query) unless lookup
+
+          ensure_searchless_lookup!(query)
+          page_window(records_by_id(caller, lookup), query)
+        end
       end
 
       # The records are already narrowed to the ids the filter asked for, so

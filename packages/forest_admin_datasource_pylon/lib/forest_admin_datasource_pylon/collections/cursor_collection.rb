@@ -69,12 +69,15 @@ module ForestAdminDatasourcePylon
 
       def fetch_records(caller, filter)
         warn_unsortable(filter&.sort)
-        return listed_records(filter) if browsing?(filter)
 
-        id = single_id_lookup(filter)
-        return page_window(records_by_id(id), filter) if id
+        with_resolved_relations(caller, filter) do |query|
+          next listed_records(query) if browsing?(query)
 
-        search_records(caller, filter)
+          id = single_id_lookup(query)
+          next page_window(records_by_id(id), query) if id
+
+          search_records(caller, query)
+        end
       end
 
       # Nothing to filter and nothing to search: the listing endpoint returns

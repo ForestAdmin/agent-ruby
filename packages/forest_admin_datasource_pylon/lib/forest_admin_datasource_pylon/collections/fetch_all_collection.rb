@@ -112,8 +112,15 @@ module ForestAdminDatasourcePylon
 
       # The complete dataset, serialized and narrowed to the rows the filter
       # keeps: what `list` pages and what `aggregate` counts are the same rows.
+      #
+      # Relation conditions are resolved first, like everywhere else: neither
+      # collection read this way declares a ManyToOne today, so what this refuses
+      # is a condition on the reverse side, which `match` would otherwise read as
+      # a missing column and answer by dropping every row.
       def filtered_records(caller, filter)
-        filter_in_memory(fetch_all.map { |entity| serialize(entity) }, caller, filter)
+        with_resolved_relations(caller, filter) do |query|
+          filter_in_memory(fetch_all.map { |entity| serialize(entity) }, caller, query)
+        end
       end
 
       # The tree is applied over the complete dataset, so the rows it keeps are

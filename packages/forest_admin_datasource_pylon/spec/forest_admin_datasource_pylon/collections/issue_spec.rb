@@ -384,25 +384,56 @@ module ForestAdminDatasourcePylon
       end
 
       # Declaring the four ManyToOne relations is what makes a filter on a
-      # related field reachable, and Pylon has no join to answer it with. The
-      # refusal names the foreign key, which is the filter that does the same
-      # job on the side the operator is already on.
-      it 'refuses a filter on a related field, naming the foreign key to use instead' do
-        query = filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme'))
+      # related field reachable, and the schema advertises it as filterable.
+      # Pylon has no join, so it is answered by reading the accounts matching
+      # the condition and sending their ids as the `account_id` filter the
+      # issues endpoint does take.
+      it 'answers a filter on a related field with the keys of the matching records' do
+        stub_request(:post, "#{base}/accounts/search")
+          .to_return(json('data' => [{ 'id' => 'acc-1' }, { 'id' => 'acc-2' }]))
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
 
-        expect { collection.list(nil, query, %w[id]) }
-          .to raise_error(UnsupportedOperatorError,
-                          /related field 'account:name'.*Filter on 'account_id' instead.*PylonAccount list/m)
+        collection.list(nil, filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/accounts/search").with(
+          body: hash_including('filter' => { 'field' => 'name', 'operator' => 'string_contains',
+                                             'value' => 'Acme' })
+        )
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(
+          body: hash_including('filter' => { 'field' => 'account_id', 'operator' => 'in',
+                                             'values' => %w[acc-1 acc-2] })
+        )
+      end
+
+      # No account matched, so no issue can: answered without asking the issues
+      # endpoint, where an empty `in` would have read as no filter at all.
+      it 'answers with no issue when no related record matched, without searching' do
+        stub_request(:post, "#{base}/accounts/search").to_return(json('data' => []))
+
+        expect(collection.list(nil, filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme')),
+                               %w[id])).to eq([])
         expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
       end
 
-      # The same filter alongside an id: the short-circuit sees the tree first,
-      # and would otherwise report the relation as a residual it cannot evaluate.
-      it 'refuses a filter on a related field combined with an id' do
+      # Resolved before the short-circuit reads the tree, so the relation
+      # becomes an `account_id in [...]` the id lookup can apply in memory.
+      it 'resolves a filter on a related field combined with an id' do
+        stub_request(:post, "#{base}/accounts/search").to_return(json('data' => [{ 'id' => 'acc-1' }]))
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
         conditions = [id_leaf(operators::EQUAL, 'i1'), leaf('account:name', operators::CONTAINS, 'Acme')]
 
-        expect { collection.list(nil, filter(condition_tree: branch('And', conditions)), %w[id]) }
-          .to raise_error(UnsupportedOperatorError, /related field 'account:name'/)
+        expect(collection.list(nil, filter(condition_tree: branch('And', conditions)), %w[id]))
+          .to eq([{ 'id' => 'i1' }])
+      end
+
+      # A relation the filter never names costs nothing: no foreign read is
+      # triggered by declaring it.
+      it 'reads no foreign collection for a filter naming none' do
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+        collection.list(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'new')), %w[id])
+
+        expect(WebMock).not_to have_requested(:post, "#{base}/accounts/search")
       end
 
       it 'keeps the same filter across every page of the walk' do

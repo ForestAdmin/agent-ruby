@@ -44,12 +44,21 @@ module ForestAdminDatasourcePylon
       FULL_TEXT = SUBSTRING.merge(Operators::NOT_CONTAINS => 'string_does_not_contain',
                                   Operators::NOT_I_CONTAINS => 'string_does_not_contain').freeze
 
-      # A list-valued field -- `tags`, `domains`: `contains` asks whether one
-      # value belongs to it, while `in` matches it against several candidates at
-      # once.
-      MEMBERSHIP = { Operators::CONTAINS => 'contains',
-                     Operators::NOT_CONTAINS => 'does_not_contain',
-                     Operators::IN => 'in',
+      # A list-valued field -- `tags`, `domains`: `in` matches it against
+      # several candidates at once.
+      #
+      # Pylon also accepts `contains` / `does_not_contain` on such a field, and
+      # they are deliberately left out: the columns are typed `Json`, the only
+      # type the toolkit has for a list, and `Rules` allows a Json column the
+      # base and array operators alone. A declared `contains` would be refused
+      # by `ConditionTreeValidator` on the way in -- "the given operator
+      # 'contains' is not allowed with the columnType schema: 'Json'" -- so the
+      # UI would offer a filter that errors instead of one Pylon answers.
+      # Typing the columns `['String']` is not the way out either: no branch of
+      # `get_allowed_operators_for_column_type` reads an array type, and the
+      # validator raises a NoMethodError on it. Reaching those two operators
+      # takes a toolkit change, which is not this datasource's to make here.
+      MEMBERSHIP = { Operators::IN => 'in',
                      Operators::NOT_IN => 'not_in' }.freeze
 
       # A custom field is filtered through its slug, so its operators come from
