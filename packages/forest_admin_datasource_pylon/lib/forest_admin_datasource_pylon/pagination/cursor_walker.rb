@@ -16,10 +16,20 @@ module ForestAdminDatasourcePylon
       end
 
       # Yields `(limit, cursor)` and expects a Client::SearchPage back.
+      #
+      # A nil limit asks for every record past the offset: the walk then runs
+      # until Pylon says there is no page left, or until a cap stops it. That
+      # distinction is the whole point of accepting nil rather than a limit
+      # standing in for "everything": a walk told to collect a thousand records
+      # stops at a thousand having covered the window it was given, and reports
+      # nothing, while a walk told to collect everything and stopped by a cap
+      # knows it is handing back less than it was asked for, and says so.
       def walk(offset:, limit:)
-        return [] unless limit.to_i.positive?
+        offset = offset.to_i.clamp(0, nil)
+        limit = limit&.to_i
+        return [] if limit && !limit.positive?
 
-        needed = offset.to_i + limit.to_i
+        needed = limit && (offset + limit)
         records = []
         cursor = nil
         pages = 0
@@ -29,7 +39,8 @@ module ForestAdminDatasourcePylon
           records.concat(page.records)
           pages += 1
 
-          break if stop?(page, cursor) || records.size >= needed
+          break if stop?(page, cursor)
+          break if needed && records.size >= needed
 
           if capped?(pages, records.size)
             log_truncation(offset: offset, limit: limit, pages: pages, collected: records.size)
@@ -39,7 +50,7 @@ module ForestAdminDatasourcePylon
           cursor = page.next_cursor
         end
 
-        records[offset.to_i, limit.to_i] || []
+        limit ? (records[offset, limit] || []) : records.drop(offset)
       end
 
       private
@@ -55,16 +66,19 @@ module ForestAdminDatasourcePylon
         pages >= @max_pages || collected >= @max_records
       end
 
-      # Bounded by the window still missing and by the record budget left, so
-      # the walk never collects past @max_records.
+      # Bounded by the record budget left, and by the window still missing when
+      # there is one, so the walk never collects past @max_records.
       def batch_size(needed, collected)
-        [needed - collected, @max_records - collected].min.clamp(1, Client::MAX_SEARCH_LIMIT)
+        budget = @max_records - collected
+        budget = [needed - collected, budget].min if needed
+        budget.clamp(1, Client::MAX_SEARCH_LIMIT)
       end
 
       def log_truncation(offset:, limit:, pages:, collected:)
+        window = limit ? "offset=#{offset} limit=#{limit}" : "every record past offset=#{offset}"
         ForestAdminDatasourcePylon.logger.warn(
           "[forest_admin_datasource_pylon] Stopped paginating after #{pages} page(s) / #{collected} record(s) " \
-          "while fetching offset=#{offset} limit=#{limit}; results are truncated. " \
+          "while fetching #{window}; results are truncated. " \
           'Narrow the filter to reach records past this point.'
         )
       end

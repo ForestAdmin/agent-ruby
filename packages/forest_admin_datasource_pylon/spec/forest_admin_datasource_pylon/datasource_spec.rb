@@ -17,9 +17,25 @@ RSpec.describe ForestAdminDatasourcePylon::Datasource do
     expect(datasource.client).to be_a(ForestAdminDatasourcePylon::Client)
   end
 
-  it 'registers the issue collection' do
-    expect(datasource.collections.keys).to eq(['PylonIssue'])
+  it 'registers the five collections Pylon exposes' do
+    expect(datasource.collections.keys)
+      .to eq(%w[PylonIssue PylonAccount PylonContact PylonUser PylonTeam])
     expect(datasource.get_collection('PylonIssue')).to be_a(ForestAdminDatasourcePylon::Collections::Issue)
+    expect(datasource.get_collection('PylonAccount')).to be_a(ForestAdminDatasourcePylon::Collections::Account)
+    expect(datasource.get_collection('PylonContact')).to be_a(ForestAdminDatasourcePylon::Collections::Contact)
+    expect(datasource.get_collection('PylonUser')).to be_a(ForestAdminDatasourcePylon::Collections::User)
+    expect(datasource.get_collection('PylonTeam')).to be_a(ForestAdminDatasourcePylon::Collections::Team)
+  end
+
+  # Every relation declared by one of them points at another: a foreign
+  # collection left unregistered is a schema the agent refuses to boot on.
+  it 'registers a collection for every foreign collection its relations point at' do
+    relations = datasource.collections.values.flat_map do |collection|
+      collection.fields.values.reject { |field| field.type == 'Column' }
+    end
+
+    expect(relations).not_to be_empty
+    expect(relations.map(&:foreign_collection).uniq - datasource.collections.keys).to be_empty
   end
 
   it 'refuses to build without an api key' do

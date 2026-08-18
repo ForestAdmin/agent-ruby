@@ -44,6 +44,11 @@ module ForestAdminDatasourcePylon
       }.merge(overrides)
     end
 
+    # Relations are fields too; the assertions on the columns select them out.
+    def columns
+      collection.fields.select { |_name, field| field.type == 'Column' }
+    end
+
     let(:datasource) { ForestAdminDatasourcePylon::Datasource.new(api_key: 'k') }
     let(:collection) { datasource.get_collection('PylonIssue') }
     let(:base) { datasource.configuration.url }
@@ -79,8 +84,15 @@ module ForestAdminDatasourcePylon
 
       # /issues/search exposes no sort parameter, and writes land in a later story.
       it 'declares every column read-only and non-sortable' do
-        expect(collection.fields.values.map(&:is_read_only).uniq).to eq([true])
-        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+        expect(columns.values.map(&:is_sortable).uniq).to eq([false])
+      end
+
+      # No Pylon endpoint aggregates, and the pages of a cursor walk are not the
+      # dataset: a chart grouped by one of these columns would answer a fraction
+      # as if it were the whole collection.
+      it 'declares no column groupable' do
+        expect(columns.values.map(&:is_groupable).uniq).to eq([false])
       end
 
       # `search_text` is native on /issues/search, while Pylon exposes neither a
@@ -94,7 +106,8 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['state'].filter_operators).to eq([operators::EQUAL, operators::IN,
                                                                    operators::NOT_IN])
         expect(collection.fields['assignee_id'].filter_operators)
-          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN, operators::PRESENT, operators::BLANK])
+          .to eq([operators::EQUAL, operators::IN, operators::NOT_IN,
+                  operators::PRESENT, operators::BLANK, operators::MISSING])
         expect(collection.fields['title'].filter_operators)
           .to eq([operators::CONTAINS, operators::I_CONTAINS, operators::NOT_CONTAINS, operators::NOT_I_CONTAINS])
       end
@@ -113,6 +126,36 @@ module ForestAdminDatasourcePylon
            customer_portal_visible time_in_status_seconds].each do |field|
           expect(collection.fields[field].filter_operators).to eq([])
         end
+      end
+    end
+
+    describe 'relations' do
+      let(:many_to_one) { ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema }
+
+      it 'declares a ManyToOne for each of the four parties of an issue' do
+        expect(collection.fields.values_at('account', 'requester', 'assignee', 'team'))
+          .to all(be_a(many_to_one))
+      end
+
+      it 'points each one at the collection owning its shape, through the flattened foreign key' do
+        expect(collection.fields['account'])
+          .to have_attributes(foreign_collection: 'PylonAccount', foreign_key: 'account_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['requester'])
+          .to have_attributes(foreign_collection: 'PylonContact', foreign_key: 'requester_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['assignee'])
+          .to have_attributes(foreign_collection: 'PylonUser', foreign_key: 'assignee_id',
+                              foreign_key_target: 'id')
+        expect(collection.fields['team'])
+          .to have_attributes(foreign_collection: 'PylonTeam', foreign_key: 'team_id',
+                              foreign_key_target: 'id')
+      end
+
+      # The key is what `/issues/search` filters, on this side and on the reverse
+      # one, so it stays a column of its own next to the relation.
+      it 'keeps the foreign keys as columns' do
+        expect(columns.keys).to include('account_id', 'requester_id', 'assignee_id', 'team_id')
       end
     end
 
@@ -241,6 +284,15 @@ module ForestAdminDatasourcePylon
         expect { collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, 'i1')), %w[id]) }
           .to raise_error(APIError)
       end
+
+      # `GET /issues/{id}` accepts the issue number as well as the UUID and
+      # answers with the issue carrying its own id: keeping it would answer
+      # `id equals 42` with a row whose id is not 42.
+      it 'reports no record when the endpoint answered an alias of the primary key' do
+        stub_request(:get, "#{base}/issues/42").to_return(json('data' => issue_payload('i1')))
+
+        expect(collection.list(nil, filter(condition_tree: id_leaf(operators::EQUAL, '42')), %w[id])).to eq([])
+      end
     end
 
     describe 'custom fields' do
@@ -329,6 +381,59 @@ module ForestAdminDatasourcePylon
         expect { collection.list(nil, filter(condition_tree: leaf('number', operators::EQUAL, 12)), %w[id]) }
           .to raise_error(UnsupportedOperatorError, /cannot filter on 'number'/)
         expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      # Declaring the four ManyToOne relations is what makes a filter on a
+      # related field reachable, and the schema advertises it as filterable.
+      # Pylon has no join, so it is answered by reading the accounts matching
+      # the condition and sending their ids as the `account_id` filter the
+      # issues endpoint does take.
+      it 'answers a filter on a related field with the keys of the matching records' do
+        stub_request(:post, "#{base}/accounts/search")
+          .to_return(json('data' => [{ 'id' => 'acc-1' }, { 'id' => 'acc-2' }]))
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+        collection.list(nil, filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/accounts/search").with(
+          body: hash_including('filter' => { 'field' => 'name', 'operator' => 'string_contains',
+                                             'value' => 'Acme' })
+        )
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search").with(
+          body: hash_including('filter' => { 'field' => 'account_id', 'operator' => 'in',
+                                             'values' => %w[acc-1 acc-2] })
+        )
+      end
+
+      # No account matched, so no issue can: answered without asking the issues
+      # endpoint, where an empty `in` would have read as no filter at all.
+      it 'answers with no issue when no related record matched, without searching' do
+        stub_request(:post, "#{base}/accounts/search").to_return(json('data' => []))
+
+        expect(collection.list(nil, filter(condition_tree: leaf('account:name', operators::CONTAINS, 'Acme')),
+                               %w[id])).to eq([])
+        expect(WebMock).not_to have_requested(:post, "#{base}/issues/search")
+      end
+
+      # Resolved before the short-circuit reads the tree, so the relation
+      # becomes an `account_id in [...]` the id lookup can apply in memory.
+      it 'resolves a filter on a related field combined with an id' do
+        stub_request(:post, "#{base}/accounts/search").to_return(json('data' => [{ 'id' => 'acc-1' }]))
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        conditions = [id_leaf(operators::EQUAL, 'i1'), leaf('account:name', operators::CONTAINS, 'Acme')]
+
+        expect(collection.list(nil, filter(condition_tree: branch('And', conditions)), %w[id]))
+          .to eq([{ 'id' => 'i1' }])
+      end
+
+      # A relation the filter never names costs nothing: no foreign read is
+      # triggered by declaring it.
+      it 'reads no foreign collection for a filter naming none' do
+        stub_request(:post, "#{base}/issues/search").to_return(json('data' => []))
+
+        collection.list(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'new')), %w[id])
+
+        expect(WebMock).not_to have_requested(:post, "#{base}/accounts/search")
       end
 
       it 'keeps the same filter across every page of the walk' do

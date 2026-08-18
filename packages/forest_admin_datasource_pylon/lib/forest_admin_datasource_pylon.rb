@@ -12,7 +12,13 @@ loader.setup
 module ForestAdminDatasourcePylon
   class Error < StandardError; end
   class ConfigurationError < Error; end
-  class UnsupportedOperatorError < Error; end
+
+  # A filter Pylon cannot express. It descends from the toolkit's ValidationError
+  # rather than from the package's own Error so the agent answers 400 carrying
+  # the message instead of a 500 "Unexpected error": every one of these names a
+  # condition the operator set and can change, and the message is the only place
+  # they learn which one.
+  class UnsupportedOperatorError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
   # Raised when a Pylon API call fails. Carries the HTTP status and the
   # (parsed) response body so callers — smart actions in particular — can

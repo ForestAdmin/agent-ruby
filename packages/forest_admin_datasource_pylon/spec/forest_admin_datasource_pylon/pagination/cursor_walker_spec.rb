@@ -62,6 +62,32 @@ RSpec.describe ForestAdminDatasourcePylon::Pagination::CursorWalker do
     expect(calls).to be_empty
   end
 
+  describe 'a nil limit' do
+    it 'walks every page the API hands out instead of stopping at one window' do
+      pages = [search_page(%w[a b], 'c1'), search_page(%w[c d], 'c2'), search_page(%w[e], nil)]
+
+      expect(walk(pages, offset: 0, limit: nil).size).to eq(5)
+      expect(calls.size).to eq(3)
+    end
+
+    it 'asks for the whole record budget on each page' do
+      walk([search_page(%w[a], nil)], offset: 0, limit: nil)
+
+      expect(calls.first[:limit]).to eq(ForestAdminDatasourcePylon::Client::MAX_SEARCH_LIMIT)
+    end
+
+    it 'still drops the offset' do
+      pages = [search_page(%w[a b c], 'c1'), search_page(%w[d], nil)]
+
+      expect(walk(pages, offset: 2, limit: nil)).to eq([{ 'id' => 'c' }, { 'id' => 'd' }])
+    end
+
+    it 'costs a single request when the first page is the last' do
+      expect(walk([search_page(%w[a b], nil)], offset: 0, limit: nil).size).to eq(2)
+      expect(calls.size).to eq(1)
+    end
+  end
+
   describe 'truncation' do
     before { allow(ForestAdminDatasourcePylon.logger).to receive(:warn) }
 
@@ -91,6 +117,21 @@ RSpec.describe ForestAdminDatasourcePylon::Pagination::CursorWalker do
     it 'does not warn when the walk ends naturally' do
       walk([search_page(%w[a b], nil)], offset: 0, limit: 100)
 
+      expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+    end
+
+    it 'warns when a cap cuts a walk that asked for every record' do
+      pages = Array.new(5) { |i| search_page(%W[a#{i} b#{i}], "c#{i}") }
+
+      expect(walk(pages, offset: 0, limit: nil, walker: described_class.new(max_records: 4)).size).to eq(4)
+      expect(ForestAdminDatasourcePylon.logger)
+        .to have_received(:warn).with(/every record past offset=0; results are truncated/)
+    end
+
+    it 'does not warn when a window the caller asked for is covered exactly' do
+      pages = [search_page(%w[a b], 'c1'), search_page(%w[c d], 'c2')]
+
+      expect(walk(pages, offset: 0, limit: 2).size).to eq(2)
       expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
     end
   end

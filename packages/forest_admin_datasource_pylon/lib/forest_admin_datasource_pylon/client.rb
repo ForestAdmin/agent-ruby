@@ -1,5 +1,7 @@
 module ForestAdminDatasourcePylon
-  class Client
+  # Long by line count only: the public surface is one explicit method per Pylon
+  # endpoint, each delegating to the shared helpers below.
+  class Client # rubocop:disable Metrics/ClassLength
     MAX_SEARCH_LIMIT = 1000
 
     # `next_cursor` is nil as soon as Pylon stops advertising a next page, so
@@ -19,22 +21,90 @@ module ForestAdminDatasourcePylon
     # POST /issues/search accepts an empty body and then returns the most recent
     # issues, ordered by `created_at` descending.
     def search_issues(limit:, cursor: nil, filter: nil, search_text: nil)
+      search_resource('issues/search', limit: limit, cursor: cursor, filter: filter, search_text: search_text)
+    end
+
+    # Accepts either the UUID or the issue number.
+    def fetch_issue(id)
+      fetch_resource('issues', id)
+    end
+
+    def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
+      search_resource('accounts/search', limit: limit, cursor: cursor, filter: filter, search_text: search_text)
+    end
+
+    def list_accounts(limit:, cursor: nil)
+      list_resource('accounts', limit: limit, cursor: cursor)
+    end
+
+    # Accepts either the Pylon UUID or the account's external id.
+    def fetch_account(id)
+      fetch_resource('accounts', id)
+    end
+
+    def search_contacts(limit:, cursor: nil, filter: nil, search_text: nil)
+      search_resource('contacts/search', limit: limit, cursor: cursor, filter: filter, search_text: search_text)
+    end
+
+    # GET /contacts is paginated exactly like GET /accounts even though the
+    # OpenAPI spec forgets to document its query parameters.
+    def list_contacts(limit:, cursor: nil)
+      list_resource('contacts', limit: limit, cursor: cursor)
+    end
+
+    def fetch_contact(id)
+      fetch_resource('contacts', id)
+    end
+
+    # GET /users is unpaginated. Deactivated agents are included by default so
+    # that assignees of older issues stay resolvable.
+    def fetch_users(include_deactivated: true)
+      fetch_all('users', 'include_deactivated' => include_deactivated)
+    end
+
+    def fetch_user(id)
+      fetch_resource('users', id)
+    end
+
+    # GET /teams is unpaginated and takes no parameter.
+    def fetch_teams
+      fetch_all('teams')
+    end
+
+    def fetch_team(id)
+      fetch_resource('teams', id)
+    end
+
+    private
+
+    def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)
       body = { 'limit' => clamp_limit(limit) }
       body['cursor']      = cursor unless blank?(cursor)
       body['filter']      = filter unless filter.nil?
       body['search_text'] = search_text unless blank?(search_text)
 
-      must_succeed('issues/search') { to_search_page(connection.post('issues/search', body).body) }
+      must_succeed(path) { to_search_page(connection.post(path, body).body) }
     end
 
-    # Accepts either the UUID or the issue number. The id comes from
-    # operator-supplied filter values, so it is escaped before joining the path.
-    def fetch_issue(id)
-      path = "issues/#{Faraday::Utils.escape(id)}"
+    # `limit` is mandatory on the paginated GET endpoints, unlike their POST
+    # /search counterparts which default it server-side.
+    def list_resource(path, limit:, cursor: nil)
+      params = { 'limit' => clamp_limit(limit) }
+      params['cursor'] = cursor unless blank?(cursor)
+
+      must_succeed(path) { to_search_page(connection.get(path, params).body) }
+    end
+
+    def fetch_all(path, params = {})
+      must_succeed(path) { Array(extract_data(connection.get(path, params).body)) }
+    end
+
+    # The id comes from operator-supplied filter values, so it is escaped before
+    # being joined to the path.
+    def fetch_resource(resource, id)
+      path = "#{resource}/#{Faraday::Utils.escape(id)}"
       must_succeed(path) { extract_data(connection.get(path).body) }
     end
-
-    private
 
     def clamp_limit(limit)
       value = limit.to_i

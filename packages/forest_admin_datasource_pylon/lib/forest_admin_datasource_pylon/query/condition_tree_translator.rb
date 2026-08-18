@@ -80,6 +80,7 @@ module ForestAdminDatasourcePylon
 
         operator = spec[:ops][leaf.operator]
         raise_unsupported_operator(leaf, spec) unless operator
+        ensure_filterable_absence!(leaf, spec)
 
         with_value({ 'field' => (spec[:param] || leaf.field).to_s, 'operator' => operator }, operator, leaf)
       end
@@ -89,6 +90,36 @@ module ForestAdminDatasourcePylon
         return filter.merge('values' => @value.list(leaf)) if LIST_OPERATORS.include?(operator)
 
         filter.merge('value' => @value.single(leaf))
+      end
+
+      # `present`, `blank` and `missing` are advertised on every field carrying
+      # an equality or a membership filter: the agent derives them from those
+      # above the datasource and rewrites them into a comparison with an empty
+      # value. Only a field the API reference documents `is_set` / `is_unset` on
+      # can answer one, and it answers it through those operators, never through
+      # the rewritten comparison -- which Pylon would match against the empty
+      # value as if it were a value of its own.
+      #
+      # Refused here rather than in FilterValue, which sees the empty value but
+      # not whether the field has a presence filter to answer it with.
+      def ensure_filterable_absence!(leaf, spec)
+        return unless absence_condition?(leaf)
+        return if spec[:ops].values.any? { |candidate| VALUELESS_OPERATORS.include?(candidate) }
+
+        raise UnsupportedOperatorError,
+              "Pylon cannot filter '#{leaf.field}' for absence: the field carries no is_set / is_unset filter " \
+              'in the Pylon API reference, so a present, blank or missing condition on it cannot be translated. ' \
+              'Filter for absence on a field that does, or filter on a value instead.'
+      end
+
+      # The shape the absence operators are rewritten into: a nil value, or a
+      # list holding nothing but blanks. An empty list is not one of them -- it
+      # comes from a filter carrying no value at all, which FilterValue reports.
+      def absence_condition?(leaf)
+        return true if leaf.value.nil?
+        return false unless leaf.value.is_a?(Array) && leaf.value.any?
+
+        leaf.value.all? { |value| value.nil? || value.to_s.empty? }
       end
 
       def raise_too_deep(depth)

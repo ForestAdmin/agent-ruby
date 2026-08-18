@@ -9,11 +9,14 @@ module ForestAdminDatasourcePylon
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
-      # column missing from that table gets no operator, so the UI never offers
-      # a filter Pylon would refuse.
+      # column missing from that table gets no operator, so the UI offers no
+      # filter of this collection's own that Pylon would refuse — the absence
+      # family the agent derives above the datasource being the exception
+      # `Query::OperatorMaps::Table` describes.
       module SchemaDefinition
-        ColumnSchema = BaseCollection::ColumnSchema
-        Operators    = BaseCollection::Operators
+        ColumnSchema    = BaseCollection::ColumnSchema
+        ManyToOneSchema = BaseCollection::ManyToOneSchema
+        Operators       = BaseCollection::Operators
 
         private
 
@@ -24,9 +27,23 @@ module ForestAdminDatasourcePylon
           define_time_fields
         end
 
-        # Relations are declared in a later story, once the Account / Contact /
-        # User / Team collections exist to point at.
-        def define_relations; end
+        # The four parties of an issue, each pointing at the collection owning its
+        # shape: the flattened `*_id` columns stay, as the keys the relation is
+        # read through and as the columns the search endpoint filters.
+        #
+        # RelationEmbedder resolves them at read time, in bulk. The reverse sides
+        # are declared by the collections they belong to; `/issues/search`
+        # filters every one of these keys, so they are answered server-side.
+        def define_relations
+          add_field('account', ManyToOneSchema.new(foreign_collection: 'PylonAccount',
+                                                   foreign_key: 'account_id', foreign_key_target: 'id'))
+          add_field('requester', ManyToOneSchema.new(foreign_collection: 'PylonContact',
+                                                     foreign_key: 'requester_id', foreign_key_target: 'id'))
+          add_field('assignee', ManyToOneSchema.new(foreign_collection: 'PylonUser',
+                                                    foreign_key: 'assignee_id', foreign_key_target: 'id'))
+          add_field('team', ManyToOneSchema.new(foreign_collection: 'PylonTeam',
+                                                foreign_key: 'team_id', foreign_key_target: 'id'))
+        end
 
         def define_identity_fields
           # Only equal/in: these are the two the primary-key short-circuit can
@@ -34,7 +51,7 @@ module ForestAdminDatasourcePylon
           # search allow-list, so it never reaches the translator.
           add_field('id', ColumnSchema.new(column_type: 'String',
                                            filter_operators: [Operators::EQUAL, Operators::IN],
-                                           is_primary_key: true, is_read_only: true))
+                                           is_primary_key: true, is_groupable: false, is_read_only: true))
           add_column('number', 'Number')
           add_column('link', 'String')
         end
@@ -53,8 +70,9 @@ module ForestAdminDatasourcePylon
           add_column('number_of_touches', 'Number')
         end
 
-        # Flattened from the nested `{id: …}` objects Pylon returns. They stay
-        # plain columns until the story that adds the related collections.
+        # Flattened from the nested `{id: …}` objects Pylon returns, and kept as
+        # columns next to the relations they are the keys of: they are what the
+        # search endpoint filters, on this side and on the reverse one.
         def define_party_fields
           %w[account_id requester_id assignee_id team_id].each { |field| add_column(field, 'String') }
         end
@@ -66,12 +84,6 @@ module ForestAdminDatasourcePylon
           %w[time_in_status_seconds business_hours_time_in_status_seconds].each do |field|
             add_column(field, 'Json')
           end
-        end
-
-        def add_column(name, type)
-          add_field(name, ColumnSchema.new(column_type: type,
-                                           filter_operators: ApiFilters.forest_operators(name),
-                                           is_read_only: true))
         end
       end
     end

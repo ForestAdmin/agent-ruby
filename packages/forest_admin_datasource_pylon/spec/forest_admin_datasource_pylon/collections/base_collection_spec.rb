@@ -10,8 +10,10 @@ module ForestAdminDatasourcePylon
         .new(aggregator, conditions)
     end
 
-    def filter(condition_tree: nil, search: nil)
-      ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: condition_tree, search: search)
+    def filter(condition_tree: nil, search: nil, page: nil)
+      ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+        condition_tree: condition_tree, search: search, page: page
+      )
     end
 
     def page(offset, limit)
@@ -40,17 +42,69 @@ module ForestAdminDatasourcePylon
           add_field('type', column.new(column_type: 'String'))
           add_field('tags', column.new(column_type: 'Json'))
           add_field('resolved_at', column.new(column_type: 'Date'))
+          add_field('account_id', column.new(column_type: 'String',
+                                             filter_operators: [Collections::BaseCollection::Operators::IN]))
+          add_field('owner_id', column.new(column_type: 'String'))
         end
 
-        def define_relations; end
+        # Two ManyToOne, so the resolution can be observed on a relation whose
+        # foreign key this collection filters and on one whose foreign key it
+        # does not -- alongside a prefix naming no relation at all.
+        def define_relations
+          add_field('account', Collections::BaseCollection::ManyToOneSchema.new(
+                                 foreign_collection: 'PylonAccount', foreign_key: 'account_id',
+                                 foreign_key_target: 'id'
+                               ))
+          add_field('owner', Collections::BaseCollection::ManyToOneSchema.new(
+                               foreign_collection: 'PylonUser', foreign_key: 'owner_id',
+                               foreign_key_target: 'id'
+                             ))
+        end
 
         public :extract_id_lookup, :project, :translate_page, :add_custom_fields,
                :translate_sort, :timezone_for, :build_pylon_filter, :api_filters, :default_pk_sort?,
-               :ensure_searchless_lookup!
+               :ensure_searchless_lookup!, :search_records, :page_window, :warn_unsortable,
+               :with_resolved_relations
+      end
+    end
+
+    # Implements the two hooks the read pipeline leaves to the collection: one
+    # page of the cursor walk, and the serialization of what it collected.
+    let(:searching_subclass) do
+      Class.new(subclass) do
+        attr_accessor :pages
+        attr_reader :calls
+
+        # A field the endpoint filters, so the translated filter handed to
+        # `search_page` can be observed.
+        def api_filters
+          operators = Collections::BaseCollection::Operators
+          { 'state' => { ops: { operators::EQUAL => 'equals' } } }
+        end
+
+        protected
+
+        def search_page(limit:, cursor:, filter:, search_text:)
+          @calls ||= []
+          @calls << { limit: limit, cursor: cursor, filter: filter, search_text: search_text }
+          @pages.shift || Client::SearchPage.new(records: [], next_cursor: nil)
+        end
+
+        private
+
+        def serialize(record) = record.merge('serialized' => true)
       end
     end
 
     let(:collection) { subclass.new(datasource, 'X') }
+
+    def searching(*pages)
+      searching_subclass.new(datasource, 'X').tap { |collection| collection.pages = pages }
+    end
+
+    def search_page(records, next_cursor = nil)
+      Client::SearchPage.new(records: records, next_cursor: next_cursor)
+    end
 
     describe 'subclass contract' do
       it 'raises NotImplementedError naming define_schema when the hook is missing' do
@@ -62,6 +116,17 @@ module ForestAdminDatasourcePylon
         incomplete = Class.new(described_class) { def define_schema; end }
 
         expect { incomplete.new(datasource, 'X') }.to raise_error(NotImplementedError, /define_relations/)
+      end
+
+      it 'raises NotImplementedError naming search_page when the walk reaches the endpoint hook' do
+        expect { collection.search_records(nil, filter) }.to raise_error(NotImplementedError, /search_page/)
+      end
+
+      # Reached only by a collection declaring a ManyToOne to this one: an
+      # unresolvable relation names the missing hook rather than embedding nil.
+      it 'raises NotImplementedError naming records_indexed_by_id when a relation points here' do
+        expect { collection.records_indexed_by_id(%w[uuid-1]) }
+          .to raise_error(NotImplementedError, /records_indexed_by_id/)
       end
     end
 
@@ -78,6 +143,138 @@ module ForestAdminDatasourcePylon
 
         expect(opted_in.is_searchable?).to be(true)
         expect(opted_in.is_countable?).to be(true)
+      end
+    end
+
+    describe 'refusals' do
+      # The agent answers 400 carrying the message for a ValidationError, and 500
+      # "Unexpected error" for anything else. Every refusal of this datasource
+      # names a filter the operator set and can change, and the message is the
+      # only place they learn which one.
+      it 'refuses through an error the agent answers 400 for' do
+        expect(UnsupportedOperatorError.new('nope'))
+          .to be_a(ForestAdminDatasourceToolkit::Exceptions::ValidationError)
+      end
+
+      # No Pylon endpoint aggregates, and a count over the pages the agent walked
+      # would answer a fraction of the collection as if it were all of it. The
+      # contract's NotImplementedError would read as an oversight instead.
+      it 'refuses to aggregate, naming the collection' do
+        expect { collection.aggregate(nil, nil, nil) }
+          .to raise_error(UnsupportedOperatorError, /X cannot be aggregated/)
+      end
+
+      # A relation whose foreign key this collection does not filter cannot be
+      # resolved: the keys read from the foreign collection would have nothing
+      # to be matched against.
+      it 'refuses a filter on a relation whose foreign key it cannot filter' do
+        query = filter(condition_tree: leaf('owner:name', operators::EQUAL, 'Bob'))
+
+        expect { collection.with_resolved_relations(nil, query) { |q| q } }
+          .to raise_error(UnsupportedOperatorError,
+                          /related field 'owner:name'.*Filter on 'owner_id' instead.*PylonUser list/m)
+      end
+
+      it 'refuses one whose prefix names no relation of the collection' do
+        query = filter(condition_tree: leaf('nope:name', operators::EQUAL, 'Acme'))
+
+        expect { collection.with_resolved_relations(nil, query) { |q| q } }
+          .to raise_error(UnsupportedOperatorError, /Filter on a column of this collection instead/)
+      end
+    end
+
+    # Pylon has no join, so a condition on a related field is answered by reading
+    # the foreign collection for the keys matching it.
+    describe '#with_resolved_relations' do
+      let(:foreign) { instance_double(Collections::Account) }
+
+      before { allow(datasource).to receive(:get_collection).with('PylonAccount').and_return(foreign) }
+
+      def resolved(tree)
+        collection.with_resolved_relations(nil, filter(condition_tree: tree), &:condition_tree)
+      end
+
+      def returning(*ids)
+        allow(foreign).to receive(:list) { ids.map { |id| { 'id' => id } } }
+      end
+
+      it 'leaves a filter naming no relation untouched, without reading anything' do
+        tree = leaf('state', operators::EQUAL, 'new')
+
+        expect(resolved(tree)).to be(tree)
+        expect(datasource).not_to have_received(:get_collection)
+      end
+
+      it 'rewrites the leaf into the foreign keys of the matching records' do
+        returning('acc-1', 'acc-2')
+
+        expect(resolved(leaf('account:name', operators::EQUAL, 'Acme')).to_h)
+          .to eq(field: 'account_id', operator: operators::IN, value: %w[acc-1 acc-2])
+      end
+
+      # The condition reaches the foreign collection unnested, asking only for
+      # the key it is matched against, and bounded so an overflow is seen.
+      it 'reads the foreign collection for the target key alone' do
+        returning('acc-1')
+        resolved(leaf('account:name', operators::EQUAL, 'Acme'))
+
+        expect(foreign).to have_received(:list) do |_caller, query, projection|
+          expect(query.condition_tree.to_h).to eq(field: 'name', operator: operators::EQUAL, value: 'Acme')
+          expect(query.page.to_h).to eq(offset: 0, limit: Collections::BaseCollection::MAX_RELATION_KEYS + 1)
+          expect(projection).to eq(['id'])
+        end
+      end
+
+      it 'resolves a relation nested inside a branch, leaving the other conditions in place' do
+        returning('acc-1')
+        tree = branch('And', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(resolved(tree).to_h[:conditions].last)
+          .to eq(field: 'account_id', operator: operators::IN, value: %w[acc-1])
+      end
+
+      # No foreign record matched, so no record of this collection can: answered
+      # without a request, rather than with an empty `in` reading as "everything".
+      it 'answers with no record when nothing matched, without running the read' do
+        returning
+        ran = false
+        query = filter(condition_tree: leaf('account:name', operators::EQUAL, 'Acme'))
+
+        expect(collection.with_resolved_relations(nil, query) { ran = true }).to eq([])
+        expect(ran).to be(false)
+      end
+
+      it 'empties an and whose relation matched nothing' do
+        returning
+        tree = branch('And', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(collection.with_resolved_relations(nil, filter(condition_tree: tree)) { |q| q }).to eq([])
+      end
+
+      # The other side of the union still selects records, so the unmatchable
+      # branch drops out instead of emptying the read.
+      it 'drops an unmatchable branch out of an or' do
+        returning
+        tree = branch('Or', [leaf('state', operators::EQUAL, 'new'), leaf('account:name', operators::EQUAL, 'Acme')])
+
+        expect(resolved(tree).to_h)
+          .to eq(aggregator: 'Or', conditions: [{ field: 'state', operator: operators::EQUAL, value: 'new' }])
+      end
+
+      it 'answers with no record when every branch of an or matched nothing' do
+        returning
+        tree = branch('Or', [leaf('account:name', operators::EQUAL, 'A'), leaf('account:name', operators::EQUAL, 'B')])
+
+        expect(collection.with_resolved_relations(nil, filter(condition_tree: tree)) { |q| q }).to eq([])
+      end
+
+      # Truncating would answer a narrower question than the one asked, without
+      # saying so.
+      it 'refuses to truncate a relation matching more records than the cap' do
+        returning(*Array.new(Collections::BaseCollection::MAX_RELATION_KEYS + 1) { |i| "acc-#{i}" })
+
+        expect { resolved(leaf('account:name', operators::EQUAL, 'Acme')) }
+          .to raise_error(UnsupportedOperatorError, /matches more than 500 PylonAccount records/)
       end
     end
 
@@ -302,6 +499,119 @@ module ForestAdminDatasourcePylon
         expect { collection.build_pylon_filter(nil, filter(condition_tree: node)) }
           .to raise_error(UnsupportedOperatorError, /has to be combined with 'and' conditions only/)
       end
+
+      # A collection whose endpoint filters id server-side never short-circuits,
+      # so there is nothing an `or` could widen: id is translated like any other
+      # field, including under an aggregator.
+      it 'translates an id the collection declares in api_filters, even inside an or' do
+        filtering = Class.new(subclass) do
+          def api_filters
+            operators = Collections::BaseCollection::Operators
+            { 'id' => { ops: { operators::EQUAL => 'equals' } },
+              'state' => { ops: { operators::EQUAL => 'equals' } } }
+          end
+        end.new(datasource, 'X')
+        node = branch('Or', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('state', operators::EQUAL, 'new')])
+
+        expect(filtering.build_pylon_filter(nil, filter(condition_tree: node))).to eq(
+          'operator' => 'or',
+          'subfilters' => [{ 'field' => 'id', 'operator' => 'equals', 'value' => 'uuid-1' },
+                           { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' }]
+        )
+      end
+    end
+
+    describe '#search_records' do
+      it 'walks a single page and serializes what it collected' do
+        collection = searching(search_page([{ 'id' => 'a' }, { 'id' => 'b' }]))
+
+        expect(collection.search_records(nil, filter))
+          .to eq([{ 'id' => 'a', 'serialized' => true }, { 'id' => 'b', 'serialized' => true }])
+        expect(collection.calls)
+          .to eq([{ limit: Client::MAX_SEARCH_LIMIT, cursor: nil, filter: nil, search_text: nil }])
+      end
+
+      # The regression guarded here: a page-less read used to travel to the walk
+      # as `limit: MAX_SEARCH_LIMIT`, which the walk could not tell from a window
+      # the caller asked for — so it stopped at the first full page and answered a
+      # larger set with its first thousand records, and did so without a warning.
+      it 'follows the cursor past the first page when the filter carries no page' do
+        collection = searching(search_page([{ 'id' => 'a' }], 'c1'),
+                               search_page([{ 'id' => 'b' }], 'c2'),
+                               search_page([{ 'id' => 'c' }]))
+
+        expect(collection.search_records(nil, filter).map { |record| record['id'] }).to eq(%w[a b c])
+        expect(collection.calls.map { |call| call[:cursor] }).to eq([nil, 'c1', 'c2'])
+      end
+
+      # The walker asks for the window still missing and hands back the cursor of
+      # the previous page; the filter and the search stay the same throughout.
+      it 'follows the cursor until the requested window is covered' do
+        collection = searching(search_page([{ 'id' => 'a' }, { 'id' => 'b' }], 'c1'),
+                               search_page([{ 'id' => 'c' }]))
+        query = filter(condition_tree: leaf('state', operators::EQUAL, 'new'), search: 'boom', page: page(2, 1))
+
+        expect(collection.search_records(nil, query)).to eq([{ 'id' => 'c', 'serialized' => true }])
+        expect(collection.calls).to eq(
+          [{ limit: 3, cursor: nil, filter: { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' },
+             search_text: 'boom' },
+           { limit: 1, cursor: 'c1', filter: { 'field' => 'state', 'operator' => 'equals', 'value' => 'new' },
+             search_text: 'boom' }]
+        )
+      end
+
+      it 'refuses a predicate the endpoint cannot express instead of searching unfiltered' do
+        collection = searching(search_page([{ 'id' => 'a' }]))
+
+        expect { collection.search_records(nil, filter(condition_tree: leaf('type', operators::EQUAL, 'x'))) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter on 'type'/)
+        expect(collection.calls).to be_nil
+      end
+    end
+
+    describe '#page_window' do
+      let(:records) { [{ 'id' => 'a' }, { 'id' => 'b' }, { 'id' => 'c' }] }
+
+      it 'slices the requested window out of the records' do
+        expect(collection.page_window(records, filter(page: page(1, 1)))).to eq([{ 'id' => 'b' }])
+      end
+
+      it 'returns every record when Forest asks for no page' do
+        expect(collection.page_window(records, nil)).to eq(records)
+      end
+
+      it 'reports an empty window rather than nil past the last record' do
+        expect(collection.page_window(records, filter(page: page(10, 5)))).to eq([])
+      end
+    end
+
+    describe '#warn_unsortable' do
+      before { allow(ForestAdminDatasourcePylon.logger).to receive(:warn) }
+
+      # The empty default matches an endpoint exposing no sort parameter: the
+      # order is reported instead of being silently swallowed.
+      it 'reports a chosen order the collection cannot honour, naming it' do
+        collection.warn_unsortable(sort('state'))
+
+        expect(ForestAdminDatasourcePylon.logger)
+          .to have_received(:warn).with('[forest_admin_datasource_pylon] X cannot honour the requested order.')
+      end
+
+      it 'stays quiet on no order and on the default primary-key sort the agent injects' do
+        collection.warn_unsortable(nil)
+        collection.warn_unsortable([])
+        collection.warn_unsortable(sort('id'))
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
+
+      it 'stays quiet on an order the endpoint does sort by' do
+        sorting = Class.new(subclass) { def sortable_fields = { 'state' => 'state' } }.new(datasource, 'X')
+
+        sorting.warn_unsortable(sort('state'))
+
+        expect(ForestAdminDatasourcePylon.logger).not_to have_received(:warn)
+      end
     end
 
     describe '#project' do
@@ -325,16 +635,16 @@ module ForestAdminDatasourcePylon
     end
 
     describe '#translate_page' do
-      it 'defaults to a single full-size page when Forest sends none' do
-        expect(collection.translate_page(nil)).to eq([0, Client::MAX_SEARCH_LIMIT])
+      it 'asks for every record when Forest sends no page' do
+        expect(collection.translate_page(nil)).to eq([0, nil])
       end
 
       it 'passes the offset and limit through' do
         expect(collection.translate_page(page(10, 25))).to eq([10, 25])
       end
 
-      it 'falls back to the maximum limit when the page carries none' do
-        expect(collection.translate_page(page(0, nil))).to eq([0, Client::MAX_SEARCH_LIMIT])
+      it 'asks for every record when the page carries no limit' do
+        expect(collection.translate_page(page(0, nil))).to eq([0, nil])
       end
 
       it 'clamps a negative offset to zero' do
