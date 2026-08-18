@@ -121,6 +121,17 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
       expect(operators_of('datetime')).to include(operators::GREATER_THAN, operators::LESS_THAN)
     end
 
+    # `Rules` grants a DATE or a DATEONLY column no array operator, so an
+    # advertised `in` would be refused by `ConditionTreeValidator` -- a filter the
+    # UI offers and the agent then answers with a 400.
+    it 'withholds the membership operators from a date, which the agent refuses on one' do
+      %w[date datetime].each do |type|
+        expect(operators_of(type)).to eq([operators::EQUAL,
+                                          operators::PRESENT, operators::BLANK, operators::MISSING,
+                                          operators::GREATER_THAN, operators::LESS_THAN])
+      end
+    end
+
     # Pylon spells the bare comparisons `time_is_after` / `time_is_before` and
     # documents nothing else, so a numeric range would travel as a time filter.
     #
@@ -162,6 +173,17 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
 
       expect(schema.is_read_only).to be(true)
       expect(schema.is_sortable).to be(false)
+    end
+
+    # `ColumnSchema` defaults this one to true, and the capabilities route turns
+    # `supportGroups` on as soon as a single field carries it: one custom field
+    # left groupable is the whole collection offering a chart `aggregate` raises
+    # on. Every native column declares it false for that reason.
+    it 'is not groupable, as Pylon exposes no aggregate endpoint' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('select', **select_metadata('p1'))])
+
+      expect(introspector.issue_custom_fields.first[:schema].is_groupable).to be(false)
     end
 
     # The slug is both the key a read payload indexes the value by and the

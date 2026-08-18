@@ -39,7 +39,13 @@ module ForestAdminDatasourcePylon
       }.freeze
 
       BASE_OPS = (Maps::EQUALITY.keys + Maps::PRESENCE.keys).freeze
-      TIME_OPS = (BASE_OPS + Maps::TIME.keys).freeze
+
+      # A date drops the membership operators on the way: `Rules` grants a DATE or
+      # a DATEONLY column no array operator, so `ConditionTreeValidator` refuses
+      # an `in` on one before the translator ever sees it -- the hazard already
+      # documented for MEMBERSHIP in `operator_maps.rb`. Native date columns
+      # declare the comparisons alone for the same reason.
+      TIME_OPS = (BASE_OPS - Maps::MEMBERSHIP.keys + Maps::TIME.keys).freeze
 
       # Drawn from `CUSTOM_FIELD_OPS`, the set every search endpoint accepts on a
       # custom field, so a collection's clamp has nothing to drop.
@@ -87,12 +93,15 @@ module ForestAdminDatasourcePylon
       # Every custom field is read-only in this story, like every native column:
       # writes land in story 7 (EXT-11), which is also where Pylon's own
       # `is_read_only` flag starts being honoured. Nothing is sortable either --
-      # no Pylon endpoint takes a sort parameter.
+      # no Pylon endpoint takes a sort parameter, and nothing is groupable, as
+      # Pylon aggregates nothing: one column left groupable turns `supportGroups`
+      # on for the whole collection, and the group-by the UI then offers errors.
       def build_schema(raw, column_type)
         opts = { column_type: column_type,
                  filter_operators: OPERATORS.fetch(column_type, []),
                  is_read_only: true,
-                 is_sortable: false }
+                 is_sortable: false,
+                 is_groupable: false }
 
         column_type == 'Enum' ? enum_schema(raw, opts) : ColumnSchema.new(**opts)
       end
