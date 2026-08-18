@@ -6,8 +6,19 @@ module ForestAdminAgent
     # One operation must not materialise an unbounded number of records: a "delete all" would otherwise read
     # every matched row and, with the pending/confirm protocol, write each of them twice. Truncation is logged,
     # never silent.
-    # ponytail: 500 covers any hand-made bulk edit; raise it if a real workflow needs more.
-    MAX_RECORDS_PER_OPERATION = 500
+    #
+    # Matches the Node agent's `MAX_SNAPSHOT_RECORDS`: the same feature behind the same config key, so a bulk
+    # operation must not be audited on one agent and truncated on the other. Change it in both or neither.
+    MAX_RECORDS_PER_OPERATION = 1000
+
+    # Auditing a subset while the write touches every match is the one thing `critical` exists to prevent, so
+    # over the cap the operation is refused instead — before anything is written, in both the write and the
+    # action path, which is why the message lives here rather than in either of them.
+    def self.refuse_over_cap!
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'The audit trail is configured as critical and cannot record an operation touching more than ' \
+            "#{MAX_RECORDS_PER_OPERATION} records at once. Narrow the selection."
+    end
 
     def self.log_truncation(kept, total)
       skipped = total ? total - kept : 'further'

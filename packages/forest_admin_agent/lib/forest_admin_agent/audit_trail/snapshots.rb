@@ -49,11 +49,7 @@ module ForestAdminAgent
       # advisory; under `critical: true` it breaks the one invariant the mode exists for, so the operation is
       # refused instead — before the write, so there is nothing to repair.
       def refuse_or_truncate(context, records, cap)
-        if AuditTrail.critical?
-          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                'The audit trail is configured as critical and cannot record an operation touching more than ' \
-                "#{cap} records at once. Narrow the selection."
-        end
+        AuditTrail.refuse_over_cap! if AuditTrail.critical?
 
         kept = records.first(cap)
         AuditTrail.log_truncation(kept.size, audit_safely { count_matching(context) })

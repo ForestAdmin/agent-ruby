@@ -74,15 +74,22 @@ means the write may or may not have landed: that residue is evidence, and it is 
 the pending insert stays best-effort in both modes, because by then the write has happened and raising would
 report a failure for an operation that succeeded.
 
+> **The guarantee is opt-in.** `critical` defaults to `false`, so on a default configuration a write can
+> succeed with no audit row at all — an unreachable audit database costs rows, not writes. Configuring the
+> database gets you a best-effort trail; `critical: true` is what makes "no unaudited write" true. The Node
+> agent defaults the same way, so the two agree.
+
 Consequences worth knowing:
 
 - A write that turns out to change nothing has its pending row **discarded** rather than confirmed, so no-op
   updates leave no trace.
 - A record the agent cannot read back after the write keeps its row **pending**. Confirming from the patch
   would claim values that may never have been written.
-- One operation audits at most 500 records. Under `critical: false` a wider selection is truncated, with
-  `N records audited, M skipped` logged at `Warn`. Under `critical: true` it is **refused**: auditing a subset
-  while the write touches every match is precisely the invariant that mode exists for.
+- One operation audits at most **1000** records — the same number as the Node agent's `MAX_SNAPSHOT_RECORDS`,
+  so a bulk operation is not audited on one agent and truncated on the other. Under `critical: false` a wider
+  selection is truncated, with `N records audited, M skipped` logged at `Warn`; a smart action over the cap is
+  recorded as one row attached to no record. Under `critical: true` both are **refused**: auditing a subset
+  while the operation touches every match is precisely the invariant that mode exists for.
 - Pending rows stay visible in the history — they are evidence of an attempt, and `status` says so — but the
   state reconstruction ignores them, since undoing a change that may never have happened would invent a state
   the record was never in.
@@ -158,7 +165,10 @@ the merge tiebreaker.
 Inside the value objects: a record's column names pass through untouched, while an action answer's keys are
 Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent transforms them on write.
 
-**A record that was renamed keeps one timeline.** An update that moves a writable primary key files its row
+**A record that was renamed keeps one timeline** — on this agent. The Node agent files an update under the
+record's new id too, but has no `previous_record_id` and so cannot walk back past the rename: the same record
+shows a complete chain here and a history beginning at the rename there, until that column is ported.
+ An update that moves a writable primary key files its row
 under the record's new id — the id later lookups use — and remembers the one it left. Both the history and the
 state routes walk that back, so asking for the current id returns everything the record has ever been filed
 under, rather than starting the story at the rename.

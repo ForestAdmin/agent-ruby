@@ -183,6 +183,11 @@ module ForestAdminAgent
 
           return records.map { |record| Utils::Id.pack_id(context.collection, record) } if records.size <= cap
 
+          # Same rule as a bulk write: recording one unattached row for a run that touched more records than
+          # the cap is a partial audit, which `critical` exists to refuse. Nothing has run yet — the gate is
+          # ahead of `execute` — so refusing costs nothing to repair.
+          ForestAdminAgent::AuditTrail.refuse_over_cap! if ForestAdminAgent::AuditTrail.critical?
+
           ForestAdminAgent::AuditTrail.log_truncation(0, nil)
           []
         end

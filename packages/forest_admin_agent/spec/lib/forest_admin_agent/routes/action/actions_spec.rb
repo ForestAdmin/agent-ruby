@@ -44,6 +44,17 @@ module ForestAdminAgent
             end
           end
 
+          # Same rule as a bulk write: one unattached row for a run that touched more is a partial audit.
+          it 'refuses a selection wider than the cap when critical is on' do
+            allow(ForestAdminAgent::AuditTrail).to receive(:critical?).and_return(true)
+            cap = ForestAdminAgent::AuditTrail::MAX_RECORDS_PER_OPERATION
+            allow(collection).to receive(:list).and_return((1..(cap + 1)).map { |id| { 'id' => id } })
+
+            expect { audited_ids }.to raise_error(
+              ForestAdminDatasourceToolkit::Exceptions::ForestException, /cannot record an operation touching more/
+            )
+          end
+
           it 'records a selection wider than the cap as attached to no record, and says so' do
             logger = instance_spy(Services::LoggerService)
             allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
