@@ -275,6 +275,18 @@ module ForestAdminDatasourcePylon
         expect(collection.list(nil, filter(page: page(2, 1)), %w[id])).to eq([{ 'id' => 'acc-3' }])
       end
 
+      # Browsing carries no page when a decorator above asks for the whole
+      # collection — an emulated sort, an emulated operator — and the walk has to
+      # answer with the collection rather than with its first page.
+      it 'walks every page when the read carries no page at all' do
+        stub_list({ 'limit' => '1000' },
+                  'data' => [account_payload('acc-1')],
+                  'pagination' => { 'cursor' => 'c1', 'has_next_page' => true })
+        stub_list({ 'limit' => '1000', 'cursor' => 'c1' }, 'data' => [account_payload('acc-2')])
+
+        expect(collection.list(nil, filter, %w[id])).to eq([{ 'id' => 'acc-1' }, { 'id' => 'acc-2' }])
+      end
+
       it 'returns an empty list when the organization has no account' do
         stub_list({ 'limit' => '1000' }, 'data' => [])
 

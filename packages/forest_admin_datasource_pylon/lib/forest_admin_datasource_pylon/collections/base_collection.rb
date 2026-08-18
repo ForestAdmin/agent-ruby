@@ -164,10 +164,8 @@ module ForestAdminDatasourcePylon
       #
       # A filter carrying no page — or a page naming no limit — asks for every
       # record it matched, and the records are already in hand: there is no
-      # window to cut. The `MAX_SEARCH_LIMIT` fallback of `translate_page` is a
-      # cap on how far a walk of the API goes, which is a different question,
-      # and applying it here would answer a page-less read with the first
-      # thousand records of a larger set as if they were all of it.
+      # window to cut. How far the walk that collected them went is a different
+      # question, answered by `translate_page` and the caps of the walker.
       def page_window(records, filter)
         page = filter&.page
         return records if page.nil?
@@ -280,11 +278,17 @@ module ForestAdminDatasourcePylon
         wanted.to_h { |k| [k, record[k]] }
       end
 
+      # A filter carrying no page — or a page naming no limit — asks for every
+      # record it matched, and travels to the walk as no limit at all rather than
+      # as `MAX_SEARCH_LIMIT`: a limit standing in for "everything" is one the
+      # walk cannot tell from a window the caller asked for, so it would stop at
+      # a thousand records having answered a larger set, and stop silently — the
+      # truncation warning only fires on a walk that knows it was cut short.
       def translate_page(page)
-        return [0, Client::MAX_SEARCH_LIMIT] if page.nil?
+        return [0, nil] if page.nil?
 
-        limit = page.limit.to_i.positive? ? page.limit.to_i : Client::MAX_SEARCH_LIMIT
-        [page.offset.to_i.clamp(0, nil), limit]
+        limit = page.limit.to_i
+        [page.offset.to_i.clamp(0, nil), limit.positive? ? limit : nil]
       end
 
       # Adds custom fields, skipping any whose column name collides with a

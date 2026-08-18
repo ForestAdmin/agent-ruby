@@ -531,6 +531,19 @@ module ForestAdminDatasourcePylon
           .to eq([{ limit: Client::MAX_SEARCH_LIMIT, cursor: nil, filter: nil, search_text: nil }])
       end
 
+      # The regression guarded here: a page-less read used to travel to the walk
+      # as `limit: MAX_SEARCH_LIMIT`, which the walk could not tell from a window
+      # the caller asked for — so it stopped at the first full page and answered a
+      # larger set with its first thousand records, and did so without a warning.
+      it 'follows the cursor past the first page when the filter carries no page' do
+        collection = searching(search_page([{ 'id' => 'a' }], 'c1'),
+                               search_page([{ 'id' => 'b' }], 'c2'),
+                               search_page([{ 'id' => 'c' }]))
+
+        expect(collection.search_records(nil, filter).map { |record| record['id'] }).to eq(%w[a b c])
+        expect(collection.calls.map { |call| call[:cursor] }).to eq([nil, 'c1', 'c2'])
+      end
+
       # The walker asks for the window still missing and hands back the cursor of
       # the previous page; the filter and the search stay the same throughout.
       it 'follows the cursor until the requested window is covered' do
@@ -622,16 +635,16 @@ module ForestAdminDatasourcePylon
     end
 
     describe '#translate_page' do
-      it 'defaults to a single full-size page when Forest sends none' do
-        expect(collection.translate_page(nil)).to eq([0, Client::MAX_SEARCH_LIMIT])
+      it 'asks for every record when Forest sends no page' do
+        expect(collection.translate_page(nil)).to eq([0, nil])
       end
 
       it 'passes the offset and limit through' do
         expect(collection.translate_page(page(10, 25))).to eq([10, 25])
       end
 
-      it 'falls back to the maximum limit when the page carries none' do
-        expect(collection.translate_page(page(0, nil))).to eq([0, Client::MAX_SEARCH_LIMIT])
+      it 'asks for every record when the page carries no limit' do
+        expect(collection.translate_page(page(0, nil))).to eq([0, nil])
       end
 
       it 'clamps a negative offset to zero' do
