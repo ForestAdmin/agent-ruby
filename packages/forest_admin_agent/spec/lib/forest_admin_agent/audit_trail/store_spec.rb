@@ -287,19 +287,48 @@ module ForestAdminAgent
         end
       end
 
-      describe '#previous_record_ids' do
-        it 'returns the ids this record was filed under before a rename, once each' do
-          store.append(record(record_id: '7', previous_record_id: '1'))
-          store.append(record(record_id: '7', previous_record_id: '1'))
+      describe '#renamed_from' do
+        it 'returns each id it was renamed from, with the moment it stopped being that id' do
+          store.append(record(record_id: '7', previous_record_id: '1', timestamp: '2026-01-02T00:00:01.000Z'))
+          store.append(record(record_id: '7', previous_record_id: '1', timestamp: '2026-01-02T00:00:09.000Z'))
           store.append(record(record_id: '7'))
 
-          expect(store.previous_record_ids(collection: 'accounts', record_id: '7')).to eq(['1'])
+          expect(store.renamed_from(collection: 'accounts', record_id: '7')).to eq(
+            [{ id: '1', until: '2026-01-02T00:00:09.000Z' }]
+          )
         end
 
         it 'returns nothing for a record that was never renamed' do
           store.append(record)
 
-          expect(store.previous_record_ids(collection: 'accounts', record_id: '1')).to be_empty
+          expect(store.renamed_from(collection: 'accounts', record_id: '1')).to be_empty
+        end
+      end
+
+      # An id a record left may since have been taken by another record: its rows are none of this one's
+      # business, so an earlier segment only reaches up to the rename.
+      describe 'reading a renamed record' do
+        it 'takes the earlier id only up to the moment it was left' do
+          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:01.000Z', correlation_key: 'mine'))
+          store.append(record(record_id: '7', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'renamed',
+                              previous_record_id: '1'))
+          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:09.000Z', correlation_key: 'someone-else'))
+
+          history = store.list_by_record(
+            collection: 'accounts',
+            record_id: [{ id: '7', until: nil }, { id: '1', until: '2026-01-02T00:00:05.000Z' }]
+          )
+
+          expect(history.map(&:correlation_key)).to eq(%w[mine renamed])
+        end
+
+        it 'counts the same rows it lists' do
+          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:01.000Z'))
+          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:09.000Z'))
+
+          segments = [{ id: '1', until: '2026-01-02T00:00:05.000Z' }]
+
+          expect(store.count_by_record(collection: 'accounts', record_id: segments)).to eq(1)
         end
       end
 
@@ -374,6 +403,24 @@ module ForestAdminAgent
 
           expect(matching_search('50%_')).to eq(['literal'])
           expect(matching_search('%')).to eq(['literal'])
+        end
+
+        # The values sit in a serialized document, where a quote is escaped: the raw term would never find them.
+        it 'finds a value holding a quote, a backslash or a newline' do
+          store.append(record(correlation_key: 'quote', new_values: { 'label' => '15" monitor' }))
+          store.append(record(correlation_key: 'path', new_values: { 'path' => 'C:\\Users\\ada' }))
+          store.append(record(correlation_key: 'multiline', new_values: { 'note' => "first\nsecond" }))
+
+          expect(matching_search('15" monitor')).to eq(['quote'])
+          expect(matching_search('C:\\Users')).to eq(['path'])
+          expect(matching_search("first\nsecond")).to eq(['multiline'])
+        end
+
+        # A bare quote would otherwise match the document's own structure, so every row.
+        it 'does not let a bare quote match every row' do
+          store.append(record(new_values: { 'city' => 'Lyon' }))
+
+          expect(matching_search('"')).to be_empty
         end
 
         it 'composes with the other filters, and the count agrees with it' do

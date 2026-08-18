@@ -82,7 +82,9 @@ module ForestAdminAgent
       # `userinfo = nil` is a no-op on URI, so the credentials come off textually; the parser then takes care
       # of the query and fragment.
       def sanitize_url(value)
-        bare = value.to_s.sub(%r{\A([a-z][a-z0-9+.-]*://)[^/@]*@}i, '\1')
+        # Both `https://user:pass@host` and the scheme-relative `//user:pass@host`, which parses fine and
+        # would otherwise keep its credentials.
+        bare = value.to_s.sub(%r{\A([a-z][a-z0-9+.-]*:)?//[^/@]*@}i, '\1//')
         uri = URI.parse(bare)
         uri.query = nil
         uri.fragment = nil

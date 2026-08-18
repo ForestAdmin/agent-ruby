@@ -160,9 +160,16 @@ Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent tr
 
 **A record that was renamed keeps one timeline.** An update that moves a writable primary key files its row
 under the record's new id — the id later lookups use — and remembers the one it left. Both the history and the
-state routes walk that chain back, so asking for the current id returns everything the record has ever been
-filed under, rather than starting the story at the rename. The chain is walked at most ten hops, and a cycle
-stops it.
+state routes walk that back, so asking for the current id returns everything the record has ever been filed
+under, rather than starting the story at the rename.
+
+Each earlier id counts only **up to the moment it was left**, because a primary key a record abandons can be
+taken by another record afterwards, and those rows are none of this record's business. What the trail cannot
+separate is the opposite case: rows written under an id *before* the record that holds it now arrived — a
+reused key, or a delete followed by a recreate — since the packed id is the only identity the trail has. That
+is deliberate for delete/recreate (the state reconstruction walks into an earlier life on purpose) and the
+same limitation for a reused key. Telling those apart needs a lineage of its own on every row, which is a
+bigger change than this one.
 
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
@@ -241,8 +248,17 @@ Because these are the same columns the field filter searches, filtering by a fie
 
 A **global** action targets no record, and a **select-all** selection only tells the agent which ids were
 *excluded*, so naming the targets would mean querying the whole selection: those runs are recorded once,
-attached to no record. Recording is best-effort — a failing audit database logs an error rather than
-breaking the action.
+attached to no record.
+
+Recording follows the same policy as a write: the row goes in before the action runs, so under
+`critical: false` a failing audit database logs an error and the action goes ahead, while under
+`critical: true` it refuses the run — nothing has happened yet, so there is nothing to repair. Everything
+after that point, the answer included, is best-effort either way.
+
+**A row attached to no record is not readable through any route today.** Every history route is scoped to a
+record id, and the correlation routes reject an empty one, so global and over-cap action runs are recorded but
+cannot be fetched. They are evidence in the table rather than something the UI can show — reaching them needs
+a collection-level endpoint that does not exist yet.
 
 The targeted records are read back through the caller's own filter rather than taken from the request: the ids
 a client sends are a claim, and in a compliance record asserting that an operator acted on a record their

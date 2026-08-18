@@ -35,15 +35,30 @@ module ForestAdminAgent
 
       # Inserts rows and returns their ids, in the order given. Batched, because a "delete all" snapshot can
       # be thousands of records and the pending/confirm protocol writes each of them twice.
+      #
+      # The ids are matched to their rows by `record_id` rather than by the order RETURNING happens to come
+      # back in, which Postgres does not promise: pairing them positionally would confirm each pending row with
+      # another record's diff. One row per record per operation, so that key is unique within a batch — bar a
+      # pending create, which has no id yet and is always a batch of one.
       def append_all(records)
         return [] if records.empty?
 
         rows = records.map { |record| to_row(record) }
+        return rows.map { |row| model.create!(row).id } unless batch_returning?(rows)
 
-        return model.insert_all(rows, returning: %w[id]).rows.flatten if model.connection.supports_insert_returning?
+        returned = model.insert_all(rows, returning: %i[id record_id]).rows.to_h { |id, key| [key, id] }
 
-        # MySQL has no RETURNING: fall back to one insert per row, which does hand the id back.
-        rows.map { |row| model.create!(row).id }
+        rows.map { |row| returned[row[:record_id]] }
+      end
+
+      # One insert per row when the ids cannot be matched back: no RETURNING on this adapter (MySQL), or a
+      # batch whose record ids are not distinct enough to pair on.
+      def batch_returning?(rows)
+        return false unless model.connection.supports_insert_returning?
+
+        keys = rows.map { |row| row[:record_id] }
+
+        keys.none?(&:nil?) && keys.uniq.size == keys.size
       end
 
       def confirm(id, attributes)
@@ -91,14 +106,16 @@ module ForestAdminAgent
           .uniq { |author| author[:user_id] }
       end
 
-      # The id this record was filed under before an update moved its primary key, if one did. Walking that
-      # back is what lets a history query reach rows written before a rename — they stay under the id they were
-      # written with, since that is the id they were true of.
-      def previous_record_ids(collection:, record_id:)
+      # The ids this record was renamed from, each with the moment it stopped being that id. Walking those back
+      # is what lets a history query reach rows written before a rename — they stay under the id they were
+      # written with, since that is the id they were true of — and the moment bounds how far: the id it left may
+      # have been taken by another record afterwards, whose rows are none of this record's business.
+      def renamed_from(collection:, record_id:)
         model.where(collection: collection, record_id: record_id)
              .where.not(previous_record_id: nil)
-             .distinct
-             .pluck(:previous_record_id)
+             .pluck(:previous_record_id, :timestamp)
+             .group_by(&:first)
+             .map { |id, rows| { id: id, until: as_iso(rows.map(&:last).max) } }
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
@@ -109,7 +126,8 @@ module ForestAdminAgent
       # pending rows — they are evidence, and `status` tells the reader what they are — but a reconstruction
       # cannot act on them.
       def list_since(collection:, record_id:, timestamp:)
-        model.where(collection: collection, record_id: record_id, status: Recording::DONE)
+        model.where(collection: collection, status: Recording::DONE)
+             .where(*segments_condition(record_id))
              .where('timestamp > ?', as_time(timestamp))
              .order(timestamp: :desc, id: :desc)
              .map { |row| from_row(row) }
@@ -132,7 +150,7 @@ module ForestAdminAgent
       # Every filter is an AND, so the count matches exactly what a page of this history holds.
       def scope(collection, record_id, user_ids: nil, start_timestamp: nil, end_timestamp: nil,
                 fields: nil, search: nil)
-        relation = model.where(collection: collection, record_id: record_id)
+        relation = model.where(collection: collection).where(*segments_condition(record_id))
         relation = relation.where(user_id: user_ids) if user_ids
         relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
         relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
@@ -145,6 +163,29 @@ module ForestAdminAgent
 
       def as_time(value)
         value.is_a?(::Time) ? value : ::Time.iso8601(value.to_s)
+      end
+
+      def as_iso(value)
+        value.respond_to?(:iso8601) ? value.iso8601(3) : value.to_s
+      end
+
+      # One record's history is its current id plus every id it was renamed from, each earlier one only up to
+      # the rename: `record_id = '7' OR (record_id = '1' AND timestamp <= …)`. A plain `IN` would hand over the
+      # rows of whichever record holds that id now.
+      #
+      # Takes an id, several, or segments — `{ id:, until: }` — so a caller that has no rename to care about
+      # simply passes the id.
+      def segments_condition(record_id)
+        binds = []
+        sql = Array(record_id).map { |value| value.is_a?(Hash) ? value : { id: value, until: nil } }.map do |segment|
+          binds << segment[:id]
+          next 'record_id = ?' unless segment[:until]
+
+          binds << as_time(segment[:until])
+          '(record_id = ? AND timestamp <= ?)'
+        end
+
+        [sql.join(' OR '), *binds]
       end
 
       def model

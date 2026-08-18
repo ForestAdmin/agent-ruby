@@ -29,7 +29,7 @@ module ForestAdminAgent
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
           allow(store).to receive_messages(list_by_record: records, count_by_record: records.length,
-                                           authors_by_record: [], previous_record_ids: [])
+                                           authors_by_record: [], renamed_from: [])
 
           route = described_class.new
           context = double('context', collection: collection, caller: build_caller, permissions: permissions)
@@ -41,7 +41,7 @@ module ForestAdminAgent
           def state_route(entries: [], record: { 'id' => 4, 'status' => 'shipped' })
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
               .and_return({ audit_trail: { store: store } })
-            allow(store).to receive_messages(list_since: entries, previous_record_ids: [])
+            allow(store).to receive_messages(list_since: entries, renamed_from: [])
             allow(collection).to receive(:list).and_return([record].compact)
 
             route = described_class.new
@@ -119,11 +119,12 @@ module ForestAdminAgent
           # Rows written before an update moved a writable primary key stay under the id they were true of.
           it 'reconstructs state from every id the record has been filed under' do
             route = state_route
-            allow(store).to receive(:previous_record_ids).and_return(['1'], [], [])
+            allow(store).to receive(:renamed_from).and_return([{ id: '1', until: nil }], [])
 
             get_state(route)
 
-            expect(store).to have_received(:list_since).with(hash_including(record_id: %w[4 1]))
+            expect(store).to have_received(:list_since)
+              .with(hash_including(record_id: [{ id: '4', until: nil }, { id: '1', until: nil }]))
           end
 
           # Strictly after the requested instant: an entry stamped exactly at it belongs to that state.
@@ -132,7 +133,8 @@ module ForestAdminAgent
             get_state(route)
 
             expect(store).to have_received(:list_since).with(
-              collection: 'projects', record_id: ['4'], timestamp: '2026-01-02T10:00:00.000Z'
+              collection: 'projects', record_id: [{ id: '4', until: nil }],
+              timestamp: '2026-01-02T10:00:00.000Z'
             )
           end
 
@@ -209,9 +211,10 @@ module ForestAdminAgent
           )
 
           expect(store).to have_received(:list_by_record).with(
-            collection: 'projects', record_id: ['4'], skip: 0, limit: 20, order: 'desc'
+            collection: 'projects', record_id: [{ id: '4', until: nil }], skip: 0, limit: 20, order: 'desc'
           )
-          expect(store).to have_received(:count_by_record).with(collection: 'projects', record_id: ['4'])
+          expect(store).to have_received(:count_by_record)
+            .with(collection: 'projects', record_id: [{ id: '4', until: nil }])
           # Top-level keys are camelCased for the frontend; nested value hashes keep the column names.
           expect(result[:content]).to eq(
             {
@@ -261,21 +264,24 @@ module ForestAdminAgent
         describe 'a record that was renamed' do
           it 'reads the history of every id it has been filed under' do
             route = route_with_store
-            allow(store).to receive(:previous_record_ids).and_return(['1'], [], [])
+            allow(store).to receive(:renamed_from)
+              .and_return([{ id: '1', until: '2026-01-02T00:00:05.000Z' }], [])
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-            expect(store).to have_received(:list_by_record).with(hash_including(record_id: %w[4 1]))
-            expect(store).to have_received(:count_by_record).with(hash_including(record_id: %w[4 1]))
+            expected = [{ id: '4', until: nil }, { id: '1', until: '2026-01-02T00:00:05.000Z' }]
+            expect(store).to have_received(:list_by_record).with(hash_including(record_id: expected))
+            expect(store).to have_received(:count_by_record).with(hash_including(record_id: expected))
           end
 
           it 'stops walking rather than looping on a chain that comes back to itself' do
             route = route_with_store
-            allow(store).to receive(:previous_record_ids).and_return(['1'], ['4'], ['1'])
+            allow(store).to receive(:renamed_from).and_return([{ id: '1', until: nil }], [{ id: '4', until: nil }])
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-            expect(store).to have_received(:list_by_record).with(hash_including(record_id: %w[4 1]))
+            expect(store).to have_received(:list_by_record)
+              .with(hash_including(record_id: [{ id: '4', until: nil }, { id: '1', until: nil }]))
           end
         end
 
@@ -295,7 +301,8 @@ module ForestAdminAgent
             expect(result[:content][:meta][:availableUsers]).to eq(
               [{ id: 12, firstName: 'Ada', lastName: 'L', email: 'ada@test' }]
             )
-            expect(store).to have_received(:authors_by_record).with(collection: 'projects', record_id: ['4'])
+            expect(store).to have_received(:authors_by_record)
+              .with(collection: 'projects', record_id: [{ id: '4', until: nil }])
           end
 
           # The front keeps the list it saw, so later pages leave it out.

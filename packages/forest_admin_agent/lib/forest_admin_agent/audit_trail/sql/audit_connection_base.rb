@@ -19,20 +19,32 @@ module ForestAdminAgent
           # clobber each other's pool and both end up writing to whichever connected last. One audit database
           # per agent is the supported shape; a second, different one is a configuration mistake worth hearing
           # about at boot.
+          #
+          # Under one mutex for all stores, not one each: the check, the connect and the assignment have to be
+          # one step, or two stores connecting at once both pass the check and the loser writes to the winner's
+          # database.
           def connect_to(database)
-            if @database && @database != database
-              raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                    'The audit trail is already connected to another database. One agent, one audit database.'
-            end
-            return if @database
+            connection_mutex.synchronize do
+              if @database && @database != database
+                raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                      'The audit trail is already connected to another database. One agent, one audit database.'
+              end
+              next if @database
 
-            establish_connection(database)
-            @database = database
+              establish_connection(database)
+              @database = database
+            end
           end
 
           def disconnect!
-            @database = nil
-            remove_connection
+            connection_mutex.synchronize do
+              @database = nil
+              remove_connection
+            end
+          end
+
+          def connection_mutex
+            @connection_mutex ||= Mutex.new
           end
         end
       end

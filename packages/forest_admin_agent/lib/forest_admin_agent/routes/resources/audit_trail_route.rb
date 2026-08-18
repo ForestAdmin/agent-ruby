@@ -50,25 +50,33 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
-        # Every id this record has been filed under, newest first. Rows written before an update moved a
-        # writable primary key stay under the id they were true of, so a history query that asked for the
-        # current id alone would start at the rename and call that the whole story.
+        # Every id this record has been filed under, each with the moment it stopped being that id. Rows
+        # written before an update moved a writable primary key stay under the id they were true of, so a
+        # history query that asked for the current id alone would start at the rename and call that the whole
+        # story — and one that asked for the bare ids would sweep up whatever record holds an abandoned id now.
         #
-        # ponytail: 10 hops is far more renaming than any record sees; the guard is against a cycle, not depth.
-        MAX_RENAMES = 10
+        # Breadth-first, and no depth limit: every hop adds an id not already seen and there are finitely many
+        # of those, so skipping what we hold is both the cycle guard and the terminator. A cap would have
+        # truncated a record renamed often enough, which reads exactly like missing history.
+        def record_segments(collection, packed_id)
+          segments = [{ id: packed_id, until: nil }]
+          queue = segments.dup
 
-        def record_ids_history(collection, packed_id)
-          ids = [packed_id]
+          until queue.empty?
+            segment = queue.shift
 
-          MAX_RENAMES.times do
-            previous = store.previous_record_ids(collection: collection.name, record_id: ids.last)
-            previous -= ids
-            break if previous.empty?
+            store.renamed_from(collection: collection.name, record_id: segment[:id]).each do |previous|
+              next if segments.any? { |seen| seen[:id] == previous[:id] }
 
-            ids.concat(previous)
+              # Bounded by its own rename and by everything walked through to reach it: an id abandoned twice
+              # only belongs to this record up to the earlier of them.
+              found = { id: previous[:id], until: [previous[:until], segment[:until]].compact.min }
+              segments << found
+              queue << found
+            end
           end
 
-          ids
+          segments
         end
 
         # What the audit trail actually records: primary keys, so a state can be identified, plus the writable

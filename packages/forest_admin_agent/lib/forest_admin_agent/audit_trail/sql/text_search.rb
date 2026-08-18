@@ -1,3 +1,5 @@
+require 'json'
+
 module ForestAdminAgent
   module AuditTrail
     module Sql
@@ -28,13 +30,27 @@ module ForestAdminAgent
         end
 
         def condition(term)
-          pattern = @connection.quote("%#{escape(term.to_s.downcase)}%")
-          columns = TEXT_COLUMNS.map { |column| column } + JSON_COLUMNS.map { |column| searchable_json(column) }
+          text = term.to_s.downcase
+          # The value objects are matched as serialized JSON, where a quote, a backslash or a newline is
+          # escaped — so `15" monitor` sits in the document as `15\" monitor` and the raw term would never
+          # find it. Escaping the term the same way makes it match, and stops a bare quote from matching the
+          # document's own structure.
+          clauses = TEXT_COLUMNS.map { |column| like(column, text) }
+          clauses += JSON_COLUMNS.map { |column| like(searchable_json(column), json_escaped(text)) }
 
-          columns.map { |expression| "LOWER(#{expression}) LIKE #{pattern} ESCAPE '#{ESCAPE}'" }.join(' OR ')
+          clauses.join(' OR ')
         end
 
         private
+
+        def like(expression, text)
+          "LOWER(#{expression}) LIKE #{@connection.quote("%#{escape(text)}%")} ESCAPE '#{ESCAPE}'"
+        end
+
+        # What JSON generation would have done to the term: `to_json` on the string, minus its own quotes.
+        def json_escaped(text)
+          text.to_json[1..-2]
+        end
 
         def searchable_json(column)
           "REPLACE(#{as_text(column)}, #{@connection.quote(REDACTED)}, '')"
