@@ -1,4 +1,3 @@
-require 'securerandom'
 require 'time'
 
 module ForestAdminAgent
@@ -24,8 +23,11 @@ module ForestAdminAgent
 
       # Same id for every change made within one request — set on the caller by the agent (see
       # CallerParser), mirroring the Node agent's caller.requestId.
+      #
+      # nil when the caller carries none, which is what a write outside any request looks like. Inventing one
+      # would group the row into a request of its own, indistinguishable from a genuine single-row request.
       def correlation_key_for(caller)
-        (caller.respond_to?(:request_id) && caller.request_id) || SecureRandom.uuid
+        caller.respond_to?(:request_id) ? caller.request_id : nil
       end
 
       def redact(values, redacted_fields)

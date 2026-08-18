@@ -70,6 +70,7 @@ module ForestAdminAgent
           capture.pending(**invocation(caller: double('caller')))
 
           expect(store.records.last.user_email).to be_nil
+          expect(store.records.last.correlation_key).to be_nil
         end
 
         it 'writes one row per targeted record, sharing timestamp and correlation key' do

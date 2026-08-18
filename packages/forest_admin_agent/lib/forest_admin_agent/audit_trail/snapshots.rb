@@ -31,20 +31,35 @@ module ForestAdminAgent
       # was already overwritten.
       #
       # An empty list on failure rather than no snapshot at all: the after hook pops unconditionally, so
-      # skipping the push would pair it with an unrelated entry.
+      # skipping the push would pair it with an unrelated entry. Reading it goes through the gate, not
+      # `audit_safely`: knowing what an operation is about to touch is part of being able to record it, so
+      # under `critical: true` a snapshot that cannot be read refuses the operation.
       def take(context, projection)
         cap = AuditTrail::MAX_RECORDS_PER_OPERATION
         page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 0, limit: cap + 1)
-        records = audit_safely { context.collection.list(context.filter.override(page: page), projection) } || []
+        records = AuditTrail.gate { context.collection.list(context.filter.override(page: page), projection) } || []
         return records if records.size <= cap
+
+        refuse_or_truncate(context, records, cap)
+      end
+
+      private
+
+      # Truncating means the operation writes more records than it audits. Tolerable when the audit trail is
+      # advisory; under `critical: true` it breaks the one invariant the mode exists for, so the operation is
+      # refused instead — before the write, so there is nothing to repair.
+      def refuse_or_truncate(context, records, cap)
+        if AuditTrail.critical?
+          raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                'The audit trail is configured as critical and cannot record an operation touching more than ' \
+                "#{cap} records at once. Narrow the selection."
+        end
 
         kept = records.first(cap)
         AuditTrail.log_truncation(kept.size, audit_safely { count_matching(context) })
 
         kept
       end
-
-      private
 
       def count_matching(context)
         aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')

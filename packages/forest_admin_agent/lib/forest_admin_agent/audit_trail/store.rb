@@ -91,8 +91,12 @@ module ForestAdminAgent
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
       # Strictly after, so an entry stamped exactly at the requested instant counts as part of that state
       # instead of being reverted out of it.
+      # Confirmed rows only: a pending one records an attempt whose outcome is unknown, and undoing a change
+      # that may never have happened would invent a state the record was never in. The history reads keep
+      # pending rows — they are evidence, and `status` tells the reader what they are — but a reconstruction
+      # cannot act on them.
       def list_since(collection:, record_id:, timestamp:)
-        model.where(collection: collection, record_id: record_id)
+        model.where(collection: collection, record_id: record_id, status: Recording::DONE)
              .where('timestamp > ?', as_time(timestamp))
              .order(timestamp: :desc, id: :desc)
              .map { |row| from_row(row) }

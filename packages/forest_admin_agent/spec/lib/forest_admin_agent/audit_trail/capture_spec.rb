@@ -127,6 +127,16 @@ module ForestAdminAgent
           expect(store.records.last.user_email).to eq('ada@test')
           expect(store.records.last.correlation_key).to eq('req-xyz')
         end
+
+        # A write outside any request belongs to no request: inventing a key would make the row look like a
+        # single-row request of its own.
+        it 'leaves the correlation key empty when the caller carries none' do
+          allow(caller_double).to receive(:request_id).and_return(nil)
+
+          before_hook('Create', data: { 'name' => 'Acme' })
+
+          expect(store.records.last.correlation_key).to be_nil
+        end
       end
 
       describe 'updating records' do
@@ -178,10 +188,13 @@ module ForestAdminAgent
           end
         end
 
-        it 'falls back to the patch when the record cannot be read back' do
+        # Confirming from the patch would claim values that may never have been written; discarding would erase
+        # the evidence that something was attempted.
+        it 'leaves the row pending when the record cannot be read back' do
           rows = update(before: [{ 'id' => 1, 'name' => 'Acme' }], persisted: [], patch: { 'name' => 'Z' })
 
-          expect(rows.last.new_values).to eq({ 'name' => 'Z' })
+          expect(rows.last.status).to eq(Recording::PENDING)
+          expect(store.discarded).to be_empty
         end
 
         # Nothing changed, so nothing is audited: the pending row goes rather than sitting there implying the
@@ -214,6 +227,14 @@ module ForestAdminAgent
       describe 'when the audit database is unreachable' do
         before { allow(store).to receive(:append_all).and_raise(StandardError, 'audit db is down') }
 
+        # Knowing what an operation is about to touch is part of being able to record it.
+        it 'refuses the operation when the snapshot cannot even be read and critical is on' do
+          allow(ForestAdminAgent::AuditTrail).to receive(:critical?).and_return(true)
+          allow(relaxed_collection).to receive(:list).and_raise(StandardError, 'datasource down')
+
+          expect { before_hook('Delete') }.to raise_error(StandardError, 'datasource down')
+        end
+
         it 'lets the write through, logging the failure, when critical is off' do
           logger = instance_spy(Services::LoggerService)
           allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
@@ -244,6 +265,17 @@ module ForestAdminAgent
 
           expect(store.records.size).to eq(cap)
           expect(logger).to have_received(:log).with('Warn', /#{cap} records audited, 25 skipped/)
+        end
+
+        # Auditing 500 of them while the write touches every match breaks the one invariant critical exists
+        # for, so the operation is refused instead — before the write, with nothing to repair.
+        it 'refuses the operation when critical is on' do
+          allow(ForestAdminAgent::AuditTrail).to receive(:critical?).and_return(true)
+          allow(relaxed_collection).to receive(:list).and_return((1..(cap + 1)).map { |id| { 'id' => id } })
+
+          expect { before_hook('Delete') }.to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException, /cannot record an operation touching more/
+          )
         end
 
         it 'asks for one more than the cap, so it can tell it was truncated' do

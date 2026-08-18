@@ -203,6 +203,26 @@ module ForestAdminAgent
       end
 
       describe '#list_since' do
+        # A pending row records an attempt whose outcome is unknown; undoing it would invent a state the
+        # record was never in.
+        it 'leaves a pending row out, so a reconstruction cannot undo a change that may never have happened' do
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', status: Recording::PENDING,
+                              correlation_key: 'attempt'))
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'confirmed'))
+
+          history = store.list_since(collection: 'accounts', record_id: '1',
+                                     timestamp: '2026-01-02T03:04:06.000Z')
+
+          expect(history.map(&:correlation_key)).to eq(['confirmed'])
+        end
+
+        # They are evidence, and `status` tells the reader what they are.
+        it 'keeps them in the history, where the payload says what they are' do
+          store.append(record(status: Recording::PENDING))
+
+          expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:status)).to eq(['pending'])
+        end
+
         it 'returns entries strictly newer than the instant, newest first' do
           store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'older'))
           store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'at'))

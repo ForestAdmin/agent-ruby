@@ -122,8 +122,12 @@ module ForestAdminAgent
         empty = []
 
         pending[:records].each_with_index do |record, index|
-          expected = record.merge(pending[:patch])
-          after = persisted[record_id(expected, pks)] || expected
+          # No row read back: the write may or may not have landed, and inventing after-values from the patch
+          # would confirm — or worse, discard — a row for something that may never have happened. Left pending,
+          # which is exactly what that state means.
+          after = persisted[record_id(record.merge(pending[:patch]), pks)]
+          next if after.nil?
+
           delta = Diff.changed_values(record, after, target[:columns])
 
           if delta[:new_values].empty?
