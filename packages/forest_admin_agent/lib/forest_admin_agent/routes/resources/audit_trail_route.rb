@@ -59,7 +59,7 @@ module ForestAdminAgent
         # of those, so skipping what we hold is both the cycle guard and the terminator. A cap would have
         # truncated a record renamed often enough, which reads exactly like missing history.
         def record_segments(collection, packed_id)
-          segments = [{ id: packed_id, until: nil }]
+          segments = [{ id: packed_id, until: nil, until_row: nil }]
           queue = segments.dup
 
           until queue.empty?
@@ -70,13 +70,24 @@ module ForestAdminAgent
 
               # Bounded by its own rename and by everything walked through to reach it: an id abandoned twice
               # only belongs to this record up to the earlier of them.
-              found = { id: previous[:id], until: [previous[:until], segment[:until]].compact.min }
+              found = earlier_bound(previous, segment).merge(id: previous[:id])
               segments << found
               queue << found
             end
           end
 
           segments
+        end
+
+        # Bounds compare as the trail orders, (timestamp, row id); nil is "no bound yet", which is later than
+        # any of them.
+        def earlier_bound(one, other)
+          return other.slice(:until, :until_row) if one[:until].nil?
+          return one.slice(:until, :until_row) if other[:until].nil?
+
+          pair = ->(bound) { [bound[:until], bound[:until_row].to_i] }
+
+          (pair[one] <= pair[other] ? one : other).slice(:until, :until_row)
         end
 
         # What the audit trail actually records: primary keys, so a state can be identified, plus the writable

@@ -293,9 +293,13 @@ module ForestAdminAgent
           store.append(record(record_id: '7', previous_record_id: '1', timestamp: '2026-01-02T00:00:09.000Z'))
           store.append(record(record_id: '7'))
 
-          expect(store.renamed_from(collection: 'accounts', record_id: '7')).to eq(
+          renamed = store.renamed_from(collection: 'accounts', record_id: '7')
+
+          expect(renamed.map { |segment| segment.slice(:id, :until) }).to eq(
             [{ id: '1', until: '2026-01-02T00:00:09.000Z' }]
           )
+          # The row id of that rename, so an equal-timestamp row can be placed either side of it.
+          expect(renamed.first[:until_row]).to be_a(Integer)
         end
 
         it 'returns nothing for a record that was never renamed' do
@@ -320,6 +324,22 @@ module ForestAdminAgent
           )
 
           expect(history.map(&:correlation_key)).to eq(%w[mine renamed])
+        end
+
+        # Same millisecond as the rename: the trail orders by (timestamp, id), so the bound does too.
+        it 'places a row written in the very millisecond of the rename by insertion order' do
+          mine = store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'mine'))
+          rename = store.append(record(record_id: '7', timestamp: '2026-01-02T00:00:05.000Z',
+                                       previous_record_id: '1', correlation_key: 'renamed'))
+          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'theirs'))
+
+          history = store.list_by_record(
+            collection: 'accounts',
+            record_id: [{ id: '7', until: nil }, { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: rename }]
+          )
+
+          expect(history.map(&:correlation_key)).to eq(%w[mine renamed])
+          expect(mine).to be < rename
         end
 
         it 'counts the same rows it lists' do

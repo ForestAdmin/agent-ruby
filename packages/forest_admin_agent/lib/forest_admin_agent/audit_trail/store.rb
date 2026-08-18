@@ -113,9 +113,15 @@ module ForestAdminAgent
       def renamed_from(collection:, record_id:)
         model.where(collection: collection, record_id: record_id)
              .where.not(previous_record_id: nil)
-             .pluck(:previous_record_id, :timestamp)
+             .pluck(:previous_record_id, :timestamp, :id)
              .group_by(&:first)
-             .map { |id, rows| { id: id, until: as_iso(rows.map(&:last).max) } }
+             .map do |id, rows|
+               # The row id comes along as the tie-breaker: the trail orders itself by (timestamp, id), so a
+               # bound that knew only the timestamp would mean something slightly different from "before".
+               _, at, row = rows.max_by { |(_, timestamp, row_id)| [timestamp, row_id] }
+
+               { id: id, until: as_iso(at), until_row: row }
+             end
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
@@ -182,7 +188,12 @@ module ForestAdminAgent
           next 'record_id = ?' unless segment[:until]
 
           binds << as_time(segment[:until])
-          '(record_id = ? AND timestamp <= ?)'
+          # Same millisecond as the rename, and the id says which side of it a row falls on: another record
+          # taking the abandoned key that fast would otherwise land in this record's history.
+          next '(record_id = ? AND timestamp <= ?)' unless segment[:until_row]
+
+          binds << as_time(segment[:until]) << segment[:until_row]
+          '(record_id = ? AND (timestamp < ? OR (timestamp = ? AND id <= ?)))'
         end
 
         [sql.join(' OR '), *binds]
