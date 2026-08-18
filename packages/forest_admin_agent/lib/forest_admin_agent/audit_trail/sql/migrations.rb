@@ -26,6 +26,9 @@ module ForestAdminAgent
                 t.text :user_first_name
                 t.text :user_last_name
                 t.text :user_email
+                # Set only on an update that moved a writable primary key: the id the row was filed under
+                # before. What lets a history query follow a record across a rename.
+                t.text :previous_record_id
                 # Smart-action rows only.
                 t.text :action_name
                 t.string :correlation_key

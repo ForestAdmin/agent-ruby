@@ -133,8 +133,14 @@ module ForestAdminAgent
           if delta[:new_values].empty?
             empty << pending[:ids][index]
           else
+            before_id = record_id(record, pks)
+            after_id = record_id(after, pks)
+
             confirm(pending[:ids][index],
-                    record_id: record_id(after, pks),
+                    record_id: after_id,
+                    # Only when the key actually moved, so a history query can walk back to the rows filed
+                    # under the id this record used to have.
+                    previous_record_id: after_id == before_id ? nil : before_id,
                     previous_values: redacted(target[:name], delta[:previous_values]),
                     new_values: redacted(target[:name], delta[:new_values]))
           end

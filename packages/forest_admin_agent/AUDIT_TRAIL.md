@@ -158,6 +158,12 @@ the merge tiebreaker.
 Inside the value objects: a record's column names pass through untouched, while an action answer's keys are
 Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent transforms them on write.
 
+**A record that was renamed keeps one timeline.** An update that moves a writable primary key files its row
+under the record's new id — the id later lookups use — and remembers the one it left. Both the history and the
+state routes walk that chain back, so asking for the current id returns everything the record has ever been
+filed under, rather than starting the story at the rename. The chain is walked at most ten hops, and a cycle
+stops it.
+
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
 audit trail, and the delete event itself is the last thing recorded.
@@ -263,6 +269,7 @@ one table nobody deletes from.
 | `operation`       | `create` / `update` / `delete`                              |
 | `collection`      | audited collection name                                     |
 | `record_id`       | packed record id (primary keys joined by `\|`), TEXT and nullable — a create's pending row has none yet, and a composite id outgrows a varchar |
+| `previous_record_id` | set only on an update that moved a writable primary key: the id the row was filed under before |
 | `user_id`         | the Forest user who made the change                         |
 | `user_first_name`, `user_last_name`, `user_email` | denormalised from the caller at write time: who acted then, not whoever holds that id today |
 | `action_name`     | smart-action rows only                                       |

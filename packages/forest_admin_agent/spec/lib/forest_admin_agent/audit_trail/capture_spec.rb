@@ -164,6 +164,8 @@ module ForestAdminAgent
                         persisted: [{ 'id' => 1, 'name' => 'ACME NORMALISED' }],
                         patch: { 'name' => 'Acme' })
 
+          # No rename, so nothing to remember.
+          expect(rows.last.previous_record_id).to be_nil
           expect(rows.last.status).to eq(Recording::DONE)
           expect(rows.last.previous_values).to eq({ 'name' => 'acme' })
           expect(rows.last.new_values).to eq({ 'name' => 'ACME NORMALISED' })
@@ -178,13 +180,15 @@ module ForestAdminAgent
             }
           end
 
-          it 'files the row under the id the record ended up with' do
+          it 'files the row under the id the record ended up with, remembering the one it left' do
             rows = update(before: [{ 'id' => 1, 'name' => 'Acme' }],
                           persisted: [{ 'id' => 7, 'name' => 'Acme' }],
                           patch: { 'id' => 7 })
 
             expect(rows.last.record_id).to eq('7')
             expect(rows.last.new_values).to eq({ 'id' => 7 })
+            # How a history query reaches the rows written while it was still 1.
+            expect(rows.last.previous_record_id).to eq('1')
           end
         end
 

@@ -11,8 +11,8 @@ module ForestAdminAgent
     class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
-      COLUMNS = %i[timestamp operation collection record_id status user_id user_first_name user_last_name
-                   user_email action_name correlation_key previous_values new_values].freeze
+      COLUMNS = %i[timestamp operation collection record_id previous_record_id status user_id user_first_name
+                   user_last_name user_email action_name correlation_key previous_values new_values].freeze
       AUTHOR_COLUMNS = %i[user_id user_first_name user_last_name user_email].freeze
 
       def initialize(database:, schema: DEFAULT_SCHEMA, table_name: DEFAULT_TABLE)
@@ -89,6 +89,16 @@ module ForestAdminAgent
           .pluck(*AUTHOR_COLUMNS)
           .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
           .uniq { |author| author[:user_id] }
+      end
+
+      # The id this record was filed under before an update moved its primary key, if one did. Walking that
+      # back is what lets a history query reach rows written before a rename — they stay under the id they were
+      # written with, since that is the id they were true of.
+      def previous_record_ids(collection:, record_id:)
+        model.where(collection: collection, record_id: record_id)
+             .where.not(previous_record_id: nil)
+             .distinct
+             .pluck(:previous_record_id)
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.

@@ -44,8 +44,9 @@ module ForestAdminAgent
           skip, limit = parse_pagination(args)
           filters = {
             collection: context.collection.name,
-            # args[:params]['id'] is already Forest's packed id, the form the audit store keys on.
-            record_id: args[:params]['id'],
+            # args[:params]['id'] is already Forest's packed id, the form the audit store keys on — plus any id
+            # this record was filed under before a rename.
+            record_id: record_ids_history(context.collection, args[:params]['id']),
             **parse_filters(args)
           }
 
@@ -72,7 +73,9 @@ module ForestAdminAgent
 
           timestamp = parse_state_timestamp(args)
           entries = store.list_since(
-            collection: context.collection.name, record_id: args[:params]['id'], timestamp: timestamp
+            collection: context.collection.name,
+            record_id: record_ids_history(context.collection, args[:params]['id']),
+            timestamp: timestamp
           )
           # Fully qualified: inside this class, `AuditTrail` is the route itself.
           state = ::ForestAdminAgent::AuditTrail::RecordState.at(current, entries)

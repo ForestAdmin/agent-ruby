@@ -32,8 +32,8 @@ module ForestAdminAgent
         store.append(record)
 
         expect(store.send(:model).column_names.sort).to eq(
-          %w[action_name collection correlation_key id new_values operation previous_values record_id status
-             timestamp user_email user_first_name user_id user_last_name]
+          %w[action_name collection correlation_key id new_values operation previous_record_id previous_values
+             record_id status timestamp user_email user_first_name user_id user_last_name]
         )
       end
 
@@ -284,6 +284,22 @@ module ForestAdminAgent
           store.append(record(record_id: long_id))
 
           expect(store.list_by_record(collection: 'accounts', record_id: long_id).size).to eq(1)
+        end
+      end
+
+      describe '#previous_record_ids' do
+        it 'returns the ids this record was filed under before a rename, once each' do
+          store.append(record(record_id: '7', previous_record_id: '1'))
+          store.append(record(record_id: '7', previous_record_id: '1'))
+          store.append(record(record_id: '7'))
+
+          expect(store.previous_record_ids(collection: 'accounts', record_id: '7')).to eq(['1'])
+        end
+
+        it 'returns nothing for a record that was never renamed' do
+          store.append(record)
+
+          expect(store.previous_record_ids(collection: 'accounts', record_id: '1')).to be_empty
         end
       end
 

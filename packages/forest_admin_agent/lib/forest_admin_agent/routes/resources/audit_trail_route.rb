@@ -41,11 +41,34 @@ module ForestAdminAgent
         # merging pages ordered by (timestamp, id). Value hashes keep the keys they were stored with: a record's
         # own column names, or an action answer's camelCase Forest names.
         def serialize_record(record)
-          record.to_h.transform_keys { |key| key.to_s.camelize(:lower) }
+          # `previous_record_id` stays out: it is how the agent follows a record across a rename, not something
+          # the payload contract carries.
+          record.to_h.except(:previous_record_id).transform_keys { |key| key.to_s.camelize(:lower) }
         end
 
         def store
           ::ForestAdminAgent::AuditTrail.store
+        end
+
+        # Every id this record has been filed under, newest first. Rows written before an update moved a
+        # writable primary key stay under the id they were true of, so a history query that asked for the
+        # current id alone would start at the rename and call that the whole story.
+        #
+        # ponytail: 10 hops is far more renaming than any record sees; the guard is against a cycle, not depth.
+        MAX_RENAMES = 10
+
+        def record_ids_history(collection, packed_id)
+          ids = [packed_id]
+
+          MAX_RENAMES.times do
+            previous = store.previous_record_ids(collection: collection.name, record_id: ids.last)
+            previous -= ids
+            break if previous.empty?
+
+            ids.concat(previous)
+          end
+
+          ids
         end
 
         # What the audit trail actually records: primary keys, so a state can be identified, plus the writable
