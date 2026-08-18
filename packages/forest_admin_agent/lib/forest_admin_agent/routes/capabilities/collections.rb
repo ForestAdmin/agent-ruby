@@ -67,11 +67,21 @@ module ForestAdminAgent
                 canUseProjectionOnGetOne: true,
                 canUseProjectionViaHeader: true,
                 canUseProjectionViaHeaderOnList: true,
-                canUseMultipleFieldsProjectionOnRelation: true
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: audit_trail_enabled?
               }
             },
             status: 200
           }
+        end
+
+        private
+
+        # True only where the store the record-history route reads from exists — the same lookup that route
+        # mounts itself on, so the capability cannot drift from what the routes actually serve. The front gates
+        # its History tab on this.
+        def audit_trail_enabled?
+          !::ForestAdminAgent::AuditTrail.store.nil?
         end
       end
     end
