@@ -85,6 +85,11 @@ Consequences worth knowing:
   updates leave no trace.
 - A record the agent cannot read back after the write keeps its row **pending**. Confirming from the patch
   would claim values that may never have been written.
+- A write nested inside another that fails and is rescued keeps its row **pending** too. Each snapshot is
+  matched to its own operation by the object the hook decorator hands to both of its hooks, so the outer write
+  settles its own rows rather than the failed inner one's. Where a customization replaced that object there is
+  nothing to match on: with one operation in flight it still pairs, with several the rows stay pending rather
+  than the wrong ones being marked done.
 - One operation audits at most **1000** records — the same number as the Node agent's `MAX_SNAPSHOT_RECORDS`,
   so a bulk operation is not audited on one agent and truncated on the other. Under `critical: false` a wider
   selection is truncated, with `N records audited, M skipped` logged at `Warn`; a smart action over the cap is

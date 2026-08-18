@@ -4,6 +4,9 @@ module ForestAdminAgent
   module AuditTrail
     describe Capture do
       let(:column_schema) { ForestAdminDatasourceToolkit::Schema::ColumnSchema }
+      # The hook decorator hands the same filter (or data) object to both contexts, which is what pairs a
+      # snapshot with its own after hook — so the helpers share one per operation, as production does.
+      let(:filter) { new_filter }
 
       # Rows keyed by position, which stands in for the row id the store hands back.
       let(:store) do
@@ -73,20 +76,21 @@ module ForestAdminAgent
         described_class.new.run(datasource_customizer, nil, store: store)
       end
 
-      def filter
+      def new_filter
         ForestAdminDatasourceToolkit::Components::Query::Filter.new(condition_tree: nil)
       end
 
-      def before_hook(type, patch: nil, data: nil)
+      def before_hook(type, patch: nil, data: nil, on: filter)
         hooks["Before_#{type}"].call(
-          double('before', caller: caller_double, filter: filter, collection: relaxed_collection,
+          double('before', caller: caller_double, filter: on, collection: relaxed_collection,
                            patch: patch, data: data)
         )
       end
 
-      def after_hook(type, record: nil)
+      def after_hook(type, record: nil, data: nil, on: filter)
         hooks["After_#{type}"].call(
-          double('after', caller: caller_double, filter: filter, collection: relaxed_collection, record: record)
+          double('after', caller: caller_double, filter: on, collection: relaxed_collection,
+                          record: record, data: data)
         )
       end
 
@@ -112,8 +116,10 @@ module ForestAdminAgent
         end
 
         it 'confirms it with the id and the record that landed' do
-          before_hook('Create', data: { 'name' => 'Acme' })
-          after_hook('Create', record: { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris' } })
+          data = { 'name' => 'Acme' }
+          before_hook('Create', data: data)
+          after_hook('Create', record: { 'id' => 1, 'name' => 'Acme', 'address' => { 'city' => 'Paris' } },
+                               data: data)
 
           row = store.records.last
           expect(row.status).to eq(Recording::DONE)
@@ -300,22 +306,53 @@ module ForestAdminAgent
         expect(store.records.last.new_values['name']).to eq(Recording::REDACTED)
       end
 
-      # The after hook settles its own operation's rows, not whichever pending row happens to be around.
-      it 'pairs the after hook with the write that raised between the two, not the stranded one' do
+      # A write nested inside another, rescued after it failed, leaves its snapshot behind. Taking the newest
+      # entry would confirm that failed operation's rows as done and strand the outer operation's own — both
+      # of them lies.
+      it 'settles its own operation, not a failed inner one left on the stack' do
+        outer = new_filter
+        inner = new_filter
         allow(relaxed_collection).to receive(:list).and_return(
-          [{ 'id' => 1, 'name' => 'stranded' }],
-          [{ 'id' => 2, 'name' => 'before' }],
-          [{ 'id' => 2, 'name' => 'after' }]
+          [{ 'id' => 1, 'name' => 'outer' }],
+          [{ 'id' => 2, 'name' => 'inner' }],
+          [{ 'id' => 1, 'name' => 'outer written' }]
         )
 
-        before_hook('Update', patch: { 'name' => 'never written' })
-        before_hook('Update', patch: { 'name' => 'after' })
-        after_hook('Update')
+        before_hook('Update', patch: { 'name' => 'outer written' }, on: outer)
+        before_hook('Update', patch: { 'name' => 'never written' }, on: inner)
+        after_hook('Update', on: outer)
 
         settled = store.records.select { |row| row.status == Recording::DONE }
-        expect(settled.map(&:record_id)).to eq(['2'])
-        expect(settled.last.new_values).to eq({ 'name' => 'after' })
-        expect(store.records.first.status).to eq(Recording::PENDING)
+        expect(settled.map(&:record_id)).to eq(['1'])
+        expect(settled.last.new_values).to eq({ 'name' => 'outer written' })
+        # The inner write may or may not have landed, which is what pending says.
+        expect(store.records.map(&:record_id).zip(store.records.map(&:status))).to include(['2', Recording::PENDING])
+      end
+
+      # A customization replacing the filter leaves nothing to match on: our before hook saw the replacement,
+      # the after context carries the original. One operation in flight is unambiguous, so it still pairs.
+      it 'still settles a single operation whose filter was replaced' do
+        allow(relaxed_collection).to receive(:list).and_return(
+          [{ 'id' => 1, 'name' => 'Acme' }], [{ 'id' => 1, 'name' => 'Z' }]
+        )
+
+        before_hook('Update', patch: { 'name' => 'Z' }, on: new_filter)
+        after_hook('Update', on: new_filter)
+
+        expect(store.records.last.status).to eq(Recording::DONE)
+      end
+
+      # Replaced *and* nested: nothing identifies which entry is ours, so neither is confirmed rather than the
+      # wrong one being marked done.
+      it 'leaves both pending when it cannot tell which operation is which' do
+        allow(relaxed_collection).to receive(:list).and_return([{ 'id' => 1, 'name' => 'a' }],
+                                                               [{ 'id' => 2, 'name' => 'b' }])
+
+        before_hook('Update', patch: { 'name' => 'x' }, on: new_filter)
+        before_hook('Update', patch: { 'name' => 'y' }, on: new_filter)
+        after_hook('Update', on: new_filter)
+
+        expect(store.records.map(&:status).uniq).to eq([Recording::PENDING])
       end
     end
   end

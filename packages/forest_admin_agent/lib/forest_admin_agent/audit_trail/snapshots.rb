@@ -3,22 +3,36 @@ module ForestAdminAgent
     # What a "before" hook leaves for the matching "after" hook: the records as they stood, the patch, and the
     # ids of the pending rows to confirm.
     #
-    # Both hooks bracket one operation on one thread, so a LIFO stack pairs them without relying on the filter
-    # object reaching both unchanged. An operation raising in between strands its entry, hence the cap.
+    # Entries are keyed by the object the hook decorator hands to both contexts — the filter, or the data on a
+    # create — because taking the newest entry is wrong as soon as writes nest: an inner write that fails skips
+    # its after hook and stays on the stack, and the outer hook would then confirm the failed operation's rows
+    # as done and leave its own stranded. Both directions of that are lies.
+    #
+    # An operation raising between the two hooks strands its entry, hence the cap; its rows stay `pending` in
+    # the table, which is the truthful state for a write that may not have landed.
     class Snapshots
       include Recording
 
       # ponytail: 16 deep is far past any legitimate nesting; raise it if one ever gets that far.
       MAX_PENDING = 16
 
-      def push(snapshot)
+      def push(key, snapshot)
         stack = pending
         stack.shift while stack.size >= MAX_PENDING
-        stack.push(snapshot)
+        stack.push(snapshot.merge(key: key))
       end
 
-      def pop
-        pending.pop
+      # The entry this operation left, or nothing rather than someone else's.
+      #
+      # A customization that replaced the filter or the data leaves no identity to match on: our before hook saw
+      # the replacement and the after context carries the original. With a single operation in flight that is
+      # unambiguous, so it still pairs; with several it does not guess, and the rows stay pending.
+      def pop_for(key)
+        stack = pending
+        index = stack.rindex { |entry| entry[:key].equal?(key) }
+        index = 0 if index.nil? && stack.size == 1
+
+        index.nil? ? nil : stack.delete_at(index)
       end
 
       # The records an operation is about to touch, capped. Reading "delete all" unbounded would materialise

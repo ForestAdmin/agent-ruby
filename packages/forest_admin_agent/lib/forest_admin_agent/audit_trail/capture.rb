@@ -50,12 +50,13 @@ module ForestAdminAgent
       def add_create_hooks(collection_customizer, target)
         collection_customizer.add_hook('Before', 'Create') do |context|
           # No record id yet — that is what the column being nullable is for.
-          @snapshots.push(ids: pending_rows(context.caller, 'create', target[:name],
-                                            [{ record_id: nil, new_values: pick(context.data, target[:columns]) }]))
+          rows = [{ record_id: nil, new_values: pick(context.data, target[:columns]) }]
+
+          @snapshots.push(context.data, ids: pending_rows(context.caller, 'create', target[:name], rows))
         end
 
         collection_customizer.add_hook('After', 'Create', prepend: true) do |context|
-          pending = @snapshots.pop
+          pending = @snapshots.pop_for(context.data)
           next unless pending
 
           confirm(pending[:ids].first,
@@ -68,6 +69,7 @@ module ForestAdminAgent
         collection_customizer.add_hook('Before', 'Update') do |context|
           records = @snapshots.take(context, target[:projection])
           @snapshots.push(
+            context.filter,
             records: records,
             patch: context.patch,
             ids: pending_rows(
@@ -82,7 +84,7 @@ module ForestAdminAgent
         end
 
         collection_customizer.add_hook('After', 'Update', prepend: true) do |context|
-          pending = @snapshots.pop
+          pending = @snapshots.pop_for(context.filter)
           next unless pending
 
           confirm_updates(context, pending, target)
@@ -93,6 +95,7 @@ module ForestAdminAgent
         collection_customizer.add_hook('Before', 'Delete') do |context|
           records = @snapshots.take(context, target[:projection])
           @snapshots.push(
+            context.filter,
             records: records,
             ids: pending_rows(
               context.caller, 'delete', target[:name],
@@ -104,8 +107,8 @@ module ForestAdminAgent
           )
         end
 
-        collection_customizer.add_hook('After', 'Delete', prepend: true) do |_context|
-          pending = @snapshots.pop
+        collection_customizer.add_hook('After', 'Delete', prepend: true) do |context|
+          pending = @snapshots.pop_for(context.filter)
           next unless pending
 
           pending[:ids].each { |id| confirm(id) }
