@@ -277,6 +277,47 @@ module ForestAdminAgent
             expect(store).to have_received(:count_by_record).with(hash_including(record_id: expected))
           end
 
+          # Two hops means two real bounds to compare, which is the path a single rename never reaches.
+          it 'carries the earlier bound down a chain of two renames' do
+            route = route_with_store
+            allow(store).to receive(:renamed_from).and_return(
+              [{ id: '7', until: '2026-01-02T00:00:09.000Z', until_row: 20 }],
+              [{ id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }],
+              []
+            )
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '9' } })
+
+            expect(store).to have_received(:list_by_record).with(
+              hash_including(record_id: [
+                               { id: '9', until: nil, until_row: nil },
+                               { id: '7', until: '2026-01-02T00:00:09.000Z', until_row: 20 },
+                               { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }
+                             ])
+            )
+          end
+
+          # The middle id was left later than the one before it, so the older segment keeps its own, earlier
+          # bound rather than inheriting the looser one.
+          it 'keeps the earlier of the two bounds when the chain reports a later one' do
+            route = route_with_store
+            allow(store).to receive(:renamed_from).and_return(
+              [{ id: '7', until: '2026-01-02T00:00:05.000Z', until_row: 10 }],
+              [{ id: '1', until: '2026-01-02T00:00:09.000Z', until_row: 20 }],
+              []
+            )
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '9' } })
+
+            expect(store).to have_received(:list_by_record).with(
+              hash_including(record_id: [
+                               { id: '9', until: nil, until_row: nil },
+                               { id: '7', until: '2026-01-02T00:00:05.000Z', until_row: 10 },
+                               { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }
+                             ])
+            )
+          end
+
           it 'stops walking rather than looping on a chain that comes back to itself' do
             route = route_with_store
             allow(store).to receive(:renamed_from).and_return(

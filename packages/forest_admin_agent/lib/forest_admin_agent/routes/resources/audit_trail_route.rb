@@ -80,14 +80,15 @@ module ForestAdminAgent
         end
 
         # Bounds compare as the trail orders, (timestamp, row id); nil is "no bound yet", which is later than
-        # any of them.
+        # any of them. Through `<=>`, since Array is not Comparable and `<=` on one raises.
         def earlier_bound(one, other)
           return other.slice(:until, :until_row) if one[:until].nil?
           return one.slice(:until, :until_row) if other[:until].nil?
 
           pair = ->(bound) { [bound[:until], bound[:until_row].to_i] }
+          earlier = (pair[one] <=> pair[other]) <= 0 ? one : other
 
-          (pair[one] <= pair[other] ? one : other).slice(:until, :until_row)
+          earlier.slice(:until, :until_row)
         end
 
         # What the audit trail actually records: primary keys, so a state can be identified, plus the writable
