@@ -96,6 +96,13 @@ module ForestAdminDatasourcePylon
           .to eq('field' => 'body_html', 'operator' => 'string_does_not_contain', 'value' => 'boom')
       end
 
+      # A bare date is read off the operator, not off the shape of the string: a
+      # text field holding what looks like a date holds a value of its own.
+      it 'leaves a date-shaped value untouched on a field not compared as time' do
+        expect(translate(leaf('title', operators::I_CONTAINS, '2026-08-01')))
+          .to include('value' => '2026-08-01')
+      end
+
       it 'refuses equal on a text field, which Pylon cannot match exactly' do
         expect { translate(leaf('title', operators::EQUAL, 'Boom')) }
           .to raise_error(UnsupportedOperatorError, /not supported on field 'title'/)
@@ -152,6 +159,20 @@ module ForestAdminDatasourcePylon
 
         expect(filter['operator']).to eq('and')
         expect(filter['subfilters'].map { |sub| sub['operator'] }).to eq(%w[time_is_after time_is_before])
+      end
+
+      # A Dateonly column -- only a custom field is typed that way -- sends the
+      # date alone, where every native column sends `time_is_after` a timestamp.
+      # The bound is the one a Ruby Date already gets.
+      it 'reads a bare date string as midnight in the timezone of the caller' do
+        filter = translate(leaf('created_at', operators::GREATER_THAN, '2026-08-01'), timezone: 'Europe/Paris')
+
+        expect(filter).to include('value' => '2026-07-31T22:00:00Z')
+      end
+
+      it 'leaves a string no date can be read from to Pylon, which names what it refuses' do
+        expect(translate(leaf('created_at', operators::GREATER_THAN, '2026-13-45')))
+          .to include('value' => '2026-13-45')
       end
 
       it 'falls back to UTC and warns on a timezone it does not know' do
@@ -296,6 +317,18 @@ module ForestAdminDatasourcePylon
         expect(translate(leaf('number_of_touches', operators::EQUAL, 12))).to include('value' => 12)
         expect(translate(leaf('customer_portal_visible', operators::EQUAL, false)))
           .to include('value' => false)
+      end
+
+      # The agent casts every Number column with `to_f`, so an integer custom
+      # field would be filtered with `42.0` -- a form none of its values carry.
+      # `be` rather than `eq`: `12.0 == 12` holds in Ruby, and the form that
+      # travels to Pylon is the one thing this is about.
+      it 'sends an integer-valued float as the integer it is' do
+        expect(translate(leaf('number_of_touches', operators::EQUAL, 12.0))['value']).to be(12)
+      end
+
+      it 'keeps what a decimal carries after the point' do
+        expect(translate(leaf('number_of_touches', operators::EQUAL, 12.5))['value']).to be(12.5)
       end
     end
   end

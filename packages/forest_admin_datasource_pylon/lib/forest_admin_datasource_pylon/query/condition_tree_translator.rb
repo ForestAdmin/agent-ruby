@@ -24,6 +24,13 @@ module ForestAdminDatasourcePylon
       LIST_OPERATORS      = %w[in not_in].freeze
       VALUELESS_OPERATORS = %w[is_set is_unset].freeze
 
+      # The comparisons Pylon reads as a moment in time: what tells FilterValue
+      # that a bare date is a date, and not a piece of text a field happens to
+      # hold. Read off the emitted operator rather than off the column type,
+      # which the translator does not see -- and it is the operator that decides
+      # the format anyway.
+      TIME_OPERATORS      = %w[time_is_after time_is_before].freeze
+
       def self.call(condition_tree, api_filters: {}, timezone: nil)
         return nil if condition_tree.nil?
 
@@ -89,7 +96,7 @@ module ForestAdminDatasourcePylon
         return filter if VALUELESS_OPERATORS.include?(operator)
         return filter.merge('values' => @value.list(leaf)) if LIST_OPERATORS.include?(operator)
 
-        filter.merge('value' => @value.single(leaf))
+        filter.merge('value' => @value.single(leaf, time: TIME_OPERATORS.include?(operator)))
       end
 
       # `present`, `blank` and `missing` are advertised on every field carrying
