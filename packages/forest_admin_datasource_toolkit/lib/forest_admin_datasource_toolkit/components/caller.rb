@@ -1,7 +1,8 @@
 module ForestAdminDatasourceToolkit
   module Components
     class Caller
-      attr_reader :id, :email, :first_name, :last_name, :tags, :team, :rendering_id, :timezone, :permission_level, :role
+      attr_reader :id, :email, :first_name, :last_name, :tags, :team, :rendering_id, :timezone,
+                  :permission_level, :role, :request, :request_id
 
       def initialize(
         id:,
@@ -15,6 +16,7 @@ module ForestAdminDatasourceToolkit
         permission_level:,
         role: nil,
         request: {},
+        request_id: nil,
         project: nil,
         environment: nil,
         **_extra_args
@@ -30,6 +32,7 @@ module ForestAdminDatasourceToolkit
         @permission_level = permission_level
         @role = role
         @request = request
+        @request_id = request_id
         @project = project
         @environment = environment
       end

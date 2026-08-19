@@ -3,6 +3,21 @@ require 'spec_helper'
 module ForestAdminAgent
   module Http
     describe Router do
+      # Rails matches in definition order, so a literal-prefixed path registered after the
+      # `:collection_name` routes is read as a collection name instead (a 2-segment
+      # `/_audit-trail/correlations` would 404 as collection `_audit-trail`, id `correlations`).
+      describe 'route order' do
+        it 'registers the audit-trail routes before the ones matching on :collection_name' do
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
+            .and_return({ audit_trail: { store: Object.new } })
+          names = described_class.routes.keys
+
+          expect(names.index('forest_audit_trail_correlations')).to be < names.index('forest_show')
+          expect(names.index('forest_audit_trail_correlations')).to be < names.index('forest_list')
+          expect(names.index('forest_audit_trail_correlations')).to be < names.index('forest_audit_trail')
+        end
+      end
+
       describe '.cached_routes' do
         before do
           described_class.reset_cached_routes!

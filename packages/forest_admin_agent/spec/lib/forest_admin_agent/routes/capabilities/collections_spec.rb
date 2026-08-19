@@ -82,13 +82,24 @@ module ForestAdminAgent
             )
           end
 
+          it 'announces the audit trail once a store is configured' do
+            # Merged rather than replaced: the rest of the request reads this config too.
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              audit_trail: { store: Object.new }
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
+
+            expect(result[:content][:agentCapabilities][:canUseAuditTrail]).to be true
+          end
+
           it 'returns agentCapabilities' do
             expect(result[:content][:agentCapabilities]).to eq(
               {
                 canUseProjectionOnGetOne: true,
                 canUseProjectionViaHeader: true,
                 canUseProjectionViaHeaderOnList: true,
-                canUseMultipleFieldsProjectionOnRelation: true
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: false
               }
             )
           end
@@ -140,7 +151,8 @@ module ForestAdminAgent
                 canUseProjectionOnGetOne: true,
                 canUseProjectionViaHeader: true,
                 canUseProjectionViaHeaderOnList: true,
-                canUseMultipleFieldsProjectionOnRelation: true
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: false
               }
             )
           end

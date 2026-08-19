@@ -18,8 +18,8 @@ module ForestAdminDatasourceCustomizer
           }
         end
 
-        def add_hook(position, type, hook)
-          @hooks[type].add_handler(position, hook)
+        def add_hook(position, type, hook, prepend: false)
+          @hooks[type].add_handler(position, hook, prepend: prepend)
         end
 
         def create(caller, data)

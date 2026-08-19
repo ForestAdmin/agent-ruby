@@ -34,6 +34,9 @@ module ForestAdminRails
   setting :disable_route_cache, default: false
   setting :rpc_max_polling_threads, default: nil
   setting :workflow_executor_url, default: nil
+  # { database: <ActiveRecord config or URL>, schema:, table_name:, redact: } — setting `database`
+  # turns the audit trail on: every change is captured and the `/_audit-trail` routes are registered.
+  setting :audit_trail, default: nil
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

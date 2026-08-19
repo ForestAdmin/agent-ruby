@@ -1,0 +1,130 @@
+require 'spec_helper'
+
+module ForestAdminAgent
+  module AuditTrail
+    module Sql
+      # The store specs cover the SQLite path end to end; these pin the Postgres-only behaviour (schema
+      # creation and the advisory lock) without needing a Postgres server.
+      describe Migrator do
+        subject(:migrator) { described_class.new(connection, schema: 'forest', table_name: 'audit_logs') }
+
+        let(:executed) { [] }
+        # A plain double on purpose: this fakes the Postgres adapter, which cannot be loaded here (no `pg`
+        # gem), and `quote_schema_name` only exists on it.
+        let(:connection) do
+          double(
+            'PostgreSQL connection',
+            adapter_name: 'PostgreSQL',
+            create_table: nil,
+            add_index: nil,
+            add_column: nil,
+            remove_index: nil,
+            change_column: nil,
+            select_values: ['001-create-audit-logs'],
+            quote_schema_name: '"forest"',
+            quote_table_name: '"forest.audit_logs_migration"',
+            quote: "'x'"
+          )
+        end
+
+        before do
+          allow(connection).to receive(:execute) { |sql| executed << sql }
+          allow(connection).to receive(:transaction).and_yield
+        end
+
+        it 'creates the schema before taking the lock, so the migrations can see it' do
+          migrator.run
+
+          expect(executed.first).to eq('CREATE SCHEMA IF NOT EXISTS "forest"')
+        end
+
+        it 'runs the migrations under a transaction-scoped advisory lock' do
+          migrator.run
+
+          expect(connection).to have_received(:transaction)
+          expect(executed).to include('SELECT pg_advisory_xact_lock(17999, 21076)')
+        end
+
+        def raise_on_create_schema(message)
+          allow(connection).to receive(:execute) do |sql|
+            raise ActiveRecord::StatementInvalid, message if sql.include?('CREATE SCHEMA')
+
+            executed << sql
+          end
+        end
+
+        it 'tolerates another instance having created the schema concurrently' do
+          raise_on_create_schema('ERROR: schema "forest" already exists')
+
+          expect { migrator.run }.not_to raise_error
+          expect(executed).to include('SELECT pg_advisory_xact_lock(17999, 21076)')
+        end
+
+        it 'still reports a schema creation that failed for another reason' do
+          raise_on_create_schema('ERROR: permission denied for database')
+
+          expect { migrator.run }.to raise_error(ActiveRecord::StatementInvalid, /permission denied/)
+        end
+
+        it 'treats the unique violation on pg_namespace as a lost race' do
+          allow(connection).to receive(:execute) do |sql|
+            raise ActiveRecord::RecordNotUnique, 'duplicate key value' if sql.include?('CREATE SCHEMA')
+
+            executed << sql
+          end
+
+          expect { migrator.run }.not_to raise_error
+        end
+
+        # A message match alone would read "role ... already exists" as a lost race; the SQLSTATE does not.
+        context 'when the adapter exposes a SQLSTATE' do
+          def raise_with_sql_state(state, message)
+            stub_const('PG::Result', Class.new { const_set(:PG_DIAG_SQLSTATE, 67) }) unless defined?(PG::Result)
+            cause = double('PG::Error', result: double('result', error_field: state))
+            error = ActiveRecord::StatementInvalid.new(message)
+            allow(error).to receive(:cause).and_return(cause)
+
+            allow(connection).to receive(:execute) do |sql|
+              raise error if sql.include?('CREATE SCHEMA')
+
+              executed << sql
+            end
+          end
+
+          it 'accepts duplicate_schema' do
+            raise_with_sql_state('42P06', 'ERROR: schema "forest" already exists')
+
+            expect { migrator.run }.not_to raise_error
+          end
+
+          it 'falls back to the message when reading the SQLSTATE itself blows up' do
+            stub_const('PG::Result', Class.new { const_set(:PG_DIAG_SQLSTATE, 67) }) unless defined?(PG::Result)
+            cause = double('PG::Error')
+            allow(cause).to receive(:result).and_raise(StandardError, 'connection already closed')
+            error = ActiveRecord::StatementInvalid.new('ERROR: schema "forest" already exists')
+            allow(error).to receive(:cause).and_return(cause)
+            allow(connection).to receive(:execute) do |sql|
+              raise error if sql.include?('CREATE SCHEMA')
+
+              executed << sql
+            end
+
+            expect { migrator.run }.not_to raise_error
+          end
+
+          it 'reports anything else, however its message reads' do
+            raise_with_sql_state('42501', 'ERROR: permission denied, object already exists elsewhere')
+
+            expect { migrator.run }.to raise_error(ActiveRecord::StatementInvalid)
+          end
+        end
+
+        it 'skips migrations already applied to this table' do
+          migrator.run
+
+          expect(connection).not_to have_received(:create_table).with('forest.audit_logs', any_args)
+        end
+      end
+    end
+  end
+end

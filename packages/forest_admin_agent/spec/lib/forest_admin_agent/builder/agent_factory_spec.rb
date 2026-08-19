@@ -254,6 +254,53 @@ module ForestAdminAgent
           end
         end
 
+        describe 'audit trail' do
+          let(:instance) { described_class.instance }
+          let(:options) do
+            {
+              auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+              env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+              is_production: false,
+              schema_path: File.join('tmp', '.forestadmin-schema.json')
+            }
+          end
+          let(:audit_options) { { database: { adapter: 'sqlite3', database: ':memory:' } } }
+
+          before { allow(instance).to receive(:send_schema) }
+
+          it 'stays off when no audit trail database is configured' do
+            instance.setup(options)
+            allow(instance.customizer).to receive(:use)
+
+            instance.build
+
+            expect(instance.container.resolve(:config)[:audit_trail]).to be_nil
+            expect(instance.customizer).not_to have_received(:use)
+          end
+
+          it 'stays off when the audit trail option carries no database' do
+            instance.setup(options.merge(audit_trail: { redact: { 'users' => ['email'] } }))
+            allow(instance.customizer).to receive(:use)
+
+            instance.build
+
+            expect(instance.container.resolve(:config)[:audit_trail][:store]).to be_nil
+            expect(instance.customizer).not_to have_received(:use)
+          end
+
+          it 'builds the store from the configured database and installs the capture layer' do
+            instance.setup(options.merge(audit_trail: audit_options.merge(redact: { 'users' => ['email'] })))
+            allow(instance.customizer).to receive(:use)
+
+            instance.build
+
+            store = instance.container.resolve(:config)[:audit_trail][:store]
+            expect(store).to be_a(AuditTrail::Store)
+            expect(instance.customizer).to have_received(:use)
+              .with(AuditTrail::Capture, { store: store, redact: { 'users' => ['email'] } })
+          end
+        end
+
         describe 'generate_schema_only' do
           it 'generates schema and writes to default path' do
             instance = described_class.instance

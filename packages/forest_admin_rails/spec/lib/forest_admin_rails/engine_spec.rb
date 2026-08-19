@@ -272,6 +272,51 @@ module ForestAdminRails
     end
   end
 
+  RSpec.describe 'load_correlation_id' do
+    let(:engine_class) { ForestAdminRails::Engine }
+    let(:engine_instance) { engine_class.allocate }
+    # rubocop:disable RSpec/VerifiedDoubles
+    let(:engine_middleware) { double('engine middleware') }
+    let(:app_middleware) { double('application middleware') }
+    let(:application) { double('application', config: double('app config', middleware: app_middleware)) }
+    let(:engine_config) { double('engine config', middleware: engine_middleware) }
+    # rubocop:enable RSpec/VerifiedDoubles
+
+    before do
+      allow(engine_instance).to receive(:config).and_return(engine_config)
+      allow(Rails).to receive(:application).and_return(application)
+    end
+
+    # The application's stack, not the engine's: ShowExceptions lives there, and under the exception
+    # handlers the 500s they build would never carry the header.
+    it 'inserts the middleware ahead of the exception handlers of the application stack' do
+      allow(app_middleware).to receive(:insert_before)
+
+      engine_instance.load_correlation_id
+
+      expect(app_middleware).to have_received(:insert_before)
+        .with(ActionDispatch::ShowExceptions, ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+
+    it 'falls back to appending when the stack has no exception handler to insert before' do
+      allow(app_middleware).to receive(:insert_before).and_raise(RuntimeError, 'no such middleware')
+      allow(engine_middleware).to receive(:use)
+
+      engine_instance.load_correlation_id
+
+      expect(engine_middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+
+    it 'falls back to appending when there is no application to reach' do
+      allow(Rails).to receive(:application).and_return(nil)
+      allow(engine_middleware).to receive(:use)
+
+      engine_instance.load_correlation_id
+
+      expect(engine_middleware).to have_received(:use).with(ForestAdminAgent::Http::CorrelationIdMiddleware)
+    end
+  end
+
   RSpec.describe 'Engine autoload behaviour' do
     it 'does not register an initializer that adds the host lib/ to autoload_paths' do
       initializer_names = ForestAdminRails::Engine.initializers.map(&:name)
