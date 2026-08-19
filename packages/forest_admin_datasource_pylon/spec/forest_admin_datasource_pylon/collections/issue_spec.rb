@@ -352,6 +352,75 @@ module ForestAdminDatasourcePylon
         expect(ForestAdminDatasourcePylon.logger)
           .to have_received(:warn).with(/cannot honour on a custom field \(starts_with\)/)
       end
+
+      # The API reference documents what a custom field is, never the form its
+      # value is read back in. The column holds the form the agent gives a filter
+      # value of the same type, so the two stay comparable whichever one Pylon
+      # answered with.
+      describe 'the form a value is read in' do
+        def typed(type)
+          ForestAdminDatasourceToolkit::Schema::ColumnSchema
+            .new(column_type: type, filter_operators: [operators::EQUAL])
+        end
+
+        def entry(slug, value)
+          { slug => { 'slug' => slug, 'value' => value } }
+        end
+
+        def read(fields)
+          stub_request(:post, "#{base}/issues/search")
+            .to_return(json('data' => [issue_payload('i1', 'custom_fields' => fields)]))
+
+          collection.list(nil, filter, nil).first
+        end
+
+        let(:collection) do
+          described_class.new(datasource, custom_fields: [{ column_name: 'nps', schema: typed('Number') },
+                                                          { column_name: 'vip', schema: typed('Boolean') },
+                                                          { column_name: 'renewal', schema: typed('Dateonly') }])
+        end
+
+        [42, '42', 42.0, ' 42 '].each do |raw|
+          it "reads a number answered as #{raw.inspect} as the agent casts a number filter" do
+            expect(read(entry('nps', raw))['nps']).to be(42.0)
+          end
+        end
+
+        it 'reads a number it cannot make sense of as absent rather than as zero' do
+          expect(read(entry('nps', 'n/a'))['nps']).to be_nil
+        end
+
+        [[true, true], ['true', true], [false, false], ['false', false], ['0', false]].each do |raw, expected|
+          it "reads a boolean answered as #{raw.inspect} as #{expected}" do
+            expect(read(entry('vip', raw))['vip']).to be(expected)
+          end
+        end
+
+        it 'reads an empty boolean as absent, false being an answer of its own' do
+          expect(read(entry('vip', ''))['vip']).to be_nil
+        end
+
+        it 'leaves a date the ISO string the filter is compared with' do
+          expect(read(entry('renewal', '2026-08-01'))['renewal']).to eq('2026-08-01')
+        end
+
+        it 'leaves a field the issue does not carry absent' do
+          expect(read({})).to include('nps' => nil, 'vip' => nil, 'renewal' => nil)
+        end
+
+        # The one place the form decides the result: an id filter is answered by
+        # `GET /issues/{id}` and the rest is applied in memory, so a number left
+        # as `"42"` would be compared with the `42.0` the agent casts the filter
+        # to, and the row would be dropped without a word.
+        it 'keeps a row matched on a number combined with an id lookup' do
+          stub_request(:get, "#{base}/issues/i1")
+            .to_return(json('data' => issue_payload('i1', 'custom_fields' => entry('nps', '42'))))
+          tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('nps', operators::EQUAL, 42.0)])
+
+          expect(collection.list(nil, filter(condition_tree: tree), %w[id nps]))
+            .to eq([{ 'id' => 'i1', 'nps' => 42.0 }])
+        end
+      end
     end
 
     describe '#list with a filter' do
