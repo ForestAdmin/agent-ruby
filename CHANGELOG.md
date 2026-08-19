@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.3...v1.39.0) (2026-08-19)
+
+
+### Features
+
+* **audit_trail:** record and expose record history in the agent, gated on an audit database ([#320](https://github.com/ForestAdmin/agent-ruby/issues/320)) ([dcfb13c](https://github.com/ForestAdmin/agent-ruby/commit/dcfb13ce6af90664deaae723f13c0a769c23066a))
+
 ## [1.38.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.2...v1.38.3) (2026-08-14)
 
 
