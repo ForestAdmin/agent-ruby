@@ -15,6 +15,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       BUNDLE_PATH: /tmp/bundle
     strategy:
@@ -39,9 +40,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The Azure mirror the runner image points at stalls intermittently, and apt's
+      # own Acquire timeouts bound a single connection, not a whole fetch.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
-        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev
+        timeout-minutes: 8
+        run: |
+          sudo timeout -k 30 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+            echo 'apt-get update incomplete; continuing with the lists on the image'
+          sudo DEBIAN_FRONTEND=noninteractive timeout -k 30 240 apt-get install -y \
+            --no-install-recommends -o Acquire::Retries=1 -o Acquire::http::Timeout=10 unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
@@ -60,6 +68,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [lint]
     env:
       BUNDLE_PATH: /tmp/bundle
@@ -87,9 +96,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The Azure mirror the runner image points at stalls intermittently, and apt's
+      # own Acquire timeouts bound a single connection, not a whole fetch.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
-        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev
+        timeout-minutes: 8
+        run: |
+          sudo timeout -k 30 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+            echo 'apt-get update incomplete; continuing with the lists on the image'
+          sudo DEBIAN_FRONTEND=noninteractive timeout -k 30 240 apt-get install -y \
+            --no-install-recommends -o Acquire::Retries=1 -o Acquire::http::Timeout=10 unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
@@ -127,6 +143,7 @@ jobs:
   coverage:
     name: Send Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [test]
     strategy:
       matrix:
