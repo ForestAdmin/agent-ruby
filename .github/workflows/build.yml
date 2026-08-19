@@ -40,12 +40,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # `unixodbc-dev` is not on the runner image, and the Azure mirror the image
-      # points at is intermittently unreachable -- during the index refresh and
-      # during the package fetch alike. apt's own timeouts bound a single
-      # connection rather than a whole fetch, so both commands are bounded from the
-      # outside. Refreshing the lists is best effort: the image carries usable
-      # ones, and only the install has to succeed.
+      # The Azure mirror the runner image points at stalls intermittently, and apt's
+      # own Acquire timeouts bound a single connection, not a whole fetch.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
@@ -101,12 +97,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # `unixodbc-dev` is not on the runner image, and the Azure mirror the image
-      # points at is intermittently unreachable -- during the index refresh and
-      # during the package fetch alike. apt's own timeouts bound a single
-      # connection rather than a whole fetch, so both commands are bounded from the
-      # outside. Refreshing the lists is best effort: the image carries usable
-      # ones, and only the install has to succeed.
+      # The Azure mirror the runner image points at stalls intermittently, and apt's
+      # own Acquire timeouts bound a single connection, not a whole fetch.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
