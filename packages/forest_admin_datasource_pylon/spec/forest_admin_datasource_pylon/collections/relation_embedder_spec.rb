@@ -80,6 +80,8 @@ module ForestAdminDatasourcePylon
     let(:contacts) { datasource.get_collection('PylonContact') }
     let(:base) { datasource.configuration.url }
 
+    before { stub_custom_fields }
+
     describe 'what the projection asks for' do
       before { stub_issues(issue_payload('i1')) }
 

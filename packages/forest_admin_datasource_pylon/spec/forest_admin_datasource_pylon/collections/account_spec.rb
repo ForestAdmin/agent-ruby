@@ -57,6 +57,8 @@ module ForestAdminDatasourcePylon
     let(:base) { datasource.configuration.url }
     let(:operators) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators }
 
+    before { stub_custom_fields }
+
     def stub_list(query, payload)
       stub_request(:get, "#{base}/accounts").with(query: query).to_return(json(payload))
     end
