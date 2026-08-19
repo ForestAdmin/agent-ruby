@@ -83,12 +83,19 @@ module ForestAdminDatasourcePylon
           .to eq(['String'])
       end
 
-      # Writes land in a later story; the order is honoured in memory over the
-      # complete dataset, so every scalar column can be sorted on.
-      it 'declares every column read-only and every scalar column sortable' do
-        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+      # The order is honoured in memory over the complete dataset, so every
+      # scalar column can be sorted on.
+      it 'declares every scalar column sortable' do
         expect(columns.except('emails').values.map(&:is_sortable).uniq).to eq([true])
         expect(collection.fields['emails'].is_sortable).to be(false)
+      end
+
+      # PATCH /users/{id} takes these four and nothing else: an address is
+      # proven by the agent signing in, and the deactivation happens in Pylon.
+      it 'declares writable exactly the columns the update endpoint takes' do
+        writable = columns.reject { |_name, column| column.is_read_only }.keys
+
+        expect(writable).to contain_exactly('name', 'avatar_url', 'status', 'role_id')
       end
 
       # GET /users carries no search parameter, and Pylon exposes no count.

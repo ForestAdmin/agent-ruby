@@ -162,17 +162,33 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
     end
   end
 
-  # Writes land in story 7 (EXT-11), which is also where Pylon's own
-  # `is_read_only` starts being honoured; no endpoint sorts, ever.
+  # No endpoint sorts, ever; read-only is Pylon's own call, which it makes for
+  # the fields an app or an integration syncs.
   describe 'the schema every custom field gets' do
-    it 'is read-only and unsortable, whatever Pylon declares' do
+    it 'is unsortable, and read-only when Pylon says so' do
       allow(client).to receive(:fetch_custom_fields).with('issue')
-                                                    .and_return([definition('text', 'is_read_only' => false)])
+                                                    .and_return([definition('text', 'is_read_only' => true)])
 
       schema = introspector.issue_custom_fields.first[:schema]
 
       expect(schema.is_read_only).to be(true)
       expect(schema.is_sortable).to be(false)
+    end
+
+    it 'is writable when Pylon declares the field editable' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('text', 'is_read_only' => false)])
+
+      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(false)
+    end
+
+    # Anything other than a true flag reads as editable, which is what a
+    # definition predating the flag is.
+    it 'is writable when Pylon declares nothing' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('text', 'is_read_only' => nil)])
+
+      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(false)
     end
 
     # `ColumnSchema` defaults this one to true, and the capabilities route turns
@@ -192,8 +208,20 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
       allow(client).to receive(:fetch_custom_fields).with('issue')
                                                     .and_return([definition('text', slug: 'sev_level')])
 
-      expect(introspector.issue_custom_fields.first.keys).to eq(%i[column_name schema])
+      expect(introspector.issue_custom_fields.first.keys).to eq(%i[column_name schema multi_value])
       expect(introspector.issue_custom_fields.first[:column_name]).to eq('sev_level')
+    end
+
+    # Pylon writes a multiselect back through `values` and every other type
+    # through `value`, so the payload builder is told which one this is rather
+    # than guessing it from the Json column type.
+    it 'flags a multiselect as multi-valued, and nothing else' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('multiselect', **select_metadata('p1')),
+                                                                 definition('select', **select_metadata('p1')),
+                                                                 definition('text')])
+
+      expect(introspector.issue_custom_fields.map { |cf| cf[:multi_value] }).to eq([true, false, false])
     end
   end
 end

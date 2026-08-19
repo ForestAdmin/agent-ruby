@@ -125,11 +125,6 @@ module ForestAdminDatasourcePylon
 
         []
       end
-
-      # The search box sends an empty string once the operator clears it.
-      def no_search?(filter)
-        filter.search.to_s.strip.empty?
-      end
     end
   end
 end

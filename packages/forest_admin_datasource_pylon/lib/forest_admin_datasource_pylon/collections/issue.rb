@@ -46,6 +46,15 @@ module ForestAdminDatasourcePylon
       # that would let this cap grow.
       MAX_MESSAGE_EMBEDS = 10
 
+      # `body_html` is the first message of the thread, which `POST /issues`
+      # requires and `PATCH /issues/{id}` does not carry; `author_unverified`
+      # qualifies that message and travels with it.
+      CREATE_ONLY = %w[body_html author_unverified].freeze
+
+      # Pylon creates every issue as `new`, of the type it decides, and takes
+      # both on an update only.
+      UPDATE_ONLY = %w[state type].freeze
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonIssue', custom_fields: custom_fields, searchable: true)
       end
@@ -61,6 +70,19 @@ module ForestAdminDatasourcePylon
       protected
 
       def filter_table = ApiFilters
+
+      def create_record(payload) = datasource.client.create_issue(payload)
+      def update_record(id, payload) = datasource.client.update_issue(id, payload)
+      def delete_record(id) = datasource.client.delete_issue(id)
+
+      def create_only_fields = CREATE_ONLY
+      def update_only_fields = UPDATE_ONLY
+
+      # Never past the primary-key fan-out: a write resolving its ids through
+      # `list` goes through `fetch_by_ids`, which truncates with a warning, and
+      # a truncated resolution would write to a subset of the selection while
+      # reporting the whole of it.
+      def max_write_targets = [Writes::MAX_WRITE_TARGETS, MAX_ID_LOOKUPS].min
 
       def sortable_fields
         PYLON_SORTABLE

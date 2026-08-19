@@ -1,11 +1,13 @@
 module ForestAdminDatasourcePylon
   module Collections
     class Issue < BaseCollection
-      # Every column is read-only in this story: writes land in a later one. No
-      # column is sortable either — `/issues/search` exposes no sort parameter at
-      # all, results always come back ordered by `created_at` descending, so
-      # advertising a sortable column would let the UI ask for an order the API
-      # cannot honour.
+      # A column is writable when `POST /issues` or `PATCH /issues/{id}` accepts
+      # it, the two directions being told apart by `Issue::CREATE_ONLY` and
+      # `Issue::UPDATE_ONLY`; everything Pylon computes — the number, the link,
+      # the timestamps, the counters — stays read-only. No column is sortable,
+      # `/issues/search` exposing no sort parameter at all: results always come
+      # back ordered by `created_at` descending, so advertising a sortable column
+      # would let the UI ask for an order the API cannot honour.
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
@@ -57,16 +59,20 @@ module ForestAdminDatasourcePylon
         end
 
         def define_content_fields
-          add_column('title', 'String')
-          add_column('body_html', 'String')
+          add_column('title', 'String', writable: true)
+          # Writable on creation only: it is the first message of the thread,
+          # which `PATCH /issues/{id}` does not carry.
+          add_column('body_html', 'String', writable: true)
           # Left as String rather than Enum: Pylon ships five built-in states
-          # but organisations define their own on top of them.
-          add_column('state', 'String')
-          add_column('type', 'String')
+          # but organisations define their own on top of them. Writable on an
+          # update only — every issue is created `new`.
+          add_column('state', 'String', writable: true)
+          add_column('type', 'String', writable: true)
+          # Where the issue came from: Pylon sets it, no endpoint takes it.
           add_column('source', 'String')
-          add_column('tags', 'Json')
-          add_column('customer_portal_visible', 'Boolean')
-          add_column('author_unverified', 'Boolean')
+          add_column('tags', 'Json', writable: true)
+          add_column('customer_portal_visible', 'Boolean', writable: true)
+          add_column('author_unverified', 'Boolean', writable: true)
           add_column('number_of_touches', 'Number')
           define_thread_field
         end
@@ -90,8 +96,17 @@ module ForestAdminDatasourcePylon
         # Flattened from the nested `{id: …}` objects Pylon returns, and kept as
         # columns next to the relations they are the keys of: they are what the
         # search endpoint filters, on this side and on the reverse one.
+        #
+        # Writable, although the schema the agent sends Forest marks a foreign
+        # key read-only whatever the datasource says — `GeneratorField` forces it
+        # so the detail view has one editor per key rather than two. What the
+        # flag opens is that editor, the `BelongsTo` reading its own read-only
+        # state off the key column, and the front sends the choice back as the
+        # very column named here.
         def define_party_fields
-          %w[account_id requester_id assignee_id team_id].each { |field| add_column(field, 'String') }
+          %w[account_id requester_id assignee_id team_id].each do |field|
+            add_column(field, 'String', writable: true)
+          end
         end
 
         def define_time_fields

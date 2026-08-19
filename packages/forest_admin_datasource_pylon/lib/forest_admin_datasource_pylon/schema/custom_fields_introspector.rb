@@ -1,8 +1,9 @@
 module ForestAdminDatasourcePylon
   module Schema
     # Turns the custom fields an organization defined in Pylon into columns, as
-    # entries shaped `{ column_name:, schema: }` — what `add_custom_fields`
-    # registers on a collection.
+    # entries shaped `{ column_name:, schema:, multi_value: }` — what
+    # `add_custom_fields` registers on a collection, and what the payload
+    # builder writes a value back through.
     #
     # `column_name` is the Pylon slug verbatim, and there is no second key
     # carrying it: the slug is both what a read payload indexes the values by and
@@ -37,6 +38,9 @@ module ForestAdminDatasourcePylon
         'select' => 'Enum',
         'multiselect' => 'Json'
       }.freeze
+
+      # The types Pylon writes back through `values` rather than `value`.
+      MULTI_VALUE_TYPES = %w[multiselect].freeze
 
       BASE_OPS = (Maps::EQUALITY.keys + Maps::PRESENCE.keys).freeze
 
@@ -97,19 +101,20 @@ module ForestAdminDatasourcePylon
         column_type = PYLON_TO_COLUMN_TYPE[raw['type']]
         return warn_unknown_type(raw, slug, object_type) if column_type.nil?
 
-        { column_name: slug, schema: build_schema(raw, column_type) }
+        { column_name: slug, schema: build_schema(raw, column_type),
+          multi_value: MULTI_VALUE_TYPES.include?(raw['type']) }
       end
 
-      # Every custom field is read-only in this story, like every native column:
-      # writes land in story 7 (EXT-11), which is also where Pylon's own
-      # `is_read_only` flag starts being honoured. Nothing is sortable either --
-      # no Pylon endpoint takes a sort parameter, and nothing is groupable, as
-      # Pylon aggregates nothing: one column left groupable turns `supportGroups`
-      # on for the whole collection, and the group-by the UI then offers errors.
+      # A custom field is writable unless Pylon says otherwise: it flags the ones
+      # synced from an app or an integration, which its own endpoints refuse.
+      # Nothing is sortable -- no Pylon endpoint takes a sort parameter -- and
+      # nothing is groupable, as Pylon aggregates nothing: one column left
+      # groupable turns `supportGroups` on for the whole collection, and the
+      # group-by the UI then offers errors.
       def build_schema(raw, column_type)
         opts = { column_type: column_type,
                  filter_operators: OPERATORS.fetch(column_type, []),
-                 is_read_only: true,
+                 is_read_only: raw['is_read_only'] == true,
                  is_sortable: false,
                  is_groupable: false }
 

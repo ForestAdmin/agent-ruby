@@ -9,6 +9,11 @@ module ForestAdminDatasourcePylon
 
       protected
 
+      # Pylon exposes no POST and no DELETE on a user — an agent is invited and
+      # deactivated from Pylon itself — so only the update hook is wired and the
+      # other two refuse the verb with a message rather than a 500.
+      def update_record(id, payload) = datasource.client.update_user(id, payload)
+
       # `include_deactivated` is left at the client default of true on purpose:
       # a deactivated agent stays the assignee and the author of the issues they
       # handled, and a record the rest of the panel points at has to stay
@@ -42,19 +47,22 @@ module ForestAdminDatasourcePylon
                                                          origin_key: 'assignee_id', origin_key_target: 'id'))
       end
 
+      # `PATCH /users/{id}` takes the name, the avatar, the role and the status,
+      # and nothing else: an address is proven by the agent signing in, and the
+      # deactivation happens in Pylon.
       def define_schema
         add_column('id', 'String', is_primary_key: true)
-        add_column('name', 'String')
+        add_column('name', 'String', writable: true)
         add_column('email', 'String')
         # The other addresses of the same agent: a list, so it is neither
         # filterable nor sortable. `email` carries the primary one.
         add_column('emails', 'Json')
-        add_column('avatar_url', 'String')
+        add_column('avatar_url', 'String', writable: true)
         # Left as String rather than Enum: Pylon documents active / away /
         # out_of_office on the update endpoint, but does not promise the read
         # side is limited to them.
-        add_column('status', 'String')
-        add_column('role_id', 'String')
+        add_column('status', 'String', writable: true)
+        add_column('role_id', 'String', writable: true)
         add_column('role_name', 'String')
         add_column('is_deactivated', 'Boolean')
       end

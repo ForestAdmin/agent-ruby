@@ -1,6 +1,8 @@
 module ForestAdminDatasourcePylon
   module Collections
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
+      include Writes
+
       ColumnSchema         = ForestAdminDatasourceToolkit::Schema::ColumnSchema
       ManyToOneSchema      = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       OneToManySchema      = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
@@ -198,18 +200,19 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      # A native column: read-only in this story — writes land in a later one —
-      # and never groupable, as no Pylon endpoint aggregates. It is not sortable
+      # A native column: read-only unless the collection declares it `writable`,
+      # which is what the payload builder reads to know a column may be sent, and
+      # never groupable, as no Pylon endpoint aggregates. It is not sortable
       # either, the ColumnSchema default, because no search endpoint takes a sort
       # parameter. Filter operators are not chosen here: they come from
       # `filter_table`, which mirrors the allow-list of the API, so a column
       # missing from it gets none and the UI offers no filter Pylon would refuse.
-      def add_column(name, type, is_primary_key: false)
+      def add_column(name, type, is_primary_key: false, writable: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: filter_table.forest_operators(name),
                                          is_primary_key: is_primary_key,
                                          is_groupable: false,
-                                         is_read_only: true))
+                                         is_read_only: !writable))
       end
 
       # A record read through the endpoint of an id that is not the primary key
@@ -260,6 +263,11 @@ module ForestAdminDatasourcePylon
       # order by presence alone.
       def default_pk_sort?(sort)
         normalized_sort_clauses(sort) == normalized_sort_clauses(SortFactory.by_primary_keys(self))
+      end
+
+      # The search box sends an empty string once the operator clears it.
+      def no_search?(filter)
+        filter&.search.to_s.strip.empty?
       end
 
       def timezone_for(caller)

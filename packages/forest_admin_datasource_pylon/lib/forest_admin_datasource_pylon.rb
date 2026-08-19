@@ -20,6 +20,13 @@ module ForestAdminDatasourcePylon
   # they learn which one.
   class UnsupportedOperatorError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
+  # A write Pylon cannot perform: a verb its API has no endpoint for, a field it
+  # only accepts in the other direction, or a filter-driven write reaching more
+  # records than one page of writes may cover. Descends from ValidationError for
+  # the same reason as above — each names something the operator did and can
+  # undo, and the message is the only place they learn what.
+  class UnsupportedWriteError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
+
   # Raised when a Pylon API call fails. Carries the HTTP status and the
   # (parsed) response body so callers — smart actions in particular — can
   # surface Pylon's own validation message instead of a generic string.

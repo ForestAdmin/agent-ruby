@@ -76,18 +76,19 @@ module ForestAdminDatasourcePylon
 
       protected
 
-      # Every column is read-only in this story: writes land in a later one.
-      # Scalar columns are sortable and groupable because the in-memory sort and
-      # aggregation honour anything asked of them; a Json column is none of the
-      # three, as it holds a list whose Pylon semantics have no in-memory
-      # counterpart — the same reason the primary-key residual guard refuses one.
-      def add_column(name, type, is_primary_key: false)
+      # A column is read-only unless the collection declares it `writable`, which
+      # is what the payload builder reads to know it may be sent. Scalar columns
+      # are sortable and groupable because the in-memory sort and aggregation
+      # honour anything asked of them; a Json column is none of the three, as it
+      # holds a list whose Pylon semantics have no in-memory counterpart — the
+      # same reason the primary-key residual guard refuses one.
+      def add_column(name, type, is_primary_key: false, writable: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: self.class.operators_for(type),
                                          is_primary_key: is_primary_key,
                                          is_sortable: type != 'Json',
                                          is_groupable: type != 'Json',
-                                         is_read_only: true))
+                                         is_read_only: !writable))
       end
 
       # Pylon defines custom fields on issues, accounts and contacts only, so

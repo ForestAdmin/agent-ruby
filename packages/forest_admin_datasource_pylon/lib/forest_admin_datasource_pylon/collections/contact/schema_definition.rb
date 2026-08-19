@@ -1,10 +1,12 @@
 module ForestAdminDatasourcePylon
   module Collections
     class Contact < CursorCollection
-      # Every column is read-only in this story: writes land in a later one. No
-      # column is sortable either — neither `GET /contacts` nor
-      # `POST /contacts/search` exposes a sort parameter, so advertising a
-      # sortable column would let the UI ask for an order the API cannot honour.
+      # A column is writable when `POST /contacts` or `PATCH /contacts/{id}`
+      # accepts it, in the shape it is read under — the Json columns holding
+      # objects rather than plain strings are left read-only, see below. No
+      # column is sortable — neither `GET /contacts` nor `POST /contacts/search`
+      # exposes a sort parameter, so advertising a sortable column would let the
+      # UI ask for an order the API cannot honour.
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
@@ -41,11 +43,13 @@ module ForestAdminDatasourcePylon
 
         def define_identity_fields
           add_column('id', 'String', is_primary_key: true)
-          add_column('name', 'String')
+          add_column('name', 'String', writable: true)
           # Flattened from the nested `{ id: ..., external_ids: ... }` object
           # Pylon returns, and kept as a column next to the `account` relation
-          # it is the key of: the search endpoint filters it.
-          add_column('account_id', 'String')
+          # it is the key of: the search endpoint filters it. Writable, which is
+          # what opens the relation editor — see the party fields of PylonIssue
+          # for why the key itself stays read-only in the Forest schema.
+          add_column('account_id', 'String', writable: true)
           # Read-only Json, and deliberately unfilterable although the search
           # endpoint does not offer it either: the API matches bare external-id
           # strings while the column shows `{external_id, label}` objects, so a
@@ -55,20 +59,27 @@ module ForestAdminDatasourcePylon
 
         # `email` and `primary_phone_number` carry the primary value; the lists
         # hold every address and number, and neither list is filterable.
+        #
+        # `emails` is writable on an update only, `POST /contacts` taking the
+        # primary address alone. `phone_numbers` is not writable at all: it
+        # holds objects, and the shape the endpoint takes them in is not the one
+        # the column shows.
         def define_contact_fields
-          add_column('email', 'String')
-          add_column('emails', 'Json')
-          add_column('primary_phone_number', 'String')
+          add_column('email', 'String', writable: true)
+          add_column('emails', 'Json', writable: true)
+          add_column('primary_phone_number', 'String', writable: true)
           add_column('phone_numbers', 'Json')
-          add_column('avatar_url', 'String')
+          add_column('avatar_url', 'String', writable: true)
         end
 
         def define_portal_fields
           # Left as String rather than Enum: Pylon documents no_access / member
           # / admin, but an organization can define its own portal roles, which
           # is what `portal_role_id` points at.
-          add_column('portal_role', 'String')
-          add_column('portal_role_id', 'String')
+          add_column('portal_role', 'String', writable: true)
+          add_column('portal_role_id', 'String', writable: true)
+          # Owned by the integrations the contact was seen through; no endpoint
+          # takes it.
           add_column('integration_user_ids', 'Json')
         end
       end
