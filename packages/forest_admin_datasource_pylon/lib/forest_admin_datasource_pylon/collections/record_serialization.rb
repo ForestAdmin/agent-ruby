@@ -26,12 +26,11 @@ module ForestAdminDatasourcePylon
       end
 
       # The API reference documents what a custom field *is*, never the form its
-      # value is read back in, so a Number answering `"42"` is not ruled out. The
-      # value therefore takes the form the agent gives a filter value of the same
-      # type -- `ConditionTreeParser.cast_to_type` casts a Number with `to_f` and
-      # a Boolean into a real boolean -- so the in-memory pass of the primary-key
-      # short-circuit compares two comparable values whichever form came back,
-      # rather than dropping the row on `"42" == 42.0`.
+      # value is read back in, so a Number answering `"42"` is not ruled out. A
+      # value that is not already of its column's type is therefore converted --
+      # the in-memory pass of the primary-key short-circuit would otherwise drop
+      # a row on `"42" == 42.0`, comparing a read string with the float
+      # `ConditionTreeParser.cast_to_type` casts the filter to.
       #
       # A date stays the string it is: the filter carries an ISO8601 string too,
       # and comparing two of those is the ordering itself.
@@ -39,14 +38,32 @@ module ForestAdminDatasourcePylon
         return nil if value.nil?
 
         case column_type
-        when 'Number'  then Float(value, exception: false)
+        when 'Number'  then coerce_number(value)
         when 'Boolean' then coerce_boolean(value)
         else                value
         end
       end
 
-      # A number that cannot be read reads as absent rather than as zero, and so
-      # does an empty boolean: `false` is an answer, and Pylon gave none.
+      # A value already numeric is handed back untouched: `ConditionTreeLeaf#match`
+      # compares with `==` and `Array#include?`, both of which hold across Integer
+      # and Float, so nothing needs widening -- and widening would make an integer
+      # field display the `12.0` it does not hold, where `FilterValue#format_float`
+      # narrows the very same value on the way out. A string is read to the
+      # tightest form for that reason, the two halves agreeing on what an integer
+      # looks like.
+      #
+      # A number that cannot be read reads as absent rather than as zero.
+      def coerce_number(value)
+        return value if value.is_a?(Numeric)
+
+        float = Float(value, exception: false)
+        return nil if float.nil?
+
+        float == float.to_i ? float.to_i : float
+      end
+
+      # An empty boolean reads as absent as well: `false` is an answer of its own,
+      # and Pylon gave none.
       def coerce_boolean(value)
         return value if [true, false].include?(value)
         return nil if value.to_s.strip.empty?

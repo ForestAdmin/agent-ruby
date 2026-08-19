@@ -380,9 +380,14 @@ module ForestAdminDatasourcePylon
                                                           { column_name: 'renewal', schema: typed('Dateonly') }])
         end
 
-        [42, '42', 42.0, ' 42 '].each do |raw|
-          it "reads a number answered as #{raw.inspect} as the agent casts a number filter" do
-            expect(read(entry('nps', raw))['nps']).to be(42.0)
+        # A value already numeric keeps its own form: widening `42` into `42.0`
+        # would display a decimal the field does not hold, where the wire half
+        # narrows the same value back. A string is read to the tightest form, so
+        # both halves agree on what an integer looks like.
+        [[42, 42], ['42', 42], [' 42 ', 42], [42.0, 42.0], [42.5, 42.5], ['42.5', 42.5],
+         ['42.0', 42]].each do |raw, expected|
+          it "reads a number answered as #{raw.inspect} as #{expected.inspect}" do
+            expect(read(entry('nps', raw))['nps']).to eql(expected)
           end
         end
 
@@ -411,14 +416,26 @@ module ForestAdminDatasourcePylon
         # The one place the form decides the result: an id filter is answered by
         # `GET /issues/{id}` and the rest is applied in memory, so a number left
         # as `"42"` would be compared with the `42.0` the agent casts the filter
-        # to, and the row would be dropped without a word.
+        # to, and the row would be dropped without a word. Reading it as the
+        # Integer `42` is enough -- `match` compares with `==`.
         it 'keeps a row matched on a number combined with an id lookup' do
           stub_request(:get, "#{base}/issues/i1")
             .to_return(json('data' => issue_payload('i1', 'custom_fields' => entry('nps', '42'))))
           tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('nps', operators::EQUAL, 42.0)])
 
           expect(collection.list(nil, filter(condition_tree: tree), %w[id nps]))
-            .to eq([{ 'id' => 'i1', 'nps' => 42.0 }])
+            .to eq([{ 'id' => 'i1', 'nps' => 42 }])
+        end
+
+        # The same row, matched through a membership filter: `Array#include?`
+        # compares with `==` too, so the Integer read answers the float list.
+        it 'keeps a row matched on a number list combined with an id lookup' do
+          stub_request(:get, "#{base}/issues/i1")
+            .to_return(json('data' => issue_payload('i1', 'custom_fields' => entry('nps', '42'))))
+          tree = branch('And', [id_leaf(operators::EQUAL, 'i1'), leaf('nps', operators::IN, [42.0, 7.0])])
+
+          expect(collection.list(nil, filter(condition_tree: tree), %w[id nps]))
+            .to eq([{ 'id' => 'i1', 'nps' => 42 }])
         end
       end
     end
