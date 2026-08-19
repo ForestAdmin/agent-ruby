@@ -41,24 +41,29 @@ jobs:
         uses: actions/checkout@v4
 
       # `unixodbc-dev` is not on the runner image, and the Azure mirror the image
-      # points at is intermittently unreachable: bounded, then retried against the
-      # canonical archive rather than stalling every step it gates.
+      # points at is intermittently unreachable. apt's own timeouts bound a single
+      # connection, not the walk over two dozen index files, so the bound comes
+      # from `timeout` -- and refreshing the lists is best effort, since only the
+      # install has to succeed.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          apt_install() {
-            sudo apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=15 &&
-            sudo apt-get install -y --no-install-recommends unixodbc-dev
+          apt_update() {
+            sudo timeout 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+              echo 'apt-get update incomplete; continuing with the lists on the image'
           }
-          apt_install && exit 0
 
-          echo 'Azure mirror unreachable; retrying against archive.ubuntu.com'
+          apt_update
+          sudo apt-get install -y --no-install-recommends unixodbc-dev && exit 0
+
+          echo 'Install failed; falling back to archive.ubuntu.com'
           sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' \
             /etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources || true
-          apt_install
+          apt_update
+          sudo apt-get install -y --no-install-recommends unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
@@ -107,24 +112,29 @@ jobs:
         uses: actions/checkout@v4
 
       # `unixodbc-dev` is not on the runner image, and the Azure mirror the image
-      # points at is intermittently unreachable: bounded, then retried against the
-      # canonical archive rather than stalling every step it gates.
+      # points at is intermittently unreachable. apt's own timeouts bound a single
+      # connection, not the walk over two dozen index files, so the bound comes
+      # from `timeout` -- and refreshing the lists is best effort, since only the
+      # install has to succeed.
       - name: Install unixODBC headers for ruby-odbc
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          apt_install() {
-            sudo apt-get update -o Acquire::Retries=2 -o Acquire::http::Timeout=15 &&
-            sudo apt-get install -y --no-install-recommends unixodbc-dev
+          apt_update() {
+            sudo timeout 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+              echo 'apt-get update incomplete; continuing with the lists on the image'
           }
-          apt_install && exit 0
 
-          echo 'Azure mirror unreachable; retrying against archive.ubuntu.com'
+          apt_update
+          sudo apt-get install -y --no-install-recommends unixodbc-dev && exit 0
+
+          echo 'Install failed; falling back to archive.ubuntu.com'
           sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' \
             /etc/apt/apt-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources || true
-          apt_install
+          apt_update
+          sudo apt-get install -y --no-install-recommends unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
         uses: ruby/setup-ruby@v1
