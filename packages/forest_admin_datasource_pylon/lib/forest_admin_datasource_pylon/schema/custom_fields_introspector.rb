@@ -40,11 +40,21 @@ module ForestAdminDatasourcePylon
 
       BASE_OPS = (Maps::EQUALITY.keys + Maps::PRESENCE.keys).freeze
 
-      # A date drops the membership operators on the way: `Rules` grants a DATE or
-      # a DATEONLY column no array operator, so `ConditionTreeValidator` refuses
-      # an `in` on one before the translator ever sees it -- the hazard already
-      # documented for MEMBERSHIP in `operator_maps.rb`. Native date columns
-      # declare the comparisons alone for the same reason.
+      # A date drops the membership operators on the way, `Rules` granting a DATE
+      # or a DATEONLY column no array operator -- the hazard already documented
+      # for MEMBERSHIP in `operator_maps.rb`. Native date columns declare the
+      # comparisons alone for the same reason.
+      #
+      # Dropping them is not what keeps `in` out of the UI, though, and nothing
+      # here can: `OperatorsEquivalenceCollectionDecorator` republishes it from
+      # the `equal` this set declares, the IN transform depending on EQUAL for
+      # every column type. A DATEONLY also gets `after_x_hours_ago` /
+      # `before_x_hours_ago` republished from the comparisons, `Times.compare`
+      # deriving them for that type where `Rules` refuses them. The validator
+      # then rejects all three, so the operator is offered a date filter the
+      # agent answers with a 400. The contradiction is the toolkit's to settle
+      # and is tracked as PRD-989; the set below is what Pylon accepts, which is
+      # the only question this table can answer.
       TIME_OPS = (BASE_OPS - Maps::MEMBERSHIP.keys + Maps::TIME.keys).freeze
 
       # Drawn from `CUSTOM_FIELD_OPS`, the set every search endpoint accepts on a
