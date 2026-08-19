@@ -50,9 +50,9 @@ jobs:
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
         run: |
-          sudo timeout 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+          sudo timeout -k 30 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
             echo 'apt-get update incomplete; continuing with the lists on the image'
-          sudo DEBIAN_FRONTEND=noninteractive timeout 240 apt-get install -y \
+          sudo DEBIAN_FRONTEND=noninteractive timeout -k 30 240 apt-get install -y \
             --no-install-recommends -o Acquire::Retries=1 -o Acquire::http::Timeout=10 unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
@@ -111,9 +111,9 @@ jobs:
         if: ${{ matrix.packages == 'forest_admin_datasource_snowflake' }}
         timeout-minutes: 8
         run: |
-          sudo timeout 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
+          sudo timeout -k 30 90 apt-get update -o Acquire::Retries=1 -o Acquire::http::Timeout=10 ||
             echo 'apt-get update incomplete; continuing with the lists on the image'
-          sudo DEBIAN_FRONTEND=noninteractive timeout 240 apt-get install -y \
+          sudo DEBIAN_FRONTEND=noninteractive timeout -k 30 240 apt-get install -y \
             --no-install-recommends -o Acquire::Retries=1 -o Acquire::http::Timeout=10 unixodbc-dev
 
       - name: Set up Ruby ${{ matrix.ruby-version }}
