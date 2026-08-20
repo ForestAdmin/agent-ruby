@@ -1,3 +1,10 @@
+## [1.39.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.0...v1.39.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **agent:** stop the update route from writing foreign keys from relationships ([#363](https://github.com/ForestAdmin/agent-ruby/issues/363)) ([6f91d9a](https://github.com/ForestAdmin/agent-ruby/commit/6f91d9a4674c7bbc1a63b70c76a2e1c0d1f48e0c))
+
 # [1.39.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.3...v1.39.0) (2026-08-19)
 
 
