@@ -89,7 +89,7 @@ module ForestAdminAgent
                               )
                             end
 
-            polymorphic_type = context.child_collection.name.gsub('__', '::')
+            polymorphic_type = context.child_collection&.name&.gsub('__', '::')
             context.collection.update(
               context.caller,
               scoped_fk_owner_filter(parent_primary_key_values, context),
