@@ -354,9 +354,13 @@ module ForestAdminDatasourcePylon
       # An `id` the short-circuit could not take out of the tree has no
       # translation left: the endpoint filters no id server-side, and an id under
       # an OR cannot be narrowed to a lookup because the other side of the union
-      # would bring in records the lookup never fetched. The UI does offer both
-      # an `id equals` filter and the or/and toggle, so this is worth an error an
-      # operator can act on rather than the translator's "add it to api_filters".
+      # would bring in records the lookup never fetched. Worth an error an
+      # operator can act on rather than the translator's "add it to api_filters",
+      # because two things they do reach it: the `id equals` filter next to the
+      # or/and toggle, and — through the write path — an excluding selection,
+      # "select every record except these", which arrives as `id not_in` and
+      # names the records to leave out rather than the ones to read. The message
+      # names both, an exclusion being no filter the operator wrote.
       #
       # A collection whose endpoint does filter id declares it in `api_filters`
       # and never short-circuits, so the translator handles its ids like any
@@ -366,9 +370,11 @@ module ForestAdminDatasourcePylon
         return unless node.some_leaf { |leaf| leaf.field == 'id' }
 
         raise UnsupportedOperatorError,
-              "A filter on 'id' has to be combined with 'and' conditions only: Pylon cannot filter on id, so the " \
-              'agent reads the records by id and applies the rest in memory, which an id inside an `or` would ' \
-              'silently widen. Rewrite the filter with `and`, or filter on another field.'
+              "#{name} cannot answer this selection: Pylon cannot filter on id, so the agent reads the records " \
+              'by id and applies the rest in memory, which only an `and` of `id equals` / `id in` conditions ' \
+              'names a set of records to read. An id inside an `or` names none, and neither does an exclusion, ' \
+              'which is what selecting every record except a few sends. Select the records to act on rather ' \
+              'than the ones to leave out, rewrite the filter with `and`, or filter on another field.'
       end
 
       def resolve_relation_conditions(caller, node)

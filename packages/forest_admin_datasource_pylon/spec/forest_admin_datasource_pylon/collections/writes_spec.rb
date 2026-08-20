@@ -162,6 +162,16 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:patch, "#{base}/issues/i1")
       end
 
+      # The cap bounds a write, and a patch naming nothing writable is not one:
+      # it is settled before the ids are, so the selection is never resolved and
+      # never refused for its width.
+      it 'sends nothing, and refuses nothing, when the patch is read-only over a wide selection' do
+        ids = Array.new(21) { |index| "i#{index}" }
+
+        expect { issues.update(nil, id_filter(operators::IN, ids), 'number' => 9) }.not_to raise_error
+        expect(WebMock).not_to have_requested(:patch, %r{/issues/})
+      end
+
       # The scope the operator's role carries rides along as an `and`, so the ids
       # are resolved through the collection's own read and a record the scope
       # excludes is never written to.
@@ -244,15 +254,60 @@ module ForestAdminDatasourcePylon
         expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
       end
 
-      # An unchecked box is not an edit of the field: dropping it costs no read
-      # at all, where refusing it would fail every edit whose form carries one.
-      it 'drops a boolean left false without reading the record back' do
+      # An unchecked box over a record holding nothing is not an edit: Pylon
+      # returns a null where the form sends `false`, and refusing that pair
+      # would fail every edit whose form carries one.
+      it 'drops a boolean left false over a record holding nothing' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
         stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
 
         issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'author_unverified' => false, 'title' => 'Louder')
 
         expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
-        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
+
+      # Over a record holding `true` the same `false` is the operator unchecking
+      # the box: Pylon cannot write it, and dropping it would report an edit it
+      # never performed.
+      it 'refuses a boolean the operator unchecked' do
+        stub_request(:get, "#{base}/issues/i1")
+          .to_return(json('data' => issue_payload('i1', 'author_unverified' => true)))
+
+        expect { issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'author_unverified' => false) }
+          .to raise_error(UnsupportedWriteError, /'author_unverified' cannot be set here on a PylonIssue/)
+      end
+
+      # Same story for a value cleared rather than unchecked: an empty body over
+      # a stored one is an edit, where an empty body over an empty one is not.
+      it 'refuses a string the operator cleared' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        expect { issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'body_html' => '') }
+          .to raise_error(UnsupportedWriteError, /'body_html' cannot be set here on a PylonIssue/)
+      end
+
+      # The markup an editor hands back may be the markup it was given,
+      # re-indented. Refusing that would name a field the operator never touched.
+      it 'drops a string the editor only re-indented' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::EQUAL, 'i1'),
+                      'body_html' => "  <p>boom</p>\n", 'title' => 'Louder')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
+      end
+
+      # Both offending fields at once: refusing them one at a time would have the
+      # operator undo one, retry, and learn about the next.
+      it 'names every field of the wrong direction in one message' do
+        stub_request(:get, "#{base}/issues/i1")
+          .to_return(json('data' => issue_payload('i1', 'author_unverified' => true)))
+
+        expect do
+          issues.update(nil, id_filter(operators::EQUAL, 'i1'),
+                        'body_html' => '<p>louder</p>', 'author_unverified' => false)
+        end.to raise_error(UnsupportedWriteError, /'body_html', 'author_unverified' cannot be set here/)
       end
 
       # The filter was already resolved into ids, so reading it again would spend
@@ -346,10 +401,13 @@ module ForestAdminDatasourcePylon
       end
 
       # "Select all except these" reaches PylonIssue as `id not_in`, which its
-      # endpoint cannot filter: the read refuses it, and so does the delete.
+      # endpoint cannot filter: the read refuses it, and so does the delete. The
+      # message names that selection rather than the `and`/`or` of a filter the
+      # operator never wrote.
       it 'refuses an excluding selection on the collection that cannot filter an id' do
         expect { issues.delete(nil, id_filter(operators::NOT_IN, %w[i1])) }
-          .to raise_error(UnsupportedOperatorError, /A filter on 'id' has to be combined with 'and'/)
+          .to raise_error(UnsupportedOperatorError,
+                          /Select the records to act on rather than the ones to leave out/)
       end
     end
 

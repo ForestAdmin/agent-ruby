@@ -19,6 +19,9 @@ module ForestAdminDatasourcePylon
     # Long by line count only: three verbs, the payload they share, and the
     # refusals naming what Pylon cannot do.
     module Writes # rubocop:disable Metrics/ModuleLength
+      # Re-declared rather than borrowed from BaseCollection: a method defined
+      # here resolves a constant against this module and its ancestors, never
+      # against the class including it.
       Filter     = ForestAdminDatasourceToolkit::Components::Query::Filter
       Page       = ForestAdminDatasourceToolkit::Components::Query::Page
       Projection = ForestAdminDatasourceToolkit::Components::Query::Projection
@@ -33,14 +36,21 @@ module ForestAdminDatasourcePylon
       MAX_WRITE_TARGETS = 20
 
       def create(_caller, data)
-        serialize(create_record(build_payload(data, :create)))
+        serialize(create_record(build_payload(writable_attributes(data), :create)))
       end
 
+      # What the patch may write is settled before the ids are: a patch naming
+      # nothing writable sends no request and, more to the point, is not refused
+      # for reaching too many records — the cap bounds a write, and there is
+      # none here.
       def update(caller, filter, patch)
+        attributes = writable_attributes(patch)
+        return if attributes.empty?
+
         ids = ids_for(caller, filter)
         return if ids.empty?
 
-        payload = build_payload(patch, :update, caller: caller, ids: ids)
+        payload = build_payload(attributes, :update, caller: caller, ids: ids)
         return if payload.empty?
 
         write_each(ids, 'updated') { |id| update_record(id, payload) }
@@ -68,13 +78,13 @@ module ForestAdminDatasourcePylon
 
       def max_write_targets = MAX_WRITE_TARGETS
 
-      # How many named ids the collection's own read can resolve exactly. No
-      # bound by default: the search endpoint filters `id` server-side, so any
-      # id list is answered by one request per chunk. The collection resolving a
-      # named id by its own endpoint overrides this with its fan-out cap — past
-      # it the read truncates, and a truncated resolution would write to part of
-      # the selection while reporting the whole of it.
-      def max_resolvable_ids = Float::INFINITY
+      # How many named ids the collection's own read can resolve exactly. `nil`
+      # is no bound at all, the default: the search endpoint filters `id`
+      # server-side, so any id list is answered by one request per chunk. The
+      # collection resolving a named id by its own endpoint overrides this with
+      # its fan-out cap — past it the read truncates, and a truncated resolution
+      # would write to part of the selection while reporting the whole of it.
+      def max_resolvable_ids = nil
 
       # The records a filter-driven write applies to: exact, or refused. Nothing
       # here may quietly answer with a subset — the caller writes one request per
@@ -93,7 +103,7 @@ module ForestAdminDatasourcePylon
           return named
         end
 
-        named_count = filtered_ids(tree)&.size
+        named_count = max_resolvable_ids && filtered_ids(tree)&.size
         refuse_unresolvable_selection(named_count) if named_count && named_count > max_resolvable_ids
         resolve_ids_by_list(caller, filter)
       end
@@ -140,20 +150,16 @@ module ForestAdminDatasourcePylon
       # this is a count of records *named*, never of records the write applies
       # to: it answers what `max_resolvable_ids` needs, not what the cap does.
       def filtered_ids(node)
-        return id_values(node) if id_values(node)
+        named = id_values(node)
+        return named if named
         return nil unless and_branch?(node)
 
-        condition = Array(node.conditions).find { |child| id_values(child) }
-        condition && id_values(condition)
+        Array(node.conditions).filter_map { |child| id_values(child) }.first
       end
 
-      # Keys the schema declares writable, custom fields included, in the shape
-      # the endpoint takes. Everything else is dropped rather than refused: the
-      # front sends the fields of its form, and a read-only one reaching the
-      # payload is the agent's doing, not a request the operator made.
-      def build_payload(data, direction, caller: nil, ids: [])
-        attrs = writable_attributes(data)
-        attrs = honour_write_direction(attrs, direction, caller, ids)
+      # The writable attributes, in the shape the endpoint takes them.
+      def build_payload(attributes, direction, caller: nil, ids: [])
+        attrs = honour_write_direction(attributes, direction, caller, ids)
         # Pylon fills in what a create leaves out; on an update a nil is the
         # operator clearing a value, so it travels.
         attrs = attrs.compact if direction == :create
@@ -164,6 +170,10 @@ module ForestAdminDatasourcePylon
         payload
       end
 
+      # Keys the schema declares writable, custom fields included. Everything
+      # else is dropped rather than refused: the front sends the fields of its
+      # form, and a read-only one reaching the payload is the agent's doing, not
+      # a request the operator made.
       def writable_attributes(data)
         attrs = data.is_a?(Hash) ? data.transform_keys(&:to_s) : {}
 
@@ -176,28 +186,35 @@ module ForestAdminDatasourcePylon
         column&.type == 'Column' && !column.is_read_only
       end
 
-      # A field of the other direction is dropped when it asks for nothing — no
-      # value at all, or, on an update, the value the record already holds, which
-      # is what a form resending an untouched field sends. It is refused when the
-      # operator really changed it: Pylon cannot write it, and answering the edit
-      # with a success it did not perform is worse than an error naming the
-      # field.
+      # A field of the other direction is dropped when it asks for nothing, and
+      # refused when the operator really changed it: Pylon cannot write it, and
+      # answering the edit with a success it did not perform is worse than an
+      # error naming the field.
+      #
+      # What "asks for nothing" means differs by direction, and only a create
+      # can tell without reading. Pylon fills a create in with exactly what a
+      # blank value asks for, so a blank one is dropped there. On an update the
+      # record already holds a value, and the only thing that settles whether
+      # the patch changes it is that value: an unchecked box is nothing to write
+      # over a stored `false`, and a real edit over a stored `true`. Blankness
+      # alone would drop the second, reporting an edit Pylon never performed.
       def honour_write_direction(attrs, direction, caller, ids)
         wrong = attrs.keys & (direction == :create ? update_only_fields : create_only_fields)
         return attrs if wrong.empty?
 
-        asked = wrong.reject { |field| blank_write_value?(attrs[field]) }
-        asked -= unchanged_fields(caller, ids, asked, attrs) if direction == :update
-        asked.each { |field| refuse_wrong_direction(field, direction) }
+        asked = if direction == :create
+                  wrong.reject { |field| blank_write_value?(attrs[field]) }
+                else
+                  wrong - unchanged_fields(caller, ids, wrong, attrs)
+                end
+        refuse_wrong_direction(asked, direction) unless asked.empty?
 
         attrs.except(*wrong)
       end
 
       # What a form sends for a field the operator never touched: no value at
-      # all, an unchecked box, an empty list. Pylon fills a create in with
-      # exactly this, and on an existing record it is the state a stored nothing
-      # already reads as — so asking for it is asking for nothing, where a `0`
-      # or a string is a value only the other endpoint could write.
+      # all, an unchecked box, an empty list. A `0` or a string is a value only
+      # the other endpoint could write.
       def blank_write_value?(value)
         return true if value.nil? || value == false
         return value.empty? if value.respond_to?(:empty?)
@@ -215,11 +232,31 @@ module ForestAdminDatasourcePylon
         stored = stored_values(caller, ids, fields)
         return [] if stored.empty?
 
-        fields.select { |field| stored.all? { |record| record[field] == attrs[field] } }
+        fields.select { |field| stored.all? { |record| same_write_value?(record[field], attrs[field]) } }
       end
 
-      # Read only when a field of the wrong direction carries a value, and only
-      # for that field: an update naming none costs no request at all.
+      # Whether the patch asks for the value the record already holds.
+      #
+      # Two blanks are the same state: Pylon returns a null where the form sends
+      # `false` or an empty string for the same untouched field, and refusing
+      # that pair would fail every edit whose form carries one.
+      #
+      # Strings are compared stripped: `body_html` travels through an editor
+      # that may hand back the markup it was given re-indented, and refusing an
+      # edit nobody made — naming a field the operator never touched — is the
+      # one error they cannot act on.
+      def same_write_value?(stored, asked)
+        return true if blank_write_value?(stored) && blank_write_value?(asked)
+        return stored.to_s.strip == asked.to_s.strip if stored.is_a?(String) || asked.is_a?(String)
+
+        stored == asked
+      end
+
+      # Read only when the patch names a field of the wrong direction, and only
+      # for those fields: an update naming none costs no request at all. It is
+      # one request on the collections whose endpoint filters `id`, and one per
+      # record on the ones reading an id through its own endpoint — PylonIssue,
+      # whose fan-out `max_resolvable_ids` bounds.
       #
       # Read by id rather than through the caller's filter: the filter was
       # already resolved into these ids, so re-running it would spend those
@@ -237,7 +274,7 @@ module ForestAdminDatasourcePylon
       # field and `value` for every other — a select being written by the slug of
       # its option, which is what the Enum column advertises.
       def split_custom_fields(attrs)
-        by_column = custom_fields.to_h { |custom_field| [custom_field[:column_name], custom_field] }
+        by_column = custom_fields_by_column
         entries = []
 
         native = attrs.each_with_object({}) do |(field, value), rest|
@@ -246,6 +283,10 @@ module ForestAdminDatasourcePylon
         end
 
         [entries, native]
+      end
+
+      def custom_fields_by_column
+        @custom_fields_by_column ||= custom_fields.to_h { |field| [field[:column_name], field] }
       end
 
       def custom_field_entry(custom_field, value)
@@ -260,15 +301,19 @@ module ForestAdminDatasourcePylon
               "A #{name} record cannot be #{verb}: the Pylon API exposes no endpoint for it."
       end
 
-      def refuse_wrong_direction(field, direction)
+      # Every offending field at once: refusing them one at a time would have the
+      # operator undo one, retry, and learn about the next.
+      def refuse_wrong_direction(fields, direction)
+        them = fields.one? ? 'it' : 'them'
         detail = if direction == :create
-                   'Pylon only accepts it on an existing record: create the record, then edit it.'
+                   "Pylon only accepts #{them} on an existing record: create the record, then edit it."
                  else
-                   'Pylon only accepts it when the record is created, and exposes no endpoint to change it ' \
-                     'afterwards.'
+                   "Pylon only accepts #{them} when the record is created, and exposes no endpoint to change " \
+                     "#{them} afterwards."
                  end
 
-        raise UnsupportedWriteError, "'#{field}' cannot be set here on a #{name}: #{detail}"
+        named = fields.map { |field| "'#{field}'" }.join(', ')
+        raise UnsupportedWriteError, "#{named} cannot be set here on a #{name}: #{detail}"
       end
 
       def refuse_too_many_targets(count)
