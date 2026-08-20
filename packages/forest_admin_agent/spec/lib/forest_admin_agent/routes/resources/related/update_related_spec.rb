@@ -194,6 +194,22 @@ module ForestAdminAgent
               expect(result).to eq({ content: nil, status: 204 })
             end
 
+            it 'clears the foreign key and its type field on a polymorphic_many_to_one relation' do
+              allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
+
+              args[:params]['collection_name'] = 'address'
+              args[:params]['relation_name'] = 'addressable'
+              args[:params]['data'] = nil
+              args[:params]['id'] = 1
+
+              result = update.handle_request(args)
+
+              expect(@datasource.get_collection('address')).to have_received(:update) do |_caller, _filter, data|
+                expect(data).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+              end
+              expect(result).to eq({ content: nil, status: 204 })
+            end
+
             it 'call handle_request on a one_to_one relation' do
               allow(permissions).to receive(:get_scope)
                 .and_return(Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 99))
