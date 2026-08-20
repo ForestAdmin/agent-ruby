@@ -34,6 +34,16 @@ module ForestAdminDatasourcePylon
   # retry of the whole selection would write those a second time.
   class PartialWriteError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
+  # A write Pylon itself refused, carrying the reason it gave. `APIError` below
+  # descends from the package's own Error, which the agent's ErrorTranslator
+  # does not recognise: it keeps the status and answers 'Unexpected error', so
+  # the likeliest way a write fails — a required field left out, a value the
+  # endpoint does not accept — would reach the operator as nothing at all.
+  # Only Pylon's 4xx travels this way: it names something the operator can fix,
+  # where a 5xx or a dropped connection is not theirs to act on and stays the
+  # APIError it was.
+  class WriteRejectedError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
+
   # Raised when a Pylon API call fails. Carries the HTTP status and the
   # (parsed) response body so callers — smart actions in particular — can
   # surface Pylon's own validation message instead of a generic string.

@@ -225,12 +225,67 @@ module ForestAdminDatasourcePylon
       end
 
       # Nothing was written, so the failure is the whole of what happened and
-      # travels as the error Pylon answered with.
-      it 'raises the API error itself when the first record failed' do
+      # travels as the reason Pylon gave — as a ValidationError, the agent
+      # answering an APIError with 'Unexpected error' whatever it carries.
+      it 'surfaces the refusal itself when the first record failed' do
         stub_request(:delete, "#{base}/issues/i1").to_return(json({ 'message' => 'gone' }, 404))
 
         expect { issues.delete(nil, id_filter(operators::IN, %w[i1 i2])) }
-          .to raise_error(APIError, %r{delete\(issues/i1\)})
+          .to raise_error(WriteRejectedError, %r{delete\(issues/i1\).*gone}m)
+      end
+    end
+
+    # Pylon's own refusal is the likeliest way a write fails, and `APIError`
+    # descends from the package's Error, which the agent's translator answers
+    # with 'Unexpected error': a 4xx is re-raised as a ValidationError so the
+    # reason reaches the operator, and nothing else is.
+    describe 'a write Pylon refused' do
+      it 'surfaces the reason a rejected create was given' do
+        stub_request(:post, "#{base}/issues")
+          .to_return(json({ 'message' => 'title is required' }, 422))
+
+        expect { issues.create(nil, 'title' => '', 'body_html' => '<p>b</p>') }
+          .to raise_error(WriteRejectedError, /title is required/)
+      end
+
+      it 'surfaces the reason a rejected update was given' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json({ 'message' => 'unknown state' }, 422))
+
+        expect { issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'state' => 'nope') }
+          .to raise_error(WriteRejectedError, /unknown state/)
+      end
+
+      # Not the operator's to fix, and not theirs to be told to fix: a gateway
+      # error stays the APIError it was, carrying its status for the agent to
+      # answer with.
+      it 'leaves a Pylon-side failure as it was' do
+        stub_request(:post, "#{base}/issues").to_return(json({ 'message' => 'boom' }, 500))
+
+        expect { issues.create(nil, 'title' => 'Boom', 'body_html' => '<p>b</p>') }
+          .to raise_error(APIError) { |error| expect(error.status).to eq(500) }
+      end
+    end
+
+    # `id in` names the records to act on, and the same one named twice is one
+    # record: writing it twice would answer 404 on the second delete and report
+    # a partial failure of a delete that fully succeeded.
+    describe 'an id named twice in the same selection' do
+      it 'writes the record once' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::IN, %w[i1 i1]), 'state' => 'closed')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").once
+      end
+
+      # The caps bound records, not mentions: a selection naming the same id
+      # over and over reaches one record and is not refused for reaching many.
+      it 'counts it once against the cap' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::IN, ['i1'] * 25), 'state' => 'closed')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").once
       end
     end
 
@@ -425,6 +480,27 @@ module ForestAdminDatasourcePylon
       it 'refuses to delete a team' do
         expect { teams.delete(nil, id_filter(operators::EQUAL, 't1')) }
           .to raise_error(UnsupportedWriteError, /A PylonTeam record cannot be deleted/)
+      end
+
+      # The refusal holds whatever the selection reaches, so it comes before the
+      # ids are resolved: answering with the cap would send the operator to
+      # narrow a selection that was never the problem, and answering a selection
+      # matching nothing with a silent success would report a delete on a
+      # collection that cannot perform one.
+      it 'refuses a selection wider than the cap without naming the cap' do
+        expect { teams.delete(nil, id_filter(operators::IN, (1..25).map { |i| "t#{i}" })) }
+          .to raise_error(UnsupportedWriteError, /A PylonTeam record cannot be deleted/)
+      end
+
+      it 'refuses a selection matching nothing rather than answering it' do
+        expect { teams.delete(nil, filter(condition_tree: leaf('name', operators::EQUAL, 'nope'))) }
+          .to raise_error(UnsupportedWriteError, /A PylonTeam record cannot be deleted/)
+      end
+
+      it 'refuses before spending a request to resolve the selection' do
+        expect { teams.delete(nil, filter(condition_tree: leaf('name', operators::EQUAL, 'x'))) }
+          .to raise_error(UnsupportedWriteError)
+        expect(WebMock).not_to have_requested(:get, "#{base}/teams")
       end
     end
 

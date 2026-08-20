@@ -340,11 +340,17 @@ module ForestAdminDatasourcePylon
         @walker ||= Pagination::CursorWalker.new
       end
 
+      # A set of ids, not a list: `id in` names the records to act on, and the
+      # same one named twice is one record. Deduplicating here is what keeps a
+      # lookup from spending two requests on one id and, on the write side, from
+      # writing it twice — a delete answering 404 the second time, reported as a
+      # partial failure of a delete that fully succeeded. It is also what the
+      # caps count against, both bounding records rather than mentions.
       def id_values(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
         return nil unless [Operators::EQUAL, Operators::IN].include?(node.operator)
 
-        Array(node.value).map(&:to_s).reject(&:empty?)
+        Array(node.value).map(&:to_s).reject(&:empty?).uniq
       end
 
       def and_branch?(node)

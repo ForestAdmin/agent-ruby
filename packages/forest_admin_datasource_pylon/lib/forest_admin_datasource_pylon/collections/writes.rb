@@ -35,8 +35,18 @@ module ForestAdminDatasourcePylon
       # would not be, which is the very thing this datasource refuses.
       MAX_WRITE_TARGETS = 20
 
+      # A verb Pylon has no endpoint for is refused first, before the payload is
+      # built and before the ids are resolved: the refusal holds whatever the
+      # selection turns out to be, and everything the write would do on the way
+      # there answers with something else — the cap naming a count, a field of
+      # the wrong direction naming a field — sending the operator to narrow a
+      # selection that was never the problem.
       def create(_caller, data)
+        refuse_write('created') unless write_endpoint?(:create_record)
+
         serialize(create_record(build_payload(writable_attributes(data), :create)))
+      rescue APIError => e
+        surface_write_rejection(e)
       end
 
       # What the patch may write is settled before the ids are: a patch naming
@@ -44,6 +54,8 @@ module ForestAdminDatasourcePylon
       # for reaching too many records — the cap bounds a write, and there is
       # none here.
       def update(caller, filter, patch)
+        refuse_write('updated') unless write_endpoint?(:update_record)
+
         attributes = writable_attributes(patch)
         return if attributes.empty?
 
@@ -57,6 +69,8 @@ module ForestAdminDatasourcePylon
       end
 
       def delete(caller, filter)
+        refuse_write('deleted') unless write_endpoint?(:delete_record)
+
         write_each(ids_for(caller, filter), 'deleted') { |id| delete_record(id) }
       end
 
@@ -110,6 +124,15 @@ module ForestAdminDatasourcePylon
 
       private
 
+      # Whether the collection wired the Pylon endpoint for a verb. The
+      # `*_record` hook is the declaration, read here rather than repeated in a
+      # list of supported verbs a collection would have to keep in step with its
+      # own hooks — the same reason `is_read_only` on the column, and not a
+      # second list of writable names, is what the payload builder reads.
+      def write_endpoint?(hook)
+        method(hook).owner != Writes
+      end
+
       # One request per record, so a failure on the k-th record leaves the k-1
       # before it written — the cap bounds how many records a write reaches,
       # nothing bounds the endpoint answering 429 or 422 halfway through. The
@@ -123,10 +146,24 @@ module ForestAdminDatasourcePylon
           yield id
           written << id
         rescue APIError => e
-          raise if written.empty?
+          # Always raises, so nothing reaches the partial report below: with no
+          # record written the failure is the whole of what happened.
+          surface_write_rejection(e) if written.empty?
 
           refuse_partial_write(verb, written, id, ids.size, e)
         end
+      end
+
+      # Pylon's own refusal, in the operator's hands. A 4xx names something they
+      # did — a required field left out, a value the endpoint does not take, a
+      # record already gone — and travels as the ValidationError whose message
+      # the agent surfaces, where the APIError it arrived as would be answered
+      # with 'Unexpected error'. Anything else is Pylon or the network failing,
+      # which no edit of theirs would change: it stays what it was.
+      def surface_write_rejection(error)
+        raise error unless (400..499).cover?(error.status.to_i)
+
+        raise WriteRejectedError, error.message
       end
 
       # One record past the cap is asked for, so an overflow is seen rather than
