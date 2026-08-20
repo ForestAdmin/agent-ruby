@@ -113,12 +113,14 @@ module ForestAdminDatasourcePylon
 
       # `phone_numbers` and `external_ids` stay read-only although the endpoint
       # takes them: they hold objects, in a shape the write side does not
-      # document as the one the column shows.
+      # document as the one the column shows. `portal_role` stays read-only next
+      # to the `portal_role_id` it is the name of, so one patch never carries two
+      # projections of the same role.
       it 'declares writable exactly the columns an endpoint takes in the shape they are read' do
         writable = columns.reject { |_name, column| column.is_read_only }.keys
 
         expect(writable).to contain_exactly('name', 'account_id', 'email', 'emails', 'avatar_url',
-                                            'primary_phone_number', 'portal_role', 'portal_role_id')
+                                            'primary_phone_number', 'portal_role_id')
       end
 
       # No Pylon endpoint aggregates, and the pages of a cursor walk are not the

@@ -27,6 +27,13 @@ module ForestAdminDatasourcePylon
   # undo, and the message is the only place they learn what.
   class UnsupportedWriteError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
+  # A filter-driven write Pylon performed on some of its records and then
+  # failed on: one record is one request, so the ones before the failure are
+  # written and stay written. Descends from ValidationError so the operator
+  # reads which records landed rather than a 500 leaving them to guess — a
+  # retry of the whole selection would write those a second time.
+  class PartialWriteError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
+
   # Raised when a Pylon API call fails. Carries the HTTP status and the
   # (parsed) response body so callers — smart actions in particular — can
   # surface Pylon's own validation message instead of a generic string.

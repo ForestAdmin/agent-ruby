@@ -177,6 +177,53 @@ module ForestAdminDatasourcePylon
       end
     end
 
+    # The record a write answers with is discarded here, so a patch Pylon
+    # answers with no body at all wrote the record just the same — and the rest
+    # of the selection is written rather than aborted on it.
+    describe '#update answered with no record' do
+      it 'writes every record of the selection' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(status: 204)
+        stub_request(:patch, "#{base}/issues/i2").to_return(json('data' => nil))
+
+        issues.update(nil, id_filter(operators::IN, %w[i1 i2]), 'state' => 'closed')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1")
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i2")
+      end
+    end
+
+    # One record is one request, so a failure on the k-th leaves the k-1 before
+    # it written and written for good: the error names them, where the API error
+    # alone would read as "the write failed, nothing happened" and a retry of the
+    # whole selection would write them twice.
+    describe 'a write failing partway through the selection' do
+      it 'names the records already written' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        stub_request(:patch, "#{base}/issues/i2").to_return(json({ 'message' => 'state is invalid' }, 422))
+
+        expect { issues.update(nil, id_filter(operators::IN, %w[i1 i2]), 'state' => 'closed') }
+          .to raise_error(PartialWriteError, /1 of 2 PylonIssue records were updated and then 'i2' failed/)
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1")
+      end
+
+      it 'names the records already deleted' do
+        stub_request(:delete, "#{base}/issues/i1").to_return(status: 204)
+        stub_request(:delete, "#{base}/issues/i2").to_return(json({ 'message' => 'gone' }, 404))
+
+        expect { issues.delete(nil, id_filter(operators::IN, %w[i1 i2])) }
+          .to raise_error(PartialWriteError, /records already deleted are i1/)
+      end
+
+      # Nothing was written, so the failure is the whole of what happened and
+      # travels as the error Pylon answered with.
+      it 'raises the API error itself when the first record failed' do
+        stub_request(:delete, "#{base}/issues/i1").to_return(json({ 'message' => 'gone' }, 404))
+
+        expect { issues.delete(nil, id_filter(operators::IN, %w[i1 i2])) }
+          .to raise_error(APIError, %r{delete\(issues/i1\)})
+      end
+    end
+
     describe '#update naming a field Pylon only takes on a create' do
       it 'refuses the update when the operator changed it' do
         stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
@@ -195,6 +242,34 @@ module ForestAdminDatasourcePylon
                       'body_html' => '<p>boom</p>', 'title' => 'Louder')
 
         expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
+      end
+
+      # An unchecked box is not an edit of the field: dropping it costs no read
+      # at all, where refusing it would fail every edit whose form carries one.
+      it 'drops a boolean left false without reading the record back' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'author_unverified' => false, 'title' => 'Louder')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
+
+      # The filter was already resolved into ids, so reading it again would spend
+      # the same requests twice and, carrying no page of its own, walk every
+      # record it matches instead of the one about to be written.
+      it 'reads the stored value by id rather than running the filter a second time' do
+        contact = { 'id' => 'c1', 'name' => 'Ada', 'email' => 'ada@acme.test' }
+        stub_request(:post, "#{base}/contacts/search").to_return(json('data' => [contact]))
+        stub_request(:get, "#{base}/contacts/c1").to_return(json('data' => contact))
+        stub_request(:patch, "#{base}/contacts/c1").to_return(json('data' => contact))
+
+        contacts.update(nil, filter(condition_tree: leaf('name', operators::EQUAL, 'Ada')),
+                        'email' => 'ada@acme.test', 'avatar_url' => 'http://x')
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+        expect(WebMock).to have_requested(:get, "#{base}/contacts/c1")
+        expect(WebMock).to have_requested(:patch, "#{base}/contacts/c1").with(body: { 'avatar_url' => 'http://x' })
       end
     end
 
@@ -239,6 +314,37 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:delete, %r{/accounts/})
       end
 
+      # The ids a filter names are not the records the write applies to when the
+      # filter narrows them further: the collections filtering `id` server-side
+      # learn the real count in one request, and write it.
+      it 'writes the records a narrowed selection really matches' do
+        stub_request(:post, "#{base}/accounts/search")
+          .to_return(json('data' => [{ 'id' => 'a1', 'name' => 'Acme' }]))
+        stub_request(:patch, "#{base}/accounts/a1").to_return(json('data' => { 'id' => 'a1' }))
+
+        ids = Array.new(25) { |index| "a#{index}" }
+        accounts.update(nil, filter(condition_tree: branch('And', [leaf('id', operators::IN, ids),
+                                                                   leaf('name', operators::EQUAL, 'Acme')])),
+                        'name' => 'Acme Inc')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/accounts/a1").with(body: { 'name' => 'Acme Inc' })
+      end
+
+      # An issue is read one request per named id, so past the fan-out the
+      # resolution would stop short and the write would cover part of the
+      # selection. Refused — as the ids it names, never as records it was found
+      # to apply to.
+      it 'refuses more named ids than the collection can resolve, without claiming they all match' do
+        ids = Array.new(25) { |index| "i#{index}" }
+
+        expect do
+          issues.update(nil, filter(condition_tree: branch('And', [leaf('id', operators::IN, ids),
+                                                                   leaf('state', operators::EQUAL, 'new')])),
+                        'title' => 'Louder')
+        end.to raise_error(UnsupportedWriteError, /names 25 PylonIssue records and filters them further/)
+        expect(WebMock).not_to have_requested(:get, %r{/issues/})
+      end
+
       # "Select all except these" reaches PylonIssue as `id not_in`, which its
       # endpoint cannot filter: the read refuses it, and so does the delete.
       it 'refuses an excluding selection on the collection that cannot filter an id' do
@@ -277,6 +383,35 @@ module ForestAdminDatasourcePylon
       it 'refuses to disable an account that does not exist yet' do
         expect { accounts.create(nil, 'name' => 'Acme', 'is_disabled' => true) }
           .to raise_error(UnsupportedWriteError, /'is_disabled' cannot be set here on a PylonAccount/)
+      end
+
+      # An account is created enabled, which is what the form asks for when the
+      # box is left unchecked: the create it produces is the one requested.
+      it 'creates an account whose update-only boolean is left false' do
+        stub_request(:post, "#{base}/accounts").to_return(json('data' => { 'id' => 'a1', 'name' => 'Acme' }))
+
+        accounts.create(nil, 'name' => 'Acme', 'is_disabled' => false)
+
+        expect(WebMock).to have_requested(:post, "#{base}/accounts").with(body: { 'name' => 'Acme' })
+      end
+
+      # `POST /contacts` takes the primary address and `PATCH /contacts/{id}` the
+      # list, so one payload never carries both projections of the addresses.
+      it 'creates a contact with its primary address' do
+        stub_request(:post, "#{base}/contacts").to_return(json('data' => { 'id' => 'c1', 'name' => 'Ada' }))
+
+        contacts.create(nil, 'name' => 'Ada', 'email' => 'ada@acme.test', 'emails' => [])
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts")
+          .with(body: { 'name' => 'Ada', 'email' => 'ada@acme.test' })
+      end
+
+      it 'refuses to change the primary address of an existing contact' do
+        stub_request(:get, "#{base}/contacts/c1")
+          .to_return(json('data' => { 'id' => 'c1', 'name' => 'Ada', 'email' => 'ada@acme.test' }))
+
+        expect { contacts.update(nil, id_filter(operators::EQUAL, 'c1'), 'email' => 'new@acme.test') }
+          .to raise_error(UnsupportedWriteError, /'email' cannot be set here on a PylonContact/)
       end
 
       it 'patches a contact' do

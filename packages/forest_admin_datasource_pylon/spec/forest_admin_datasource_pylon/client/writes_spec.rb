@@ -69,6 +69,23 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
       expect { client.update_issue('i1', 'title' => 'Boom') }
         .to raise_error(ForestAdminDatasourcePylon::APIError, %r{update\(issues/i1\)})
     end
+
+    # An update's record is discarded by the collection, so an answer carrying
+    # none is the write having landed with nothing to hand back — raising there
+    # would report a failure on a record Pylon already patched.
+    it 'accepts an update answered with no body at all' do
+      stub_request(:patch, "#{base}/issues/i1").to_return(status: 204)
+
+      expect(client.update_issue('i1', 'title' => 'Boom')).to be_nil
+    end
+
+    it 'accepts an update answered without a record' do
+      stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => nil, 'request_id' => 'req_1'))
+      stub_request(:patch, "#{base}/issues/i2").to_return(json('request_id' => 'req_2'))
+
+      expect(client.update_issue('i1', 'title' => 'Boom')).to be_nil
+      expect(client.update_issue('i2', 'title' => 'Boom')).to be_nil
+    end
   end
 
   describe 'a failed write' do

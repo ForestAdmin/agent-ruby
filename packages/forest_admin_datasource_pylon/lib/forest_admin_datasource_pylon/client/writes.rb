@@ -43,7 +43,7 @@ module ForestAdminDatasourcePylon
         path      = "#{resource}/#{Faraday::Utils.escape(id)}"
         operation = "update(#{path})"
 
-        must_succeed(operation) { extract_written(connection.patch(path, attributes).body, operation) }
+        must_succeed(operation) { extract_updated(connection.patch(path, attributes).body, operation) }
       end
 
       # Answers true rather than the body: Pylon returns 200 or 204 with nothing
@@ -66,8 +66,25 @@ module ForestAdminDatasourcePylon
         record = body['data'] if body.is_a?(Hash)
         return record if record.is_a?(Hash)
 
+        refuse_body_shape(body, operation, "missing 'data'")
+      end
+
+      # An update is answered the same way, but its record is never read back:
+      # the collection discards it. So a 204, an empty body or a null `data` is
+      # the write having landed with nothing to hand back, and raising there
+      # would report a failure on a record Pylon already patched — and abort the
+      # records a bulk edit had left to write. Only a `data` carrying something
+      # that is not a record means the contract broke.
+      def extract_updated(body, operation)
+        record = body['data'] if body.is_a?(Hash)
+        return record if record.nil? || record.is_a?(Hash)
+
+        refuse_body_shape(body, operation, "'data' is not a record")
+      end
+
+      def refuse_body_shape(body, operation, detail)
         raise APIError,
-              "Pylon API #{operation} returned an unexpected body shape (missing 'data'): #{body.inspect}"
+              "Pylon API #{operation} returned an unexpected body shape (#{detail}): #{body.inspect}"
       end
     end
   end

@@ -78,11 +78,14 @@ module ForestAdminDatasourcePylon
       def create_only_fields = CREATE_ONLY
       def update_only_fields = UPDATE_ONLY
 
-      # Never past the primary-key fan-out: a write resolving its ids through
-      # `list` goes through `fetch_by_ids`, which truncates with a warning, and
-      # a truncated resolution would write to a subset of the selection while
-      # reporting the whole of it.
       def max_write_targets = [Writes::MAX_WRITE_TARGETS, MAX_ID_LOOKUPS].min
+
+      # Never past the primary-key fan-out: an issue is read by its own
+      # endpoint, so a write resolving named ids through `list` goes through
+      # `fetch_by_ids`, which truncates with a warning past this many, and a
+      # truncated resolution would write to a subset of the selection while
+      # reporting the whole of it.
+      def max_resolvable_ids = MAX_ID_LOOKUPS
 
       def sortable_fields
         PYLON_SORTABLE

@@ -22,6 +22,8 @@ module ForestAdminDatasourcePylon
       Filter     = ForestAdminDatasourceToolkit::Components::Query::Filter
       Page       = ForestAdminDatasourceToolkit::Components::Query::Page
       Projection = ForestAdminDatasourceToolkit::Components::Query::Projection
+      Leaf       = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+      Operators  = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
 
       # How many records one filter-driven update or delete may reach. Pylon
       # writes one record per request against a budget of 10 to 20 requests per
@@ -38,14 +40,14 @@ module ForestAdminDatasourcePylon
         ids = ids_for(caller, filter)
         return if ids.empty?
 
-        payload = build_payload(patch, :update, caller: caller, filter: filter)
+        payload = build_payload(patch, :update, caller: caller, ids: ids)
         return if payload.empty?
 
-        ids.each { |id| update_record(id, payload) }
+        write_each(ids, 'updated') { |id| update_record(id, payload) }
       end
 
       def delete(caller, filter)
-        ids_for(caller, filter).each { |id| delete_record(id) }
+        write_each(ids_for(caller, filter), 'deleted') { |id| delete_record(id) }
       end
 
       protected
@@ -66,6 +68,14 @@ module ForestAdminDatasourcePylon
 
       def max_write_targets = MAX_WRITE_TARGETS
 
+      # How many named ids the collection's own read can resolve exactly. No
+      # bound by default: the search endpoint filters `id` server-side, so any
+      # id list is answered by one request per chunk. The collection resolving a
+      # named id by its own endpoint overrides this with its fan-out cap — past
+      # it the read truncates, and a truncated resolution would write to part of
+      # the selection while reporting the whole of it.
+      def max_resolvable_ids = Float::INFINITY
+
       # The records a filter-driven write applies to: exact, or refused. Nothing
       # here may quietly answer with a subset — the caller writes one request per
       # id and reports success for the whole selection.
@@ -78,14 +88,36 @@ module ForestAdminDatasourcePylon
       # so the scope applies and the endpoint filters what it can.
       def ids_for(caller, filter)
         tree = filter&.condition_tree
-        ids  = filtered_ids(tree)
-        refuse_too_many_targets(ids.size) if ids && ids.size > max_write_targets
-        return ids if ids && id_values(tree) && no_search?(filter)
+        if (named = id_values(tree)) && no_search?(filter)
+          refuse_too_many_targets(named.size) if named.size > max_write_targets
+          return named
+        end
 
+        named_count = filtered_ids(tree)&.size
+        refuse_unresolvable_selection(named_count) if named_count && named_count > max_resolvable_ids
         resolve_ids_by_list(caller, filter)
       end
 
       private
+
+      # One request per record, so a failure on the k-th record leaves the k-1
+      # before it written — the cap bounds how many records a write reaches,
+      # nothing bounds the endpoint answering 429 or 422 halfway through. The
+      # error names the records that landed: raising the API error alone reads
+      # as "the write failed, nothing happened", and retrying the selection on
+      # that reading would write them a second time.
+      def write_each(ids, verb)
+        written = []
+
+        ids.each do |id|
+          yield id
+          written << id
+        rescue APIError => e
+          raise if written.empty?
+
+          refuse_partial_write(verb, written, id, ids.size, e)
+        end
+      end
 
       # One record past the cap is asked for, so an overflow is seen rather than
       # guessed from a full page — the same bound `foreign_keys_matching` puts on
@@ -104,8 +136,9 @@ module ForestAdminDatasourcePylon
       # what the rest of the tree can be applied in memory: the leftovers travel
       # to `list`, which answers them the way a read does — server-side where the
       # endpoint filters `id`, through the primary-key short-circuit where it
-      # does not. What this answers is only "how many records is this write
-      # about", which is the question the cap needs.
+      # does not. Nothing is asserted about the sibling conditions either, so
+      # this is a count of records *named*, never of records the write applies
+      # to: it answers what `max_resolvable_ids` needs, not what the cap does.
       def filtered_ids(node)
         return id_values(node) if id_values(node)
         return nil unless and_branch?(node)
@@ -118,9 +151,9 @@ module ForestAdminDatasourcePylon
       # the endpoint takes. Everything else is dropped rather than refused: the
       # front sends the fields of its form, and a read-only one reaching the
       # payload is the agent's doing, not a request the operator made.
-      def build_payload(data, direction, caller: nil, filter: nil)
+      def build_payload(data, direction, caller: nil, ids: [])
         attrs = writable_attributes(data)
-        attrs = honour_write_direction(attrs, direction, caller, filter)
+        attrs = honour_write_direction(attrs, direction, caller, ids)
         # Pylon fills in what a create leaves out; on an update a nil is the
         # operator clearing a value, so it travels.
         attrs = attrs.compact if direction == :create
@@ -149,26 +182,54 @@ module ForestAdminDatasourcePylon
       # operator really changed it: Pylon cannot write it, and answering the edit
       # with a success it did not perform is worse than an error naming the
       # field.
-      def honour_write_direction(attrs, direction, caller, filter)
+      def honour_write_direction(attrs, direction, caller, ids)
         wrong = attrs.keys & (direction == :create ? update_only_fields : create_only_fields)
         return attrs if wrong.empty?
 
-        stored = direction == :update ? stored_values(caller, filter, wrong) : []
-        wrong.each do |field|
-          value = attrs[field]
-          next if value.nil? || value == ''
-          next if direction == :update && stored.all? { |record| record[field] == value }
-
-          refuse_wrong_direction(field, direction)
-        end
+        asked = wrong.reject { |field| blank_write_value?(attrs[field]) }
+        asked -= unchanged_fields(caller, ids, asked, attrs) if direction == :update
+        asked.each { |field| refuse_wrong_direction(field, direction) }
 
         attrs.except(*wrong)
       end
 
+      # What a form sends for a field the operator never touched: no value at
+      # all, an unchecked box, an empty list. Pylon fills a create in with
+      # exactly this, and on an existing record it is the state a stored nothing
+      # already reads as — so asking for it is asking for nothing, where a `0`
+      # or a string is a value only the other endpoint could write.
+      def blank_write_value?(value)
+        return true if value.nil? || value == false
+        return value.empty? if value.respond_to?(:empty?)
+
+        false
+      end
+
+      # The wrong-direction fields already holding the value the patch asks for.
+      # An unreadable record counts as none of them: the field is refused rather
+      # than dropped, since nothing here may claim a value is unchanged without
+      # having read it.
+      def unchanged_fields(caller, ids, fields, attrs)
+        return [] if fields.empty?
+
+        stored = stored_values(caller, ids, fields)
+        return [] if stored.empty?
+
+        fields.select { |field| stored.all? { |record| record[field] == attrs[field] } }
+      end
+
       # Read only when a field of the wrong direction carries a value, and only
       # for that field: an update naming none costs no request at all.
-      def stored_values(caller, filter, fields)
-        list(caller, filter, Projection.new(['id'] + fields))
+      #
+      # Read by id rather than through the caller's filter: the filter was
+      # already resolved into these ids, so re-running it would spend those
+      # requests a second time and — carrying no page of its own — walk every
+      # record it matches rather than the handful about to be written.
+      def stored_values(caller, ids, fields)
+        query = Filter.new(condition_tree: Leaf.new('id', Operators::IN, ids),
+                           page: Page.new(offset: 0, limit: ids.size))
+
+        list(caller, query, Projection.new(['id'] + fields))
       end
 
       # Pylon reads its custom fields back as a map indexed by slug and writes
@@ -216,6 +277,27 @@ module ForestAdminDatasourcePylon
               'covers: Pylon writes one record per request, against a budget of ten to twenty requests per ' \
               'minute, and a write stopping halfway would report a success it did not perform. Narrow the ' \
               'selection to reach the records past this point.'
+      end
+
+      # Named ids the collection cannot resolve exactly, the filter carrying
+      # more than the ids themselves. How many of them the rest of the filter
+      # matches is unknown here — it is what the read would answer — so the
+      # count is reported as what it is, records named rather than records
+      # written to.
+      def refuse_unresolvable_selection(count)
+        raise UnsupportedWriteError,
+              "This write names #{count} #{name} records and filters them further, which #{name} answers with " \
+              "one request per named record, more than the #{max_resolvable_ids} one pass reads: the resolution " \
+              'would stop short and the write would then cover part of the selection while reporting all of ' \
+              'it. Select fewer records, or drop the other conditions to write the ones named.'
+      end
+
+      def refuse_partial_write(verb, written, failed_id, total, error)
+        raise PartialWriteError,
+              "#{written.size} of #{total} #{name} records were #{verb} and then '#{failed_id}' failed: " \
+              "#{error.message}. The records already #{verb} are #{written.join(", ")}, and they stay " \
+              "#{verb} — the ones after them were left untouched. Retry the write on the untouched records " \
+              "alone: retrying the whole selection would perform it twice on the ones already #{verb}."
       end
     end
   end

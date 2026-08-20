@@ -60,10 +60,15 @@ module ForestAdminDatasourcePylon
         # `email` and `primary_phone_number` carry the primary value; the lists
         # hold every address and number, and neither list is filterable.
         #
-        # `emails` is writable on an update only, `POST /contacts` taking the
-        # primary address alone. `phone_numbers` is not writable at all: it
-        # holds objects, and the shape the endpoint takes them in is not the one
-        # the column shows.
+        # `email` is written on a create and `emails` on an update, one
+        # direction each: `POST /contacts` takes the primary address alone, and
+        # the other ones are set on an existing contact. Two writable
+        # projections of the same addresses would otherwise travel in one patch,
+        # the list leaving out whatever the primary carries — the reason
+        # PylonAccount keeps `domain` read-only next to `domains`.
+        #
+        # `phone_numbers` is not writable at all: it holds objects, and the
+        # shape the endpoint takes them in is not the one the column shows.
         def define_contact_fields
           add_column('email', 'String', writable: true)
           add_column('emails', 'Json', writable: true)
@@ -75,8 +80,11 @@ module ForestAdminDatasourcePylon
         def define_portal_fields
           # Left as String rather than Enum: Pylon documents no_access / member
           # / admin, but an organization can define its own portal roles, which
-          # is what `portal_role_id` points at.
-          add_column('portal_role', 'String', writable: true)
+          # is what `portal_role_id` points at. The id is the one written and
+          # the name is read-only, like `role_id` and `role_name` on PylonUser:
+          # writing both would carry two projections of one role in the same
+          # patch, and whichever Pylon ignored would come back stale.
+          add_column('portal_role', 'String')
           add_column('portal_role_id', 'String', writable: true)
           # Owned by the integrations the contact was seen through; no endpoint
           # takes it.
