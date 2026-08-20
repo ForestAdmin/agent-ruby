@@ -101,61 +101,112 @@ module ForestAdminAgent
             end
           end
 
-          describe 'with polymorphic many to one relation' do
-            it 'call update with polymorphic foreign key and type' do
-              collection_company = build_collection(
-                name: 'company',
+          describe 'with relationships in the payload' do
+            let(:collection_creator) do
+              build_collection(
+                name: 'creator',
                 schema: {
                   fields: {
                     'id' => ColumnSchema.new(
                       column_type: 'Number',
                       is_primary_key: true,
                       filter_operators: [Operators::IN, Operators::EQUAL]
-                    ),
-                    'name' => ColumnSchema.new(column_type: 'String')
-                  }
-                }
-              )
-
-              collection_member = build_collection(
-                name: 'member',
-                schema: {
-                  fields: {
-                    'id' => ColumnSchema.new(
-                      column_type: 'Number',
-                      is_primary_key: true,
-                      filter_operators: [Operators::IN, Operators::EQUAL]
-                    ),
-                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
-                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
-                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
-                      foreign_collections: ['company'],
-                      foreign_key: 'memberable_id',
-                      foreign_key_type_field: 'memberable_type',
-                      foreign_key_targets: { 'company' => 'id' }
                     )
                   }
                 }
               )
+            end
 
-              @datasource.add_collection(collection_company)
-              @datasource.add_collection(collection_member)
+            let(:collection_experience) do
+              build_collection(
+                name: 'experience',
+                schema: {
+                  fields: {
+                    'id' => ColumnSchema.new(
+                      column_type: 'Number',
+                      is_primary_key: true,
+                      filter_operators: [Operators::IN, Operators::EQUAL]
+                    ),
+                    'name' => ColumnSchema.new(column_type: 'String'),
+                    'creator_id' => ColumnSchema.new(column_type: 'Number'),
+                    'creator' => Relations::ManyToOneSchema.new(
+                      foreign_collection: 'creator',
+                      foreign_key: 'creator_id',
+                      foreign_key_target: 'id'
+                    ),
+                    'memberable_id' => ColumnSchema.new(column_type: 'Number'),
+                    'memberable_type' => ColumnSchema.new(column_type: 'String'),
+                    'memberable' => Relations::PolymorphicManyToOneSchema.new(
+                      foreign_collections: ['creator'],
+                      foreign_key: 'memberable_id',
+                      foreign_key_type_field: 'memberable_type',
+                      foreign_key_targets: { 'creator' => 'id' }
+                    )
+                  }
+                }
+              )
+            end
 
-              args[:params][:data] = {
-                attributes: {},
-                relationships: { 'memberable' => { 'data' => { 'type' => 'Company', 'id' => 5 } } }
-              }
-              args[:params]['collection_name'] = 'member'
+            before do
+              @datasource.add_collection(collection_creator)
+              @datasource.add_collection(collection_experience)
+              args[:params]['collection_name'] = 'experience'
               args[:params]['id'] = '1'
-              member = { 'id' => 1, 'memberable_id' => 5, 'memberable_type' => 'Company' }
-              allow(@datasource.get_collection('member')).to receive_messages(list: [member], update: true)
+              allow(@datasource.get_collection('experience'))
+                .to receive_messages(list: [{ 'id' => 1, 'name' => 'edited' }], update: true)
+            end
+
+            it 'does not write a many to one foreign key sent as data null' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'edited' },
+                relationships: { 'creator' => { 'data' => nil } }
+              }
 
               update.handle_request(args)
-              expect(@datasource.get_collection('member')).to have_received(:update) do |caller, filter, data|
-                expect(caller).to be_instance_of(Components::Caller)
-                expect(data).to eq({ 'memberable_id' => 5, 'memberable_type' => 'Company' })
-                expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 1)
+
+              expect(@datasource.get_collection('experience')).to have_received(:update) do |_caller, _filter, data|
+                expect(data).to eq({ 'name' => 'edited' })
               end
+            end
+
+            it 'does not write a polymorphic foreign key nor its type field' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'edited' },
+                relationships: { 'memberable' => { 'data' => { 'type' => 'Creator', 'id' => 5 } } }
+              }
+
+              update.handle_request(args)
+
+              expect(@datasource.get_collection('experience')).to have_received(:update) do |_caller, _filter, data|
+                expect(data).to eq({ 'name' => 'edited' })
+              end
+            end
+
+            it 'keeps the attributes of a payload mixing touched and untouched relations' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'edited' },
+                relationships: {
+                  'creator' => { 'data' => nil },
+                  'memberable' => { 'data' => { 'type' => 'Creator', 'id' => 5 } }
+                }
+              }
+
+              update.handle_request(args)
+
+              expect(@datasource.get_collection('experience')).to have_received(:update) do |_caller, _filter, data|
+                expect(data).to eq({ 'name' => 'edited' })
+              end
+            end
+
+            it 'drops the relationships from the payload it forwards' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'edited' },
+                relationships: { 'creator' => { 'data' => nil } }
+              }
+
+              update.handle_request(args)
+
+              expect(args[:params][:data]).not_to have_key(:relationships)
             end
           end
         end

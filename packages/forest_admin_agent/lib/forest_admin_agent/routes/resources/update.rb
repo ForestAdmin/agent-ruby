@@ -23,6 +23,8 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
+          payload = args[:params][:data]
+          payload.delete(:relationships) if payload.is_a?(Hash)
           data = format_attributes(args, context.collection)
           context.collection.update(context.caller, filter, data)
           records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
