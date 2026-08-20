@@ -23,8 +23,7 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
-          payload = args[:params][:data]
-          payload.delete(:relationships) if payload.is_a?(Hash)
+          drop_relationships!(args)
           data = format_attributes(args, context.collection)
           context.collection.update(context.caller, filter, data)
           records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
@@ -38,6 +37,15 @@ module ForestAdminAgent
               serializer: Serializer::ForestSerializer
             )
           }
+        end
+
+        private
+
+        # The frontend writes relations through PUT /:collection/:id/relationships/:name, which fires
+        # before this route. Honouring the relationships block here would turn the untouched relations
+        # it always resends as `data: null` into foreign keys set to nil. Parity with agent-nodejs.
+        def drop_relationships!(args)
+          args[:params][:data].delete(:relationships)
         end
       end
     end

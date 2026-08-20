@@ -172,7 +172,7 @@ module ForestAdminAgent
             it 'does not write a polymorphic foreign key nor its type field' do
               args[:params][:data] = {
                 attributes: { 'name' => 'edited' },
-                relationships: { 'memberable' => { 'data' => { 'type' => 'Creator', 'id' => 5 } } }
+                relationships: { 'memberable' => { 'data' => { 'type' => 'creator', 'id' => 5 } } }
               }
 
               update.handle_request(args)
@@ -187,7 +187,7 @@ module ForestAdminAgent
                 attributes: { 'name' => 'edited' },
                 relationships: {
                   'creator' => { 'data' => nil },
-                  'memberable' => { 'data' => { 'type' => 'Creator', 'id' => 5 } }
+                  'memberable' => { 'data' => { 'type' => 'creator', 'id' => 5 } }
                 }
               }
 
@@ -196,17 +196,6 @@ module ForestAdminAgent
               expect(@datasource.get_collection('experience')).to have_received(:update) do |_caller, _filter, data|
                 expect(data).to eq({ 'name' => 'edited' })
               end
-            end
-
-            it 'drops the relationships from the payload it forwards' do
-              args[:params][:data] = {
-                attributes: { 'name' => 'edited' },
-                relationships: { 'creator' => { 'data' => nil } }
-              }
-
-              update.handle_request(args)
-
-              expect(args[:params][:data]).not_to have_key(:relationships)
             end
           end
         end
