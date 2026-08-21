@@ -23,6 +23,7 @@ module ForestAdminAgent
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
             context.permissions.can?(:export, context.child_collection)
+            context.permissions.assert_can_read_query_fields(context.child_collection, args, consumes: %i[filter])
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
@@ -32,8 +33,13 @@ module ForestAdminAgent
                 ]
               )
             )
-            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_from_request(
+            requested = ForestAdminAgent::Utils::QueryStringParser.parse_requested_projection(
               context.child_collection, args
+            )
+            projection = context.permissions.redact_projection(
+              context.child_collection,
+              requested[:projection],
+              named_by_caller: requested[:named_by_caller]
             )
 
             # Get the parent record primary keys
@@ -43,7 +49,9 @@ module ForestAdminAgent
             # Generate timestamp for filename
             now = Time.now.strftime('%Y%m%d_%H%M%S')
             collection_name = args.dig(:params, 'collection_name')
-            header = args.dig(:params, 'header')
+            header = ForestAdminAgent::Utils::CsvGenerator.filter_header(
+              args.dig(:params, 'header'), requested[:projection], projection
+            )
             filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
 
             # Create a callable to fetch related records

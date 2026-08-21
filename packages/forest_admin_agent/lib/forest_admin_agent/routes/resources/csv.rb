@@ -22,6 +22,7 @@ module ForestAdminAgent
           context = build(args)
           context.permissions.can?(:browse, context.collection)
           context.permissions.can?(:export, context.collection)
+          context.permissions.assert_can_read_query_fields(context.collection, args)
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
@@ -37,10 +38,15 @@ module ForestAdminAgent
             sort: QueryStringParser.parse_sort(context.collection, args),
             segment: QueryStringParser.parse_segment(context.collection, args)
           )
-          projection = QueryStringParser.parse_projection_from_request(context.collection, args)
+          requested = QueryStringParser.parse_requested_projection(context.collection, args)
+          projection = context.permissions.redact_projection(
+            context.collection,
+            requested[:projection],
+            named_by_caller: requested[:named_by_caller]
+          )
           filename = args[:params][:filename] || args[:params]['collection_name']
           filename += '.csv' unless /\.csv$/i.match?(filename)
-          header = args[:params][:header]
+          header = Utils::CsvGenerator.filter_header(args[:params][:header], requested[:projection], projection)
 
           # Generate timestamp for filename
           now = Time.now.strftime('%Y%m%d_%H%M%S')

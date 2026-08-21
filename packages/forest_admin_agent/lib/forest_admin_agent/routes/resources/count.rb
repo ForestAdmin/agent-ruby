@@ -19,6 +19,8 @@ module ForestAdminAgent
           context.permissions.can?(:browse, context.collection)
 
           if context.collection.is_countable?
+            context.permissions.assert_can_read_query_fields(context.collection, args, consumes: %i[filter search])
+
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [

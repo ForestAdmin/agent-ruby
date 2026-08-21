@@ -14,6 +14,7 @@ module ForestAdminAgent
 
         describe ListRelated do
           include_context 'with caller'
+          include_context 'with readable related collections'
           subject(:list) { described_class.new }
           let(:args) do
             {
@@ -192,6 +193,7 @@ module ForestAdminAgent
 
         describe ListRelated, 'with a projection deeper than one relation' do
           include_context 'with caller'
+          include_context 'with readable related collections'
           subject(:list) { described_class.new }
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
           let(:args) do

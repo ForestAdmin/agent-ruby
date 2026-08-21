@@ -17,6 +17,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:browse, context.collection)
+          context.permissions.assert_can_read_query_fields(context.collection, args)
 
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
@@ -33,7 +34,12 @@ module ForestAdminAgent
             segment: QueryStringParser.parse_segment(context.collection, args)
           )
 
-          projection = QueryStringParser.parse_projection_with_pks(context.collection, args)
+          requested = QueryStringParser.parse_requested_projection(context.collection, args)
+          projection = context.permissions.redact_projection(
+            context.collection,
+            requested[:projection],
+            named_by_caller: requested[:named_by_caller]
+          ).with_pks(context.collection)
           records = context.collection.list(context.caller, filter, projection)
 
           {

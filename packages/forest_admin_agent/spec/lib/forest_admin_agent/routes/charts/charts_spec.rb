@@ -15,6 +15,7 @@ module ForestAdminAgent
 
       describe Charts do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:chart) { described_class.new }
         let(:args) do
           {

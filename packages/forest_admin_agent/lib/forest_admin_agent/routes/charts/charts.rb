@@ -28,6 +28,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can_chart?(args[:params])
+          context.permissions.assert_can_read_query_fields(context.collection, args, consumes: %i[filter])
           type = validate_and_get_type(args[:params][:type])
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
@@ -89,6 +90,10 @@ module ForestAdminAgent
 
         def make_pie(context, filter, args)
           group_field = args[:params][:groupByFieldName]
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['group a chart by', group_field], ['aggregate a chart on', args[:params][:aggregateFieldName]]]
+          )
           aggregation = Aggregation.new(
             operation: args[:params][:aggregator],
             field: args[:params][:aggregateFieldName],
@@ -102,6 +107,11 @@ module ForestAdminAgent
 
         def make_line(context, filter, args)
           group_by_field_name = args[:params][:groupByFieldName]
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['group a chart by', group_by_field_name],
+             ['aggregate a chart on', args[:params][:aggregateFieldName]]]
+          )
           time_range = args[:params][:timeRange]
           filter_only_with_values = filter.override(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
@@ -178,6 +188,18 @@ module ForestAdminAgent
           end
 
           if collection && leaderboard_filter && aggregation
+            assert_can_read_aggregated_fields(
+              context, context.datasource.get_collection(collection),
+              [['group a leaderboard by', aggregation.groups[0][:field]],
+               ['aggregate a leaderboard on', aggregation.field]]
+            )
+
+            # A count exposes the cardinality of the relation, which `/relationships/<name>/count`
+            # puts behind `browse`. No path names it, so nothing above sees it.
+            if aggregation.field.nil?
+              context.permissions.can?(:browse, context.datasource.get_collection(field.foreign_collection))
+            end
+
             rows = context.datasource.get_collection(collection).aggregate(
               context.caller,
               leaderboard_filter,
@@ -200,11 +222,32 @@ module ForestAdminAgent
         end
 
         def compute_value(context, filter, args)
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['aggregate a chart on', args[:params][:aggregateFieldName]]]
+          )
           aggregation = Aggregation.new(operation: args[:params][:aggregator],
                                         field: args[:params][:aggregateFieldName])
           result = context.collection.aggregate(context.caller, filter, aggregation)
 
           result[0]['value'] || 0
+        end
+
+        # The permission root stays the chart's own collection, which the leaderboard call site does
+        # not share with the collection its paths resolve against.
+        def assert_can_read_aggregated_fields(context, path_collection, fields)
+          usages = fields.reject { |_action, path| path.nil? || path.to_s.empty? }
+                         .map do |action, path|
+            {
+              action: action,
+              path: path,
+              collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(
+                path_collection, path
+              )
+            }
+          end
+
+          context.permissions.assert_can_read_usages(context.collection.name, usages)
         end
       end
     end

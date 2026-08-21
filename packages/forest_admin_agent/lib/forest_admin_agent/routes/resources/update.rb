@@ -26,7 +26,8 @@ module ForestAdminAgent
           drop_relationships!(args)
           data = format_attributes(args, context.collection)
           context.collection.update(context.caller, filter, data)
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          projection = redacted_full_projection(context)
+          records = context.collection.list(context.caller, filter, projection)
 
           {
             name: args[:params]['collection_name'],

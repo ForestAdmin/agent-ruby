@@ -9,6 +9,8 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      QUERY_COMPONENTS = %i[filter sort search].freeze
+
       attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
@@ -51,6 +53,101 @@ module ForestAdminAgent
         raise ForbiddenError, "You don't have permission to #{action} this collection." unless is_allowed
 
         is_allowed
+      end
+
+      # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
+      # listing, +read+ a get, and the signed hash a chart.
+      #
+      # One cached pass for the whole request, and a single refetch only if it denied something —
+      # unlike +can?+, which refetches on every denial. Denial is the steady state here rather than
+      # the exception, so refetching per collection would cost one permission fetch per request.
+      def read_permissions(root_collection_name, collection_names)
+        to_check = collection_names.uniq.reject { |name| name == root_collection_name }
+        allowed = { root_collection_name => true }
+
+        return allowed if to_check.empty?
+
+        # An absent permission system is not a denial: `can?` allows everything there, and answering
+        # anything else would redact every relation on a deployment that granted nothing to check.
+        return allowed.merge(to_check.to_h { |name| [name, true] }) unless permission_system?
+
+        user_data = get_user_data(caller.id)
+        collections_data = get_collections_permissions_data
+        results = to_check.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+
+        unless results.values.all?
+          collections_data = get_collections_permissions_data(force_fetch: true)
+          results = to_check.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+        end
+
+        allowed.merge(results)
+      end
+
+      # An unnamed field is dropped rather than refused: the default expansion covers every column
+      # of every to-one relation, so refusing would turn an ordinary listing into a 403 for a caller
+      # that asked for nothing.
+      def redact_projection(collection, projection, named_by_caller:)
+        owners = projection.to_h do |path|
+          [path, ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)]
+        end
+        allowed = read_permissions(collection.name, owners.values.flatten)
+        readable = ->(path) { owners[path].all? { |name| allowed[name] } }
+
+        if named_by_caller
+          denied = projection.reject { |path| readable.call(path) }
+
+          unless denied.empty?
+            fields = denied.map { |path| "'#{path}' from the '#{owners[path].join("' or '")}' collection" }
+            raise ForbiddenError, "You are not allowed to read #{fields.join(", ")}."
+          end
+        end
+
+        ForestAdminDatasourceToolkit::Components::Query::Projection.new(projection.select { |path| readable.call(path) })
+      end
+
+      # Refused rather than redacted: dropping a condition widens the result set and dropping a sort
+      # clause silently reorders it, while both leak the value they touch anyway — a `starts_with`
+      # filter answers one guess per request without returning a column of its own.
+      #
+      # +consumes+ names the query components the calling route actually applies to its filter.
+      # Checking one it drops would refuse a request the denied field cannot reach: a count carries
+      # no sort, a chart neither sort nor search.
+      def assert_can_read_query_fields(collection, args, consumes: QUERY_COMPONENTS)
+        usages = []
+        push = lambda do |action, path|
+          usages << {
+            action: action,
+            path: path,
+            collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)
+          }
+        end
+
+        # `for_each_leaf` on a branch replaces each condition with the block's return value, so the
+        # leaf has to come back out or the tree is rebuilt from whatever `push` returned.
+        if consumes.include?(:filter)
+          Utils::QueryStringParser.parse_condition_tree(collection, args)&.for_each_leaf do |leaf|
+            push.call('filter on', leaf.field)
+            leaf
+          end
+        end
+
+        if consumes.include?(:sort)
+          Utils::QueryStringParser.parse_sort(collection, args).each { |clause| push.call('sort on', clause[:field]) }
+        end
+
+        assert_can_read_search(collection, args, usages) if consumes.include?(:search)
+        assert_can_read_usages(collection.name, usages)
+      end
+
+      def assert_can_read_usages(root_collection_name, usages)
+        allowed = read_permissions(root_collection_name, usages.flat_map { |usage| usage[:collections] })
+        denied = usages.find { |usage| !usage[:collections].all? { |name| allowed[name] } }
+
+        return unless denied
+
+        raise ForbiddenError,
+              "You cannot #{denied[:action]} '#{denied[:path]}': you are not allowed to read the " \
+              "'#{denied[:collections].join("' or '")}' collection."
       end
 
       def can_chart?(parameters)
@@ -187,6 +284,35 @@ module ForestAdminAgent
       end
 
       private
+
+      def read_allowed?(collections_data, collection_name, user_data)
+        return false unless user_data_valid?(user_data)
+
+        collection_key = collection_name.to_sym
+        return false unless collection_exists?(collections_data, collection_key, collection_name, user_data)
+
+        role_ids = get_role_ids_for_action(collections_data, collection_key, :read, collection_name, user_data)
+        return false unless role_ids
+
+        check_user_permission(role_ids, user_data, :read, collection_name)
+      end
+
+      def assert_can_read_search(collection, args, usages)
+        # Guarded on searchability before parsing: `parse_search` raises for a search on a collection
+        # that has none, which would turn an ignored parameter into a 400 on the chart routes.
+        return unless collection.schema[:searchable] && collection.respond_to?(:searched_fields)
+
+        search = Utils::QueryStringParser.parse_search(collection, args)
+
+        return if search.nil?
+
+        extended = Utils::QueryStringParser.parse_search_extended(args)
+        searched = collection.searched_fields(search, extended)
+
+        searched&.each do |field|
+          usages << { action: 'search on', path: field[:path], collections: field[:collections] }
+        end
+      end
 
       def permission_allowed?(collections_data, collection, action, user_data)
         return false unless user_data_valid?(user_data)

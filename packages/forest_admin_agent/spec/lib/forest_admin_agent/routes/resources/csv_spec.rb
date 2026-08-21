@@ -13,6 +13,7 @@ module ForestAdminAgent
 
       describe Csv do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:csv) { described_class.new }
         let(:args) do
           {

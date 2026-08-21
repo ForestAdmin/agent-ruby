@@ -23,6 +23,7 @@ module ForestAdminAgent
           def handle_request(args = {})
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
+            context.permissions.assert_can_read_query_fields(context.child_collection, args, consumes: %i[filter sort])
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
@@ -34,8 +35,14 @@ module ForestAdminAgent
               page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
               sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(context.child_collection, args)
             )
-            projection = ForestAdminAgent::Utils::QueryStringParser.parse_projection_with_pks(context.child_collection,
-                                                                                              args)
+            requested = ForestAdminAgent::Utils::QueryStringParser.parse_requested_projection(
+              context.child_collection, args
+            )
+            projection = context.permissions.redact_projection(
+              context.child_collection,
+              requested[:projection],
+              named_by_caller: requested[:named_by_caller]
+            ).with_pks(context.child_collection)
             primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             records = Collection.list_relation(
               context.collection,
