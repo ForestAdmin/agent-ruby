@@ -23,7 +23,7 @@ module ForestAdminAgent
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
             context.permissions.can?(:export, context.child_collection)
-            context.permissions.assert_can_read_query_fields(context.child_collection, args)
+            context.permissions.assert_can_read_query_fields(context.child_collection, args, consumes: %i[filter])
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(

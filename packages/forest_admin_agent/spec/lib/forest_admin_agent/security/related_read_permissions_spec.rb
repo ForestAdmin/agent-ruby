@@ -263,6 +263,18 @@ module ForestAdminAgent
             .not_to raise_error
         end
 
+        # A count applies no sort, so refusing one would refuse a request the denied field cannot
+        # reach. Same shape on the chart routes, which apply neither sort nor search.
+        it 'ignores a query component the route does not apply' do
+          permissions = build_permissions([])
+
+          expect do
+            permissions.assert_can_read_query_fields(
+              cards, args_with(sort: '-account.iban'), consumes: %i[filter search]
+            )
+          end.not_to raise_error
+        end
+
         it 'accepts a filter once the collection it reaches is readable' do
           permissions = build_permissions(%w[accounts])
           args = args_with(filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json)

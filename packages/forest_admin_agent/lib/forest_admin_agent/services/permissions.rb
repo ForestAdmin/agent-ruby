@@ -9,6 +9,8 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      QUERY_COMPONENTS = %i[filter sort search].freeze
+
       attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
@@ -106,7 +108,11 @@ module ForestAdminAgent
       # Refused rather than redacted: dropping a condition widens the result set and dropping a sort
       # clause silently reorders it, while both leak the value they touch anyway — a `starts_with`
       # filter answers one guess per request without returning a column of its own.
-      def assert_can_read_query_fields(collection, args)
+      #
+      # +consumes+ names the query components the calling route actually applies to its filter.
+      # Checking one it drops would refuse a request the denied field cannot reach: a count carries
+      # no sort, a chart neither sort nor search.
+      def assert_can_read_query_fields(collection, args, consumes: QUERY_COMPONENTS)
         usages = []
         push = lambda do |action, path|
           usages << {
@@ -118,14 +124,18 @@ module ForestAdminAgent
 
         # `for_each_leaf` on a branch replaces each condition with the block's return value, so the
         # leaf has to come back out or the tree is rebuilt from whatever `push` returned.
-        Utils::QueryStringParser.parse_condition_tree(collection, args)&.for_each_leaf do |leaf|
-          push.call('filter on', leaf.field)
-          leaf
+        if consumes.include?(:filter)
+          Utils::QueryStringParser.parse_condition_tree(collection, args)&.for_each_leaf do |leaf|
+            push.call('filter on', leaf.field)
+            leaf
+          end
         end
 
-        Utils::QueryStringParser.parse_sort(collection, args).each { |clause| push.call('sort on', clause[:field]) }
+        if consumes.include?(:sort)
+          Utils::QueryStringParser.parse_sort(collection, args).each { |clause| push.call('sort on', clause[:field]) }
+        end
 
-        assert_can_read_search(collection, args, usages)
+        assert_can_read_search(collection, args, usages) if consumes.include?(:search)
         assert_can_read_usages(collection.name, usages)
       end
 
