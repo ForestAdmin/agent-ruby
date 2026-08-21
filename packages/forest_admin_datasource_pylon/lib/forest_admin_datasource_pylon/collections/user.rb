@@ -9,9 +9,8 @@ module ForestAdminDatasourcePylon
 
       protected
 
-      # Pylon exposes no POST and no DELETE on a user — an agent is invited and
-      # deactivated from Pylon itself — so only the update hook is wired and the
-      # other two refuse the verb with a message rather than a 500.
+      # Pylon exposes no POST and no DELETE on a user: an agent is invited and
+      # deactivated from Pylon itself, so the other two hooks are left to refuse.
       def update_record(id, payload) = datasource.client.update_user(id, payload)
 
       # `include_deactivated` is left at the client default of true on purpose:
@@ -48,8 +47,7 @@ module ForestAdminDatasourcePylon
       end
 
       # `PATCH /users/{id}` takes the name, the avatar, the role and the status,
-      # and nothing else: an address is proven by the agent signing in, and the
-      # deactivation happens in Pylon.
+      # and nothing else.
       def define_schema
         add_column('id', 'String', is_primary_key: true)
         add_column('name', 'String', writable: true)

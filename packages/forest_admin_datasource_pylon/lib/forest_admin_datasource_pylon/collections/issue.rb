@@ -80,11 +80,10 @@ module ForestAdminDatasourcePylon
 
       def max_write_targets = [Writes::MAX_WRITE_TARGETS, MAX_ID_LOOKUPS].min
 
-      # Never past the primary-key fan-out: an issue is read by its own
-      # endpoint, so a write resolving named ids through `list` goes through
-      # `fetch_by_ids`, which truncates with a warning past this many, and a
-      # truncated resolution would write to a subset of the selection while
-      # reporting the whole of it.
+      # Never past the primary-key fan-out: a write resolving named ids through
+      # `list` goes through `fetch_by_ids`, which truncates with a warning past
+      # this many, and a truncated resolution would write to a subset of the
+      # selection while reporting the whole of it.
       def max_resolvable_ids = MAX_ID_LOOKUPS
 
       def sortable_fields

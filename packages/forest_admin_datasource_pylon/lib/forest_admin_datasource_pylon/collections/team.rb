@@ -7,8 +7,7 @@ module ForestAdminDatasourcePylon
 
       protected
 
-      # `delete_record` is left alone: Pylon exposes no DELETE on a team, and
-      # the default hook refuses the verb with a message rather than a 500.
+      # Pylon exposes no DELETE on a team, so that hook is left to refuse.
       def create_record(payload) = datasource.client.create_team(payload)
       def update_record(id, payload) = datasource.client.update_team(id, payload)
 
@@ -40,9 +39,9 @@ module ForestAdminDatasourcePylon
         add_column('id', 'String', is_primary_key: true)
         add_column('name', 'String', writable: true)
         # A list, so neither filterable nor sortable, and no relation either:
-        # see `define_relations` above. Writable: `POST /teams` and
-        # `PATCH /teams/{id}` take the members as this very list of ids, and the
-        # one sent replaces the membership whole.
+        # see `define_relations` above. `POST /teams` and `PATCH /teams/{id}`
+        # take the members as this very list, and the one sent replaces the
+        # membership whole.
         add_column('user_ids', 'Json', writable: true)
       end
     end

@@ -7,9 +7,9 @@ module ForestAdminDatasourcePylon
     # enriches a page — a thread that could not be read costs a column — where a
     # write that silently did nothing would tell the operator their edit landed.
     #
-    # Pylon exposes no write endpoint for every verb: there is no POST or DELETE
-    # on users, and no DELETE on teams. The collections answer those, not the
-    # client, which only spells the endpoints that exist.
+    # Pylon exposes no POST or DELETE on users, and no DELETE on teams. The
+    # collections answer those, not the client, which only spells the endpoints
+    # that exist.
     module Writes
       # `title` and `body_html` are the two fields POST /issues requires.
       def create_issue(attributes) = post_resource('issues', attributes)
@@ -58,10 +58,9 @@ module ForestAdminDatasourcePylon
       end
 
       # Pylon answers a write with the written record under `data`. Anything else
-      # means the contract broke, which is worth a typed error rather than an
-      # envelope the collection would then serialize into a record with no id --
-      # `extract_data` hands the body back untouched when `data` is absent, which
-      # is what a read wants and a write must not accept.
+      # broke the contract: `extract_data` hands the body back untouched when
+      # `data` is absent, which is what a read wants and a write must not accept
+      # — the collection would serialize the envelope into a record with no id.
       def extract_written(body, operation)
         record = body['data'] if body.is_a?(Hash)
         return record if record.is_a?(Hash)
@@ -69,12 +68,10 @@ module ForestAdminDatasourcePylon
         refuse_body_shape(body, operation, "missing 'data'")
       end
 
-      # An update is answered the same way, but its record is never read back:
-      # the collection discards it. So a 204, an empty body or a null `data` is
-      # the write having landed with nothing to hand back, and raising there
-      # would report a failure on a record Pylon already patched — and abort the
-      # records a bulk edit had left to write. Only a `data` carrying something
-      # that is not a record means the contract broke.
+      # An update discards its record, so a 204, an empty body or a null `data`
+      # is the write having landed with nothing to hand back: raising there would
+      # report a failure on a record Pylon already patched, and abort the records
+      # a bulk edit had left to write.
       def extract_updated(body, operation)
         record = body['data'] if body.is_a?(Hash)
         return record if record.nil? || record.is_a?(Hash)

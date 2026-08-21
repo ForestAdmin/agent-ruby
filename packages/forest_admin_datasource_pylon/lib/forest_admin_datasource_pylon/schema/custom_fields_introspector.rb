@@ -108,9 +108,8 @@ module ForestAdminDatasourcePylon
       # A custom field is writable unless Pylon says otherwise: it flags the ones
       # synced from an app or an integration, which its own endpoints refuse.
       # Nothing is sortable -- no Pylon endpoint takes a sort parameter -- and
-      # nothing is groupable, as Pylon aggregates nothing: one column left
-      # groupable turns `supportGroups` on for the whole collection, and the
-      # group-by the UI then offers errors.
+      # nothing is groupable: one column left groupable turns `supportGroups` on
+      # for the whole collection, and the group-by the UI then offers errors.
       def build_schema(raw, column_type)
         opts = { column_type: column_type,
                  filter_operators: OPERATORS.fetch(column_type, []),

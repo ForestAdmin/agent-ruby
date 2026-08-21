@@ -68,16 +68,15 @@ module ForestAdminDatasourcePylon
           # returns; a plain column, see `define_relations` above.
           add_column('owner_id', 'String', writable: true)
           # Read-only although the endpoint takes it: the column shows
-          # `{external_id, label}` objects, and what the API writes back is not
-          # documented in that shape — writing one for the other would replace
+          # `{external_id, label}` objects, and the write shape the reference
+          # documents is not that one — writing one for the other would replace
           # the ids of the account with something it cannot read.
           add_column('external_ids', 'Json')
         end
 
         # Both belong to the integrations Pylon syncs them from: `crm_settings`
         # is absent from every write endpoint, and `channels` — which they do
-        # take — is a list of objects whose write shape the reference does not
-        # document, the same reason `external_ids` stays read-only above.
+        # take — holds objects, like `external_ids` above.
         def define_integration_fields
           add_column('channels', 'Json')
           add_column('crm_settings', 'Json')

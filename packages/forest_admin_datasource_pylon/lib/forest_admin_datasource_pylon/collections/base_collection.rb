@@ -201,8 +201,7 @@ module ForestAdminDatasourcePylon
       end
 
       # A native column: read-only unless the collection declares it `writable`,
-      # which is what the payload builder reads to know a column may be sent, and
-      # never groupable, as no Pylon endpoint aggregates. It is not sortable
+      # and never groupable, as no Pylon endpoint aggregates. It is not sortable
       # either, the ColumnSchema default, because no search endpoint takes a sort
       # parameter. Filter operators are not chosen here: they come from
       # `filter_table`, which mirrors the allow-list of the API, so a column
@@ -340,12 +339,10 @@ module ForestAdminDatasourcePylon
         @walker ||= Pagination::CursorWalker.new
       end
 
-      # A set of ids, not a list: `id in` names the records to act on, and the
-      # same one named twice is one record. Deduplicating here is what keeps a
-      # lookup from spending two requests on one id and, on the write side, from
-      # writing it twice — a delete answering 404 the second time, reported as a
-      # partial failure of a delete that fully succeeded. It is also what the
-      # caps count against, both bounding records rather than mentions.
+      # A set of ids, not a list: the same one named twice is one record, so a
+      # lookup spends one request on it and a delete does not answer 404 the
+      # second time. The caps count records rather than mentions for the same
+      # reason.
       def id_values(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
         return nil unless [Operators::EQUAL, Operators::IN].include?(node.operator)
@@ -363,10 +360,8 @@ module ForestAdminDatasourcePylon
       # would bring in records the lookup never fetched. Worth an error an
       # operator can act on rather than the translator's "add it to api_filters",
       # because two things they do reach it: the `id equals` filter next to the
-      # or/and toggle, and — through the write path — an excluding selection,
-      # "select every record except these", which arrives as `id not_in` and
-      # names the records to leave out rather than the ones to read. The message
-      # names both, an exclusion being no filter the operator wrote.
+      # or/and toggle, and an excluding selection — "every record except these" —
+      # which arrives as `id not_in` and is no filter they wrote.
       #
       # A collection whose endpoint does filter id declares it in `api_filters`
       # and never short-circuits, so the translator handles its ids like any

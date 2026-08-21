@@ -3,11 +3,11 @@ module ForestAdminDatasourcePylon
     class Issue < BaseCollection
       # A column is writable when `POST /issues` or `PATCH /issues/{id}` accepts
       # it, the two directions being told apart by `Issue::CREATE_ONLY` and
-      # `Issue::UPDATE_ONLY`; everything Pylon computes — the number, the link,
-      # the timestamps, the counters — stays read-only. No column is sortable,
-      # `/issues/search` exposing no sort parameter at all: results always come
-      # back ordered by `created_at` descending, so advertising a sortable column
-      # would let the UI ask for an order the API cannot honour.
+      # `Issue::UPDATE_ONLY`; everything Pylon computes stays read-only. No
+      # column is sortable, `/issues/search` exposing no sort parameter at all:
+      # results always come back ordered by `created_at` descending, so
+      # advertising a sortable column would let the UI ask for an order the API
+      # cannot honour.
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
@@ -97,12 +97,11 @@ module ForestAdminDatasourcePylon
         # columns next to the relations they are the keys of: they are what the
         # search endpoint filters, on this side and on the reverse one.
         #
-        # Writable, although the schema the agent sends Forest marks a foreign
-        # key read-only whatever the datasource says — `GeneratorField` forces it
-        # so the detail view has one editor per key rather than two. What the
-        # flag opens is that editor, the `BelongsTo` reading its own read-only
-        # state off the key column, and the front sends the choice back as the
-        # very column named here.
+        # Writable, although `GeneratorField` forces a foreign key read-only in
+        # the emitted schema whatever the datasource says, so the detail view has
+        # one editor per key rather than two. What the flag opens is that editor:
+        # the `BelongsTo` reads its own read-only state off the key column, and
+        # the front sends the choice back as the very column named here.
         def define_party_fields
           %w[account_id requester_id assignee_id team_id].each do |field|
             add_column(field, 'String', writable: true)
