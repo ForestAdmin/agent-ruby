@@ -353,6 +353,21 @@ module ForestAdminDatasourcePylon
         expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
       end
 
+      # Nothing here may claim a value is unchanged on a record it never read,
+      # and one record short of the selection is enough: dropping the field would
+      # write the rest of the patch to a record whose stored value is unknown and
+      # report the whole edit as performed.
+      it 'refuses it when one of the named records could not be read' do
+        stub_request(:get, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+        stub_request(:get, "#{base}/issues/i2").to_return(json({ 'message' => 'gone' }, 404))
+
+        expect do
+          issues.update(nil, id_filter(operators::IN, %w[i1 i2]),
+                        'body_html' => '<p>boom</p>', 'title' => 'Louder')
+        end.to raise_error(UnsupportedWriteError, /'body_html' cannot be set here on a PylonIssue/)
+        expect(WebMock).not_to have_requested(:patch, %r{/issues/})
+      end
+
       # Both offending fields at once: refusing them one at a time would have the
       # operator undo one, retry, and learn about the next.
       it 'names every field of the wrong direction in one message' do
@@ -415,12 +430,15 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:delete, %r{/issues/})
       end
 
-      it 'refuses it when the count only shows once the filter is resolved' do
+      # The resolution asks for one record past the cap, so the overflow is seen
+      # rather than counted: reporting the window as a count would name 21 to an
+      # operator whose selection holds thousands.
+      it 'refuses it when the overflow only shows once the filter is resolved, without naming a count' do
         stub_request(:post, "#{base}/accounts/search")
           .to_return(json('data' => Array.new(21) { |index| { 'id' => "a#{index}", 'name' => 'Acme' } }))
 
         expect { accounts.delete(nil, filter(condition_tree: leaf('name', operators::EQUAL, 'Acme'))) }
-          .to raise_error(UnsupportedWriteError, /applies to 21 PylonAccount records/)
+          .to raise_error(UnsupportedWriteError, /applies to more than the 20 PylonAccount records one pass covers/)
         expect(WebMock).not_to have_requested(:delete, %r{/accounts/})
       end
 

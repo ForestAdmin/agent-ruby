@@ -19,12 +19,21 @@ module ForestAdminDatasourcePylon
       Faraday::RetriableResponse, Faraday::ConnectionFailed
     ].freeze
 
-    # Faraday only retries these by default; a 429 is safe to retry on any verb
-    # because Pylon rejected the request before processing it, whereas a 502 on a
-    # POST /issues may well have created the issue. This has to go through
-    # retry_if rather than methods: faraday-retry ORs the two, so methods can
-    # only widen the set, never restrict it.
-    IDEMPOTENT_METHODS = %i[delete get head options put].freeze
+    # The verbs a replay cannot repeat: a GET, a HEAD and an OPTIONS change
+    # nothing, so any transient failure is worth another attempt.
+    #
+    # DELETE is deliberately out, although HTTP calls it idempotent and
+    # faraday-retry ships it as a default: a 502 or a dropped connection on the
+    # way back from a DELETE Pylon did perform is replayed into a 404, which the
+    # write path then surfaces as a deletion that failed when it landed -- the
+    # very report of something that did not happen this datasource refuses. PUT
+    # is out for having no endpoint: Pylon writes through POST and PATCH.
+    #
+    # A 429 stays safe to retry on any verb, Pylon having rejected the request
+    # before processing it, and travels through retry_if rather than through this
+    # list: faraday-retry ORs the two, so methods can only widen the set, never
+    # restrict it.
+    IDEMPOTENT_METHODS = %i[get head options].freeze
     RETRY_IF = ->(env, _exception) { env[:status] == 429 }
 
     BACKOFF_FACTOR = 2

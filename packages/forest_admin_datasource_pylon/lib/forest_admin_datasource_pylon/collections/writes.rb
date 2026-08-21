@@ -173,7 +173,7 @@ module ForestAdminDatasourcePylon
         window  = Page.new(offset: 0, limit: max_write_targets + 1)
         query   = (filter || Filter.new).override(page: window)
         records = list(caller, query, Projection.new(['id']))
-        refuse_too_many_targets(records.size) if records.size > max_write_targets
+        refuse_unbounded_targets if records.size > max_write_targets
 
         records.filter_map { |record| record['id'] }.uniq
       end
@@ -260,14 +260,15 @@ module ForestAdminDatasourcePylon
       end
 
       # The wrong-direction fields already holding the value the patch asks for.
-      # An unreadable record counts as none of them: the field is refused rather
-      # than dropped, since nothing here may claim a value is unchanged without
-      # having read it.
+      # A record the read did not hand back counts as none of them, and one
+      # missing record is enough: the field is refused rather than dropped, since
+      # nothing here may claim a value is unchanged on a record it never read --
+      # which a selection where only some ids came back would otherwise do.
       def unchanged_fields(caller, ids, fields, attrs)
         return [] if fields.empty?
 
         stored = stored_values(caller, ids, fields)
-        return [] if stored.empty?
+        return [] if stored.size < ids.size
 
         fields.select { |field| stored.all? { |record| same_write_value?(record[field], attrs[field]) } }
       end
@@ -353,12 +354,23 @@ module ForestAdminDatasourcePylon
         raise UnsupportedWriteError, "#{named} cannot be set here on a #{name}: #{detail}"
       end
 
+      # The count is exact here, the filter having named the ids.
       def refuse_too_many_targets(count)
+        refuse_write_reach("applies to #{count} #{name} records, more than the #{max_write_targets} one pass covers")
+      end
+
+      # The resolution asks for one record past the cap, so all it knows is that
+      # the selection overflows: reporting the size of its window as a count
+      # would name 21 records to an operator whose selection holds thousands.
+      def refuse_unbounded_targets
+        refuse_write_reach("applies to more than the #{max_write_targets} #{name} records one pass covers")
+      end
+
+      def refuse_write_reach(reach)
         raise UnsupportedWriteError,
-              "This write applies to #{count} #{name} records, more than the #{max_write_targets} one pass " \
-              'covers: Pylon writes one record per request, against a budget of ten to twenty requests per ' \
-              'minute, and a write stopping halfway would report a success it did not perform. Narrow the ' \
-              'selection to reach the records past this point.'
+              "This write #{reach}: Pylon writes one record per request, against a budget of ten to twenty " \
+              'requests per minute, and a write stopping halfway would report a success it did not perform. ' \
+              'Narrow the selection to reach the records past this point.'
       end
 
       # Named ids the collection cannot resolve exactly, the filter carrying

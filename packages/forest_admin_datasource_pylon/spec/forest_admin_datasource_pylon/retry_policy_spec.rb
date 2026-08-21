@@ -36,9 +36,16 @@ RSpec.describe ForestAdminDatasourcePylon::RetryPolicy do
       expect(options[:exceptions]).to include(Faraday::ConnectionFailed, Faraday::RetriableResponse)
     end
 
-    it 'limits blanket retries to idempotent verbs' do
-      expect(options[:methods]).to eq(%i[delete get head options put])
+    it 'limits blanket retries to the verbs that read' do
+      expect(options[:methods]).to eq(%i[get head options])
       expect(options[:methods]).not_to include(:post, :patch)
+    end
+
+    # A 502 on the way back from a DELETE Pylon did perform would be replayed
+    # into a 404, which the write path surfaces as a deletion that failed when
+    # it landed. Only its 429 is retried, through RETRY_IF.
+    it 'never replays a delete on anything but a 429' do
+      expect(options[:methods]).not_to include(:delete)
     end
   end
 

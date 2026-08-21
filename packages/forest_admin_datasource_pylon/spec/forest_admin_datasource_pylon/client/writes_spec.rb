@@ -135,5 +135,25 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
       expect { client.create_issue('title' => 'Boom') }.to raise_error(ForestAdminDatasourcePylon::APIError)
       expect(WebMock).to have_requested(:post, "#{base}/issues").once
     end
+
+    it 'retries a rate-limited delete' do
+      stub_request(:delete, "#{base}/issues/i1")
+        .to_return(json({ 'message' => 'slow down' }, 429))
+        .then.to_return(json({}, 204))
+
+      expect(client.delete_issue('i1')).to be(true)
+      expect(WebMock).to have_requested(:delete, "#{base}/issues/i1").twice
+    end
+
+    # A 502 on the way back from a DELETE Pylon did perform would be replayed
+    # into a 404, which the write path surfaces as a deletion that failed when
+    # it landed -- a report of something that did not happen. So the gateway
+    # error stays what it is, on a delete as on a create.
+    it 'does not retry a delete that failed on a gateway error' do
+      stub_request(:delete, "#{base}/issues/i1").to_return(json({ 'message' => 'bad gateway' }, 502))
+
+      expect { client.delete_issue('i1') }.to raise_error(ForestAdminDatasourcePylon::APIError, /502/)
+      expect(WebMock).to have_requested(:delete, "#{base}/issues/i1").once
+    end
   end
 end
