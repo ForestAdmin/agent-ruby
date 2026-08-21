@@ -2,6 +2,8 @@ module ForestAdminDatasourcePylon
   # Long by line count only: the public surface is one explicit method per Pylon
   # endpoint, each delegating to the shared helpers below.
   class Client # rubocop:disable Metrics/ClassLength
+    include Writes
+
     MAX_SEARCH_LIMIT = 1000
 
     # Bounds `collect_pages`, which asks for a whole dataset rather than a

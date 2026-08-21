@@ -1,10 +1,12 @@
 module ForestAdminDatasourcePylon
   module Collections
     class Account < CursorCollection
-      # Every column is read-only in this story: writes land in a later one. No
-      # column is sortable either — neither `GET /accounts` nor
-      # `POST /accounts/search` exposes a sort parameter, so advertising a
-      # sortable column would let the UI ask for an order the API cannot honour.
+      # A column is writable when `POST /accounts` or `PATCH /accounts/{id}`
+      # accepts it, in the shape it is read under — the Json columns holding
+      # objects rather than plain strings are left read-only, see below. No
+      # column is sortable — neither `GET /accounts` nor `POST /accounts/search`
+      # exposes a sort parameter, so advertising a sortable column would let the
+      # UI ask for an order the API cannot honour.
       #
       # Filter operators are not chosen here: they come from
       # `ApiFilters::API_FILTERS`, which mirrors the allow-list of the API. A
@@ -41,29 +43,40 @@ module ForestAdminDatasourcePylon
 
         def define_identity_fields
           add_column('id', 'String', is_primary_key: true)
-          add_column('name', 'String')
+          add_column('name', 'String', writable: true)
           # Left as String rather than Enum: Pylon ships customer / partner /
-          # prospect but lets an organization define its own account types.
-          add_column('type', 'String')
-          add_column('is_disabled', 'Boolean')
+          # prospect but lets an organization define its own account types. It
+          # is written under the name `account_type`, see `Account::RENAMES`.
+          add_column('type', 'String', writable: true)
+          # Writable on an update only: an account is created enabled.
+          add_column('is_disabled', 'Boolean', writable: true)
         end
 
         # `domain` and `primary_domain` carry the same value; both are kept
         # because Pylon returns both, and only the `domains` list is filterable.
+        # Neither is writable: `domains` is the list the API takes, and writing
+        # one of its two projections would leave the other stale.
         def define_domain_fields
           add_column('domain', 'String')
           add_column('primary_domain', 'String')
-          add_column('domains', 'Json')
-          add_column('tags', 'Json')
+          add_column('domains', 'Json', writable: true)
+          add_column('tags', 'Json', writable: true)
         end
 
         def define_ownership_fields
           # Flattened from the nested `{ id: ..., email: ... }` object Pylon
           # returns; a plain column, see `define_relations` above.
-          add_column('owner_id', 'String')
+          add_column('owner_id', 'String', writable: true)
+          # Read-only although the endpoint takes it: the column shows
+          # `{external_id, label}` objects, and the write shape the reference
+          # documents is not that one — writing one for the other would replace
+          # the ids of the account with something it cannot read.
           add_column('external_ids', 'Json')
         end
 
+        # Both belong to the integrations Pylon syncs them from: `crm_settings`
+        # is absent from every write endpoint, and `channels` — which they do
+        # take — holds objects, like `external_ids` above.
         def define_integration_fields
           add_column('channels', 'Json')
           add_column('crm_settings', 'Json')

@@ -4,6 +4,13 @@ module ForestAdminDatasourcePylon
       include SchemaDefinition
       include Serializer
 
+      # Pylon reads an account's type back as `type` and takes it as
+      # `account_type`.
+      RENAMES = { 'type' => 'account_type' }.freeze
+
+      # An account is created enabled; only `PATCH /accounts/{id}` disables one.
+      UPDATE_ONLY = %w[is_disabled].freeze
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonAccount', custom_fields: custom_fields, searchable: true)
       end
@@ -11,6 +18,13 @@ module ForestAdminDatasourcePylon
       protected
 
       def filter_table = ApiFilters
+
+      def create_record(payload) = datasource.client.create_account(payload)
+      def update_record(id, payload) = datasource.client.update_account(id, payload)
+      def delete_record(id) = datasource.client.delete_account(id)
+
+      def update_only_fields = UPDATE_ONLY
+      def payload_renames = RENAMES
 
       def unsortable_warning
         '[forest_admin_datasource_pylon] PylonAccount cannot honour the requested order; neither GET /accounts ' \

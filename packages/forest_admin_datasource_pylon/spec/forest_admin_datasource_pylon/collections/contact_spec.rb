@@ -106,10 +106,21 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['integration_user_ids'].column_type).to eq('Json')
       end
 
-      # Neither endpoint exposes a sort parameter, and writes land in a later story.
-      it 'declares every column read-only and non-sortable' do
-        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+      # Neither endpoint exposes a sort parameter.
+      it 'declares every column non-sortable' do
         expect(columns.values.map(&:is_sortable).uniq).to eq([false])
+      end
+
+      # `phone_numbers` and `external_ids` stay read-only although the endpoint
+      # takes them: they hold objects, in a shape the write side does not
+      # document as the one the column shows. `portal_role` stays read-only next
+      # to the `portal_role_id` it is the name of, so one patch never carries two
+      # projections of the same role.
+      it 'declares writable exactly the columns an endpoint takes in the shape they are read' do
+        writable = columns.reject { |_name, column| column.is_read_only }.keys
+
+        expect(writable).to contain_exactly('name', 'account_id', 'email', 'emails', 'avatar_url',
+                                            'primary_phone_number', 'portal_role_id')
       end
 
       # No Pylon endpoint aggregates, and the pages of a cursor walk are not the

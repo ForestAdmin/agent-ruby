@@ -1,8 +1,9 @@
 module ForestAdminDatasourcePylon
   module Schema
     # Turns the custom fields an organization defined in Pylon into columns, as
-    # entries shaped `{ column_name:, schema: }` — what `add_custom_fields`
-    # registers on a collection.
+    # entries shaped `{ column_name:, schema:, multi_value: }` — what
+    # `add_custom_fields` registers on a collection, and what the payload
+    # builder writes a value back through.
     #
     # `column_name` is the Pylon slug verbatim, and there is no second key
     # carrying it: the slug is both what a read payload indexes the values by and
@@ -37,6 +38,9 @@ module ForestAdminDatasourcePylon
         'select' => 'Enum',
         'multiselect' => 'Json'
       }.freeze
+
+      # The types Pylon writes back through `values` rather than `value`.
+      MULTI_VALUE_TYPES = %w[multiselect].freeze
 
       BASE_OPS = (Maps::EQUALITY.keys + Maps::PRESENCE.keys).freeze
 
@@ -97,19 +101,19 @@ module ForestAdminDatasourcePylon
         column_type = PYLON_TO_COLUMN_TYPE[raw['type']]
         return warn_unknown_type(raw, slug, object_type) if column_type.nil?
 
-        { column_name: slug, schema: build_schema(raw, column_type) }
+        { column_name: slug, schema: build_schema(raw, column_type),
+          multi_value: MULTI_VALUE_TYPES.include?(raw['type']) }
       end
 
-      # Every custom field is read-only in this story, like every native column:
-      # writes land in story 7 (EXT-11), which is also where Pylon's own
-      # `is_read_only` flag starts being honoured. Nothing is sortable either --
-      # no Pylon endpoint takes a sort parameter, and nothing is groupable, as
-      # Pylon aggregates nothing: one column left groupable turns `supportGroups`
-      # on for the whole collection, and the group-by the UI then offers errors.
+      # A custom field is writable when Pylon says it is: it flags the ones
+      # synced from an app or an integration, which its own endpoints refuse.
+      # Nothing is sortable -- no Pylon endpoint takes a sort parameter -- and
+      # nothing is groupable: one column left groupable turns `supportGroups` on
+      # for the whole collection, and the group-by the UI then offers errors.
       def build_schema(raw, column_type)
         opts = { column_type: column_type,
                  filter_operators: OPERATORS.fetch(column_type, []),
-                 is_read_only: true,
+                 is_read_only: !writable_definition?(raw),
                  is_sortable: false,
                  is_groupable: false }
 
@@ -135,6 +139,28 @@ module ForestAdminDatasourcePylon
         Array(options).filter_map do |option|
           option['slug'] if option.is_a?(Hash) && !option['slug'].to_s.empty?
         end
+      end
+
+      # Only an explicit `false` opens a custom field to writes. A definition
+      # carrying no flag at all is left read-only and reported: this datasource
+      # advertises nothing an endpoint would refuse, and reading the absence as
+      # "writable" would turn every field synced from an app into an editor whose
+      # every save Pylon rejects -- where reading it as "read-only" costs the
+      # capability and says so once per boot.
+      def writable_definition?(raw)
+        return true if raw['is_read_only'] == false
+        return false if raw['is_read_only'] == true
+
+        warn_unflagged_writability(raw)
+        false
+      end
+
+      def warn_unflagged_writability(raw)
+        ForestAdminDatasourcePylon.logger.warn(
+          "[forest_admin_datasource_pylon] Custom field '#{raw["slug"]}' carries no 'is_read_only' flag; " \
+          'leaving it read-only. Pylon refuses a write on the fields it syncs from an app or an integration, ' \
+          'and nothing here can tell this one apart from those without the flag.'
+        )
       end
 
       def warn_unknown_type(raw, slug, object_type)

@@ -74,12 +74,19 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['id'].is_primary_key).to be(true)
       end
 
-      # Writes land in a later story; the order is honoured in memory over the
-      # complete dataset, so both scalar columns can be sorted on.
-      it 'declares every column read-only and both scalar columns sortable' do
-        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+      # The order is honoured in memory over the complete dataset, so both
+      # scalar columns can be sorted on.
+      it 'declares both scalar columns sortable' do
         expect(columns.except('user_ids').values.map(&:is_sortable).uniq).to eq([true])
         expect(collection.fields['user_ids'].is_sortable).to be(false)
+      end
+
+      # POST /teams and PATCH /teams/{id} take the name and the members, and
+      # Pylon names the id itself.
+      it 'declares writable exactly the columns an endpoint takes' do
+        writable = columns.reject { |_name, column| column.is_read_only }.keys
+
+        expect(writable).to contain_exactly('name', 'user_ids')
       end
 
       # GET /teams carries neither a search nor a filter parameter, and Pylon

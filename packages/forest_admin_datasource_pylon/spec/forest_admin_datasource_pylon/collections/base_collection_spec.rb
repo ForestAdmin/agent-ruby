@@ -497,7 +497,7 @@ module ForestAdminDatasourcePylon
         node = branch('Or', [leaf('id', operators::EQUAL, 'uuid-1'), leaf('state', operators::EQUAL, 'new')])
 
         expect { collection.build_pylon_filter(nil, filter(condition_tree: node)) }
-          .to raise_error(UnsupportedOperatorError, /has to be combined with 'and' conditions only/)
+          .to raise_error(UnsupportedOperatorError, /An id inside an `or` names none/)
       end
 
       # A collection whose endpoint filters id server-side never short-circuits,

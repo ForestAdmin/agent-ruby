@@ -102,10 +102,18 @@ module ForestAdminDatasourcePylon
         expect(collection.fields['latest_customer_activity_time'].column_type).to eq('Date')
       end
 
-      # Neither endpoint exposes a sort parameter, and writes land in a later story.
-      it 'declares every column read-only and non-sortable' do
-        expect(columns.values.map(&:is_read_only).uniq).to eq([true])
+      # Neither endpoint exposes a sort parameter.
+      it 'declares every column non-sortable' do
         expect(columns.values.map(&:is_sortable).uniq).to eq([false])
+      end
+
+      # The Json columns holding objects — `external_ids`, `channels` — stay
+      # read-only although the endpoint takes them: their write shape is not the
+      # one the column shows.
+      it 'declares writable exactly the columns an endpoint takes in the shape they are read' do
+        writable = columns.reject { |_name, column| column.is_read_only }.keys
+
+        expect(writable).to contain_exactly('name', 'type', 'is_disabled', 'domains', 'tags', 'owner_id')
       end
 
       # No Pylon endpoint aggregates, and the pages of a cursor walk are not the

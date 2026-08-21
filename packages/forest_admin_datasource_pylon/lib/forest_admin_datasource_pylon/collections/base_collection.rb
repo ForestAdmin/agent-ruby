@@ -1,6 +1,8 @@
 module ForestAdminDatasourcePylon
   module Collections
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
+      include Writes
+
       ColumnSchema         = ForestAdminDatasourceToolkit::Schema::ColumnSchema
       ManyToOneSchema      = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       OneToManySchema      = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
@@ -198,18 +200,18 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      # A native column: read-only in this story — writes land in a later one —
+      # A native column: read-only unless the collection declares it `writable`,
       # and never groupable, as no Pylon endpoint aggregates. It is not sortable
       # either, the ColumnSchema default, because no search endpoint takes a sort
       # parameter. Filter operators are not chosen here: they come from
       # `filter_table`, which mirrors the allow-list of the API, so a column
       # missing from it gets none and the UI offers no filter Pylon would refuse.
-      def add_column(name, type, is_primary_key: false)
+      def add_column(name, type, is_primary_key: false, writable: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: filter_table.forest_operators(name),
                                          is_primary_key: is_primary_key,
                                          is_groupable: false,
-                                         is_read_only: true))
+                                         is_read_only: !writable))
       end
 
       # A record read through the endpoint of an id that is not the primary key
@@ -260,6 +262,11 @@ module ForestAdminDatasourcePylon
       # order by presence alone.
       def default_pk_sort?(sort)
         normalized_sort_clauses(sort) == normalized_sort_clauses(SortFactory.by_primary_keys(self))
+      end
+
+      # The search box sends an empty string once the operator clears it.
+      def no_search?(filter)
+        filter&.search.to_s.strip.empty?
       end
 
       def timezone_for(caller)
@@ -332,11 +339,15 @@ module ForestAdminDatasourcePylon
         @walker ||= Pagination::CursorWalker.new
       end
 
+      # A set of ids, not a list: the same one named twice is one record, so a
+      # lookup spends one request on it and a delete does not answer 404 the
+      # second time. The caps count records rather than mentions for the same
+      # reason.
       def id_values(node)
         return nil unless node.is_a?(Leaf) && node.field == 'id'
         return nil unless [Operators::EQUAL, Operators::IN].include?(node.operator)
 
-        Array(node.value).map(&:to_s).reject(&:empty?)
+        Array(node.value).map(&:to_s).reject(&:empty?).uniq
       end
 
       def and_branch?(node)
@@ -346,9 +357,11 @@ module ForestAdminDatasourcePylon
       # An `id` the short-circuit could not take out of the tree has no
       # translation left: the endpoint filters no id server-side, and an id under
       # an OR cannot be narrowed to a lookup because the other side of the union
-      # would bring in records the lookup never fetched. The UI does offer both
-      # an `id equals` filter and the or/and toggle, so this is worth an error an
-      # operator can act on rather than the translator's "add it to api_filters".
+      # would bring in records the lookup never fetched. Worth an error an
+      # operator can act on rather than the translator's "add it to api_filters",
+      # because two things they do reach it: the `id equals` filter next to the
+      # or/and toggle, and an excluding selection — "every record except these" —
+      # which arrives as `id not_in` and is no filter they wrote.
       #
       # A collection whose endpoint does filter id declares it in `api_filters`
       # and never short-circuits, so the translator handles its ids like any
@@ -358,9 +371,11 @@ module ForestAdminDatasourcePylon
         return unless node.some_leaf { |leaf| leaf.field == 'id' }
 
         raise UnsupportedOperatorError,
-              "A filter on 'id' has to be combined with 'and' conditions only: Pylon cannot filter on id, so the " \
-              'agent reads the records by id and applies the rest in memory, which an id inside an `or` would ' \
-              'silently widen. Rewrite the filter with `and`, or filter on another field.'
+              "#{name} cannot answer this selection: Pylon cannot filter on id, so the agent reads the records " \
+              'by id and applies the rest in memory, which only an `and` of `id equals` / `id in` conditions ' \
+              'names a set of records to read. An id inside an `or` names none, and neither does an exclusion, ' \
+              'which is what selecting every record except a few sends. Select the records to act on rather ' \
+              'than the ones to leave out, rewrite the filter with `and`, or filter on another field.'
       end
 
       def resolve_relation_conditions(caller, node)

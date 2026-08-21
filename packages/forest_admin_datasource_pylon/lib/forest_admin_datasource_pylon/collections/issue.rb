@@ -46,6 +46,15 @@ module ForestAdminDatasourcePylon
       # that would let this cap grow.
       MAX_MESSAGE_EMBEDS = 10
 
+      # `body_html` is the first message of the thread, which `POST /issues`
+      # requires and `PATCH /issues/{id}` does not carry; `author_unverified`
+      # qualifies that message and travels with it.
+      CREATE_ONLY = %w[body_html author_unverified].freeze
+
+      # Pylon creates every issue as `new`, of the type it decides, and takes
+      # both on an update only.
+      UPDATE_ONLY = %w[state type].freeze
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonIssue', custom_fields: custom_fields, searchable: true)
       end
@@ -61,6 +70,27 @@ module ForestAdminDatasourcePylon
       protected
 
       def filter_table = ApiFilters
+
+      def create_record(payload) = datasource.client.create_issue(payload)
+      def update_record(id, payload) = datasource.client.update_issue(id, payload)
+      def delete_record(id) = datasource.client.delete_issue(id)
+
+      def create_only_fields = CREATE_ONLY
+      def update_only_fields = UPDATE_ONLY
+
+      # An issue is read through `GET /issues/{id}`, one request per record: a
+      # selection resolved or compared that way spends the write budget twice
+      # over, so it divides the records one pass reaches rather than fitting
+      # beside them.
+      def requests_per_record_read = 1
+
+      # Never past the primary-key fan-out either: a write resolving named ids
+      # through `list` goes through `fetch_by_ids`, which truncates with a
+      # warning past this many, and a truncated resolution would write to a
+      # subset of the selection while reporting the whole of it. The budget is
+      # the tighter of the two at today's numbers; the clamp keeps that true if
+      # either moves.
+      def max_resolvable_ids(reads: 0) = [super, MAX_ID_LOOKUPS].min
 
       def sortable_fields
         PYLON_SORTABLE

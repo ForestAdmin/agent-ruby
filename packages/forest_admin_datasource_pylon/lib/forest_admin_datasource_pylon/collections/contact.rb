@@ -4,6 +4,11 @@ module ForestAdminDatasourcePylon
       include SchemaDefinition
       include Serializer
 
+      # `POST /contacts` takes the primary address alone; the other ones are set
+      # on an existing contact, through the list.
+      CREATE_ONLY = %w[email].freeze
+      UPDATE_ONLY = %w[emails].freeze
+
       def initialize(datasource, custom_fields: [])
         super(datasource, 'PylonContact', custom_fields: custom_fields, searchable: true)
       end
@@ -11,6 +16,13 @@ module ForestAdminDatasourcePylon
       protected
 
       def filter_table = ApiFilters
+
+      def create_record(payload) = datasource.client.create_contact(payload)
+      def update_record(id, payload) = datasource.client.update_contact(id, payload)
+      def delete_record(id) = datasource.client.delete_contact(id)
+
+      def create_only_fields = CREATE_ONLY
+      def update_only_fields = UPDATE_ONLY
 
       def unsortable_warning
         '[forest_admin_datasource_pylon] PylonContact cannot honour the requested order; neither GET /contacts ' \
