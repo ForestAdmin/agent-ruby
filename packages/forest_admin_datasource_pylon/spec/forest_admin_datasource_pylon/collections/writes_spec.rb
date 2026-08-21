@@ -473,6 +473,68 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:get, %r{/issues/})
       end
 
+      # The cap is a budget of requests, not of writes: where a record is read
+      # through its own endpoint, every read the path owes it comes out of the
+      # same twenty, so the records one pass reaches halve for each of them.
+      it 'halves the reach when the patch has every record read before it is written' do
+        ids = Array.new(11) { |index| "i#{index}" }
+
+        expect { issues.update(nil, id_filter(operators::IN, ids), 'body_html' => '<p>x</p>', 'title' => 'Louder') }
+          .to raise_error(UnsupportedWriteError, /applies to 11 PylonIssue records, more than the 10 one pass/)
+        expect(WebMock).not_to have_requested(:get, %r{/issues/})
+        expect(WebMock).not_to have_requested(:patch, %r{/issues/})
+      end
+
+      # The same eleven records, with nothing to read before writing to them.
+      it 'keeps the full reach when the patch owes the records no read' do
+        stub_request(:patch, %r{/issues/i\d+}).to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::IN, Array.new(11) { |index| "i#{index}" }), 'title' => 'Louder')
+
+        expect(WebMock).to have_requested(:patch, %r{/issues/i\d+}).times(11)
+      end
+
+      # A selection naming ids is resolved by reading each of them, so it is
+      # bounded by the same halved reach — and refused before the first of those
+      # reads rather than after twenty of them.
+      it 'refuses a resolution costing a request per record past the halved reach' do
+        ids = Array.new(12) { |index| "i#{index}" }
+
+        expect do
+          issues.update(nil, filter(condition_tree: branch('And', [leaf('id', operators::IN, ids),
+                                                                   leaf('state', operators::EQUAL, 'new')])),
+                        'title' => 'Louder')
+        end.to raise_error(UnsupportedWriteError, /names 12 PylonIssue records .* more than the 10 one pass covers/m)
+        expect(WebMock).not_to have_requested(:get, %r{/issues/})
+      end
+
+      # A selection naming no id is resolved by one page of the search endpoint,
+      # whose cost does not grow with the count: nothing to charge per record, so
+      # the full reach stands.
+      it 'keeps the full reach when the resolution costs one request whatever the count' do
+        stub_request(:post, "#{base}/issues/search")
+          .to_return(json('data' => Array.new(21) { |index| issue_payload("i#{index}") }))
+
+        expect { issues.delete(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'new'))) }
+          .to raise_error(UnsupportedWriteError, /more than the 20 PylonIssue records one pass covers/)
+        expect(WebMock).to have_requested(:post, "#{base}/issues/search").once
+      end
+
+      # And nothing is charged per record where a record costs no request of its
+      # own: the search endpoint filters `id`, so reading the stored value of a
+      # whole selection is one request, whatever the reach.
+      it 'keeps the full reach on a collection whose read does not fan out' do
+        ids = Array.new(11) { |index| "c#{index}" }
+        stored = ids.map { |id| { 'id' => id, 'name' => 'Ada', 'email' => 'ada@acme.test' } }
+        stub_request(:post, "#{base}/contacts/search").to_return(json('data' => stored))
+        stub_request(:patch, %r{/contacts/c\d+}).to_return(json('data' => stored.first))
+
+        contacts.update(nil, id_filter(operators::IN, ids), 'email' => 'ada@acme.test', 'name' => 'Ada Lovelace')
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+        expect(WebMock).to have_requested(:patch, %r{/contacts/c\d+}).times(11)
+      end
+
       # "Select all except these" reaches PylonIssue as `id not_in`, which its
       # endpoint cannot filter: the read refuses it, and so does the delete. The
       # message names that selection rather than the `and`/`or` of a filter the

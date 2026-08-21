@@ -18,10 +18,15 @@ module ForestAdminDatasourcePylon
       Leaf       = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
       Operators  = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
 
-      # How many records one filter-driven update or delete may reach. Pylon
-      # writes one record per request against a budget of 10 to 20 requests per
-      # minute, so a wider selection is refused rather than written halfway.
-      MAX_WRITE_TARGETS = 20
+      # What one filter-driven update or delete may spend, in requests. Pylon
+      # allows 10 to 20 per minute, so a costlier selection is refused rather
+      # than written halfway.
+      #
+      # The budget covers the whole pass, not its writes: where a record is read
+      # through its own endpoint, resolving the selection costs a request per
+      # record and reading a stored value costs another, so a cap counting the
+      # writes alone would let one pass spend three times this.
+      MAX_WRITE_REQUESTS = 20
 
       # The refusal comes before the payload and the ids: everything on the way
       # there answers with something else — a count, a field of the wrong
@@ -42,7 +47,7 @@ module ForestAdminDatasourcePylon
         attributes = writable_attributes(patch)
         return if attributes.empty?
 
-        ids = ids_for(caller, filter)
+        ids = ids_for(caller, filter, extra_reads: stored_read?(attributes) ? 1 : 0)
         return if ids.empty?
 
         payload = build_payload(attributes, :update, caller: caller, ids: ids)
@@ -72,14 +77,25 @@ module ForestAdminDatasourcePylon
       # Columns whose Pylon write name differs from the one they are read under.
       def payload_renames = {}.freeze
 
-      def max_write_targets = MAX_WRITE_TARGETS
+      # What reading one record costs here. Nothing where the search endpoint
+      # filters `id`, a whole selection travelling in one request whatever its
+      # size; one request where an id is read through its own endpoint.
+      def requests_per_record_read = 0
 
-      # How many named ids the collection's own read can resolve exactly. `nil`
-      # is no bound: the search endpoint filters `id` server-side, so any id list
-      # costs one request per chunk. A collection reading an id through its own
-      # endpoint overrides this with its fan-out cap — past it the read truncates,
-      # and a truncated resolution writes to part of a selection it reports whole.
-      def max_resolvable_ids = nil
+      # How many records one write may reach: the budget divided by what each of
+      # them costs — the write itself, plus the `reads` the path still owes it.
+      def max_write_targets(reads: 0)
+        MAX_WRITE_REQUESTS / (1 + (reads * requests_per_record_read))
+      end
+
+      # How many ids a filter may name before the resolution is refused rather
+      # than spent: the same reach, a named id being read before it is written
+      # to. `nil` is no bound, a read costing nothing per record.
+      def max_resolvable_ids(reads: 0)
+        return nil if requests_per_record_read.zero?
+
+        max_write_targets(reads: reads)
+      end
 
       # The records a filter-driven write applies to: exact, or refused — the
       # caller writes one request per id and reports success for the whole
@@ -87,16 +103,23 @@ module ForestAdminDatasourcePylon
       #
       # An `id equals`/`id in` filter alone — what the record detail and the bulk
       # selection send — costs no request. Anything else goes through `list`.
-      def ids_for(caller, filter)
+      def ids_for(caller, filter, extra_reads: 0)
         tree = filter&.condition_tree
         if (named = id_values(tree)) && no_search?(filter)
-          refuse_too_many_targets(named.size) if named.size > max_write_targets
+          cap = max_write_targets(reads: extra_reads)
+          refuse_too_many_targets(named.size, cap) if named.size > cap
           return named
         end
 
-        named_count = max_resolvable_ids && filtered_ids(tree)&.size
-        refuse_unresolvable_selection(named_count) if named_count && named_count > max_resolvable_ids
-        resolve_ids_by_list(caller, filter)
+        # A selection naming ids is resolved by reading each of them; any other
+        # one by a single page of the collection's own read, whose cost does not
+        # grow with the count.
+        named_ids = filtered_ids(tree)
+        reads     = extra_reads + (named_ids ? 1 : 0)
+        bound     = named_ids && max_resolvable_ids(reads: reads)
+        refuse_unresolvable_selection(named_ids.size, bound) if bound && named_ids.size > bound
+
+        resolve_ids_by_list(caller, filter, reads: reads)
       end
 
       private
@@ -141,11 +164,12 @@ module ForestAdminDatasourcePylon
 
       # One record past the cap is asked for, so an overflow is seen rather than
       # guessed from a full page.
-      def resolve_ids_by_list(caller, filter)
-        window  = Page.new(offset: 0, limit: max_write_targets + 1)
+      def resolve_ids_by_list(caller, filter, reads:)
+        cap     = max_write_targets(reads: reads)
+        window  = Page.new(offset: 0, limit: cap + 1)
         query   = (filter || Filter.new).override(page: window)
         records = list(caller, query, Projection.new(['id']))
-        refuse_unbounded_targets if records.size > max_write_targets
+        refuse_unbounded_targets(cap) if records.size > cap
 
         records.filter_map { |record| record['id'] }.uniq
       end
@@ -190,6 +214,11 @@ module ForestAdminDatasourcePylon
 
         column&.type == 'Column' && !column.is_read_only
       end
+
+      # Whether the patch will have `stored_values` read every record it reaches
+      # before a field of the wrong direction is dropped or refused, which the
+      # cap has to charge it for: see `ids_for`.
+      def stored_read?(attributes) = (attributes.keys & create_only_fields).any?
 
       # A field of the other direction is dropped when it asks for nothing, and
       # refused when the operator really changed it: answering an edit with a
@@ -249,9 +278,9 @@ module ForestAdminDatasourcePylon
 
       # Read only when the patch names a field of the wrong direction, and only
       # for those fields. One request where the endpoint filters `id`, one per
-      # record where an id is read through its own endpoint — which
-      # `max_write_targets` does not count, so a wide update naming such a field
-      # spends two requests per record against the write budget.
+      # record where an id is read through its own endpoint — which the cap does
+      # charge the patch for, `stored_read?` declaring it before the ids are
+      # resolved.
       #
       # By id rather than through the caller's filter: that filter was already
       # resolved into these ids, so re-running it would spend those requests
@@ -310,14 +339,14 @@ module ForestAdminDatasourcePylon
       end
 
       # The count is exact here, the filter having named the ids.
-      def refuse_too_many_targets(count)
-        refuse_write_reach("applies to #{count} #{name} records, more than the #{max_write_targets} one pass covers")
+      def refuse_too_many_targets(count, cap)
+        refuse_write_reach("applies to #{count} #{name} records, more than the #{cap} one pass covers")
       end
 
       # The resolution only knows the selection overflows: reporting the size of
       # its window would name 21 records to a selection holding thousands.
-      def refuse_unbounded_targets
-        refuse_write_reach("applies to more than the #{max_write_targets} #{name} records one pass covers")
+      def refuse_unbounded_targets(cap)
+        refuse_write_reach("applies to more than the #{cap} #{name} records one pass covers")
       end
 
       def refuse_write_reach(reach)
@@ -329,12 +358,11 @@ module ForestAdminDatasourcePylon
 
       # How many of the named ids the rest of the filter matches is unknown here,
       # so the count is reported as what it is: records named.
-      def refuse_unresolvable_selection(count)
+      def refuse_unresolvable_selection(count, bound)
         raise UnsupportedWriteError,
               "This write names #{count} #{name} records and filters them further, which #{name} answers with " \
-              "one request per named record, more than the #{max_resolvable_ids} one pass reads: the resolution " \
-              'would stop short and the write would then cover part of the selection while reporting all of ' \
-              'it. Select fewer records, or drop the other conditions to write the ones named.'
+              "one request per named record, on top of the one each write costs: more than the #{bound} one " \
+              'pass covers. Select fewer records, or drop the other conditions to write the ones named.'
       end
 
       def refuse_partial_write(verb, written, failed_id, total, error)

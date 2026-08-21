@@ -78,13 +78,19 @@ module ForestAdminDatasourcePylon
       def create_only_fields = CREATE_ONLY
       def update_only_fields = UPDATE_ONLY
 
-      def max_write_targets = [Writes::MAX_WRITE_TARGETS, MAX_ID_LOOKUPS].min
+      # An issue is read through `GET /issues/{id}`, one request per record: a
+      # selection resolved or compared that way spends the write budget twice
+      # over, so it divides the records one pass reaches rather than fitting
+      # beside them.
+      def requests_per_record_read = 1
 
-      # Never past the primary-key fan-out: a write resolving named ids through
-      # `list` goes through `fetch_by_ids`, which truncates with a warning past
-      # this many, and a truncated resolution would write to a subset of the
-      # selection while reporting the whole of it.
-      def max_resolvable_ids = MAX_ID_LOOKUPS
+      # Never past the primary-key fan-out either: a write resolving named ids
+      # through `list` goes through `fetch_by_ids`, which truncates with a
+      # warning past this many, and a truncated resolution would write to a
+      # subset of the selection while reporting the whole of it. The budget is
+      # the tighter of the two at today's numbers; the clamp keeps that true if
+      # either moves.
+      def max_resolvable_ids(reads: 0) = [super, MAX_ID_LOOKUPS].min
 
       def sortable_fields
         PYLON_SORTABLE
