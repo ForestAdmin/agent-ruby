@@ -26,7 +26,14 @@ module ForestAdminAgent
           drop_relationships!(args)
           data = format_attributes(args, context.collection)
           context.collection.update(context.caller, filter, data)
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          # The projection is ours, not the caller's, so it is redacted rather than refused: a write
+          # must not 403 because the row it wrote carries a relation the caller cannot read.
+          projection = context.permissions.redact_projection(
+            context.collection,
+            ProjectionFactory.all(context.collection),
+            named_by_caller: false
+          )
+          records = context.collection.list(context.caller, filter, projection)
 
           {
             name: args[:params]['collection_name'],

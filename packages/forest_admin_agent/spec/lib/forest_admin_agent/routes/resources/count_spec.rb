@@ -11,6 +11,7 @@ module ForestAdminAgent
 
       describe Count do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:count) { described_class.new }
         let(:args) do
           {

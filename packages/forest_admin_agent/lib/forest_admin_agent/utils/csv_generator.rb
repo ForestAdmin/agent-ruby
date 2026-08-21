@@ -3,6 +3,29 @@ require 'csv'
 module ForestAdminAgent
   module Utils
     class CsvGenerator
+      # Labels are positionally aligned with the requested projection, so dropping a field without
+      # dropping its label shifts every later value under the wrong heading.
+      #
+      # Returns +header+ untouched when nothing was dropped, and when the caller sent none: the
+      # generator then falls back to the projection, which is already the redacted one.
+      def self.filter_header(header, requested, kept)
+        return header if header.nil? || kept.size == requested.size
+
+        labels = header.is_a?(String) ? parse_header_labels(header) : header
+
+        return header unless labels.is_a?(Array)
+
+        labels.each_with_index
+              .select { |_label, index| kept.include?(requested[index]) }
+              .map(&:first)
+      end
+
+      def self.parse_header_labels(header)
+        JSON.parse(header)
+      rescue JSON::ParserError
+        nil
+      end
+
       def self.generate(records, projection)
         data = {}
         projection.each do |schema_field|

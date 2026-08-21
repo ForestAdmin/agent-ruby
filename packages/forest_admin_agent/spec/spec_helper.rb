@@ -32,6 +32,20 @@ RSpec.shared_context 'with caller' do
   let(:caller) { build_caller }
 end
 
+# Lets a route spec stub the read guards without pinning what they check — the guards themselves are
+# exercised against a real Permissions in spec/lib/forest_admin_agent/security.
+#
+# Worth stubbing rather than leaving unstubbed: RSpec renders an unexpected-message error by
+# inspecting the arguments, and a collection reaches its datasource, which reaches every collection,
+# so the inspect never finishes and the suite hangs instead of failing.
+RSpec.shared_context 'with readable related collections' do
+  before do
+    allow(permissions).to receive(:assert_can_read_query_fields)
+    allow(permissions).to receive(:assert_can_read_usages)
+    allow(permissions).to receive(:redact_projection) { |_collection, projection, **| projection }
+  end
+end
+
 RSpec.configure do |config|
   config.include ForestAdminTestToolkit::Factory::Caller
   config.include ForestAdminTestToolkit::Factory::Collection
