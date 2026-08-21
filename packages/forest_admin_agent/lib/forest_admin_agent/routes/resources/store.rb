@@ -25,7 +25,8 @@ module ForestAdminAgent
           filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
             condition_tree: ConditionTree::ConditionTreeFactory.match_ids(context.collection, [id])
           )
-          records = context.collection.list(context.caller, filter, ProjectionFactory.all(context.collection))
+          projection = redacted_full_projection(context)
+          records = context.collection.list(context.caller, filter, projection)
 
           {
             name: args[:params]['collection_name'],

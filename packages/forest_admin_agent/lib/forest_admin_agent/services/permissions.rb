@@ -65,7 +65,11 @@ module ForestAdminAgent
         to_check = collection_names.uniq.reject { |name| name == root_collection_name }
         allowed = { root_collection_name => true }
 
-        return allowed if to_check.empty? || !permission_system?
+        return allowed if to_check.empty?
+
+        # An absent permission system is not a denial: `can?` allows everything there, and answering
+        # anything else would redact every relation on a deployment that granted nothing to check.
+        return allowed.merge(to_check.to_h { |name| [name, true] }) unless permission_system?
 
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data
@@ -289,9 +293,13 @@ module ForestAdminAgent
       # read below the publication and renaming layers, and only that layer knows whether a replacer
       # or a natively searchable datasource has taken the choice out of its hands.
       def assert_can_read_search(collection, args, usages)
+        # Guarded on searchability before parsing: `parse_search` raises for a search on a collection
+        # that has none, which would turn an ignored parameter into a 400 on the chart routes.
+        return unless collection.schema[:searchable] && collection.respond_to?(:searched_fields)
+
         search = Utils::QueryStringParser.parse_search(collection, args)
 
-        return if search.nil? || !collection.respond_to?(:searched_fields)
+        return if search.nil?
 
         extended = Utils::QueryStringParser.parse_search_extended(args)
         searched = collection.searched_fields(search, extended)

@@ -82,6 +82,35 @@ module ForestAdminAgent
         permissions
       end
 
+      # `can?` allows everything when no permission system is configured, so this side of the check
+      # has to agree with it: an absent permission system is not a denial.
+      describe 'without a permission system' do
+        it 'keeps every path' do
+          permissions = described_class.new(caller)
+          allow(permissions).to receive(:permission_system?).and_return(false)
+
+          projection = permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban holder:*]), named_by_caller: true
+          )
+
+          expect(projection).to eq(%w[id account:iban holder:*])
+        end
+
+        it 'refuses no filter' do
+          permissions = described_class.new(caller)
+          allow(permissions).to receive(:permission_system?).and_return(false)
+          args = {
+            headers: { 'HTTP_AUTHORIZATION' => bearer },
+            params: {
+              'collection_name' => 'cards',
+              filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json
+            }
+          }
+
+          expect { permissions.assert_can_read_query_fields(cards, args) }.not_to raise_error
+        end
+      end
+
       describe '#redact_projection' do
         it 'refuses a field the caller named on a collection it cannot read' do
           permissions = build_permissions([])
@@ -188,6 +217,56 @@ module ForestAdminAgent
 
           tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(cards, args)
           expect(tree.field).to eq('account:iban')
+        end
+
+        # The stack is asked what a search reaches, so the check has to be driven by its answer and
+        # not by anything derived from the schema here.
+        def searchable_cards(searched)
+          double = instance_double(
+            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
+            name: 'cards',
+            schema: cards.schema.merge(searchable: true),
+            is_searchable?: true,
+            datasource: datasource
+          )
+          allow(double).to receive(:searched_fields).and_return(searched)
+
+          double
+        end
+
+        it 'refuses whatever the stack says the search will reach' do
+          permissions = build_permissions([])
+          collection = searchable_cards([{ path: 'holder:national_id', collections: ['persons'] }])
+
+          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You cannot search on 'holder:national_id': you are not allowed to read the 'persons' collection."
+            )
+        end
+
+        it 'accepts a search once every collection the stack names is readable' do
+          permissions = build_permissions(%w[persons])
+          collection = searchable_cards([{ path: 'holder:national_id', collections: ['persons'] }])
+
+          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+            .not_to raise_error
+        end
+
+        # A replaced search: the handler picks the fields, the caller only supplies the text.
+        it 'serves the request when the stack cannot say what a search reaches' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(searchable_cards(nil), args_with(search: 'martin')) }
+            .not_to raise_error
+        end
+
+        # The chart routes ignore `search`, so parsing it here must not turn it into a 400.
+        it 'ignores a search on a collection that has none' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(cards, args_with(search: 'martin')) }
+            .not_to raise_error
         end
 
         it 'accepts a filter once the collection it reaches is readable' do

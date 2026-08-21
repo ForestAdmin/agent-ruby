@@ -11,6 +11,7 @@ module ForestAdminAgent
 
       describe Store do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:store) { described_class.new }
         let(:args) do
           {
