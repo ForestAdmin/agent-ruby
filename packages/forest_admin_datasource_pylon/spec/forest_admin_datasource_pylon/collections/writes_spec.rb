@@ -637,6 +637,22 @@ module ForestAdminDatasourcePylon
           .with(body: { 'name' => 'Ada', 'account_id' => 'a1' })
       end
 
+      # The only create whose record is serialized by a collection read in whole:
+      # `POST /teams` answers with the members nested where the column carries
+      # their ids, so the flattening the read side does has to run here too.
+      it 'creates a team and flattens the members of the record it answers with' do
+        stub_request(:post, "#{base}/teams")
+          .to_return(json('data' => { 'id' => 't1', 'name' => 'Support',
+                                      'users' => [{ 'id' => 'u1', 'email' => 'ada@acme.test' },
+                                                  { 'id' => 'u2' }] }))
+
+        record = teams.create(nil, 'name' => 'Support', 'user_ids' => %w[u1 u2])
+
+        expect(record).to eq('id' => 't1', 'name' => 'Support', 'user_ids' => %w[u1 u2])
+        expect(WebMock).to have_requested(:post, "#{base}/teams")
+          .with(body: { 'name' => 'Support', 'user_ids' => %w[u1 u2] })
+      end
+
       it 'replaces the members of a team' do
         stub_request(:patch, "#{base}/teams/t1").to_return(json('data' => { 'id' => 't1', 'name' => 'Support' }))
 

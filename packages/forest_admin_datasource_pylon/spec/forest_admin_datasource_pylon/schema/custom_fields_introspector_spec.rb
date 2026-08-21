@@ -182,13 +182,18 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
       expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(false)
     end
 
-    # Anything other than a true flag reads as editable, which is what a
-    # definition predating the flag is.
-    it 'is writable when Pylon declares nothing' do
+    # A definition carrying no flag is left read-only: this datasource
+    # advertises nothing an endpoint would refuse, and the fields Pylon syncs
+    # from an app are exactly the ones the flag tells apart, so reading its
+    # absence as "editable" would offer an editor whose every save is rejected.
+    it 'is read-only, and says so, when Pylon declares nothing' do
+      allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
       allow(client).to receive(:fetch_custom_fields).with('issue')
                                                     .and_return([definition('text', 'is_read_only' => nil)])
 
-      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(false)
+      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(true)
+      expect(ForestAdminDatasourcePylon.logger)
+        .to have_received(:warn).with(/carries no 'is_read_only' flag; leaving it read-only/)
     end
 
     # `ColumnSchema` defaults this one to true, and the capabilities route turns
