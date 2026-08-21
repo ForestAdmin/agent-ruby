@@ -5,9 +5,6 @@ module ForestAdminAgent
     class CsvGenerator
       # Labels are positionally aligned with the requested projection, so dropping a field without
       # dropping its label shifts every later value under the wrong heading.
-      #
-      # Returns +header+ untouched when nothing was dropped, and when the caller sent none: the
-      # generator then falls back to the projection, which is already the redacted one.
       def self.filter_header(header, requested, kept)
         return header if header.nil? || kept.size == requested.size
 

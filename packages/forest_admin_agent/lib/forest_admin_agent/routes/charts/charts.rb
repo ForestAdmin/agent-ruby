@@ -233,8 +233,8 @@ module ForestAdminAgent
           result[0]['value'] || 0
         end
 
-        # +path_collection+ is what the paths resolve against; the permission root stays the chart's
-        # own collection, which the leaderboard call site does not share.
+        # The permission root stays the chart's own collection, which the leaderboard call site does
+        # not share with the collection its paths resolve against.
         def assert_can_read_aggregated_fields(context, path_collection, fields)
           usages = fields.reject { |_action, path| path.nil? || path.to_s.empty? }
                          .map do |action, path|

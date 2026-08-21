@@ -66,9 +66,9 @@ module ForestAdminAgent
         parse_projection_from_header(collection, args) || parse_projection(collection, args)
       end
 
-      # The projection, and whether the caller named the fields in it. Both halves read the same
-      # `fields` param the same way on purpose: an empty `fields[<collection>]=` means "every
-      # column", so it is not named and must take the redaction path rather than a 403.
+      # Both halves read the same `fields` param the same way on purpose: an empty
+      # `fields[<collection>]=` means "every column", so it is not named and must take the redaction
+      # path rather than a 403.
       def self.parse_requested_projection(collection, args)
         from_header = parse_projection_from_header(collection, args)
 

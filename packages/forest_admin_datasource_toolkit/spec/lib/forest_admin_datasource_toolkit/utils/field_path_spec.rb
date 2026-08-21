@@ -66,7 +66,6 @@ module ForestAdminDatasourceToolkit
           expect(described_class.leaf_collection_names(cards, 'account:organization:id')).to eq(['organizations'])
         end
 
-        # No discriminant travels in the path, so a record may resolve to either target.
         it 'answers every target of a polymorphic many-to-one' do
           expect(described_class.leaf_collection_names(cards, 'holder:*')).to eq(%w[persons companies])
         end
@@ -75,8 +74,6 @@ module ForestAdminDatasourceToolkit
           expect(described_class.leaf_collection_names(cards, 'certificate:id')).to eq(['certificates'])
         end
 
-        # The caller pins the collection it asked about to readable, so falling back to it would turn
-        # "this path does not resolve" into "this path is allowed".
         it 'raises rather than falling back when the prefix is a column' do
           expect { described_class.leaf_collection_names(cards, 'pan_last4:id') }.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ForestException,

@@ -12,9 +12,8 @@ module ForestAdminAgent
         context
       end
 
-      # For a route that serializes a record back with a projection of its own rather than the
-      # caller's — a create, an update. Redacted and never refused: a write must not 403 because the
-      # row it just wrote carries a relation the caller cannot read.
+      # Never refused: a write must not 403 because the row it just wrote carries a relation the
+      # caller cannot read.
       def redacted_full_projection(context)
         all = ForestAdminDatasourceToolkit::Components::Query::ProjectionFactory.all(context.collection)
 

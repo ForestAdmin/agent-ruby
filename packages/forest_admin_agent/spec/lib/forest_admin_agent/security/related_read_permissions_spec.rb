@@ -15,8 +15,6 @@ module ForestAdminAgent
       let(:datasource) { build_datasource_with_collections(collections) }
       let(:cards) { datasource.get_collection('cards') }
 
-      # `cards.holder` is polymorphic: no discriminant travels in the path, so a record may resolve
-      # to either target and neither can be ruled out.
       let(:collections) do
         [
           build_collection(
@@ -82,8 +80,6 @@ module ForestAdminAgent
         permissions
       end
 
-      # `can?` allows everything when no permission system is configured, so this side of the check
-      # has to agree with it: an absent permission system is not a denial.
       describe 'without a permission system' do
         it 'keeps every path' do
           permissions = described_class.new(caller)
@@ -219,8 +215,6 @@ module ForestAdminAgent
           expect(tree.field).to eq('account:iban')
         end
 
-        # The stack is asked what a search reaches, so the check has to be driven by its answer and
-        # not by anything derived from the schema here.
         def searchable_cards(searched)
           double = instance_double(
             ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,

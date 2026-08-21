@@ -53,8 +53,6 @@ module ForestAdminAgent
         is_allowed
       end
 
-      # Whether the caller may read each of +collection_names+.
-      #
       # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
       # listing, +read+ a get, and the signed hash a chart.
       #
@@ -289,9 +287,6 @@ module ForestAdminAgent
         check_user_permission(role_ids, user_data, :read, collection_name)
       end
 
-      # Asked of the stack, not derived from the schema: the fields an extended search reaches are
-      # read below the publication and renaming layers, and only that layer knows whether a replacer
-      # or a natively searchable datasource has taken the choice out of its hands.
       def assert_can_read_search(collection, args, usages)
         # Guarded on searchability before parsing: `parse_search` raises for a search on a collection
         # that has none, which would turn an ignored parameter into a 400 on the chart routes.
