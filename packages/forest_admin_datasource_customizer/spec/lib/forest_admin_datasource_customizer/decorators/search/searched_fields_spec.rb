@@ -39,18 +39,33 @@ module ForestAdminDatasourceCustomizer
         describe '#searched_fields' do
           it 'reports the columns of the collection itself when the search is not extended' do
             expect(decorated.searched_fields('martin', false)).to contain_exactly(
-              { path: 'id', collections: ['cards'] },
               { path: 'pan_last4', collections: ['cards'] }
             )
           end
 
           it 'reports the collection a relation column belongs to when the search is extended' do
             expect(decorated.searched_fields('martin', true)).to contain_exactly(
+              { path: 'pan_last4', collections: ['cards'] },
+              { path: 'holder:national_id', collections: ['holders'] }
+            )
+          end
+
+          it 'leaves out a column the term cannot match, which the search builds no condition for' do
+            expect(decorated.searched_fields('martin', true).map { |field| field[:path] })
+              .not_to include('id', 'holder:id')
+          end
+
+          it 'reports a numeric column once the term is a number the search will compare it to' do
+            expect(decorated.searched_fields('42', true)).to contain_exactly(
               { path: 'id', collections: ['cards'] },
               { path: 'pan_last4', collections: ['cards'] },
               { path: 'holder:id', collections: ['holders'] },
               { path: 'holder:national_id', collections: ['holders'] }
             )
+          end
+
+          it 'reaches nothing for a search the stack discards as insignificant' do
+            expect(decorated.searched_fields('  ', true)).to eq([])
           end
 
           # Reading it as "reaches nothing" would let a replaced search through unchecked.

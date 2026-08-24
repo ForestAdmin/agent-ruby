@@ -59,12 +59,19 @@ module ForestAdminDatasourceCustomizer
         # Answers against +@child_collection+, which is what the search actually reads: a field
         # hidden by the publication or renaming layers above is still searched.
         #
+        # The term is run through the same +build_condition+ selection +refine_filter+ applies, so a
+        # field the search cannot match — a number column for a word, a uuid column for anything
+        # else — is left out rather than reported as reached.
+        #
         # +nil+ whenever this layer does not choose the fields — a replacer is installed, or the
         # child collection searches natively — because then no enumeration made here is true.
-        def searched_fields(_search, extended)
+        def searched_fields(search, extended)
           return nil if @replacer || @child_collection.schema[:searchable]
+          return [] if search.nil? || search.strip.empty?
 
-          get_fields(extended).map do |path, _schema|
+          get_fields(extended).filter_map do |path, schema|
+            next unless build_condition(path, schema, search)
+
             {
               path: path,
               collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(
