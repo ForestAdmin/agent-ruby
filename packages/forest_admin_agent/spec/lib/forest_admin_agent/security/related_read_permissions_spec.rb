@@ -326,15 +326,31 @@ module ForestAdminAgent
             .not_to raise_error
         end
 
-        # Below publication, so the permission payload has never heard of it: unpublished, not denied.
-        it 'ignores a search target the datasource stopped publishing' do
-          permissions = build_permissions([])
+        # An extended search reaches a removed collection: the condition is built below publication,
+        # which has already passed the filter down. Refused as unexposed rather than as denied — no
+        # role can be granted `read` on a collection absent from the permission payload.
+        it 'refuses a search reaching a collection the agent does not expose' do
+          permissions = build_permissions(%w[accounts])
           collection = searchable_cards([{ path: 'account:iban', collections: ['accounts'] }])
           published = datasource.collections.except('accounts')
           allow(datasource).to receive(:collections).and_return(published)
 
           expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
-            .not_to raise_error
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You cannot search on 'account:iban': the 'accounts' collection is not exposed by this agent."
+            )
+        end
+
+        it 'tells an unexposed collection apart from one the role cannot read' do
+          permissions = build_permissions([])
+          collection = searchable_cards([{ path: 'account:iban', collections: ['accounts'] }])
+
+          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You cannot search on 'account:iban': you are not allowed to read the 'accounts' collection."
+            )
         end
 
         # A replaced search: the handler picks the fields, the caller only supplies the text.

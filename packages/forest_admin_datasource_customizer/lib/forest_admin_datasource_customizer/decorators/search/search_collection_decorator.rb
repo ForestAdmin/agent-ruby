@@ -66,22 +66,32 @@ module ForestAdminDatasourceCustomizer
         # +nil+ whenever this layer does not choose the fields — a replacer is installed, or the
         # child collection searches natively — because then no enumeration made here is true.
         def searched_fields(search, extended)
-          return nil if @replacer || @child_collection.schema[:searchable]
-          return [] if search.nil? || search.strip.empty?
+          return nil unless enumerable_search?
+          return [] if insignificant_search?(search)
 
           get_fields(extended).filter_map do |path, schema|
-            next unless build_condition(path, schema, search)
-
-            {
-              path: path,
-              collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(
-                @child_collection, path
-              )
-            }
+            searched_field(path) if build_condition(path, schema, search)
           end
         end
 
         private
+
+        def enumerable_search?
+          @replacer.nil? && !@child_collection.schema[:searchable]
+        end
+
+        def insignificant_search?(search)
+          search.nil? || search.strip.empty?
+        end
+
+        def searched_field(path)
+          {
+            path: path,
+            collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(
+              @child_collection, path
+            )
+          }
+        end
 
         def default_replacer(search, extended)
           searchable_fields = get_fields(extended)

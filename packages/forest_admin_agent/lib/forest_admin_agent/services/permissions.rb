@@ -343,26 +343,35 @@ module ForestAdminAgent
 
         return if search.nil?
 
-        extended = Utils::QueryStringParser.parse_search_extended(args)
-        searched = collection.searched_fields(search, extended)
+        searched = collection.searched_fields(search, Utils::QueryStringParser.parse_search_extended(args))
 
         return if searched.nil?
 
         published = collection.datasource.collections
 
         searched.each do |field|
-          # `searched_fields` answers below the publication layer, so a target the datasource stopped
-          # publishing is absent from the permission payload. That is unpublished, not denied: no
-          # route exposes it and looking it up would refuse the search for every role, admins
-          # included.
-          targets = field[:collections].select { |name| published.key?(name) }
-
-          # Only a list the filter emptied has nothing left to check. One that arrived empty is a
-          # relation that resolves to nothing, and stays denied like everywhere else.
-          next if targets.empty? && field[:collections].any?
-
-          usages << { action: 'search on', path: field[:path], collections: targets }
+          assert_search_target_exposed(field, published)
+          usages << { action: 'search on', path: field[:path], collections: field[:collections] }
         end
+      end
+
+      # `searched_fields` answers below the publication layer — deliberately, so a field hidden by
+      # renaming above it is still checked — so it can name a collection `remove_collection` took out
+      # of the API. An extended search does reach through to it: the condition is built below
+      # publication, which has already passed the filter down and cannot strip it.
+      #
+      # That collection is absent from the permission payload too, so asking `read_allowed?` answers
+      # "denied" for every role, admins included, and no grant can lift it. So it is refused as what
+      # it is — a column the agent does not expose — which points at `disable_search` or publishing
+      # the collection again rather than at a permission to grant.
+      def assert_search_target_exposed(field, published)
+        unexposed = field[:collections].reject { |name| published.key?(name) }
+
+        return if unexposed.empty?
+
+        raise ForbiddenError,
+              "You cannot search on '#{field[:path]}': the '#{unexposed.join("' or '")}' collection " \
+              'is not exposed by this agent.'
       end
 
       def permission_allowed?(collections_data, collection, action, user_data)
