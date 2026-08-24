@@ -34,12 +34,7 @@ module ForestAdminAgent
             segment: QueryStringParser.parse_segment(context.collection, args)
           )
 
-          requested = QueryStringParser.parse_requested_projection(context.collection, args)
-          projection = context.permissions.redact_projection(
-            context.collection,
-            requested[:projection],
-            named_by_caller: requested[:named_by_caller]
-          ).with_pks(context.collection)
+          projection = redacted_projection_with_pks(context, context.collection, args)
           records = context.collection.list(context.caller, filter, projection)
 
           {

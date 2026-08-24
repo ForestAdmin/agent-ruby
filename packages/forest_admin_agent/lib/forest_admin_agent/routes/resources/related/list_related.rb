@@ -35,14 +35,7 @@ module ForestAdminAgent
               page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
               sort: ForestAdminAgent::Utils::QueryStringParser.parse_sort(context.child_collection, args)
             )
-            requested = ForestAdminAgent::Utils::QueryStringParser.parse_requested_projection(
-              context.child_collection, args
-            )
-            projection = context.permissions.redact_projection(
-              context.child_collection,
-              requested[:projection],
-              named_by_caller: requested[:named_by_caller]
-            ).with_pks(context.child_collection)
+            projection = redacted_projection_with_pks(context, context.child_collection, args)
             primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             records = Collection.list_relation(
               context.collection,

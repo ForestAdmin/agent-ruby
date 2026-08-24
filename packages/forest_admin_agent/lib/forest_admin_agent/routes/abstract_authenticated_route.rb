@@ -20,6 +20,18 @@ module ForestAdminAgent
         context.permissions.redact_projection(context.collection, all, named_by_caller: false)
       end
 
+      # +with_pks+ runs after the redaction on purpose. It only re-adds keys for relations the
+      # redaction kept a path through, and the serializer needs those keys to emit the readable
+      # column behind them — dropping them would take the permitted path down with them. A relation
+      # the redaction emptied contributes no path, so nothing is re-added for it.
+      def redacted_projection_with_pks(context, collection, args)
+        requested = Utils::QueryStringParser.parse_requested_projection(collection, args)
+
+        context.permissions.redact_projection(
+          collection, requested[:projection], named_by_caller: requested[:named_by_caller]
+        ).with_pks(collection)
+      end
+
       def format_attributes(args, collection)
         record = args[:params][:data][:attributes] || {}
 
