@@ -20,4 +20,6 @@ Gemfile-test.lock
 *.gem
 pkg/
 
-.claude/
+# .claude/ is shared except for the team settings file (see .claude/settings.json)
+.claude/*
+!.claude/settings.json

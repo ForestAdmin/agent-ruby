@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "forest": {
+      "source": {
+        "source": "github",
+        "repo": "ForestAdmin/claudine"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "forest@forest": true
+  }
+}
