@@ -100,6 +100,9 @@ module ForestAdminAgent
                   'links' => { 'self' => '/forest/book/1' }
                 }
             )
+            # Redacted, never refused: a write must not 403 because the row it just wrote carries a
+            # relation the caller cannot read. Same helper serves `update` and `update_field`.
+            expect(read_guard_calls[:projections]).to eq([{ collection: 'book', named_by_caller: false }])
           end
 
           it 'includes null attributes in the returned result' do

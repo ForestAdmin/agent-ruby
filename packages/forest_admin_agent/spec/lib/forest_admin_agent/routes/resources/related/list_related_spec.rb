@@ -80,6 +80,21 @@ module ForestAdminAgent
             expect(list.routes.length).to eq 1
           end
 
+          # The only routes resolving against the foreign collection rather than their own, and a
+          # related listing applies no search — so neither is checked against the parent.
+          it 'checks the components it applies against the foreign collection' do
+            args[:params]['relation_name'] = 'category'
+            args[:params]['id'] = 1
+            allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+            list.handle_request(args)
+
+            expect(read_guard_calls[:query_fields]).to eq(
+              [{ collection: 'category', consumes: %i[filter sort] }]
+            )
+            expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
+          end
+
           context 'when call without filters' do
             it 'call list_relation with expected args' do
               args[:params]['relation_name'] = 'category'

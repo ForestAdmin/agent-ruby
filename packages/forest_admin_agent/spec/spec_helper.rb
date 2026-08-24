@@ -32,17 +32,33 @@ RSpec.shared_context 'with caller' do
   let(:caller) { build_caller }
 end
 
-# Lets a route spec stub the read guards without pinning what they check — the guards themselves are
-# exercised against a real Permissions in spec/lib/forest_admin_agent/security.
+# Stubs the read guards for a route spec and records how the route wired them, so a spec can pin the
+# collection each guard resolves against, the query components the route says it applies, and whether
+# a denial is a 403 or a redaction. The guards themselves are exercised against a real Permissions in
+# spec/lib/forest_admin_agent/security.
 #
-# Worth stubbing rather than leaving unstubbed: RSpec renders an unexpected-message error by
-# inspecting the arguments, and a collection reaches its datasource, which reaches every collection,
-# so the inspect never finishes and the suite hangs instead of failing.
+# The collection is recorded by name rather than matched on: RSpec renders an argument mismatch by
+# inspecting it, and a collection reaches its datasource, which reaches every collection, so the
+# inspect never finishes and the suite hangs instead of failing. Leaving a guard unstubbed hangs the
+# same way.
 RSpec.shared_context 'with readable related collections' do
+  let(:read_guard_calls) { { query_fields: [], projections: [] } }
+
   before do
-    allow(permissions).to receive(:assert_can_read_query_fields)
+    allow(permissions).to receive(:assert_can_read_query_fields) do |collection, _args, **options|
+      read_guard_calls[:query_fields] << {
+        collection: collection.name,
+        consumes: options.fetch(:consumes, ForestAdminAgent::Services::Permissions::QUERY_COMPONENTS)
+      }
+    end
     allow(permissions).to receive(:assert_can_read_usages)
-    allow(permissions).to receive(:redact_projection) { |_collection, projection, **| projection }
+    allow(permissions).to receive(:redact_projection) do |collection, projection, **options|
+      read_guard_calls[:projections] << {
+        collection: collection.name,
+        named_by_caller: options[:named_by_caller]
+      }
+      projection
+    end
   end
 end
 

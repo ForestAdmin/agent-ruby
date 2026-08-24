@@ -49,6 +49,15 @@ module ForestAdminAgent
           expect(count.routes.length).to eq 1
         end
 
+        # A count applies no sort, so checking one would refuse a request the denied field cannot
+        # reach — while its filter and search are the sharper half and stay checked.
+        it 'checks only the query components it applies, against its own collection' do
+          ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
+          count.handle_request(args)
+
+          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'user', consumes: %i[filter search] }])
+        end
+
         context 'when collection is countable' do
           it 'return an serialized content' do
             ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count

@@ -80,6 +80,17 @@ module ForestAdminAgent
             expect(csv.routes.length).to eq 1
           end
 
+          it 'checks the components it applies against the foreign collection' do
+            args[:params]['relation_name'] = 'category'
+            args[:params]['id'] = 1
+            allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+            csv.handle_request(args)
+
+            expect(read_guard_calls[:query_fields]).to eq([{ collection: 'category', consumes: %i[filter] }])
+            expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
+          end
+
           context 'when call csv' do
             it 'returns a streaming export csv of the related collection' do
               args[:params]['relation_name'] = 'category'

@@ -61,6 +61,16 @@ module ForestAdminAgent
           expect(csv.routes.length).to eq 1
         end
 
+        it 'checks every query component it applies, against its own collection' do
+          allow(csv_generator_stream).to receive(:stream).and_return([].to_enum)
+          csv.handle_request(args)
+
+          expect(read_guard_calls[:query_fields]).to eq(
+            [{ collection: 'user', consumes: %i[filter sort search] }]
+          )
+          expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: false }])
+        end
+
         context 'when call csv' do
           it 'returns a streaming export csv' do
             # Create a mock enumerator that yields CSV data
