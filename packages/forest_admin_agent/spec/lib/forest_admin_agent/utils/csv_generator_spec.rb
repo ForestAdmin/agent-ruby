@@ -105,6 +105,17 @@ module ForestAdminAgent
             .to eq(['Planet'])
         end
 
+        # `fields[books]=author,id,title` with `fields[author]=firstName,lastName` expands into four
+        # paths against three labels: filtering by position drops "Id" and keeps "Title", leaving one
+        # label for two data columns, under the wrong name.
+        it 'hands back a JSON header the expanded projection has outgrown' do
+          expanded = Projection.new(%w[author:firstName author:lastName id title])
+          kept = Projection.new(%w[id title])
+
+          expect(described_class.filter_header('["Author","Id","Title"]', expanded, kept))
+            .to eq('["Author","Id","Title"]')
+        end
+
         it 'hands back a header that carries no label for each exported column' do
           # `fields[users]=address,id` expands `address` into two paths, so no label sits at the
           # index of a path and dropping one by position would mislabel the rest.

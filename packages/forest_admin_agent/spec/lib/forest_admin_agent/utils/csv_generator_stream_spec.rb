@@ -67,6 +67,12 @@ module ForestAdminAgent
             expect(enumerator.to_a.join).to start_with("Id,First name,Last name\n")
           end
 
+          it 'escapes a label carrying a comma instead of widening the header row' do
+            enumerator = described_class.stream(['Id', 'Last, first', 'Name'], filter, projection, list_records)
+
+            expect(enumerator.to_a.join).to start_with(%(Id,"Last, first",Name\n))
+          end
+
           it 'uses the projection when the header carries no label for each exported column' do
             enumerator = described_class.stream('Id,First name', filter, projection, list_records)
 

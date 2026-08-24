@@ -16,8 +16,9 @@ module ForestAdminAgent
       def self.stream(header, filter, projection, list_records, limit_export_size = nil)
         Enumerator.new do |yielder|
           # Yield header row first (client receives immediately)
-          header_array = parse_header(header, projection)
-          yielder << "#{header_array.join(",")}\n"
+          # Escaped like any other row: the labels are the caller's, and one carrying a comma or a
+          # quote would otherwise emit a header row wider than the data under it.
+          yielder << CSV.generate_line(parse_header(header, projection))
 
           offset = 0
 
