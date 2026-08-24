@@ -51,30 +51,16 @@ module ForestAdminDatasourceCustomizer
           projection.apply(records)
         end
 
-        # Only a field registered through `emulate_field_sorting` or
-        # `replace_field_sorting` becomes sortable here: those are the ones
-        # `list` above knows how to order, either by emulating the sort over the
-        # whole collection or by rewriting it into an equivalent one. Every other
-        # field keeps the flag its datasource declared -- a clause on it is
-        # handed straight to `child_collection.list`, so marking it sortable
-        # would let the UI ask for an order nothing honours, and the records
-        # would come back in whatever order the datasource imposes.
-        #
         # `@sorts` holds nil as the value of an emulated field, so membership is
-        # read with `key?`, the way `emulated?` reads it.
-        #
-        # `CollectionDecorator#schema` only shallow-copies the schema it hands
-        # over, so the fields hash and the ColumnSchema objects in it are the
-        # ones of the collection below: both are copied before the flag is set,
-        # or the decorator would rewrite the schema of its own child.
+        # read with `key?`, the way `emulated?` reads it. The fields hash and the
+        # ColumnSchema objects in it belong to the collection below, so both are
+        # copied before the flag is written.
         def refine_schema(child_schema)
           schema = child_schema.dup
-          schema[:fields] = child_schema[:fields].dup
+          schema[:fields] = child_schema[:fields].to_h do |name, field|
+            next [name, field] unless field.type == 'Column' && @sorts.key?(name)
 
-          schema[:fields].each do |name, field|
-            next unless field.type == 'Column' && @sorts.key?(name)
-
-            schema[:fields][name] = field.dup.tap { |sortable| sortable.is_sortable = true }
+            [name, field.dup.tap { |column| column.is_sortable = true }]
           end
 
           schema
