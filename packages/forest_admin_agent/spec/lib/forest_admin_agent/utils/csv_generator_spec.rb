@@ -108,21 +108,39 @@ module ForestAdminAgent
         # `fields[books]=author,id,title` with `fields[author]=firstName,lastName` expands into four
         # paths against three labels: filtering by position drops "Id" and keeps "Title", leaving one
         # label for two data columns, under the wrong name.
-        it 'hands back a JSON header the expanded projection has outgrown' do
+        it 'discards a JSON header the expanded projection has outgrown' do
           expanded = Projection.new(%w[author:firstName author:lastName id title])
           kept = Projection.new(%w[id title])
 
-          expect(described_class.filter_header('["Author","Id","Title"]', expanded, kept))
-            .to eq('["Author","Id","Title"]')
+          expect(described_class.filter_header('["Author","Id","Title"]', expanded, kept)).to be_nil
         end
 
-        it 'hands back a header that carries no label for each exported column' do
+        it 'discards a header that carries no label for each requested path' do
           # `fields[users]=address,id` expands `address` into two paths, so no label sits at the
           # index of a path and dropping one by position would mislabel the rest.
           expanded = Projection.new(%w[address:planet address:city id])
 
-          expect(described_class.filter_header('Address,Id', expanded, Projection.new(%w[id])))
-            .to eq('Address,Id')
+          expect(described_class.filter_header('Address,Id', expanded, Projection.new(%w[id]))).to be_nil
+        end
+
+        # An unmappable header must not be handed back: the stream re-checks the label count against
+        # the *kept* projection, so a header matching that count by coincidence would be accepted and
+        # print each surviving column under the label of whatever preceded it. Here `holder:*` is
+        # denied while the type field appended next to it survives, and 'Holder' would head
+        # `holder_type`.
+        it 'discards a header whose label count coincides with the kept projection' do
+          requested = Projection.new(%w[pan_last4 holder:* holder_type])
+          kept = Projection.new(%w[pan_last4 holder_type])
+
+          expect(described_class.filter_header('PAN,Holder', requested, kept)).to be_nil
+        end
+
+        # The one branch where handing the header back is safe: both counts are the same number, so
+        # the stream's own check cannot reach a different answer.
+        it 'keeps the header the caller sent when the redaction dropped no column' do
+          requested = Projection.new(%w[pan_last4 holder_type])
+
+          expect(described_class.filter_header('PAN,Type', requested, requested)).to eq('PAN,Type')
         end
       end
 
