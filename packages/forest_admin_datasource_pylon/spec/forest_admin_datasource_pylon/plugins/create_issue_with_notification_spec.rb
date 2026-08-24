@@ -30,8 +30,12 @@ module ForestAdminDatasourcePylon
       end.new
     end
 
+    # `sender_email` rides along by default: Pylon refuses an email delivery
+    # that does not name the sending address, so the plugin refuses to register
+    # one, and an email destination is what the options default to.
     def register(opts = {})
-      described_class.new.run(nil, collection_customizer, { datasource: datasource }.merge(opts))
+      options = { datasource: datasource, sender_email: 'support@acme.test' }.merge(opts)
+      described_class.new.run(nil, collection_customizer, options)
       collection_customizer.registered[opts[:action_name] || described_class::NAME]
     end
 
@@ -113,6 +117,17 @@ module ForestAdminDatasourcePylon
         expect { register(destination: 'pigeon') }.to raise_error(forest_exception, /Unknown.*pigeon/)
       end
 
+      it 'refuses an email delivery that names no sending address' do
+        expect { described_class.new.run(nil, collection_customizer, datasource: datasource) }
+          .to raise_error(forest_exception, /:sender_email when the destination is email/)
+      end
+
+      # The address belongs to the email app; the other channels never carry it.
+      it 'asks for no sending address on another channel' do
+        expect { described_class.new.run(nil, collection_customizer, datasource: datasource, destination: 'slack') }
+          .not_to raise_error
+      end
+
       it 'raises a ForestException on an unknown priority' do
         expect { register(priority_override: 'critical') }.to raise_error(forest_exception, /Unknown.*critical/)
       end
@@ -137,7 +152,8 @@ module ForestAdminDatasourcePylon
         expect(client).to have_received(:create_issue).with(
           'title' => 'Boom', 'body_html' => '<p>it broke</p>',
           'requester_email' => 'ada@acme.test', 'requester_name' => 'ada',
-          'priority' => 'high', 'destination_metadata' => { 'destination' => 'email' }
+          'priority' => 'high',
+          'destination_metadata' => { 'destination' => 'email', 'email' => 'support@acme.test' }
         )
         expect(result[:type]).to eq('Success')
         expect(result[:message]).to include('Issue #12 created and the requester notified by email.')
@@ -146,8 +162,7 @@ module ForestAdminDatasourcePylon
       it 'carries the sending address and the copies of an email delivery' do
         allow(client).to receive(:create_issue).and_return({ 'id' => 'i1' })
 
-        run_action(register(sender_email: 'support@acme.test', email_ccs: ['lead@acme.test'],
-                            email_bccs: ['audit@acme.test']), form_values)
+        run_action(register(email_ccs: ['lead@acme.test'], email_bccs: ['audit@acme.test']), form_values)
 
         expect(client).to have_received(:create_issue).with(
           hash_including('destination_metadata' => { 'destination' => 'email', 'email' => 'support@acme.test',
@@ -161,7 +176,7 @@ module ForestAdminDatasourcePylon
       it 'leaves the email settings out of another channel' do
         allow(client).to receive(:create_issue).and_return({ 'id' => 'i1' })
 
-        run_action(register(destination: 'slack', sender_email: 'support@acme.test'), form_values)
+        run_action(register(destination: 'slack'), form_values)
 
         expect(client).to have_received(:create_issue)
           .with(hash_including('destination_metadata' => { 'destination' => 'slack' }))
@@ -217,6 +232,24 @@ module ForestAdminDatasourcePylon
         expect(client).not_to have_received(:create_issue)
         expect(result[:type]).to eq('Error')
         expect(result[:message]).to include('Requester email is required.')
+      end
+
+      it 'hands the operator the reason Pylon refused the creation' do
+        allow(client).to receive(:create_issue)
+          .and_raise(APIError.new('Pylon API call failed: create(issues): HTTP 400 account_id is required',
+                                  status: 400))
+
+        result = run_action(register, form_values)
+
+        expect(result[:type]).to eq('Error')
+        expect(result[:message]).to include('account_id is required')
+      end
+
+      it 'lets a Pylon failure that is not the operator\'s to fix stay an error' do
+        allow(client).to receive(:create_issue)
+          .and_raise(APIError.new('Pylon API call failed: create(issues): HTTP 503', status: 503))
+
+        expect { run_action(register, form_values) }.to raise_error(APIError, /503/)
       end
     end
 

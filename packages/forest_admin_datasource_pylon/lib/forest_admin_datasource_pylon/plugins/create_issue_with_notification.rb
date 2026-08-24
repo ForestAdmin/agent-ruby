@@ -30,6 +30,7 @@ module ForestAdminDatasourcePylon
         opts[:email_templates] = Array(opts[:email_templates]).compact
         opts[:destination] = normalize_destination(opts[:destination])
         opts[:priority_override] = normalize_priority(opts[:priority_override])
+        require_sender_email!(opts)
 
         collection_customizer.add_action(opts[:action_name] || NAME, build_action(datasource, opts))
       end
@@ -40,6 +41,20 @@ module ForestAdminDatasourcePylon
         return Payload::EMAIL_DESTINATION if value.nil?
 
         normalize(value, IssueEnums::DESTINATION, 'destination')
+      end
+
+      # `POST /issues` refuses an email delivery that does not name the address it
+      # is sent from, so the option is mandatory there rather than optional. The
+      # refusal belongs at registration, where it names the option and the agent
+      # will not boot without it, rather than at the first execution, where it
+      # reaches the operator as a Pylon 400 on a form they filled correctly.
+      def require_sender_email!(opts)
+        return unless opts[:destination] == Payload::EMAIL_DESTINATION
+        return if Payload.present?(opts[:sender_email])
+
+        raise ForestException,
+              'CreateIssueWithNotification requires :sender_email when the destination is email. ' \
+              'It must be one of the addresses configured in the Pylon email app.'
       end
 
       def normalize_priority(value)
@@ -66,10 +81,29 @@ module ForestAdminDatasourcePylon
           email  = values['Requester email']
           next result_builder.error(message: 'Requester email is required.') unless Payload.present?(email)
 
-          issue = datasource.client.create_issue(Payload.build(values, email, opts))
+          issue = create_issue(datasource, Payload.build(values, email, opts))
+          next result_builder.error(message: issue.last) if issue.is_a?(Array)
+
           writeback = write_back_issue_id(context, opts[:issue_id_field], issue['id'])
           result_builder.success(message: success_message(issue, values, opts, writeback))
         end
+      end
+
+      # A 4xx is Pylon naming what the operator filled in, and reaches them as
+      # the action's own error, message intact: raised, it would leave the agent
+      # to answer 'Unexpected error' — APIError is none of the classes whose
+      # message the translator passes through — and to log nothing either, its
+      # status being under 500. Anything else is Pylon or the network failing,
+      # which no edit of the form would change, and stays the 500 it is.
+      def create_issue(datasource, payload)
+        datasource.client.create_issue(payload)
+      rescue APIError => e
+        raise unless (400..499).cover?(e.status.to_i)
+
+        ForestAdminDatasourcePylon.logger.warn(
+          "[forest_admin_datasource_pylon] Pylon refused the issue creation: #{e.message}"
+        )
+        [:rejected, e.message]
       end
 
       # Best-effort: Pylon has no transaction to roll back, and the issue exists

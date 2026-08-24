@@ -5,7 +5,9 @@ module ForestAdminDatasourcePylon
       # the operator fills.
       module Payload
         # Only meaningful on an email delivery: Pylon reads the sending address
-        # and the copies off the email app they belong to.
+        # and the copies off the email app they belong to. The address is
+        # mandatory there — `CreateIssueWithNotification` refuses to register an
+        # email delivery without one.
         EMAIL_DESTINATION = 'email'.freeze
 
         module_function
@@ -46,7 +48,7 @@ module ForestAdminDatasourcePylon
           metadata = { 'destination' => destination }
           return metadata unless destination == EMAIL_DESTINATION
 
-          metadata['email'] = opts[:sender_email] if present?(opts[:sender_email])
+          metadata['email'] = opts[:sender_email]
           metadata['email_ccs'] = Array(opts[:email_ccs]) if Array(opts[:email_ccs]).any?
           metadata['email_bccs'] = Array(opts[:email_bccs]) if Array(opts[:email_bccs]).any?
           metadata
