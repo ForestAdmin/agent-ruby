@@ -12,10 +12,9 @@ module ForestAdminDatasourcePylon
 
     INTERNAL_DESTINATION = 'internal'.freeze
 
-    # The states Pylon ships. An organization defines its own on top of them, so
-    # this list is what a form offers, never what a write is checked against.
-    STANDARD_STATES = %w[new waiting_on_you waiting_on_customer on_hold closed].freeze
-
+    # The one state every organization has: the others Pylon ships, and the
+    # custom ones defined on top of them, are named by the option that writes
+    # them rather than listed here.
     CLOSED_STATE = 'closed'.freeze
   end
 end

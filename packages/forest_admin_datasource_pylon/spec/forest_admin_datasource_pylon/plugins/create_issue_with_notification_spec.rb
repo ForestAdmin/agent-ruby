@@ -355,6 +355,16 @@ module ForestAdminDatasourcePylon
         register(email_templates: templates).form.last[:elements].find { |field| field[:label] == 'Message' }
       end
 
+      def with_default(default_message)
+        register(action_name: "with default #{default_message}", email_templates: templates,
+                 default_message: default_message)
+          .form.last[:elements].find { |field| field[:label] == 'Message' }
+      end
+
+      def context_with_record
+        FakeCreateContext.new(record: { 'name' => 'Ada & Co' })
+      end
+
       def template_context(changed:, chosen:, record: {})
         context = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle)
         allow(context).to receive(:field_changed?).with('Template').and_return(changed)
@@ -370,8 +380,38 @@ module ForestAdminDatasourcePylon
         expect(value).to eq('<p>Sorry Ada &amp; Co</p>')
       end
 
-      it 'clears the message when the template is taken back' do
+      it 'clears the message when the template is taken back and no default was configured' do
         expect(message_field[:value].call(template_context(changed: true, chosen: 'No template'))).to eq('')
+      end
+
+      # The wizard carries the configured default like the flat form does: the
+      # first page decides whether a template replaces it, not whether the
+      # operator is handed an empty required field.
+      it 'still fills the first render from the configured default' do
+        field = with_default('<p>Hi</p>')
+
+        expect(field[:default_value]).to eq('<p>Hi</p>')
+        expect(field[:value]).to be_a(Proc)
+      end
+
+      it 'interpolates the default of the first render, tokens escaped' do
+        field = with_default('<p>Hi {{ record.name }}</p>')
+
+        expect(field[:default_value].call(context_with_record)).to eq('<p>Hi Ada &amp; Co</p>')
+      end
+
+      it 'restores the configured default when the template is taken back' do
+        value = with_default('<p>Hi</p>')[:value]
+                .call(template_context(changed: true, chosen: 'No template'))
+
+        expect(value).to eq('<p>Hi</p>')
+      end
+
+      it 'restores a default carrying tokens, interpolated' do
+        value = with_default('<p>Hi {{ record.name }}</p>')[:value]
+                .call(template_context(changed: true, chosen: 'No template', record: { 'name' => 'Ada & Co' }))
+
+        expect(value).to eq('<p>Hi Ada &amp; Co</p>')
       end
 
       # Nil means "leave what the operator typed", which is what keeps their

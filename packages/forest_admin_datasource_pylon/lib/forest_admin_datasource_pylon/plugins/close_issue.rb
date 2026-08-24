@@ -37,12 +37,12 @@ module ForestAdminDatasourcePylon
 
       private
 
-      # Left unchecked against `STANDARD_STATES`: Pylon takes the slug of a
+      # Left unchecked against the states Pylon ships: it takes the slug of a
       # custom status just as well, and refusing one would refuse the very
       # workflow an organization built.
       def normalize_state(value)
-        state = value.nil? ? IssueEnums::CLOSED_STATE : value.to_s
-        return state unless state.strip.empty?
+        state = value.nil? ? IssueEnums::CLOSED_STATE : value.to_s.strip
+        return state unless state.empty?
 
         raise ForestException, 'CloseIssue :state cannot be empty.'
       end

@@ -60,12 +60,14 @@ module ForestAdminDatasourcePylon
           field = { type: FieldType::STRING, label: 'Message', widget: 'RichText', is_required: true,
                     description: 'The body of the issue (HTML). Unless it is sent as an internal note, this is ' \
                                  'the message Pylon delivers to the requester.' }
-          return field.merge(default_value: template_default(default_message, escape_html: true)) if templates.empty?
+          default = template_default(default_message, escape_html: true)
+          return field.merge(default_value: default) if templates.empty?
 
-          # `value:` (not `default_value:`) — drop_default runs once (data
-          # key sticks after the first render); drop_deferred re-evaluates
-          # on every fetch, so Template changes re-fire the message proc.
-          field.merge(value: message_value(templates))
+          # Both keys: `default_value:` fills the first render — drop_default
+          # runs once, the data key sticking after it — where `value:` is
+          # re-evaluated by drop_deferred on every fetch, which is what a
+          # Template change re-fires the message proc through.
+          field.merge(default_value: default, value: message_value(templates, default))
         end
 
         # No default: Pylon applies its own when the key is absent, and no
@@ -107,19 +109,32 @@ module ForestAdminDatasourcePylon
 
         # Returns nil unless Template was just changed, so set_watch_changes
         # carries over the user's current Message edits between renders.
-        def message_value(templates)
+        #
+        # Taking a template back restores the configured default rather than
+        # emptying a required field: it is what the operator was handed before
+        # they picked one.
+        def message_value(templates, default)
           by_title = templates.to_h { |t| [t[:title], t[:content].to_s] }
           lambda do |context|
             return nil unless context.field_changed?('Template')
 
             title = context.get_form_value('Template')
-            return '' if title == NO_TEMPLATE
+            return evaluate_default(default, context) if title == NO_TEMPLATE
 
-            content = by_title[title].to_s
-            return content unless content.match?(TOKEN_RE)
-
-            interpolate(content, fetch_record(context), escape_html: true)
+            interpolated(by_title[title].to_s, context)
           end
+        end
+
+        # A default carrying tokens is a proc, and one without is the string
+        # itself; no default at all empties the field, as it always did.
+        def evaluate_default(default, context)
+          default.is_a?(Proc) ? default.call(context) : default.to_s
+        end
+
+        def interpolated(content, context)
+          return content unless content.match?(TOKEN_RE)
+
+          interpolate(content, fetch_record(context), escape_html: true)
         end
 
         def fetch_record(context)
