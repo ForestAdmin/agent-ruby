@@ -60,6 +60,18 @@ module ForestAdminAgent
 
             expect(csv_output).to start_with("id,first_name,last_name\n")
           end
+
+          it 'labels the columns from a comma-joined header, which is what the front sends' do
+            enumerator = described_class.stream('Id,First name,Last name', filter, projection, list_records)
+
+            expect(enumerator.to_a.join).to start_with("Id,First name,Last name\n")
+          end
+
+          it 'uses the projection when the header carries no label for each exported column' do
+            enumerator = described_class.stream('Id,First name', filter, projection, list_records)
+
+            expect(enumerator.to_a.join).to start_with("id,first_name,last_name\n")
+          end
         end
 
         it 'streams CSV data with header and records' do

@@ -72,6 +72,49 @@ module ForestAdminAgent
         "id,last_name,first_name,email,active,created_at,updated_at,address\n1,Skywalker,Luke,luke@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Tatooine\n2,Solo,Han,han@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Corellia\n3,Organa,Leia,leia@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Alderaan\n4,Kenobi,Obi-Wan,obiwan@sw.com,false,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Stewjon\n"
       end
 
+      describe 'filter_header' do
+        let(:requested) { Projection.new(%w[id last_name address:planet]) }
+
+        it 'hands the header back untouched when the redaction dropped nothing' do
+          expect(described_class.filter_header('Id,Last name,Planet', requested, requested))
+            .to eq('Id,Last name,Planet')
+        end
+
+        it 'returns nothing when the caller sent no header' do
+          expect(described_class.filter_header(nil, requested, Projection.new(%w[id]))).to be_nil
+        end
+
+        it 'drops the label of a path the redaction removed from a comma-joined header' do
+          kept = Projection.new(%w[id last_name])
+
+          expect(described_class.filter_header('Id,Last name,Planet', requested, kept))
+            .to eq(['Id', 'Last name'])
+        end
+
+        it 'drops the label of a path the redaction removed from a JSON header' do
+          kept = Projection.new(%w[id address:planet])
+
+          expect(described_class.filter_header('["Id","Last name","Planet"]', requested, kept))
+            .to eq(%w[Id Planet])
+        end
+
+        it 'drops the label of a path the redaction removed from an array of labels' do
+          kept = Projection.new(%w[address:planet])
+
+          expect(described_class.filter_header(['Id', 'Last name', 'Planet'], requested, kept))
+            .to eq(['Planet'])
+        end
+
+        it 'hands back a header that carries no label for each exported column' do
+          # `fields[users]=address,id` expands `address` into two paths, so no label sits at the
+          # index of a path and dropping one by position would mislabel the rest.
+          expanded = Projection.new(%w[address:planet address:city id])
+
+          expect(described_class.filter_header('Address,Id', expanded, Projection.new(%w[id])))
+            .to eq('Address,Id')
+        end
+      end
+
       describe 'generate' do
         it 'generates a CSV string' do
           csv = described_class.generate(records, projection)
