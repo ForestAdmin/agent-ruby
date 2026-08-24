@@ -168,6 +168,74 @@ module ForestAdminAgent
           )
         end
 
+        it 'leaves nothing for `with_pks` to re-add once the redaction emptied a relation' do
+          permissions = build_permissions([])
+
+          projection = permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban]), named_by_caller: false
+          ).with_pks(cards)
+
+          expect(projection).to eq(%w[id])
+        end
+
+        # The key of a collection the caller cannot read stays, because the serializer needs it to
+        # emit the readable column behind it — dropping it would take the permitted path down too.
+        it 'keeps the key `with_pks` needs to serialize a path the redaction kept' do
+          permissions = build_permissions(%w[organizations])
+
+          projection = permissions.redact_projection(
+            cards, Projection.new(%w[id account:organization:name]), named_by_caller: true
+          ).with_pks(cards)
+
+          expect(projection).to include('account:id', 'account:organization:id')
+        end
+
+        context 'when a polymorphic relation declares no target at all' do
+          let(:orphan_cards) do
+            build_datasource_with_collections(
+              [
+                build_collection(
+                  name: 'cards',
+                  schema: {
+                    fields: {
+                      'id' => build_numeric_primary_key,
+                      'holder_id' => build_column(column_type: 'Number'),
+                      'holder_type' => build_column(column_type: 'String'),
+                      'holder' => Relations::PolymorphicManyToOneSchema.new(
+                        foreign_key: 'holder_id',
+                        foreign_key_type_field: 'holder_type',
+                        foreign_collections: [],
+                        foreign_key_targets: {}
+                      )
+                    }
+                  }
+                )
+              ]
+            ).get_collection('cards')
+          end
+
+          it 'refuses the path the caller named rather than allowing what resolves to nothing' do
+            permissions = build_permissions([])
+
+            expect do
+              permissions.redact_projection(orphan_cards, Projection.new(%w[id holder:*]), named_by_caller: true)
+            end.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You are not allowed to read 'holder:*' from an unresolved polymorphic relation."
+            )
+          end
+
+          it 'drops the path from the default expansion' do
+            permissions = build_permissions([])
+
+            projection = permissions.redact_projection(
+              orphan_cards, Projection.new(%w[id holder:*]), named_by_caller: false
+            )
+
+            expect(projection).to eq(%w[id])
+          end
+        end
+
         it 'drops a polymorphic relation with a denied target from the default expansion' do
           permissions = build_permissions(%w[persons])
 
@@ -205,14 +273,25 @@ module ForestAdminAgent
             )
         end
 
-        it 'leaves the condition tree intact while walking it' do
+        # `for_each_leaf` on a branch replaces each condition with the block's return value, so the
+        # tree the guard walked is the one asserted on — a freshly parsed one could not catch it.
+        it 'leaves the branch it walked intact instead of rebuilding it from the guard' do
           permissions = build_permissions(%w[accounts])
-          args = args_with(filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json)
+          args = args_with(
+            filters: {
+              aggregator: 'and',
+              conditions: [
+                { field: 'account:iban', operator: 'equal', value: 'FR76' },
+                { field: 'id', operator: 'equal', value: 1 }
+              ]
+            }.to_json
+          )
+          tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(cards, args)
+          allow(ForestAdminAgent::Utils::QueryStringParser).to receive(:parse_condition_tree).and_return(tree)
 
           permissions.assert_can_read_query_fields(cards, args)
 
-          tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(cards, args)
-          expect(tree.field).to eq('account:iban')
+          expect(tree.conditions.map(&:field)).to eq(%w[account:iban id])
         end
 
         def searchable_cards(searched)
@@ -242,6 +321,17 @@ module ForestAdminAgent
         it 'accepts a search once every collection the stack names is readable' do
           permissions = build_permissions(%w[persons])
           collection = searchable_cards([{ path: 'holder:national_id', collections: ['persons'] }])
+
+          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+            .not_to raise_error
+        end
+
+        # Below publication, so the permission payload has never heard of it: unpublished, not denied.
+        it 'ignores a search target the datasource stopped publishing' do
+          permissions = build_permissions([])
+          collection = searchable_cards([{ path: 'account:iban', collections: ['accounts'] }])
+          published = datasource.collections.except('accounts')
+          allow(datasource).to receive(:collections).and_return(published)
 
           expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
             .not_to raise_error
@@ -280,6 +370,37 @@ module ForestAdminAgent
           args = args_with(filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json)
 
           expect { permissions.assert_can_read_query_fields(cards, args) }.not_to raise_error
+        end
+      end
+
+      describe '#read_permissions' do
+        it 'answers a collection once for the whole request' do
+          permissions = build_permissions(%w[accounts])
+
+          permissions.read_permissions('cards', %w[accounts])
+          permissions.read_permissions('cards', %w[accounts])
+
+          expect(permissions).to have_received(:get_collections_permissions_data).once
+        end
+
+        # Denial is the steady state here: a role that simply lacks `read` must not cost a permission
+        # fetch, and a cache eviction every other in-flight request reads through, on each page load.
+        it 'does not refetch for a denial the cached payload already accounts for' do
+          permissions = build_permissions([])
+
+          expect(permissions.read_permissions('cards', %w[accounts])).to eq(
+            { 'cards' => true, 'accounts' => false }
+          )
+          expect(permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'refetches once for the whole request when the payload does not know a collection' do
+          permissions = build_permissions([])
+
+          permissions.read_permissions('cards', %w[not_in_payload])
+          permissions.read_permissions('cards', %w[another_one_missing])
+
+          expect(permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
         end
       end
     end

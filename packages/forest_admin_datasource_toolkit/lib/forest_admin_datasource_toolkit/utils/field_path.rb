@@ -7,11 +7,20 @@ module ForestAdminDatasourceToolkit
       # Collections crossed on the way are joins, not read targets, so they are not returned.
       #
       # Several names come back for a path ending on a polymorphic relation: it carries no
-      # discriminant, so any record may resolve to any of its targets and none can be ruled out.
+      # discriminant, so any record may resolve to any of its targets and none can be ruled out. The
+      # list is empty for a polymorphic relation declaring no target at all, which the caller counts
+      # as denied — an empty list is a path that resolves to nothing, not a path that needs nothing.
       #
       # A prefix naming no relation raises rather than falling back to +collection+. The caller pins
       # the collection it asked about to readable, so falling back would turn "this path does not
       # resolve" into "this path is allowed".
+      #
+      # A path with no prefix at all is a column of +collection+ itself, and so is allowed. Two
+      # customisations reach a related collection through one deliberately: +import_field+, and an
+      # +add_field+ whose dependencies cross a relation, both register a root-level column that the
+      # operator and sorting layers rewrite into a relation path below this guard. Like a scope or a
+      # +replace_search+, they are the customer's own choice of what a role reaches through a column
+      # it can read.
       def self.leaf_collection_names(collection, path)
         index = path.index(':')
 

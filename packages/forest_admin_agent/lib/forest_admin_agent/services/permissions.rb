@@ -58,9 +58,8 @@ module ForestAdminAgent
       # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
       # listing, +read+ a get, and the signed hash a chart.
       #
-      # One cached pass for the whole request, and a single refetch only if it denied something —
-      # unlike +can?+, which refetches on every denial. Denial is the steady state here rather than
-      # the exception, so refetching per collection would cost one permission fetch per request.
+      # Answered once per collection for the whole request: +redact_projection+ and
+      # +assert_can_read_query_fields+ both ask on a listing, and a chart asks three times.
       def read_permissions(root_collection_name, collection_names)
         to_check = collection_names.uniq.reject { |name| name == root_collection_name }
         allowed = { root_collection_name => true }
@@ -71,16 +70,11 @@ module ForestAdminAgent
         # anything else would redact every relation on a deployment that granted nothing to check.
         return allowed.merge(to_check.to_h { |name| [name, true] }) unless permission_system?
 
-        user_data = get_user_data(caller.id)
-        collections_data = get_collections_permissions_data
-        results = to_check.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+        @read_permissions ||= {}
+        missing = to_check - @read_permissions.keys
+        @read_permissions.merge!(fetch_read_permissions(missing)) unless missing.empty?
 
-        unless results.values.all?
-          collections_data = get_collections_permissions_data(force_fetch: true)
-          results = to_check.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
-        end
-
-        allowed.merge(results)
+        allowed.merge(@read_permissions.slice(*to_check))
       end
 
       # An unnamed field is dropped rather than refused: the default expansion covers every column
@@ -91,13 +85,13 @@ module ForestAdminAgent
           [path, ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)]
         end
         allowed = read_permissions(collection.name, owners.values.flatten)
-        readable = ->(path) { owners[path].all? { |name| allowed[name] } }
+        readable = ->(path) { readable_leaves?(owners[path], allowed) }
 
         if named_by_caller
           denied = projection.reject { |path| readable.call(path) }
 
           unless denied.empty?
-            fields = denied.map { |path| "'#{path}' from the '#{owners[path].join("' or '")}' collection" }
+            fields = denied.map { |path| "'#{path}' from #{leaf_label(owners[path])}" }
             raise ForbiddenError, "You are not allowed to read #{fields.join(", ")}."
           end
         end
@@ -141,13 +135,13 @@ module ForestAdminAgent
 
       def assert_can_read_usages(root_collection_name, usages)
         allowed = read_permissions(root_collection_name, usages.flat_map { |usage| usage[:collections] })
-        denied = usages.find { |usage| !usage[:collections].all? { |name| allowed[name] } }
+        denied = usages.find { |usage| !readable_leaves?(usage[:collections], allowed) }
 
         return unless denied
 
         raise ForbiddenError,
-              "You cannot #{denied[:action]} '#{denied[:path]}': you are not allowed to read the " \
-              "'#{denied[:collections].join("' or '")}' collection."
+              "You cannot #{denied[:action]} '#{denied[:path]}': you are not allowed to read " \
+              "#{leaf_label(denied[:collections])}."
       end
 
       def can_chart?(parameters)
@@ -285,6 +279,35 @@ module ForestAdminAgent
 
       private
 
+      # An empty list of leaves resolves to no collection at all — a polymorphic relation declaring
+      # no `foreign_collections`. `[].all?` would allow it unconditionally, which is the one answer
+      # this guard must never give by default, so it counts as denied.
+      def readable_leaves?(names, allowed)
+        names.any? && names.all? { |name| allowed[name] }
+      end
+
+      def leaf_label(names)
+        names.empty? ? 'an unresolved polymorphic relation' : "the '#{names.join("' or '")}' collection"
+      end
+
+      # A denial is refetched only when the collection is absent from the payload, the one denial a
+      # stale cache explains. A role that simply lacks `read` is the steady state here, and
+      # `refresh-roles` on the SSE channel already evicts the cache when a role changes — refetching
+      # on every denial would cost a permission fetch, and a cache eviction every other in-flight
+      # request reads through, on each page load.
+      def fetch_read_permissions(names)
+        user_data = get_user_data(caller.id)
+        collections_data = get_collections_permissions_data
+        results = names.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+
+        return results if @read_permissions_refetched || names.all? { |name| collections_data.key?(name.to_sym) }
+
+        @read_permissions_refetched = true
+        collections_data = get_collections_permissions_data(force_fetch: true)
+
+        names.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+      end
+
       def read_allowed?(collections_data, collection_name, user_data)
         return false unless user_data_valid?(user_data)
 
@@ -309,8 +332,18 @@ module ForestAdminAgent
         extended = Utils::QueryStringParser.parse_search_extended(args)
         searched = collection.searched_fields(search, extended)
 
-        searched&.each do |field|
-          usages << { action: 'search on', path: field[:path], collections: field[:collections] }
+        return if searched.nil?
+
+        published = collection.datasource.collections
+
+        searched.each do |field|
+          # `searched_fields` answers below the publication layer, so a target the datasource stopped
+          # publishing is absent from the permission payload. That is unpublished, not denied: no
+          # route exposes it and looking it up would refuse the search for every role, admins
+          # included.
+          targets = field[:collections].select { |name| published.key?(name) }
+
+          usages << { action: 'search on', path: field[:path], collections: targets } unless targets.empty?
         end
       end
 
