@@ -48,6 +48,15 @@ module ForestAdminAgent
 
         private
 
+        # An empty `aggregateFieldName` is a count, and `can_chart?` cannot tell it from an absent
+        # one — `sanitize_chart_parameters` drops both before hashing. Normalising here keeps the
+        # aggregation and the guards that read it from disagreeing on what a count is.
+        def aggregate_field_name(args)
+          field = args[:params][:aggregateFieldName]
+
+          field.nil? || field.to_s.empty? ? nil : field
+        end
+
         def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
@@ -92,11 +101,11 @@ module ForestAdminAgent
           group_field = args[:params][:groupByFieldName]
           assert_can_read_aggregated_fields(
             context, context.collection,
-            [['group a chart by', group_field], ['aggregate a chart on', args[:params][:aggregateFieldName]]]
+            [['group a chart by', group_field], ['aggregate a chart on', aggregate_field_name(args)]]
           )
           aggregation = Aggregation.new(
             operation: args[:params][:aggregator],
-            field: args[:params][:aggregateFieldName],
+            field: aggregate_field_name(args),
             groups: group_field ? [{ field: group_field }] : []
           )
 
@@ -110,7 +119,7 @@ module ForestAdminAgent
           assert_can_read_aggregated_fields(
             context, context.collection,
             [['group a chart by', group_by_field_name],
-             ['aggregate a chart on', args[:params][:aggregateFieldName]]]
+             ['aggregate a chart on', aggregate_field_name(args)]]
           )
           time_range = args[:params][:timeRange]
           filter_only_with_values = filter.override(
@@ -126,7 +135,7 @@ module ForestAdminAgent
             filter_only_with_values,
             Aggregation.new(
               operation: args[:params][:aggregator],
-              field: args[:params][:aggregateFieldName],
+              field: aggregate_field_name(args),
               groups: [{ field: group_by_field_name, operation: time_range }]
             )
           )
@@ -161,7 +170,7 @@ module ForestAdminAgent
               leaderboard_filter = filter.nest(inverse)
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
-                field: args[:params][:aggregateFieldName],
+                field: aggregate_field_name(args),
                 groups: [{ field: "#{inverse}:#{args[:params][:labelFieldName]}" }]
               )
             end
@@ -181,7 +190,7 @@ module ForestAdminAgent
               leaderboard_filter = filter.nest(origin)
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
-                field: args[:params][:aggregateFieldName] ? "#{target}:#{args[:params][:aggregateFieldName]}" : nil,
+                field: aggregate_field_name(args) ? "#{target}:#{aggregate_field_name(args)}" : nil,
                 groups: [{ field: "#{origin}:#{args[:params][:labelFieldName]}" }]
               )
             end
@@ -224,10 +233,10 @@ module ForestAdminAgent
         def compute_value(context, filter, args)
           assert_can_read_aggregated_fields(
             context, context.collection,
-            [['aggregate a chart on', args[:params][:aggregateFieldName]]]
+            [['aggregate a chart on', aggregate_field_name(args)]]
           )
           aggregation = Aggregation.new(operation: args[:params][:aggregator],
-                                        field: args[:params][:aggregateFieldName])
+                                        field: aggregate_field_name(args))
           result = context.collection.aggregate(context.caller, filter, aggregation)
 
           result[0]['value'] || 0
