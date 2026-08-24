@@ -290,22 +290,36 @@ module ForestAdminAgent
         names.empty? ? 'an unresolved polymorphic relation' : "the '#{names.join("' or '")}' collection"
       end
 
-      # A denial is refetched only when the collection is absent from the payload, the one denial a
-      # stale cache explains. A role that simply lacks `read` is the steady state here, and
-      # `refresh-roles` on the SSE channel already evicts the cache when a role changes — refetching
-      # on every denial would cost a permission fetch, and a cache eviction every other in-flight
-      # request reads through, on each page load.
       def fetch_read_permissions(names)
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data
         results = names.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
 
-        return results if @read_permissions_refetched || names.all? { |name| collections_data.key?(name.to_sym) }
+        return results if results.values.all? || !refetch_denied_reads?(names, collections_data)
 
         @read_permissions_refetched = true
-        collections_data = get_collections_permissions_data(force_fetch: true)
+        refetched = get_collections_permissions_data(force_fetch: true)
 
-        names.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+        names.to_h { |name| [name, read_allowed?(refetched, name, user_data)] }
+      end
+
+      # `can?` refetches the whole environment on every denial. Denial is the steady state of this
+      # check rather than the exception, so paying that per denial would cost a permission fetch, and
+      # a cache eviction every other in-flight request reads through, on each page load.
+      #
+      # Two things make a denial worth one fetch. Without `instant_cache_refresh` nothing else keeps
+      # the cache fresh — this is the gate node puts its own refetch behind — so a role granted `read`
+      # would otherwise stay redacted until the cache expires. With the channel up, `refresh-roles`
+      # evicts on a role change, and the only denial staleness still explains is a collection the
+      # payload has never heard of.
+      def refetch_denied_reads?(names, collections_data)
+        return false if @read_permissions_refetched
+
+        !instant_cache_refresh? || names.any? { |name| !collections_data.key?(name.to_sym) }
+      end
+
+      def instant_cache_refresh?
+        Facades::Container.config_from_cache[:instant_cache_refresh] == true
       end
 
       def read_allowed?(collections_data, collection_name, user_data)
@@ -343,7 +357,11 @@ module ForestAdminAgent
           # included.
           targets = field[:collections].select { |name| published.key?(name) }
 
-          usages << { action: 'search on', path: field[:path], collections: targets } unless targets.empty?
+          # Only a list the filter emptied has nothing left to check. One that arrived empty is a
+          # relation that resolves to nothing, and stays denied like everywhere else.
+          next if targets.empty? && field[:collections].any?
+
+          usages << { action: 'search on', path: field[:path], collections: targets }
         end
       end
 

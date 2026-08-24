@@ -374,7 +374,13 @@ module ForestAdminAgent
       end
 
       describe '#read_permissions' do
+        def with_instant_cache_refresh(enabled)
+          config = ForestAdminAgent::Facades::Container.config_from_cache.merge(instant_cache_refresh: enabled)
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(config)
+        end
+
         it 'answers a collection once for the whole request' do
+          with_instant_cache_refresh(true)
           permissions = build_permissions(%w[accounts])
 
           permissions.read_permissions('cards', %w[accounts])
@@ -383,9 +389,11 @@ module ForestAdminAgent
           expect(permissions).to have_received(:get_collections_permissions_data).once
         end
 
-        # Denial is the steady state here: a role that simply lacks `read` must not cost a permission
-        # fetch, and a cache eviction every other in-flight request reads through, on each page load.
-        it 'does not refetch for a denial the cached payload already accounts for' do
+        # Denial is the steady state here, and `refresh-roles` on the SSE channel already evicts on a
+        # role change: a role that simply lacks `read` must not cost a permission fetch, and a cache
+        # eviction every other in-flight request reads through, on each page load.
+        it 'does not refetch for a denial the cached payload accounts for while the channel is up' do
+          with_instant_cache_refresh(true)
           permissions = build_permissions([])
 
           expect(permissions.read_permissions('cards', %w[accounts])).to eq(
@@ -394,13 +402,34 @@ module ForestAdminAgent
           expect(permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
         end
 
+        # `instant_cache_refresh` defaults to production only, so outside it nothing else keeps the
+        # cache fresh and a newly granted `read` would stay redacted until the cache expires.
+        it 'refetches a denial when no channel keeps the cache fresh' do
+          with_instant_cache_refresh(false)
+          permissions = build_permissions([])
+
+          permissions.read_permissions('cards', %w[accounts])
+
+          expect(permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+
         it 'refetches once for the whole request when the payload does not know a collection' do
+          with_instant_cache_refresh(true)
           permissions = build_permissions([])
 
           permissions.read_permissions('cards', %w[not_in_payload])
           permissions.read_permissions('cards', %w[another_one_missing])
 
           expect(permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+
+        it 'answers without a fetch once the permission system is absent' do
+          permissions = described_class.new(caller)
+          allow(permissions).to receive_messages(permission_system?: false)
+
+          expect(permissions.read_permissions('cards', %w[accounts])).to eq(
+            { 'cards' => true, 'accounts' => true }
+          )
         end
       end
     end
