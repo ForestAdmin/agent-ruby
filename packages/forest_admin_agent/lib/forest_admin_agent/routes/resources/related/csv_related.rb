@@ -23,14 +23,16 @@ module ForestAdminAgent
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
             context.permissions.can?(:export, context.child_collection)
-            context.permissions.assert_can_read_query_fields(context.child_collection, args, consumes: %i[filter])
+            condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+              context.child_collection, args
+            )
+            context.permissions.assert_can_read_query_fields(
+              context.child_collection, condition_tree: condition_tree
+            )
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
-                [
-                  context.permissions.get_scope(context.child_collection),
-                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.child_collection, args)
-                ]
+                [context.permissions.get_scope(context.child_collection), condition_tree]
               )
             )
             requested = ForestAdminAgent::Utils::QueryStringParser.parse_requested_projection(

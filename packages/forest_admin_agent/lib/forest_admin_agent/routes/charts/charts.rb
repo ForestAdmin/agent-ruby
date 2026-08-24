@@ -28,16 +28,14 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can_chart?(args[:params])
-          context.permissions.assert_can_read_query_fields(context.collection, args, consumes: %i[filter])
+          condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+            context.collection, args
+          )
+          context.permissions.assert_can_read_query_fields(context.collection, condition_tree: condition_tree)
           type = validate_and_get_type(args[:params][:type])
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
-              [
-                context.permissions.get_scope(context.collection),
-                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  context.collection, args
-                )
-              ]
+              [context.permissions.get_scope(context.collection), condition_tree]
             )
           )
 

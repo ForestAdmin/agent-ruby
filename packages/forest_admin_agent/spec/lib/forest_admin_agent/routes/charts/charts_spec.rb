@@ -144,7 +144,7 @@ module ForestAdminAgent
 
           chart.handle_request(args)
 
-          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'book', consumes: %i[filter] }])
+          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'book', applies: %i[filter] }])
         end
 
         it 'throw an error when request has a bad chart type' do

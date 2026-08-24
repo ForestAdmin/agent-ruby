@@ -9,8 +9,6 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      QUERY_COMPONENTS = %i[filter sort search].freeze
-
       attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
@@ -103,33 +101,21 @@ module ForestAdminAgent
       # clause silently reorders it, while both leak the value they touch anyway — a `starts_with`
       # filter answers one guess per request without returning a column of its own.
       #
-      # +consumes+ names the query components the calling route actually applies to its filter.
-      # Checking one it drops would refuse a request the denied field cannot reach: a count carries
-      # no sort, a chart neither sort nor search.
-      def assert_can_read_query_fields(collection, args, consumes: QUERY_COMPONENTS)
+      # The route passes the components it will actually apply, already parsed. A component it drops
+      # is simply one it does not pass — a count carries no sort, a chart neither sort nor search — so
+      # nothing has to be declared alongside the query and then kept in step with it. What is
+      # authorised here is what the filter carries, not a second parse of the same parameters.
+      def assert_can_read_query_fields(collection, condition_tree: nil, sort: nil, search: nil,
+                                       search_extended: false)
         usages = []
-        push = lambda do |action, path|
-          usages << {
-            action: action,
-            path: path,
-            collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)
-          }
-        end
 
-        # `for_each_leaf` on a branch replaces each condition with the block's return value, so the
-        # leaf has to come back out or the tree is rebuilt from whatever `push` returned.
-        if consumes.include?(:filter)
-          Utils::QueryStringParser.parse_condition_tree(collection, args)&.for_each_leaf do |leaf|
-            push.call('filter on', leaf.field)
-            leaf
-          end
-        end
+        # `projection` collects the leaf fields without touching the tree. The route applies this very
+        # instance next, so a traversal that rebuilt a branch — as `for_each_leaf` does — would leave
+        # the guard deciding what runs.
+        condition_tree&.projection&.each { |path| usages << usage('filter on', collection, path) }
+        sort&.each { |clause| usages << usage('sort on', collection, clause[:field]) }
+        collect_search_usages(collection, search, search_extended, usages)
 
-        if consumes.include?(:sort)
-          Utils::QueryStringParser.parse_sort(collection, args).each { |clause| push.call('sort on', clause[:field]) }
-        end
-
-        assert_can_read_search(collection, args, usages) if consumes.include?(:search)
         assert_can_read_usages(collection.name, usages)
       end
 
@@ -334,16 +320,18 @@ module ForestAdminAgent
         check_user_permission(role_ids, user_data, :read, collection_name)
       end
 
-      def assert_can_read_search(collection, args, usages)
-        # Guarded on searchability before parsing: `parse_search` raises for a search on a collection
-        # that has none, which would turn an ignored parameter into a 400 on the chart routes.
-        return unless collection.schema[:searchable] && collection.respond_to?(:searched_fields)
+      def usage(action, collection, path)
+        {
+          action: action,
+          path: path,
+          collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)
+        }
+      end
 
-        search = Utils::QueryStringParser.parse_search(collection, args)
+      def collect_search_usages(collection, search, search_extended, usages)
+        return if search.nil? || !collection.respond_to?(:searched_fields)
 
-        return if search.nil?
-
-        searched = collection.searched_fields(search, Utils::QueryStringParser.parse_search_extended(args))
+        searched = collection.searched_fields(search, search_extended)
 
         return if searched.nil?
 

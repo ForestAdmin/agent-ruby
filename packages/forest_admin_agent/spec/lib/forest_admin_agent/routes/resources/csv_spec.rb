@@ -66,7 +66,7 @@ module ForestAdminAgent
           csv.handle_request(args)
 
           expect(read_guard_calls[:query_fields]).to eq(
-            [{ collection: 'user', consumes: %i[filter sort search] }]
+            [{ collection: 'user', applies: %i[filter sort search] }]
           )
           expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: false }])
         end

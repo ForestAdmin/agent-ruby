@@ -90,7 +90,7 @@ module ForestAdminAgent
             list.handle_request(args)
 
             expect(read_guard_calls[:query_fields]).to eq(
-              [{ collection: 'category', consumes: %i[filter sort] }]
+              [{ collection: 'category', applies: %i[filter sort] }]
             )
             expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
           end

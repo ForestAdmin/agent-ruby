@@ -19,18 +19,26 @@ module ForestAdminAgent
           context.permissions.can?(:browse, context.collection)
 
           if context.collection.is_countable?
-            context.permissions.assert_can_read_query_fields(context.collection, args, consumes: %i[filter search])
+            condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+              context.collection, args
+            )
+            search = QueryStringParser.parse_search(context.collection, args)
+            search_extended = QueryStringParser.parse_search_extended(args)
+            context.permissions.assert_can_read_query_fields(
+              context.collection,
+              condition_tree: condition_tree, search: search, search_extended: search_extended
+            )
 
             filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
               condition_tree: ConditionTreeFactory.intersect(
                 [
                   context.permissions.get_scope(context.collection),
                   parse_query_segment(context.collection, args, context.permissions, context.caller),
-                  ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(context.collection, args)
+                  condition_tree
                 ]
               ),
-              search: QueryStringParser.parse_search(context.collection, args),
-              search_extended: QueryStringParser.parse_search_extended(args),
+              search: search,
+              search_extended: search_extended,
               segment: QueryStringParser.parse_segment(context.collection, args)
             )
             aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')

@@ -95,15 +95,10 @@ module ForestAdminAgent
         it 'refuses no filter' do
           permissions = described_class.new(caller)
           allow(permissions).to receive(:permission_system?).and_return(false)
-          args = {
-            headers: { 'HTTP_AUTHORIZATION' => bearer },
-            params: {
-              'collection_name' => 'cards',
-              filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json
-            }
-          }
+          condition_tree = Nodes::ConditionTreeLeaf.new('account:iban', Operators::EQUAL, 'FR76')
 
-          expect { permissions.assert_can_read_query_fields(cards, args) }.not_to raise_error
+          expect { permissions.assert_can_read_query_fields(cards, condition_tree: condition_tree) }
+            .not_to raise_error
         end
       end
 
@@ -249,57 +244,14 @@ module ForestAdminAgent
       end
 
       describe '#assert_can_read_query_fields' do
-        def args_with(params)
-          { headers: { 'HTTP_AUTHORIZATION' => bearer }, params: { 'collection_name' => 'cards' }.merge(params) }
-        end
-
-        it 'refuses a filter on a collection the caller cannot read' do
-          permissions = build_permissions([])
-          args = args_with(filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json)
-
-          expect { permissions.assert_can_read_query_fields(cards, args) }.to raise_error(
-            ForestAdminAgent::Http::Exceptions::ForbiddenError,
-            "You cannot filter on 'account:iban': you are not allowed to read the 'accounts' collection."
-          )
-        end
-
-        it 'refuses a sort on a collection the caller cannot read' do
-          permissions = build_permissions([])
-
-          expect { permissions.assert_can_read_query_fields(cards, args_with(sort: '-account.iban')) }
-            .to raise_error(
-              ForestAdminAgent::Http::Exceptions::ForbiddenError,
-              "You cannot sort on 'account:iban': you are not allowed to read the 'accounts' collection."
-            )
-        end
-
-        # `for_each_leaf` on a branch replaces each condition with the block's return value, so the
-        # tree the guard walked is the one asserted on — a freshly parsed one could not catch it.
-        it 'leaves the branch it walked intact instead of rebuilding it from the guard' do
-          permissions = build_permissions(%w[accounts])
-          args = args_with(
-            filters: {
-              aggregator: 'and',
-              conditions: [
-                { field: 'account:iban', operator: 'equal', value: 'FR76' },
-                { field: 'id', operator: 'equal', value: 1 }
-              ]
-            }.to_json
-          )
-          tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(cards, args)
-          allow(ForestAdminAgent::Utils::QueryStringParser).to receive(:parse_condition_tree).and_return(tree)
-
-          permissions.assert_can_read_query_fields(cards, args)
-
-          expect(tree.conditions.map(&:field)).to eq(%w[account:iban id])
+        def leaf(field)
+          Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, 'FR76')
         end
 
         def searchable_cards(searched)
           double = instance_double(
             ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
             name: 'cards',
-            schema: cards.schema.merge(searchable: true),
-            is_searchable?: true,
             datasource: datasource
           )
           allow(double).to receive(:searched_fields).and_return(searched)
@@ -307,11 +259,51 @@ module ForestAdminAgent
           double
         end
 
+        it 'refuses a filter on a collection the caller cannot read' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(cards, condition_tree: leaf('account:iban')) }
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You cannot filter on 'account:iban': you are not allowed to read the 'accounts' collection."
+            )
+        end
+
+        it 'reaches every leaf of a branch, not only the first' do
+          permissions = build_permissions([])
+          tree = Nodes::ConditionTreeBranch.new('And', [leaf('id'), leaf('account:iban')])
+
+          expect { permissions.assert_can_read_query_fields(cards, condition_tree: tree) }
+            .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError, /'account:iban'/)
+        end
+
+        # The route applies this very instance next, so a traversal that rebuilt a branch — as
+        # `for_each_leaf` does — would leave the guard deciding what actually runs.
+        it 'leaves the tree the route is about to apply untouched' do
+          permissions = build_permissions(%w[accounts])
+          tree = Nodes::ConditionTreeBranch.new('And', [leaf('account:iban'), leaf('id')])
+
+          permissions.assert_can_read_query_fields(cards, condition_tree: tree)
+
+          expect(tree.conditions.map(&:field)).to eq(%w[account:iban id])
+        end
+
+        it 'refuses a sort on a collection the caller cannot read' do
+          permissions = build_permissions([])
+          sort = [{ field: 'account:iban', ascending: false }]
+
+          expect { permissions.assert_can_read_query_fields(cards, sort: sort) }
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              "You cannot sort on 'account:iban': you are not allowed to read the 'accounts' collection."
+            )
+        end
+
         it 'refuses whatever the stack says the search will reach' do
           permissions = build_permissions([])
           collection = searchable_cards([{ path: 'holder:national_id', collections: ['persons'] }])
 
-          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+          expect { permissions.assert_can_read_query_fields(collection, search: 'martin') }
             .to raise_error(
               ForestAdminAgent::Http::Exceptions::ForbiddenError,
               "You cannot search on 'holder:national_id': you are not allowed to read the 'persons' collection."
@@ -322,8 +314,16 @@ module ForestAdminAgent
           permissions = build_permissions(%w[persons])
           collection = searchable_cards([{ path: 'holder:national_id', collections: ['persons'] }])
 
-          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
-            .not_to raise_error
+          expect { permissions.assert_can_read_query_fields(collection, search: 'martin') }.not_to raise_error
+        end
+
+        it 'passes the extended flag on to the layer, since it decides what the search reaches' do
+          permissions = build_permissions(%w[persons])
+          collection = searchable_cards([])
+
+          permissions.assert_can_read_query_fields(collection, search: 'martin', search_extended: true)
+
+          expect(collection).to have_received(:searched_fields).with('martin', true)
         end
 
         # An extended search reaches a removed collection: the condition is built below publication,
@@ -335,7 +335,7 @@ module ForestAdminAgent
           published = datasource.collections.except('accounts')
           allow(datasource).to receive(:collections).and_return(published)
 
-          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+          expect { permissions.assert_can_read_query_fields(collection, search: 'martin') }
             .to raise_error(
               ForestAdminAgent::Http::Exceptions::ForbiddenError,
               "You cannot search on 'account:iban': the 'accounts' collection is not exposed by this agent."
@@ -346,7 +346,7 @@ module ForestAdminAgent
           permissions = build_permissions([])
           collection = searchable_cards([{ path: 'account:iban', collections: ['accounts'] }])
 
-          expect { permissions.assert_can_read_query_fields(collection, args_with(search: 'martin')) }
+          expect { permissions.assert_can_read_query_fields(collection, search: 'martin') }
             .to raise_error(
               ForestAdminAgent::Http::Exceptions::ForbiddenError,
               "You cannot search on 'account:iban': you are not allowed to read the 'accounts' collection."
@@ -357,35 +357,29 @@ module ForestAdminAgent
         it 'serves the request when the stack cannot say what a search reaches' do
           permissions = build_permissions([])
 
-          expect { permissions.assert_can_read_query_fields(searchable_cards(nil), args_with(search: 'martin')) }
+          expect { permissions.assert_can_read_query_fields(searchable_cards(nil), search: 'martin') }
             .not_to raise_error
         end
 
-        # The chart routes ignore `search`, so parsing it here must not turn it into a 400.
-        it 'ignores a search on a collection that has none' do
+        it 'checks nothing on a collection that cannot answer what a search reaches' do
           permissions = build_permissions([])
 
-          expect { permissions.assert_can_read_query_fields(cards, args_with(search: 'martin')) }
-            .not_to raise_error
-        end
-
-        # A count applies no sort, so refusing one would refuse a request the denied field cannot
-        # reach. Same shape on the chart routes, which apply neither sort nor search.
-        it 'ignores a query component the route does not apply' do
-          permissions = build_permissions([])
-
-          expect do
-            permissions.assert_can_read_query_fields(
-              cards, args_with(sort: '-account.iban'), consumes: %i[filter search]
-            )
-          end.not_to raise_error
+          expect { permissions.assert_can_read_query_fields(cards, search: 'martin') }.not_to raise_error
         end
 
         it 'accepts a filter once the collection it reaches is readable' do
           permissions = build_permissions(%w[accounts])
-          args = args_with(filters: { field: 'account:iban', operator: 'equal', value: 'FR76' }.to_json)
 
-          expect { permissions.assert_can_read_query_fields(cards, args) }.not_to raise_error
+          expect { permissions.assert_can_read_query_fields(cards, condition_tree: leaf('account:iban')) }
+            .not_to raise_error
+        end
+
+        # Which components a route applies is now expressed by what it passes, so there is no flag to
+        # keep in step with the query: `spec/lib/forest_admin_agent/routes` pins that per route.
+        it 'checks nothing at all when the route passes no component' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(cards) }.not_to raise_error
         end
       end
 
