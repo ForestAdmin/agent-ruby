@@ -295,7 +295,9 @@ module ForestAdminDatasourcePylon
         f.response :raise_error
         f.response :json
         f.request :retry, **@configuration.retry_policy.to_faraday_options
-        f.use Throttle, limiter: @configuration.rate_limiter if @configuration.rate_limiter
+        if @configuration.rate_limiter
+          f.use Throttle, limiter: @configuration.rate_limiter, base_path: @configuration.base_path
+        end
         f.headers['Authorization'] = "Bearer #{@configuration.api_key}"
         f.headers['Accept']        = 'application/json'
         f.headers['User-Agent']    = "forest_admin_datasource_pylon/#{VERSION}"

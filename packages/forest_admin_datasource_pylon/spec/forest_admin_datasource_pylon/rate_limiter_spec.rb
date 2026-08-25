@@ -103,6 +103,27 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimiter do
       end
     end
 
+    # A booking of `now` — the request let through past the bound — lands before
+    # slots already reserved further out, so the list only reads as "the limit-th
+    # most recent booking" while it stays ordered. Here the fourth request goes
+    # out at t=3 while a slot is already booked at t=7: unsorted, the caller at
+    # t=6 reads that t=7 slot instead of the t=3 one and lets its request through
+    # against a window that had room for it 3s later.
+    it 'keeps its bookings in order, so a later caller reads the right slot' do
+      allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+      subject = limiter
+      at(1.0)
+      subject.acquire(:get, '/things')
+
+      at(3.0)
+      3.times { subject.acquire(:get, '/things') }
+
+      at(6.0)
+      subject.acquire(:get, '/things')
+
+      expect(slept).to eq([4.0, 3.0])
+    end
+
     describe 'across endpoints' do
       let(:limits) do
         class_double(ForestAdminDatasourcePylon::RateLimits).tap do |stub|

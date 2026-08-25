@@ -25,6 +25,52 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimits do
     it 'reads the documented budget of the writes' do
       expect(rule_for(:post, '/issues').limit).to eq(30)
       expect(rule_for(:patch, '/issues/abc').limit).to eq(120)
+      expect(rule_for(:delete, '/issues/abc').limit).to eq(120)
+      expect(rule_for(:post, '/teams').limit).to eq(30)
+      expect(rule_for(:patch, '/teams/team_1').limit).to eq(120)
+      expect(rule_for(:patch, '/users/usr_1').limit).to eq(120)
+    end
+
+    # The budget of a write is no more uniform than that of a read: creating an
+    # account is granted ten times creating an issue, and patching one two and a
+    # half times patching an issue. A table spelling `/issues` and leaving the
+    # rest to the fallback would throttle these at a tenth of what Pylon grants.
+    it 'tells the write budget of one resource from another' do
+      expect(rule_for(:post, '/accounts').limit).to eq(300)
+      expect(rule_for(:patch, '/accounts/acc_1').limit).to eq(300)
+      expect(rule_for(:post, '/contacts').limit).to eq(300)
+      expect(rule_for(:patch, '/contacts/con_1').limit).to eq(300)
+    end
+
+    # Deleting is the one write Pylon rates below the rest, and not everywhere:
+    # 30 a minute on an account or a contact, 120 on an issue.
+    it 'reads the documented budget of the deletes' do
+      expect(rule_for(:delete, '/accounts/acc_1').limit).to eq(30)
+      expect(rule_for(:delete, '/contacts/con_1').limit).to eq(30)
+    end
+
+    it 'rates the identity endpoint the client calls on connection' do
+      expect(rule_for(:get, '/me').limit).to eq(300)
+    end
+
+    # Every endpoint the client issues has to resolve to a rule: one left to the
+    # fallback is metered at 30 a minute whatever Pylon grants it, which is a
+    # throttle the datasource inflicts on itself.
+    it 'leaves no endpoint the client calls to the fallback' do
+      called = [
+        [:get, '/me'], [:post, '/issues/search'], [:get, '/issues/abc'],
+        [:get, '/issues/abc/messages'], [:post, '/issues'], [:patch, '/issues/abc'],
+        [:delete, '/issues/abc'], [:post, '/accounts/search'], [:get, '/accounts'],
+        [:get, '/accounts/acc_1'], [:post, '/accounts'], [:patch, '/accounts/acc_1'],
+        [:delete, '/accounts/acc_1'], [:post, '/contacts/search'], [:get, '/contacts'],
+        [:get, '/contacts/con_1'], [:post, '/contacts'], [:patch, '/contacts/con_1'],
+        [:delete, '/contacts/con_1'], [:get, '/users'], [:get, '/users/usr_1'],
+        [:patch, '/users/usr_1'], [:get, '/teams'], [:get, '/teams/team_1'],
+        [:post, '/teams'], [:patch, '/teams/team_1'], [:get, '/custom-fields']
+      ]
+
+      undocumented = called.reject { |method, path| rule_for(method, path).name.include?('undocumented') }
+      expect(undocumented.size).to eq(called.size)
     end
 
     # `/issues/{id}` and `/issues/{id}/messages` sit under the same prefix at
@@ -61,25 +107,27 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimits do
       end
     end
 
+    # Pylon exposes no DELETE on a team and no verb at all on `/macros`, so
+    # neither can carry a documented figure for the table to read.
     describe 'an endpoint the API reference does not rate' do
       it 'falls back to the lowest budget documented anywhere' do
-        expect(rule_for(:get, '/me').limit).to eq(described_class::DEFAULT_LIMIT)
-        expect(rule_for(:delete, '/issues/abc').limit).to eq(described_class::DEFAULT_LIMIT)
+        expect(rule_for(:delete, '/teams/team_1').limit).to eq(described_class::DEFAULT_LIMIT)
+        expect(rule_for(:get, '/macros').limit).to eq(described_class::DEFAULT_LIMIT)
       end
 
       it 'says so in the name, so a log line does not read as a documented budget' do
-        expect(rule_for(:get, '/me').name).to match(/undocumented/)
+        expect(rule_for(:get, '/macros').name).to match(/undocumented/)
       end
 
       # Keying the fallback on the path would open a window per record id, so a
       # fan-out over a hundred records would meter as a hundred endpoints one
       # request in — that is, as no limit at all.
       it 'buckets by endpoint rather than by record' do
-        expect(rule_for(:delete, '/issues/one').name).to eq(rule_for(:delete, '/issues/two').name)
+        expect(rule_for(:delete, '/teams/one').name).to eq(rule_for(:delete, '/teams/two').name)
       end
 
       it 'keeps two undocumented verbs on one path apart' do
-        expect(rule_for(:delete, '/accounts/x').name).not_to eq(rule_for(:put, '/accounts/x').name)
+        expect(rule_for(:delete, '/teams/x').name).not_to eq(rule_for(:put, '/teams/x').name)
       end
     end
 

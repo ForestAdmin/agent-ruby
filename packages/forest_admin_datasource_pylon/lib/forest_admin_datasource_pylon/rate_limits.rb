@@ -10,6 +10,13 @@ module ForestAdminDatasourcePylon
   # An endpoint absent from the table falls back to DEFAULT_LIMIT, the lowest
   # figure documented anywhere on the API. An undocumented quota is not an
   # absent one, and the generous guess is the one an operator discovers as a 429.
+  #
+  # Every endpoint the client calls has a rule, writes included: the budget of a
+  # write is no more uniform than that of a read — `POST /accounts` is granted
+  # ten times `POST /issues`, and `PATCH /accounts/{id}` two and a half times
+  # `PATCH /issues/{id}` — so leaving one to the fallback throttles it at a
+  # fraction of what Pylon grants, which is the failure this table exists to
+  # avoid rather than a safe default.
   class RateLimits
     DEFAULT_LIMIT = 30
 
@@ -43,7 +50,18 @@ module ForestAdminDatasourcePylon
       ['get /users/:id',                :get,    %r{\A/users/#{ID}\z},                300],
       ['get /teams',                    :get,    %r{\A/teams\z},                      300],
       ['get /teams/:id',                :get,    %r{\A/teams/#{ID}\z},                300],
-      ['get /custom-fields',            :get,    %r{\A/custom-fields\z},              300]
+      ['get /custom-fields',            :get,    %r{\A/custom-fields\z},              300],
+      ['get /me',                       :get,    %r{\A/me\z},                         300],
+      ['post /accounts',                :post,   %r{\A/accounts\z},                   300],
+      ['patch /accounts/:id',           :patch,  %r{\A/accounts/#{ID}\z},             300],
+      ['post /contacts',                :post,   %r{\A/contacts\z},                   300],
+      ['patch /contacts/:id',           :patch,  %r{\A/contacts/#{ID}\z},             300],
+      ['delete /issues/:id',            :delete, %r{\A/issues/#{ID}\z},               120],
+      ['patch /teams/:id',              :patch,  %r{\A/teams/#{ID}\z},                120],
+      ['patch /users/:id',              :patch,  %r{\A/users/#{ID}\z},                120],
+      ['delete /accounts/:id',          :delete, %r{\A/accounts/#{ID}\z},              30],
+      ['delete /contacts/:id',          :delete, %r{\A/contacts/#{ID}\z},              30],
+      ['post /teams',                   :post,   %r{\A/teams\z},                       30]
     ].map { |name, verb, pattern, limit| [verb, pattern, Rule.new(name: name, limit: limit)] }.freeze
 
     class << self

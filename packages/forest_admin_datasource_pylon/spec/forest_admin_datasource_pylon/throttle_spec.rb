@@ -49,6 +49,39 @@ RSpec.describe ForestAdminDatasourcePylon::Throttle do
     expect(limiter).to have_received(:acquire).twice
   end
 
+  # Faraday hands over the path of the resolved url, prefix included. Left on,
+  # every anchored rule in the table misses and the whole datasource meters in
+  # one fallback bucket at a tenth of the budget Pylon grants.
+  describe 'when the base url is mounted under a subpath' do
+    let(:configuration) do
+      ForestAdminDatasourcePylon::Configuration.new(
+        api_key: 'k', base_url: 'https://proxy.test/pylon/v1', retry_policy: retry_policy, rate_limiter: limiter
+      )
+    end
+
+    it 'meters the endpoint rather than the prefix in front of it' do
+      stub_request(:get, "#{base}/issues/abc-123").to_return(json('data' => { 'id' => 'abc-123' }))
+
+      client.fetch_issue('abc-123')
+
+      expect(limiter).to have_received(:acquire).with(:get, '/issues/abc-123')
+    end
+
+    # The bucket the limiter ends up on is the point: an unstripped path resolves
+    # to `get /pylon (undocumented)` at 30 a minute, pooling every read together.
+    it 'lands on the documented bucket, not the fallback one' do
+      stub_request(:get, "#{base}/issues/abc-123").to_return(json('data' => { 'id' => 'abc-123' }))
+      paths = []
+      allow(limiter).to receive(:acquire) { |_method, path| paths << path }
+
+      client.fetch_issue('abc-123')
+
+      rule = ForestAdminDatasourcePylon::RateLimits.for(:get, paths.first)
+      expect(rule.name).to eq('get /issues/:id')
+      expect(rule.limit).to eq(300)
+    end
+  end
+
   describe 'when the configuration declines a limiter' do
     let(:configuration) do
       ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', retry_policy: retry_policy, rate_limiter: nil)

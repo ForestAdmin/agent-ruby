@@ -77,4 +77,23 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       expect(config.url).to eq('https://example.test')
     end
   end
+
+  describe '#base_path' do
+    it 'is empty against the API itself, which mounts its endpoints on the host' do
+      expect(described_class.new(**valid_args).base_path).to eq('')
+    end
+
+    # `RateLimits` is keyed on the endpoint, so a base url mounted under a
+    # subpath — an egress proxy, a mock server — has to have that prefix taken
+    # off a path before the table is asked.
+    it 'is the prefix a base url mounted under a subpath puts in front of every path' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon/v1')
+      expect(config.base_path).to eq('/pylon/v1')
+    end
+
+    it 'carries no trailing slash, `url` having trimmed it' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon/')
+      expect(config.base_path).to eq('/pylon')
+    end
+  end
 end

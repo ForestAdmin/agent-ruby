@@ -15,11 +15,23 @@ module ForestAdminDatasourcePylon
   class RateLimiter
     WINDOW = 60.0
 
-    # How long a request may be held back before it is let through anyway. The
+    # How long one attempt may be held back before it is let through anyway. The
     # limiter exists to avoid a 429, not to guarantee one never happens: past
     # this point the window is saturated by more than this agent's own traffic,
     # so queueing behind it would trade a retry the client already handles for a
     # request the operator watches spin. It goes out, and the warning says why.
+    #
+    # Per attempt, not per request: `retry` replays up to `max_retries` times and
+    # each replay asks for a slot of its own, so a request can spend this bound
+    # once per attempt, on top of the backoff `retry` waits itself. None of it
+    # runs under the Faraday timeout, which only covers the adapter.
+    #
+    # The bound leaves a narrow operating region, and it is worth being plain
+    # about it: a wait fits under it only while the window has been full for less
+    # than this long, so what gets smoothed is a stream a few percent over
+    # budget. A burst arriving at once books its next slot a whole window out and
+    # goes straight through. Under real saturation the 429 retry is the defence,
+    # not this.
     DEFAULT_MAX_WAIT = 5.0
 
     attr_reader :max_wait, :window
@@ -66,6 +78,11 @@ module ForestAdminDatasourcePylon
       # recording the one it declined to wait for would meter a request nobody
       # ever made and push the whole window further out.
       taken << (wait > @max_wait ? now : slot)
+      # A booking of `now` lands before slots already reserved further out, and
+      # the index above only reads as the limit-th most recent booking on an
+      # ordered list: unsorted, a later caller reads the wrong one and lets a
+      # request through against a window that had a slot for it.
+      taken.sort!
 
       wait
     end

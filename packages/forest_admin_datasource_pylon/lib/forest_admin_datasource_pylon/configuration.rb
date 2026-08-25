@@ -23,6 +23,15 @@ module ForestAdminDatasourcePylon
       @base_url.chomp('/')
     end
 
+    # Whatever precedes the endpoint in the path, for a base url mounted under a
+    # subpath — an egress proxy, or a mock server. Empty against the API itself.
+    # `RateLimits` is keyed on the endpoint, so this has to come off a path
+    # before the table is asked: left on, every anchored rule misses and the
+    # whole datasource meters in one fallback bucket.
+    def base_path
+      @base_path ||= URI.parse(url).path
+    end
+
     private
 
     def validate!
