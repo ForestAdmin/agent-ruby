@@ -1,3 +1,10 @@
+## [1.39.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.1...v1.39.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **agent:** serve only the columns of collections the caller may read ([#365](https://github.com/ForestAdmin/agent-ruby/issues/365)) ([3aa70c8](https://github.com/ForestAdmin/agent-ruby/commit/3aa70c8d4e8918490bc843ce1fc4597db4b5b8a6))
+
 ## [1.39.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.0...v1.39.1) (2026-08-20)
 
 
