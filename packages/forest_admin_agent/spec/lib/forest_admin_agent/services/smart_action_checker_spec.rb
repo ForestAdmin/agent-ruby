@@ -175,19 +175,63 @@ module ForestAdminAgent
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = []
         smart_action[:userApprovalEnabled] = [7]
+        parameters[:data][:attributes][:all_records] = true
 
-        smart_action_checker = described_class.new(
-          parameters, @datasource.get_collection('Book'), smart_action,
-          QueryStringParser.parse_caller(args), 1, Filter.new,
-          resolve_select_all_record_ids: -> { %w[1 2 3] }
-        )
+        collection = @datasource.get_collection('Book')
+        allow(collection).to receive(:list).and_return([{ 'id' => 1 }, { 'id' => 2 }, { 'id' => 3 }])
+
+        smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
         expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError) do |error|
           expect(error.details[:recordIds]).to eq(%w[1 2 3])
           expect(error.details[:roleIdsAllowedToApprove]).to eq([7])
         end
+        expect(collection).to have_received(:list).with(
+          anything,
+          have_attributes(page: have_attributes(offset: 0, limit: 501)),
+          anything
+        )
       end
 
-      it 'omits record ids from the error when no resolver is given (explicit selection)' do
+      it 'rejects a "select all" trigger matching more records than max_records_for_approval' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        parameters[:data][:attributes][:all_records] = true
+
+        collection = @datasource.get_collection('Book')
+        allow(collection).to receive(:list).and_return([{ 'id' => 1 }, { 'id' => 2 }, { 'id' => 3 }])
+        config = ForestAdminAgent::Facades::Container.config_from_cache.merge(max_records_for_approval: 2)
+        allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(config)
+
+        smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
+        expect { smart_action_checker.can_execute? }
+          .to raise_error(ApprovalSelectionTooLargeError, /more than 2 records/)
+      end
+
+      it 'clamps max_records_for_approval to the Forest server cap of 500' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        parameters[:data][:attributes][:all_records] = true
+
+        collection = @datasource.get_collection('Book')
+        allow(collection).to receive(:list).and_return([{ 'id' => 1 }])
+        config = ForestAdminAgent::Facades::Container.config_from_cache.merge(max_records_for_approval: 1000)
+        allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(config)
+
+        smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
+        expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError)
+        expect(collection).to have_received(:list).with(
+          anything,
+          have_attributes(page: have_attributes(limit: 501)),
+          anything
+        )
+      end
+
+      it 'omits record ids from the error on an explicit selection' do
         smart_action[:triggerEnabled] = [1]
         smart_action[:approvalRequired] = [1]
         smart_action[:approvalRequiredConditions] = []

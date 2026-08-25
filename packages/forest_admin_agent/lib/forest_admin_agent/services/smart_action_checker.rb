@@ -35,9 +35,13 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      # Max number of records a "select all" approval request may target. The Forest server
+      # enforces the same cap authoritatively; max_records_for_approval may lower it, never raise it.
+      MAX_RECORDS_FOR_APPROVAL = 500
+
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
 
-      def initialize(parameters, collection, smart_action, caller, role_id, filter, resolve_select_all_record_ids: nil)
+      def initialize(parameters, collection, smart_action, caller, role_id, filter)
         @parameters = parameters
         @collection = collection
         @smart_action = smart_action
@@ -45,7 +49,6 @@ module ForestAdminAgent
         @role_id = role_id
         @filter = filter
         @attributes = parameters[:data][:attributes]
-        @resolve_select_all_record_ids = resolve_select_all_record_ids
       end
 
       def can_execute?
@@ -76,7 +79,10 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
-            record_ids = @resolve_select_all_record_ids&.call
+            # On a "select all" trigger the frontend has no explicit id list to store in the
+            # approval request: resolve the selection here (capped) and hand the ids back
+            # through the error.
+            record_ids = resolve_select_all_record_ids if attributes[:all_records]
 
             raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',
@@ -93,6 +99,21 @@ module ForestAdminAgent
         end
 
         raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
+      end
+
+      # Fetching cap+1 distinguishes "over the cap" from "exactly the cap".
+      def resolve_select_all_record_ids
+        configured = ForestAdminAgent::Facades::Container.config_from_cache[:max_records_for_approval]
+        max = [configured || MAX_RECORDS_FOR_APPROVAL, MAX_RECORDS_FOR_APPROVAL].min
+        records = collection.list(
+          caller,
+          filter.override(page: Page.new(offset: 0, limit: max + 1)),
+          Projection.new.with_pks(collection)
+        )
+
+        raise ApprovalSelectionTooLargeError, max if records.size > max
+
+        Utils::Id.pack_ids(collection, records)
       end
 
       def match_conditions(condition_name)

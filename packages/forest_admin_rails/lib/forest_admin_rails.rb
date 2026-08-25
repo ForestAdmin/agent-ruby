@@ -38,7 +38,7 @@ module ForestAdminRails
   # turns the audit trail on: every change is captured and the `/_audit-trail` routes are registered.
   setting :audit_trail, default: nil
   # Max number of records an approval-required action may target when "select all" is used.
-  # Must not exceed the Forest server's own cap (500), which is the authoritative gate.
+  # Can only lower the Forest server's own cap (500): higher values are clamped to it.
   setting :max_records_for_approval, default: 500
 
   if defined?(Rails::Railtie)
