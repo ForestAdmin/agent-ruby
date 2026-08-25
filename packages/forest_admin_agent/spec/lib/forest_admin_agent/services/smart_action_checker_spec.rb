@@ -156,6 +156,49 @@ module ForestAdminAgent
         end.to raise_error(CustomActionRequiresApprovalError, 'This action requires to be approved.')
       end
 
+      it 'includes the approver role ids under the key the frontend reads' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        smart_action[:userApprovalEnabled] = [7, 16]
+
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
+        expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError) do |error|
+          expect(error.details[:roleIdsAllowedToApprove]).to eq([7, 16])
+          expect(error.details[:user_approval_enabled]).to eq([7, 16])
+        end
+      end
+
+      it 'includes the resolved record ids in the error on a "select all" trigger' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        smart_action[:userApprovalEnabled] = [7]
+
+        smart_action_checker = described_class.new(
+          parameters, @datasource.get_collection('Book'), smart_action,
+          QueryStringParser.parse_caller(args), 1, Filter.new,
+          resolve_select_all_record_ids: -> { %w[1 2 3] }
+        )
+        expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError) do |error|
+          expect(error.details[:recordIds]).to eq(%w[1 2 3])
+          expect(error.details[:roleIdsAllowedToApprove]).to eq([7])
+        end
+      end
+
+      it 'omits record ids from the error when no resolver is given (explicit selection)' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
+        expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError) do |error|
+          expect(error.details).not_to have_key(:recordIds)
+        end
+      end
+
       it 'throws when the user try to trigger the action with approvalRequired and match approvalRequiredConditions' do
         smart_action[:triggerEnabled] = [1]
         smart_action[:approvalRequired] = [1]

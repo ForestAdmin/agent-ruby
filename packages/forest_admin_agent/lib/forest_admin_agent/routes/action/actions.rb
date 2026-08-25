@@ -52,7 +52,17 @@ module ForestAdminAgent
           filter_for_caller = get_record_selection(args, context)
           get_record_selection(args, context, include_user_scope: false)
 
-          context.permissions.can_smart_action?(args, context.collection, filter_for_caller)
+          # Only a "select all" trigger needs its selection resolved (capped) for the approval
+          # request — a normal execute is never capped.
+          resolver = if args.dig(:params, :data, :attributes, :all_records)
+                       -> { resolve_approval_record_ids(context, filter_for_caller) }
+                     end
+          context.permissions.can_smart_action?(
+            args,
+            context.collection,
+            filter_for_caller,
+            resolve_select_all_record_ids: resolver
+          )
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
@@ -190,6 +200,22 @@ module ForestAdminAgent
 
           ForestAdminAgent::AuditTrail.log_truncation(0, nil)
           []
+        end
+
+        # Resolve a "select all" selection to the concrete ids stored in the approval request.
+        # Capped at max_records_for_approval (the Forest server enforces the same cap
+        # authoritatively). Fetching cap+1 distinguishes "over the cap" from "exactly the cap".
+        def resolve_approval_record_ids(context, filter_for_caller)
+          max = Facades::Container.config_from_cache[:max_records_for_approval] || 500
+          records = context.collection.list(
+            context.caller,
+            filter_for_caller.override(page: Page.new(offset: 0, limit: max + 1)),
+            Projection.new.with_pks(context.collection)
+          )
+
+          raise Services::ApprovalSelectionTooLargeError, max if records.size > max
+
+          Utils::Id.pack_ids(context.collection, records)
         end
 
         def middleware_custom_action_approval_request_data(args)

@@ -20,6 +20,15 @@ module ForestAdminAgent
       end
     end
 
+    class ApprovalSelectionTooLargeError < UnprocessableError
+      def initialize(max)
+        super(
+          "This action requires approval and cannot be triggered on more than #{max} records at once. " \
+          'Please refine your selection.'
+        )
+      end
+    end
+
     class SmartActionChecker
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Utils
@@ -28,7 +37,7 @@ module ForestAdminAgent
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
 
-      def initialize(parameters, collection, smart_action, caller, role_id, filter)
+      def initialize(parameters, collection, smart_action, caller, role_id, filter, resolve_select_all_record_ids: nil)
         @parameters = parameters
         @collection = collection
         @smart_action = smart_action
@@ -36,6 +45,7 @@ module ForestAdminAgent
         @role_id = role_id
         @filter = filter
         @attributes = parameters[:data][:attributes]
+        @resolve_select_all_record_ids = resolve_select_all_record_ids
       end
 
       def can_execute?
@@ -66,9 +76,16 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
+            record_ids = @resolve_select_all_record_ids&.call
+
             raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',
-              details: { user_approval_enabled: smart_action[:userApprovalEnabled] }
+              details: {
+                user_approval_enabled: smart_action[:userApprovalEnabled],
+                # The keys the frontend actually reads (camelCase, sent verbatim in the error data).
+                roleIdsAllowedToApprove: smart_action[:userApprovalEnabled],
+                **(record_ids ? { recordIds: record_ids } : {})
+              }
             )
           elsif condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true

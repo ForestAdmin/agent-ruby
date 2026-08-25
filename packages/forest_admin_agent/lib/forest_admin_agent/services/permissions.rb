@@ -189,7 +189,10 @@ module ForestAdminAgent
         is_allowed
       end
 
-      def can_smart_action?(request, collection, filter, allow_fetch: true)
+      # `resolve_select_all_record_ids` is only set on a "select all" trigger: the frontend has no
+      # explicit id list to store in the approval request, so when approval turns out to be
+      # required, the resolved (capped) ids are handed back through the error.
+      def can_smart_action?(request, collection, filter, allow_fetch: true, resolve_select_all_record_ids: nil)
         return true unless permission_system?
 
         user_data = get_user_data(caller.id)
@@ -204,7 +207,8 @@ module ForestAdminAgent
           collection_actions[action['name'].to_sym],
           caller,
           user_data[:roleId],
-          filter
+          filter,
+          resolve_select_all_record_ids: resolve_select_all_record_ids
         )
 
         is_allowed = smart_action_approval.can_execute?
