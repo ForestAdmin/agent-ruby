@@ -2,19 +2,28 @@ module ForestAdminDatasourcePylon
   class Configuration
     DEFAULT_BASE_URL = 'https://api.usepylon.com'.freeze
 
-    attr_reader :api_key, :base_url, :open_timeout, :timeout, :retry_policy, :rate_limiter
+    attr_reader :api_key, :base_url, :open_timeout, :timeout, :retry_policy, :rate_limiter,
+                :boot_open_timeout, :boot_timeout, :boot_retry_policy
 
     # `rate_limiter: nil` takes the throttling out of the stack, leaving the 429
     # retry as the only rate-limit handling. For the deployment metering on its
     # own side, or the one that would rather see the 429.
+    #
+    # The `boot_` trio governs what the datasource reads while it is being
+    # constructed, where the wait is a Rails boot the operator sits through
+    # rather than a request that has already returned a page.
     def initialize(api_key:, base_url: nil, open_timeout: 5, timeout: 30, retry_policy: RetryPolicy.new,
-                   rate_limiter: RateLimiter.new)
+                   rate_limiter: RateLimiter.new, boot_open_timeout: 3, boot_timeout: 10,
+                   boot_retry_policy: RetryPolicy.boot)
       @api_key      = api_key
       @base_url     = base_url || DEFAULT_BASE_URL
       @open_timeout = open_timeout
       @timeout      = timeout
       @retry_policy = retry_policy
       @rate_limiter = rate_limiter
+      @boot_open_timeout = boot_open_timeout
+      @boot_timeout      = boot_timeout
+      @boot_retry_policy = boot_retry_policy
       validate!
     end
 

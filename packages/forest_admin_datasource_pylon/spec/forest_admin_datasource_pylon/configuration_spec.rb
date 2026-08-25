@@ -35,6 +35,28 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       expect([config.open_timeout, config.timeout]).to eq([1, 2])
     end
 
+    # What is read while the datasource is being constructed is waited on by a
+    # Rails boot, not by a request that has already returned a page.
+    it 'defaults the boot timeouts under the ones every other call gets' do
+      config = described_class.new(**valid_args)
+      expect([config.boot_open_timeout, config.boot_timeout]).to eq([3, 10])
+    end
+
+    it 'keeps configurable boot timeouts' do
+      config = described_class.new(**valid_args, boot_open_timeout: 1, boot_timeout: 2)
+      expect([config.boot_open_timeout, config.boot_timeout]).to eq([1, 2])
+    end
+
+    it 'defaults the boot retry policy to one bounded retry' do
+      policy = described_class.new(**valid_args).boot_retry_policy
+      expect([policy.max_retries, policy.max_interval]).to eq([1, 2])
+    end
+
+    it 'accepts an injected boot retry policy' do
+      policy = ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 0)
+      expect(described_class.new(**valid_args, boot_retry_policy: policy).boot_retry_policy).to be(policy)
+    end
+
     it 'defaults to a standard retry policy' do
       expect(described_class.new(**valid_args).retry_policy)
         .to be_a(ForestAdminDatasourcePylon::RetryPolicy)

@@ -107,11 +107,17 @@ module ForestAdminDatasourcePylon
     # Degrades to an empty list: this is read while the agent boots, and a token
     # missing the permission — or a Pylon that happens to be down right then —
     # has to cost the operator the custom columns, not the whole datasource.
+    #
+    # Which is why it goes through `boot_connection`: a call declared best-effort
+    # has no business holding the boot for the minutes the resilient policy is
+    # willing to spend waiting a 429 out. The bound is per request, and the walk
+    # is allowed the same pages as any other — one is what this endpoint answers
+    # with, having a handful of definitions to return per object type.
     def fetch_custom_fields(object_type)
       params = { 'object_type' => object_type }
 
       best_effort("fetch_custom_fields(#{object_type})", default: []) do
-        must_succeed('custom-fields') { collect_pages('custom-fields', params) }
+        must_succeed('custom-fields') { collect_pages('custom-fields', params, conn: boot_connection) }
       end
     end
 
@@ -148,14 +154,17 @@ module ForestAdminDatasourcePylon
     #
     # An empty page and a cursor that does not move both stop the loop: neither
     # happens today, but a walk driven by a remote value stops on its own terms.
-    def collect_pages(path, params = {})
+    #
+    # `conn` is what a caller reading on the boot path hands its own connection
+    # through: every page of the walk is then bounded like the first.
+    def collect_pages(path, params = {}, conn: connection)
       records = []
       cursor = nil
       pages = 0
 
       loop do
         query = cursor.nil? ? params : params.merge('cursor' => cursor)
-        page = to_search_page(connection.get(path, query).body)
+        page = to_search_page(conn.get(path, query).body)
         records.concat(page.records)
         pages += 1
         break if page.next_cursor.nil? || page.next_cursor == cursor || page.records.empty?
@@ -287,6 +296,18 @@ module ForestAdminDatasourcePylon
         retry_policy: @configuration.retry_policy,
         timeout: @configuration.timeout,
         open_timeout: @configuration.open_timeout
+      )
+    end
+
+    # For what is read while the datasource is being constructed: short timeouts
+    # and one quick retry, so the introspection cannot turn a Pylon that is down
+    # into minutes of Rails boot. Memoized separately from `connection`, which
+    # keeps the patience every later request is entitled to.
+    def boot_connection
+      @boot_connection ||= build_connection(
+        retry_policy: @configuration.boot_retry_policy,
+        timeout: @configuration.boot_timeout,
+        open_timeout: @configuration.boot_open_timeout
       )
     end
 

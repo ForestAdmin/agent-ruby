@@ -32,9 +32,22 @@ module ForestAdminDatasourcePylon
     RETRYABLE_METHODS = %i[get head options].freeze
     RETRY_IF = ->(env, _exception) { env[:status] == 429 }
 
+    # The cap for a call that must not hold the boot, deliberately below a
+    # rate-limit window where DEFAULT_MAX_INTERVAL sits above it: a Retry-After
+    # past the cap makes faraday-retry abandon outright, which is what turns a
+    # 429 into an immediate give-up rather than a minute of waiting per attempt.
+    BOOT_MAX_INTERVAL = 2
+
     BACKOFF_FACTOR = 2
 
     attr_reader :max_retries, :interval, :max_interval
+
+    # One retry rather than none, for what is read once and never revisited: a
+    # transient failure there costs its result for the whole life of the process,
+    # and half a second absorbs the hiccup without waiting a 429 out.
+    def self.boot
+      new(max_retries: 1, interval: 0.5, max_interval: BOOT_MAX_INTERVAL)
+    end
 
     def initialize(max_retries: 3, interval: 0.5, max_interval: DEFAULT_MAX_INTERVAL)
       @max_retries  = max_retries
