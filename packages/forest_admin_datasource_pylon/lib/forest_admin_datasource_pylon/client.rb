@@ -285,12 +285,19 @@ module ForestAdminDatasourcePylon
     # Middleware order is deliberate: `raise_error` sits outside the JSON parser
     # so it raises with an already-parsed body, and `retry` sits innermost so it
     # inspects raw statuses — behind `raise_error` it would never see a 429.
+    #
+    # The throttle goes inside `retry`, which is what makes a replay wait for a
+    # slot like a first attempt: outside it, the middleware would run once for a
+    # request that reached Pylon three times.
     def connection
       @connection ||= Faraday.new(url: @configuration.url) do |f|
         f.request :json
         f.response :raise_error
         f.response :json
         f.request :retry, **@configuration.retry_policy.to_faraday_options
+        if @configuration.rate_limiter
+          f.use Throttle, limiter: @configuration.rate_limiter, base_path: @configuration.base_path
+        end
         f.headers['Authorization'] = "Bearer #{@configuration.api_key}"
         f.headers['Accept']        = 'application/json'
         f.headers['User-Agent']    = "forest_admin_datasource_pylon/#{VERSION}"

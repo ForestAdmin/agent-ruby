@@ -19,8 +19,14 @@ module ForestAdminDatasourcePylon
       Operators  = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
 
       # What one filter-driven update or delete may spend, in requests. Pylon
-      # allows 10 to 20 per minute, so a costlier selection is refused rather
-      # than written halfway.
+      # writes one record per request, so a selection costing more than this is
+      # refused rather than written halfway.
+      #
+      # The cap is about the round-trips, not the quota: `RateLimiter` spaces the
+      # requests out inside the documented budget, which no pass this size comes
+      # near — but no throttling makes a hundred sequential writes a wait the
+      # operator watches, or a request the agent times out on first. Refusing is
+      # the honest answer where a partial write is not recoverable.
       #
       # The budget covers the whole pass, not its writes: where a record is read
       # through its own endpoint, resolving the selection costs a request per
@@ -351,8 +357,8 @@ module ForestAdminDatasourcePylon
 
       def refuse_write_reach(reach)
         raise UnsupportedWriteError,
-              "This write #{reach}: Pylon writes one record per request, against a budget of ten to twenty " \
-              'requests per minute, and a write stopping halfway would report a success it did not perform. ' \
+              "This write #{reach}: Pylon writes one record per request, and a write stopping halfway — on a " \
+              'timeout, or on the first record Pylon refuses — would report a success it did not perform. ' \
               'Narrow the selection to reach the records past this point.'
       end
 
