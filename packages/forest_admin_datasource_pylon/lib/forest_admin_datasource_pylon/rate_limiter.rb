@@ -26,12 +26,18 @@ module ForestAdminDatasourcePylon
     # once per attempt, on top of the backoff `retry` waits itself. None of it
     # runs under the Faraday timeout, which only covers the adapter.
     #
-    # The bound leaves a narrow operating region, and it is worth being plain
-    # about it: a wait fits under it only while the window has been full for less
-    # than this long, so what gets smoothed is a stream a few percent over
-    # budget. A burst arriving at once books its next slot a whole window out and
-    # goes straight through. Under real saturation the 429 retry is the defence,
-    # not this.
+    # The region this smooths is narrow, and it is worth being plain about it.
+    # On a stream over budget the waits accumulate rather than settling, so the
+    # bound is crossed sooner the further over it sits: measured against a
+    # 120/min endpoint, a stream 1% over budget throttles its first thousand
+    # requests and then lets roughly one in twelve through unthrottled, one 5%
+    # over gives up after two hundred and lets half through, and past ~10% over
+    # the bound is crossed as soon as the window fills — request 121 — after
+    # which almost nothing is throttled at all. A burst arriving at once books
+    # its next slot a whole window out and goes straight through from the first
+    # request past the budget. Under real saturation the 429 retry is the
+    # defence, not this; what this buys is the region just over budget, and a
+    # budget the code knows rather than one it discovers as a 429.
     DEFAULT_MAX_WAIT = 5.0
 
     attr_reader :max_wait, :window
@@ -44,16 +50,17 @@ module ForestAdminDatasourcePylon
       @sleeper = sleeper || ->(seconds) { sleep(seconds) }
       @mutex   = Mutex.new
       @slots   = {}
+      @warned  = {}
     end
 
     # Blocks until the endpoint has room, then returns. Called once per attempt,
     # retries included: a replayed request spends the budget a first one did.
     def acquire(method, path)
       rule = @limits.for(method, path)
-      wait = @mutex.synchronize { reserve(rule) }
-      return if wait <= 0
+      wait, warn = @mutex.synchronize { reserve(rule) }
 
-      return warn_saturated(rule, wait) if wait > @max_wait
+      warn_saturated(rule, wait) if warn
+      return if wait <= 0 || wait > @max_wait
 
       @sleeper.call(wait)
     end
@@ -67,31 +74,48 @@ module ForestAdminDatasourcePylon
     # What is recorded is the moment the request will be made, not the moment it
     # was asked for, so concurrent callers each take a distinct slot and spread
     # out instead of all waking onto the same one.
+    #
+    # Returns the wait the caller owes and whether this is the bypass worth a log
+    # line — both settled here, the second being shared state like the first.
     def reserve(rule)
       taken = (@slots[rule.name] ||= [])
       now = @clock.call
-      taken.reject! { |at| at <= now - @window }
+      # The list is kept ordered, so the expired bookings are its leading run
+      # and the index below reads as the limit-th most recent one.
+      taken.shift(taken.bsearch_index { |at| at > now - @window } || taken.size)
 
       slot = taken.size < rule.limit ? now : taken[taken.size - rule.limit] + @window
       wait = slot - now
       # Past the bound the request goes out now, so the slot it books is now:
       # recording the one it declined to wait for would meter a request nobody
       # ever made and push the whole window further out.
-      taken << (wait > @max_wait ? now : slot)
-      # A booking of `now` lands before slots already reserved further out, and
-      # the index above only reads as the limit-th most recent booking on an
-      # ordered list: unsorted, a later caller reads the wrong one and lets a
-      # request through against a window that had a slot for it.
-      taken.sort!
+      insert(taken, wait > @max_wait ? now : slot)
 
-      wait
+      [wait, wait > @max_wait && first_warning?(rule, now)]
+    end
+
+    def insert(taken, booking)
+      taken.insert(taken.bsearch_index { |at| at >= booking } || taken.size, booking)
+    end
+
+    # One line per endpoint per window. What the warning reports is a saturation
+    # that lasts, so a line per request puts one on every request it describes —
+    # a thousand of them for a couple of minutes over budget, burying the first,
+    # which is the only one the operator needed.
+    def first_warning?(rule, now)
+      last = @warned[rule.name]
+      return false if last && now - last < @window
+
+      @warned[rule.name] = now
+      true
     end
 
     def warn_saturated(rule, wait)
       ForestAdminDatasourcePylon.logger.warn(
         "[forest_admin_datasource_pylon] #{rule.name} is at its budget of #{rule.limit} requests per " \
         "#{@window.round}s; the next slot is #{wait.round(1)}s out, past the #{@max_wait.round(1)}s this waits. " \
-        'Letting the request through — Pylon may answer 429, which the client retries.'
+        'Letting the request through — Pylon may answer 429, which the client retries. Further requests over ' \
+        "this budget are let through too, and this says so once per #{@window.round}s."
       )
     end
   end

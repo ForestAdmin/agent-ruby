@@ -69,6 +69,7 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimiter do
 
     describe 'when the wait would exceed max_wait' do
       it 'lets the request through rather than queueing behind the window' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
         subject = limiter(max_wait: 1.0)
         limit.times { subject.acquire(:get, '/things') }
 
@@ -86,6 +87,36 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimiter do
 
         expect(ForestAdminDatasourcePylon.logger)
           .to have_received(:warn).with(%r{get /things is at its budget of 2 requests per 6s})
+      end
+
+      # What the warning reports is a saturation that lasts, so a line per request
+      # puts one on every request it describes: a stream 10% over a 120/min
+      # budget crosses the bound as the window fills and then bypasses almost
+      # everything, which is a thousand identical lines for a couple of minutes.
+      it 'warns once per window rather than once per request' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        subject = limiter(max_wait: 1.0)
+        limit.times { subject.acquire(:get, '/things') }
+
+        5.times { subject.acquire(:get, '/things') }
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).once
+      end
+
+      # Deduplicated, not silenced: a saturation still going a window later is
+      # news again, and the operator reading one line has to be able to tell the
+      # burst that passed from the stream that did not.
+      it 'warns again once a window has gone by' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        subject = limiter(max_wait: 1.0)
+        limit.times { subject.acquire(:get, '/things') }
+        subject.acquire(:get, '/things')
+
+        at(7.0)
+        limit.times { subject.acquire(:get, '/things') }
+        subject.acquire(:get, '/things')
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).twice
       end
 
       # The slot it declined to wait for must not be booked: recording it would
@@ -142,6 +173,17 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimiter do
         subject.acquire(:get, '/others')
 
         expect(slept).to be_empty
+      end
+
+      # Each endpoint reports its own saturation too: one silenced by another's
+      # line would have the operator narrow the wrong budget.
+      it 'warns for each endpoint that saturates' do
+        allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+        subject = limiter(max_wait: 1.0)
+
+        ['/things', '/others'].each { |path| (limit + 1).times { subject.acquire(:get, path) } }
+
+        expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).twice
       end
     end
   end
