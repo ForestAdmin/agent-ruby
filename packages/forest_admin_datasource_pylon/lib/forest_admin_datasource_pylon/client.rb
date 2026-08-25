@@ -282,6 +282,14 @@ module ForestAdminDatasourcePylon
       body
     end
 
+    def connection
+      @connection ||= build_connection(
+        retry_policy: @configuration.retry_policy,
+        timeout: @configuration.timeout,
+        open_timeout: @configuration.open_timeout
+      )
+    end
+
     # Middleware order is deliberate: `raise_error` sits outside the JSON parser
     # so it raises with an already-parsed body, and `retry` sits innermost so it
     # inspects raw statuses — behind `raise_error` it would never see a 429.
@@ -289,20 +297,25 @@ module ForestAdminDatasourcePylon
     # The throttle goes inside `retry`, which is what makes a replay wait for a
     # slot like a first attempt: outside it, the middleware would run once for a
     # request that reached Pylon three times.
-    def connection
-      @connection ||= Faraday.new(url: @configuration.url) do |f|
+    #
+    # How long a request is allowed to take is the caller's to state, everything
+    # else being the same on every connection this builds: the limiter included,
+    # a second connection metering in a window of its own spending the budget of
+    # the endpoint twice over.
+    def build_connection(retry_policy:, timeout:, open_timeout:)
+      Faraday.new(url: @configuration.url) do |f|
         f.request :json
         f.response :raise_error
         f.response :json
-        f.request :retry, **@configuration.retry_policy.to_faraday_options
+        f.request :retry, **retry_policy.to_faraday_options
         if @configuration.rate_limiter
           f.use Throttle, limiter: @configuration.rate_limiter, base_path: @configuration.base_path
         end
         f.headers['Authorization'] = "Bearer #{@configuration.api_key}"
         f.headers['Accept']        = 'application/json'
         f.headers['User-Agent']    = "forest_admin_datasource_pylon/#{VERSION}"
-        f.options.open_timeout = @configuration.open_timeout
-        f.options.timeout      = @configuration.timeout
+        f.options.open_timeout = open_timeout
+        f.options.timeout      = timeout
       end
     end
   end
