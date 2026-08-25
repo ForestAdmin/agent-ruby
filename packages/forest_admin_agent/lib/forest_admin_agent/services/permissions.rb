@@ -53,6 +53,83 @@ module ForestAdminAgent
         is_allowed
       end
 
+      # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
+      # listing, +read+ a get, and the signed hash a chart.
+      #
+      # Answered once per collection for the whole request: +redact_projection+ and
+      # +assert_can_read_query_fields+ both ask on a listing, and a chart asks three times.
+      def read_permissions(root_collection_name, collection_names)
+        to_check = collection_names.uniq.reject { |name| name == root_collection_name }
+        allowed = { root_collection_name => true }
+
+        return allowed if to_check.empty?
+
+        # An absent permission system is not a denial: `can?` allows everything there, and answering
+        # anything else would redact every relation on a deployment that granted nothing to check.
+        return allowed.merge(to_check.to_h { |name| [name, true] }) unless permission_system?
+
+        @read_permissions ||= {}
+        missing = to_check - @read_permissions.keys
+        @read_permissions.merge!(fetch_read_permissions(missing)) unless missing.empty?
+
+        allowed.merge(@read_permissions.slice(*to_check))
+      end
+
+      # An unnamed field is dropped rather than refused: the default expansion covers every column
+      # of every to-one relation, so refusing would turn an ordinary listing into a 403 for a caller
+      # that asked for nothing.
+      def redact_projection(collection, projection, named_by_caller:)
+        owners = projection.to_h do |path|
+          [path, ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)]
+        end
+        allowed = read_permissions(collection.name, owners.values.flatten)
+        readable = ->(path) { readable_leaves?(owners[path], allowed) }
+
+        if named_by_caller
+          denied = projection.reject { |path| readable.call(path) }
+
+          unless denied.empty?
+            fields = denied.map { |path| "'#{path}' from #{leaf_label(owners[path])}" }
+            raise ForbiddenError, "You are not allowed to read #{fields.join(", ")}."
+          end
+        end
+
+        ForestAdminDatasourceToolkit::Components::Query::Projection.new(projection.select { |path| readable.call(path) })
+      end
+
+      # Refused rather than redacted: dropping a condition widens the result set and dropping a sort
+      # clause silently reorders it, while both leak the value they touch anyway — a `starts_with`
+      # filter answers one guess per request without returning a column of its own.
+      #
+      # The route passes the components it will actually apply, already parsed. A component it drops
+      # is simply one it does not pass — a count carries no sort, a chart neither sort nor search — so
+      # nothing has to be declared alongside the query and then kept in step with it. What is
+      # authorised here is what the filter carries, not a second parse of the same parameters.
+      def assert_can_read_query_fields(collection, condition_tree: nil, sort: nil, search: nil,
+                                       search_extended: false)
+        usages = []
+
+        # `projection` collects the leaf fields without touching the tree. The route applies this very
+        # instance next, so a traversal that rebuilt a branch — as `for_each_leaf` does — would leave
+        # the guard deciding what runs.
+        condition_tree&.projection&.each { |path| usages << usage('filter on', collection, path) }
+        sort&.each { |clause| usages << usage('sort on', collection, clause[:field]) }
+        collect_search_usages(collection, search, search_extended, usages)
+
+        assert_can_read_usages(collection.name, usages)
+      end
+
+      def assert_can_read_usages(root_collection_name, usages)
+        allowed = read_permissions(root_collection_name, usages.flat_map { |usage| usage[:collections] })
+        denied = usages.find { |usage| !readable_leaves?(usage[:collections], allowed) }
+
+        return unless denied
+
+        raise ForbiddenError,
+              "You cannot #{denied[:action]} '#{denied[:path]}': you are not allowed to read " \
+              "#{leaf_label(denied[:collections])}."
+      end
+
       def can_chart?(parameters)
         attributes = sanitize_chart_parameters(parameters.deep_symbolize_keys)
         hash_request = "#{attributes[:type]}:#{array_hash(attributes)}"
@@ -187,6 +264,103 @@ module ForestAdminAgent
       end
 
       private
+
+      # An empty list of leaves resolves to no collection at all — a polymorphic relation declaring
+      # no `foreign_collections`. `[].all?` would allow it unconditionally, which is the one answer
+      # this guard must never give by default, so it counts as denied.
+      def readable_leaves?(names, allowed)
+        names.any? && names.all? { |name| allowed[name] }
+      end
+
+      def leaf_label(names)
+        names.empty? ? 'an unresolved polymorphic relation' : "the '#{names.join("' or '")}' collection"
+      end
+
+      def fetch_read_permissions(names)
+        user_data = get_user_data(caller.id)
+        collections_data = get_collections_permissions_data
+        results = names.to_h { |name| [name, read_allowed?(collections_data, name, user_data)] }
+
+        return results if results.values.all? || !refetch_denied_reads?(names, collections_data)
+
+        @read_permissions_refetched = true
+        refetched = get_collections_permissions_data(force_fetch: true)
+
+        names.to_h { |name| [name, read_allowed?(refetched, name, user_data)] }
+      end
+
+      # `can?` refetches the whole environment on every denial. Denial is the steady state of this
+      # check rather than the exception, so paying that per denial would cost a permission fetch, and
+      # a cache eviction every other in-flight request reads through, on each page load.
+      #
+      # Two things make a denial worth one fetch. Without `instant_cache_refresh` nothing else keeps
+      # the cache fresh — this is the gate node puts its own refetch behind — so a role granted `read`
+      # would otherwise stay redacted until the cache expires. With the channel up, `refresh-roles`
+      # evicts on a role change, and the only denial staleness still explains is a collection the
+      # payload has never heard of.
+      def refetch_denied_reads?(names, collections_data)
+        return false if @read_permissions_refetched
+
+        !instant_cache_refresh? || names.any? { |name| !collections_data.key?(name.to_sym) }
+      end
+
+      def instant_cache_refresh?
+        Facades::Container.config_from_cache[:instant_cache_refresh] == true
+      end
+
+      def read_allowed?(collections_data, collection_name, user_data)
+        return false unless user_data_valid?(user_data)
+
+        collection_key = collection_name.to_sym
+        return false unless collection_exists?(collections_data, collection_key, collection_name, user_data)
+
+        role_ids = get_role_ids_for_action(collections_data, collection_key, :read, collection_name, user_data)
+        return false unless role_ids
+
+        check_user_permission(role_ids, user_data, :read, collection_name)
+      end
+
+      def usage(action, collection, path)
+        {
+          action: action,
+          path: path,
+          collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(collection, path)
+        }
+      end
+
+      def collect_search_usages(collection, search, search_extended, usages)
+        return if search.nil? || !collection.respond_to?(:searched_fields)
+
+        searched = collection.searched_fields(search, search_extended)
+
+        return if searched.nil?
+
+        published = collection.datasource.collections
+
+        searched.each do |field|
+          assert_search_target_exposed(field, published)
+          usages << { action: 'search on', path: field[:path], collections: field[:collections] }
+        end
+      end
+
+      # `searched_fields` answers below the publication layer — deliberately, so a field hidden by
+      # renaming above it is still checked — so it can name a collection `remove_collection` took out
+      # of the API. An extended search does reach through to it: the condition is built below
+      # publication, which has already passed the filter down and cannot strip it.
+      #
+      # That collection is absent from the permission payload too, so asking `read_allowed?` answers
+      # "denied" for every role, admins included, and no grant can lift it. So it is refused as what
+      # it is — a column the agent does not expose — which points at `disable_search` or publishing
+      # the collection again rather than at a permission to grant.
+      def assert_search_target_exposed(field, published)
+        unexposed = field[:collections].reject { |name| published.key?(name) }
+
+        return if unexposed.empty?
+
+        raise ForbiddenError,
+              "You cannot search on '#{field[:path]}': the '#{unexposed.join("' or '")}' collection " \
+              'is not exposed by this agent.'
+      end
 
       def permission_allowed?(collections_data, collection, action, user_data)
         return false unless user_data_valid?(user_data)

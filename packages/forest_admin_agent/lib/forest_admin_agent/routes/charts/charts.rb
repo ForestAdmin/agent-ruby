@@ -28,15 +28,14 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can_chart?(args[:params])
+          condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
+            context.collection, args
+          )
+          context.permissions.assert_can_read_query_fields(context.collection, condition_tree: condition_tree)
           type = validate_and_get_type(args[:params][:type])
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
-              [
-                context.permissions.get_scope(context.collection),
-                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  context.collection, args
-                )
-              ]
+              [context.permissions.get_scope(context.collection), condition_tree]
             )
           )
 
@@ -46,6 +45,15 @@ module ForestAdminAgent
         end
 
         private
+
+        # An empty `aggregateFieldName` is a count, and `can_chart?` cannot tell it from an absent
+        # one — `sanitize_chart_parameters` drops both before hashing. Normalising here keeps the
+        # aggregation and the guards that read it from disagreeing on what a count is.
+        def aggregate_field_name(args)
+          field = args[:params][:aggregateFieldName]
+
+          field.nil? || field.to_s.empty? ? nil : field
+        end
 
         def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
@@ -89,9 +97,13 @@ module ForestAdminAgent
 
         def make_pie(context, filter, args)
           group_field = args[:params][:groupByFieldName]
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['group a chart by', group_field], ['aggregate a chart on', aggregate_field_name(args)]]
+          )
           aggregation = Aggregation.new(
             operation: args[:params][:aggregator],
-            field: args[:params][:aggregateFieldName],
+            field: aggregate_field_name(args),
             groups: group_field ? [{ field: group_field }] : []
           )
 
@@ -102,6 +114,11 @@ module ForestAdminAgent
 
         def make_line(context, filter, args)
           group_by_field_name = args[:params][:groupByFieldName]
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['group a chart by', group_by_field_name],
+             ['aggregate a chart on', aggregate_field_name(args)]]
+          )
           time_range = args[:params][:timeRange]
           filter_only_with_values = filter.override(
             condition_tree: ConditionTree::ConditionTreeFactory.intersect(
@@ -116,7 +133,7 @@ module ForestAdminAgent
             filter_only_with_values,
             Aggregation.new(
               operation: args[:params][:aggregator],
-              field: args[:params][:aggregateFieldName],
+              field: aggregate_field_name(args),
               groups: [{ field: group_by_field_name, operation: time_range }]
             )
           )
@@ -151,7 +168,7 @@ module ForestAdminAgent
               leaderboard_filter = filter.nest(inverse)
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
-                field: args[:params][:aggregateFieldName],
+                field: aggregate_field_name(args),
                 groups: [{ field: "#{inverse}:#{args[:params][:labelFieldName]}" }]
               )
             end
@@ -171,13 +188,25 @@ module ForestAdminAgent
               leaderboard_filter = filter.nest(origin)
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
-                field: args[:params][:aggregateFieldName] ? "#{target}:#{args[:params][:aggregateFieldName]}" : nil,
+                field: aggregate_field_name(args) ? "#{target}:#{aggregate_field_name(args)}" : nil,
                 groups: [{ field: "#{origin}:#{args[:params][:labelFieldName]}" }]
               )
             end
           end
 
           if collection && leaderboard_filter && aggregation
+            assert_can_read_aggregated_fields(
+              context, context.datasource.get_collection(collection),
+              [['group a leaderboard by', aggregation.groups[0][:field]],
+               ['aggregate a leaderboard on', aggregation.field]]
+            )
+
+            # A count exposes the cardinality of the relation, which `/relationships/<name>/count`
+            # puts behind `browse`. No path names it, so nothing above sees it.
+            if aggregation.field.nil?
+              context.permissions.can?(:browse, context.datasource.get_collection(field.foreign_collection))
+            end
+
             rows = context.datasource.get_collection(collection).aggregate(
               context.caller,
               leaderboard_filter,
@@ -200,11 +229,32 @@ module ForestAdminAgent
         end
 
         def compute_value(context, filter, args)
+          assert_can_read_aggregated_fields(
+            context, context.collection,
+            [['aggregate a chart on', aggregate_field_name(args)]]
+          )
           aggregation = Aggregation.new(operation: args[:params][:aggregator],
-                                        field: args[:params][:aggregateFieldName])
+                                        field: aggregate_field_name(args))
           result = context.collection.aggregate(context.caller, filter, aggregation)
 
           result[0]['value'] || 0
+        end
+
+        # The permission root stays the chart's own collection, which the leaderboard call site does
+        # not share with the collection its paths resolve against.
+        def assert_can_read_aggregated_fields(context, path_collection, fields)
+          usages = fields.reject { |_action, path| path.nil? || path.to_s.empty? }
+                         .map do |action, path|
+            {
+              action: action,
+              path: path,
+              collections: ForestAdminDatasourceToolkit::Utils::FieldPath.leaf_collection_names(
+                path_collection, path
+              )
+            }
+          end
+
+          context.permissions.assert_can_read_usages(context.collection.name, usages)
         end
       end
     end

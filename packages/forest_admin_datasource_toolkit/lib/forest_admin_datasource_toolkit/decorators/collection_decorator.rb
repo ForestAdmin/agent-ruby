@@ -77,6 +77,14 @@ module ForestAdminDatasourceToolkit
         @child_collection.render_chart(caller, name, record_id, parameters)
       end
 
+      # Which fields a search will actually reach, and the collection each one ends on. +nil+ means
+      # the collection cannot say, which a caller must read as "unknown", never as "none".
+      def searched_fields(search, extended)
+        return nil unless @child_collection.is_a?(CollectionDecorator)
+
+        @child_collection.searched_fields(search, extended)
+      end
+
       protected
 
       def mark_schema_as_dirty

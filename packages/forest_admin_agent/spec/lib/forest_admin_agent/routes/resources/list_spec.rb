@@ -14,6 +14,7 @@ module ForestAdminAgent
 
       describe List do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:list) { described_class.new }
         let(:args) do
           {
@@ -72,6 +73,40 @@ module ForestAdminAgent
           list.setup_routes
           expect(list.routes.include?('forest_list')).to be true
           expect(list.routes.length).to eq 1
+        end
+
+        it 'checks every query component it applies, against its own collection' do
+          list.handle_request(args)
+
+          expect(read_guard_calls[:query_fields]).to eq(
+            [{ collection: 'user', applies: %i[filter sort search] }]
+          )
+        end
+
+        it 'refuses a projection the caller named on its own collection' do
+          args[:params][:fields] = { 'user' => 'id,first_name' }
+          list.handle_request(args)
+
+          expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: true }])
+        end
+
+        it 'redacts rather than refuses the expansion the caller never asked for' do
+          list.handle_request(args)
+
+          expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: false }])
+        end
+
+        it 'answers a denied query field with a 403 rather than a listing' do
+          allow(permissions).to receive(:assert_can_read_query_fields).and_raise(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
+              "You cannot filter on 'category:label': you are not allowed to read the 'category' collection."
+            )
+          )
+
+          expect { list.handle_request(args) }.to raise_error(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError,
+            /You cannot filter on 'category:label'/
+          )
         end
 
         it 'return an serialized content' do
@@ -168,6 +203,7 @@ module ForestAdminAgent
 
       describe List, 'with a projection deeper than one relation' do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:list) { described_class.new }
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
 
