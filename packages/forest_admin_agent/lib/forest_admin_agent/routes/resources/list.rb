@@ -43,7 +43,7 @@ module ForestAdminAgent
               class_name: context.collection.name,
               is_collection: true,
               serializer: Serializer::ForestSerializer,
-              include: projection.relations(only_keys: true),
+              include: projection.relation_include_paths,
               meta: handle_search_decorator(args[:params]['search'], records, context.collection)
             )
           }

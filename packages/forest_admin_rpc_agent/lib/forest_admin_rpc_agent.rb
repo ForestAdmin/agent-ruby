@@ -28,6 +28,7 @@ module ForestAdminRpcAgent
   setting :customize_error_message, default: nil
   setting :disable_route_cache, default: false
   setting :rpc_max_polling_threads, default: nil
+  setting :audit_trail, default: nil
 
   begin
     require 'thor'

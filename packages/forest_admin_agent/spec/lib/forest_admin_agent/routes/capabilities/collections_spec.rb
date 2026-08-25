@@ -82,9 +82,25 @@ module ForestAdminAgent
             )
           end
 
+          it 'announces the audit trail once a store is configured' do
+            # Merged rather than replaced: the rest of the request reads this config too.
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              audit_trail: { store: Object.new }
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
+
+            expect(result[:content][:agentCapabilities][:canUseAuditTrail]).to be true
+          end
+
           it 'returns agentCapabilities' do
             expect(result[:content][:agentCapabilities]).to eq(
-              { canUseProjectionOnGetOne: true, canUseMultipleFieldsProjectionOnRelation: true }
+              {
+                canUseProjectionOnGetOne: true,
+                canUseProjectionViaHeader: true,
+                canUseProjectionViaHeaderOnList: true,
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: false
+              }
             )
           end
         end
@@ -131,7 +147,13 @@ module ForestAdminAgent
 
           it 'returns agentCapabilities' do
             expect(result[:content][:agentCapabilities]).to eq(
-              { canUseProjectionOnGetOne: true, canUseMultipleFieldsProjectionOnRelation: true }
+              {
+                canUseProjectionOnGetOne: true,
+                canUseProjectionViaHeader: true,
+                canUseProjectionViaHeaderOnList: true,
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: false
+              }
             )
           end
         end
@@ -234,6 +256,50 @@ module ForestAdminAgent
           it 'sets supportGroups to false when no field is groupable' do
             aggregation_caps = result[:content][:collections][0][:aggregationCapabilities]
             expect(aggregation_caps[:supportGroups]).to be false
+          end
+        end
+
+        context 'when the request is not authenticated' do
+          let(:args) do
+            {
+              headers: {},
+              params: {
+                'collectionNames' => ['user'],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          it 'rejects the request with no Authorization header' do
+            expect { capabilities_collections.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::UnauthorizedError,
+              'You must be logged in to access at this resource.'
+            )
+          end
+
+          it 'does not instantiate permissions' do
+            expect { capabilities_collections.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::UnauthorizedError
+            )
+            expect(ForestAdminAgent::Services::Permissions).not_to have_received(:new)
+          end
+        end
+
+        context 'when the request carries a remote ip' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer, 'action_dispatch.remote_ip' => '10.0.0.1' },
+              params: {
+                'collectionNames' => [],
+                'timezone' => 'Europe/Paris'
+              }
+            }
+          end
+
+          it 'checks the ip against the whitelist' do
+            allow(ForestAdminAgent::Facades::Whitelist).to receive(:check_ip)
+            capabilities_collections.handle_request(args)
+            expect(ForestAdminAgent::Facades::Whitelist).to have_received(:check_ip).with('10.0.0.1')
           end
         end
 

@@ -1,3 +1,4 @@
+require 'jsonapi-serializers'
 require 'openid_connect'
 
 module ForestAdminRails
@@ -22,7 +23,7 @@ module ForestAdminRails
               body: request.raw_post
             }
           )
-        rescue StandardError => e
+        rescue StandardError, JSONAPI::Serializer::Error => e
           exception_handler e
         end
       else

@@ -1,6 +1,6 @@
 {
   "name": "agent-ruby",
-  "version": "1.36.2",
+  "version": "1.39.1",
   "description": "The official agent Ruby for Forest.",
   "private": false,
   "repository": {
@@ -23,6 +23,10 @@
   },
   "resolutions": {
     "semantic-release-slack-bot/**/micromatch": "^4.0.8",
-    "brace-expansion": "^5.0.7"
+    "brace-expansion": "^5.0.7",
+    "fast-uri": "^3.1.4",
+    "tar": "^7.5.21",
+    "ip-address": "^10.3.1",
+    "js-yaml": "^4.3.1"
   }
 }

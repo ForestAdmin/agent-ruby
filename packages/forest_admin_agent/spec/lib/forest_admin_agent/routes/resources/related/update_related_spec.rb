@@ -105,7 +105,24 @@ module ForestAdminAgent
               stub_const('Book', book_class)
             end
 
+            it 'checks the edit permission before parsing any id' do
+              allow(permissions).to receive(:can?)
+                .and_raise(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+              allow(Utils::Id).to receive(:unpack_id)
+
+              args[:params]['collection_name'] = 'book'
+              args[:params]['relation_name'] = 'author'
+              args[:params]['data'] = { 'id' => 'malformed|id' }
+              args[:params]['id'] = 'malformed|id'
+
+              expect { update.handle_request(args) }
+                .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+              expect(Utils::Id).not_to have_received(:unpack_id)
+            end
+
             it 'call handle_request on a many_to_one relation' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('book')).to receive(:update).and_return(true)
 
               args[:params]['collection_name'] = 'book'
@@ -115,10 +132,20 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'book'))
+              expect(permissions).not_to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'book'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(@datasource.get_collection('book')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'author_id', operator: Operators::NOT_EQUAL, value: 99),
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                    ]
+                  ),
                   page: nil,
                   search: nil,
                   search_extended: nil,
@@ -131,6 +158,8 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a polymorphic_many_to_one relation' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
 
               args[:params]['collection_name'] = 'address'
@@ -140,10 +169,20 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'address'))
+              expect(permissions).not_to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address'))
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
               expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, data|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter).to have_attributes(
-                  condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris'),
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                    ]
+                  ),
                   page: nil,
                   search: nil,
                   search_extended: nil,
@@ -155,7 +194,25 @@ module ForestAdminAgent
               expect(result).to eq({ content: nil, status: 204 })
             end
 
+            it 'clears the foreign key and its type field on a polymorphic_many_to_one relation' do
+              allow(@datasource.get_collection('address')).to receive(:update).and_return(true)
+
+              args[:params]['collection_name'] = 'address'
+              args[:params]['relation_name'] = 'addressable'
+              args[:params]['data'] = nil
+              args[:params]['id'] = 1
+
+              result = update.handle_request(args)
+
+              expect(@datasource.get_collection('address')).to have_received(:update) do |_caller, _filter, data|
+                expect(data).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+              end
+              expect(result).to eq({ content: nil, status: 204 })
+            end
+
             it 'call handle_request on a one_to_one relation' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('book')).to receive_messages(aggregate: [{ 'value' => 1 }], update: true)
 
               args[:params]['collection_name'] = 'user'
@@ -165,6 +222,11 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'book'))
+              expect(permissions).not_to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'book')).at_least(:once)
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
+
               parameters = [
                 [
                   Components::Caller,
@@ -172,6 +234,7 @@ module ForestAdminAgent
                     condition_tree: have_attributes(
                       aggregator: 'And',
                       conditions: [
+                        have_attributes(field: 'author_id', operator: Operators::NOT_EQUAL, value: 99),
                         have_attributes(field: 'author_id', operator: Operators::EQUAL, value: 1),
                         have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
                       ]
@@ -187,7 +250,13 @@ module ForestAdminAgent
                 [
                   Components::Caller,
                   {
-                    condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'author_id', operator: Operators::NOT_EQUAL, value: 99),
+                        have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                      ]
+                    ),
                     page: nil,
                     search: nil,
                     search_extended: nil,
@@ -209,6 +278,8 @@ module ForestAdminAgent
             end
 
             it 'call handle_request on a polymorphic_one_to_one relation' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('address')).to receive_messages(aggregate: [{ 'value' => 1 }], update: true)
 
               args[:params]['collection_name'] = 'user'
@@ -218,6 +289,11 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
+              expect(permissions).to have_received(:can?).with(:edit, having_attributes(name: 'address'))
+              expect(permissions).not_to have_received(:can?).with(:edit, having_attributes(name: 'user'))
+              expect(permissions).to have_received(:get_scope).with(having_attributes(name: 'address')).at_least(:once)
+              expect(permissions).not_to have_received(:get_scope).with(having_attributes(name: 'user'))
+
               parameters = [
                 [
                   Components::Caller,
@@ -225,6 +301,7 @@ module ForestAdminAgent
                     condition_tree: have_attributes(
                       aggregator: 'And',
                       conditions: [
+                        have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris'),
                         have_attributes(field: 'addressable_id', operator: Operators::EQUAL, value: 1),
                         have_attributes(field: 'addressable_type', operator: Operators::EQUAL, value: 'user'),
                         have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 1)
@@ -241,7 +318,13 @@ module ForestAdminAgent
                 [
                   Components::Caller,
                   {
-                    condition_tree: have_attributes(field: 'id', operator: Operators::EQUAL, value: 1),
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris'),
+                        have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                      ]
+                    ),
                     page: nil,
                     search: nil,
                     search_extended: nil,

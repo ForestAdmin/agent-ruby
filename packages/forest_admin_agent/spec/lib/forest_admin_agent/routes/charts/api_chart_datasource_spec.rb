@@ -33,6 +33,7 @@ module ForestAdminAgent
               render_chart: { countCurrent: 12 }
             )
             ForestAdminAgent::Facades::Container.instance.register(:datasource, datasource)
+            allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
           end
 
           it 'adds the routes' do
@@ -77,6 +78,50 @@ module ForestAdminAgent
               }
               expect(result).to have_key(:content)
               expect(result[:content]).to eq({ countCurrent: 12 })
+            end
+          end
+
+          describe 'when the request is not authenticated' do
+            let(:args) do
+              {
+                headers: {},
+                params: { 'timezone' => 'Europe/Paris' }
+              }
+            end
+
+            it 'rejects handle_api_chart with no Authorization header' do
+              expect { described_class.new('my_chart').handle_api_chart(args) }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::UnauthorizedError
+              )
+            end
+
+            it 'rejects handle_smart_chart with no Authorization header' do
+              expect { described_class.new('my_chart').handle_smart_chart(args) }.to raise_error(
+                ForestAdminAgent::Http::Exceptions::UnauthorizedError
+              )
+            end
+          end
+
+          describe 'when the request carries a remote ip' do
+            let(:args) do
+              {
+                headers: { 'HTTP_AUTHORIZATION' => bearer, 'action_dispatch.remote_ip' => '10.0.0.1' },
+                params: { 'timezone' => 'Europe/Paris' }
+              }
+            end
+
+            before do
+              allow(ForestAdminAgent::Facades::Whitelist).to receive(:check_ip)
+            end
+
+            it 'checks the ip against the whitelist on handle_api_chart' do
+              described_class.new('my_chart').handle_api_chart(args)
+              expect(ForestAdminAgent::Facades::Whitelist).to have_received(:check_ip).with('10.0.0.1')
+            end
+
+            it 'checks the ip against the whitelist on handle_smart_chart' do
+              described_class.new('my_chart').handle_smart_chart(args)
+              expect(ForestAdminAgent::Facades::Whitelist).to have_received(:check_ip).with('10.0.0.1')
             end
           end
         end

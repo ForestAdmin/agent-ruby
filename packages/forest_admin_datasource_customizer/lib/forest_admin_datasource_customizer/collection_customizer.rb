@@ -263,8 +263,10 @@ module ForestAdminDatasourceCustomizer
     # .add_hook('before', 'list') do |context|
     #   # Do something before the list action
     # end
-    def add_hook(position, type, &handler)
-      push_customization { @stack.hook.get_collection(@name).add_hook(position, type, handler) }
+    def add_hook(position, type, prepend: false, &handler)
+      push_customization do
+        @stack.hook.get_collection(@name).add_hook(position, type, handler, prepend: prepend)
+      end
     end
 
     # Add a new segment on the collection.

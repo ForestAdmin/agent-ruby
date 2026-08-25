@@ -9,6 +9,7 @@ module ForestAdminAgent
 
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
+      POLYMORPHIC_TARGET_WILDCARD = '*'.freeze
 
       def self.parse_condition_tree(collection, args)
         filters = begin
@@ -47,6 +48,24 @@ module ForestAdminAgent
         raise BadRequestError, "Invalid projection: #{e.message}"
       end
 
+      def self.parse_projection_from_header(collection, args)
+        header = args.dig(:headers, 'HTTP_FOREST_PROJECTION')&.to_s&.strip
+
+        return if header.nil? || header.empty?
+
+        projection_fields = build_header_projection_fields(collection, header.split(',', -1).map(&:strip))
+
+        ForestAdminDatasourceToolkit::Validations::ProjectionValidator.validate?(collection, projection_fields)
+
+        Projection.new(projection_fields)
+      rescue ForestAdminDatasourceToolkit::Exceptions::ForestException => e
+        raise BadRequestError, "Invalid Forest-Projection header: #{e.message}"
+      end
+
+      def self.parse_projection_from_request(collection, args)
+        parse_projection_from_header(collection, args) || parse_projection(collection, args)
+      end
+
       def self.add_polymorphic_type_fields(collection, requested_field_names)
         polymorphic_relations = collection.schema[:fields].select { |_, field| field.type == 'PolymorphicManyToOne' }
 
@@ -70,7 +89,7 @@ module ForestAdminAgent
           when 'Column'
             field_name
           when 'PolymorphicManyToOne'
-            "#{field_name}:*"
+            "#{field_name}:#{POLYMORPHIC_TARGET_WILDCARD}"
           else
             relation_fields = args.dig(:params, :fields, field_name)
 
@@ -83,6 +102,74 @@ module ForestAdminAgent
         end
       end
 
+      def self.build_header_projection_fields(collection, requested_paths)
+        if requested_paths.any? { |path| path.empty? || path.split(':', -1).any?(&:empty?) }
+          raise ForestAdminDatasourceToolkit::Exceptions::ValidationError, 'The projection contains an empty field.'
+        end
+
+        root_field_names = requested_paths.map { |path| path.split(':').first }
+        root_field_names_with_types = root_field_names.dup
+        add_polymorphic_type_fields(collection, root_field_names_with_types)
+
+        projection_fields = requested_paths.map { |path| expand_polymorphic_leaf(collection, path) }
+
+        projection_fields |
+          (root_field_names_with_types - root_field_names) |
+          nested_polymorphic_linkage_fields(collection, projection_fields)
+      end
+
+      def self.expand_polymorphic_leaf(collection, path)
+        segments = path.split(':')
+        leaf_index = segments.size - 1
+
+        each_field_along_path(collection, segments) do |field, index|
+          return "#{path}:#{POLYMORPHIC_TARGET_WILDCARD}" if polymorphic_many_to_one?(field) && index == leaf_index
+        end
+
+        path
+      end
+
+      def self.nested_polymorphic_linkage_fields(collection, projection_fields)
+        projection_fields.flat_map do |path|
+          segments = path.split(':')
+
+          each_field_along_path(collection, segments).flat_map do |field, index|
+            next [] unless polymorphic_many_to_one?(field) && index.positive?
+
+            polymorphic_linkage_columns(field, segments[0...index])
+          end
+        end
+      end
+
+      def self.polymorphic_linkage_columns(field, relation_path)
+        [field.foreign_key_type_field, field.foreign_key].map { |column| (relation_path + [column]).join(':') }
+      end
+
+      def self.each_field_along_path(collection, segments)
+        return to_enum(:each_field_along_path, collection, segments) unless block_given?
+
+        current_collection = collection
+
+        segments.each_with_index do |segment, index|
+          field = field_along_path(current_collection, segment, root: index.zero?)
+          break if field.nil?
+
+          yield field, index
+
+          break unless field.respond_to?(:foreign_collection)
+
+          current_collection = collection.datasource.get_collection(field.foreign_collection)
+        end
+      end
+
+      def self.field_along_path(collection, segment, root:)
+        root ? get_field(collection, segment) : collection.schema[:fields][segment]
+      end
+
+      def self.polymorphic_many_to_one?(field)
+        field.type == 'PolymorphicManyToOne'
+      end
+
       def self.get_field(collection, field_name)
         field = collection.schema[:fields][field_name]
         return field unless field.nil?
@@ -93,12 +180,14 @@ module ForestAdminAgent
               "Available fields are: [#{available_fields}]. " \
               'Please check if the field name is correct.'
       end
-      private_class_method :add_polymorphic_type_fields, :build_projection_fields, :get_field
+      private_class_method :add_polymorphic_type_fields, :build_projection_fields,
+                           :build_header_projection_fields, :get_field,
+                           :expand_polymorphic_leaf, :nested_polymorphic_linkage_fields,
+                           :polymorphic_linkage_columns, :each_field_along_path,
+                           :field_along_path, :polymorphic_many_to_one?
 
       def self.parse_projection_with_pks(collection, args)
-        projection = parse_projection(collection, args)
-
-        projection.with_pks(collection)
+        parse_projection_from_request(collection, args).with_pks(collection)
       end
 
       def self.parse_pagination(args)

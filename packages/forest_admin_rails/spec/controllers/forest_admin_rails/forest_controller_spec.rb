@@ -150,21 +150,7 @@ module ForestAdminRails
 
       context 'when exception does not have name attribute' do
         it 'uses exception class name as fallback' do
-          # rubocop:disable RSpec/VerifiedDoubles
-          exception = double(
-            'GenericError',
-            message: 'Something went wrong',
-            respond_to?: false,
-            class: StandardError
-          )
-          # rubocop:enable RSpec/VerifiedDoubles
-          allow(exception.class).to receive(:name).and_return('StandardError')
-          allow(exception).to receive(:try).with(:status).and_return(nil)
-          allow(exception).to receive(:try).with(:data).and_return(nil)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
-          allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
+          exception = StandardError.new('Something went wrong')
           allow(exception).to receive(:full_message).and_return('Full error')
 
           controller.send(:exception_handler, exception)
@@ -178,21 +164,7 @@ module ForestAdminRails
 
       context 'when exception has no status' do
         it 'returns errors format with 500 status' do
-          # rubocop:disable RSpec/VerifiedDoubles
-          exception = double(
-            'GenericError',
-            message: 'Generic error',
-            respond_to?: false,
-            class: StandardError
-          )
-          # rubocop:enable RSpec/VerifiedDoubles
-          allow(exception.class).to receive(:name).and_return('StandardError')
-          allow(exception).to receive(:try).with(:status).and_return(nil)
-          allow(exception).to receive(:try).with(:data).and_return(nil)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
-          allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
+          exception = StandardError.new('Generic error')
           allow(exception).to receive(:full_message).and_return('Full error')
 
           controller.send(:exception_handler, exception)
@@ -207,21 +179,7 @@ module ForestAdminRails
 
       context 'when exception has no data' do
         it 'returns errors format with nil data' do
-          # rubocop:disable RSpec/VerifiedDoubles
-          exception = double(
-            'GenericError',
-            message: 'Generic error',
-            respond_to?: false,
-            class: StandardError
-          )
-          # rubocop:enable RSpec/VerifiedDoubles
-          allow(exception.class).to receive(:name).and_return('StandardError')
-          allow(exception).to receive(:try).with(:status).and_return(nil)
-          allow(exception).to receive(:try).with(:data).and_return(nil)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
-          allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
+          exception = StandardError.new('Generic error')
           allow(exception).to receive(:full_message).and_return('Full error')
 
           controller.send(:exception_handler, exception)
@@ -231,53 +189,53 @@ module ForestAdminRails
         end
       end
 
-      context 'with production and non-production modes' do
-        it 'logs exception in non-production mode' do
-          # rubocop:disable RSpec/VerifiedDoubles
-          exception = double(
-            'GenericError',
-            message: 'Test error',
-            respond_to?: false,
-            class: StandardError
-          )
-          # rubocop:enable RSpec/VerifiedDoubles
-          allow(exception.class).to receive(:name).and_return('StandardError')
-          allow(exception).to receive(:try).with(:status).and_return(nil)
-          allow(exception).to receive(:try).with(:data).and_return(nil)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
-          allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
+      context 'with exception logging' do
+        it 'logs the full message when the translated status is 500' do
+          exception = StandardError.new('Test error')
           allow(exception).to receive(:full_message).and_return('Full error trace')
-          allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(false)
 
           controller.send(:exception_handler, exception)
 
           expect(logger).to have_received(:log).with('Error', 'Full error trace')
         end
 
-        it 'does not log exception in production mode' do
-          # rubocop:disable RSpec/VerifiedDoubles
-          exception = double(
-            'GenericError',
-            message: 'Test error',
-            respond_to?: false,
-            class: StandardError
-          )
-          # rubocop:enable RSpec/VerifiedDoubles
-          allow(exception.class).to receive(:name).and_return('StandardError')
-          allow(exception).to receive(:try).with(:status).and_return(nil)
-          allow(exception).to receive(:try).with(:data).and_return(nil)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::HttpException).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::BusinessError).and_return(false)
-          allow(exception).to receive(:is_a?).with(ForestAdminAgent::Http::Exceptions::AuthenticationOpenIdClient).and_return(false)
-          allow(exception).to receive(:is_a?).with(OpenIDConnect::Exception).and_return(false)
+        it 'logs 500 errors even in production mode' do
+          exception = StandardError.new('Test error')
           allow(exception).to receive(:full_message).and_return('Full error trace')
           allow(ForestAdminAgent::Facades::Container).to receive(:cache).with(:is_production).and_return(true)
 
           controller.send(:exception_handler, exception)
 
+          expect(logger).to have_received(:log).with('Error', 'Full error trace')
+        end
+
+        it 'does not log when the translated status is below 500' do
+          exception = ForestAdminAgent::Http::Exceptions::ForbiddenError.new('Access denied')
+
+          controller.send(:exception_handler, exception)
+
           expect(logger).not_to have_received(:log)
+        end
+      end
+
+      context 'with a serializer error, which descends from Exception and not StandardError' do
+        it 'names a constant the rescue clause can resolve' do
+          expect(defined?(JSONAPI::Serializer::Error)).to eq('constant')
+          expect(JSONAPI::Serializer::Error.superclass).to eq(Exception)
+        end
+
+        it 'reports and logs it instead of letting it escape' do
+          exception = JSONAPI::Serializer::InvalidIncludeError.new("'*' is not a valid include.")
+          allow(exception).to receive(:full_message).and_return('Full error trace')
+
+          begin
+            raise exception
+          rescue StandardError, JSONAPI::Serializer::Error => e
+            controller.send(:exception_handler, e)
+          end
+
+          expect(response_mock.status).to eq(500)
+          expect(logger).to have_received(:log).with('Error', 'Full error trace')
         end
       end
     end

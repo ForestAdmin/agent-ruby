@@ -50,6 +50,12 @@ module ForestAdminAgent
           { name: 'charts', handler: -> { Charts::Charts.new.routes } },
           { name: 'collections', handler: -> { Capabilities::Collections.new.routes } },
           { name: 'native_query', handler: -> { Resources::NativeQuery.new.routes } },
+          # Both must come before the routes matching on `:collection_name`: Rails matches in
+          # definition order, so `/_audit-trail/correlations` would otherwise be read as
+          # `/:collection_name/:id` and 404 on a collection named `_audit-trail`. Correlation first, so
+          # `/_audit-trail/correlations` wins over the per-record `/_audit-trail/:collection_name/:id`.
+          { name: 'audit_trail_correlation', handler: -> { Resources::AuditTrailCorrelation.new.routes } },
+          { name: 'audit_trail', handler: -> { Resources::AuditTrail.new.routes } },
           { name: 'count', handler: -> { Resources::Count.new.routes } },
           { name: 'delete', handler: -> { Resources::Delete.new.routes } },
           { name: 'csv', handler: -> { Resources::Csv.new.routes } },

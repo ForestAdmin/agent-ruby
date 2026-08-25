@@ -80,6 +80,32 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe 'add_handler with prepend' do
+          it 'runs the prepended handler before the ones already registered' do
+            calls = []
+
+            hooks = described_class.new
+            hooks.add_handler('After', proc { calls << :existing })
+            hooks.add_handler('After', proc { calls << :prepended }, prepend: true)
+            hooks.execute_after(fake_hook_context.new)
+
+            expect(calls).to eq(%i[prepended existing])
+          end
+
+          # execute_after stops at the first exception: a handler that must run whatever a sibling does
+          # cannot afford to be last.
+          it 'runs the prepended handler even when a later one raises' do
+            calls = []
+
+            hooks = described_class.new
+            hooks.add_handler('After', proc { raise 'boom' })
+            hooks.add_handler('After', proc { calls << :prepended }, prepend: true)
+
+            expect { hooks.execute_after(fake_hook_context.new) }.to raise_error('boom')
+            expect(calls).to eq([:prepended])
+          end
+        end
+
         describe 'execute_after' do
           describe 'when multiple after hooks are defined' do
             it 'call all of them' do

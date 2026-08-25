@@ -1,4 +1,6 @@
 require 'filecache'
+require 'active_record'
+require 'sqlite3'
 require 'simplecov'
 require 'simplecov_json_formatter'
 require 'simplecov-html'
@@ -37,6 +39,10 @@ RSpec.configure do |config|
   config.include ForestAdminTestToolkit::Factory::Column
 
   config.before do
+    # The audit connection is class-level, so it is handed back between examples: a store pointed at another
+    # database would otherwise be refused.
+    ForestAdminAgent::AuditTrail::Sql::AuditConnectionBase.disconnect!
+
     cache = FileCache.new('app', 'tmp/cache/forest_admin')
     cache.clear
 

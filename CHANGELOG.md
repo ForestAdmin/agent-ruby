@@ -1,3 +1,87 @@
+## [1.39.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.0...v1.39.1) (2026-08-20)
+
+
+### Bug Fixes
+
+* **agent:** stop the update route from writing foreign keys from relationships ([#363](https://github.com/ForestAdmin/agent-ruby/issues/363)) ([6f91d9a](https://github.com/ForestAdmin/agent-ruby/commit/6f91d9a4674c7bbc1a63b70c76a2e1c0d1f48e0c))
+
+# [1.39.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.3...v1.39.0) (2026-08-19)
+
+
+### Features
+
+* **audit_trail:** record and expose record history in the agent, gated on an audit database ([#320](https://github.com/ForestAdmin/agent-ruby/issues/320)) ([dcfb13c](https://github.com/ForestAdmin/agent-ruby/commit/dcfb13ce6af90664deaae723f13c0a769c23066a))
+
+## [1.38.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.2...v1.38.3) (2026-08-14)
+
+
+### Bug Fixes
+
+* **agent:** serialize every level of a projection deeper than one relation ([#357](https://github.com/ForestAdmin/agent-ruby/issues/357)) ([a1e8cbd](https://github.com/ForestAdmin/agent-ruby/commit/a1e8cbde08321f368a4cabd46d8096ba2e8f80ca))
+
+## [1.38.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.1...v1.38.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **agent:** authorize associate-related on the foreign collection and scope the many-to-many link ([#356](https://github.com/ForestAdmin/agent-ruby/issues/356)) ([2f618b9](https://github.com/ForestAdmin/agent-ruby/commit/2f618b96eabca2b70392792dcedc744809a16282)), closes [#350](https://github.com/ForestAdmin/agent-ruby/issues/350)
+
+## [1.38.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.38.0...v1.38.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **agent:** authorize create with a linked one-to-one on the foreign collection ([#353](https://github.com/ForestAdmin/agent-ruby/issues/353)) ([9577d80](https://github.com/ForestAdmin/agent-ruby/commit/9577d808a0a00181c34efa34fa4785d05a683334)), closes [#350](https://github.com/ForestAdmin/agent-ruby/issues/350)
+
+# [1.38.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.4...v1.38.0) (2026-08-12)
+
+
+### Features
+
+* **agent:** accept the Forest-Projection header on record routes ([#352](https://github.com/ForestAdmin/agent-ruby/issues/352)) ([ff25d09](https://github.com/ForestAdmin/agent-ruby/commit/ff25d09171325458441a80bcfa304b9cb12eb1b1)), closes [#1813](https://github.com/ForestAdmin/agent-ruby/issues/1813) [#1822](https://github.com/ForestAdmin/agent-ruby/issues/1822)
+
+## [1.37.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.3...v1.37.4) (2026-08-11)
+
+
+### Bug Fixes
+
+* **agent:** scope and authorize related write routes on the mutated collection ([#350](https://github.com/ForestAdmin/agent-ruby/issues/350)) ([021deac](https://github.com/ForestAdmin/agent-ruby/commit/021deac91be338a8d8362f3803d0ff6e72d93608)), closes [#348](https://github.com/ForestAdmin/agent-ruby/issues/348)
+
+## [1.37.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.2...v1.37.3) (2026-08-11)
+
+
+### Bug Fixes
+
+* **security:** enforce authentication and IP whitelist on private routes [PRD-896] ([#349](https://github.com/ForestAdmin/agent-ruby/issues/349)) ([26fcec9](https://github.com/ForestAdmin/agent-ruby/commit/26fcec9144a147156a5fd400ca6d2a9968071bbf)), closes [#281](https://github.com/ForestAdmin/agent-ruby/issues/281)
+
+## [1.37.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.1...v1.37.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* **agent:** authorize and scope related read routes on the target collection ([#348](https://github.com/ForestAdmin/agent-ruby/issues/348)) ([4492b60](https://github.com/ForestAdmin/agent-ruby/commit/4492b60703835c37fdf5ed9b6a2904fe3167182c)), closes [#823](https://github.com/ForestAdmin/agent-ruby/issues/823)
+
+## [1.37.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.37.0...v1.37.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* surface HTTP errors instead of silently skipping schema sync ([#344](https://github.com/ForestAdmin/agent-ruby/issues/344)) ([ac7a4a0](https://github.com/ForestAdmin/agent-ruby/commit/ac7a4a0b0feb749e0ddc8fb7e8953e0cf0630444))
+
+# [1.37.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.3...v1.37.0) (2026-08-06)
+
+
+### Features
+
+* **datasource graphql hasura:** add Hasura datasource with Rails polymorphism support ([#343](https://github.com/ForestAdmin/agent-ruby/issues/343)) ([d0d6d9b](https://github.com/ForestAdmin/agent-ruby/commit/d0d6d9b14ac94119628cd997f133eb444efb3cf1))
+
+## [1.36.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.2...v1.36.3) (2026-08-05)
+
+
+### Bug Fixes
+
+* **agent:** store the model name in the polymorphic type column on create ([#342](https://github.com/ForestAdmin/agent-ruby/issues/342)) ([a810dab](https://github.com/ForestAdmin/agent-ruby/commit/a810daba9221f247cdac29711f8d2a7856b5aa93))
+
 ## [1.36.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.36.1...v1.36.2) (2026-08-04)
 
 

@@ -41,6 +41,12 @@ module ForestAdminDatasourceToolkit
           only_keys ? relations.keys : relations
         end
 
+        def relation_include_paths
+          relations.flat_map do |relation, sub_projection|
+            [relation, *sub_projection.relation_include_paths.map { |path| "#{relation}.#{path}" }]
+          end
+        end
+
         def nest(prefix: nil)
           prefix ? Projection.new(map { |path| "#{prefix}:#{path}" }) : self
         end

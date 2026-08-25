@@ -29,11 +29,32 @@ module ForestAdminRails
     end
 
     config.after_initialize do
-      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException) do
+      Rails.error.handle(ForestAdminDatasourceToolkit::Exceptions::ForestException, severity: :error) do
         agent_factory = ForestAdminAgent::Builder::AgentFactory.instance
         agent_factory.setup(ForestAdminRails.config)
         load_configuration
         load_cors
+        load_correlation_id
+      end
+    end
+
+    # Echo the agent-generated correlation id on every response (mirrors the Node agent's
+    # router.use(correlationIdMiddleware)); CORS exposure of the header is handled in load_cors.
+    #
+    # Ahead of ShowExceptions rather than at the end of the stack: a Rack middleware can only add a header
+    # to a response it sees returned, so sitting under the exception handlers meant error responses they
+    # build on the way out never carried the id.
+    def load_correlation_id
+      middleware = ForestAdminAgent::Http::CorrelationIdMiddleware
+
+      begin
+        # The application's stack, not the engine's: ShowExceptions lives there, and an
+        # insert_before recorded on the engine's own (empty) proxy raises when it is applied.
+        Rails.application.config.middleware.insert_before ActionDispatch::ShowExceptions, middleware
+      rescue StandardError
+        # No ShowExceptions in this stack (or already gone): the id still reaches every response the app
+        # returns normally.
+        config.middleware.use middleware
       end
     end
 
@@ -102,7 +123,8 @@ module ForestAdminRails
           hostnames += ENV['CORS_ORIGINS'].split(',') if ENV['CORS_ORIGINS']
 
           origins hostnames
-          resource '*', headers: :any, methods: :any, credentials: true, max_age: 86_400
+          resource '*', headers: :any, methods: :any, credentials: true, max_age: 86_400,
+                        expose: [ForestAdminAgent::Http::CorrelationId::HEADER]
         end
       end
     end

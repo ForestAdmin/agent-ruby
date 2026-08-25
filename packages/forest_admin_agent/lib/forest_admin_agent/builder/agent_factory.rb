@@ -13,6 +13,8 @@ module ForestAdminAgent
       attr_reader :customizer, :container, :has_env_secret
       attr_accessor :schema_only_mode
 
+      ENV_SECRET_FORMAT = /\A[0-9a-f]{64}\z/
+
       def initialize
         super
         @reloading = false
@@ -20,7 +22,7 @@ module ForestAdminAgent
 
       def setup(options)
         @options = options
-        @has_env_secret = options.to_h.key?(:env_secret)
+        @has_env_secret = !options.to_h[:env_secret].nil?
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
         build_cache
@@ -56,6 +58,7 @@ module ForestAdminAgent
       end
 
       def build
+        install_audit_trail
         @container.register(:datasource, @customizer.datasource(@logger))
 
         # Reset route cache to ensure routes are computed with all customizations
@@ -115,6 +118,7 @@ module ForestAdminAgent
         end
 
         return unless @has_env_secret
+        return unless secrets_format_valid?
 
         schema = generate_schema_file
 
@@ -127,7 +131,19 @@ module ForestAdminAgent
           end
         end
 
-        post_schema(schema, force)
+        begin
+          post_schema(schema, force)
+        rescue StandardError => e
+          # A well-formed secret can still be rejected by the server (wrong project, revoked
+          # secret, network down, ...). Same rule as an invalid format: block boot in
+          # production, but never in dev - warn and move on instead. Scoped to this call
+          # only, so a local bug (a broken customization, an unwritable schema_path, ...)
+          # still surfaces immediately instead of being logged as a generic warning.
+          raise e if Facades::Container.cache(:is_production)
+
+          @logger.log('Warn', "[ForestAdmin] #{e.message}")
+          @logger.log('Warn', '[ForestAdmin] Schema sync failed, continuing without it.')
+        end
       end
 
       # Generates or loads the schema and writes it to file (in development mode).
@@ -175,6 +191,40 @@ module ForestAdminAgent
 
       private
 
+      # Checked from send_schema rather than setup, so that schema-only mode (which never
+      # syncs to the server) never fails on a secret it doesn't actually need.
+      def secrets_format_valid?
+        errors = secret_format_errors
+        return true if errors.empty?
+
+        if Facades::Container.cache(:is_production)
+          raise ForestAdminAgent::Http::Exceptions::ValidationError, errors.join(' ')
+        end
+
+        # Don't block boot on a config mistake in dev: warn loudly and skip the schema
+        # sync instead, so the developer can still work on the rest of the app.
+        errors.each { |error| @logger.log('Warn', "[ForestAdmin] #{error}") }
+        @logger.log('Warn', '[ForestAdmin] Skipping schema sync until this is fixed.')
+        false
+      end
+
+      def secret_format_errors
+        errors = []
+        env_secret = @options.to_h[:env_secret]
+
+        unless env_secret.is_a?(String) && env_secret.match?(ENV_SECRET_FORMAT)
+          errors << 'config.env_secret is invalid: it must be the 64-character hexadecimal secret from your ' \
+                    'Forest Admin project settings.'
+        end
+
+        auth_secret = @options.to_h[:auth_secret]
+        unless auth_secret.is_a?(String)
+          errors << 'config.auth_secret is invalid: it must be a string. Any long random value works.'
+        end
+
+        errors
+      end
+
       def container_replace(key, value)
         @container._container.delete(key.to_s)
         @container.register(key, value)
@@ -211,6 +261,7 @@ module ForestAdminAgent
 
         begin
           response = client.post('/forest/apimaps/hashcheck', { schemaFileHash: hash }.to_json)
+          client.raise_for_response!(response)
           body = JSON.parse(response.body)
           body['sendSchema']
         rescue JSON::ParserError => e
@@ -239,10 +290,29 @@ module ForestAdminAgent
         @options[:customize_error_message] =
           clean_option_value(@options[:customize_error_message], 'config.customize_error_message =')
         @options[:logger] = clean_option_value(@options[:logger], 'config.logger =')
+        build_audit_trail_store
 
         @container.register(:config, @options.to_h)
 
         configure_rpc_polling_pool if @options[:rpc_max_polling_threads]
+      end
+
+      # The audit trail switches on as soon as a database is configured. The store connects and migrates here,
+      # at boot, rather than on the first write: an audit database the agent cannot reach should stop it
+      # starting, not leave it looking healthy while recording nothing — and under `critical: true` it would
+      # otherwise refuse every write from the moment somebody first tried to save something.
+      def build_audit_trail_store
+        options = @options[:audit_trail]
+        return unless options && options[:database]
+
+        options[:store] = AuditTrail::Store.new(**options.slice(:database, :schema, :table_name).compact).connect!
+      end
+
+      def install_audit_trail
+        options = @options[:audit_trail]
+        return if options.nil? || options[:store].nil?
+
+        @customizer.use(AuditTrail::Capture, { store: options[:store], redact: options[:redact] })
       end
 
       def configure_rpc_polling_pool
@@ -281,7 +351,8 @@ module ForestAdminAgent
       def send_schema_to_server(api_map)
         ForestAdminAgent::Facades::Container.logger.log('Info', 'schema was updated, sending new version')
         client = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        client.post('/forest/apimaps', api_map.to_json)
+        response = client.post('/forest/apimaps', api_map.to_json)
+        client.raise_for_response!(response)
       rescue Faraday::Error => e
         status = e.response[:status] if e.response
         if status

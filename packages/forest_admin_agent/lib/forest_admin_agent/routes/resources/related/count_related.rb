@@ -22,10 +22,10 @@ module ForestAdminAgent
 
           def handle_request(args = {})
             context = build(args)
-            context.permissions.can?(:browse, context.collection)
+            context.permissions.can?(:browse, context.child_collection)
 
             if context.child_collection.is_countable?
-              filter = Filter.new(condition_tree: context.permissions.get_scope(context.collection))
+              filter = Filter.new(condition_tree: context.permissions.get_scope(context.child_collection))
               primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
               result = Collection.aggregate_relation(
                 context.collection,

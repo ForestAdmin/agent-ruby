@@ -1,7 +1,12 @@
 class ForestAdminErrorSubscriber
-  def report(error, handled:, severity:, context:, source: nil)
-    return if ForestAdminAgent::Facades::Container.cache(:is_production)
+  SEVERITY_TO_LEVEL = {
+    error: 'Error',
+    warning: 'Warn',
+    info: 'Info'
+  }.freeze
 
-    ForestAdminAgent::Facades::Container.logger.log('Debug', error.full_message)
+  def report(error, handled:, severity:, context:, source: nil)
+    level = SEVERITY_TO_LEVEL.fetch(severity, 'Error')
+    ForestAdminAgent::Facades::Container.logger.log(level, "[ForestAdmin] #{error.full_message}")
   end
 end

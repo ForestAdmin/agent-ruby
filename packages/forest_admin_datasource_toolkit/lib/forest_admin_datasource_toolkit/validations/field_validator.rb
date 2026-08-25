@@ -22,7 +22,7 @@ module ForestAdminDatasourceToolkit
             end
           end
         else
-          prefix, suffix = field.split(':')
+          prefix, suffix = field.split(':', 2)
           schema = collection.schema[:fields][prefix]
 
           raise Exceptions::ValidationError, "Relation not found: '#{collection.name}.#{prefix}'" if schema.nil?
@@ -38,7 +38,6 @@ module ForestAdminDatasourceToolkit
           end
 
           if schema.type != 'PolymorphicManyToOne'
-            suffix = field[dot_index + 1, field.length - dot_index - 1]
             association = collection.datasource.get_collection(schema.foreign_collection)
             validate(association, suffix, values)
           end

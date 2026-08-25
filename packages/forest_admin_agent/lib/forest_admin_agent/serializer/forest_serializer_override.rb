@@ -54,23 +54,24 @@ module ForestAdminAgent
               # Full linkage: a request for comments.author MUST automatically include comments
               # in the response.
               objects = is_collection ? object : [object]
+
+              relation = ForestAdminAgent::Facades::Container.datasource
+                                                             .get_collection(options[:class_name].gsub('::', '__'))
+                                                             .schema[:fields][attribute_name]
+              if relation.type == 'PolymorphicManyToOne'
+                relation_class_name = root_object[relation.foreign_key_type_field]
+              else
+                relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
+              end
+
+              related_collection_options = options.merge(class_name: relation_class_name)
+
               if child_inclusion_tree[:_include] == true
                 # Include the current level objects if the _include attribute exists.
                 # If it is not set, that indicates that this is an inner path and not a leaf and will
                 # be followed by the recursion below.
                 objects.each do |obj|
-                  relation = ForestAdminAgent::Facades::Container.datasource
-                                                                 .get_collection(options[:class_name].gsub('::', '__'))
-                                                                 .schema[:fields][attribute_name]
-                  if relation.type == 'PolymorphicManyToOne'
-                    relation_class_name = root_object[relation.foreign_key_type_field]
-                  else
-                    relation_class_name = ForestAdminAgent::Facades::Container.datasource.get_collection(relation.foreign_collection).name
-                  end
-
-                  option_relation = options.clone
-                  option_relation[:class_name] = relation_class_name
-                  obj_serializer = JSONAPI::Serializer.find_serializer(obj, option_relation)
+                  obj_serializer = JSONAPI::Serializer.find_serializer(obj, related_collection_options)
 
                   # Use keys of ['posts', '1'] for the results to enforce uniqueness.
                   # Spec: A compound document MUST NOT include more than one resource object for each
@@ -105,7 +106,7 @@ module ForestAdminAgent
 
               # For each object we just loaded, find all deeper recursive relationships.
               objects.each do |obj|
-                find_recursive_relationships(obj, child_inclusion_tree, results, options)
+                find_recursive_relationships(obj, child_inclusion_tree, results, related_collection_options)
               end
             end
             nil

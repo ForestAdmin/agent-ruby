@@ -1,7 +1,7 @@
 module ForestAdminAgent
   module Routes
     module Security
-      class ScopeInvalidation < AbstractRoute
+      class ScopeInvalidation < AbstractAuthenticatedRoute
         include ForestAdminAgent::Builder
         include ForestAdminAgent::Services
 
@@ -17,8 +17,7 @@ module ForestAdminAgent
         end
 
         def handle_request(args)
-          # Check if user is logged
-          Utils::QueryStringParser.parse_caller(args)
+          build(args)
           Permissions.invalidate_cache('forest.rendering')
 
           { content: nil, status: 204 }

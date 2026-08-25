@@ -2,7 +2,7 @@ require 'json'
 module ForestAdminAgent
   module Routes
     module Capabilities
-      class Collections < AbstractRoute
+      class Collections < AbstractAuthenticatedRoute
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Schema::Relations
 
@@ -16,7 +16,8 @@ module ForestAdminAgent
         end
 
         def handle_request(args = {})
-          datasource = ForestAdminAgent::Facades::Container.datasource
+          context = build(args)
+          datasource = context.datasource
           collections = args[:params]['collectionNames'] || []
 
           connections = datasource.live_query_connections.keys.map { |connection_name| { name: connection_name } }
@@ -64,11 +65,23 @@ module ForestAdminAgent
               nativeQueryConnections: connections,
               agentCapabilities: {
                 canUseProjectionOnGetOne: true,
-                canUseMultipleFieldsProjectionOnRelation: true
+                canUseProjectionViaHeader: true,
+                canUseProjectionViaHeaderOnList: true,
+                canUseMultipleFieldsProjectionOnRelation: true,
+                canUseAuditTrail: audit_trail_enabled?
               }
             },
             status: 200
           }
+        end
+
+        private
+
+        # True only where the store the record-history route reads from exists — the same lookup that route
+        # mounts itself on, so the capability cannot drift from what the routes actually serve. The front gates
+        # its History tab on this.
+        def audit_trail_enabled?
+          !::ForestAdminAgent::AuditTrail.store.nil?
         end
       end
     end

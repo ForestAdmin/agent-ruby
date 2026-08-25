@@ -96,6 +96,28 @@ module ForestAdminAgent
           )
         end
 
+        context 'when the Forest-Projection header is sent' do
+          it 'gives precedence to the header over the fields params' do
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'first_name'
+            args[:params][:fields] = { 'user' => 'last_name' }
+            list.handle_request(args)
+
+            expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, _filter, projection|
+              expect(projection).to eq(%w[first_name id])
+            end
+          end
+
+          it 'does not fall back to the fields params when the header is invalid' do
+            args[:headers]['HTTP_FOREST_PROJECTION'] = 'field-that-do-not-exist'
+            args[:params][:fields] = { 'user' => 'last_name' }
+
+            expect { list.handle_request(args) }.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:/
+            )
+          end
+        end
+
         context 'when call list with simple condition tree leaf' do
           it 'call list with expected filters arg' do
             args[:params][:filters] = JSON.generate({ field: 'id', operator: 'greater_than', value: 7 })
@@ -141,6 +163,88 @@ module ForestAdminAgent
         it 'throws an error when the filter operator is not allowed' do
           args[:params][:filters] = JSON.generate({ field: 'id', operator: 'shorter_than', value: 7 })
           expect { list.handle_request(args) }.to raise_error(ForestException, "The given operator 'shorter_than' is not supported by the column: 'id'. The column is not filterable")
+        end
+      end
+
+      describe List, 'with a projection deeper than one relation' do
+        include_context 'with caller'
+        subject(:list) { described_class.new }
+        let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+
+        before do
+          allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
+          allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
+          allow(permissions).to receive_messages(can?: true, get_scope: nil, get_team: { id: 100, name: 'Ops' })
+        end
+
+        context 'when the projection goes through more than one relation' do
+          let(:args) do
+            {
+              headers: { 'HTTP_AUTHORIZATION' => bearer, 'HTTP_FOREST_PROJECTION' => 'title,author:company:name' },
+              params: { 'collection_name' => 'book', 'timezone' => 'Europe/Paris' }
+            }
+          end
+
+          before do
+            datasource = Datasource.new
+            datasource.add_collection(
+              build_collection(
+                name: 'company',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::EQUAL]),
+                  'name' => ColumnSchema.new(column_type: 'String')
+                } }
+              )
+            )
+            datasource.add_collection(
+              build_collection(
+                name: 'author',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::EQUAL]),
+                  'company_id' => ColumnSchema.new(column_type: 'Number'),
+                  'company' => Relations::ManyToOneSchema.new(foreign_key: 'company_id',
+                                                              foreign_key_target: 'id',
+                                                              foreign_collection: 'company')
+                } }
+              )
+            )
+            datasource.add_collection(
+              build_collection(
+                name: 'book',
+                schema: { fields: {
+                  'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true,
+                                           filter_operators: [Operators::EQUAL]),
+                  'title' => ColumnSchema.new(column_type: 'String'),
+                  'author_id' => ColumnSchema.new(column_type: 'Number'),
+                  'author' => Relations::ManyToOneSchema.new(foreign_key: 'author_id',
+                                                             foreign_key_target: 'id',
+                                                             foreign_collection: 'author')
+                } }
+              )
+            )
+            ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+            ForestAdminAgent::Builder::AgentFactory.instance.build
+            @datasource = ForestAdminAgent::Facades::Container.datasource
+            allow(@datasource.get_collection('book')).to receive(:list).and_return(
+              [
+                { 'id' => 1, 'title' => 'Foundation',
+                  'author' => { 'id' => 10, 'company' => { 'id' => 100, 'name' => 'Gnome Press' } } },
+                { 'id' => 2, 'title' => 'I, Robot',
+                  'author' => { 'id' => 10, 'company' => { 'id' => 100, 'name' => 'Gnome Press' } } }
+              ]
+            )
+          end
+
+          it 'serializes the record at the end of the path once for the whole page' do
+            result = list.handle_request(args)
+
+            included = result[:content]['included']
+            expect(included.map { |resource| resource['type'] }).to contain_exactly('author', 'company')
+            expect(included.find { |resource| resource['type'] == 'company' }['attributes']['name'])
+              .to eq('Gnome Press')
+          end
         end
       end
     end
