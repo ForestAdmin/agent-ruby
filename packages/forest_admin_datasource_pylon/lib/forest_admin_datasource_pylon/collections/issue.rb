@@ -12,12 +12,11 @@ module ForestAdminDatasourcePylon
       # The mechanism stays in place for the collections whose endpoint sorts.
       PYLON_SORTABLE = {}.freeze
 
-      # A primary-key lookup spends one `GET /issues/{id}` per id, against the
-      # same 20 requests/minute budget the cursor walk is capped for, and the
-      # retry policy only absorbs three 429s. The fan-out is therefore bounded
-      # like the walk: truncated with a warning rather than turned into a rate
-      # limit error halfway through the page. Story 9 (EXT-13) owns the
-      # throttling that would let this cap grow.
+      # A primary-key lookup spends one `GET /issues/{id}` per id, sequentially.
+      # The fan-out is bounded like the cursor walk, and for the same reason:
+      # `RateLimiter` keeps the requests inside the 300 a minute that endpoint
+      # grants, but nothing makes two hundred round-trips fast, so the page is
+      # truncated with a warning rather than left to time out.
       MAX_ID_LOOKUPS = 20
 
       # The shape of one message inside the `messages` column. Field names follow
@@ -39,11 +38,13 @@ module ForestAdminDatasourcePylon
         'author_user_id' => 'String'
       }.freeze
 
-      # One thread is one `GET /issues/{id}/messages`, an endpoint allowing 20
-      # requests per minute: a page asking for more threads than this reads the
-      # first ones and reports the rest, for the same reason MAX_ID_LOOKUPS
-      # bounds the primary-key fan-out. Story 9 (EXT-13) owns the throttling
-      # that would let this cap grow.
+      # One thread is one `GET /issues/{id}/messages`, and a thread is the whole
+      # conversation rather than a page of it. A list view asking for more of
+      # them than this reads the first ones and reports the rest, for the same
+      # reason MAX_ID_LOOKUPS bounds the primary-key fan-out — sequential
+      # round-trips, each carrying an unbounded payload. Lower than
+      # MAX_ID_LOOKUPS because of that payload, not because of the quota: the
+      # endpoint grants 120 requests a minute.
       MAX_MESSAGE_EMBEDS = 10
 
       # `body_html` is the first message of the thread, which `POST /issues`
@@ -160,7 +161,7 @@ module ForestAdminDatasourcePylon
       def warn_truncated_lookup(asked)
         ForestAdminDatasourcePylon.logger.warn(
           "[forest_admin_datasource_pylon] Asked for #{asked} issues by id, reading the first " \
-          "#{MAX_ID_LOOKUPS}: one request per id would exhaust the rate limit of the agent. " \
+          "#{MAX_ID_LOOKUPS}: Pylon answers one issue per request, and the requests are sequential. " \
           'Narrow the selection to reach the records past this point.'
         )
       end

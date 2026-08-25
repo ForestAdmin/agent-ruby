@@ -44,6 +44,27 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       policy = ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 9)
       expect(described_class.new(**valid_args, retry_policy: policy).retry_policy).to be(policy)
     end
+
+    it 'throttles by default' do
+      expect(described_class.new(**valid_args).rate_limiter)
+        .to be_a(ForestAdminDatasourcePylon::RateLimiter)
+    end
+
+    it 'accepts an injected limiter' do
+      limiter = ForestAdminDatasourcePylon::RateLimiter.new(max_wait: 1)
+      expect(described_class.new(**valid_args, rate_limiter: limiter).rate_limiter).to be(limiter)
+    end
+
+    # One limiter per configuration, so per token: Pylon meters the token, and
+    # two agents holding different ones do not share a budget.
+    it 'gives each configuration its own window' do
+      first = described_class.new(**valid_args)
+      expect(described_class.new(**valid_args).rate_limiter).not_to be(first.rate_limiter)
+    end
+
+    it 'takes the throttling out of the stack when handed nil' do
+      expect(described_class.new(**valid_args, rate_limiter: nil).rate_limiter).to be_nil
+    end
   end
 
   describe '#url' do

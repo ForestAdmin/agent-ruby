@@ -79,7 +79,7 @@ module ForestAdminDatasourcePylon
         def warn_truncated_threads(asked)
           ForestAdminDatasourcePylon.logger.warn(
             "[forest_admin_datasource_pylon] Asked for the message thread of #{asked} issues, reading the first " \
-            "#{MAX_MESSAGE_EMBEDS}: one request per issue would exhaust the rate limit of the agent. " \
+            "#{MAX_MESSAGE_EMBEDS}: one request per issue, each carrying a whole conversation. " \
             'Narrow the selection, or take the thread out of the projection, to reach the records past this point.'
           )
         end

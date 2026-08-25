@@ -13,8 +13,9 @@ module ForestAdminDatasourcePylon
     # one has. The cost is bandwidth, not correctness.
     #
     # Each `list` re-reads the endpoint, so what the operator sees is what Pylon
-    # holds now; the 60 requests/minute these endpoints allow is a budget the
-    # throttling story (EXT-13) owns.
+    # holds now rather than what it held when the process booted. One request
+    # per list against the 300 a minute these endpoints grant, spaced out by
+    # `RateLimiter`, is a budget no list view comes near.
     class FetchAllCollection < BaseCollection
       # The filters a column may advertise, per column type. Restricted to the
       # operators `ConditionTreeLeaf#match` evaluates natively or

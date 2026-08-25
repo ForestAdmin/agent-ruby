@@ -209,7 +209,7 @@ module ForestAdminDatasourcePylon
     end
 
     # No condition tree and no search: the listing endpoint returns the same
-    # records for 60 requests per minute where the search endpoint allows 20.
+    # records for 300 requests per minute where the search endpoint allows 120.
     describe '#list without a filter' do
       it 'browses the listing endpoint and serializes what it returns' do
         stub_list({ 'limit' => '1000' }, 'data' => [account_payload('acc-1')])
@@ -402,7 +402,7 @@ module ForestAdminDatasourcePylon
     end
 
     # A record detail is `id equals X` alone: reading it through GET
-    # /accounts/{id} spends the 60 requests/minute budget instead of the 20 of
+    # /accounts/{id} spends the 300 requests/minute budget instead of the 120 of
     # the search endpoint.
     describe '#list on a single-id filter' do
       it 'reads the account through its own endpoint instead of searching' do

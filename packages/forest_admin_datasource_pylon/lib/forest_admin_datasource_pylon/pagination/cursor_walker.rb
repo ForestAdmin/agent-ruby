@@ -3,9 +3,10 @@ module ForestAdminDatasourcePylon
     # Forest asks for an offset/limit window; Pylon only knows how to hand out
     # the next page of a cursor. Bridging the two means walking pages until the
     # window is covered, then slicing. Deep offsets therefore cost one request
-    # per page, which is why the walk is capped: `/issues/search` allows 20
-    # requests per minute, so an unbounded walk would spend the whole budget of
-    # the agent on a single list view.
+    # per page, which is why the walk is capped: the requests are sequential —
+    # a cursor is only known once the page before it came back — so an unbounded
+    # walk is a list view the operator waits on, page after page, well before it
+    # is a quota `/issues/search` grants 120 requests a minute of.
     class CursorWalker
       MAX_PAGES = 20
       MAX_RECORDS = 5_000

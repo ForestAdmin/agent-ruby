@@ -418,9 +418,9 @@ module ForestAdminDatasourcePylon
       end
     end
 
-    # One request per record against a budget of ten to twenty per minute: past
-    # the cap the write is refused rather than applied to the first records and
-    # reported as done for the whole selection.
+    # One request per record, sequentially, and no way to undo the ones already
+    # written: past the cap the write is refused rather than applied to the first
+    # records and reported as done for the whole selection.
     describe 'a write reaching more records than one pass covers' do
       it 'refuses it before spending a single request' do
         ids = Array.new(21) { |index| "i#{index}" }
