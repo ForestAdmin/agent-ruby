@@ -79,21 +79,38 @@ module ForestAdminDatasourcePylon
     # line — both settled here, the second being shared state like the first.
     def reserve(rule)
       taken = (@slots[rule.name] ||= [])
-      now = @clock.call
-      # The list is kept ordered, so the expired bookings are its leading run
-      # and the index below reads as the limit-th most recent one.
-      taken.shift(taken.bsearch_index { |at| at > now - @window } || taken.size)
+      now   = @clock.call
+      expire(taken, now)
 
-      slot = taken.size < rule.limit ? now : taken[taken.size - rule.limit] + @window
-      wait = slot - now
+      slot   = next_slot(taken, rule.limit, now)
+      wait   = slot - now
+      bypass = wait > @max_wait
       # Past the bound the request goes out now, so the slot it books is now:
       # recording the one it declined to wait for would meter a request nobody
       # ever made and push the whole window further out.
-      insert(taken, wait > @max_wait ? now : slot)
+      insert(taken, bypass ? now : slot)
 
-      [wait, wait > @max_wait && first_warning?(rule, now)]
+      [wait, bypass && first_warning?(rule, now)]
     end
 
+    # The bookings that have left the window are its leading run, the list being
+    # kept ordered.
+    def expire(taken, now)
+      taken.shift(taken.bsearch_index { |at| at > now - @window } || taken.size)
+    end
+
+    # Now while the window still has room, otherwise a window past the limit-th
+    # most recent booking, which is the one that has to fall out of it first —
+    # an index that only reads as such on an ordered list.
+    def next_slot(taken, limit, now)
+      return now if taken.size < limit
+
+      taken[taken.size - limit] + @window
+    end
+
+    # A booking has one position in an ordered list, so it goes there rather than
+    # onto the end followed by a sort: `now` lands before the slots already
+    # reserved further out, and the list is what `next_slot` reads an index off.
     def insert(taken, booking)
       taken.insert(taken.bsearch_index { |at| at >= booking } || taken.size, booking)
     end
