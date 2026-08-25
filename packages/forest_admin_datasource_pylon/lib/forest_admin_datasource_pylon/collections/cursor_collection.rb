@@ -1,9 +1,9 @@
 module ForestAdminDatasourcePylon
   module Collections
     # Base for the collections Pylon exposes through three endpoints: a plain
-    # cursor-paginated listing (`GET /accounts`, `GET /contacts`: 60 requests per
-    # minute), a search over the same pages (`POST /accounts/search`: 20) and a
-    # single record (`GET /accounts/{id}`: 60).
+    # cursor-paginated listing (`GET /accounts`, `GET /contacts`: 300 requests
+    # per minute), a search over the same pages (`POST /accounts/search`: 120)
+    # and a single record (`GET /accounts/{id}`: 300).
     #
     # Their search endpoint filters `id` server-side, so — unlike Issue — they
     # declare it in `api_filters` and never need the primary-key short-circuit:
@@ -81,7 +81,8 @@ module ForestAdminDatasourcePylon
       end
 
       # Nothing to filter and nothing to search: the listing endpoint returns
-      # the same records for a budget three times larger than the search one.
+      # the same records for a budget two and a half times larger than the
+      # search one.
       def browsing?(filter)
         return true if filter.nil?
 
