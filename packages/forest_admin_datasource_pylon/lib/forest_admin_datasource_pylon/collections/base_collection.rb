@@ -49,15 +49,19 @@ module ForestAdminDatasourcePylon
 
       # Template method: subclasses implement `define_schema` and
       # `define_relations` as hooks; ordering between them, custom-field
-      # registration, and the search/count flags is owned here so collisions
-      # are always evaluated against the final native schema.
-      def initialize(datasource, name, custom_fields: [], searchable: false, countable: false, native_driver: nil)
+      # registration, and the search flag is owned here so collisions are always
+      # evaluated against the final native schema.
+      #
+      # No `countable` counterpart: Pylon exposes no count endpoint and no total,
+      # and counting the pages a cursor walk collected would answer a fraction of
+      # a collection as if it were the whole of it — which is why `aggregate`
+      # refuses rather than approximates. See EXT-7.
+      def initialize(datasource, name, custom_fields: [], searchable: false, native_driver: nil)
         super(datasource, name, native_driver)
         define_schema
         define_relations
         @custom_fields = add_custom_fields(custom_fields)
         enable_search if searchable
-        enable_count if countable
       end
 
       # How a collection another one points at with a ManyToOne is read in bulk:

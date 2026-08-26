@@ -138,11 +138,14 @@ module ForestAdminDatasourcePylon
         expect(collection.is_countable?).to be(false)
       end
 
-      it 'honours searchable: true / countable: true from super' do
-        opted_in = subclass.new(datasource, 'X', searchable: true, countable: true)
+      # Count has no Pylon equivalent at all, so nothing opts into it: the
+      # collections walking a cursor refuse `aggregate` outright, and the two
+      # reading their whole dataset are not advertised as countable either.
+      it 'honours searchable: true from super, count having no opt-in' do
+        opted_in = subclass.new(datasource, 'X', searchable: true)
 
         expect(opted_in.is_searchable?).to be(true)
-        expect(opted_in.is_countable?).to be(true)
+        expect(opted_in.is_countable?).to be(false)
       end
     end
 
