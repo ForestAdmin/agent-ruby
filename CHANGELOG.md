@@ -1,3 +1,10 @@
+## [1.39.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.3...v1.39.4) (2026-08-26)
+
+
+### Bug Fixes
+
+* **datasource-active-record:** map inet/cidr/macaddr(8) columns to String ([#377](https://github.com/ForestAdmin/agent-ruby/issues/377)) ([487e056](https://github.com/ForestAdmin/agent-ruby/commit/487e056ec64dac73f37834f7cc81cbe29f65735c)), closes [#372](https://github.com/ForestAdmin/agent-ruby/issues/372)
+
 ## [1.39.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.2...v1.39.3) (2026-08-26)
 
 
