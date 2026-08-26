@@ -17,6 +17,10 @@ module ForestAdminDatasourceActiveRecord
         string: 'String',
         text: 'String',
         citext: 'String',
+        inet: 'String',
+        cidr: 'String',
+        macaddr: 'String',
+        macaddr8: 'String',
         time: 'Time',
         uuid: 'Uuid',
         binary: 'Binary'

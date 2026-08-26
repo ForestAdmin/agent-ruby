@@ -56,6 +56,21 @@ module ForestAdminDatasourceActiveRecord
 
           expect(dummy_class.get_column_type(User, column)).to eq ['Number']
         end
+
+        %i[inet cidr macaddr macaddr8].each do |pg_type|
+          it "maps Postgres #{pg_type} columns to String without logging an unknown-type message" do
+            logger = instance_double(Logger, log: nil)
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+            column = instance_double(
+              ActiveRecord::ConnectionAdapters::SQLite3::Column,
+              name: 'address',
+              type: pg_type
+            )
+
+            expect(dummy_class.get_column_type(User, column)).to eq 'String'
+            expect(logger).not_to have_received(:log)
+          end
+        end
       end
 
       describe 'get_enum_values' do
