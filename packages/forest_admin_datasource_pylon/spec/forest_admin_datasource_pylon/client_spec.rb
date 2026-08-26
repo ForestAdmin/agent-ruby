@@ -611,7 +611,7 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
                                                  .to_return(json({ 'message' => 'boom' }, 500))
 
-      expect(client.fetch_custom_fields('issue')).to eq([])
+      expect(client.fetch_custom_fields('issue')).to be_nil
       expect(logger).to have_received(:warn).with(/fetch_custom_fields\(issue\) failed; degrading.*HTTP 500 boom/)
     end
 
@@ -619,7 +619,7 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       stub_request(:get, "#{base}/custom-fields").with(query: { 'object_type' => 'issue' })
                                                  .to_return(json({ 'message' => 'forbidden' }, 403))
 
-      expect(client.fetch_custom_fields('issue')).to eq([])
+      expect(client.fetch_custom_fields('issue')).to be_nil
     end
   end
 
@@ -655,7 +655,7 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
                                                 headers: { 'Content-Type' => 'application/json',
                                                            'Retry-After' => '60' })
 
-      expect(client.fetch_custom_fields('issue')).to eq([])
+      expect(client.fetch_custom_fields('issue')).to be_nil
       expect(WebMock).to have_requested(:get, definitions).with(query: { 'object_type' => 'issue' }).once
     end
 
@@ -676,7 +676,7 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       stub_request(:get, definitions).with(query: { 'object_type' => 'issue' })
                                      .to_return(json({ 'message' => 'slow down' }, 429))
 
-      expect(boot_client(boot_retry_policy: fast_boot).fetch_custom_fields('issue')).to eq([])
+      expect(boot_client(boot_retry_policy: fast_boot).fetch_custom_fields('issue')).to be_nil
       expect(WebMock).to have_requested(:get, definitions).with(query: { 'object_type' => 'issue' }).twice
     end
 

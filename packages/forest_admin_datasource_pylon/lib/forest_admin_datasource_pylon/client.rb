@@ -104,9 +104,14 @@ module ForestAdminDatasourcePylon
     # mandatory on this endpoint, so a schema spanning several collections costs
     # one call per collection rather than one call in total.
     #
-    # Degrades to an empty list: this is read while the agent boots, and a token
-    # missing the permission — or a Pylon that happens to be down right then —
-    # has to cost the operator the custom columns, not the whole datasource.
+    # Degrades to nil: this is read while the agent boots, and a token missing
+    # the permission — or a Pylon that happens to be down right then — has to
+    # cost the operator the custom columns, not the whole datasource.
+    #
+    # nil rather than an empty list so the caller can tell a failure from an
+    # organization that defined no custom field, the two costing very different
+    # things: the second says nothing about the next object type, the first says
+    # it will almost certainly fail the same way.
     #
     # Which is why it goes through `boot_connection`: a call declared best-effort
     # has no business holding the boot for the minutes the resilient policy is
@@ -116,7 +121,7 @@ module ForestAdminDatasourcePylon
     def fetch_custom_fields(object_type)
       params = { 'object_type' => object_type }
 
-      best_effort("fetch_custom_fields(#{object_type})", default: []) do
+      best_effort("fetch_custom_fields(#{object_type})", default: nil) do
         must_succeed('custom-fields') { collect_pages('custom-fields', params, conn: boot_connection) }
       end
     end

@@ -24,8 +24,10 @@ module ForestAdminDatasourcePylon
     # hold — and two Pylon datasources in the same agent share nothing.
     #
     # An introspection that fails costs the custom columns, not the datasource:
-    # `fetch_custom_fields` degrades to an empty list and the agent boots on the
-    # native schema.
+    # `fetch_custom_fields` degrades and the agent boots on the native schema.
+    # The first failure also stands for the object types after it, each call
+    # being bounded per request rather than across the three — see
+    # `CustomFieldsIntrospector`.
     def register_collections
       custom_fields = Schema::CustomFieldsIntrospector.new(@client)
 

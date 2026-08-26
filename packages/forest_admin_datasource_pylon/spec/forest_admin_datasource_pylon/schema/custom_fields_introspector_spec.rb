@@ -28,6 +28,37 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
       expect(client).to have_received(:fetch_custom_fields).with('account')
       expect(client).to have_received(:fetch_custom_fields).with('contact')
     end
+
+    # Three calls in front of a Rails boot, each bounded per request: a Pylon
+    # that is down fails the two after the first the same way, so trying them
+    # spends the bound three times over to learn what the first one said.
+    it 'leaves the object types after a failure unread' do
+      allow(ForestAdminDatasourcePylon.logger).to receive(:warn)
+      allow(client).to receive(:fetch_custom_fields).with('issue').and_return(nil)
+
+      introspector = described_class.new(client)
+
+      expect(introspector.issue_custom_fields).to eq([])
+      expect(introspector.account_custom_fields).to eq([])
+      expect(introspector.contact_custom_fields).to eq([])
+      expect(client).to have_received(:fetch_custom_fields).with('issue').once
+      expect(client).not_to have_received(:fetch_custom_fields).with('account')
+      expect(ForestAdminDatasourcePylon.logger).to have_received(:warn).with(/could not be read for issue/)
+    end
+
+    # An organization that defined no custom field on one object type says
+    # nothing about the next, unlike a failure.
+    it 'keeps reading the object types after an empty one' do
+      allow(client).to receive(:fetch_custom_fields).with('issue').and_return([])
+      allow(client).to receive(:fetch_custom_fields).with('account').and_return([])
+      allow(client).to receive(:fetch_custom_fields).with('contact').and_return([])
+
+      introspector = described_class.new(client)
+      introspector.issue_custom_fields
+      introspector.account_custom_fields
+
+      expect(client).to have_received(:fetch_custom_fields).with('account')
+    end
   end
 
   describe 'column types' do

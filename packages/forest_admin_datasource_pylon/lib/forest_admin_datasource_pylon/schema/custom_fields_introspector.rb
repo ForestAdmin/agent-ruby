@@ -80,6 +80,7 @@ module ForestAdminDatasourcePylon
 
       def initialize(client)
         @client = client
+        @unreachable = false
       end
 
       def issue_custom_fields   = introspect('issue')
@@ -88,8 +89,29 @@ module ForestAdminDatasourcePylon
 
       private
 
+      # One object type per call, three of them, all of it in front of a Rails
+      # boot the operator sits through. The first failure stands for the rest:
+      # a Pylon that is down, or a token missing the permission, fails the two
+      # that follow the same way, and each is bounded per request rather than
+      # across the three — so trying them anyway spends the bound three times to
+      # learn what the first one already said.
       def introspect(object_type)
-        Array(@client.fetch_custom_fields(object_type)).filter_map { |raw| build_entry(raw, object_type) }
+        return [] if @unreachable
+
+        definitions = @client.fetch_custom_fields(object_type)
+        return give_up(object_type) if definitions.nil?
+
+        definitions.filter_map { |raw| build_entry(raw, object_type) }
+      end
+
+      def give_up(object_type)
+        @unreachable = true
+        ForestAdminDatasourcePylon.logger.warn(
+          "[forest_admin_datasource_pylon] Custom fields could not be read for #{object_type}; " \
+          'the object types after it are left unread rather than held against the same failure. ' \
+          'The datasource boots on the native schema, without the custom columns.'
+        )
+        []
       end
 
       def build_entry(raw, object_type)
