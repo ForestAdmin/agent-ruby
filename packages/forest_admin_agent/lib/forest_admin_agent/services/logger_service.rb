@@ -16,6 +16,7 @@ module ForestAdminAgent
         @logger_level = logger_level
         @logger = logger
         @default_logger = MonoLogger.new($stdout)
+        @default_logger.level = get_level(@logger_level) || Logger::INFO
       end
 
       def log(level, message)
@@ -28,7 +29,7 @@ module ForestAdminAgent
       end
 
       def get_level(level)
-        LEVELS[level]
+        LEVELS[level.to_s.capitalize]
       end
     end
   end
