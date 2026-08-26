@@ -57,7 +57,7 @@ module ForestAdminDatasourceActiveRecord
           expect(dummy_class.get_column_type(User, column)).to eq ['Number']
         end
 
-        %i[inet cidr macaddr macaddr8].each do |pg_type|
+        %i[inet cidr macaddr].each do |pg_type|
           it "maps Postgres #{pg_type} columns to String without logging an unknown-type message" do
             logger = instance_double(Logger, log: nil)
             allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
