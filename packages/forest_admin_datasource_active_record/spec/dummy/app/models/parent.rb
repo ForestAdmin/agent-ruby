@@ -1,4 +1,4 @@
 class Parent < ApplicationRecord
-  has_many :children, as: :owner
-  has_many :leaves, through: :children
+  has_many :kids, as: :owner
+  has_many :details, through: :kids, source: :detail
 end

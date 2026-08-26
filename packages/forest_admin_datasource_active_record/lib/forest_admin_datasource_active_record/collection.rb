@@ -88,8 +88,9 @@ module ForestAdminDatasourceActiveRecord
       %i[destroy destroy_async delete_all].include?(association.options[:dependent])
     end
 
-    # True only when the source reflection is belongs_to; a has_one/has_many source
-    # means the column actually lives on the target collection instead (see #370).
+    # ThroughReflection#join_foreign_key delegates to the source reflection; only
+    # belongs_to overrides it to return a real FK column. Any other macro falls back
+    # to the source model's own primary key, producing a bogus identity join (#370).
     def foreign_key_on_through_collection?(association)
       association.source_reflection&.belongs_to?
     end

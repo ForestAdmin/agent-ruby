@@ -193,15 +193,32 @@ module ForestAdminDatasourceActiveRecord
         end
 
         it 'skips a has_many :through whose source reflection is not a belongs_to (#370)' do
-          # Parent -> (polymorphic has_many) -> Child -> (has_one, custom foreign_key) -> Leaf.
-          # The fk ends up on Leaf, not on Child (the through collection), which
-          # ManyToManySchema cannot express -- so the field must not be published at all.
-          expect do
-            described_class.new(datasource, Parent)
-          end.not_to raise_error
+          # Parent -> Kid (polymorphic has_many) -> Detail (has_one, custom foreign_key).
+          # Kid#detail is a has_one, so join_foreign_key resolves to Kid's own primary key
+          # instead of a real join column -- the relation can't be expressed as ManyToMany.
+          expect { datasource.get_collection('Parent') }.to output(/Skipping association 'details'/).to_stdout
 
-          collection = described_class.new(datasource, Parent)
-          expect(collection.schema[:fields].keys).not_to include('leaves')
+          expect(datasource.get_collection('Parent').schema[:fields].keys).not_to include('details')
+        end
+
+        it 'skips a polymorphic has_one :through whose source reflection is not a belongs_to' do
+          # Solo -> Kid (polymorphic has_one) -> Detail (has_one, custom foreign_key): same
+          # invalid shape as above, through the has_one branch instead of has_many. The
+          # has_one branch only reaches this guard when the relation is polymorphic --
+          # a non-polymorphic has_one :through still falls into the pre-existing
+          # OneToOneSchema path below, unguarded (same class of bug, out of scope here).
+          expect { datasource.get_collection('Solo') }.to output(/Skipping association 'detail'/).to_stdout
+
+          expect(datasource.get_collection('Solo').schema[:fields].keys).not_to include('detail')
+        end
+
+        it 'skips a non-polymorphic has_many :through whose source reflection is not a belongs_to' do
+          # Box -> Slot (plain has_many, no polymorphism at all) -> Tag (has_one, custom
+          # foreign_key). Unlike the has_one branch above, the has_many branch has no
+          # polymorphic gate: this guard applies to ordinary has_many :through chains too.
+          expect { datasource.get_collection('Box') }.to output(/Skipping association 'tags'/).to_stdout
+
+          expect(datasource.get_collection('Box').schema[:fields].keys).not_to include('tags')
         end
 
         # rubocop:disable RSpec/ExampleLength
