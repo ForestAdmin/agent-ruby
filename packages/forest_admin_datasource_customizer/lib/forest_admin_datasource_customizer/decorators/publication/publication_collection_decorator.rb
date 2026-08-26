@@ -86,17 +86,33 @@ module ForestAdminDatasourceCustomizer
           end
 
           if field.type == 'ManyToMany'
+            candidates = [field.through_collection, field.foreign_collection]
+
             return (
               datasource.published?(field.through_collection) &&
               datasource.published?(field.foreign_collection) &&
-              datasource.get_collection(field.through_collection).published?(field.foreign_key) &&
-              datasource.get_collection(field.through_collection).published?(field.origin_key) &&
+              relation_key_published?(candidates, field.foreign_key) &&
+              relation_key_published?(candidates, field.origin_key) &&
               published?(field.origin_key_target) &&
               datasource.get_collection(field.foreign_collection).published?(field.foreign_key_target)
             )
           end
 
           true
+        end
+
+        # foreign_key/origin_key are normally columns on the through collection, but a
+        # has_many :through chaining into a has_one/belongs_to with a custom foreign_key
+        # can produce a schema where the column actually lives on the foreign collection
+        # instead (see #370). Check whichever candidate collection actually declares the
+        # field, falling back to the first one so a genuinely missing field still logs.
+        def relation_key_published?(candidate_collections, key)
+          candidate_collections.each do |collection_name|
+            collection = datasource.get_collection(collection_name)
+            return collection.published?(key) if collection.schema[:fields].key?(key)
+          end
+
+          datasource.get_collection(candidate_collections.first).published?(key)
         end
 
         # rubocop:disable Lint/UselessMethodDefinition
