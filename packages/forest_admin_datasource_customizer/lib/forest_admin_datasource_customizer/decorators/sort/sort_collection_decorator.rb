@@ -52,9 +52,9 @@ module ForestAdminDatasourceCustomizer
         end
 
         # `@sorts` holds nil as the value of an emulated field, so membership is
-        # read with `key?`, the way `emulated?` reads it. The fields hash and the
-        # ColumnSchema objects in it belong to the collection below, so both are
-        # copied before the flag is written.
+        # read with `key?`, the way `emulated?` reads it. The ColumnSchema objects
+        # belong to the collection below, so each is copied before the flag is
+        # written.
         def refine_schema(child_schema)
           schema = child_schema.dup
           schema[:fields] = child_schema[:fields].to_h do |name, field|
