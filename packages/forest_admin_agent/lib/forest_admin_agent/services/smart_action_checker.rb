@@ -81,8 +81,10 @@ module ForestAdminAgent
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
             # On a "select all" trigger the frontend has no explicit id list to store in the
             # approval request: resolve the selection here (capped) and hand the ids back
-            # through the error.
-            record_ids = resolve_select_all_record_ids if attributes[:all_records]
+            # through the error. Global actions target no specific records — never resolve.
+            if attributes[:all_records] && smart_action[:scope] != ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL
+              record_ids = resolve_select_all_record_ids
+            end
 
             raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',

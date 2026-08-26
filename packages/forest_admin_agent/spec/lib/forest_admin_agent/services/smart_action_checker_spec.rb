@@ -231,6 +231,24 @@ module ForestAdminAgent
         )
       end
 
+      it 'does not resolve record ids on a "select all" trigger of a global action' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        smart_action[:scope] = 'global'
+        parameters[:data][:attributes][:all_records] = true
+
+        collection = @datasource.get_collection('Book')
+        allow(collection).to receive(:list)
+
+        smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                   QueryStringParser.parse_caller(args), 1, Filter.new)
+        expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError) do |error|
+          expect(error.details).not_to have_key(:recordIds)
+        end
+        expect(collection).not_to have_received(:list)
+      end
+
       it 'omits record ids from the error on an explicit selection' do
         smart_action[:triggerEnabled] = [1]
         smart_action[:approvalRequired] = [1]
