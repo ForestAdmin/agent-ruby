@@ -21,6 +21,22 @@ RSpec.describe ForestAdminDatasourcePylon::RetryPolicy do
     end
   end
 
+  describe '.boot' do
+    it 'retries once' do
+      expect(described_class.boot.max_retries).to eq(1)
+    end
+
+    # The mirror image of DEFAULT_MAX_INTERVAL: faraday-retry abandons when
+    # Retry-After exceeds the cap, which is how a 429 costs a boot nothing.
+    it 'caps the wait below a Pylon rate-limit window' do
+      expect(described_class.boot.max_interval).to be < 60
+    end
+
+    it 'still absorbs a hiccup Pylon answered without a Retry-After' do
+      expect(described_class.boot.interval).to be_positive
+    end
+  end
+
   describe '#to_faraday_options' do
     subject(:options) { described_class.new(max_retries: 2, interval: 0.1, max_interval: 7).to_faraday_options }
 

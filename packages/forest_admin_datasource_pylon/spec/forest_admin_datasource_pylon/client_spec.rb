@@ -610,6 +610,85 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  # The introspection runs while the datasource is being constructed, so it is
+  # read through a connection of its own: what the resilient one is willing to
+  # wait for is minutes of Rails boot the operator sits through.
+  describe 'the boot connection' do
+    let(:fast_boot) { ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 1, interval: 0, max_interval: 2) }
+    let(:definitions) { "#{base}/custom-fields" }
+
+    def boot_client(**options)
+      described_class.new(ForestAdminDatasourcePylon::Configuration.new(api_key: 'k', **options))
+    end
+
+    it 'bounds how long one attempt may take' do
+      conn = client.send(:boot_connection)
+
+      expect([conn.options.open_timeout, conn.options.timeout]).to eq([3, 10])
+    end
+
+    it 'honours the configured boot timeouts' do
+      conn = boot_client(boot_open_timeout: 1, boot_timeout: 2).send(:boot_connection)
+
+      expect([conn.options.open_timeout, conn.options.timeout]).to eq([1, 2])
+    end
+
+    # The whole point of the bound: faraday-retry abandons a Retry-After past
+    # max_interval, so a rate-limited boot degrades at once instead of waiting
+    # out a window per attempt.
+    it 'gives up at once on a 429 carrying a whole rate-limit window' do
+      stub_request(:get, definitions).with(query: { 'object_type' => 'issue' })
+                                     .to_return(status: 429, body: { 'message' => 'slow down' }.to_json,
+                                                headers: { 'Content-Type' => 'application/json',
+                                                           'Retry-After' => '60' })
+
+      expect(client.fetch_custom_fields('issue')).to eq([])
+      expect(WebMock).to have_requested(:get, definitions).with(query: { 'object_type' => 'issue' }).once
+    end
+
+    # One retry rather than none: the introspection runs once and is never
+    # revisited, so a hiccup would cost the custom columns for the whole life of
+    # the process.
+    it 'retries once a failure Pylon sent without a Retry-After' do
+      stub_request(:get, definitions).with(query: { 'object_type' => 'issue' })
+                                     .to_return(json({ 'message' => 'slow down' }, 429))
+                                     .then.to_return(json('data' => [{ 'slug' => 'severity' }]))
+
+      expect(boot_client(boot_retry_policy: fast_boot).fetch_custom_fields('issue'))
+        .to eq([{ 'slug' => 'severity' }])
+      expect(WebMock).to have_requested(:get, definitions).with(query: { 'object_type' => 'issue' }).twice
+    end
+
+    it 'spends no more than that one retry' do
+      stub_request(:get, definitions).with(query: { 'object_type' => 'issue' })
+                                     .to_return(json({ 'message' => 'slow down' }, 429))
+
+      expect(boot_client(boot_retry_policy: fast_boot).fetch_custom_fields('issue')).to eq([])
+      expect(WebMock).to have_requested(:get, definitions).with(query: { 'object_type' => 'issue' }).twice
+    end
+
+    # Pylon meters the endpoint, so the boot spends the same budget as every
+    # later call: a window of its own would spend that budget twice over.
+    it 'meters the introspection on the limiter the rest of the client uses' do
+      limiter = instance_spy(ForestAdminDatasourcePylon::RateLimiter)
+      stub_request(:get, definitions).with(query: { 'object_type' => 'issue' }).to_return(json('data' => []))
+
+      boot_client(rate_limiter: limiter).fetch_custom_fields('issue')
+      expect(limiter).to have_received(:acquire).with(:get, '/custom-fields')
+    end
+
+    # The other cursor walk is a request the operator is already waiting on, and
+    # keeps the patience the resilient policy grants it -- here two retries,
+    # where the boot connection would have spent one.
+    it 'leaves every other call on the resilient connection' do
+      messages = "#{base}/issues/i1/messages"
+      stub_request(:get, messages).to_return(json({ 'message' => 'slow down' }, 429))
+
+      expect(client.fetch_issue_messages('i1')).to be_nil
+      expect(WebMock).to have_requested(:get, messages).times(3)
+    end
+  end
+
   describe 'rate limiting' do
     it 'retries a 429 and returns the eventual success' do
       stub_request(:get, "#{base}/me")
