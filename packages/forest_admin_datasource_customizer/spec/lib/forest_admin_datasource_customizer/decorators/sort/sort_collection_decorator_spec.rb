@@ -115,6 +115,7 @@ module ForestAdminDatasourceCustomizer
           @decorated_book.replace_field_sorting('author_id', [{ field: 'id', ascending: true }])
 
           expect(@decorated_book.schema[:fields]['author_id'].is_sortable).to be true
+          expect(@decorated_book.schema[:fields]['title'].is_sortable).to be false
         end
 
         it 'leaves the schema of the collection below untouched' do

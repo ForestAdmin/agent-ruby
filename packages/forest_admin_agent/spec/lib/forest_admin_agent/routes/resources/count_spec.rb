@@ -11,6 +11,7 @@ module ForestAdminAgent
 
       describe Count do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:count) { described_class.new }
         let(:args) do
           {
@@ -46,6 +47,15 @@ module ForestAdminAgent
           count.setup_routes
           expect(count.routes.include?('forest_count')).to be true
           expect(count.routes.length).to eq 1
+        end
+
+        # A count applies no sort, so checking one would refuse a request the denied field cannot
+        # reach — while its filter and search are the sharper half and stay checked.
+        it 'checks only the query components it applies, against its own collection' do
+          ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
+          count.handle_request(args)
+
+          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'user', applies: %i[filter search] }])
         end
 
         context 'when collection is countable' do

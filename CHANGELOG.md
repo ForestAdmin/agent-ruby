@@ -1,3 +1,25 @@
+## [1.39.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.3...v1.39.4) (2026-08-26)
+
+
+### Bug Fixes
+
+* **datasource-active-record:** map inet/cidr/macaddr(8) columns to String ([#377](https://github.com/ForestAdmin/agent-ruby/issues/377)) ([487e056](https://github.com/ForestAdmin/agent-ruby/commit/487e056ec64dac73f37834f7cc81cbe29f65735c)), closes [#372](https://github.com/ForestAdmin/agent-ruby/issues/372)
+
+## [1.39.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.2...v1.39.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **agent:** apply the configured logger_level to the default logger ([#376](https://github.com/ForestAdmin/agent-ruby/issues/376)) ([bb4ac89](https://github.com/ForestAdmin/agent-ruby/commit/bb4ac89beb6418b2f99a1e3d46697aec7f8a9408)), closes [#371](https://github.com/ForestAdmin/agent-ruby/issues/371)
+* **customizer:** mark a field sortable only when the sort decorator can order it (PRD-1036) ([#368](https://github.com/ForestAdmin/agent-ruby/issues/368)) ([a04900d](https://github.com/ForestAdmin/agent-ruby/commit/a04900d1f69b43f432debb0c2eb68738af0ac328))
+
+## [1.39.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.1...v1.39.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **agent:** serve only the columns of collections the caller may read ([#365](https://github.com/ForestAdmin/agent-ruby/issues/365)) ([3aa70c8](https://github.com/ForestAdmin/agent-ruby/commit/3aa70c8d4e8918490bc843ce1fc4597db4b5b8a6))
+
 ## [1.39.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.0...v1.39.1) (2026-08-20)
 
 

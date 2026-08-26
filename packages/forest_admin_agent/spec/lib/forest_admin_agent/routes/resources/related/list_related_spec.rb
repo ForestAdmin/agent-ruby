@@ -14,6 +14,7 @@ module ForestAdminAgent
 
         describe ListRelated do
           include_context 'with caller'
+          include_context 'with readable related collections'
           subject(:list) { described_class.new }
           let(:args) do
             {
@@ -77,6 +78,21 @@ module ForestAdminAgent
             list.setup_routes
             expect(list.routes.include?('forest_related_list')).to be true
             expect(list.routes.length).to eq 1
+          end
+
+          # The only routes resolving against the foreign collection rather than their own, and a
+          # related listing applies no search — so neither is checked against the parent.
+          it 'checks the components it applies against the foreign collection' do
+            args[:params]['relation_name'] = 'category'
+            args[:params]['id'] = 1
+            allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+            list.handle_request(args)
+
+            expect(read_guard_calls[:query_fields]).to eq(
+              [{ collection: 'category', applies: %i[filter sort] }]
+            )
+            expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
           end
 
           context 'when call without filters' do
@@ -192,6 +208,7 @@ module ForestAdminAgent
 
         describe ListRelated, 'with a projection deeper than one relation' do
           include_context 'with caller'
+          include_context 'with readable related collections'
           subject(:list) { described_class.new }
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
           let(:args) do

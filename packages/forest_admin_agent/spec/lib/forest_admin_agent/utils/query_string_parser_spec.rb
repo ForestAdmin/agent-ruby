@@ -712,6 +712,80 @@ module ForestAdminAgent
         end
       end
 
+      describe 'parse_requested_projection' do
+        let(:collection) do
+          datasource = Datasource.new
+          collection_person = Collection.new(datasource, 'Person')
+          collection_person.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+              'name' => ColumnSchema.new(column_type: 'String')
+            }
+          )
+          collection = Collection.new(datasource, 'Book')
+          collection.add_fields(
+            {
+              'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+              'title' => ColumnSchema.new(column_type: 'String'),
+              'author_id' => ColumnSchema.new(column_type: 'Number'),
+              'author' => Relations::ManyToOneSchema.new(
+                foreign_key: 'author_id',
+                foreign_key_target: 'id',
+                foreign_collection: 'Person'
+              )
+            }
+          )
+
+          datasource.add_collection(collection)
+          datasource.add_collection(collection_person)
+
+          return collection
+        end
+
+        it 'reports a projection header as named by the caller' do
+          args = { headers: { 'HTTP_FOREST_PROJECTION' => 'title,author:name' }, params: {} }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(%w[title author:name]), named_by_caller: true }
+          )
+        end
+
+        it 'reports a fields parameter as named by the caller' do
+          args = { headers: {}, params: { fields: { 'Book' => 'id,title' } } }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(%w[id title]), named_by_caller: true }
+          )
+        end
+
+        it 'reports an absent fields parameter as not named by the caller' do
+          args = { headers: {}, params: {} }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(%w[id title author_id author:id author:name]), named_by_caller: false }
+          )
+        end
+
+        it 'reports an empty fields parameter as not named by the caller' do
+          args = { headers: {}, params: { fields: { 'Book' => '' } } }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(%w[id title author_id author:id author:name]), named_by_caller: false }
+          )
+        end
+
+        it 'prefers the header over a fields parameter naming other columns' do
+          args = {
+            headers: { 'HTTP_FOREST_PROJECTION' => 'title' },
+            params: { fields: { 'Book' => '' } }
+          }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(%w[title]), named_by_caller: true }
+          )
+        end
+      end
+
       describe 'parse_projection_with_pks' do
         let(:collection) do
           datasource = Datasource.new

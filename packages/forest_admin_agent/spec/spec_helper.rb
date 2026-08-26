@@ -32,6 +32,41 @@ RSpec.shared_context 'with caller' do
   let(:caller) { build_caller }
 end
 
+# Stubs the read guards for a route spec and records how the route wired them, so a spec can pin the
+# collection each guard resolves against, the query components the route says it applies, and whether
+# a denial is a 403 or a redaction. The guards themselves are exercised against a real Permissions in
+# spec/lib/forest_admin_agent/security.
+#
+# The collection is recorded by name rather than matched on: RSpec renders an argument mismatch by
+# inspecting it, and a collection reaches its datasource, which reaches every collection, so the
+# inspect never finishes and the suite hangs instead of failing. Leaving a guard unstubbed hangs the
+# same way.
+
+# `applies` is derived from the keys the route actually passed, so it cannot drift from the query the
+# route builds: a component it drops is one it does not pass.
+READ_GUARD_QUERY_KEYS = { filter: :condition_tree, sort: :sort, search: :search }.freeze
+
+RSpec.shared_context 'with readable related collections' do
+  let(:read_guard_calls) { { query_fields: [], projections: [] } }
+
+  before do
+    allow(permissions).to receive(:assert_can_read_query_fields) do |collection, **options|
+      read_guard_calls[:query_fields] << {
+        collection: collection.name,
+        applies: READ_GUARD_QUERY_KEYS.select { |_name, key| options.key?(key) }.keys
+      }
+    end
+    allow(permissions).to receive(:assert_can_read_usages)
+    allow(permissions).to receive(:redact_projection) do |collection, projection, **options|
+      read_guard_calls[:projections] << {
+        collection: collection.name,
+        named_by_caller: options[:named_by_caller]
+      }
+      projection
+    end
+  end
+end
+
 RSpec.configure do |config|
   config.include ForestAdminTestToolkit::Factory::Caller
   config.include ForestAdminTestToolkit::Factory::Collection

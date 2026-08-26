@@ -11,6 +11,7 @@ module ForestAdminAgent
 
       describe Show do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:show) { described_class.new }
         let(:args) do
           {
@@ -71,6 +72,13 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
             @datasource = ForestAdminAgent::Facades::Container.datasource
             allow(@datasource.get_collection('user')).to receive(:list).and_return([User.new(1, 'foo', 'foo')])
+          end
+
+          it 'redacts the projection it serves against its own collection' do
+            args[:params]['id'] = 1
+            show.handle_request(args)
+
+            expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: false }])
           end
 
           it 'return an serialized content' do

@@ -66,6 +66,22 @@ module ForestAdminAgent
         parse_projection_from_header(collection, args) || parse_projection(collection, args)
       end
 
+      # Both halves read the same `fields` param the same way on purpose: an empty
+      # `fields[<collection>]=` means "every column", so it is not named and must take the redaction
+      # path rather than a 403.
+      def self.parse_requested_projection(collection, args)
+        from_header = parse_projection_from_header(collection, args)
+
+        return { projection: from_header, named_by_caller: true } if from_header
+
+        fields = args.dig(:params, :fields, collection.name)
+
+        {
+          projection: parse_projection(collection, args),
+          named_by_caller: !(fields.nil? || fields == '')
+        }
+      end
+
       def self.add_polymorphic_type_fields(collection, requested_field_names)
         polymorphic_relations = collection.schema[:fields].select { |_, field| field.type == 'PolymorphicManyToOne' }
 

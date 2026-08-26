@@ -10,6 +10,7 @@ module ForestAdminAgent
 
       describe UpdateField do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:update_field) { described_class.new }
 
         let(:args) do
