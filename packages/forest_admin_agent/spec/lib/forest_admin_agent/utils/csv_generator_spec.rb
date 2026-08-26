@@ -72,6 +72,78 @@ module ForestAdminAgent
         "id,last_name,first_name,email,active,created_at,updated_at,address\n1,Skywalker,Luke,luke@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Tatooine\n2,Solo,Han,han@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Corellia\n3,Organa,Leia,leia@sw.com,true,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Alderaan\n4,Kenobi,Obi-Wan,obiwan@sw.com,false,2024-05-21T00:00:00.000Z,2024-05-21T00:00:00.000Z,Stewjon\n"
       end
 
+      describe 'filter_header' do
+        let(:requested) { Projection.new(%w[id last_name address:planet]) }
+
+        it 'hands the header back untouched when the redaction dropped nothing' do
+          expect(described_class.filter_header('Id,Last name,Planet', requested, requested))
+            .to eq('Id,Last name,Planet')
+        end
+
+        it 'returns nothing when the caller sent no header' do
+          expect(described_class.filter_header(nil, requested, Projection.new(%w[id]))).to be_nil
+        end
+
+        it 'drops the label of a path the redaction removed from a comma-joined header' do
+          kept = Projection.new(%w[id last_name])
+
+          expect(described_class.filter_header('Id,Last name,Planet', requested, kept))
+            .to eq(['Id', 'Last name'])
+        end
+
+        it 'drops the label of a path the redaction removed from a JSON header' do
+          kept = Projection.new(%w[id address:planet])
+
+          expect(described_class.filter_header('["Id","Last name","Planet"]', requested, kept))
+            .to eq(%w[Id Planet])
+        end
+
+        it 'drops the label of a path the redaction removed from an array of labels' do
+          kept = Projection.new(%w[address:planet])
+
+          expect(described_class.filter_header(['Id', 'Last name', 'Planet'], requested, kept))
+            .to eq(['Planet'])
+        end
+
+        # `fields[books]=author,id,title` with `fields[author]=firstName,lastName` expands into four
+        # paths against three labels: filtering by position drops "Id" and keeps "Title", leaving one
+        # label for two data columns, under the wrong name.
+        it 'discards a JSON header the expanded projection has outgrown' do
+          expanded = Projection.new(%w[author:firstName author:lastName id title])
+          kept = Projection.new(%w[id title])
+
+          expect(described_class.filter_header('["Author","Id","Title"]', expanded, kept)).to be_nil
+        end
+
+        it 'discards a header that carries no label for each requested path' do
+          # `fields[users]=address,id` expands `address` into two paths, so no label sits at the
+          # index of a path and dropping one by position would mislabel the rest.
+          expanded = Projection.new(%w[address:planet address:city id])
+
+          expect(described_class.filter_header('Address,Id', expanded, Projection.new(%w[id]))).to be_nil
+        end
+
+        # An unmappable header must not be handed back: the stream re-checks the label count against
+        # the *kept* projection, so a header matching that count by coincidence would be accepted and
+        # print each surviving column under the label of whatever preceded it. Here `holder:*` is
+        # denied while the type field appended next to it survives, and 'Holder' would head
+        # `holder_type`.
+        it 'discards a header whose label count coincides with the kept projection' do
+          requested = Projection.new(%w[pan_last4 holder:* holder_type])
+          kept = Projection.new(%w[pan_last4 holder_type])
+
+          expect(described_class.filter_header('PAN,Holder', requested, kept)).to be_nil
+        end
+
+        # The one branch where handing the header back is safe: both counts are the same number, so
+        # the stream's own check cannot reach a different answer.
+        it 'keeps the header the caller sent when the redaction dropped no column' do
+          requested = Projection.new(%w[pan_last4 holder_type])
+
+          expect(described_class.filter_header('PAN,Type', requested, requested)).to eq('PAN,Type')
+        end
+      end
+
       describe 'generate' do
         it 'generates a CSV string' do
           csv = described_class.generate(records, projection)

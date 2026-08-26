@@ -15,6 +15,7 @@ module ForestAdminAgent
 
       describe Charts do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:chart) { described_class.new }
         let(:args) do
           {
@@ -127,6 +128,23 @@ module ForestAdminAgent
           chart.setup_routes
           expect(chart.routes.include?('forest_chart')).to be true
           expect(chart.routes.length).to eq 1
+        end
+
+        # A chart applies neither sort nor search, so checking either would refuse a request the
+        # denied field cannot reach.
+        it 'checks only the filter, against its own collection' do
+          args[:params] = args[:params].merge({
+                                                aggregateFieldName: 'price',
+                                                aggregator: 'Sum',
+                                                sourceCollectionName: 'book',
+                                                type: 'Value',
+                                                timezone: 'Europe/Paris'
+                                              })
+          allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([{ 'value' => 10, 'group' => [] }])
+
+          chart.handle_request(args)
+
+          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'book', applies: %i[filter] }])
         end
 
         it 'throw an error when request has a bad chart type' do
@@ -485,6 +503,73 @@ module ForestAdminAgent
                   }
                 }
               }
+            )
+          end
+
+          # A count names no path back to the collection it counts, so nothing above sees it. An empty
+          # `aggregateFieldName` is a count too: `can_chart?` cannot tell it from an absent one.
+          it 'asserts browse on the counted collection when a OneToMany count names no field' do
+            args[:params] = args[:params].merge({
+                                                  labelFieldName: 'author',
+                                                  relationshipFieldName: 'bookReviews',
+                                                  aggregator: 'Count',
+                                                  aggregateFieldName: '',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Leaderboard',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(permissions).to receive(:can?)
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            allow(@datasource.get_collection('review')).to receive(:aggregate).and_return([])
+
+            chart.handle_request(args)
+
+            expect(permissions).to have_received(:can?) do |action, collection|
+              expect(action).to eq(:browse)
+              expect(collection.name).to eq('review')
+            end
+          end
+
+          it 'asserts browse on the foreign collection when a ManyToMany count names no field' do
+            args[:params] = args[:params].merge({
+                                                  labelFieldName: 'year',
+                                                  relationshipFieldName: 'reviews',
+                                                  aggregator: 'Count',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Leaderboard',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(permissions).to receive(:can?)
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            allow(@datasource.get_collection('book_review')).to receive(:aggregate).and_return([])
+
+            chart.handle_request(args)
+
+            expect(permissions).to have_received(:can?) do |action, collection|
+              expect(action).to eq(:browse)
+              expect(collection.name).to eq('review')
+            end
+          end
+
+          it 'refuses a count leaderboard the caller cannot browse the counted collection for' do
+            args[:params] = args[:params].merge({
+                                                  labelFieldName: 'author',
+                                                  relationshipFieldName: 'bookReviews',
+                                                  aggregator: 'Count',
+                                                  aggregateFieldName: '',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Leaderboard',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(permissions).to receive(:can?).and_raise(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
+                "You don't have permission to browse this collection."
+              )
+            )
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+
+            expect { chart.handle_request(args) }.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError
             )
           end
 

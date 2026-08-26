@@ -25,7 +25,7 @@ module ForestAdminAgent
             condition_tree: ConditionTree::ConditionTreeFactory.intersect([condition_tree, scope])
           )
 
-          projection = QueryStringParser.parse_projection_with_pks(context.collection, args)
+          projection = redacted_projection_with_pks(context, context.collection, args)
 
           records = context.collection.list(context.caller, filter, projection)
 

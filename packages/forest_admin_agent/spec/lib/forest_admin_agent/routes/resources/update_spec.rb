@@ -11,6 +11,7 @@ module ForestAdminAgent
 
       describe Update do
         include_context 'with caller'
+        include_context 'with readable related collections'
         subject(:update) { described_class.new }
         let(:args) do
           {
