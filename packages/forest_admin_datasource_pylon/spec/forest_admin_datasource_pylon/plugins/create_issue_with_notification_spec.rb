@@ -72,6 +72,18 @@ module ForestAdminDatasourcePylon
           .to eq(['Requester email', 'Subject', 'Message', 'Priority', 'Send as internal note'])
       end
 
+      # The title is the enum value and the key the content is looked up by, so
+      # it has to name one template.
+      it 'refuses two templates sharing a title, which would hide the first' do
+        expect { register(email_templates: [{ title: 'Outage', content: 'a' }, { title: 'Outage', content: 'b' }]) }
+          .to raise_error(forest_exception, /Duplicate email template titles: Outage/)
+      end
+
+      it 'refuses a template titled like the option that picks none of them' do
+        expect { register(email_templates: [{ title: 'No template', content: 'a' }]) }
+          .to raise_error(forest_exception, /cannot be titled/)
+      end
+
       it 'splits the form in two pages when templates are configured' do
         form = register(email_templates: [{ title: 'Outage', content: 'Sorry' }]).form
 

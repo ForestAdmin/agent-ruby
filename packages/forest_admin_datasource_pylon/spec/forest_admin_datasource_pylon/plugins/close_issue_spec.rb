@@ -72,6 +72,12 @@ module ForestAdminDatasourcePylon
         expect { register(scopes: %i[single weird]) }.to raise_error(forest_exception, /Unknown.*weird/)
       end
 
+      # Through `to_s`, so a value carrying no `to_sym` reaches the error that
+      # names it rather than a NoMethodError naming nothing.
+      it 'names a scope that is neither a symbol nor a string' do
+        expect { register(scopes: [1]) }.to raise_error(forest_exception, /Unknown.*1/)
+      end
+
       it 'raises a ForestException on an empty state' do
         expect { register(state: '  ') }.to raise_error(forest_exception, /state cannot be empty/)
       end

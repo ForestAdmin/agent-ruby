@@ -27,7 +27,7 @@ module ForestAdminDatasourcePylon
         raise ForestException, 'CreateIssueWithNotification plugin requires a collection' unless collection_customizer
 
         opts = options.except(:datasource)
-        opts[:email_templates] = Array(opts[:email_templates]).compact
+        opts[:email_templates] = normalize_templates(opts[:email_templates])
         opts[:destination] = normalize_destination(opts[:destination])
         opts[:priority_override] = normalize_priority(opts[:priority_override])
         require_sender_email!(opts)
@@ -36,6 +36,25 @@ module ForestAdminDatasourcePylon
       end
 
       private
+
+      # The title is what the enum carries and what the content is looked up
+      # by, so it has to name one template: a duplicate makes the first
+      # unreachable and would send the other one's content under its name, and
+      # the sentinel of the "pick nothing" option makes the template it names
+      # unpickable. Both are configuration, so both are refused at registration
+      # rather than discovered by whoever sends the wrong message.
+      def normalize_templates(value)
+        templates = Array(value).compact
+        titles = templates.map { |template| template[:title].to_s }
+
+        reserved = titles.include?(FormBuilder::NO_TEMPLATE)
+        raise ForestException, "An email template cannot be titled #{FormBuilder::NO_TEMPLATE.inspect}." if reserved
+
+        duplicated = titles.tally.select { |_title, count| count > 1 }.keys
+        raise ForestException, "Duplicate email template titles: #{duplicated.join(", ")}." if duplicated.any?
+
+        templates
+      end
 
       def normalize_destination(value)
         return Payload::EMAIL_DESTINATION if value.nil?

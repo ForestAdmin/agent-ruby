@@ -47,8 +47,11 @@ module ForestAdminDatasourcePylon
         raise ForestException, 'CloseIssue :state cannot be empty.'
       end
 
+      # Through `to_s`: a value that is neither a string nor a symbol has no
+      # `to_sym`, and raising NoMethodError here would hide the unknown-scope
+      # error that names what was actually passed.
       def normalize_scopes(value)
-        scopes = Array(value).map(&:to_sym).uniq
+        scopes = Array(value).map { |scope| scope.to_s.to_sym }.uniq
         scopes = SCOPE_KEYS if scopes.empty?
         unknown = scopes - SCOPE_KEYS
         return scopes if unknown.empty?
