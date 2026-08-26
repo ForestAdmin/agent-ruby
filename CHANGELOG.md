@@ -1,3 +1,11 @@
+## [1.39.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.2...v1.39.3) (2026-08-26)
+
+
+### Bug Fixes
+
+* **agent:** apply the configured logger_level to the default logger ([#376](https://github.com/ForestAdmin/agent-ruby/issues/376)) ([bb4ac89](https://github.com/ForestAdmin/agent-ruby/commit/bb4ac89beb6418b2f99a1e3d46697aec7f8a9408)), closes [#371](https://github.com/ForestAdmin/agent-ruby/issues/371)
+* **customizer:** mark a field sortable only when the sort decorator can order it (PRD-1036) ([#368](https://github.com/ForestAdmin/agent-ruby/issues/368)) ([a04900d](https://github.com/ForestAdmin/agent-ruby/commit/a04900d1f69b43f432debb0c2eb68738af0ac328))
+
 ## [1.39.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.1...v1.39.2) (2026-08-25)
 
 
