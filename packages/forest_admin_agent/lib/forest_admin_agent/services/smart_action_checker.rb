@@ -103,7 +103,13 @@ module ForestAdminAgent
       # Fetching cap+1 distinguishes "over the cap" from "exactly the cap".
       def resolve_select_all_record_ids
         configured = ForestAdminAgent::Facades::Container.config_from_cache[:max_records_for_approval]
-        max = [configured || MAX_RECORDS_FOR_APPROVAL, MAX_RECORDS_FOR_APPROVAL].min
+        # Anything but a positive Integer gets the default (a negative LIMIT means unlimited on
+        # some datasources, and a String would raise on comparison).
+        max = if configured.is_a?(Integer) && configured.positive?
+                [configured, MAX_RECORDS_FOR_APPROVAL].min
+              else
+                MAX_RECORDS_FOR_APPROVAL
+              end
         records = collection.list(
           caller,
           filter.override(page: Page.new(offset: 0, limit: max + 1)),

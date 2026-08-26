@@ -231,6 +231,29 @@ module ForestAdminAgent
         )
       end
 
+      it 'falls back to the default cap when max_records_for_approval is invalid' do
+        smart_action[:triggerEnabled] = [1]
+        smart_action[:approvalRequired] = [1]
+        smart_action[:approvalRequiredConditions] = []
+        parameters[:data][:attributes][:all_records] = true
+
+        collection = @datasource.get_collection('Book')
+        allow(collection).to receive(:list).and_return([{ 'id' => 1 }])
+
+        [-5, 'lots', true].each do |invalid|
+          config = ForestAdminAgent::Facades::Container.config_from_cache.merge(max_records_for_approval: invalid)
+          allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(config)
+
+          smart_action_checker = described_class.new(parameters, collection, smart_action,
+                                                     QueryStringParser.parse_caller(args), 1, Filter.new)
+          expect { smart_action_checker.can_execute? }.to raise_error(CustomActionRequiresApprovalError)
+        end
+
+        expect(collection).to have_received(:list)
+          .with(anything, have_attributes(page: have_attributes(limit: 501)), anything)
+          .exactly(3).times
+      end
+
       it 'does not resolve record ids on a "select all" trigger of a global action' do
         smart_action[:triggerEnabled] = [1]
         smart_action[:approvalRequired] = [1]
