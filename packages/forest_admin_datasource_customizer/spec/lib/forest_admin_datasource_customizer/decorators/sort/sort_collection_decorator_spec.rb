@@ -105,6 +105,26 @@ module ForestAdminDatasourceCustomizer
           expect { @decorated_book.replace_field_sorting('author_id', nil) }.to raise_error(ForestException, 'A new sorting method should be provided to replace field sorting')
         end
 
+        it 'leaves the sortability of the fields it cannot order as the datasource declared it' do
+          expect(@decorated_book.schema[:fields]['title'].is_sortable).to be false
+          expect(@decorated_book.schema[:fields]['author_id'].is_sortable).to be false
+          expect(@decorated_book.schema[:fields]['id'].is_sortable).to be false
+        end
+
+        it 'marks a field sortable once its sorting is replaced' do
+          @decorated_book.replace_field_sorting('author_id', [{ field: 'id', ascending: true }])
+
+          expect(@decorated_book.schema[:fields]['author_id'].is_sortable).to be true
+          expect(@decorated_book.schema[:fields]['title'].is_sortable).to be false
+        end
+
+        it 'leaves the schema of the collection below untouched' do
+          @decorated_book.emulate_field_sorting('title')
+
+          expect(@decorated_book.schema[:fields]['title'].is_sortable).to be true
+          expect(@collection_book.schema[:fields]['title'].is_sortable).to be false
+        end
+
         context 'when emulating sort on book.title (no relations)' do
           before do
             @decorated_book.emulate_field_sorting('title')

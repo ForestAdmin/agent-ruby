@@ -51,15 +51,19 @@ module ForestAdminDatasourceCustomizer
           projection.apply(records)
         end
 
+        # `@sorts` holds nil as the value of an emulated field, so membership is
+        # read with `key?`, the way `emulated?` reads it. The ColumnSchema objects
+        # belong to the collection below, so each is copied before the flag is
+        # written.
         def refine_schema(child_schema)
-          child_schema[:fields].each do |name, schema|
-            if schema.type == 'Column'
-              schema.is_sortable = true if @sorts[name].nil?
-              child_schema[:fields][name] = schema
-            end
+          schema = child_schema.dup
+          schema[:fields] = child_schema[:fields].to_h do |name, field|
+            next [name, field] unless field.type == 'Column' && @sorts.key?(name)
+
+            [name, field.dup.tap { |column| column.is_sortable = true }]
           end
 
-          child_schema
+          schema
         end
 
         def rewrite_plain_sort_clause(clause)
