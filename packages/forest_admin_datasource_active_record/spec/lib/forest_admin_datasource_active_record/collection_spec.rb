@@ -192,6 +192,18 @@ module ForestAdminDatasourceActiveRecord
           expect(projects_relation.origin_type_value).to be_nil
         end
 
+        it 'skips a has_many :through whose source reflection is not a belongs_to (#370)' do
+          # Parent -> (polymorphic has_many) -> Child -> (has_one, custom foreign_key) -> Leaf.
+          # The fk ends up on Leaf, not on Child (the through collection), which
+          # ManyToManySchema cannot express -- so the field must not be published at all.
+          expect do
+            described_class.new(datasource, Parent)
+          end.not_to raise_error
+
+          collection = described_class.new(datasource, Parent)
+          expect(collection.schema[:fields].keys).not_to include('leaves')
+        end
+
         # rubocop:disable RSpec/ExampleLength
         it 'handles polymorphic associations with missing foreign key columns' do
           # This test reproduces issue #202: Server crashing on startup when missing columns for foreign keys
