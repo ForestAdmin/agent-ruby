@@ -270,14 +270,43 @@ module ForestAdminDatasourcePylon
         expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i2' }])
       end
 
-      it 'slices the page over the records that still exist' do
+      # The window is taken off the ids, so it is the ids of the page that are
+      # read and no others: one that no longer resolves leaves a gap rather
+      # than pulling the next id in behind it, which would cost a request per
+      # record outside the page to find out.
+      it 'reads only the ids of the page, gap included, when one no longer exists' do
         stub_request(:get, "#{base}/issues/gone").to_return(json({ 'message' => 'not found' }, 404))
         %w[i2 i3].each do |id|
           stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id)))
         end
         query = filter(condition_tree: id_leaf(operators::IN, %w[gone i2 i3]), page: page(0, 2))
 
-        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i2' }, { 'id' => 'i3' }])
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i2' }])
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i3")
+      end
+
+      # The cap bounds a page, not a selection: an offset past it used to read
+      # the first MAX_ID_LOOKUPS ids and answer an empty page from them.
+      it 'answers a page past the lookup cap instead of an empty one' do
+        ids = Array.new(30) { |i| "i#{i + 1}" }
+        %w[i21 i22].each do |id|
+          stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id)))
+        end
+        query = filter(condition_tree: id_leaf(operators::IN, ids), page: page(20, 2))
+
+        expect(collection.list(nil, query, %w[id])).to eq([{ 'id' => 'i21' }, { 'id' => 'i22' }])
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
+
+      # Which records the window holds is only known once they are all read, so
+      # a wide selection carrying other conditions cannot be answered a page at
+      # a time, and is refused rather than answered with a fraction of itself.
+      it 'refuses a selection past the cap that filters the named issues further' do
+        ids = Array.new(Collections::Issue::MAX_ID_LOOKUPS + 5) { |i| "i#{i}" }
+        tree = branch('And', [id_leaf(operators::IN, ids), leaf('state', operators::EQUAL, 'new')])
+
+        expect { collection.list(nil, filter(condition_tree: tree), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /names #{ids.size} issues by id/)
       end
 
       it 'skips an issue that no longer exists' do

@@ -6,6 +6,7 @@ module ForestAdminDatasourcePylon
       include Serializer
       include RelationEmbedder
       include MessagesEmbedder
+      include IdLookupReader
 
       # `/issues/search` exposes no sort parameter, so the allow-list is empty and
       # every requested order is reported instead of being silently swallowed.
@@ -15,8 +16,12 @@ module ForestAdminDatasourcePylon
       # A primary-key lookup spends one `GET /issues/{id}` per id, sequentially.
       # The fan-out is bounded like the cursor walk, and for the same reason:
       # `RateLimiter` keeps the requests inside the 300 a minute that endpoint
-      # grants, but nothing makes two hundred round-trips fast, so the page is
-      # truncated with a warning rather than left to time out.
+      # grants, but nothing makes two hundred round-trips fast.
+      #
+      # What it bounds is one page, not the selection behind it: the window is
+      # taken off the ids first, so a selection wider than this is read a page
+      # at a time rather than truncated at its first #{MAX_ID_LOOKUPS}. See
+      # `IdLookupReader`, and the one case that cannot be paged.
       MAX_ID_LOOKUPS = 20
 
       # The shape of one message inside the `messages` column. Field names follow
@@ -86,11 +91,10 @@ module ForestAdminDatasourcePylon
       def requests_per_record_read = 1
 
       # Never past the primary-key fan-out either: a write resolving named ids
-      # through `list` goes through `fetch_by_ids`, which truncates with a
-      # warning past this many, and a truncated resolution would write to a
-      # subset of the selection while reporting the whole of it. The budget is
-      # the tighter of the two at today's numbers; the clamp keeps that true if
-      # either moves.
+      # through `list` reads them one request apiece, and a resolution the page
+      # cap trimmed would write to a subset of the selection while reporting the
+      # whole of it. The budget is the tighter of the two at today's numbers;
+      # the clamp keeps that true if either moves.
       def max_resolvable_ids(reads: 0) = [super, MAX_ID_LOOKUPS].min
 
       def sortable_fields
@@ -116,54 +120,8 @@ module ForestAdminDatasourcePylon
           next search_records(caller, query) unless lookup
 
           ensure_searchless_lookup!(query)
-          page_window(records_by_id(caller, lookup), query)
+          records_by_id(caller, lookup, query)
         end
-      end
-
-      # The records are already narrowed to the ids the filter asked for, so
-      # applying the conditions left over by the short-circuit in memory cannot
-      # return a record the API would have excluded. The reverse — dropping a
-      # record over a condition memory evaluates differently from Pylon — is
-      # ruled out by `extract_id_lookup`, which refuses such residuals.
-      def records_by_id(caller, lookup)
-        records = fetch_by_ids(lookup.ids)
-        return records if lookup.residual.nil?
-
-        lookup.residual.apply(records, self, timezone_for(caller))
-      end
-
-      # `GET /issues/{id}` accepts the issue number as well as the UUID, so a
-      # record answering with an id other than the one asked for is dropped:
-      # see `matches_id?`.
-      def fetch_by_ids(ids)
-        wanted = ids.first(MAX_ID_LOOKUPS)
-        warn_truncated_lookup(ids.size) if ids.size > wanted.size
-
-        wanted.filter_map do |id|
-          record = fetch_issue(id)
-          next if record.nil?
-
-          serialized = serialize(record)
-          serialized if matches_id?(serialized, id)
-        end
-      end
-
-      # A record the operator can no longer reach — deleted, or outside the
-      # token's scope — reads as "no record" rather than as a failed page.
-      def fetch_issue(id)
-        datasource.client.fetch_issue(id)
-      rescue APIError => e
-        raise unless e.status == 404
-
-        nil
-      end
-
-      def warn_truncated_lookup(asked)
-        ForestAdminDatasourcePylon.logger.warn(
-          "[forest_admin_datasource_pylon] Asked for #{asked} issues by id, reading the first " \
-          "#{MAX_ID_LOOKUPS}: Pylon answers one issue per request, and the requests are sequential. " \
-          'Narrow the selection to reach the records past this point.'
-        )
       end
     end
   end
