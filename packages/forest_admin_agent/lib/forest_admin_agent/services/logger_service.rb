@@ -9,7 +9,9 @@ module ForestAdminAgent
         'Info' => Logger::INFO,
         'Debug' => Logger::DEBUG,
         'Warn' => Logger::WARN,
-        'Error' => Logger::ERROR
+        'Error' => Logger::ERROR,
+        'Fatal' => Logger::FATAL,
+        'Unknown' => Logger::UNKNOWN
       }.freeze
 
       def initialize(logger_level = 'Info', logger = nil)

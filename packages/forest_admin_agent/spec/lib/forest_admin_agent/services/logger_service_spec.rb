@@ -27,6 +27,18 @@ module ForestAdminAgent
 
           expect(service.default_logger.level).to eq(Logger::INFO)
         end
+
+        it 'supports Fatal, the quietest level' do
+          service = described_class.new('Fatal')
+
+          expect(service.default_logger.level).to eq(Logger::FATAL)
+        end
+
+        it 'supports Unknown' do
+          service = described_class.new('Unknown')
+
+          expect(service.default_logger.level).to eq(Logger::UNKNOWN)
+        end
       end
 
       describe '#log' do
