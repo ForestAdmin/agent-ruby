@@ -35,8 +35,7 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
-      # Max number of records a "select all" approval request may target. The Forest server
-      # enforces the same cap authoritatively; max_records_for_approval may lower it, never raise it.
+      # The Forest server's cap on approval record ids; max_records_for_approval may only lower it.
       MAX_RECORDS_FOR_APPROVAL = 500
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
@@ -79,9 +78,7 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
-            # On a "select all" trigger the frontend has no explicit id list to store in the
-            # approval request: resolve the selection here (capped) and hand the ids back
-            # through the error. Global actions target no specific records — never resolve.
+            # Global actions target no specific records — never resolve.
             if attributes[:all_records] && smart_action[:scope] != ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL
               record_ids = resolve_select_all_record_ids
             end
@@ -90,7 +87,7 @@ module ForestAdminAgent
               'This action requires to be approved.',
               details: {
                 user_approval_enabled: smart_action[:userApprovalEnabled],
-                # The keys the frontend actually reads (camelCase, sent verbatim in the error data).
+                # camelCase: sent verbatim in the error data, the key the frontend reads.
                 roleIdsAllowedToApprove: smart_action[:userApprovalEnabled],
                 **(record_ids ? { recordIds: record_ids } : {})
               }
