@@ -309,7 +309,7 @@ module ForestAdminDatasourcePylon
     # The filter travels as JSON, so only the date types need a wire format.
     describe 'value types' do
       let(:default_filters) do
-        { 'number_of_touches' => { ops: { operators::EQUAL => 'equals' } },
+        { 'number_of_touches' => { ops: { operators::EQUAL => 'equals', operators::IN => 'in' } },
           'customer_portal_visible' => { ops: { operators::EQUAL => 'equals' } } }
       end
 
@@ -329,6 +329,25 @@ module ForestAdminDatasourcePylon
 
       it 'keeps what a decimal carries after the point' do
         expect(translate(leaf('number_of_touches', operators::EQUAL, 12.5))['value']).to be(12.5)
+      end
+
+      # `"1e999".to_f` is what the agent's own cast hands over. Left alone it
+      # reaches `to_i`, which raises, and then the JSON encoder, which raises
+      # too -- a 500 either way, on a value the operator typed.
+      it 'refuses a value the cast overflowed rather than raising on it' do
+        expect { translate(leaf('number_of_touches', operators::EQUAL, '1e999'.to_f)) }
+          .to raise_error(ForestAdminDatasourcePylon::UnsupportedOperatorError, /number_of_touches.*Infinity/m)
+      end
+
+      it 'refuses a NaN the same way' do
+        expect { translate(leaf('number_of_touches', operators::EQUAL, Float::NAN)) }
+          .to raise_error(ForestAdminDatasourcePylon::UnsupportedOperatorError, /number_of_touches.*NaN/m)
+      end
+
+      it 'refuses one inside a list too, the list being formatted the same way' do
+        expect(translate(leaf('number_of_touches', operators::IN, [1.0, 2.5]))['values']).to eq([1, 2.5])
+        expect { translate(leaf('number_of_touches', operators::IN, [1.0, -Float::INFINITY])) }
+          .to raise_error(ForestAdminDatasourcePylon::UnsupportedOperatorError, /number_of_touches.*-Infinity/m)
       end
     end
   end

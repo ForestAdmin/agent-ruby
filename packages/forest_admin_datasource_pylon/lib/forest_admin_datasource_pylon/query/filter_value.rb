@@ -22,7 +22,7 @@ module ForestAdminDatasourcePylon
       def single(leaf, time: false)
         raise_nil_value(leaf.field) if leaf.value.nil?
 
-        format(leaf.value, time: time)
+        format(leaf.value, time: time, field: leaf.field)
       end
 
       # Dropping the blanks would silently answer a different question: `not_in
@@ -36,18 +36,18 @@ module ForestAdminDatasourcePylon
         raise_empty_list(leaf) if values.empty?
         raise_blank_in_list(leaf) if values.any? { |value| value.nil? || value.to_s.empty? }
 
-        values.map { |value| format(value) }
+        values.map { |value| format(value, field: leaf.field) }
       end
 
       private
 
       # Booleans travel as they are: the filter is JSON, not a query string, so
       # only the dates and the numbers the agent widened need a wire format.
-      def format(value, time: false)
+      def format(value, time: false, field: nil)
         case value
         when Time, DateTime then value.to_time.utc.iso8601
         when Date           then format_date(value)
-        when Float          then format_float(value)
+        when Float          then format_float(value, field)
         when String         then time ? format_time_string(value) : value
         else                     value
         end
@@ -58,7 +58,13 @@ module ForestAdminDatasourcePylon
       # filtered with `42.0` -- a form none of its values carry. A float with
       # nothing after the point travels as the integer it is; a decimal keeps its
       # own.
-      def format_float(value)
+      #
+      # A cast that overflowed to Infinity, or a NaN, is refused rather than
+      # passed on: `to_i` raises on both, and so does the JSON encoder a step
+      # later, either way as a 500 naming nothing the operator can act on.
+      def format_float(value, field)
+        raise_out_of_range(value, field) unless value.finite?
+
         value == value.to_i ? value.to_i : value
       end
 
@@ -111,6 +117,12 @@ module ForestAdminDatasourcePylon
         raise UnsupportedOperatorError,
               "Operator '#{leaf.operator}' on field '#{leaf.field}' was given an empty list; " \
               'pass at least one value.'
+      end
+
+      def raise_out_of_range(value, field)
+        raise UnsupportedOperatorError,
+              "Filter value on '#{field}' is #{value}, which is not a number Pylon can be asked for; " \
+              'filter with a value inside the range of a double.'
       end
     end
   end

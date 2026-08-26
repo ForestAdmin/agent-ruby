@@ -152,14 +152,16 @@ module ForestAdminDatasourcePylon
     # `params` ride along on every page, cursor included: a mandatory parameter
     # dropped on the second request answers a different question than the first.
     #
-    # An empty page and a cursor that does not move both stop the loop: neither
-    # happens today, but a walk driven by a remote value stops on its own terms.
+    # An empty page, a cursor that does not move and a cursor already followed
+    # all stop the loop: none happens today, but a walk driven by a remote value
+    # stops on its own terms rather than collecting the same page twice over.
     #
     # `conn` is what a caller reading on the boot path hands its own connection
     # through: every page of the walk is then bounded like the first.
     def collect_pages(path, params = {}, conn: connection)
       records = []
       cursor = nil
+      seen = Set.new
       pages = 0
 
       loop do
@@ -167,7 +169,7 @@ module ForestAdminDatasourcePylon
         page = to_search_page(conn.get(path, query).body)
         records.concat(page.records)
         pages += 1
-        break if page.next_cursor.nil? || page.next_cursor == cursor || page.records.empty?
+        break if page.next_cursor.nil? || page.records.empty? || !seen.add?(page.next_cursor)
 
         if pages >= MAX_COLLECTED_PAGES
           log_pagination_cap(path, pages, records.size)

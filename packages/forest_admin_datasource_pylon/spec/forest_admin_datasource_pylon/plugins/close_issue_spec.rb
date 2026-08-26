@@ -112,6 +112,19 @@ module ForestAdminDatasourcePylon
         expect(result[:message]).to include('Issue i7 closed.')
       end
 
+      # A column of issue ids is not a key, so two host records may name the
+      # same issue: writing it twice and counting it twice is one bug apiece.
+      it 'writes an issue named by several of the selected records once' do
+        allow(client).to receive(:update_issue)
+        records = [{ issue_id_field => 'i1' }, { issue_id_field => 'i1' }, { issue_id_field => 'i2' }]
+
+        result = single.execute.call(FakeCloseContext.new(records: records), result_builder)
+
+        expect(client).to have_received(:update_issue).with('i1', 'state' => 'closed').once
+        expect(client).to have_received(:update_issue).with('i2', 'state' => 'closed').once
+        expect(result[:message]).to include('2 issues')
+      end
+
       it 'returns an error naming the column when no host record carries an id' do
         allow(client).to receive(:update_issue)
 

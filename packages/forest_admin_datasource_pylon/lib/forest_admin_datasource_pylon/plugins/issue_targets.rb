@@ -15,9 +15,12 @@ module ForestAdminDatasourcePylon
       # message rather than through a stack trace in the panel.
       def resolve_issue_ids(context, field = nil)
         ids = field.nil? ? primary_key_ids(context) : column_ids(context, field)
+        # Deduplicated: a column of issue ids is not a key, so two selected
+        # records may name the same issue, which would then be written twice and
+        # counted twice in what the action reports back.
         ids.filter_map do |id|
           id.to_s unless id.nil? || id.to_s.empty?
-        end
+        end.uniq
       rescue StandardError => e
         source = field ? "from '#{field}'" : 'from the selected records'
         ForestAdminDatasourcePylon.logger.warn(

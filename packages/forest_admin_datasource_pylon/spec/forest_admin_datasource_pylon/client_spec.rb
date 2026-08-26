@@ -301,6 +301,19 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       expect(client.fetch_issue_messages('i1').size).to eq(2)
     end
 
+    it 'stops on a cursor it has already followed' do
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: {})
+                                                      .to_return(page([{ 'id' => 'm1' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: { 'cursor' => 'c1' })
+                                                      .to_return(page([{ 'id' => 'm2' }], cursor: 'c2'))
+      stub_request(:get, "#{base}/issues/i1/messages").with(query: { 'cursor' => 'c2' })
+                                                      .to_return(page([{ 'id' => 'm3' }], cursor: 'c1'))
+
+      expect(client.fetch_issue_messages('i1')).to eq([{ 'id' => 'm1' }, { 'id' => 'm2' }, { 'id' => 'm3' }])
+      expect(WebMock).to have_requested(:get, "#{base}/issues/i1/messages")
+        .with(query: { 'cursor' => 'c1' }).once
+    end
+
     it 'stops on an empty page' do
       stub_request(:get, "#{base}/issues/i1/messages").to_return(page([], cursor: 'c1'))
 
