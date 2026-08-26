@@ -629,8 +629,16 @@ module ForestAdminDatasourcePylon
         expect(collection.project(record, %w[id missing])).to eq('id' => 'uuid-1', 'missing' => nil)
       end
 
-      it 'ignores relation paths and returns the whole record when only those are asked for' do
-        expect(collection.project(record, ['account:name'])).to eq(record)
+      # The relation is embedded onto the row afterwards; what `project` owns is
+      # the columns, and a projection naming none asks for none. Serving the
+      # whole record here would put every native column under a projection that
+      # excluded them.
+      it 'keeps no column when only relation paths are asked for' do
+        expect(collection.project(record, ['account:name'])).to eq({})
+      end
+
+      it 'keeps the columns of a projection mixing the two' do
+        expect(collection.project(record, ['id', 'account:name'])).to eq('id' => 'uuid-1')
       end
     end
 

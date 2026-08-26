@@ -276,12 +276,15 @@ module ForestAdminDatasourcePylon
         timezone.nil? || timezone.to_s.empty? ? 'UTC' : timezone
       end
 
+      # A projection naming only relations names no column of this collection,
+      # and the row it asks for carries none: returning the whole record there
+      # would serve every native column under a projection that excluded them,
+      # which is what `Projection#re_project` does not do. Only a nil projection
+      # — no projection at all — still means the record as it is.
       def project(record, projection)
         return record if projection.nil?
 
         wanted = Array(projection).map(&:to_s).reject { |p| p.include?(':') }
-        return record if wanted.empty?
-
         wanted.to_h { |k| [k, record[k]] }
       end
 
