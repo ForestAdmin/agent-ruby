@@ -125,6 +125,23 @@ RSpec.describe ForestAdminDatasourcePylon::Schema::CustomFieldsIntrospector do
       expect(schema.filter_operators).to include(operators::I_CONTAINS)
     end
 
+    # `definition` flags the field writable, so this is Pylon saying yes and the
+    # fallback saying no: a select is written as the slug of one of its options,
+    # and a free-text editor on one offers no value the endpoint would accept.
+    it 'leaves that fallback read-only even where Pylon flags the field writable' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('select', **select_metadata)])
+
+      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(true)
+    end
+
+    it 'keeps a writable select writable while it still has options' do
+      allow(client).to receive(:fetch_custom_fields).with('issue')
+                                                    .and_return([definition('select', **select_metadata('p1'))])
+
+      expect(introspector.issue_custom_fields.first[:schema].is_read_only).to be(false)
+    end
+
     it 'ignores an option with no slug rather than advertising a blank value' do
       metadata = { 'select_metadata' => { 'options' => [{ 'label' => 'P1' }, { 'slug' => 'p2' }, 'nope'] } }
       allow(client).to receive(:fetch_custom_fields).with('issue')

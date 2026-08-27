@@ -147,11 +147,17 @@ module ForestAdminDatasourcePylon
       #
       # Forest refuses an Enum carrying no value: a select whose options were all
       # removed falls back to String, so the column still shows what it holds.
+      #
+      # Read-only there whatever Pylon says of the field, unlike every other
+      # fallback here: a select is written as the slug of one of its options, so
+      # a free-text editor on one offers the operator no value the endpoint would
+      # accept. Showing what it holds is the whole of what this can do.
       def enum_schema(raw, opts)
         values = option_slugs(raw)
         return ColumnSchema.new(**opts, enum_values: values) unless values.empty?
 
-        ColumnSchema.new(**opts, column_type: 'String', filter_operators: OPERATORS.fetch('String'))
+        ColumnSchema.new(**opts, column_type: 'String',
+                                 filter_operators: OPERATORS.fetch('String'), is_read_only: true)
       end
 
       def option_slugs(raw)
