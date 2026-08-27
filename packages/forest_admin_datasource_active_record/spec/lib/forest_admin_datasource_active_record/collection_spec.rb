@@ -361,8 +361,54 @@ module ForestAdminDatasourceActiveRecord
 
           collection = described_class.new(datasource, CompositeRoot, support_polymorphic_relations: true)
 
+          # This pins that foreign_key_target comes out mangled -- not that it's usable.
+          # association_primary_key stringifies a composite target (ThroughReflection#
+          # association_primary_key calls .to_s), so foreign_key_target is this mangled
+          # string rather than a real column reference; that's a pre-existing (main-inherited)
+          # limitation being pinned here, not endorsed.
           field = collection.schema[:fields]['leaves']
-          expect(field).to have_attributes(class: Relations::ManyToManySchema, foreign_key: %w[car_id check_id])
+          expect(field).to have_attributes(
+            class: Relations::ManyToManySchema,
+            origin_key: 'car_id',
+            origin_key_target: 'id',
+            through_collection: 'CompositeThrough',
+            foreign_key: %w[car_id check_id],
+            foreign_key_target: '["category_id", "reference"]'
+          )
+        end
+
+        it 'renders a composite (array) foreign key as a clean list in the deprecation warning' do
+          # Same Array-valued join_foreign_key case as the belongs_to fixture above, but
+          # sourced from a plain has_one (not belongs_to) so it reaches
+          # warn_deprecated_identity_join instead -- pins that this message normalizes the
+          # Array too, not just warn_unrepresentable_many_to_many.
+          stub_const('ArrayLeaf', Class.new(ApplicationRecord) do
+            self.table_name = 'users'
+            self.abstract_class = true
+          end)
+
+          stub_const('ArrayThrough', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.primary_key = %w[category_id reference]
+            self.abstract_class = true
+
+            has_one :leaf, class_name: 'ArrayLeaf', foreign_key: :id
+          end)
+
+          stub_const('ArrayRoot', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.abstract_class = true
+
+            has_many :throughs, class_name: 'ArrayThrough', foreign_key: :category_id
+            has_many :leaves, through: :throughs, source: :leaf
+          end)
+
+          association = ArrayRoot.reflect_on_association(:leaves)
+          expect(association.join_foreign_key).to eq(%w[category_id reference])
+
+          expect do
+            described_class.new(datasource, ArrayRoot, support_polymorphic_relations: true)
+          end.to output(/joining 'ArrayThrough'\.'category_id, reference' to 'ArrayLeaf'\.'id'/).to_stdout
         end
 
         # rubocop:disable RSpec/ExampleLength

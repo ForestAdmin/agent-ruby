@@ -335,11 +335,13 @@ module ForestAdminDatasourceActiveRecord
 
     def warn_deprecated_identity_join(association, through_reflection)
       logger = ActiveSupport::Logger.new($stdout)
+      foreign_key = Array(association.join_foreign_key).join(', ')
+      foreign_key_target = Array(association.association_primary_key).join(', ')
       logger.warn(
         "[ForestAdmin] ⚠️  Association '#{association.name}' in model '#{@model.name}' is published " \
         "as a many-to-many joining '#{format_model_name(through_reflection.klass.name)}'." \
-        "'#{association.join_foreign_key}' to " \
-        "'#{format_model_name(association.klass.name)}'.'#{association.association_primary_key}', " \
+        "'#{foreign_key}' to " \
+        "'#{format_model_name(association.klass.name)}'.'#{foreign_key_target}', " \
         'since its source association is not a belongs_to. This identity join will be removed ' \
         'in a future major version -- see #370.'
       )
