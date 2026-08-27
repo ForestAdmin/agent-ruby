@@ -47,8 +47,9 @@ module ForestAdminDatasourceActiveRecord
         # Supplier -> Account -> AccountHistory: same bug class as #370 (a :through relation
         # sourced from a non-belongs_to), just via this pre-existing OneToOneSchema path
         # instead of ManyToManySchema -- origin_key/origin_key_target below resolve to both
-        # models' own primary keys, not a real join column. Out of scope for #370's fix;
-        # this test pins the current (buggy) behavior, not correct behavior.
+        # models' own primary keys, not a real join column. Out of scope for #370's fix,
+        # tracked separately as #379; this test pins the current (buggy) behavior, not
+        # correct behavior.
         it 'add has_one_through relation as a to-one (OneToOne)' do
           collection = described_class.new(datasource, Supplier)
 
