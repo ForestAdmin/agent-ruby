@@ -192,13 +192,39 @@ module ForestAdminDatasourceActiveRecord
           expect(projects_relation.origin_type_value).to be_nil
         end
 
-        it 'skips a has_many :through whose source reflection is not a belongs_to (#370)' do
+        it 'skips a has_many :through whose source reflection is not a belongs_to' do
           # Parent -> Kid (polymorphic has_many) -> Detail (has_one, custom foreign_key).
           # Kid#detail is a has_one, so join_foreign_key resolves to Kid's own primary key
           # instead of a real join column -- the relation can't be expressed as ManyToMany.
           expect { datasource.get_collection('Parent') }.to output(/Skipping association 'details'/).to_stdout
 
           expect(datasource.get_collection('Parent').schema[:fields].keys).not_to include('details')
+        end
+
+        it "skips a nested has_many :through, reproducing #370's exact symptom" do
+          # Category -> Car (plain has_many) -> Check, through Car's OWN has_many :through
+          # (Car#checks, through: :car_checks). Car.checks's source_reflection is itself a
+          # ThroughReflection, so #belongs_to? is false and join_foreign_key resolves all
+          # the way down to CarCheck#check's real FK ("check_id") -- a genuine column name,
+          # missing from Car specifically (not the generic "id" the single-hop cases above
+          # fall back to). This is the shape that actually produces #370's reported message.
+          stub_const('NestedThroughProbe', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.abstract_class = true
+
+            has_many :cars, foreign_key: :category_id
+            has_many :checks, through: :cars, source: :checks
+          end)
+
+          association = NestedThroughProbe.reflect_on_association(:checks)
+          expect(association.join_foreign_key).to eq('check_id')
+
+          collection = nil
+          expect do
+            collection = described_class.new(datasource, NestedThroughProbe, support_polymorphic_relations: true)
+          end.to output(/Skipping association 'checks'/).to_stdout
+
+          expect(collection.schema[:fields].keys).not_to include('checks')
         end
 
         it 'skips a polymorphic has_one :through whose source reflection is not a belongs_to' do

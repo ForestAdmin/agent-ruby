@@ -318,12 +318,14 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def warn_unrepresentable_many_to_many(association, through_reflection)
+      source = association.source_reflection
       logger = ActiveSupport::Logger.new($stdout)
       logger.warn(
         "[ForestAdmin] ⚠️  Skipping association '#{association.name}' in model '#{@model.name}': " \
-        "its foreign key lives on '#{format_model_name(association.klass.name)}', not on the through " \
-        "collection '#{format_model_name(through_reflection.klass.name)}', so it cannot be represented " \
-        'as a Forest Admin many-to-many relation.'
+        "its source association '#{source.name}' on '#{format_model_name(through_reflection.klass.name)}' " \
+        "is a #{source.macro}, not a belongs_to, so there is no real join column between " \
+        "'#{format_model_name(through_reflection.klass.name)}' and '#{format_model_name(association.klass.name)}' " \
+        '-- this relation cannot be represented as a Forest Admin many-to-many.'
       )
     end
 
