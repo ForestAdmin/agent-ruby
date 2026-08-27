@@ -33,7 +33,7 @@ module ForestAdminDatasourcePylon
         # The checkbox wins over the configured destination: it is the
         # operator's call, made on the record they are looking at.
         def destination_for(values, opts)
-          truthy?(values['Send as internal note']) ? IssueEnums::INTERNAL_DESTINATION : opts[:destination]
+          truthy?(values[FormBuilder::INTERNAL_NOTE_LABEL]) ? IssueEnums::INTERNAL_DESTINATION : opts[:destination]
         end
 
         # An internal issue travels as no metadata at all rather than as

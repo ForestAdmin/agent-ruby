@@ -96,7 +96,7 @@ module ForestAdminDatasourcePylon
 
       def executor(datasource, opts)
         lambda do |context, result_builder|
-          values = context.form_values
+          values = submitted_values(context, opts)
           email  = values['Requester email']
           next result_builder.error(message: 'Requester email is required.') unless Payload.present?(email)
 
@@ -106,6 +106,19 @@ module ForestAdminDatasourcePylon
           writeback = write_back_issue_id(context, opts[:issue_id_field], issue['id'])
           result_builder.success(message: success_message(issue, values, opts, writeback))
         end
+      end
+
+      # The form only carries the internal-note checkbox when the option asked
+      # for it, but a form value is not what the form offered: the agent copies
+      # every key the request sent, matched against a field or not. Left as
+      # submitted, the flag would create an internal issue on an action
+      # registered without it — and the requester the plugin exists to notify
+      # would not be. What the form does not show cannot be sent.
+      def submitted_values(context, opts)
+        values = context.form_values
+        return values if opts[:show_internal_note]
+
+        values.merge(FormBuilder::INTERNAL_NOTE_LABEL => false)
       end
 
       # A 4xx is Pylon naming what the operator filled in, and reaches them as

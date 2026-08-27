@@ -206,6 +206,21 @@ module ForestAdminDatasourcePylon
         expect(result[:message]).to include('Issue #12 created (internal, the requester was not contacted).')
       end
 
+      # The field is not on a form registered without the option, but the agent
+      # copies every key the request carried whether a field matched it or not.
+      # Honoured, it would leave the requester uncontacted on an action built to
+      # contact them.
+      it 'refuses an internal note submitted to an action that does not offer one' do
+        allow(client).to receive(:create_issue).and_return({ 'id' => 'i1', 'number' => 12 })
+
+        result = run_action(register, form_values('Send as internal note' => true))
+
+        expect(client).to have_received(:create_issue).with(
+          hash_including('destination_metadata' => hash_including('destination' => 'email'))
+        )
+        expect(result[:message]).not_to include('internal')
+      end
+
       it 'sends no destination when the plugin itself is configured as internal' do
         allow(client).to receive(:create_issue).and_return({ 'id' => 'i1' })
 

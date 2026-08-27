@@ -9,6 +9,11 @@ module ForestAdminDatasourcePylon
         NO_TEMPLATE = 'No template'.freeze
         TOKEN_RE = /\{\{\s*record\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/
 
+        # Shared with `Payload`, which reads the submitted value back, and with
+        # the executor, which has to neutralise it when the form does not carry
+        # the field at all.
+        INTERNAL_NOTE_LABEL = 'Send as internal note'.freeze
+
         module_function
 
         # ActionCollectionDecorator rejects forms that mix Page elements with
@@ -80,7 +85,7 @@ module ForestAdminDatasourcePylon
         end
 
         def internal_note_field
-          { type: FieldType::BOOLEAN, label: 'Send as internal note',
+          { type: FieldType::BOOLEAN, label: INTERNAL_NOTE_LABEL,
             description: 'When checked, the issue is created without contacting the requester.',
             default_value: false }
         end
