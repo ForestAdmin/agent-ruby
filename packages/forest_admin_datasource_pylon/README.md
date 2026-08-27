@@ -104,13 +104,22 @@ so one failure does not abort the batch.
 end
 ```
 
-Two things to know before granting it. The state is written straight through the Pylon client
-rather than through `PylonIssue`, because the action is registered on the host collection: a Forest
-scope or segment restricting `PylonIssue` therefore does **not** bound what this closes — the
-records the operator may see on the host collection do. And the batch is one request per selected
-record with no cap, so a wide bulk selection is a long run of sequential writes that the request
-may time out on, leaving the issues closed up to that point closed. Restrict the action, or the
-selection, accordingly.
+Two things to know before granting it.
+
+**Which scope bounds it.** The state is written straight through the Pylon client rather than
+through `PylonIssue`, because the action is registered on the host collection — but the ids were
+read before that write, through the collection the action sits on, and the agent intersects the
+operator's scope into the filter that read them. So the scope that bounds this is the scope of the
+**host** collection: mounted on `PylonIssue`, a scope or segment on `PylonIssue` bounds exactly what
+it closes; mounted on a business collection with `issue_id_field`, what bounds it is the records the
+operator may see there, and the issue ids those records carry. In that second form the column is
+the authority — an operator who can write it can name any Pylon issue — so treat it as one.
+
+**The batch is uncapped.** One request per selected record, so a wide bulk selection is a long run
+of sequential writes that the request may time out on, leaving the issues closed up to that point
+closed. Note that this is looser than the collections themselves: a filter-driven `update` or
+`delete` on a Pylon collection refuses a selection costing more than `MAX_WRITE_REQUESTS` (20)
+rather than writing it halfway. Restrict the action, or the selection, accordingly.
 
 ### `CreateIssueWithNotification`
 
