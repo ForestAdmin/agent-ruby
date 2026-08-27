@@ -104,6 +104,14 @@ so one failure does not abort the batch.
 end
 ```
 
+Two things to know before granting it. The state is written straight through the Pylon client
+rather than through `PylonIssue`, because the action is registered on the host collection: a Forest
+scope or segment restricting `PylonIssue` therefore does **not** bound what this closes — the
+records the operator may see on the host collection do. And the batch is one request per selected
+record with no cap, so a wide bulk selection is a long run of sequential writes that the request
+may time out on, leaving the issues closed up to that point closed. Restrict the action, or the
+selection, accordingly.
+
 ### `CreateIssueWithNotification`
 
 Creates an issue from a form and notifies the requester, optionally writing the new issue id back
