@@ -473,6 +473,24 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:get, %r{/issues/})
       end
 
+      # The count a refusal is worded around is what the `and` names, and an
+      # `and` of two `id` conditions names their intersection: the wider of the
+      # two would refuse a selection of three.
+      it 'counts the intersection of two id conditions, not the wider of them' do
+        wide = Array.new(25) { |index| "i#{index}" }
+        %w[i2 i4].each do |id|
+          stub_request(:get, "#{base}/issues/#{id}")
+            .to_return(json('data' => { 'id' => id, 'state' => 'new' }))
+          stub_request(:patch, "#{base}/issues/#{id}").to_return(json('data' => { 'id' => id }))
+        end
+        tree = branch('And', [leaf('id', operators::IN, wide), leaf('id', operators::IN, %w[i2 i4])])
+
+        issues.update(nil, filter(condition_tree: tree), 'title' => 'Louder')
+
+        %w[i2 i4].each { |id| expect(WebMock).to have_requested(:patch, "#{base}/issues/#{id}") }
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i0")
+      end
+
       # The cap is a budget of requests, not of writes: where a record is read
       # through its own endpoint, every read the path owes it comes out of the
       # same twenty, so the records one pass reaches halve for each of them.

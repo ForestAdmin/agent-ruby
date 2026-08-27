@@ -182,15 +182,21 @@ module ForestAdminDatasourcePylon
 
       # The ids a filter names, as a leaf of its own or inside a top-level `and`.
       # Unlike `extract_id_lookup`, nothing is asserted about the rest of the
-      # tree — the leftovers travel to `list` — nor about the sibling conditions,
-      # so this counts records *named*, never records the write applies to. The
-      # first id leaf of an `and` of two wins, over-refusing a narrower one.
+      # tree — the leftovers travel to `list` — so this counts records *named*,
+      # never records the write applies to: what it bounds is the resolution.
+      #
+      # The `id` leaves of an `and` intersect, as they do there: this is the
+      # count a refusal is worded around, and the first of two would refuse a
+      # selection narrower than the number it names.
       def filtered_ids(node)
         named = id_values(node)
         return named if named
         return nil unless and_branch?(node)
 
-        Array(node.conditions).filter_map { |child| id_values(child) }.first
+        named = Array(node.conditions).filter_map { |child| id_values(child) }
+        return nil if named.empty?
+
+        named.reduce(:&)
       end
 
       # The writable attributes, in the shape the endpoint takes them.

@@ -298,6 +298,28 @@ module ForestAdminDatasourcePylon
         expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
       end
 
+      # An `and` names the records all of its conditions name, so two `id`
+      # leaves intersect: keeping only the first would apply the cap to the
+      # wider set and refuse a selection narrower than it.
+      it 'intersects two id conditions of an and rather than refusing over the wider one' do
+        wide = Array.new(Collections::Issue::MAX_ID_LOOKUPS + 5) { |i| "i#{i}" }
+        %w[i2 i4].each do |id|
+          stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id)))
+        end
+        tree = branch('And', [id_leaf(operators::IN, wide), id_leaf(operators::IN, %w[i2 i4])])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id]))
+          .to eq([{ 'id' => 'i2' }, { 'id' => 'i4' }])
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i0")
+      end
+
+      it 'reads nothing when the two id conditions of an and are disjoint' do
+        tree = branch('And', [id_leaf(operators::IN, %w[i1 i2]), id_leaf(operators::EQUAL, 'i9')])
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([])
+        expect(WebMock).not_to have_requested(:get, "#{base}/issues/i1")
+      end
+
       # Which records the window holds is only known once they are all read, so
       # a wide selection carrying other conditions cannot be answered a page at
       # a time, and is refused rather than answered with a fraction of itself.

@@ -99,18 +99,30 @@ module ForestAdminDatasourcePylon
       # The leaf is also pulled out of a top-level AND, because Forest sends
       # `AND(id equal X, <scope>)` on a record detail as soon as a scope or a
       # segment is set, and `id` is not a field Pylon can filter on.
+      #
+      # Every `id` leaf of that AND is taken, not the first: an `and` names the
+      # records all of its conditions name, so two of them intersect. Left as a
+      # residual, the second would have the cap applied around the wider set and
+      # refuse a selection narrower than it — and cost a request per id the
+      # intersection drops.
       def extract_id_lookup(node)
         ids = id_values(node)
         return IdLookup.new(ids: ids, residual: nil) if ids
         return nil unless and_branch?(node)
 
-        conditions = Array(node.conditions)
-        id_index = conditions.index { |condition| id_values(condition) }
-        return nil if id_index.nil?
+        named, rest = Array(node.conditions).partition { |condition| id_values(condition) }
+        return nil if named.empty?
 
-        residual = ConditionTreeFactory.intersect(conditions.reject.with_index { |_, index| index == id_index })
+        residual = ConditionTreeFactory.intersect(rest)
         ensure_residual_appliable!(residual)
-        IdLookup.new(ids: id_values(conditions[id_index]), residual: guard_nil_comparisons(residual))
+        IdLookup.new(ids: intersect_ids(named), residual: guard_nil_comparisons(residual))
+      end
+
+      # Disjoint sets name no record, which is the empty lookup — no request —
+      # rather than a request per id of the first set for a page that is empty
+      # whatever they answer.
+      def intersect_ids(conditions)
+        conditions.map { |condition| id_values(condition) }.reduce(:&)
       end
 
       # Pylon runs the free-text search inside its search endpoint, which the
