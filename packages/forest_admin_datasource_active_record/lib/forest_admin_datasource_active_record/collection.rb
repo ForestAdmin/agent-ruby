@@ -114,6 +114,12 @@ module ForestAdminDatasourceActiveRecord
       association.source_reflection&.belongs_to?
     end
 
+    # A composite primary key on either endpoint can't be used as a single OneToOneSchema
+    # origin_key/origin_key_target column (#379).
+    def unrepresentable_one_to_one?(association)
+      Array(association.klass.primary_key).size > 1 || Array(@model.primary_key).size > 1
+    end
+
     def build_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
       ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
         foreign_collection: format_model_name(association.klass.name),
@@ -157,15 +163,19 @@ module ForestAdminDatasourceActiveRecord
 
               if many_to_many_shape
                 add_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
+              elsif unrepresentable_one_to_one?(association)
+                warn_unrepresentable_one_to_one(association, through_reflection)
               else
                 add_field(
                   association.name.to_s,
                   ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(
                     foreign_collection: format_model_name(association.klass.name),
                     origin_key: association.klass.primary_key,
-                    origin_key_target: @model.primary_key
+                    origin_key_target: @model.primary_key,
+                    is_read_only: true
                   )
                 )
+                warn_readonly_identity_join(association, through_reflection)
               end
             elsif association.inverse_of&.polymorphic?
               add_field(
@@ -359,6 +369,33 @@ module ForestAdminDatasourceActiveRecord
         "'#{format_model_name(association.klass.name)}'.'#{association.association_primary_key}': " \
         "its source association is not a belongs_to, so this join uses each side's own identifier " \
         'rather than a dedicated foreign key column -- see #370 for background.'
+      )
+    end
+
+    def warn_unrepresentable_one_to_one(association, through_reflection)
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.warn(
+        "[ForestAdmin] ⚠️  Skipping association '#{association.name}' in model '#{@model.name}': " \
+        "this has_one :through (via '#{format_model_name(through_reflection.klass.name)}') can't be " \
+        'represented as a Forest Admin one-to-one -- one of its endpoints has a composite primary key.'
+      )
+    end
+
+    # OneToOneSchema has no through_collection, so this publishes each side's own primary key
+    # as a placeholder join -- the columns exist on both sides, so GeneratorField's field
+    # lookups don't raise, but the join isn't meaningful data (it matches two unrelated
+    # sequences), which is exactly why it's marked read-only rather than left writable through
+    # what's really the foreign collection's own primary key (#379).
+    def warn_readonly_identity_join(association, through_reflection)
+      logger = ActiveSupport::Logger.new($stdout)
+      foreign_key = association.klass.primary_key
+      origin_key = @model.primary_key
+      logger.warn(
+        "[ForestAdmin] ⚠️  Association '#{association.name}' in model '#{@model.name}' is published " \
+        "as a read-only one-to-one joining '#{format_model_name(association.klass.name)}'.'#{foreign_key}' " \
+        "to this model's own '#{origin_key}': it's a has_one chained through " \
+        "'#{format_model_name(through_reflection.klass.name)}', which OneToOneSchema can't express as a " \
+        'real two-hop join -- see #379 for background.'
       )
     end
 

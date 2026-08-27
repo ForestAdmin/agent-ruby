@@ -78,6 +78,16 @@ module ForestAdminDatasourceToolkit
         )
       end
 
+      # A read-only relation (e.g. #379's has_one :through identity join, which has no real
+      # join column and would corrupt the foreign collection's own primary key if written to)
+      # only hides its edit control in the UI via isReadOnly -- a direct write still has to be
+      # blocked here, at every route that can write a to-one relation's origin_key.
+      def self.assert_writable_relation!(relation)
+        return unless relation.is_read_only
+
+        raise ForestException, "Field #{relation.foreign_collection} is not editable"
+      end
+
       def self.get_value(collection, caller, primary_key_values, field)
         if primary_key_values.is_a? Array
           index = Schema.primary_keys(collection).index(field)

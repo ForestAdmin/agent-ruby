@@ -408,6 +408,34 @@ module ForestAdminAgent
             end
           end
 
+          describe 'with a read-only one to one relation' do
+            before do
+              @datasource.get_collection('person').schema[:fields]['locked_passport'] =
+                Relations::OneToOneSchema.new(
+                  origin_key: 'person_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'passport',
+                  is_read_only: true
+                )
+            end
+
+            it 'refuses to link it (#379: it would overwrite the foreign collection\'s own primary key)' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'john' },
+                relationships: { 'locked_passport' => { 'data' => { 'type' => 'passports', 'id' => 1 } } },
+                type: 'persons'
+              }
+              args[:params]['collection_name'] = 'person'
+              allow(@datasource.get_collection('person')).to receive(:create)
+              allow(@datasource.get_collection('passport')).to receive(:update)
+
+              expect { store.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not editable/)
+              expect(@datasource.get_collection('person')).not_to have_received(:create)
+              expect(@datasource.get_collection('passport')).not_to have_received(:update)
+            end
+          end
+
           describe 'with polymorphic one to one relation' do
             before do
               collection_address = build_collection(

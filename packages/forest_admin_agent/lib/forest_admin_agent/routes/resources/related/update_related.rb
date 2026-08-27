@@ -109,6 +109,8 @@ module ForestAdminAgent
           end
 
           def update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+            Collection.assert_writable_relation!(relation)
+
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                                 relation.origin_key_target)
 
