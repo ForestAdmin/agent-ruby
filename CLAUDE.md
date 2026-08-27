@@ -42,9 +42,22 @@ releases silently, not loudly:
    - `@semantic-release/git` `assets`: `packages/<package>/lib/<package>/version.rb`
 
 5. **`.github/workflows/build.yml`** — add the package name to:
-   - the `lint` job's `packages` matrix
    - the `test` job's `packages` matrix
-   - the codecov step's `files:` list (`.../<package>/coverage.json`)
+   - the "Send coverage" step's `files:` list, as
+     `.../reports/<ruby-version>-<package>/coverage.json` — the version prefix
+     comes from the artifact name and is easy to drop, and a path that
+     resolves to nothing is exactly the silent-zero case warned about there
+
+   The `lint` job needs no entry: it runs one root `bundle exec rubocop`, and
+   the root `.rubocop.yml` has no `Include`, so it already walks `packages/**`.
+
+   A package with no spec suite (like `forest_admin_test_toolkit`) belongs in
+   neither list: the Test step dies at `BUNDLE_GEMFILE=Gemfile-test bundle
+   install` before rspec runs, and qlty's `skip-errors` default swallows a
+   missing `coverage.json` instead of reddening the job. Such a package's own
+   `Gemfile` is then resolved nowhere in CI — breakage surfaces only locally —
+   though its gemspec still is, via the `path:` refs in five other packages'
+   `Gemfile-test`.
 
 After merging, verify the next release actually bumps the new `version.rb` —
 the sed in step 4 silently no-ops if the format from step 1 is off, with no
