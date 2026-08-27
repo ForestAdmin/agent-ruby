@@ -33,6 +33,24 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).to include('category', 'user', 'car_checks', 'checks')
         end
 
+        it 'builds a full ManyToManySchema for a has_many :through sourced from a belongs_to' do
+          field = collection.schema[:fields]['checks']
+
+          expect(field).to have_attributes(
+            class: Relations::ManyToManySchema,
+            foreign_collection: 'Check',
+            origin_key: 'car_id',
+            origin_key_target: 'id',
+            through_collection: 'CarCheck',
+            foreign_key: 'check_id',
+            foreign_key_target: 'id',
+            origin_type_field: nil,
+            origin_type_value: nil,
+            foreign_type_field: nil,
+            foreign_type_value: nil
+          )
+        end
+
         it 'do not add polymorphic relations' do
           expect(datasource.get_collection('User').schema[:fields].keys).not_to include('address')
           expect(datasource.get_collection('Address').schema[:fields].keys).not_to include('addressable')
@@ -44,12 +62,14 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).to include('users')
         end
 
-        # Supplier -> Account -> AccountHistory: same bug class as #370 (a :through relation
-        # sourced from a non-belongs_to), just via this pre-existing OneToOneSchema path
-        # instead of ManyToManySchema -- origin_key/origin_key_target below resolve to both
-        # models' own primary keys, not a real join column. Out of scope for #370's fix,
-        # tracked separately as #379; this test pins the current (buggy) behavior, not
-        # correct behavior.
+        # Supplier -> Account -> AccountHistory is a has_one :through that isn't polymorphic,
+        # so it never reaches the many_to_many_shape guard above -- it falls into this plain
+        # OneToOneSchema branch instead, which hardcodes {AccountHistory,Supplier}'s own
+        # primary keys unconditionally, regardless of the real FK or of whether the source is
+        # a belongs_to (here it actually is one; account_history_id is a real column on
+        # accounts, just never consulted by this branch). Unrelated to #370's guard, tracked
+        # separately as #379; this test pins current (arguably wrong) behavior, not correct
+        # behavior.
         it 'add has_one_through relation as a to-one (OneToOne)' do
           collection = described_class.new(datasource, Supplier)
 
@@ -206,11 +226,11 @@ module ForestAdminDatasourceActiveRecord
         # revision of this fix shipped with.
         it "skips a has_many :through whose foreign key is missing from the through collection, reproducing #370's exact symptom" do
           # Category -> Car (plain has_many) -> Check, through Car's OWN has_many :through
-          # (Car#checks, through: :car_checks). Car.checks's source_reflection is itself a
-          # ThroughReflection, so join_foreign_key resolves all the way down to CarCheck#check's
-          # real FK ("check_id") -- a genuine column name, missing from Car specifically (not
-          # the generic "id" the bucket-B cases below fall back to). This is the shape that
-          # actually produces #370's reported message, and the only one dropped from the schema.
+          # (Car#checks, through: :car_checks). NestedThroughProbe#checks's source_reflection
+          # is Car#checks, which is itself a ThroughReflection, so join_foreign_key resolves
+          # all the way down to CarCheck#check's real FK ("check_id") -- a genuine column
+          # name, missing from Car specifically (not the generic "id" the bucket-B cases below
+          # fall back to). This is the shape that actually produces #370's reported message.
           stub_const('NestedThroughProbe', Class.new(ApplicationRecord) do
             self.table_name = 'categories'
             self.abstract_class = true
@@ -240,9 +260,19 @@ module ForestAdminDatasourceActiveRecord
           expect { datasource.get_collection('Parent') }.to output(/is published as a many-to-many/).to_stdout
 
           field = datasource.get_collection('Parent').schema[:fields]['details']
-          expect(field).to be_a(Relations::ManyToManySchema)
-          expect(field.through_collection).to eq('Kid')
-          expect(field.foreign_key).to eq('id')
+          expect(field).to have_attributes(
+            class: Relations::ManyToManySchema,
+            foreign_collection: 'Detail',
+            origin_key: 'owner_id',
+            origin_key_target: 'id',
+            through_collection: 'Kid',
+            foreign_key: 'id',
+            foreign_key_target: 'id',
+            origin_type_field: 'owner_type',
+            origin_type_value: 'Parent',
+            foreign_type_field: nil,
+            foreign_type_value: nil
+          )
         end
 
         it 'still publishes, with a deprecation warning, a polymorphic has_one :through with the same shape' do
@@ -252,8 +282,19 @@ module ForestAdminDatasourceActiveRecord
           expect { datasource.get_collection('Solo') }.to output(/is published as a many-to-many/).to_stdout
 
           field = datasource.get_collection('Solo').schema[:fields]['detail']
-          expect(field).to be_a(Relations::ManyToManySchema)
-          expect(field.through_collection).to eq('Kid')
+          expect(field).to have_attributes(
+            class: Relations::ManyToManySchema,
+            foreign_collection: 'Detail',
+            origin_key: 'owner_id',
+            origin_key_target: 'id',
+            through_collection: 'Kid',
+            foreign_key: 'id',
+            foreign_key_target: 'id',
+            origin_type_field: 'owner_type',
+            origin_type_value: 'Solo',
+            foreign_type_field: nil,
+            foreign_type_value: nil
+          )
         end
 
         it 'still publishes, with a deprecation warning, a non-polymorphic has_many :through with the same shape' do
@@ -263,8 +304,65 @@ module ForestAdminDatasourceActiveRecord
           expect { datasource.get_collection('Box') }.to output(/is published as a many-to-many/).to_stdout
 
           field = datasource.get_collection('Box').schema[:fields]['tags']
-          expect(field).to be_a(Relations::ManyToManySchema)
-          expect(field.through_collection).to eq('Slot')
+          expect(field).to have_attributes(
+            class: Relations::ManyToManySchema,
+            foreign_collection: 'Tag',
+            origin_key: 'box_id',
+            origin_key_target: 'id',
+            through_collection: 'Slot',
+            foreign_key: 'id',
+            foreign_key_target: 'id',
+            origin_type_field: nil,
+            origin_type_value: nil,
+            foreign_type_field: nil,
+            foreign_type_value: nil
+          )
+        end
+
+        it 'does not warn when a many-to-many :through source is a belongs_to' do
+          # datasource builds every collection eagerly on first dereference (see the guard
+          # comment above), so a bare `not_to output(/is published as a many-to-many/)` would
+          # also pick up Box/Parent/Solo's own deprecation warnings from that same eager build.
+          # Naming the exact association+model excludes those unrelated warnings.
+          expect { datasource.get_collection('User') }
+            .not_to output(/Association 'projects' in model 'User' is published as a many-to-many/).to_stdout
+        end
+
+        it 'still publishes a has_many :through with a composite (array) foreign key on a belongs_to source' do
+          # join_foreign_key can be an Array, not just a String, whenever the belongs_to source
+          # declares a composite foreign_key (or query_constraints). column_names.include?(array)
+          # is always false, so a naive "missing" check misclassifies this as unrepresentable and
+          # drops a genuinely valid relation -- verified this fixture gets dropped without the
+          # Array(...) handling in foreign_key_missing_from_through?.
+          stub_const('CompositeLeaf', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.primary_key = %w[category_id reference]
+            self.abstract_class = true
+          end)
+
+          stub_const('CompositeThrough', Class.new(ApplicationRecord) do
+            self.table_name = 'car_checks'
+            self.abstract_class = true
+
+            belongs_to :leaf, class_name: 'CompositeLeaf', foreign_key: %w[car_id check_id],
+                              primary_key: %w[category_id reference]
+          end)
+
+          stub_const('CompositeRoot', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.abstract_class = true
+
+            has_many :throughs, class_name: 'CompositeThrough', foreign_key: :car_id
+            has_many :leaves, through: :throughs, source: :leaf
+          end)
+
+          association = CompositeRoot.reflect_on_association(:leaves)
+          expect(association.join_foreign_key).to eq(%w[car_id check_id])
+
+          collection = described_class.new(datasource, CompositeRoot, support_polymorphic_relations: true)
+
+          field = collection.schema[:fields]['leaves']
+          expect(field).to have_attributes(class: Relations::ManyToManySchema, foreign_key: %w[car_id check_id])
         end
 
         # rubocop:disable RSpec/ExampleLength

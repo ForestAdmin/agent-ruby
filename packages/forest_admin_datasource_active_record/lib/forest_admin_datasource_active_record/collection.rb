@@ -88,17 +88,20 @@ module ForestAdminDatasourceActiveRecord
       %i[destroy destroy_async delete_all].include?(association.options[:dependent])
     end
 
-    # join_foreign_key can fall back to the source model's own PK (see
+    # join_foreign_key can fall back to the through model's own PK (see
     # valid_many_to_many_source? below); that PK usually still exists as a column, so
     # "column missing" alone only catches a genuinely broken relation, not every
-    # identity-join case.
+    # identity-join case. join_foreign_key can also be an Array on a composite key.
     def foreign_key_missing_from_through?(association, through_reflection)
-      !through_reflection.klass.column_names.include?(association.join_foreign_key)
+      columns = through_reflection.klass.column_names
+      Array(association.join_foreign_key).any? { |key| !columns.include?(key) }
     end
 
     # True only for a belongs_to source: ThroughReflection#join_foreign_key delegates to
-    # the source reflection, and only belongs_to overrides it to return a real FK column
-    # instead of falling back to the source model's own primary key (#370).
+    # the source reflection, and only belongs_to overrides it to return a real FK column.
+    # Any other source macro falls back to AssociationReflection#active_record_primary_key
+    # -- the through model's own primary key column (honoring a custom primary_key:, and
+    # possibly composite), not a genuine join column (#370).
     def valid_many_to_many_source?(association)
       association.source_reflection&.belongs_to?
     end
@@ -321,9 +324,10 @@ module ForestAdminDatasourceActiveRecord
 
     def warn_unrepresentable_many_to_many(association, through_reflection)
       logger = ActiveSupport::Logger.new($stdout)
+      keys = Array(association.join_foreign_key).join(', ')
       logger.warn(
         "[ForestAdmin] ⚠️  Skipping association '#{association.name}' in model '#{@model.name}': " \
-        "its foreign key ('#{association.join_foreign_key}') is not a column of the through " \
+        "its foreign key ('#{keys}') is not a column of the through " \
         "collection '#{format_model_name(through_reflection.klass.name)}' -- this relation cannot " \
         'be represented as a Forest Admin many-to-many.'
       )
@@ -333,10 +337,11 @@ module ForestAdminDatasourceActiveRecord
       logger = ActiveSupport::Logger.new($stdout)
       logger.warn(
         "[ForestAdmin] ⚠️  Association '#{association.name}' in model '#{@model.name}' is published " \
-        "as a many-to-many joining '#{format_model_name(through_reflection.klass.name)}' and " \
-        "'#{format_model_name(association.klass.name)}' by their own primary keys, since its source " \
-        'association is not a belongs_to. This identity join will be removed in a future major ' \
-        'version -- see #370.'
+        "as a many-to-many joining '#{format_model_name(through_reflection.klass.name)}'." \
+        "'#{association.join_foreign_key}' to " \
+        "'#{format_model_name(association.klass.name)}'.'#{association.association_primary_key}', " \
+        'since its source association is not a belongs_to. This identity join will be removed ' \
+        'in a future major version -- see #370.'
       )
     end
 
