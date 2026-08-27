@@ -1,3 +1,15 @@
+# [1.40.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.4...v1.40.0) (2026-08-27)
+
+
+### Bug Fixes
+
+* **datasource-active-record:** skip unrepresentable has_many/has_one :through relations and deprecate silent identity joins ([#370](https://github.com/ForestAdmin/agent-ruby/issues/370)) ([#378](https://github.com/ForestAdmin/agent-ruby/issues/378)) ([9d02bf5](https://github.com/ForestAdmin/agent-ruby/commit/9d02bf5fec10be42b7f947263f7aaead7291c75c))
+
+
+### Features
+
+* **actions:** resolve select-all selections for approval-required actions ([#374](https://github.com/ForestAdmin/agent-ruby/issues/374)) ([d2071aa](https://github.com/ForestAdmin/agent-ruby/commit/d2071aa9304613010480d03ba153c80d1ba4b746))
+
 ## [1.39.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.3...v1.39.4) (2026-08-26)
 
 
