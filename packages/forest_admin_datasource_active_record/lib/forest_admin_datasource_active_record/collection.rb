@@ -90,11 +90,19 @@ module ForestAdminDatasourceActiveRecord
 
     # join_foreign_key can fall back to the through model's own PK (see
     # valid_many_to_many_source? below); that PK usually still exists as a column, so
-    # "column missing" alone only catches a genuinely broken relation, not every
-    # identity-join case. join_foreign_key can also be an Array on a composite key.
-    def foreign_key_missing_from_through?(association, through_reflection)
-      columns = through_reflection.klass.column_names
-      Array(association.join_foreign_key).any? { |key| !columns.include?(key) }
+    # "column missing" alone doesn't catch every unrepresentable case -- a composite key is
+    # unrepresentable too, even when every individual column exists: GeneratorField looks
+    # fields up by the raw key, so a composite key never resolves. A composite key can reach
+    # us either as a real Array, or (via an explicit primary_key: option on the source)
+    # already flattened by Rails into a mangled String like '["a", "b"]' -- neither is ever a
+    # real column name, so checking column membership catches both forms uniformly, on
+    # whichever collection each key is actually resolved against downstream (#370).
+    def unrepresentable_many_to_many?(association, through_reflection)
+      [
+        [association.join_foreign_key, through_reflection.klass],
+        [through_reflection.foreign_key, through_reflection.klass],
+        [association.association_primary_key, association.klass]
+      ].any? { |key, klass| !klass.column_names.include?(key) }
     end
 
     # True only for a belongs_to source: ThroughReflection#join_foreign_key delegates to
@@ -122,7 +130,7 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def add_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
-      if foreign_key_missing_from_through?(association, through_reflection)
+      if unrepresentable_many_to_many?(association, through_reflection)
         warn_unrepresentable_many_to_many(association, through_reflection)
         return
       end
@@ -131,7 +139,7 @@ module ForestAdminDatasourceActiveRecord
         association.name.to_s,
         build_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
       )
-      warn_deprecated_identity_join(association, through_reflection) unless valid_many_to_many_source?(association)
+      warn_identity_join(association, through_reflection) unless valid_many_to_many_source?(association)
     end
 
     # rubocop:disable Metrics/BlockNesting
@@ -324,26 +332,33 @@ module ForestAdminDatasourceActiveRecord
 
     def warn_unrepresentable_many_to_many(association, through_reflection)
       logger = ActiveSupport::Logger.new($stdout)
-      keys = Array(association.join_foreign_key).join(', ')
       logger.warn(
         "[ForestAdmin] ⚠️  Skipping association '#{association.name}' in model '#{@model.name}': " \
-        "its foreign key ('#{keys}') is not a column of the through " \
-        "collection '#{format_model_name(through_reflection.klass.name)}' -- this relation cannot " \
-        'be represented as a Forest Admin many-to-many.'
+        'this relation cannot be represented as a Forest Admin many-to-many -- its join keys must ' \
+        'each be a single existing column, on the through collection ' \
+        "'#{format_model_name(through_reflection.klass.name)}' or the foreign collection " \
+        "'#{format_model_name(association.klass.name)}' (composite/query_constraints keys are " \
+        'not supported).'
       )
     end
 
-    def warn_deprecated_identity_join(association, through_reflection)
+    # join_foreign_key/association_primary_key are guaranteed to be single, real, existing
+    # columns here: unrepresentable_many_to_many? above already checks column membership for
+    # both (and for origin_key) before this is ever called.
+    #
+    # Deliberately a diagnostic, not a deprecation notice: this shape is common (any
+    # has_many/has_one :through sourced from a plain has_one/has_many, not just polymorphic
+    # ones) and the relation is kept published to avoid narrowing the schema -- see #370.
+    # No removal is promised or planned.
+    def warn_identity_join(association, through_reflection)
       logger = ActiveSupport::Logger.new($stdout)
-      foreign_key = Array(association.join_foreign_key).join(', ')
-      foreign_key_target = Array(association.association_primary_key).join(', ')
       logger.warn(
         "[ForestAdmin] ⚠️  Association '#{association.name}' in model '#{@model.name}' is published " \
         "as a many-to-many joining '#{format_model_name(through_reflection.klass.name)}'." \
-        "'#{foreign_key}' to " \
-        "'#{format_model_name(association.klass.name)}'.'#{foreign_key_target}', " \
-        'since its source association is not a belongs_to. This identity join will be removed ' \
-        'in a future major version -- see #370.'
+        "'#{association.join_foreign_key}' to " \
+        "'#{format_model_name(association.klass.name)}'.'#{association.association_primary_key}': " \
+        "its source association is not a belongs_to, so this join uses each side's own identifier " \
+        'rather than a dedicated foreign key column -- see #370 for background.'
       )
     end
 

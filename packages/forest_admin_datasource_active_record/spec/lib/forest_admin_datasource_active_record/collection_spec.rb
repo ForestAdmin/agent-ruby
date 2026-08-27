@@ -250,13 +250,13 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).not_to include('checks')
         end
 
-        it 'still publishes, with a deprecation warning, a has_many :through whose foreign key ' \
+        it 'still publishes, with a diagnostic warning, a has_many :through whose foreign key ' \
            'coincidentally exists on the through collection' do
           # Parent -> Kid (polymorphic has_many) -> Detail (has_one, custom foreign_key). Kid#detail
           # is a has_one, so join_foreign_key resolves to Kid's own primary key ("id") -- a column
           # that trivially exists on every table, so it's not "missing" and the relation is still
           # published exactly as before, as an (until now undetected) identity join. Dropping it
-          # outright would change the published schema for this shape, so it's deprecated instead.
+          # outright would change the published schema for this shape, so it's flagged instead.
           expect { datasource.get_collection('Parent') }.to output(/is published as a many-to-many/).to_stdout
 
           field = datasource.get_collection('Parent').schema[:fields]['details']
@@ -275,7 +275,7 @@ module ForestAdminDatasourceActiveRecord
           )
         end
 
-        it 'still publishes, with a deprecation warning, a polymorphic has_one :through with the same shape' do
+        it 'still publishes, with a diagnostic warning, a polymorphic has_one :through with the same shape' do
           # Solo -> Kid (polymorphic has_one) -> Detail: same bucket-B shape as above, through the
           # has_one branch. A non-polymorphic has_one :through isn't reached by this guard at all --
           # it falls into the pre-existing OneToOneSchema path, unguarded (tracked as #379).
@@ -297,7 +297,7 @@ module ForestAdminDatasourceActiveRecord
           )
         end
 
-        it 'still publishes, with a deprecation warning, a non-polymorphic has_many :through with the same shape' do
+        it 'still publishes, with a diagnostic warning, a non-polymorphic has_many :through with the same shape' do
           # Box -> Slot (plain has_many, no polymorphism at all) -> Tag: same bucket-B shape,
           # showing the has_many branch has no polymorphic gate -- it reaches this guard
           # unconditionally, unlike the has_one branch above.
@@ -322,18 +322,20 @@ module ForestAdminDatasourceActiveRecord
         it 'does not warn when a many-to-many :through source is a belongs_to' do
           # datasource builds every collection eagerly on first dereference (see the guard
           # comment above), so a bare `not_to output(/is published as a many-to-many/)` would
-          # also pick up Box/Parent/Solo's own deprecation warnings from that same eager build.
+          # also pick up Box/Parent/Solo's own identity-join warnings from that same eager build.
           # Naming the exact association+model excludes those unrelated warnings.
           expect { datasource.get_collection('User') }
             .not_to output(/Association 'projects' in model 'User' is published as a many-to-many/).to_stdout
         end
 
-        it 'still publishes a has_many :through with a composite (array) foreign key on a belongs_to source' do
+        it 'skips a has_many :through whose foreign key is composite, since a composite key ' \
+           'crashes schema:generate downstream even when every column exists' do
           # join_foreign_key can be an Array, not just a String, whenever the belongs_to source
-          # declares a composite foreign_key (or query_constraints). column_names.include?(array)
-          # is always false, so a naive "missing" check misclassifies this as unrepresentable and
-          # drops a genuinely valid relation -- verified this fixture gets dropped without the
-          # Array(...) handling in foreign_key_missing_from_through?.
+          # declares a composite foreign_key (or query_constraints). GeneratorField looks fields
+          # up by the raw key (never resolves for an Array) and stringifies a composite
+          # foreign_key_target instead of naming real columns -- both crash schema:generate on
+          # this exact fixture (confirmed pre-existing on main too, so skipping it regresses
+          # nothing that ever worked, see #370).
           stub_const('CompositeLeaf', Class.new(ApplicationRecord) do
             self.table_name = 'cars'
             self.primary_key = %w[category_id reference]
@@ -359,56 +361,97 @@ module ForestAdminDatasourceActiveRecord
           association = CompositeRoot.reflect_on_association(:leaves)
           expect(association.join_foreign_key).to eq(%w[car_id check_id])
 
-          collection = described_class.new(datasource, CompositeRoot, support_polymorphic_relations: true)
+          collection = nil
+          expect do
+            collection = described_class.new(datasource, CompositeRoot, support_polymorphic_relations: true)
+          end.to output(/Skipping association 'leaves'/).to_stdout
 
-          # This pins that foreign_key_target comes out mangled -- not that it's usable.
-          # association_primary_key stringifies a composite target (ThroughReflection#
-          # association_primary_key calls .to_s), so foreign_key_target is this mangled
-          # string rather than a real column reference; that's a pre-existing (main-inherited)
-          # limitation being pinned here, not endorsed.
-          field = collection.schema[:fields]['leaves']
-          expect(field).to have_attributes(
-            class: Relations::ManyToManySchema,
-            origin_key: 'car_id',
-            origin_key_target: 'id',
-            through_collection: 'CompositeThrough',
-            foreign_key: %w[car_id check_id],
-            foreign_key_target: '["category_id", "reference"]'
-          )
+          expect(collection.schema[:fields].keys).not_to include('leaves')
         end
 
-        it 'renders a composite (array) foreign key as a clean list in the deprecation warning' do
-          # Same Array-valued join_foreign_key case as the belongs_to fixture above, but
-          # sourced from a plain has_one (not belongs_to) so it reaches
-          # warn_deprecated_identity_join instead -- pins that this message normalizes the
-          # Array too, not just warn_unrepresentable_many_to_many.
-          stub_const('ArrayLeaf', Class.new(ApplicationRecord) do
-            self.table_name = 'users'
+        it 'skips a has_many :through whose origin_key (the root-to-through key, not the ' \
+           'source association) is composite' do
+          # through_reflection.foreign_key (origin_key) can independently be an Array, driven by
+          # the ROOT's own has_many :through declaration rather than by the source association --
+          # unrepresentable_many_to_many? must check it too, or a composite origin_key sails
+          # through with a perfectly normal (String) join_foreign_key and crashes
+          # GeneratorField#build_many_to_many_schema on origin_key instead (#370).
+          stub_const('OriginKeyLeaf', Class.new(ApplicationRecord) do
+            self.table_name = 'checks'
             self.abstract_class = true
           end)
 
-          stub_const('ArrayThrough', Class.new(ApplicationRecord) do
+          stub_const('OriginKeyThrough', Class.new(ApplicationRecord) do
+            self.table_name = 'car_checks'
+            self.abstract_class = true
+
+            belongs_to :leaf, class_name: 'OriginKeyLeaf', foreign_key: :check_id
+          end)
+
+          stub_const('OriginKeyRoot', Class.new(ApplicationRecord) do
             self.table_name = 'cars'
             self.primary_key = %w[category_id reference]
             self.abstract_class = true
 
-            has_one :leaf, class_name: 'ArrayLeaf', foreign_key: :id
-          end)
-
-          stub_const('ArrayRoot', Class.new(ApplicationRecord) do
-            self.table_name = 'categories'
-            self.abstract_class = true
-
-            has_many :throughs, class_name: 'ArrayThrough', foreign_key: :category_id
+            has_many :throughs, class_name: 'OriginKeyThrough', foreign_key: %w[car_id check_id]
             has_many :leaves, through: :throughs, source: :leaf
           end)
 
-          association = ArrayRoot.reflect_on_association(:leaves)
-          expect(association.join_foreign_key).to eq(%w[category_id reference])
+          association = OriginKeyRoot.reflect_on_association(:leaves)
+          expect(association.join_foreign_key).to eq('check_id')
+          expect(association.through_reflection.foreign_key).to eq(%w[car_id check_id])
 
+          collection = nil
           expect do
-            described_class.new(datasource, ArrayRoot, support_polymorphic_relations: true)
-          end.to output(/joining 'ArrayThrough'\.'category_id, reference' to 'ArrayLeaf'\.'id'/).to_stdout
+            collection = described_class.new(datasource, OriginKeyRoot, support_polymorphic_relations: true)
+          end.to output(/Skipping association 'leaves'/).to_stdout
+
+          expect(collection.schema[:fields].keys).not_to include('leaves')
+        end
+
+        it 'skips a has_many :through whose foreign_key_target is composite, even when it ' \
+           'reaches us as a mangled String rather than a real Array, and even when ' \
+           'join_foreign_key/origin_key are both fine' do
+          # association_primary_key can be composite two different ways: a genuine Array (the
+          # foreign class's own composite primary_key, no override), or -- as here -- a String
+          # that LOOKS scalar but is actually Array#to_s'd by ThroughReflection#
+          # association_primary_key whenever the source declares an explicit array primary_key:
+          # option. A naive `.is_a?(Array)` check only catches the first form; checking column
+          # membership catches both, since neither is ever a real column name. join_foreign_key
+          # and origin_key are both deliberately valid here, to isolate this one check.
+          stub_const('MangledLeaf', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.abstract_class = true
+          end)
+
+          stub_const('MangledThrough', Class.new(ApplicationRecord) do
+            self.table_name = 'car_checks'
+            self.abstract_class = true
+
+            belongs_to :leaf, class_name: 'MangledLeaf', foreign_key: :check_id,
+                              primary_key: %w[category_id reference], optional: true
+          end)
+
+          stub_const('MangledRoot', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.abstract_class = true
+
+            has_many :throughs, class_name: 'MangledThrough', foreign_key: :car_id
+            has_many :leaves, through: :throughs, source: :leaf
+          end)
+
+          association = MangledRoot.reflect_on_association(:leaves)
+          expect(association.join_foreign_key).to eq('check_id')
+          expect(association.through_reflection.foreign_key).to eq('car_id')
+          expect(association.association_primary_key).to be_a(String)
+          expect(association.association_primary_key).to eq('["category_id", "reference"]')
+
+          collection = nil
+          expect do
+            collection = described_class.new(datasource, MangledRoot, support_polymorphic_relations: true)
+          end.to output(/Skipping association 'leaves'/).to_stdout
+
+          expect(collection.schema[:fields].keys).not_to include('leaves')
         end
 
         # rubocop:disable RSpec/ExampleLength
