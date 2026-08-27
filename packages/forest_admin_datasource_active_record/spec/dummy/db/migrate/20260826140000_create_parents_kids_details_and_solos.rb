@@ -1,4 +1,4 @@
-class CreateKidsDetailsAndSolos < ActiveRecord::Migration[7.1]
+class CreateParentsKidsDetailsAndSolos < ActiveRecord::Migration[7.1]
   def change
     create_table :parents
     create_table :solos

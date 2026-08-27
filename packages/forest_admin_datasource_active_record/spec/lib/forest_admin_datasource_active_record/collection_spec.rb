@@ -44,6 +44,11 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).to include('users')
         end
 
+        # Supplier -> Account -> AccountHistory: same bug class as #370 (a :through relation
+        # sourced from a non-belongs_to), just via this pre-existing OneToOneSchema path
+        # instead of ManyToManySchema -- origin_key/origin_key_target below resolve to both
+        # models' own primary keys, not a real join column. Out of scope for #370's fix;
+        # this test pins the current (buggy) behavior, not correct behavior.
         it 'add has_one_through relation as a to-one (OneToOne)' do
           collection = described_class.new(datasource, Supplier)
 
@@ -192,6 +197,12 @@ module ForestAdminDatasourceActiveRecord
           expect(projects_relation.origin_type_value).to be_nil
         end
 
+        # In every `output(...).to_stdout` guard test below, `datasource` must be
+        # dereferenced for the first time *inside* the `expect` block: Datasource#generate
+        # builds every collection (and so triggers the warning) once, at construction. If
+        # something earlier in the example touched `datasource` first, the matcher would
+        # pass vacuously with no warning to catch -- the exact failure mode a previous
+        # revision of this fix shipped with.
         it 'skips a has_many :through whose source reflection is not a belongs_to' do
           # Parent -> Kid (polymorphic has_many) -> Detail (has_one, custom foreign_key).
           # Kid#detail is a has_one, so join_foreign_key resolves to Kid's own primary key
