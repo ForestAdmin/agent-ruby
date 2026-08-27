@@ -163,6 +163,20 @@ module ForestAdminDatasourcePylon
         expect(ForestAdminDatasourcePylon.logger).to have_received(:warn)
           .with(a_string_including(issue_id_field, 'boom'))
       end
+
+      # A ValidationError is the collection refusing the selection in words
+      # written for the operator -- PylonIssue naming more issues by id than one
+      # page of lookups covers, for one. Degraded to an empty list, it would be
+      # reported as "no issue selected" about a selection they can see they made.
+      it 'lets a refusal of the selection through rather than reporting nothing selected' do
+        context = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContext)
+        allow(context).to receive(:get_record_ids).and_raise(UnsupportedOperatorError, 'names 25 issues by id')
+        allow(client).to receive(:update_issue)
+
+        expect { on_primary_key.execute.call(context, result_builder) }
+          .to raise_error(UnsupportedOperatorError, /names 25 issues by id/)
+        expect(client).not_to have_received(:update_issue)
+      end
     end
 
     describe 'the state an execution writes' do
