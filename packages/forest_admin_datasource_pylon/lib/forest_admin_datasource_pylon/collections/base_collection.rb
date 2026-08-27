@@ -283,10 +283,16 @@ module ForestAdminDatasourcePylon
       # A projection naming only relations names no column of this collection,
       # and the row it asks for carries none: returning the whole record there
       # would serve every native column under a projection that excluded them,
-      # which is what `Projection#re_project` does not do. Only a nil projection
-      # — no projection at all — still means the record as it is.
+      # which is what `Projection#re_project` does not do.
+      #
+      # An empty projection is the other case and not that one — it asks for
+      # nothing rather than for relations alone, and means the record as it is,
+      # exactly like no projection at all. `ActionContext#get_records` sends one
+      # on every action whatever fields it was handed, so a row emptied here
+      # costs the plugins the record they act on: `primary_keys` raises on it,
+      # and `IssueTargets` reads the raise as "no issue selected".
       def project(record, projection)
-        return record if projection.nil?
+        return record if projection.nil? || Array(projection).empty?
 
         wanted = Array(projection).map(&:to_s).reject { |p| p.include?(':') }
         wanted.to_h { |k| [k, record[k]] }

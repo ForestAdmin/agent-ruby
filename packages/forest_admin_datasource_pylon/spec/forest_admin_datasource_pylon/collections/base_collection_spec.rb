@@ -624,6 +624,16 @@ module ForestAdminDatasourcePylon
         expect(collection.project(record, nil)).to eq(record)
       end
 
+      # What `ActionContext#get_records` sends on every action, whatever fields
+      # it was handed. Emptied here, the row costs a plugin the record it acts
+      # on rather than a column: `primary_keys` raises on it.
+      it 'returns the record untouched for an empty projection' do
+        expect(collection.project(record, [])).to eq(record)
+        expect(
+          collection.project(record, ForestAdminDatasourceToolkit::Components::Query::Projection.new)
+        ).to eq(record)
+      end
+
       it 'keeps only the projected fields' do
         expect(collection.project(record, %w[id title])).to eq('id' => 'uuid-1', 'title' => 'Boom')
       end
