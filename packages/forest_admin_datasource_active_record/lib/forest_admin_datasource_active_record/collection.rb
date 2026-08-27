@@ -88,11 +88,47 @@ module ForestAdminDatasourceActiveRecord
       %i[destroy destroy_async delete_all].include?(association.options[:dependent])
     end
 
-    # ThroughReflection#join_foreign_key delegates to the source reflection; only
-    # belongs_to overrides it to return a real FK column. Any other macro falls back
-    # to the source model's own primary key, producing a bogus identity join (#370).
-    def foreign_key_on_through_collection?(association)
+    # join_foreign_key can fall back to the source model's own PK (see
+    # valid_many_to_many_source? below); that PK usually still exists as a column, so
+    # "column missing" alone only catches a genuinely broken relation, not every
+    # identity-join case.
+    def foreign_key_missing_from_through?(association, through_reflection)
+      !through_reflection.klass.column_names.include?(association.join_foreign_key)
+    end
+
+    # True only for a belongs_to source: ThroughReflection#join_foreign_key delegates to
+    # the source reflection, and only belongs_to overrides it to return a real FK column
+    # instead of falling back to the source model's own primary key (#370).
+    def valid_many_to_many_source?(association)
       association.source_reflection&.belongs_to?
+    end
+
+    def build_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
+      ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
+        foreign_collection: format_model_name(association.klass.name),
+        origin_key: through_reflection.foreign_key,
+        origin_key_target: through_reflection.join_foreign_key,
+        foreign_key: association.join_foreign_key,
+        foreign_key_target: association.association_primary_key,
+        through_collection: format_model_name(through_reflection.klass.name),
+        origin_type_field: is_polymorphic ? through_reflection.type : nil,
+        origin_type_value: is_polymorphic ? @model.name : nil,
+        foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
+        foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
+      )
+    end
+
+    def add_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
+      if foreign_key_missing_from_through?(association, through_reflection)
+        warn_unrepresentable_many_to_many(association, through_reflection)
+        return
+      end
+
+      add_field(
+        association.name.to_s,
+        build_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
+      )
+      warn_deprecated_identity_join(association, through_reflection) unless valid_many_to_many_source?(association)
     end
 
     # rubocop:disable Metrics/BlockNesting
@@ -108,24 +144,8 @@ module ForestAdminDatasourceActiveRecord
                                    association.options[:source_type].present?
               many_to_many_shape = is_polymorphic || source_polymorphic
 
-              if many_to_many_shape && foreign_key_on_through_collection?(association)
-                add_field(
-                  association.name.to_s,
-                  ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                    foreign_collection: format_model_name(association.klass.name),
-                    origin_key: through_reflection.foreign_key,
-                    origin_key_target: through_reflection.join_foreign_key,
-                    foreign_key: association.join_foreign_key,
-                    foreign_key_target: association.association_primary_key,
-                    through_collection: format_model_name(through_reflection.klass.name),
-                    origin_type_field: is_polymorphic ? through_reflection.type : nil,
-                    origin_type_value: is_polymorphic ? @model.name : nil,
-                    foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
-                    foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
-                  )
-                )
-              elsif many_to_many_shape
-                warn_unrepresentable_many_to_many(association, through_reflection)
+              if many_to_many_shape
+                add_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
               else
                 add_field(
                   association.name.to_s,
@@ -196,25 +216,7 @@ module ForestAdminDatasourceActiveRecord
               source_polymorphic = association.source_reflection&.polymorphic? &&
                                    association.options[:source_type].present?
 
-              if foreign_key_on_through_collection?(association)
-                add_field(
-                  association.name.to_s,
-                  ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(
-                    foreign_collection: format_model_name(association.klass.name),
-                    origin_key: through_reflection.foreign_key,
-                    origin_key_target: through_reflection.join_foreign_key,
-                    foreign_key: association.join_foreign_key,
-                    foreign_key_target: association.association_primary_key,
-                    through_collection: format_model_name(through_reflection.klass.name),
-                    origin_type_field: is_polymorphic ? through_reflection.type : nil,
-                    origin_type_value: is_polymorphic ? @model.name : nil,
-                    foreign_type_field: source_polymorphic ? association.source_reflection.foreign_type : nil,
-                    foreign_type_value: source_polymorphic ? association.options[:source_type] : nil
-                  )
-                )
-              else
-                warn_unrepresentable_many_to_many(association, through_reflection)
-              end
+              add_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)
             elsif association.inverse_of&.polymorphic?
               add_field(
                 association.name.to_s,
@@ -318,14 +320,23 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def warn_unrepresentable_many_to_many(association, through_reflection)
-      source = association.source_reflection
       logger = ActiveSupport::Logger.new($stdout)
       logger.warn(
         "[ForestAdmin] ⚠️  Skipping association '#{association.name}' in model '#{@model.name}': " \
-        "its source association '#{source.name}' on '#{format_model_name(through_reflection.klass.name)}' " \
-        "is a #{source.macro}, not a belongs_to, so there is no real join column between " \
-        "'#{format_model_name(through_reflection.klass.name)}' and '#{format_model_name(association.klass.name)}' " \
-        '-- this relation cannot be represented as a Forest Admin many-to-many.'
+        "its foreign key ('#{association.join_foreign_key}') is not a column of the through " \
+        "collection '#{format_model_name(through_reflection.klass.name)}' -- this relation cannot " \
+        'be represented as a Forest Admin many-to-many.'
+      )
+    end
+
+    def warn_deprecated_identity_join(association, through_reflection)
+      logger = ActiveSupport::Logger.new($stdout)
+      logger.warn(
+        "[ForestAdmin] ⚠️  Association '#{association.name}' in model '#{@model.name}' is published " \
+        "as a many-to-many joining '#{format_model_name(through_reflection.klass.name)}' and " \
+        "'#{format_model_name(association.klass.name)}' by their own primary keys, since its source " \
+        'association is not a belongs_to. This identity join will be removed in a future major ' \
+        'version -- see #370.'
       )
     end
 
