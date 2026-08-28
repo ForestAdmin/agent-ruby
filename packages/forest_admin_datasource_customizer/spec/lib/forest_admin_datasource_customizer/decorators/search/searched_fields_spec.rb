@@ -242,6 +242,17 @@ module ForestAdminDatasourceCustomizer
             expect { decorated.replace_search(include_fields: ['holder:nope']) }
               .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /nope/)
           end
+
+          # `get_field_schema` only requires a to-one relation of the segments it crosses, so a bare
+          # relation resolves to a RelationSchema and reached `build_condition`, which asks it for a
+          # `column_type` it does not have.
+          it 'refuses a bare relation, which carries no term to compare' do
+            expect { decorated.replace_search(only_fields: ['holder']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Cannot search on 'holder': a ManyToOne is not a column"
+              )
+          end
         end
       end
     end

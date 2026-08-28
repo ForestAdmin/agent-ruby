@@ -4,6 +4,7 @@ module ForestAdminDatasourceCustomizer
       class SearchCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminDatasourceToolkit::Exceptions
 
         POLYMORPHIC_TYPES = %w[PolymorphicManyToOne PolymorphicOneToOne].freeze
         TO_ONE_RELATIONS = %w[ManyToOne OneToOne].freeze
@@ -145,9 +146,16 @@ module ForestAdminDatasourceCustomizer
         end
 
         # Strict where an end-user term would be interpreted: this list is written by the developer,
-        # so a name that names nothing is a mistake to report.
+        # so a name that names nothing, or names a relation the search cannot compare a term to, is a
+        # mistake to report.
         def resolved_field(path)
-          [path, ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)]
+          schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
+
+          unless schema.type == 'Column'
+            raise ForestException, "Cannot search on '#{path}': a #{schema.type} is not a column"
+          end
+
+          [path, schema]
         end
 
         def build_condition(field, schema, search_string)

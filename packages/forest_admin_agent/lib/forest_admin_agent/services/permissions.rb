@@ -330,7 +330,8 @@ module ForestAdminAgent
       end
 
       def collect_search_usages(collection, search, search_extended, usages)
-        return if search.nil?
+        # The stack discards a blank search instead of running it, so there is nothing to authorize.
+        return if search.nil? || search.strip.empty?
 
         searched = collection.searched_fields(search, search_extended) if collection.respond_to?(:searched_fields)
 
