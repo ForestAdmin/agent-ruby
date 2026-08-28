@@ -1,3 +1,10 @@
+## [1.40.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.0...v1.40.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **datasource-active-record:** mark non-polymorphic has_one :through identity joins read-only ([#381](https://github.com/ForestAdmin/agent-ruby/issues/381)) ([790eecf](https://github.com/ForestAdmin/agent-ruby/commit/790eecf385a3d69b7b51774248c8ae8ef01e0f4b))
+
 # [1.40.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.39.4...v1.40.0) (2026-08-27)
 
 
