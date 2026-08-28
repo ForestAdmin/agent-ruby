@@ -142,7 +142,7 @@ module ForestAdminDatasourcePylon
       body['filter']      = filter unless filter.nil?
       body['search_text'] = search_text unless blank?(search_text)
 
-      must_succeed(path) { to_search_page(connection.post(path, body).body) }
+      must_succeed(path) { to_search_page(connection.post(path, body).body, path) }
     end
 
     # `limit` is mandatory on the paginated GET endpoints, unlike their POST
@@ -151,11 +151,11 @@ module ForestAdminDatasourcePylon
       params = { 'limit' => clamp_limit(limit) }
       params['cursor'] = cursor unless blank?(cursor)
 
-      must_succeed(path) { to_search_page(connection.get(path, params).body) }
+      must_succeed(path) { to_search_page(connection.get(path, params).body, path) }
     end
 
     def fetch_all(path, params = {})
-      must_succeed(path) { Array(extract_data(connection.get(path, params).body)) }
+      must_succeed(path) { extract_list(connection.get(path, params).body, path) }
     end
 
     # Every record of a cursor-paginated GET, no window asked for and no limit
@@ -179,7 +179,7 @@ module ForestAdminDatasourcePylon
 
       loop do
         query = cursor.nil? ? params : params.merge('cursor' => cursor)
-        page = to_search_page(conn.get(path, query).body)
+        page = to_search_page(conn.get(path, query).body, path)
         records.concat(page.records)
         pages += 1
         break if page.next_cursor.nil? || page.records.empty? || !seen.add?(page.next_cursor)
@@ -206,7 +206,7 @@ module ForestAdminDatasourcePylon
     # being joined to the path.
     def fetch_resource(resource, id)
       path = "#{resource}/#{Faraday::Utils.escape(id)}"
-      must_succeed(path) { extract_data(connection.get(path).body) }
+      must_succeed(path) { extract_record(connection.get(path).body, path) }
     end
 
     def clamp_limit(limit)
@@ -218,11 +218,37 @@ module ForestAdminDatasourcePylon
 
     # Pylon only includes the `pagination` block when a next page exists, so an
     # absent block, `has_next_page: false` and an empty cursor all mean "done".
-    def to_search_page(body)
+    def to_search_page(body, operation)
       pagination = body.is_a?(Hash) ? body['pagination'] : nil
       cursor = pagination.is_a?(Hash) && pagination['has_next_page'] ? pagination['cursor'] : nil
 
-      SearchPage.new(records: Array(extract_data(body)), next_cursor: blank?(cursor) ? nil : cursor)
+      SearchPage.new(records: extract_list(body, operation), next_cursor: blank?(cursor) ? nil : cursor)
+    end
+
+    # A read expects `data` to hold what it asked for, and anything else broke
+    # the contract. `extract_data` hands an envelope carrying no `data` straight
+    # back, which `Array()` would then split into `[key, value]` pairs and the
+    # collection would serialize into rows holding nothing -- a page that looks
+    # answered and is empty. Refused instead, the way the write path already
+    # refuses the same shape: see `Client::Writes#extract_written`.
+    #
+    # An absent or null `data` stays the empty answer it is: Pylon spells "no
+    # record" that way, and a search matching nothing is not a broken contract.
+    def extract_list(body, operation)
+      data = extract_data(body)
+      return [] if data.nil?
+      return data if data.is_a?(Array)
+
+      refuse_body_shape(body, operation, "'data' is not a list")
+    end
+
+    # The single-record half of the same check. nil travels: it is what a
+    # caller reads as "no such record".
+    def extract_record(body, operation)
+      data = extract_data(body)
+      return data if data.nil? || data.is_a?(Hash)
+
+      refuse_body_shape(body, operation, "'data' is not a record")
     end
 
     def blank?(value)

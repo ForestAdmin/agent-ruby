@@ -768,4 +768,41 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       end
     end
   end
+
+  # The write path already refuses a body Pylon answered without `data`; a read
+  # used to hand the envelope back, and `Array()` split it into `[key, value]`
+  # pairs the collection serialized into rows holding nothing -- a page that
+  # looks answered and is empty.
+  describe 'a response body that broke the contract' do
+    it 'refuses an envelope carrying no "data" where a list was expected' do
+      stub_request(:get, "#{base}/teams").to_return(json('teams' => [{ 'id' => 't1' }]))
+
+      expect { client.fetch_teams }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /teams.*'data' is not a list/)
+    end
+
+    it 'refuses a "data" holding something other than a list on a search' do
+      stub_request(:post, "#{base}/issues/search").to_return(json('data' => { 'id' => 'i1' }))
+
+      expect { client.search_issues(limit: 10) }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, %r{issues/search.*'data' is not a list})
+    end
+
+    it 'refuses a "data" holding something other than a record on a single read' do
+      stub_request(:get, "#{base}/issues/i1").to_return(json('data' => %w[i1]))
+
+      expect { client.fetch_issue('i1') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, %r{issues/i1.*'data' is not a record})
+    end
+
+    # Pylon spells "no record" that way, and a search matching nothing is not a
+    # broken contract.
+    it 'reads an absent or null "data" as the empty answer it is' do
+      stub_request(:get, "#{base}/teams").to_return(json('data' => nil))
+      stub_request(:get, "#{base}/issues/i1").to_return(json('data' => nil))
+
+      expect(client.fetch_teams).to eq([])
+      expect(client.fetch_issue('i1')).to be_nil
+    end
+  end
 end
