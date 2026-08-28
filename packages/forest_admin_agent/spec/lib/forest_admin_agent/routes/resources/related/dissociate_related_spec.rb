@@ -41,6 +41,15 @@ module ForestAdminAgent
                   origin_key_target: 'id',
                   origin_type_field: 'addressable_type',
                   origin_type_value: 'user'
+                ),
+                'locked_addresses' => Relations::ManyToManySchema.new(
+                  foreign_key: 'address_id',
+                  foreign_collection: 'address',
+                  foreign_key_target: 'id',
+                  through_collection: 'address_user',
+                  origin_key: 'user_id',
+                  origin_key_target: 'id',
+                  is_read_only: true
                 )
               }
             )
@@ -238,6 +247,20 @@ module ForestAdminAgent
                 ForestAdminDatasourceToolkit::Exceptions::ForestException,
                 'Expected no empty id list'
               )
+            end
+
+            it 'refuses to dissociate a read-only relation (any type, not just OneToOne, can be ' \
+               'marked is_read_only now that it lives on the shared RelationSchema)' do
+              allow(@datasource.get_collection('address_user')).to receive(:delete)
+
+              args[:params]['relation_name'] = 'locked_addresses'
+              args[:params][:data] = [{ 'id' => 1 }]
+              args[:params]['id'] = 1
+
+              expect { dissociate.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                                'Field locked_addresses is not editable')
+              expect(@datasource.get_collection('address_user')).not_to have_received(:delete)
             end
 
             it 'call dissociate_or_delete_many_to_many without deletion' do

@@ -28,6 +28,7 @@ module ForestAdminAgent
             target_primary_key_values = Utils::Id.unpack_id(context.child_collection, args[:params]['data'][0]['id'],
                                                             with_key: true)
             relation = Schema.get_to_many_relation(context.collection, args[:params]['relation_name'])
+            Collection.assert_writable_relation!(args[:params]['relation_name'], relation)
 
             case relation.type
             when 'OneToMany'

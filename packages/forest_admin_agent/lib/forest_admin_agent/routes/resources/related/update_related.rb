@@ -28,6 +28,11 @@ module ForestAdminAgent
             # Must run before unpack_id: unauthorized callers get a 403, not a validation error
             context.permissions.can?(:edit, mutated_collection(relation, context))
 
+            # Every relation type this route writes through can be read-only (#379's
+            # OneToOne identity join is the reason this exists, but the flag itself sits on
+            # the shared RelationSchema, so enforce it once here rather than per-branch).
+            Collection.assert_writable_relation!(args[:params]['relation_name'], relation)
+
             parent_primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'])
 
             linked_primary_key_values = if (id = args.dig(:params, 'data', 'id'))
@@ -40,8 +45,7 @@ module ForestAdminAgent
             when 'PolymorphicManyToOne'
               update_polymorphic_many_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             when 'OneToOne'
-              update_one_to_one(args[:params]['relation_name'], relation, parent_primary_key_values,
-                                linked_primary_key_values, context)
+              update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             when 'PolymorphicOneToOne'
               update_polymorphic_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             end
@@ -109,9 +113,7 @@ module ForestAdminAgent
             create_new_polymorphic_one_to_one_relationship(relation, origin_value, linked_primary_key_values, context)
           end
 
-          def update_one_to_one(field_name, relation, parent_primary_key_values, linked_primary_key_values, context)
-            Collection.assert_writable_relation!(field_name, relation)
-
+          def update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                                 relation.origin_key_target)
 
