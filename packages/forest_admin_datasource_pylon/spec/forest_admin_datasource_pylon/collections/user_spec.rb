@@ -98,10 +98,11 @@ module ForestAdminDatasourcePylon
         expect(writable).to contain_exactly('name', 'avatar_url', 'status', 'role_id')
       end
 
-      # GET /users carries no search parameter, and Pylon exposes no count.
-      it 'leaves search and count disabled' do
+      # GET /users carries no search parameter. It does hand back every agent, so
+      # the count is exact rather than a fraction of one.
+      it 'leaves search disabled and enables count' do
         expect(collection.is_searchable?).to be(false)
-        expect(collection.is_countable?).to be(false)
+        expect(collection.is_countable?).to be(true)
       end
 
       it 'advertises the string filters on the string columns' do

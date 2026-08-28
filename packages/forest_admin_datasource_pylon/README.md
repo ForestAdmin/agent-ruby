@@ -44,7 +44,9 @@ answering something that looks right and is not. All of these arrive as a 400 ca
 
 - **No aggregate endpoint and no total.** `aggregate` is refused on the cursor-backed collections:
   counting the pages a walk collected would answer a fraction of a collection as if it were the
-  whole of it. No collection is advertised as countable.
+  whole of it, so those are not advertised as countable. `PylonUser` and `PylonTeam` are the
+  exception — their endpoint hands back every record, so a count or a group over it is the figure
+  a server-side aggregation would have given.
 - **No sort parameter on `/issues/search`.** Issues always come back newest first. A requested
   order is reported in the log rather than silently swallowed.
 - **No `id` filter on the search endpoints.** A primary-key lookup is short-circuited to

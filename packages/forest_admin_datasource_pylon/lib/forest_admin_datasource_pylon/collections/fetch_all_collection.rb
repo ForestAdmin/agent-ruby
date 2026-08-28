@@ -40,6 +40,17 @@ module ForestAdminDatasourcePylon
         end
       end
 
+      # Countable, alone among the Pylon collections: the count answered here is
+      # taken over every record Pylon holds, not over the pages a cursor walk
+      # happened to collect, so it is the figure a server-side count would have
+      # given rather than a fraction of it presented as the whole -- the very
+      # reason `BaseCollection#aggregate` refuses everywhere else. One request
+      # per count, against the 300 a minute these endpoints grant.
+      def initialize(datasource, name, **options)
+        super
+        enable_count
+      end
+
       def list(caller, filter, projection)
         records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
 

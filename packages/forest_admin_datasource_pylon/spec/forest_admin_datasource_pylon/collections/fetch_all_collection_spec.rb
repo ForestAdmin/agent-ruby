@@ -123,10 +123,12 @@ module ForestAdminDatasourcePylon
           .to raise_error(NotImplementedError, /did not implement serialize/)
       end
 
-      # Neither endpoint carries a search parameter, and Pylon exposes no count.
-      it 'leaves search and count disabled' do
+      # Neither endpoint carries a search parameter. Count is the one capability
+      # a collection holding the whole dataset can answer exactly, where every
+      # cursor-backed one would be counting the pages it happened to walk.
+      it 'leaves search disabled and enables count' do
         expect(collection.is_searchable?).to be(false)
-        expect(collection.is_countable?).to be(false)
+        expect(collection.is_countable?).to be(true)
       end
 
       # A group is computed over the complete dataset here, unlike every other
