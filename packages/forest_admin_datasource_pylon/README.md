@@ -117,11 +117,13 @@ it closes; mounted on a business collection with `issue_id_field`, what bounds i
 operator may see there, and the issue ids those records carry. In that second form the column is
 the authority — an operator who can write it can name any Pylon issue — so treat it as one.
 
-**The batch is uncapped.** One request per selected record, so a wide bulk selection is a long run
-of sequential writes that the request may time out on, leaving the issues closed up to that point
-closed. Note that this is looser than the collections themselves: a filter-driven `update` or
-`delete` on a Pylon collection refuses a selection costing more than `MAX_WRITE_REQUESTS` (20)
-rather than writing it halfway. Restrict the action, or the selection, accordingly.
+**The batch is capped at `MAX_TARGETS` (20) issues**, the budget a filter-driven write already gets:
+Pylon takes one request per issue, so a wider selection is a long run of sequential writes the
+request may time out on, leaving the issues closed up to that point closed and reporting which ones
+to nobody. Past the cap the run is refused before its first write, the way `update` and `delete`
+refuse a selection costing more than `MAX_WRITE_REQUESTS`. The cap counts the issues named, not the
+records selected: a column of issue ids is not a key, so a hundred host records naming ten issues is
+a batch of ten.
 
 ### `CreateIssueWithNotification`
 

@@ -17,6 +17,16 @@ module ForestAdminDatasourcePylon
           "Failed to #{verb(state)} all #{failed.size} issues. First error: #{failed.first.last}"
         end
 
+        # Worded around the selection rather than around the run: what the
+        # operator can act on is how many issues they picked, and the cap is
+        # named so the next attempt is a size they can aim for.
+        def too_many(count, state)
+          "This selection names #{count} Pylon issues, more than the #{CloseIssue::MAX_TARGETS} one run of " \
+            'this action covers: Pylon takes one request per issue, and a run stopping halfway would leave ' \
+            "part of the selection #{past_verb(state)} without naming which part. Select fewer issues, and " \
+            'run the action again on the rest.'
+        end
+
         def no_target(field)
           return 'No Pylon issue selected.' if field.nil?
 

@@ -16,6 +16,17 @@ module ForestAdminDatasourcePylon
       ActionScope     = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
       ForestException = ForestAdminDatasourceToolkit::Exceptions::ForestException
 
+      # What one run may write, the budget a filter-driven write already gets:
+      # this writes one PATCH per issue too, sequentially, and the action runs
+      # inside a single HTTP request. Past this the batch is refused before the
+      # first write rather than discovered after the twentieth, where a run cut
+      # short by a timeout leaves part of the selection moved and reports which
+      # part to nobody -- `apply_state` only names it once the loop returns.
+      #
+      # The collection cannot bound this: the action writes through the client,
+      # being registered on the host collection rather than on PylonIssue.
+      MAX_TARGETS = Collections::Writes::MAX_WRITE_REQUESTS
+
       SCOPE_KEYS = %i[single bulk].freeze
       SCOPES = { single: ActionScope::SINGLE, bulk: ActionScope::BULK }.freeze
       NAMES = { single: 'Close Pylon issue', bulk: 'Close selected Pylon issues' }.freeze
@@ -72,6 +83,7 @@ module ForestAdminDatasourcePylon
         lambda do |context, result_builder|
           ids = IssueTargets.resolve_issue_ids(context, issue_id_field)
           next result_builder.error(message: Messages.no_target(issue_id_field)) if ids.empty?
+          next result_builder.error(message: Messages.too_many(ids.size, state)) if ids.size > MAX_TARGETS
 
           succeeded, failed = apply_state(datasource, ids, state)
           next result_builder.error(message: Messages.error(failed, state)) if succeeded.empty?

@@ -150,6 +150,40 @@ module ForestAdminDatasourcePylon
         expect(result[:message]).to eq('No Pylon issue selected.')
       end
 
+      it 'refuses a selection wider than one run covers, before writing anything' do
+        ids = Array.new(described_class::MAX_TARGETS + 1) { |i| "i#{i}" }
+        allow(client).to receive(:update_issue)
+
+        result = on_primary_key.execute.call(FakeCloseContext.new(record_ids: ids), result_builder)
+
+        expect(client).not_to have_received(:update_issue)
+        expect(result[:type]).to eq('Error')
+        expect(result[:message]).to include(ids.size.to_s, described_class::MAX_TARGETS.to_s)
+      end
+
+      it 'writes a selection of exactly what one run covers' do
+        ids = Array.new(described_class::MAX_TARGETS) { |i| "i#{i}" }
+        allow(client).to receive(:update_issue)
+
+        result = on_primary_key.execute.call(FakeCloseContext.new(record_ids: ids), result_builder)
+
+        expect(client).to have_received(:update_issue).exactly(ids.size).times
+        expect(result[:type]).to eq('Success')
+      end
+
+      # The cap counts issues, not selected records: a column of issue ids is
+      # not a key, so a wide selection naming few issues is written rather than
+      # refused on a count the operator cannot see.
+      it 'counts the issues named rather than the records selected' do
+        records = Array.new(described_class::MAX_TARGETS + 5) { { issue_id_field => 'i1' } }
+        allow(client).to receive(:update_issue)
+
+        result = single.execute.call(FakeCloseContext.new(records: records), result_builder)
+
+        expect(client).to have_received(:update_issue).once
+        expect(result[:type]).to eq('Success')
+      end
+
       it 'logs and answers an error when the records cannot be read at all' do
         context = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::Context::ActionContextSingle)
         allow(context).to receive(:get_records).and_raise(StandardError, 'boom')
