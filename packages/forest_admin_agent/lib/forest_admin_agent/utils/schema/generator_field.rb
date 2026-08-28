@@ -127,7 +127,7 @@ module ForestAdminAgent
                 isFilterable: foreign_collection_filterable?(foreign_collection),
                 isPrimaryKey: false,
                 isRequired: false,
-                isReadOnly: key_field.is_read_only,
+                isReadOnly: relation.is_read_only || key_field.is_read_only,
                 isSortable: target_field.is_sortable,
                 validations: [],
                 reference: "#{foreign_collection.name}.#{relation.origin_key_target}"

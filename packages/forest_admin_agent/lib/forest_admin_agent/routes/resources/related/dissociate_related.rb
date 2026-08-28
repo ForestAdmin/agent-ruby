@@ -34,6 +34,7 @@ module ForestAdminAgent
 
             filter = get_base_foreign_filter(args, context)
             relation = Schema.get_to_many_relation(context.collection, args[:params]['relation_name'])
+            Collection.assert_writable_relation!(args[:params]['relation_name'], relation)
 
             relation_name = args[:params]['relation_name']
             options = {

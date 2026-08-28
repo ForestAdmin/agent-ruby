@@ -78,6 +78,22 @@ module ForestAdminDatasourceToolkit
         )
       end
 
+      # A read-only relation (e.g. #379's has_one :through identity join, which has no real
+      # join column and would corrupt the foreign collection's own primary key if written to)
+      # only hides its edit control in the UI via isReadOnly -- a direct write still has to be
+      # blocked here, at every route that can write to a relation's origin_key/through_collection.
+      # ValidationError (not a bare ForestException) so this maps to a 400, not a 500 -- rejecting
+      # a write to a non-editable field is a client error, not a server failure.
+      #
+      # respond_to? guards PolymorphicManyToOneSchema specifically: it doesn't inherit
+      # RelationSchema (unlike every other relation type), so it has no is_read_only at all --
+      # not a versioning gap, a genuinely different type with no such concept yet.
+      def self.assert_writable_relation!(field_name, relation)
+        return unless relation.respond_to?(:is_read_only) && relation.is_read_only
+
+        raise ValidationError, "Field #{field_name} is not editable"
+      end
+
       def self.get_value(collection, caller, primary_key_values, field)
         if primary_key_values.is_a? Array
           index = Schema.primary_keys(collection).index(field)

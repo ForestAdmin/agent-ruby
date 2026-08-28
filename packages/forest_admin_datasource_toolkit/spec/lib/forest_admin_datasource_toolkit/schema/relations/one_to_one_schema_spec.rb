@@ -17,6 +17,21 @@ module ForestAdminDatasourceToolkit
           it { expect(relation.origin_key).to eq 'origin_key' }
           it { expect(relation.origin_key_target).to eq 'origin_key_target' }
           it { expect(relation.foreign_collection).to eq 'foreign_collection' }
+          it { expect(relation.is_read_only).to be false }
+        end
+
+        describe 'is_read_only' do
+          it 'defaults to false when not given' do
+            expect(described_class.new(origin_key: 'a', origin_key_target: 'b', foreign_collection: 'c').is_read_only)
+              .to be false
+          end
+
+          it 'can be set explicitly' do
+            relation = described_class.new(origin_key: 'a', origin_key_target: 'b', foreign_collection: 'c',
+                                           is_read_only: true)
+
+            expect(relation.is_read_only).to be true
+          end
         end
 
         describe 'setters' do

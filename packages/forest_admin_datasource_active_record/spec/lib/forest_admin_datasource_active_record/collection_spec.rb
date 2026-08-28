@@ -62,24 +62,97 @@ module ForestAdminDatasourceActiveRecord
           expect(collection.schema[:fields].keys).to include('users')
         end
 
-        # Supplier -> Account -> AccountHistory is a has_one :through that isn't polymorphic,
-        # so it never reaches the many_to_many_shape guard above -- it falls into this plain
-        # OneToOneSchema branch instead, which hardcodes {AccountHistory,Supplier}'s own
-        # primary keys unconditionally, regardless of the real FK or of whether the source is
-        # a belongs_to (here it actually is one; account_history_id is a real column on
-        # accounts, just never consulted by this branch). Unrelated to #370's guard, tracked
-        # separately as #379; this test pins current (arguably wrong) behavior, not correct
-        # behavior.
-        it 'add has_one_through relation as a to-one (OneToOne)' do
+        # Supplier -> Account -> AccountHistory is a has_one :through that isn't polymorphic, so
+        # it never reaches the many_to_many_shape guard above -- it falls into the read-only
+        # identity-join branch instead (see warn_readonly_identity_join for why). The real FK
+        # this ignores is accounts.account_history_id.
+        it 'adds a has_one :through relation as a read-only to-one (OneToOne) identity join' do
           collection = described_class.new(datasource, Supplier)
 
           expect(collection.schema[:fields].keys).to include('account_history')
 
           field = collection.schema[:fields]['account_history']
-          expect(field.class).to eq(Relations::OneToOneSchema)
-          expect(field.foreign_collection).to eq('AccountHistory')
-          expect(field.origin_key).to eq(AccountHistory.primary_key)
-          expect(field.origin_key_target).to eq(Supplier.primary_key)
+          expect(field).to have_attributes(
+            class: Relations::OneToOneSchema,
+            foreign_collection: 'AccountHistory',
+            origin_key: AccountHistory.primary_key,
+            origin_key_target: Supplier.primary_key,
+            is_read_only: true
+          )
+        end
+
+        it 'adds a second, belongs_to-chained has_one :through relation as a read-only identity ' \
+           'join too (Account -> AccountHistory -> Order)' do
+          collection = described_class.new(datasource, Account)
+
+          field = collection.schema[:fields]['order']
+          expect(field).to have_attributes(class: Relations::OneToOneSchema, is_read_only: true)
+        end
+
+        it 'leaves a plain, non-through has_one writable' do
+          field = collection.schema[:fields]['user']
+
+          expect(field).to have_attributes(class: Relations::OneToOneSchema, is_read_only: false)
+        end
+
+        it 'skips a non-polymorphic has_one :through when the root has a composite primary key' do
+          stub_const('CompPkLeaf', Class.new(ApplicationRecord) do
+            self.table_name = 'users'
+            self.abstract_class = true
+          end)
+
+          stub_const('CompPkMiddle', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.abstract_class = true
+
+            has_one :leaf, class_name: 'CompPkLeaf', foreign_key: :id
+          end)
+
+          stub_const('CompPkRoot', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.primary_key = %w[id label]
+            self.abstract_class = true
+
+            has_one :middle, class_name: 'CompPkMiddle', foreign_key: :category_id
+            has_one :leaf, through: :middle
+          end)
+
+          collection = nil
+          expect do
+            collection = described_class.new(datasource, CompPkRoot)
+          end.to output(/can't be represented as a Forest Admin one-to-one/).to_stdout
+
+          expect(collection.schema[:fields].keys).not_to include('leaf')
+        end
+
+        it 'skips a non-polymorphic has_one :through when the foreign collection has a composite primary key' do
+          stub_const('CompPkLeaf2', Class.new(ApplicationRecord) do
+            self.table_name = 'cars'
+            self.primary_key = %w[category_id reference]
+            self.abstract_class = true
+          end)
+
+          stub_const('CompPkMiddle2', Class.new(ApplicationRecord) do
+            self.table_name = 'users'
+            self.abstract_class = true
+
+            has_one :leaf, class_name: 'CompPkLeaf2', foreign_key: :id
+          end)
+
+          stub_const('CompPkRoot2', Class.new(ApplicationRecord) do
+            self.table_name = 'categories'
+            self.abstract_class = true
+
+            has_one :middle, class_name: 'CompPkMiddle2', foreign_key: :category_id
+            has_one :leaf, through: :middle
+          end)
+
+          collection = nil
+          expect do
+            collection = described_class.new(datasource, CompPkRoot2)
+          end.to output(/can't be represented as a Forest Admin one-to-one/).to_stdout
+
+          expect(collection.schema[:fields].keys).not_to include('leaf')
         end
 
         it 'skips association when foreign_key raises an error' do
@@ -278,7 +351,7 @@ module ForestAdminDatasourceActiveRecord
         it 'still publishes, with a diagnostic warning, a polymorphic has_one :through with the same shape' do
           # Solo -> Kid (polymorphic has_one) -> Detail: same bucket-B shape as above, through the
           # has_one branch. A non-polymorphic has_one :through isn't reached by this guard at all --
-          # it falls into the pre-existing OneToOneSchema path, unguarded (tracked as #379).
+          # it falls into the separately-guarded read-only identity-join branch instead (#379).
           expect { datasource.get_collection('Solo') }.to output(/is published as a many-to-many/).to_stdout
 
           field = datasource.get_collection('Solo').schema[:fields]['detail']
