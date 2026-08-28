@@ -9,6 +9,8 @@ module ForestAdminDatasourceCustomizer
       describe SearchCollectionDecorator do
         subject(:decorated) { described_class.new(datasource.get_collection('cards'), datasource) }
 
+        let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+
         let(:datasource) do
           build_datasource_with_collections(
             [
@@ -137,8 +139,6 @@ module ForestAdminDatasourceCustomizer
         # The invariant the permission check rests on: a path the search reads without appearing in
         # the footprint is a column read unchecked.
         describe '#searched_fields against what the search actually reads' do
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
-
           def paths_read(selection, search: 'martin', extended: true)
             decorated.replace_search(**selection)
             refined = decorated.refine_filter(
@@ -185,9 +185,93 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
-        describe '#refine_filter when the selection leaves no field searchable' do
-          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+        describe 'when the collection carries a polymorphic relation' do
+          let(:datasource) do
+            build_datasource_with_collections(
+              [
+                build_collection(
+                  name: 'cards',
+                  schema: {
+                    fields: {
+                      'id' => build_numeric_primary_key,
+                      'pan_last4' => build_column(column_type: 'String', filter_operators: [Operators::I_CONTAINS]),
+                      'holder_id' => build_column(column_type: 'Number'),
+                      'holder_type' => build_column(column_type: 'String'),
+                      'holder' => Relations::PolymorphicManyToOneSchema.new(
+                        foreign_key: 'holder_id',
+                        foreign_key_type_field: 'holder_type',
+                        foreign_collections: %w[persons companies],
+                        foreign_key_targets: { 'persons' => 'id', 'companies' => 'id' }
+                      )
+                    }
+                  }
+                ),
+                build_collection(
+                  name: 'persons',
+                  schema: {
+                    fields: {
+                      'id' => build_numeric_primary_key,
+                      'national_id' => build_column(column_type: 'String', filter_operators: [Operators::I_CONTAINS])
+                    }
+                  }
+                ),
+                build_collection(
+                  name: 'companies',
+                  schema: { fields: { 'id' => build_numeric_primary_key } }
+                )
+              ]
+            )
+          end
 
+          before do
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(
+              instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+            )
+          end
+
+          it 'refuses a path crossing it, which the search cannot follow' do
+            expect { decorated.replace_search(include_fields: ['holder:national_id']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                'Unexpected field type PolymorphicManyToOne: cards.holder'
+              )
+          end
+
+          it 'refuses it named bare, which carries no term to compare' do
+            expect { decorated.replace_search(only_fields: ['holder']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Cannot search on 'holder': a PolymorphicManyToOne is not a column"
+              )
+          end
+
+          it 'refuses excluding a path crossing it, rather than excluding nothing' do
+            expect { decorated.replace_search(exclude_fields: ['holder:national_id']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                'Unexpected field type PolymorphicManyToOne: cards.holder'
+              )
+          end
+
+          # Its targets stay out of both, so no footprint entry ever needs the several collections
+          # `leaf_collection_names` would answer for a polymorphic leaf.
+          it 'keeps its columns out of the footprint and out of what the search reads' do
+            decorated.replace_search(include_fields: ['pan_last4'])
+
+            footprint = decorated.searched_fields('martin', true).map { |field| field[:path] }
+            refined = decorated.refine_filter(
+              caller,
+              ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+                search: 'martin', search_extended: true
+              )
+            )
+
+            expect(footprint).to eq(['pan_last4'])
+            expect(refined.condition_tree.projection.uniq).to eq(['pan_last4'])
+          end
+        end
+
+        describe '#refine_filter when the selection leaves no field searchable' do
           def refined(selection)
             decorated.replace_search(selection)
             decorated.refine_filter(
