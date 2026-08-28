@@ -185,6 +185,30 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe '#refine_filter when the selection leaves no field searchable' do
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+
+          def refined(selection)
+            decorated.replace_search(selection)
+            decorated.refine_filter(
+              caller,
+              ForestAdminDatasourceToolkit::Components::Query::Filter.new(search: 'martin')
+            )
+          end
+
+          # An empty union is nil, and `intersect` drops a nil: the search would carry no condition
+          # at all and the request would answer every row instead of none.
+          it 'matches nothing rather than everything once only_fields is empty' do
+            expect(refined({ only_fields: [] }).condition_tree)
+              .to have_attributes(aggregator: 'Or', conditions: [])
+          end
+
+          it 'matches nothing rather than everything once every searchable field is excluded' do
+            expect(refined({ exclude_fields: %w[id pan_last4 holder_id holder:id holder:national_id] }).condition_tree)
+              .to have_attributes(aggregator: 'Or', conditions: [])
+          end
+        end
+
         describe '#replace_search with an unresolvable field selection' do
           it 'names the field it cannot resolve rather than searching nothing for good' do
             expect { decorated.replace_search(only_fields: ['pan_last_four']) }
@@ -199,6 +223,14 @@ module ForestAdminDatasourceCustomizer
           it 'refuses a name spelt in another case rather than resolving it fuzzily' do
             expect { decorated.replace_search(include_fields: ['panLast4']) }
               .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /panLast4/)
+          end
+
+          it 'accepts a symbol, which resolves to the same column as the string' do
+            decorated.replace_search(only_fields: [:pan_last4])
+
+            expect(decorated.searched_fields('martin', false)).to eq(
+              [{ path: 'pan_last4', collections: ['cards'] }]
+            )
           end
 
           it 'checks the excluded names too, which would otherwise exclude nothing' do

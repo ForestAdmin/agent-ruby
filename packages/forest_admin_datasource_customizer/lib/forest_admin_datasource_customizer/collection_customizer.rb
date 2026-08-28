@@ -33,21 +33,18 @@ module ForestAdminDatasourceCustomizer
 
     # Replace the behavior of the search bar, either with a block or with a field selection.
     #
-    # A field selection narrows the same default search, so the agent knows which columns are read
-    # and checks them against the caller's read permissions: a path the role may not read is refused
-    # by name. Prefer it whenever it expresses what you need. On a collection whose datasource
-    # searches natively, it does not narrow that native search — it replaces it with the agent's own
-    # per-column one, restricted to the selection.
+    # A field selection is checked against the caller's read permissions, because the agent can tell
+    # which columns it reads: a path the role may not read is refused by name. A block cannot be, so
+    # a plain search on it is served unchecked and an extended one is refused outright.
     #
-    # A block is unrestricted, and pays for it: it picks its own fields, so the agent cannot tell
-    # which columns the search reads and checks none of them.
+    # Converting a block to a selection is stricter, not looser: an included relation path is checked
+    # on a plain search too, so a role that cannot read that collection starts being refused.
     #
-    # +extended+ is deliberately not accepted: that flag is the caller's, and comes from the
-    # request. The block is handed the one the request carried.
+    # +extended+ is not accepted, so that a customization cannot pin a flag the caller owns; the
+    # block is handed the one the request carried.
     #
-    # A field selection is stricter than the block it replaces, not looser. An included relation path
-    # is reported on a plain search too, so converting a block can start refusing a search for a role
-    # that cannot read the related collection. That is a migration to plan, not a mechanical rewrite.
+    # On a natively searchable datasource, a selection replaces that search with the agent's own
+    # per-column one rather than narrowing it.
     #
     # Example:
     #   collection.replace_search(include_fields: ['project:name'], exclude_fields: ['description'])
