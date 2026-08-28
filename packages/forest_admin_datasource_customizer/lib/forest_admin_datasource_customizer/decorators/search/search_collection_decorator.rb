@@ -19,8 +19,11 @@ module ForestAdminDatasourceCustomizer
           mark_schema_as_dirty
         end
 
+        # +replacer+ is either a callable, which picks its own fields, or a field selection naming
+        # the fields the default search reads.
         def replace_search(replacer)
           @replacer = replacer
+          assert_selection_resolves
           @disabled_search = false
           mark_schema_as_dirty
         end
@@ -35,13 +38,14 @@ module ForestAdminDatasourceCustomizer
 
           # Implement search ourselves
           if @replacer || !@child_collection.schema[:searchable]
-            ctx = ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext.new(self, caller)
-            tree = default_replacer(filter.search, filter.search_extended)
-
-            if @replacer
-              plain_tree = @replacer.call(filter.search, filter.search_extended, ctx)
-              tree = ConditionTreeFactory.from_plain_object(plain_tree)
-            end
+            tree = if handler
+                     ctx = ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext.new(self, caller)
+                     ConditionTreeFactory.from_plain_object(
+                       handler.call(filter.search, filter.search_extended, ctx)
+                     )
+                   else
+                     search_condition_tree(filter.search, filter.search_extended)
+                   end
 
             # Note that if no fields are searchable with the provided searchString, the conditions
             # array might be empty, which will create a condition returning zero records
@@ -63,21 +67,44 @@ module ForestAdminDatasourceCustomizer
         # field the search cannot match — a number column for a word, a uuid column for anything
         # else — is left out rather than reported as reached.
         #
-        # +nil+ whenever this layer does not choose the fields — a replacer is installed, or the
-        # child collection searches natively — because then no enumeration made here is true.
+        # +nil+ whenever this layer does not choose the fields — a callable replacer is installed, or
+        # the child collection searches natively — because then no enumeration made here is true. A
+        # field selection is a declarative list, so it is answered rather than refused.
         def searched_fields(search, extended)
           return nil unless enumerable_search?
           return [] if insignificant_search?(search)
 
-          get_fields(extended).filter_map do |path, schema|
+          searchable_fields(extended).filter_map do |path, schema|
             searched_field(path) if build_condition(path, schema, search)
           end
         end
 
         private
 
+        def handler
+          @replacer.respond_to?(:call) ? @replacer : nil
+        end
+
+        def field_selection
+          @replacer.respond_to?(:call) ? nil : @replacer
+        end
+
+        # The footprint is knowable exactly when this layer builds the condition tree, which is the
+        # condition +refine_filter+ tests: a replacer is installed, or the child cannot search. Only
+        # a callable then picks fields no enumeration made here can name.
         def enumerable_search?
-          @replacer.nil? && !@child_collection.schema[:searchable]
+          handler.nil? && (!@replacer.nil? || !@child_collection.schema[:searchable])
+        end
+
+        # Resolved when the customization is applied rather than per request: a name that resolves
+        # to nothing would otherwise drop out of the searchable set unnoticed and leave the search
+        # matching nothing for good.
+        def assert_selection_resolves
+          selection = field_selection
+
+          return if selection.nil?
+
+          selected_paths(selection).each { |path| resolved_field(path) }
         end
 
         def insignificant_search?(search)
@@ -93,14 +120,43 @@ module ForestAdminDatasourceCustomizer
           }
         end
 
-        def default_replacer(search, extended)
-          searchable_fields = get_fields(extended)
-
-          conditions = searchable_fields.map do |field, schema|
+        def search_condition_tree(search, extended)
+          conditions = searchable_fields(extended).map do |field, schema|
             build_condition(field, schema, search)
           end
 
           ConditionTreeFactory.union(conditions)
+        end
+
+        # Both the condition tree +refine_filter+ builds and the footprint +searched_fields+ reports
+        # come from here: a path the search reads without appearing in the footprint is a column read
+        # unchecked.
+        #
+        # Keyed by path, so a field named twice — a selected one that is already a default — is
+        # searched and reported once. Defaults are merged first, which is what decides the order the
+        # footprint is reported in.
+        def searchable_fields(extended)
+          selection = field_selection || {}
+          only_fields = selection[:only_fields]
+
+          defaults = only_fields ? {} : get_fields(extended).to_h
+          selected = (Array(only_fields) + Array(selection[:include_fields])).map { |path| resolved_field(path) }
+
+          defaults.merge(selected.to_h).except(*Array(selection[:exclude_fields]))
+        end
+
+        def selected_paths(selection)
+          Array(selection[:only_fields]) +
+            Array(selection[:include_fields]) +
+            Array(selection[:exclude_fields])
+        end
+
+        # Strict on purpose: this list is written by the developer, so a name that names nothing is a
+        # mistake to report, not a term to interpret. +get_field_schema+ names the field it could not
+        # resolve, and refuses a path crossing anything but a to-one relation — a polymorphic one
+        # included, which the search does not follow either.
+        def resolved_field(path)
+          [path, ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)]
         end
 
         def build_condition(field, schema, search_string)

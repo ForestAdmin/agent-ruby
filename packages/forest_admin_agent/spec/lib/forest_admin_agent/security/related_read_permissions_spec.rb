@@ -381,6 +381,49 @@ module ForestAdminAgent
 
           expect { permissions.assert_can_read_query_fields(cards) }.not_to raise_error
         end
+
+        # The examples above hand the guard a stubbed footprint to pin its policy. These drive a real
+        # search decorator instead, so what the decorator reports and what the guard does with it are
+        # checked together.
+        describe 'through a real replace_search field selection' do
+          def cards_searching(replacer)
+            decorator = ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator.new(
+              cards, datasource
+            )
+            decorator.replace_search(replacer)
+
+            decorator
+          end
+
+          it 'refuses an included relation path the caller cannot read' do
+            permissions = build_permissions([])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }
+              .to raise_error(
+                ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                "You cannot search on 'account:iban': you are not allowed to read the 'accounts' collection."
+              )
+          end
+
+          it 'serves the same search once the collection the path reaches is readable' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
+          end
+
+          # The gap a field selection closes: a callable names no field, so nothing is checked and the
+          # same column is read for a role that cannot read the collection it belongs to.
+          it 'checks nothing of the same search once a callable picks the fields' do
+            permissions = build_permissions([])
+            collection = cards_searching(
+              ->(value, _extended, _context) { { field: 'account:iban', operator: Operators::EQUAL, value: value } }
+            )
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
+          end
+        end
       end
 
       describe '#read_permissions' do

@@ -200,6 +200,48 @@ module ForestAdminDatasourceCustomizer
 
         expect(search_collection.instance_variable_get(:@replacer)).to eq(condition)
       end
+
+      it 'hands the search decorator the field selection it was given' do
+        stack = @datasource_customizer.stack
+        stack.apply_queued_customizations({})
+
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+        customizer.replace_search(include_fields: ['title'], exclude_fields: ['id'])
+        stack.apply_queued_customizations({})
+
+        search_collection = @datasource_customizer.stack.search.get_collection('book')
+
+        expect(search_collection.instance_variable_get(:@replacer))
+          .to eq({ include_fields: ['title'], exclude_fields: ['id'] })
+      end
+
+      # `extended` is the caller's, and comes from the request: a customization pinning it would
+      # decide for every caller.
+      it 'refuses a key that is not one of the three field lists' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(extended: true) }.to raise_error(ArgumentError, /extended/)
+      end
+
+      it 'refuses a block and a field selection at once, which would leave the winner implicit' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(only_fields: ['title']) { |value| value } }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search accepts either a block or a field selection, not both'
+          )
+      end
+
+      it 'refuses neither, which would replace the search with nothing' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search needs a block, or one of include_fields, exclude_fields, only_fields'
+          )
+      end
     end
 
     context 'when using disable_search' do

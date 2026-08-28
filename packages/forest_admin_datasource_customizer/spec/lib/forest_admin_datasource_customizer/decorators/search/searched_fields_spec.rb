@@ -82,6 +82,135 @@ module ForestAdminDatasourceCustomizer
             expect(described_class.new(child, datasource).searched_fields('martin', true)).to be_nil
           end
         end
+
+        describe '#searched_fields when a field selection narrows the default search' do
+          it 'answers the footprint instead of refusing to tell' do
+            decorated.replace_search(exclude_fields: ['pan_last4'])
+
+            expect(decorated.searched_fields('martin', true)).to contain_exactly(
+              { path: 'holder:national_id', collections: ['holders'] }
+            )
+          end
+
+          it 'reports an included relation path on a plain search too, not only an extended one' do
+            decorated.replace_search(include_fields: ['holder:national_id'])
+
+            expect(decorated.searched_fields('martin', false)).to contain_exactly(
+              { path: 'pan_last4', collections: ['cards'] },
+              { path: 'holder:national_id', collections: ['holders'] }
+            )
+          end
+
+          it 'reports only the replaced set once only_fields is given' do
+            decorated.replace_search(only_fields: ['holder:national_id'])
+
+            expect(decorated.searched_fields('martin', true)).to eq(
+              [{ path: 'holder:national_id', collections: ['holders'] }]
+            )
+          end
+
+          it 'reports an included path once, where it overlaps a default field' do
+            decorated.replace_search(include_fields: ['pan_last4'])
+
+            expect(decorated.searched_fields('martin', false).map { |field| field[:path] })
+              .to eq(['pan_last4'])
+          end
+
+          it 'answers the footprint even when the datasource searches natively, which it replaces' do
+            child = datasource.get_collection('cards')
+            allow(child).to receive(:schema).and_return(child.schema.merge(searchable: true))
+            decorator = described_class.new(child, datasource)
+            decorator.replace_search(only_fields: ['pan_last4'])
+
+            expect(decorator.searched_fields('martin', true)).to eq(
+              [{ path: 'pan_last4', collections: ['cards'] }]
+            )
+          end
+
+          it 'still answers nothing it can be sure of when a callable chooses the fields' do
+            decorated.replace_search(->(search, _extended, _context) { { field: 'id', operator: 'equal', value: search } })
+
+            expect(decorated.searched_fields('martin', true)).to be_nil
+          end
+        end
+
+        # The invariant the permission check rests on: a path the search reads without appearing in
+        # the footprint is a column read unchecked.
+        describe '#searched_fields against what the search actually reads' do
+          let(:caller) { instance_double(ForestAdminDatasourceToolkit::Components::Caller) }
+
+          def paths_read(selection, search: 'martin', extended: true)
+            decorated.replace_search(**selection)
+            refined = decorated.refine_filter(
+              caller,
+              ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+                search: search, search_extended: extended
+              )
+            )
+
+            refined.condition_tree.projection.uniq
+          end
+
+          it 'covers every path an included relation path makes the search read' do
+            read = paths_read({ include_fields: ['holder:national_id'] })
+            footprint = decorated.searched_fields('martin', true).map { |field| field[:path] }
+
+            expect(read).to include('holder:national_id')
+            expect(footprint).to include(*read)
+          end
+
+          it 'covers every path the search reads once exclude_fields dropped one' do
+            read = paths_read({ exclude_fields: ['pan_last4'] })
+            footprint = decorated.searched_fields('martin', true).map { |field| field[:path] }
+
+            expect(read).not_to include('pan_last4')
+            expect(read).to include('holder:national_id')
+            expect(footprint).to include(*read)
+          end
+
+          it 'covers every path the search reads once only_fields replaced the set' do
+            read = paths_read({ only_fields: ['holder:national_id'] })
+            footprint = decorated.searched_fields('martin', true).map { |field| field[:path] }
+
+            expect(read).to eq(['holder:national_id'])
+            expect(footprint).to include(*read)
+          end
+
+          it 'reads nothing outside the footprint for a numeric term, which matches more columns' do
+            read = paths_read({ include_fields: ['holder:national_id'] }, search: '42')
+            footprint = decorated.searched_fields('42', true).map { |field| field[:path] }
+
+            expect(read).to include('id', 'holder:id')
+            expect(footprint).to include(*read)
+          end
+        end
+
+        describe '#replace_search with an unresolvable field selection' do
+          it 'names the field it cannot resolve rather than searching nothing for good' do
+            expect { decorated.replace_search(only_fields: ['pan_last_four']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                /Column not found cards.pan_last_four/
+              )
+          end
+
+          # The list is written by the developer, so a name that names nothing is a mistake to
+          # report rather than one to guess at.
+          it 'refuses a name spelt in another case rather than resolving it fuzzily' do
+            expect { decorated.replace_search(include_fields: ['panLast4']) }
+              .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /panLast4/)
+          end
+
+          it 'checks the excluded names too, which would otherwise exclude nothing' do
+            expect { decorated.replace_search(exclude_fields: ['nope']) }
+              .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /nope/)
+          end
+
+          it 'refuses a path reaching through a relation the search cannot follow' do
+            expect { decorated.replace_search(include_fields: ['holder:nope']) }
+              .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /nope/)
+          end
+        end
       end
     end
   end
