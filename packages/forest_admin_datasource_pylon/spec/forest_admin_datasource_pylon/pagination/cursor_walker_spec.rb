@@ -150,5 +150,16 @@ RSpec.describe ForestAdminDatasourcePylon::Pagination::CursorWalker do
       expect(walk(pages, offset: 0, limit: 10).size).to eq(2)
       expect(calls.size).to eq(2)
     end
+
+    # Every cursor followed is remembered, not the last one alone, the way
+    # `Client#collect_pages` walks: a cycle wider than one page would otherwise
+    # run to a cap and hand the same records back twice over.
+    it 'stops on a cursor it has already followed, however wide the cycle' do
+      pages = [search_page(%w[a], 'c1'), search_page(%w[b], 'c2'), search_page(%w[c], 'c1'),
+               search_page(%w[d], 'c2')]
+
+      expect(walk(pages, offset: 0, limit: 10)).to eq([{ 'id' => 'a' }, { 'id' => 'b' }, { 'id' => 'c' }])
+      expect(calls.map { |call| call[:cursor] }).to eq([nil, 'c1', 'c2'])
+    end
   end
 end

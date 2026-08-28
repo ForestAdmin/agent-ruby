@@ -25,14 +25,26 @@ module ForestAdminDatasourcePylon
       # stops at a thousand having covered the window it was given, and reports
       # nothing, while a walk told to collect everything and stopped by a cap
       # knows it is handing back less than it was asked for, and says so.
-      def walk(offset:, limit:)
+      def walk(offset:, limit:, &page_source)
         offset = offset.to_i.clamp(0, nil)
         limit = limit&.to_i
         return [] if limit && !limit.positive?
 
+        records = collect(offset, limit, &page_source)
+
+        limit ? (records[offset, limit] || []) : records.drop(offset)
+      end
+
+      private
+
+      # The walk itself: pages are collected until the window is covered, the
+      # source says there is nothing left, or a cap stops it. The slicing is
+      # `walk`'s, this only decides how far to go.
+      def collect(offset, limit)
         needed = limit && (offset + limit)
         records = []
         cursor = nil
+        seen = Set.new
         pages = 0
 
         loop do
@@ -40,7 +52,7 @@ module ForestAdminDatasourcePylon
           records.concat(page.records)
           pages += 1
 
-          break if stop?(page, cursor)
+          break if stop?(page, seen)
           break if needed && records.size >= needed
 
           if capped?(pages, records.size)
@@ -51,16 +63,19 @@ module ForestAdminDatasourcePylon
           cursor = page.next_cursor
         end
 
-        limit ? (records[offset, limit] || []) : records.drop(offset)
+        records
       end
 
-      private
-
-      # An empty page or a cursor that does not move would loop forever; Pylon
-      # does neither today, but a walk driven by a remote value stops on its own
-      # terms rather than on the caps only.
-      def stop?(page, cursor)
-        page.next_cursor.nil? || page.records.empty? || page.next_cursor == cursor
+      # An empty page, a cursor that does not move and a cursor already followed
+      # all stop the walk; Pylon does none of the three today, but a walk driven
+      # by a remote value stops on its own terms rather than on the caps only.
+      #
+      # The whole set is kept rather than the previous cursor alone, like
+      # `Client#collect_pages`: a cycle wider than one page would otherwise
+      # collect the same pages over and over until a cap cut it short, and hand
+      # back the duplicates as records.
+      def stop?(page, seen)
+        page.next_cursor.nil? || page.records.empty? || !seen.add?(page.next_cursor)
       end
 
       def capped?(pages, collected)
