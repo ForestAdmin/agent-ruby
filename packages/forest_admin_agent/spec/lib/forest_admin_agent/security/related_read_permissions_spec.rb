@@ -353,7 +353,7 @@ module ForestAdminAgent
             )
         end
 
-        # A replaced search: the handler picks the fields, the caller only supplies the text.
+        # A replaced search: the block picks the fields, the caller only supplies the text.
         it 'serves the request when the stack cannot say what a search reaches' do
           permissions = build_permissions([])
 
@@ -361,10 +361,39 @@ module ForestAdminAgent
             .not_to raise_error
         end
 
+        # The flag is the caller's: the same term with it off and on differs by exactly the rows
+        # matched through a relation, so an unverifiable traversal is refused where a plain search is
+        # served.
+        it 'refuses the extended half of that same search' do
+          permissions = build_permissions([])
+
+          expect do
+            permissions.assert_can_read_query_fields(
+              searchable_cards(nil), search: 'martin', search_extended: true
+            )
+          end.to raise_error(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError,
+            "You cannot run an extended search on the 'cards' collection: the fields it reaches " \
+            'cannot be determined, so they cannot be checked against your permissions.'
+          )
+        end
+
         it 'checks nothing on a collection that cannot answer what a search reaches' do
           permissions = build_permissions([])
 
           expect { permissions.assert_can_read_query_fields(cards, search: 'martin') }.not_to raise_error
+        end
+
+        # Silence is not an empty footprint either: a collection with no `searched_fields` at all
+        # says as little as one answering nil.
+        it 'reads a collection that cannot answer at all as an unknown footprint too' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(cards, search: 'martin', search_extended: true) }
+            .to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              /You cannot run an extended search on the 'cards' collection/
+            )
         end
 
         it 'accepts a filter once the collection it reaches is readable' do
@@ -413,15 +442,39 @@ module ForestAdminAgent
             expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
           end
 
-          # The gap a field selection closes: a callable names no field, so nothing is checked and the
-          # same column is read for a role that cannot read the collection it belongs to.
-          it 'checks nothing of the same search once a callable picks the fields' do
+          # What a field selection buys over a callable: the callable names no field, so a plain search
+          # reads the same column unchecked for a role that cannot read the collection it belongs to,
+          # and its extended half is refused outright rather than checked.
+          it 'serves a plain search a callable describes, which names no field to check' do
             permissions = build_permissions([])
             collection = cards_searching(
               ->(value, _extended, _context) { { field: 'account:iban', operator: Operators::EQUAL, value: value } }
             )
 
             expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
+          end
+
+          it 'refuses the extended search of that callable, where the selection is checked instead' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching(
+              ->(value, _extended, _context) { { field: 'account:iban', operator: Operators::EQUAL, value: value } }
+            )
+
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'FR76', search_extended: true)
+            end.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              /You cannot run an extended search on the 'cards' collection/
+            )
+          end
+
+          it 'serves the extended search of the equivalent field selection' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'FR76', search_extended: true)
+            end.not_to raise_error
           end
         end
       end
