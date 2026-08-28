@@ -120,6 +120,70 @@ module ForestAdminDatasourceToolkit
                                             'Europe/Paris')).to be_truthy
               end
 
+              it 'keeps the aggregator of a nested branch' do
+                collection = Collection.new(Datasource.new, 'myCollection')
+                collection.add_fields(
+                  {
+                    'role' => ColumnSchema.new(
+                      column_type: PrimitiveType::STRING,
+                      filter_operators: [Operators::EQUAL]
+                    ),
+                    'name' => ColumnSchema.new(
+                      column_type: PrimitiveType::STRING,
+                      filter_operators: [Operators::EQUAL]
+                    )
+                  }
+                )
+                tree = ConditionTreeBranch.new('And', [
+                                                 ConditionTreeLeaf.new('role', Operators::EQUAL, 'admin'),
+                                                 ConditionTreeBranch.new('Or', [
+                                                                           ConditionTreeLeaf.new('name',
+                                                                                                 Operators::EQUAL,
+                                                                                                 'alice'),
+                                                                           ConditionTreeLeaf.new('name',
+                                                                                                 Operators::EQUAL,
+                                                                                                 'carol')
+                                                                         ])
+                                               ])
+
+                expect(tree.match({ 'role' => 'admin', 'name' => 'alice' }, collection, 'Europe/Paris')).to be_truthy
+                expect(tree.match({ 'role' => 'admin', 'name' => 'carol' }, collection, 'Europe/Paris')).to be_truthy
+                expect(tree.match({ 'role' => 'admin', 'name' => 'bob' }, collection, 'Europe/Paris')).to be_falsey
+                expect(tree.match({ 'role' => 'user', 'name' => 'alice' }, collection, 'Europe/Paris')).to be_falsey
+              end
+
+              it 'stops at the first condition of a nested branch that settles it' do
+                collection = Collection.new(Datasource.new, 'myCollection')
+                collection.add_fields(
+                  {
+                    'role' => ColumnSchema.new(
+                      column_type: PrimitiveType::STRING,
+                      filter_operators: [Operators::EQUAL]
+                    ),
+                    'age' => ColumnSchema.new(
+                      column_type: PrimitiveType::NUMBER,
+                      filter_operators: [Operators::EQUAL]
+                    )
+                  }
+                )
+                # The shape a nil-unsafe comparison is guarded with: the presence
+                # check must keep the comparison from ever seeing the null.
+                tree = ConditionTreeBranch.new('Or', [
+                                                 ConditionTreeLeaf.new('role', Operators::EQUAL, 'ghost'),
+                                                 ConditionTreeBranch.new('And', [
+                                                                           ConditionTreeLeaf.new('age',
+                                                                                                 Operators::PRESENT),
+                                                                           ConditionTreeLeaf.new('age',
+                                                                                                 Operators::GREATER_THAN,
+                                                                                                 20)
+                                                                         ])
+                                               ])
+
+                expect(tree.match({ 'role' => 'user', 'age' => nil }, collection, 'Europe/Paris')).to be_falsey
+                expect(tree.match({ 'role' => 'user', 'age' => 30 }, collection, 'Europe/Paris')).to be_truthy
+                expect(tree.match({ 'role' => 'user', 'age' => 10 }, collection, 'Europe/Paris')).to be_falsey
+              end
+
               it 'works with null value' do
                 collection = Collection.new(Datasource.new, 'myCollection')
                 collection.add_fields(
