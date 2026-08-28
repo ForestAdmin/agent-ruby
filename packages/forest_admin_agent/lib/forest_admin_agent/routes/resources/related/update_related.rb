@@ -40,7 +40,8 @@ module ForestAdminAgent
             when 'PolymorphicManyToOne'
               update_polymorphic_many_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             when 'OneToOne'
-              update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
+              update_one_to_one(args[:params]['relation_name'], relation, parent_primary_key_values,
+                                linked_primary_key_values, context)
             when 'PolymorphicOneToOne'
               update_polymorphic_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
             end
@@ -108,8 +109,8 @@ module ForestAdminAgent
             create_new_polymorphic_one_to_one_relationship(relation, origin_value, linked_primary_key_values, context)
           end
 
-          def update_one_to_one(relation, parent_primary_key_values, linked_primary_key_values, context)
-            Collection.assert_writable_relation!(relation)
+          def update_one_to_one(field_name, relation, parent_primary_key_values, linked_primary_key_values, context)
+            Collection.assert_writable_relation!(field_name, relation)
 
             origin_value = Collection.get_value(context.collection, context.caller, parent_primary_key_values,
                                                 relation.origin_key_target)

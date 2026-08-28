@@ -64,10 +64,10 @@ module ForestAdminAgent
           schema = context.collection.schema[:fields][field]
           return unless %w[OneToOne PolymorphicOneToOne].include?(schema.type)
 
-          ForestAdminDatasourceToolkit::Utils::Collection.assert_writable_relation!(schema)
-
           id = value.dig('data', 'id')
           return if id.nil?
+
+          ForestAdminDatasourceToolkit::Utils::Collection.assert_writable_relation!(field, schema)
 
           {
             schema: schema,

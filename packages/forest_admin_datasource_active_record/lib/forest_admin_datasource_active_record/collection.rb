@@ -114,10 +114,13 @@ module ForestAdminDatasourceActiveRecord
       association.source_reflection&.belongs_to?
     end
 
-    # A composite primary key on either endpoint can't be used as a single OneToOneSchema
-    # origin_key/origin_key_target column (#379).
+    # Same criterion as unrepresentable_many_to_many?: a composite primary key can arrive as a
+    # real Array or already flattened by Rails into a mangled String -- checking column
+    # membership catches both forms, plus a custom primary_key pointing at a non-column, all of
+    # which would otherwise hit nil.column_type in build_one_to_one_schema (#379).
     def unrepresentable_one_to_one?(association)
-      Array(association.klass.primary_key).size > 1 || Array(@model.primary_key).size > 1
+      !association.klass.column_names.include?(association.klass.primary_key) ||
+        !@model.column_names.include?(@model.primary_key)
     end
 
     def build_many_to_many_field(association, through_reflection, is_polymorphic, source_polymorphic)

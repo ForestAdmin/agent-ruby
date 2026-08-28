@@ -430,8 +430,25 @@ module ForestAdminAgent
               allow(@datasource.get_collection('passport')).to receive(:update)
 
               expect { store.handle_request(args) }
-                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not editable/)
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                                'Field locked_passport is not editable')
               expect(@datasource.get_collection('person')).not_to have_received(:create)
+              expect(@datasource.get_collection('passport')).not_to have_received(:update)
+            end
+
+            it 'ignores a read-only one to one relationship carrying no data, same as a writable one' do
+              args[:params][:data] = {
+                attributes: { 'name' => 'john' },
+                relationships: { 'locked_passport' => { 'data' => nil } },
+                type: 'persons'
+              }
+              args[:params]['collection_name'] = 'person'
+              allow(@datasource.get_collection('person')).to receive_messages(
+                create: { 'id' => 1, 'name' => 'john' },
+                list: [{ 'id' => 1, 'name' => 'john' }]
+              )
+
+              expect { store.handle_request(args) }.not_to raise_error
               expect(@datasource.get_collection('passport')).not_to have_received(:update)
             end
           end

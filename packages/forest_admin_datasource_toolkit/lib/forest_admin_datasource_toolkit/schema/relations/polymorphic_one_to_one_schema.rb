@@ -6,8 +6,8 @@ module ForestAdminDatasourceToolkit
         attr_reader :origin_key_target, :origin_type_field, :cascade_on_delete
 
         def initialize(origin_key:, origin_key_target:, foreign_collection:, origin_type_field:, origin_type_value:,
-                       cascade_on_delete: false)
-          super(foreign_collection, 'PolymorphicOneToOne')
+                       cascade_on_delete: false, is_read_only: false)
+          super(foreign_collection, 'PolymorphicOneToOne', is_read_only: is_read_only)
           @origin_key = origin_key
           @origin_key_target = origin_key_target
           @origin_type_field = origin_type_field

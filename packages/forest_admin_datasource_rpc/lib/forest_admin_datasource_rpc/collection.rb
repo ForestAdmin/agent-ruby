@@ -28,34 +28,26 @@ module ForestAdminDatasourceRpc
       @schema[:aggregation_capabilities] = schema[:aggregation_capabilities] if schema[:aggregation_capabilities]
     end
 
+    FIELD_CLASSES = {
+      'Column' => ForestAdminDatasourceToolkit::Schema::ColumnSchema,
+      'ManyToMany' => ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema,
+      'OneToMany' => ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema,
+      'ManyToOne' => ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema,
+      'OneToOne' => ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema,
+      'PolymorphicManyToOne' => ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema,
+      'PolymorphicOneToMany' => ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema,
+      'PolymorphicOneToOne' => ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema
+    }.freeze
+
+    KEYWORD_PARAM_KINDS = %i[key keyreq].freeze
+
     def add_fields(fields)
       fields.each do |field_name, schema|
         field_name = field_name.to_s
-        type = schema[:type]
-        schema.delete(:type)
-        # remove these
-        schema.delete(:allow_null)
-        case type
-        when 'Column'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::ColumnSchema.new(**schema))
-        when 'ManyToMany'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema.new(**schema))
-        when 'OneToMany'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema.new(**schema))
-        when 'ManyToOne'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema.new(**schema))
-        when 'OneToOne'
-          add_field(field_name, ForestAdminDatasourceToolkit::Schema::Relations::OneToOneSchema.new(**schema))
-        when 'PolymorphicManyToOne'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema.new(**schema))
-        when 'PolymorphicOneToMany'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToManySchema.new(**schema))
-        when 'PolymorphicOneToOne'
-          add_field(field_name,
-                    ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicOneToOneSchema.new(**schema))
-        end
+        klass = FIELD_CLASSES[schema[:type]]
+        next unless klass
+
+        add_field(field_name, klass.new(**accepted_keywords(klass, schema)))
       end
     end
 
@@ -173,6 +165,18 @@ module ForestAdminDatasourceRpc
 
     def build_params(extra_params = {})
       @base_params.merge(extra_params)
+    end
+
+    # Filters a deserialized field payload down to whatever klass#initialize actually accepts,
+    # instead of deleting specific keys by name -- an attribute the RPC agent's schema
+    # serialization adds later (or a version mismatch between agents) shouldn't crash
+    # hydration on this side.
+    def accepted_keywords(klass, schema)
+      accepted = klass.instance_method(:initialize).parameters.filter_map do |kind, name|
+        name if KEYWORD_PARAM_KINDS.include?(kind)
+      end
+
+      schema.slice(*accepted)
     end
 
     def encode_form_data(data)

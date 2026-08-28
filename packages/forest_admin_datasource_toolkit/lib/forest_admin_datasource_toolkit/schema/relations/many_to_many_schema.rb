@@ -15,9 +15,10 @@ module ForestAdminDatasourceToolkit
           origin_type_field: nil,
           origin_type_value: nil,
           foreign_type_field: nil,
-          foreign_type_value: nil
+          foreign_type_value: nil,
+          is_read_only: false
         )
-          super(foreign_collection, 'ManyToMany')
+          super(foreign_collection, 'ManyToMany', is_read_only: is_read_only)
           @origin_key = origin_key
           @origin_key_target = origin_key_target
           @through_collection = through_collection

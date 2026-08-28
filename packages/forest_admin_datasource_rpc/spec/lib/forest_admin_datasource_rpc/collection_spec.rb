@@ -28,6 +28,25 @@ module ForestAdminDatasourceRpc
         expect(collection.instance_variable_get(:@client)).to eq(datasource.shared_rpc_client)
       end
 
+      it 'hydrates every relation type from a payload carrying is_read_only=true, not just OneToOne' do
+        # A schema attribute added to RelationSchema (the shared base) gets serialized for
+        # every relation type, but only reaches a subclass's own attr_accessor if that
+        # subclass's initializer also accepts it -- fixtures pin true (not the false default)
+        # so a silently-dropped attribute (accepted_keywords filtering it out because the
+        # subclass doesn't declare it) shows up as a wrong value, not just a lucky match.
+        manufacturer_collection = datasource.get_collection('Manufacturer')
+        product_collection = datasource.get_collection('Product')
+
+        expect(manufacturer_collection.schema[:fields]['products']).to have_attributes(
+          class: ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema,
+          is_read_only: true
+        )
+        expect(product_collection.schema[:fields]['manufacturer']).to have_attributes(
+          class: ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema,
+          is_read_only: true
+        )
+      end
+
       context 'when the schema carries action static_form values' do
         let(:actions_introspection) do
           {

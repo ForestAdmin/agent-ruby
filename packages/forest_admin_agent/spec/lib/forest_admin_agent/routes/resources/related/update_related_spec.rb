@@ -293,7 +293,8 @@ module ForestAdminAgent
               args[:params]['id'] = 1
 
               expect { update.handle_request(args) }
-                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /not editable/)
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                                'Field locked_book is not editable')
               expect(@datasource.get_collection('book')).not_to have_received(:update)
             end
 
