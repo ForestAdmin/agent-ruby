@@ -246,35 +246,45 @@ module ForestAdminDatasourcePylon
     describe 'the shape of the embedded record' do
       before { stub_issues(issue_payload('i1')) }
 
-      # Serialized by the foreign collection itself, not by a second field list
-      # kept here: an account carries every column PylonAccount declares.
-      it 'carries the columns of the foreign collection, and nothing else' do
+      # The foreign endpoint takes no field list, so the collection reads the
+      # whole record and the projection is applied to it here. Serving all of it
+      # would answer `team:name` with columns the projection excluded -- and the
+      # agent redacts that projection per collection, so the excluded ones are
+      # also the ones the caller may not read.
+      it 'carries the projected fields of the foreign collection, and nothing else' do
+        stub_teams(team_payload('team-1'))
+
+        expect(issues.list(nil, filter, %w[id team:name]).first['team'])
+          .to eq('id' => 'team-1', 'name' => 'Support')
+      end
+
+      it 'leaves out the columns of the foreign collection the projection did not name' do
         stub_accounts(account_payload('acc-1'))
 
         embedded = issues.list(nil, filter, %w[id account:name]).first['account']
 
-        expect(embedded.keys).to match_array(columns_of('PylonAccount'))
+        expect(embedded.keys).to match_array(%w[id name])
+        expect(columns_of('PylonAccount') - embedded.keys).to include('crm_settings', 'external_ids')
+      end
+
+      # `with_pks` puts it in the projection the route sends, but a caller inside
+      # the agent may project without it, and the id is what the serializer
+      # builds the nested resource around.
+      it 'keeps the primary key of the foreign record even when the projection leaves it out' do
+        stub_teams(team_payload('team-1'))
+
+        expect(issues.list(nil, filter, %w[id team:user_ids]).first['team'])
+          .to eq('id' => 'team-1', 'user_ids' => %w[usr-1])
       end
 
       it 'flattens the nested objects of the foreign record the way its own list does' do
         stub_accounts(account_payload('acc-1'))
         stub_users(user_payload('usr-1'))
 
-        row = issues.list(nil, filter, %w[id account:name assignee:name]).first
+        row = issues.list(nil, filter, %w[id account:owner_id assignee:role_name]).first
 
-        expect(row['account']).to include('owner_id' => 'usr-9')
-        expect(row['account']).not_to have_key('owner')
-        expect(row['assignee']).to include('role_name' => 'Admin')
-        expect(row['assignee']).not_to have_key('role')
-      end
-
-      # The projection of the relation is not applied here: the agent picks the
-      # fields it asked for out of the record.
-      it 'embeds the whole foreign record rather than the projected fields of it' do
-        stub_teams(team_payload('team-1'))
-
-        expect(issues.list(nil, filter, %w[id team:name]).first['team'])
-          .to eq('id' => 'team-1', 'name' => 'Support', 'user_ids' => %w[usr-1])
+        expect(row['account']).to eq('id' => 'acc-1', 'owner_id' => 'usr-9')
+        expect(row['assignee']).to eq('id' => 'usr-1', 'role_name' => 'Admin')
       end
     end
 
