@@ -118,4 +118,40 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       expect(config.base_path).to eq('/pylon')
     end
   end
+
+  # Nothing prints a Configuration on purpose: what reaches an `inspect` is a
+  # Rails error page, or a `logger.debug` of the datasource. The default would
+  # print the bearer token in clear in both.
+  describe '#inspect' do
+    it 'masks the api key, and keeps the base url a reader needs to place it' do
+      output = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon').inspect
+
+      expect(output).to include('[FILTERED]', 'https://proxy.test/pylon')
+      expect(output).not_to include('pk_test_xyz')
+    end
+
+    # Masking the Configuration alone is not enough: the token also rides in the
+    # headers of the client's Faraday connections, which `Faraday::Connection`
+    # prints in clear, and every collection reaches those through the
+    # datasource. The whole graph is asserted so a new holder cannot reopen a
+    # path quietly.
+    it 'is masked on every object this package hands out, not on the configuration alone' do
+      stub_custom_fields
+      datasource = ForestAdminDatasourcePylon::Datasource.new(api_key: 'pk_test_xyz')
+      datasource.client.send(:connection)
+
+      [datasource, datasource.client, datasource.configuration,
+       datasource.get_collection('PylonIssue'), datasource.get_collection('PylonUser')].each do |object|
+        expect(object.inspect).not_to include('pk_test_xyz')
+      end
+    end
+
+    it 'keeps each of them worth printing' do
+      stub_custom_fields
+      datasource = ForestAdminDatasourcePylon::Datasource.new(api_key: 'pk_test_xyz')
+
+      expect(datasource.inspect).to include('PylonIssue', 'PylonTeam')
+      expect(datasource.client.inspect).to include('https://api.usepylon.com')
+    end
+  end
 end

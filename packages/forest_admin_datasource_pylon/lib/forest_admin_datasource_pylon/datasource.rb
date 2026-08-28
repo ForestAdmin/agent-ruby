@@ -10,6 +10,16 @@ module ForestAdminDatasourcePylon
       register_collections
     end
 
+    # The datasource is what a Rails error page or a `logger.debug` is likeliest
+    # to print, and it holds the client whose connections carry the bearer
+    # token. Every collection reaches that token the same way, through the
+    # `@datasource` the toolkit's Collection keeps, so cutting the chain here
+    # covers them too -- and spares the recursive dump the default `inspect`
+    # walks into, a datasource and its collections pointing at each other.
+    def inspect
+      "#<#{self.class.name} collections=#{collections.keys.inspect}>"
+    end
+
     private
 
     # The five collections are registered together: each one declares relations

@@ -126,6 +126,14 @@ module ForestAdminDatasourcePylon
       end
     end
 
+    # The two memoized connections carry the bearer token in their headers, and
+    # `Faraday::Connection#inspect` prints those in clear: a Client reaching an
+    # `inspect` by accident leaks the credential whatever `Configuration` does
+    # about its own. Masked here for that reason, and not only for symmetry.
+    def inspect
+      "#<#{self.class.name} base_url=#{@configuration.url.inspect}>"
+    end
+
     private
 
     def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)

@@ -41,6 +41,19 @@ module ForestAdminDatasourcePylon
       @base_path ||= URI.parse(url).path
     end
 
+    # `api_key` is a bearer token, and nothing prints a Configuration on
+    # purpose: what reaches an `inspect` is a Rails error page, or a
+    # `logger.debug` of something holding one. The default would put the token
+    # in clear there.
+    #
+    # One of three, not the whole of it: the token also rides in the headers of
+    # the client's Faraday connections, which print them in clear, so `Client`
+    # and `Datasource` mask their own. Together they cut every path from an
+    # object this package hands out to the credential.
+    def inspect
+      "#<#{self.class.name} base_url=#{@base_url.inspect} api_key=[FILTERED]>"
+    end
+
     private
 
     def validate!
