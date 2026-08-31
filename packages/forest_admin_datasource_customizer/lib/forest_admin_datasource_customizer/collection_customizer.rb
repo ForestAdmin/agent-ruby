@@ -50,28 +50,7 @@ module ForestAdminDatasourceCustomizer
         only_fields: only_fields
       }.compact
 
-      if definition && selection.any?
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              'replace_search accepts either a block or a field selection, not both'
-      end
-
-      if definition.nil? && selection.empty?
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              'replace_search needs a block, or one of include_fields, exclude_fields, only_fields'
-      end
-
-      empty = selection.select { |_name, names| Array(names).empty? }
-      if empty.any?
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              "replace_search cannot take an empty #{empty.keys.join(" or ")}: use disable_search to " \
-              'turn the search bar off'
-      end
-
-      if only_fields && (include_fields || exclude_fields)
-        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
-              'replace_search accepts only_fields on its own, not alongside include_fields or ' \
-              'exclude_fields'
-      end
+      assert_search_replacement(selection, definition, only_fields: only_fields)
 
       push_customization { @stack.search.get_collection(@name).replace_search(definition || selection) }
     end
@@ -350,6 +329,30 @@ module ForestAdminDatasourceCustomizer
     end
 
     private
+
+    def assert_search_replacement(selection, definition, only_fields:)
+      if definition && selection.any?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              'replace_search accepts either a block or a field selection, not both'
+      end
+
+      if definition.nil? && selection.empty?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              'replace_search needs a block, or one of include_fields, exclude_fields, only_fields'
+      end
+
+      empty = selection.select { |_name, names| Array(names).empty? }
+      if empty.any?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "replace_search cannot take an empty #{empty.keys.join(" or ")}: use disable_search to " \
+              'turn the search bar off'
+      end
+
+      return unless only_fields && selection.keys != [:only_fields]
+
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search accepts only_fields on its own, not alongside include_fields or exclude_fields'
+    end
 
     def push_customization(&customization)
       @stack.queue_customization(customization)

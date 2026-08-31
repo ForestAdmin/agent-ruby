@@ -236,7 +236,14 @@ module ForestAdminAgent
 
         raise BadRequestError, 'Collection is not searchable' if search && !collection.is_searchable?
 
-        search
+        if search && !search.is_a?(String) && !search.is_a?(Numeric)
+          raise BadRequestError, 'Search must be a string or a number'
+        end
+
+        # Every layer that consumes this strips it: the permission guard, `refine_filter`, and
+        # `insignificant_search?`. A number reaching them raises, and `?search[]=x` would search the
+        # string an Array prints as.
+        search&.to_s
       end
 
       def self.parse_search_extended(args)
