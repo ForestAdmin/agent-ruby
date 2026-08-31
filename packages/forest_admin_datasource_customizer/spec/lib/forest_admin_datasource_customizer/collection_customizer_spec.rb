@@ -242,6 +242,57 @@ module ForestAdminDatasourceCustomizer
             'replace_search needs a block, or one of include_fields, exclude_fields, only_fields'
           )
       end
+
+      # It also re-enables a bar `disable_search` had switched off.
+      it 'refuses an empty field list, which says nothing and disables nothing' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(only_fields: []) }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search cannot take an empty only_fields: use disable_search to turn the search bar off'
+          )
+      end
+
+      it 'refuses only_fields alongside include_fields, where only would stop meaning only' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(only_fields: ['title'], include_fields: ['id']) }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search accepts only_fields on its own, not alongside include_fields or exclude_fields'
+          )
+      end
+
+      it 'refuses only_fields alongside exclude_fields, which could empty the selected set' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(only_fields: ['title'], exclude_fields: ['title']) }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search accepts only_fields on its own, not alongside include_fields or exclude_fields'
+          )
+      end
+
+      it 'refuses an empty include_fields too, not only an empty only_fields' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(include_fields: []) }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search cannot take an empty include_fields: use disable_search to turn the search bar off'
+          )
+      end
+
+      it 'names every empty list it was given, not just the first' do
+        customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+
+        expect { customizer.replace_search(include_fields: [], exclude_fields: []) }
+          .to raise_error(
+            ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            /empty include_fields or exclude_fields/
+          )
+      end
     end
 
     context 'when using disable_search' do

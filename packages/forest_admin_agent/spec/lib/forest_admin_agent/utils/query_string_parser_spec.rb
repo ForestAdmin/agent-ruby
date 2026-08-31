@@ -1232,6 +1232,37 @@ module ForestAdminAgent
 
           expect(described_class.parse_search_extended(args)).to be(false)
         end
+
+        [false, 0, 'false', 'FALSE', ''].each do |falsy|
+          it "reads #{falsy.inspect} as not extended" do
+            expect(described_class.parse_search_extended({ params: { searchExtended: falsy } })).to be(false)
+          end
+        end
+
+        it 'reads an absent parameter as not extended' do
+          expect(described_class.parse_search_extended({ params: {} })).to be(false)
+        end
+
+        it 'keeps reading an unrecognised value as extended, as it always did' do
+          expect(described_class.parse_search_extended({ params: { searchExtended: 'yes' } })).to be(true)
+        end
+
+        it 'lets the subset query say no while the query string still carries the flag' do
+          args = {
+            params: {
+              searchExtended: '1',
+              data: { attributes: { all_records_subset_query: { searchExtended: false } } }
+            }
+          }
+
+          expect(described_class.parse_search_extended(args)).to be(false)
+        end
+
+        it 'falls back to the query string when the subset query does not name the flag' do
+          args = { params: { searchExtended: '1', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search_extended(args)).to be(true)
+        end
       end
 
       describe 'parse_sort' do

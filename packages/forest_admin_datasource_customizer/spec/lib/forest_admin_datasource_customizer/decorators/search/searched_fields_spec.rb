@@ -337,6 +337,32 @@ module ForestAdminDatasourceCustomizer
                 "Cannot search on 'holder': a ManyToOne is not a column"
               )
           end
+
+          it 'refuses a column no search term can match, which the defaults already skip' do
+            expect { decorated.replace_search(include_fields: ['holder_id']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Cannot search on 'holder_id': its Number column declares no filter operator a search term can use"
+              )
+          end
+
+          it 'still accepts excluding that column, which only has to exist to be dropped' do
+            decorated.replace_search(exclude_fields: ['holder_id'])
+
+            expect(decorated.searched_fields('martin', false)).to eq(
+              [{ path: 'pan_last4', collections: ['cards'] }]
+            )
+          end
+
+          it 'leaves the previous selection in place when it refuses a new one' do
+            decorated.replace_search(only_fields: ['pan_last4'])
+
+            expect { decorated.replace_search(only_fields: ['nope']) }
+              .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /nope/)
+            expect(decorated.searched_fields('martin', false)).to eq(
+              [{ path: 'pan_last4', collections: ['cards'] }]
+            )
+          end
         end
       end
     end

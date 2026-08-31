@@ -349,20 +349,23 @@ module ForestAdminAgent
         end
       end
 
-      # An unknown footprint is a `replace_search` block choosing its own fields. On a plain search
-      # the caller aimed at nothing, so it is served — the same category as a scope, and refusing
-      # would remove search from every customized collection. The extended flag is the caller's own,
-      # though: running one term both ways isolates the rows matched through a relation, a bit per
-      # term on collections no check covered. The exemption stops there.
-      #
-      # A collection that cannot answer at all is read the same way: silence is not an empty
-      # footprint either.
+      # Only a callable `replace_search` is a footprint this stack could have described and did not; a
+      # native child search, or no search decorator at all, builds no condition here. A plain search is
+      # served in either case — the extended flag is the caller's own, so the exemption stops there.
       def assert_extended_search_checkable(collection, search_extended)
         return unless search_extended
+        return unless permission_system?
+        return unless describes_own_search?(collection)
 
         raise ForbiddenError,
               "You cannot run an extended search on the '#{collection.name}' collection: the fields " \
               'it reaches cannot be determined, so they cannot be checked against your permissions.'
+      end
+
+      # Reaches the search decorator only through `CollectionDecorator#search_handler?`: drop that
+      # delegation and this answers false for every collection.
+      def describes_own_search?(collection)
+        collection.respond_to?(:search_handler?) && collection.search_handler?
       end
 
       # `searched_fields` answers below the publication layer — deliberately, so a field hidden by

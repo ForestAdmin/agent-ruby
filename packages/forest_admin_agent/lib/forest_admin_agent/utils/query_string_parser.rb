@@ -10,6 +10,7 @@ module ForestAdminAgent
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
       POLYMORPHIC_TARGET_WILDCARD = '*'.freeze
+      FALSY_SEARCH_EXTENDED = [nil, false, 0, '0', 'false', ''].freeze
 
       def self.parse_condition_tree(collection, args)
         filters = begin
@@ -239,12 +240,15 @@ module ForestAdminAgent
       end
 
       def self.parse_search_extended(args)
-        extended = args.dig(:params, :data, :attributes, :all_records_subset_query,
-                            :searchExtended) || args.dig(:params, :searchExtended)
+        # `key?` rather than `||`: a real +false+ here is falsy, and would lose to the query string.
+        subset = args.dig(:params, :data, :attributes, :all_records_subset_query)
+        extended = if subset.is_a?(Hash) && subset.key?(:searchExtended)
+                     subset[:searchExtended]
+                   else
+                     args.dig(:params, :searchExtended)
+                   end
 
-        return false if extended.nil?
-
-        extended != '0'
+        !FALSY_SEARCH_EXTENDED.include?(extended.is_a?(String) ? extended.downcase : extended)
       end
 
       def self.parse_sort(collection, args)

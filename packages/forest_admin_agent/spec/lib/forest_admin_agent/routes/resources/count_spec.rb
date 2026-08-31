@@ -55,7 +55,7 @@ module ForestAdminAgent
           ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
           count.handle_request(args)
 
-          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'user', applies: %i[filter search] }])
+          expect(read_guard_calls[:query_fields]).to eq([{ collection: 'user', applies: %i[filter search search_extended] }])
         end
 
         context 'when collection is countable' do

@@ -44,10 +44,12 @@ end
 
 # `applies` is derived from the keys the route actually passed, so it cannot drift from the query the
 # route builds: a component it drops is one it does not pass.
-READ_GUARD_QUERY_KEYS = { filter: :condition_tree, sort: :sort, search: :search }.freeze
+READ_GUARD_QUERY_KEYS = {
+  filter: :condition_tree, sort: :sort, search: :search, search_extended: :search_extended
+}.freeze
 
 RSpec.shared_context 'with readable related collections' do
-  let(:read_guard_calls) { { query_fields: [], projections: [] } }
+  let(:read_guard_calls) { { query_fields: [], projections: [], search_extended: [] } }
 
   before do
     allow(permissions).to receive(:assert_can_read_query_fields) do |collection, **options|
@@ -55,6 +57,8 @@ RSpec.shared_context 'with readable related collections' do
         collection: collection.name,
         applies: READ_GUARD_QUERY_KEYS.select { |_name, key| options.key?(key) }.keys
       }
+      # `applies` only says the key was passed; the refusal turns on its value.
+      read_guard_calls[:search_extended] << options[:search_extended] if options.key?(:search_extended)
     end
     allow(permissions).to receive(:assert_can_read_usages)
     allow(permissions).to receive(:redact_projection) do |collection, projection, **options|

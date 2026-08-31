@@ -21,8 +21,8 @@ module ForestAdminDatasourceCustomizer
         end
 
         def replace_search(replacer)
+          assert_selection_resolves(replacer)
           @replacer = replacer
-          assert_selection_resolves
           @disabled_search = false
           mark_schema_as_dirty
         end
@@ -69,6 +69,10 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        def search_handler?
+          !handler.nil?
+        end
+
         private
 
         def handler
@@ -87,14 +91,12 @@ module ForestAdminDatasourceCustomizer
           handler.nil? && implements_search?
         end
 
-        # Resolved now rather than per request, so a name that resolves to nothing is reported here
-        # instead of leaving the search matching nothing.
-        def assert_selection_resolves
-          selection = field_selection
+        def assert_selection_resolves(replacer)
+          return if replacer.nil? || replacer.respond_to?(:call)
 
-          return if selection.nil?
-
-          selected_paths(selection).each { |path| resolved_field(path) }
+          field_paths(replacer[:only_fields]).each { |path| selected_field(path) }
+          field_paths(replacer[:include_fields]).each { |path| selected_field(path) }
+          field_paths(replacer[:exclude_fields]).each { |path| resolved_field(path) }
         end
 
         def insignificant_search?(search)
@@ -135,12 +137,6 @@ module ForestAdminDatasourceCustomizer
             .except(*field_paths(selection[:exclude_fields]))
         end
 
-        def selected_paths(selection)
-          field_paths(selection[:only_fields]) +
-            field_paths(selection[:include_fields]) +
-            field_paths(selection[:exclude_fields])
-        end
-
         def field_paths(names)
           Array(names).map(&:to_s)
         end
@@ -156,6 +152,21 @@ module ForestAdminDatasourceCustomizer
           end
 
           [path, schema]
+        end
+
+        # `get_fields` skips such a column silently; here it is refused, because a Number or UUID column
+        # reaching `build_condition` gets an EQUAL leaf its datasource never declared.
+        def selected_field(path)
+          resolved = resolved_field(path)
+          schema = resolved.last
+
+          unless searchable_field?(schema)
+            raise ForestException,
+                  "Cannot search on '#{path}': its #{schema.column_type} column declares no filter " \
+                  'operator a search term can use'
+          end
+
+          resolved
         end
 
         def build_condition(field, schema, search_string)
