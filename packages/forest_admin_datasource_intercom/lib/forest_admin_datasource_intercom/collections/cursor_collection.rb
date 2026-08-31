@@ -75,6 +75,14 @@ module ForestAdminDatasourceIntercom
       # pays for it by the page. See Ticket.
       def max_page_size = Client::MAX_PER_PAGE
 
+      # One page of the collection. A listing for conversations, a search for
+      # tickets -- Intercom exposes no `GET /tickets` at all -- so the endpoint
+      # and its shape belong to the collection, while walking it does not.
+      def read_page(per_page:, cursor:)
+        client.list_page(list_endpoint, per_page: [per_page, max_page_size].min,
+                                        starting_after: cursor, params: read_params, list_key: list_key)
+      end
+
       # A column of this tier advertises no filter and no sort, because the
       # collection can honour neither -- except on the primary key, which is
       # answered by the record endpoint rather than by a filter. A schema that
@@ -152,10 +160,7 @@ module ForestAdminDatasourceIntercom
       def listed_records(filter)
         offset, limit = translate_page(filter&.page)
 
-        walker.walk(offset: offset, limit: limit) do |per_page, cursor|
-          client.list_page(list_endpoint, per_page: [per_page, max_page_size].min,
-                                          starting_after: cursor, params: read_params, list_key: list_key)
-        end
+        walker.walk(offset: offset, limit: limit) { |per_page, cursor| read_page(per_page: per_page, cursor: cursor) }
       end
 
       # A filter with no page asks for every record it matched; the walker reads
@@ -176,7 +181,7 @@ module ForestAdminDatasourceIntercom
 
         refuse_filter!(filter) unless browsing?(filter)
 
-        page = client.list_page(list_endpoint, per_page: 1, params: read_params, list_key: list_key)
+        page = read_page(per_page: 1, cursor: nil)
         return page.total_count if page.total_count
 
         raise UnsupportedOperatorError,

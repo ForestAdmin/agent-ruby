@@ -11,7 +11,7 @@ module ForestAdminDatasourceIntercom
           attrs = conversation.is_a?(Hash) ? conversation : {}
 
           native(attrs)
-            .merge(contacts_of(attrs))
+            .merge(contact_columns_for(attrs))
             .merge(source_of(attrs['source']))
             .merge(statistics_of(attrs['statistics']))
         end
@@ -41,17 +41,6 @@ module ForestAdminDatasourceIntercom
           }
         end
 
-        # A group conversation carries several contacts. The row names the first
-        # and counts them, rather than presenting one of several as the one.
-        def contacts_of(attrs)
-          ids = nested_list(attrs['contacts'], 'contacts').filter_map { |contact| stringify_id(contact['id']) }
-
-          { 'contact_ids' => ids, 'contact_count' => ids.size,
-            # Filled by the bulk read of `enrich`, and left nil when the
-            # projection did not ask for them.
-            'contact_name' => nil, 'contact_email' => nil }
-        end
-
         def source_of(source)
           attrs = source.is_a?(Hash) ? source : {}
           author = attrs['author'].is_a?(Hash) ? attrs['author'] : {}
@@ -79,21 +68,6 @@ module ForestAdminDatasourceIntercom
             'last_admin_reply_at' => stamp(attrs['last_admin_reply_at']),
             'reopen_count' => attrs['count_reopens'],
             'part_count' => attrs['count_conversation_parts'] }
-        end
-
-        # Intercom nests its lists twice -- `{"type": "contact.list", "contacts":
-        # [...]}` -- and answers a null instead of an empty list when there is
-        # nothing.
-        def nested_list(container, key)
-          return [] unless container.is_a?(Hash)
-
-          list = container[key]
-          list.is_a?(Array) ? list : []
-        end
-
-        def first_contact_id(record)
-          contact = nested_list((record || {})['contacts'], 'contacts').first
-          contact.is_a?(Hash) ? stringify_id(contact['id']) : nil
         end
       end
     end

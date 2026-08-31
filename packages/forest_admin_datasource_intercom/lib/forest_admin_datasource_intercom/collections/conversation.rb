@@ -10,7 +10,8 @@ module ForestAdminDatasourceIntercom
     # customers, and rendering third-party HTML inside Forest is neither safe nor
     # useful (R10).
     # Long by line count only: most of it declares the columns, one call each.
-    class Conversation < CursorCollection # rubocop:disable Metrics/ClassLength
+    class Conversation < CursorCollection
+      include ContactIdentity
       include Conversation::Serializer
       include Conversation::Timeline
 
@@ -21,10 +22,6 @@ module ForestAdminDatasourceIntercom
       # page the operator waits half a minute for; rows past the cap are left at
       # nil, which reads as "unknown", never as "this conversation is empty".
       MAX_TIMELINE_READS = 10
-
-      # An `id in [...]` read of contacts is one request per chunk, against the
-      # whole page rather than per row.
-      CONTACT_CHUNK = 100
 
       def initialize(datasource)
         super(datasource, 'IntercomConversation')
@@ -114,38 +111,6 @@ module ForestAdminDatasourceIntercom
         add_column('last_admin_reply_at', 'Date')
         add_column('reopen_count', 'Number')
         add_column('part_count', 'Number')
-      end
-
-      def embed_contact_identity(records, rows, projection)
-        return unless (%w[contact_name contact_email] & projection).any?
-
-        identities = contact_identities(records)
-        records.each_with_index do |record, index|
-          identity = identities[first_contact_id(record)] || {}
-          rows[index]['contact_name'] = identity['name'] if rows[index].key?('contact_name')
-          rows[index]['contact_email'] = identity['email'] if rows[index].key?('contact_email')
-        end
-      end
-
-      # One read per chunk of ids for the whole page, never one per row. A
-      # failure costs the two columns and nothing else: an identity that could
-      # not be read is not a page that could not be served.
-      def contact_identities(records)
-        ids = records.filter_map { |record| first_contact_id(record) }.uniq
-        return {} if ids.empty?
-
-        ids.each_slice(CONTACT_CHUNK).with_object({}) do |chunk, indexed|
-          page = client.search_page('contacts/search', per_page: chunk.size,
-                                                       query: { 'field' => 'id', 'operator' => 'IN',
-                                                                'value' => chunk })
-          page.records.each { |contact| indexed[contact['id'].to_s] = contact }
-        end
-      rescue APIError => e
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} could not read the contacts of this page (HTTP " \
-          "#{e.status || "-"}); the name and e-mail columns are left empty for it."
-        )
-        {}
       end
 
       # A record read through the record endpoint already carries its parts, so

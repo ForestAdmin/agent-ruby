@@ -33,6 +33,16 @@ module ForestAdminDatasourceIntercom
       add_collection(Collections::TicketType.new(self))
       add_collection(Collections::TicketState.new(self))
       add_collection(Collections::Conversation.new(self))
+      # The one boot-time read of the datasource: the attributes a workspace
+      # defines on its ticket types, which are columns of the Tickets collection
+      # and cannot be discovered from a ticket payload -- a ticket carries the
+      # values of its own type only. It degrades to no attribute column rather
+      # than to a failed boot.
+      add_collection(Collections::Ticket.new(self, attributes: ticket_attributes))
+    end
+
+    def ticket_attributes
+      Schema::TicketAttributesIntrospector.new(@client).attributes
     end
   end
 end

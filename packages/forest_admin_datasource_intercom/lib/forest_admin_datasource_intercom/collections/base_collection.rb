@@ -68,6 +68,16 @@ module ForestAdminDatasourceIntercom
         value&.to_s
       end
 
+      # Intercom nests its lists twice -- `{"type": "contact.list", "contacts":
+      # [...]}` -- and answers a null instead of an empty list when there is
+      # nothing.
+      def nested_list(container, key)
+        return [] unless container.is_a?(Hash)
+
+        list = container[key]
+        list.is_a?(Array) ? list : []
+      end
+
       # Intercom dates travel as epoch seconds; Forest reads a Date column as an
       # ISO8601 string, and a filter carries one too, so comparing the two is the
       # ordering itself. UTC deliberately: that is where Intercom stores and

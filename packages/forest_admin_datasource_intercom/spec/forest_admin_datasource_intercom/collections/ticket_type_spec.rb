@@ -9,7 +9,7 @@ module ForestAdminDatasourceIntercom
       ForestAdminDatasourceToolkit::Components::Query::Filter.new
     end
 
-    def stub_ticket_types(*types)
+    def stub_types(*types)
       stub_request(:get, "#{base}/ticket_types")
         .to_return(status: 200, body: { 'type' => 'list', 'data' => types }.to_json,
                    headers: { 'Content-Type' => 'application/json' })
@@ -25,8 +25,8 @@ module ForestAdminDatasourceIntercom
 
     # This endpoint uses the `data` envelope, unlike /admins and /teams.
     it 'reads the endpoint through the data envelope' do
-      stub_ticket_types('type' => 'ticket_type', 'id' => '1', 'name' => 'Bug', 'description' => 'A bug',
-                        'category' => 'request', 'icon' => '🐛', 'archived' => false)
+      stub_types('type' => 'ticket_type', 'id' => '1', 'name' => 'Bug', 'description' => 'A bug',
+                 'category' => 'request', 'icon' => '🐛', 'archived' => false)
 
       expect(collection.list(nil, filter, nil))
         .to eq([{ 'id' => '1', 'name' => 'Bug', 'description' => 'A bug', 'category' => 'request',
@@ -37,7 +37,7 @@ module ForestAdminDatasourceIntercom
     # to build its columns -- an attribute of the same name carries a different
     # id from one type to the next -- and they are meaningless as a column.
     it 'leaves the nested attribute definitions out of the schema' do
-      stub_ticket_types('id' => '1', 'ticket_type_attributes' => { 'type' => 'list', 'data' => [{ 'id' => '9' }] })
+      stub_types('id' => '1', 'ticket_type_attributes' => { 'type' => 'list', 'data' => [{ 'id' => '9' }] })
 
       expect(collection.list(nil, filter, nil).first.keys).not_to include('ticket_type_attributes')
     end
