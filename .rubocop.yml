@@ -42,6 +42,7 @@ Gemspec/RequireMFA:
     - 'packages/forest_admin_datasource_snowflake/forest_admin_datasource_snowflake.gemspec'
     - 'packages/forest_admin_datasource_mambu_payments/forest_admin_datasource_mambu_payments.gemspec'
     - 'packages/forest_admin_datasource_graphql_hasura/forest_admin_datasource_graphql_hasura.gemspec'
+    - 'packages/forest_admin_datasource_intercom/forest_admin_datasource_intercom.gemspec'
 
 # Offense count: 1
 # This cop supports unsafe autocorrection (--autocorrect-all).
@@ -133,6 +134,7 @@ Style/MutableConstant:
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/version.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb'
     - 'packages/forest_admin_datasource_mambu_payments/lib/forest_admin_datasource_mambu_payments/version.rb'
+    - 'packages/forest_admin_datasource_intercom/lib/forest_admin_datasource_intercom/version.rb'
 
 # Offense count: 38
 # This cop supports safe autocorrection (--autocorrect).
@@ -217,6 +219,7 @@ Style/StringLiterals:
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/version.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb'
     - 'packages/forest_admin_datasource_mambu_payments/lib/forest_admin_datasource_mambu_payments/version.rb'
+    - 'packages/forest_admin_datasource_intercom/lib/forest_admin_datasource_intercom/version.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
