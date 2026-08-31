@@ -7,10 +7,11 @@ module ForestAdminDatasourceIntercom
     end
 
     # The reference collections come first: they are what turns an assignee id
-    # into a teammate and a state id into a label.
-    it 'publishes the reference collections' do
+    # into a teammate and a state id into a label. Conversations follow, Tickets
+    # next.
+    it 'publishes the collections of the lot' do
       expect(datasource.collections.keys)
-        .to eq(%w[IntercomAdmin IntercomTeam IntercomTicketType IntercomTicketState])
+        .to eq(%w[IntercomAdmin IntercomTeam IntercomTicketType IntercomTicketState IntercomConversation])
     end
 
     it 'reaches Intercom only when a collection is listed, never while booting' do

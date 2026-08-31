@@ -12,6 +12,7 @@ module ForestAdminDatasourceIntercom
       ColumnSchema = ForestAdminDatasourceToolkit::Schema::ColumnSchema
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
       Equivalent = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeEquivalent
+      Leaf = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
 
       def initialize(datasource, name)
         super
@@ -65,6 +66,17 @@ module ForestAdminDatasourceIntercom
       # comes, an integer id would never match the string the filter carries.
       def stringify_id(value)
         value&.to_s
+      end
+
+      # Intercom dates travel as epoch seconds; Forest reads a Date column as an
+      # ISO8601 string, and a filter carries one too, so comparing the two is the
+      # ordering itself. UTC deliberately: that is where Intercom stores and
+      # truncates, and rendering a local time here would hide the very shift that
+      # makes a day-granular date filter wrong.
+      def stamp(seconds)
+        return nil unless seconds.is_a?(Numeric) && seconds.positive?
+
+        Time.at(seconds).utc.iso8601
       end
     end
   end

@@ -23,15 +23,16 @@ module ForestAdminDatasourceIntercom
     private
 
     # The reference collections first: they are what turns an assignee id into a
-    # teammate and a state id into a label, and nothing else in the schema points
-    # at them yet. Conversations and Tickets follow, and no request is made here
-    # -- each collection reads its endpoint when it is listed, so a datasource
-    # boots whatever Intercom is doing.
+    # teammate and a state id into a label. No request is made here -- each
+    # collection reads its endpoint when it is listed, so a datasource boots
+    # whatever Intercom is doing, and a workspace the token cannot read costs
+    # rows rather than the agent.
     def register_collections
       add_collection(Collections::Admin.new(self))
       add_collection(Collections::Team.new(self))
       add_collection(Collections::TicketType.new(self))
       add_collection(Collections::TicketState.new(self))
+      add_collection(Collections::Conversation.new(self))
     end
   end
 end

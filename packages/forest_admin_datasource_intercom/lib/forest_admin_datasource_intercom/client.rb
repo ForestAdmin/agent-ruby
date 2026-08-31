@@ -50,11 +50,38 @@ module ForestAdminDatasourceIntercom
     #
     # `CursorWalker` is what turns the offset/limit window a list view asks for
     # into a sequence of these.
-    def list_page(path, per_page:, starting_after: nil, params: {}, boot: false)
+    #
+    # `list_key` is the key the endpoint puts its records under, and it is not
+    # `data` everywhere: `/tickets/search` answers under `tickets` (measured), so
+    # a caller names its own and `data` stays the fallback.
+    def list_page(path, per_page:, starting_after: nil, params: {}, list_key: 'data', boot: false)
       query = params.merge('per_page' => self.class.bounded_per_page(per_page))
       query['starting_after'] = starting_after unless blank?(starting_after)
 
-      must_succeed(path) { to_page(get(path, query, boot: boot).body, path) }
+      must_succeed(path) { to_page(get(path, query, boot: boot).body, path, list_key) }
+    end
+
+    # One page of a search endpoint. The query is written by the caller rather
+    # than translated from a Forest filter -- that translation is lot 2 -- so
+    # what goes on the wire is what the caller asked for.
+    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data')
+      pagination = { 'per_page' => self.class.bounded_per_page(per_page) }
+      pagination['starting_after'] = starting_after unless blank?(starting_after)
+      body = { 'query' => query, 'pagination' => pagination }
+
+      must_succeed(path) { to_page(post(path, body).body, path, list_key) }
+    end
+
+    # One record from its own endpoint. Raises on a 404 like on any other
+    # failure: what a missing record means -- a stale link, a record outside the
+    # token's scope, a deletion -- is the caller's to decide, not the client's.
+    def fetch_record(path, id, params: {}, boot: false)
+      operation = "#{path}/#{id}"
+
+      must_succeed(operation) do
+        body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
+        body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
+      end
     end
 
     # Every record of an endpoint that answers in one response: the reference
@@ -96,6 +123,10 @@ module ForestAdminDatasourceIntercom
       (boot ? boot_connection : connection).get(path, params)
     end
 
+    def post(path, body, boot: false)
+      (boot ? boot_connection : connection).post(path, body)
+    end
+
     # Intercom serves the version its workspace defaults to when the pin is not
     # honoured, and the payloads differ between versions. The echo is the only
     # way to notice, and noticing at boot is worth more than a schema that
@@ -134,15 +165,19 @@ module ForestAdminDatasourceIntercom
     end
 
     # The records under the key the endpoint uses, or under `data`. Anything
-    # else is refused: a reference collection silently read as empty is a
-    # ticket-state column with no values and an assignee shown as a raw id.
+    # else is refused rather than read as an empty page: `Array()` would turn the
+    # envelope into `[key, value]` pairs a collection would serialize into rows
+    # holding nothing -- a page that looks answered and is empty -- and a
+    # reference collection silently read as empty is a state column with no
+    # values and an assignee shown as a raw id.
     def extract_entities(body, operation, list_key)
       return [] if body.nil? || body == ''
 
       entities = body.is_a?(Hash) ? (body[list_key] || body['data']) : nil
       return entities if entities.is_a?(Array)
 
-      refuse_body_shape(operation, "neither '#{list_key}' nor 'data' is a list")
+      detail = list_key == 'data' ? "'data' is not a list" : "neither '#{list_key}' nor 'data' is a list"
+      refuse_body_shape(operation, detail)
     end
 
     def log_collection_cap(path, pages, collected)
@@ -155,21 +190,10 @@ module ForestAdminDatasourceIntercom
 
     # Intercom wraps a listing in `{ "type": "list", "data": [...],
     # "total_count": N, "pages": { "next": { "starting_after": "..." } } }`.
-    def to_page(body, operation)
-      Page.new(records: extract_list(body, operation),
+    def to_page(body, operation, list_key)
+      Page.new(records: extract_entities(body, operation, list_key),
                next_cursor: next_cursor(body, operation),
                total_count: extract_count(body))
-    end
-
-    # A listing whose `data` is absent or is not a list broke the contract. It
-    # is refused rather than read as an empty page: `Array()` would turn the
-    # envelope into `[key, value]` pairs the collection would serialize into
-    # rows holding nothing -- a page that looks answered and is empty.
-    def extract_list(body, operation)
-      data = body.is_a?(Hash) ? body['data'] : nil
-      return data if data.is_a?(Array)
-
-      refuse_body_shape(operation, "'data' is not a list")
     end
 
     # Absent on the last page, which is how the walk knows it is done. An older
