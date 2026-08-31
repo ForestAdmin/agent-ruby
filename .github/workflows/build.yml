@@ -11,6 +11,12 @@ permissions:
   contents: read
   id-token: write
 
+# A PR's runs are superseded by its next push; runs on main/beta are not, since
+# `deploy` publishes gems from them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     name: Lint
@@ -93,12 +99,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/bundle
-          key: ${{ runner.os }}-gems-${{ matrix.ruby-version }}-${{ matrix.packages }}-${{ hashFiles('Gemfile', '*.gemspec', format('packages/{0}/Gemfile-test', matrix.packages), 'packages/*/*.gemspec') }}
+          key: ${{ runner.os }}-gems-${{ matrix.ruby-version }}-${{ matrix.packages }}-${{ hashFiles(format('packages/{0}/Gemfile-test', matrix.packages), 'packages/*/*.gemspec') }}
           restore-keys: |
             ${{ runner.os }}-gems-${{ matrix.ruby-version }}-${{ matrix.packages }}-
-
-      - name: Install dependencies on main repo
-        run: bundle install
 
       - name: Wait for MongoDB
         if: ${{ matrix.packages == 'forest_admin_datasource_mongoid' }}
