@@ -303,6 +303,85 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    describe '#fetch_all' do
+      it 'reads the records under the key the endpoint uses' do
+        stub_request(:get, "#{base}/admins")
+          .to_return(json('type' => 'admin.list', 'admins' => [{ 'id' => '1' }, { 'id' => '2' }]))
+
+        expect(client.fetch_all('admins', list_key: 'admins').size).to eq(2)
+      end
+
+      # Intercom is not consistent about it: /admins and /teams use their own
+      # key, /ticket_types the `data` envelope every paginated listing uses.
+      it 'falls back to the data envelope' do
+        stub_request(:get, "#{base}/ticket_types").to_return(json('type' => 'list', 'data' => [{ 'id' => '1' }]))
+
+        expect(client.fetch_all('ticket_types')).to eq([{ 'id' => '1' }])
+      end
+
+      it 'asks for no page: these endpoints answer whole' do
+        stub_request(:get, "#{base}/teams").to_return(json('teams' => []))
+
+        client.fetch_all('teams', list_key: 'teams')
+
+        expect(WebMock).to have_requested(:get, "#{base}/teams").with(query: {})
+      end
+
+      # A reference collection read as empty is a state column with no values and
+      # an assignee shown as a raw id -- worse than a failure naming the shape.
+      it 'refuses a response holding neither key' do
+        stub_request(:get, "#{base}/admins").to_return(json('type' => 'admin.list', 'admins' => { 'id' => '1' }))
+
+        expect { client.fetch_all('admins', list_key: 'admins') }
+          .to raise_error(APIError, /neither 'admins' nor 'data' is a list/)
+      end
+
+      it 'reads an empty body as no record' do
+        stub_request(:get, "#{base}/admins").to_return(status: 200, body: '')
+
+        expect(client.fetch_all('admins', list_key: 'admins')).to eq([])
+      end
+
+      # No pagination parameter in the specification is not a promise that a
+      # large workspace answers in one response, and a truncated reference
+      # collection would show an operator a state list missing its last states.
+      it 'follows a cursor if one is advertised anyway' do
+        stub_request(:get, "#{base}/tags").with(query: {})
+                                          .to_return(json('data' => [{ 'id' => '1' }],
+                                                          'pages' => { 'next' => { 'starting_after' => 'c2' } }))
+        stub_request(:get, "#{base}/tags").with(query: { 'starting_after' => 'c2' })
+                                          .to_return(json('data' => [{ 'id' => '2' }]))
+
+        expect(client.fetch_all('tags').map { |tag| tag['id'] }).to eq(%w[1 2])
+      end
+
+      it 'stops at its page cap and says what it left out' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_request(:get, "#{base}/tags").with(query: hash_including({}))
+                                          .to_return(json('data' => [{ 'id' => '1' }],
+                                                          'pages' => { 'next' => { 'starting_after' => 'c' } }))
+
+        client.fetch_all('tags')
+
+        expect(WebMock).to have_requested(:get, "#{base}/tags")
+          .with(query: hash_including({})).times(described_class::MAX_COLLECTED_PAGES)
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/Stopped reading tags/)
+      end
+
+      it 'reads through the boot connection when asked to' do
+        stub_request(:get, "#{base}/ticket_types").to_return(json('data' => []))
+
+        expect(client.fetch_all('ticket_types', boot: true)).to eq([])
+      end
+
+      it 'names the endpoint when the read fails' do
+        stub_request(:get, "#{base}/admins").to_return(json({ 'errors' => [{ 'code' => 'forbidden' }] }, 403))
+
+        expect { client.fetch_all('admins', list_key: 'admins') }
+          .to raise_error(APIError, /admins: HTTP 403 forbidden/)
+      end
+    end
+
     describe '.bounded_per_page' do
       # Intercom answers `invalid_per_page` past 150 instead of clamping, so a
       # page size is bounded before it is sent or the list view breaks.

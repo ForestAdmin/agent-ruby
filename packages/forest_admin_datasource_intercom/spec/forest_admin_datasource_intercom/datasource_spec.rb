@@ -6,8 +6,17 @@ module ForestAdminDatasourceIntercom
       expect { datasource }.not_to raise_error
     end
 
-    it 'registers no collection yet' do
-      expect(datasource.collections).to be_empty
+    # The reference collections come first: they are what turns an assignee id
+    # into a teammate and a state id into a label.
+    it 'publishes the reference collections' do
+      expect(datasource.collections.keys)
+        .to eq(%w[IntercomAdmin IntercomTeam IntercomTicketType IntercomTicketState])
+    end
+
+    it 'reaches Intercom only when a collection is listed, never while booting' do
+      datasource
+
+      expect(WebMock).not_to have_requested(:get, /intercom/)
     end
 
     it 'configures a client from the options it is handed' do
@@ -22,7 +31,7 @@ module ForestAdminDatasourceIntercom
     end
 
     it 'names the collections it holds when printed' do
-      expect(datasource.inspect).to eq('#<ForestAdminDatasourceIntercom::Datasource collections=[]>')
+      expect(datasource.inspect).to include('IntercomAdmin', 'IntercomTicketState')
     end
 
     it 'never prints the token the client carries' do

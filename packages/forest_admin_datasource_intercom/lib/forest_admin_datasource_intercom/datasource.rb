@@ -1,7 +1,4 @@
 module ForestAdminDatasourceIntercom
-  # Boot skeleton: it configures a client and registers no collection yet. The
-  # collections follow in their own pull requests, each one bringing the
-  # endpoints it reads.
   class Datasource < ForestAdminDatasourceToolkit::Datasource
     attr_reader :client, :configuration
 
@@ -25,6 +22,16 @@ module ForestAdminDatasourceIntercom
 
     private
 
-    def register_collections; end
+    # The reference collections first: they are what turns an assignee id into a
+    # teammate and a state id into a label, and nothing else in the schema points
+    # at them yet. Conversations and Tickets follow, and no request is made here
+    # -- each collection reads its endpoint when it is listed, so a datasource
+    # boots whatever Intercom is doing.
+    def register_collections
+      add_collection(Collections::Admin.new(self))
+      add_collection(Collections::Team.new(self))
+      add_collection(Collections::TicketType.new(self))
+      add_collection(Collections::TicketState.new(self))
+    end
   end
 end

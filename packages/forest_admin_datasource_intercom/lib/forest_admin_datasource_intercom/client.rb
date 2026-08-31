@@ -14,6 +14,12 @@ module ForestAdminDatasourceIntercom
     # before it is sent or the list view breaks rather than shrinks.
     MAX_PER_PAGE = 150
 
+    # Bounds `fetch_all`, which asks for a whole reference collection rather than
+    # a window: those endpoints answer in one response, so reaching this many
+    # pages means Intercom started paginating on its own and the read is spending
+    # more than the answer is worth.
+    MAX_COLLECTED_PAGES = 10
+
     # `next_cursor` is nil as soon as Intercom stops advertising a next page, so
     # callers never have to know how the absence is spelled on the wire.
     # `total_count` is exact, filter included, which is what makes Forest's
@@ -51,6 +57,23 @@ module ForestAdminDatasourceIntercom
       must_succeed(path) { to_page(get(path, query, boot: boot).body, path) }
     end
 
+    # Every record of an endpoint that answers in one response: the reference
+    # collections -- admins, teams, ticket types, ticket states -- whose paths
+    # declare no pagination parameter at all.
+    #
+    # `list_key` is the key the endpoint puts its records under. Intercom is not
+    # consistent about it: `/admins` answers `{"type": "admin.list", "admins":
+    # [...]}` where `/ticket_types` answers the `data` envelope every paginated
+    # listing uses, so the collection names its own and `data` is the fallback.
+    #
+    # A cursor is followed if one is advertised, defensively: no pagination
+    # parameter in the specification is not a promise that a large workspace
+    # answers in one response, and a truncated reference collection would show
+    # an operator a state list missing its last states.
+    def fetch_all(path, list_key: 'data', boot: false)
+      must_succeed(path) { collect_pages(path, list_key: list_key, boot: boot) }
+    end
+
     # The page size Intercom accepts, whatever was asked for.
     def self.bounded_per_page(size)
       value = size.to_i
@@ -86,6 +109,47 @@ module ForestAdminDatasourceIntercom
         "[forest_admin_datasource_intercom] asked Intercom for API version #{@configuration.api_version} " \
         "and it served #{served}. Payload shapes may differ from the ones this datasource expects; check the " \
         "workspace's default version in the Developer Hub."
+      )
+    end
+
+    def collect_pages(path, list_key:, boot:)
+      records = []
+      cursor = nil
+      pages = 0
+
+      loop do
+        body = get(path, cursor.nil? ? nil : { 'starting_after' => cursor }, boot: boot).body
+        records.concat(extract_entities(body, path, list_key))
+        pages += 1
+        cursor = next_cursor(body, path)
+        break if cursor.nil?
+
+        if pages >= MAX_COLLECTED_PAGES
+          log_collection_cap(path, pages, records.size)
+          break
+        end
+      end
+
+      records
+    end
+
+    # The records under the key the endpoint uses, or under `data`. Anything
+    # else is refused: a reference collection silently read as empty is a
+    # ticket-state column with no values and an assignee shown as a raw id.
+    def extract_entities(body, operation, list_key)
+      return [] if body.nil? || body == ''
+
+      entities = body.is_a?(Hash) ? (body[list_key] || body['data']) : nil
+      return entities if entities.is_a?(Array)
+
+      refuse_body_shape(operation, "neither '#{list_key}' nor 'data' is a list")
+    end
+
+    def log_collection_cap(path, pages, collected)
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] Stopped reading #{path} after #{pages} page(s) / " \
+        "#{collected} record(s); the rest is left out. This endpoint is read whole on purpose, so a workspace " \
+        'this large needs the collection bounded rather than listed.'
       )
     end
 
