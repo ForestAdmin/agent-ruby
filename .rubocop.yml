@@ -264,6 +264,7 @@ Metrics/ParameterLists:
     - 'packages/forest_admin_agent/lib/forest_admin_agent/audit_trail/capture.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/audit_trail/store.rb'
     - 'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/configuration.rb'
+    - 'packages/forest_admin_datasource_intercom/lib/forest_admin_datasource_intercom/configuration.rb'
     - 'packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/collections/base_collection.rb'
     - 'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/datasource.rb'
     - 'packages/forest_admin_agent/lib/forest_admin_agent/routes/query_handler.rb'
@@ -299,6 +300,7 @@ Metrics/ModuleLength:
     - 'packages/forest_admin_datasource_mambu_payments/spec/**/*'
     - 'packages/forest_admin_rails/spec/**/*'
     - 'packages/forest_admin_rpc_agent/spec/**/*'
+    - 'packages/forest_admin_datasource_intercom/spec/**/*'
     - 'packages/forest_admin_datasource_mongoid/lib/forest_admin_datasource_mongoid/utils/helpers.rb'
 
 Metrics/MethodLength:
