@@ -6,11 +6,19 @@ module ForestAdminDatasourceIntercom
   # the quota headers, because the pacing is driven by them; and Intercom's own
   # error body, because that text is what an operator reads when an action
   # fails.
-  class Client
+  # Long by line count only: the public surface is one method per endpoint, and
+  # the rest is the envelope and error handling every one of them shares.
+  class Client # rubocop:disable Metrics/ClassLength
     # `per_page=200` is refused with `invalid_per_page` -- "must be an integer
     # between 0 and 150". There is no silent downgrade, so a page size is bounded
     # before it is sent or the list view breaks rather than shrinks.
     MAX_PER_PAGE = 150
+
+    # `next_cursor` is nil as soon as Intercom stops advertising a next page, so
+    # callers never have to know how the absence is spelled on the wire.
+    # `total_count` is exact, filter included, which is what makes Forest's
+    # record counter and its "number of" charts one request each.
+    Page = Struct.new(:records, :next_cursor, :total_count, keyword_init: true)
 
     def initialize(configuration)
       @configuration = configuration
@@ -29,6 +37,18 @@ module ForestAdminDatasourceIntercom
         verify_pinned_version(response)
         response.body
       end
+    end
+
+    # One page of a cursor-paginated listing. `starting_after` is what the
+    # previous page advertised; nil asks for the first one.
+    #
+    # `CursorWalker` is what turns the offset/limit window a list view asks for
+    # into a sequence of these.
+    def list_page(path, per_page:, starting_after: nil, params: {}, boot: false)
+      query = params.merge('per_page' => self.class.bounded_per_page(per_page))
+      query['starting_after'] = starting_after unless blank?(starting_after)
+
+      must_succeed(path) { to_page(get(path, query, boot: boot).body, path) }
     end
 
     # The page size Intercom accepts, whatever was asked for.
@@ -69,10 +89,79 @@ module ForestAdminDatasourceIntercom
       )
     end
 
+    # Intercom wraps a listing in `{ "type": "list", "data": [...],
+    # "total_count": N, "pages": { "next": { "starting_after": "..." } } }`.
+    def to_page(body, operation)
+      Page.new(records: extract_list(body, operation),
+               next_cursor: next_cursor(body, operation),
+               total_count: extract_count(body))
+    end
+
+    # A listing whose `data` is absent or is not a list broke the contract. It
+    # is refused rather than read as an empty page: `Array()` would turn the
+    # envelope into `[key, value]` pairs the collection would serialize into
+    # rows holding nothing -- a page that looks answered and is empty.
+    def extract_list(body, operation)
+      data = body.is_a?(Hash) ? body['data'] : nil
+      return data if data.is_a?(Array)
+
+      refuse_body_shape(operation, "'data' is not a list")
+    end
+
+    # Absent on the last page, which is how the walk knows it is done. An older
+    # API version spells it as a url instead of an object -- and one can be
+    # served despite the pin, which is what the version echo warns about -- so
+    # the cursor is read out of its query string rather than the page being
+    # taken for the last one.
+    #
+    # Anything else is refused, an advertised page whose cursor cannot be read
+    # included: taking it for the last page would truncate the answer silently,
+    # which is worse than a failure naming what it could not read.
+    def next_cursor(body, operation)
+      advertised = body.is_a?(Hash) && body['pages'].is_a?(Hash) ? body['pages']['next'] : nil
+      return nil if advertised.nil?
+
+      cursor = case advertised
+               when Hash then advertised['starting_after']
+               when String then cursor_from_url(advertised)
+               end
+
+      presence(cursor) || refuse_body_shape(operation, "'pages.next' carries no cursor this can follow")
+    end
+
+    def cursor_from_url(url)
+      Faraday::Utils.parse_query(URI.parse(url).query.to_s)['starting_after']
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # nil rather than 0 when Intercom sends no count: zero is an answer, and
+    # this is the absence of one.
+    def extract_count(body)
+      count = body['total_count'] if body.is_a?(Hash)
+      count.is_a?(Numeric) ? count.to_i : nil
+    end
+
+    def refuse_body_shape(operation, detail)
+      raise APIError.new("Intercom API call failed: #{operation}: unexpected response shape, #{detail}", status: nil)
+    end
+
+    def presence(value)
+      blank?(value) ? nil : value
+    end
+
+    def blank?(value)
+      value.nil? || value.to_s.empty?
+    end
+
     def must_succeed(operation)
       yield
     rescue Faraday::Error => e
       raise api_error(operation, e)
+    rescue APIError
+      # Already mapped, with its status intact; re-wrapping would erase it --
+      # a 404 read as "no such record" rather than as a failure, above all.
+      raise
     rescue StandardError => e
       raise APIError, "Intercom API call failed: #{operation}: #{e.class}: #{e.message}"
     end

@@ -160,6 +160,149 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    describe '#list_page' do
+      def list_body(data, next_page: nil, total: 2)
+        body = { 'type' => 'list', 'data' => data, 'total_count' => total,
+                 'pages' => { 'type' => 'pages', 'page' => 1, 'per_page' => 50 } }
+        body['pages']['next'] = next_page unless next_page.nil?
+        body
+      end
+
+      it 'reads the records, the next cursor and the exact count off one response' do
+        body = list_body([{ 'id' => '1' }], next_page: { 'starting_after' => 'cursor_2' })
+        stub_request(:get, "#{base}/conversations").with(query: { 'per_page' => '150' }).to_return(json(body))
+
+        page = client.list_page('conversations', per_page: 150)
+
+        expect(page.records).to eq([{ 'id' => '1' }])
+        expect(page.next_cursor).to eq('cursor_2')
+        expect(page.total_count).to eq(2)
+      end
+
+      it 'sends the cursor the previous page advertised' do
+        stub_request(:get, "#{base}/conversations")
+          .with(query: { 'per_page' => '50', 'starting_after' => 'cursor_2' })
+          .to_return(json(list_body([])))
+
+        client.list_page('conversations', per_page: 50, starting_after: 'cursor_2')
+
+        expect(WebMock).to have_requested(:get, "#{base}/conversations")
+          .with(query: { 'per_page' => '50', 'starting_after' => 'cursor_2' })
+      end
+
+      it 'bounds the page size before sending it, Intercom refusing rather than clamping' do
+        stub_request(:get, "#{base}/conversations").with(query: { 'per_page' => '150' })
+                                                   .to_return(json(list_body([])))
+
+        client.list_page('conversations', per_page: 500)
+
+        expect(WebMock).to have_requested(:get, "#{base}/conversations").with(query: { 'per_page' => '150' })
+      end
+
+      it 'carries the parameters an endpoint of its own needs' do
+        stub_request(:get, "#{base}/conversations")
+          .with(query: { 'per_page' => '150', 'display_as' => 'plaintext' }).to_return(json(list_body([])))
+
+        client.list_page('conversations', per_page: 150, params: { 'display_as' => 'plaintext' })
+
+        expect(WebMock).to have_requested(:get, "#{base}/conversations")
+          .with(query: hash_including('display_as' => 'plaintext'))
+      end
+
+      # The last page simply carries no `pages.next`, which is what stops a walk.
+      it 'reports no next cursor on the last page' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json(list_body([{ 'id' => '1' }])))
+
+        expect(client.list_page('conversations', per_page: 150).next_cursor).to be_nil
+      end
+
+      # An older API version spells `pages.next` as a url, and one can be served
+      # despite the pin -- reading the cursor out of it beats taking the page for
+      # the last one and truncating the answer.
+      it 'reads the cursor out of a next page spelled as a url' do
+        url = "#{base}/conversations?per_page=50&starting_after=cursor_9"
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json(list_body([], next_page: url)))
+
+        expect(client.list_page('conversations', per_page: 50).next_cursor).to eq('cursor_9')
+      end
+
+      # An advertised page taken for the last one is a silently truncated
+      # answer, so every unreadable shape is refused rather than dropped.
+      it 'refuses a next-page url carrying no cursor' do
+        body = list_body([], next_page: "#{base}/conversations?per_page=50")
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({})).to_return(json(body))
+
+        expect { client.list_page('conversations', per_page: 50) }
+          .to raise_error(APIError, /pages\.next' carries no cursor/)
+      end
+
+      it 'refuses a next-page url it cannot parse' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json(list_body([], next_page: 'http://[bad')))
+
+        expect { client.list_page('conversations', per_page: 50) }
+          .to raise_error(APIError, /pages\.next' carries no cursor/)
+      end
+
+      it 'refuses a next page it can read neither way, rather than truncating silently' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json(list_body([], next_page: 42)))
+
+        expect { client.list_page('conversations', per_page: 50) }
+          .to raise_error(APIError, /unexpected response shape.*pages\.next/m)
+      end
+
+      # `Array()` on the envelope would hand the collection rows built out of
+      # [key, value] pairs: a page that looks answered and holds nothing.
+      it 'refuses a response whose data is not a list' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json({ 'type' => 'list', 'data' => { 'id' => '1' } }))
+
+        expect { client.list_page('conversations', per_page: 50) }
+          .to raise_error(APIError, /unexpected response shape.*'data' is not a list/m)
+      end
+
+      it 'refuses a response carrying no data at all' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json({ 'type' => 'list', 'total_count' => 0 }))
+
+        expect { client.list_page('conversations', per_page: 50) }.to raise_error(APIError, /'data' is not a list/)
+      end
+
+      it 'serves an empty page as an empty page, zero being an answer' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json(list_body([], total: 0)))
+
+        expect(client.list_page('conversations', per_page: 50))
+          .to have_attributes(records: [], next_cursor: nil, total_count: 0)
+      end
+
+      # nil rather than 0: zero is an answer, and this is the absence of one.
+      it 'reports no count when Intercom sends none' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json({ 'type' => 'list', 'data' => [] }))
+
+        expect(client.list_page('conversations', per_page: 50).total_count).to be_nil
+      end
+
+      it 'reads a page through the boot connection when asked to' do
+        stub_request(:get, "#{base}/ticket_types").with(query: hash_including({}))
+                                                  .to_return(json(list_body([{ 'id' => '1' }])))
+
+        expect(client.list_page('ticket_types', per_page: 50, boot: true).records.size).to eq(1)
+      end
+
+      it 'names the endpoint when the read fails' do
+        stub_request(:get, "#{base}/conversations").with(query: hash_including({}))
+                                                   .to_return(json({ 'errors' => [{ 'code' => 'not_found' }] }, 404))
+
+        expect { client.list_page('conversations', per_page: 50) }
+          .to raise_error(APIError, /conversations: HTTP 404 not_found/)
+      end
+    end
+
     describe '.bounded_per_page' do
       # Intercom answers `invalid_per_page` past 150 instead of clamping, so a
       # page size is bounded before it is sent or the list view breaks.
