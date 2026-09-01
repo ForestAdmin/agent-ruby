@@ -1,3 +1,3 @@
 module ForestAdminDatasourceMongoid
-  VERSION = "1.39.4"
+  VERSION = "1.40.1"
 end

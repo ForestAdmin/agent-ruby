@@ -63,6 +63,36 @@ module ForestAdminAgent
             )
           end
 
+          it 'marks the field read-only when the relation itself is read-only, even if the ' \
+             'underlying key column is writable' do
+            collection_note = Collection.new(@datasource, 'Note')
+            collection_note.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, is_read_only: false),
+                'author_id' => ColumnSchema.new(column_type: 'String', is_read_only: false, is_sortable: true)
+              }
+            )
+
+            collection_person = Collection.new(@datasource, 'PersonReadonly')
+            collection_person.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
+                'note' => Relations::OneToOneSchema.new(
+                  origin_key: 'author_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'Note',
+                  is_read_only: true
+                )
+              }
+            )
+            @datasource.add_collection(collection_note)
+            @datasource.add_collection(collection_person)
+
+            schema = described_class.build_schema(@datasource.get_collection('PersonReadonly'), 'note')
+
+            expect(schema[:isReadOnly]).to be true
+          end
+
           it 'generate inverse relation' do
             schema = described_class.build_schema(@datasource.get_collection('Book'), 'author')
 

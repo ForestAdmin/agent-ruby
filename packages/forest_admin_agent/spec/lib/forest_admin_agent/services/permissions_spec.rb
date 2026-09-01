@@ -1352,6 +1352,44 @@ module ForestAdminAgent
             @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
           end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
         end
+
+        it 'hands the collection schema action scope to the smart action checker' do
+          args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
+          args[:headers]['REQUEST_METHOD'] = 'POST'
+          args[:params] = {
+            data: {
+              attributes: {
+                'ids' => [],
+                'collection_name' => 'Book',
+                'all_records' => true,
+                'all_records_ids_excluded' => [],
+                'smart_action_id' => 'make-photocopy',
+                'signed_approval_request' => nil
+              },
+              'type' => 'custom-action-requests'
+            }
+          }
+
+          collection = @datasource.collections['Book']
+          schema_action = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'global')
+          allow(collection).to receive(:schema).and_return({ actions: { 'make-photocopy' => schema_action } })
+
+          @permissions.cache.set('forest.has_permission', { enable: true })
+          allow(@permissions).to receive_messages(
+            get_user_data: { roleId: 15 },
+            get_collections_permissions_data: { Book: { actions: { 'make-photocopy': { triggerEnabled: [15] } } } },
+            find_action_from_endpoint: { 'name' => 'make-photocopy' }
+          )
+
+          checker = instance_double(SmartActionChecker, can_execute?: true)
+          allow(SmartActionChecker).to receive(:new).and_return(checker)
+
+          expect(@permissions.can_smart_action?(args, collection, Filter.new)).to be true
+          # The schema scope must reach the checker: without it a global action would be resolved.
+          expect(SmartActionChecker).to have_received(:new).with(
+            anything, collection, hash_including(scope: 'global', triggerEnabled: [15]), anything, 15, anything
+          )
+        end
       end
     end
   end

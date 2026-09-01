@@ -201,7 +201,8 @@ module ForestAdminAgent
         smart_action_approval = SmartActionChecker.new(
           request[:params],
           collection,
-          collection_actions[action['name'].to_sym],
+          # The schema scope lets the checker skip select-all resolution for global actions.
+          collection_actions[action['name'].to_sym].merge(scope: collection.schema[:actions][action['name']]&.scope),
           caller,
           user_data[:roleId],
           filter

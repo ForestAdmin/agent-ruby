@@ -37,6 +37,8 @@ module ForestAdminRails
   # { database: <ActiveRecord config or URL>, schema:, table_name:, redact: } — setting `database`
   # turns the audit trail on: every change is captured and the `/_audit-trail` routes are registered.
   setting :audit_trail, default: nil
+  # Max records a "select all" approval may target; clamped to the Forest server's cap (500).
+  setting :max_records_for_approval, default: 500
 
   if defined?(Rails::Railtie)
     # logic for cors middleware,... here // or it might be into Engine

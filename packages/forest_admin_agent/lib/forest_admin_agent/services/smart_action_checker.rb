@@ -20,11 +20,23 @@ module ForestAdminAgent
       end
     end
 
+    class ApprovalSelectionTooLargeError < UnprocessableError
+      def initialize(max)
+        super(
+          "This action requires approval and cannot be triggered on more than #{max} records at once. " \
+          'Please refine your selection.'
+        )
+      end
+    end
+
     class SmartActionChecker
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Utils
       include ForestAdminDatasourceToolkit::Components::Query
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
+      # The Forest server's cap on approval record ids; max_records_for_approval may only lower it.
+      MAX_RECORDS_FOR_APPROVAL = 500
 
       attr_reader :parameters, :collection, :smart_action, :caller, :role_id, :filter, :attributes
 
@@ -66,9 +78,19 @@ module ForestAdminAgent
           end
         elsif smart_action[:approvalRequired].include?(role_id) && smart_action[:triggerEnabled].include?(role_id)
           if condition_by_role_id(smart_action[:approvalRequiredConditions]).nil? || match_conditions(:approvalRequiredConditions)
+            # Global actions target no specific records — never resolve.
+            if attributes[:all_records] && smart_action[:scope] != ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::GLOBAL
+              record_ids = resolve_select_all_record_ids
+            end
+
             raise CustomActionRequiresApprovalError.new(
               'This action requires to be approved.',
-              details: { user_approval_enabled: smart_action[:userApprovalEnabled] }
+              details: {
+                user_approval_enabled: smart_action[:userApprovalEnabled],
+                # camelCase: sent verbatim in the error data, the key the frontend reads.
+                roleIdsAllowedToApprove: smart_action[:userApprovalEnabled],
+                **(record_ids ? { recordIds: record_ids } : {})
+              }
             )
           elsif condition_by_role_id(smart_action[:triggerConditions]).nil? || match_conditions(:triggerConditions)
             return true
@@ -76,6 +98,27 @@ module ForestAdminAgent
         end
 
         raise CustomActionTriggerForbiddenError, 'You don\'t have the permission to trigger this action.'
+      end
+
+      # Fetching cap+1 distinguishes "over the cap" from "exactly the cap".
+      def resolve_select_all_record_ids
+        configured = ForestAdminAgent::Facades::Container.config_from_cache[:max_records_for_approval]
+        # Anything but a positive Integer gets the default (a negative LIMIT means unlimited on
+        # some datasources, and a String would raise on comparison).
+        max = if configured.is_a?(Integer) && configured.positive?
+                [configured, MAX_RECORDS_FOR_APPROVAL].min
+              else
+                MAX_RECORDS_FOR_APPROVAL
+              end
+        records = collection.list(
+          caller,
+          filter.override(page: Page.new(offset: 0, limit: max + 1)),
+          Projection.new.with_pks(collection)
+        )
+
+        raise ApprovalSelectionTooLargeError, max if records.size > max
+
+        Utils::Id.pack_ids(collection, records)
       end
 
       def match_conditions(condition_name)

@@ -27,6 +27,12 @@ module ForestAdminAgent
                   origin_key_target: 'id',
                   foreign_collection: 'book'
                 ),
+                'locked_book' => Relations::OneToOneSchema.new(
+                  origin_key: 'author_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'book',
+                  is_read_only: true
+                ),
                 'address' => Relations::PolymorphicOneToOneSchema.new(
                   origin_key: 'addressable_id',
                   foreign_collection: 'address',
@@ -47,6 +53,12 @@ module ForestAdminAgent
                   foreign_key: 'author_id',
                   foreign_key_target: 'id',
                   foreign_collection: 'user'
+                ),
+                'locked_author' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'author_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'user',
+                  is_read_only: true
                 )
               }
             )
@@ -155,6 +167,21 @@ module ForestAdminAgent
                 expect(data).to eq({ 'author_id' => 1 })
               end
               expect(result).to eq({ content: nil, status: 204 })
+            end
+
+            it 'refuses to write a read-only many_to_one relation (not just OneToOne can be ' \
+               'marked is_read_only now that it lives on the shared RelationSchema)' do
+              allow(@datasource.get_collection('book')).to receive(:update)
+
+              args[:params]['collection_name'] = 'book'
+              args[:params]['relation_name'] = 'locked_author'
+              args[:params]['data'] = { 'id' => 1 }
+              args[:params]['id'] = 1
+
+              expect { update.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                                'Field locked_author is not editable')
+              expect(@datasource.get_collection('book')).not_to have_received(:update)
             end
 
             it 'call handle_request on a polymorphic_many_to_one relation' do
@@ -275,6 +302,21 @@ module ForestAdminAgent
                 expect(data).to eq(parameter[2])
               end
               expect(result).to eq({ content: nil, status: 204 })
+            end
+
+            it 'refuses to write a read-only one_to_one relation (#379: it would overwrite ' \
+               "the foreign collection's own primary key)" do
+              allow(@datasource.get_collection('book')).to receive_messages(aggregate: [{ 'value' => 1 }], update: true)
+
+              args[:params]['collection_name'] = 'user'
+              args[:params]['relation_name'] = 'locked_book'
+              args[:params]['data'] = { 'id' => 1 }
+              args[:params]['id'] = 1
+
+              expect { update.handle_request(args) }
+                .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+                                'Field locked_book is not editable')
+              expect(@datasource.get_collection('book')).not_to have_received(:update)
             end
 
             it 'call handle_request on a polymorphic_one_to_one relation' do

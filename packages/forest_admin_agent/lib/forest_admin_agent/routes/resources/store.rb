@@ -67,6 +67,8 @@ module ForestAdminAgent
           id = value.dig('data', 'id')
           return if id.nil?
 
+          ForestAdminDatasourceToolkit::Utils::Collection.assert_writable_relation!(field, schema)
+
           {
             schema: schema,
             foreign_collection: context.datasource.get_collection(schema.foreign_collection),

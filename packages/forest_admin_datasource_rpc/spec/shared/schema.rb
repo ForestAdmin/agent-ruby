@@ -74,7 +74,8 @@ RSpec.shared_context 'with introspection' do
               foreign_collection: 'Product',
               type: 'OneToMany',
               origin_key: 'manufacturer_id',
-              origin_key_target: 'id'
+              origin_key_target: 'id',
+              is_read_only: true
             }
           },
           countable: true,
@@ -180,7 +181,8 @@ RSpec.shared_context 'with introspection' do
               foreign_collection: 'Manufacturer',
               type: 'ManyToOne',
               foreign_key: 'manufacturer_id',
-              foreign_key_target: 'id'
+              foreign_key_target: 'id',
+              is_read_only: true
             }
           },
           countable: true,

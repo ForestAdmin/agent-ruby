@@ -326,6 +326,22 @@ module ForestAdminDatasourceToolkit
                                                     ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))).to eq(1)
         end
       end
+
+      describe 'assert_writable_relation!' do
+        it 'does nothing for a writable relation' do
+          relation = Relations::OneToOneSchema.new(origin_key: 'a', origin_key_target: 'id', foreign_collection: 'b')
+
+          expect { described_class.assert_writable_relation!('field_name', relation) }.not_to raise_error
+        end
+
+        it 'raises a ValidationError naming the field for a read-only relation' do
+          relation = Relations::OneToOneSchema.new(origin_key: 'a', origin_key_target: 'id', foreign_collection: 'b',
+                                                   is_read_only: true)
+
+          expect { described_class.assert_writable_relation!('locked_field', relation) }
+            .to raise_error(ValidationError, 'Field locked_field is not editable')
+        end
+      end
     end
   end
 end
