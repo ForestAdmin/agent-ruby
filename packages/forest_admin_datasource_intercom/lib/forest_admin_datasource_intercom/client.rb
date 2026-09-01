@@ -61,15 +61,16 @@ module ForestAdminDatasourceIntercom
       must_succeed(path) { to_page(get(path, query, boot: boot).body, path, list_key) }
     end
 
-    # One page of a search endpoint. The query is written by the caller rather
-    # than translated from a Forest filter -- that translation is lot 2 -- so
-    # what goes on the wire is what the caller asked for.
-    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data')
+    # One page of a search endpoint. The query is the one the condition-tree
+    # translator wrote, and it travels in the body; `params` is what still
+    # belongs in the query string -- `display_as` above all, which is not part
+    # of the search payload.
+    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data', params: {})
       pagination = { 'per_page' => self.class.bounded_per_page(per_page) }
       pagination['starting_after'] = starting_after unless blank?(starting_after)
       body = { 'query' => query, 'pagination' => pagination }
 
-      must_succeed(path) { to_page(post(path, body).body, path, list_key) }
+      must_succeed(path) { to_page(post(path, body, params: params).body, path, list_key) }
     end
 
     # One record from its own endpoint. Raises on a 404 like on any other
@@ -123,8 +124,13 @@ module ForestAdminDatasourceIntercom
       (boot ? boot_connection : connection).get(path, params)
     end
 
-    def post(path, body, boot: false)
-      (boot ? boot_connection : connection).post(path, body)
+    def post(path, body, params: {}, boot: false)
+      http = boot ? boot_connection : connection
+
+      http.post(path) do |request|
+        request.params.update(params) unless params.nil? || params.empty?
+        request.body = body
+      end
     end
 
     # Intercom serves the version its workspace defaults to when the pin is not

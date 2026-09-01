@@ -11,10 +11,10 @@ module ForestAdminDatasourceIntercom
     # * no condition at all -- a list view -- walks the listing endpoint;
     # * `id equals X` reads the record through its own endpoint, which is what a
     #   record detail is;
-    # * anything else is **refused**. Translating a Forest condition tree into
-    #   Intercom's search DSL is lot 2, and until it exists a filter that cannot
-    #   be honoured has to say so: an unfiltered page served in answer to a
-    #   filter is the one failure this datasource is built to avoid.
+    # * anything else is translated into Intercom's search DSL and walked
+    #   through the search endpoint. What the translator will not express, it
+    #   refuses by name: an unfiltered page served in answer to a filter is the
+    #   one failure this datasource is built to avoid.
     #
     # Counting is the exception that costs nothing: `total_count` is exact on
     # every response, filter included, so the record counter is one request.
@@ -35,10 +35,10 @@ module ForestAdminDatasourceIntercom
         enable_count
       end
 
-      def list(_caller, filter, projection)
+      def list(caller, filter, projection)
         warn_ignored_sort(filter&.sort)
 
-        records = fetch_records(filter)
+        records = fetch_records(caller, filter)
         rows = records.map { |record| project(serialize(record), projection) }
         enrich(records, rows, projection)
         rows
@@ -48,10 +48,10 @@ module ForestAdminDatasourceIntercom
       # and grouping over the pages a walk happened to collect would look exact
       # while answering a fraction. Refused here rather than through the
       # contract's NotImplementedError, which reads as an oversight.
-      def aggregate(_caller, filter, aggregation, _limit = nil)
+      def aggregate(caller, filter, aggregation, _limit = nil)
         refuse_unsupported_aggregation!(aggregation)
 
-        [{ 'group' => {}, 'value' => count_records(filter) }]
+        [{ 'group' => {}, 'value' => count_records(caller, filter) }]
       end
 
       protected
@@ -62,6 +62,19 @@ module ForestAdminDatasourceIntercom
       def record_endpoint = list_endpoint
       def list_key = 'data'
       def read_params = {}
+
+      # The row of the measured table this collection is filtered through: what
+      # its columns may advertise, and what the translator is allowed to write.
+      def searchable = raise(NotImplementedError, "#{self.class} did not implement searchable")
+
+      def search_endpoint
+        @search_endpoint ||= Query::SearchFields.fetch(searchable)
+      end
+
+      # The column a free-text search is answered on, for a collection whose
+      # endpoint has one. Nil elsewhere, and a search is then refused rather than
+      # answered by a page that ignored it.
+      def search_column = nil
 
       # One Intercom entity flattened into a record matching the schema.
       def serialize(_entity) = raise(NotImplementedError, "#{self.class} did not implement serialize")
@@ -78,20 +91,32 @@ module ForestAdminDatasourceIntercom
       # One page of the collection. A listing for conversations, a search for
       # tickets -- Intercom exposes no `GET /tickets` at all -- so the endpoint
       # and its shape belong to the collection, while walking it does not.
-      def read_page(per_page:, cursor:)
-        client.list_page(list_endpoint, per_page: [per_page, max_page_size].min,
-                                        starting_after: cursor, params: read_params, list_key: list_key)
+      def read_page(per_page:, cursor:, query: nil)
+        size = [per_page, max_page_size].min
+
+        if query.nil?
+          client.list_page(list_endpoint, per_page: size, starting_after: cursor,
+                                          params: read_params, list_key: list_key)
+        else
+          client.search_page(search_endpoint.path, query: query, per_page: size, starting_after: cursor,
+                                                   params: read_params, list_key: list_key)
+        end
       end
 
-      # A column of this tier advertises no filter and no sort, because the
-      # collection can honour neither -- except on the primary key, which is
-      # answered by the record endpoint rather than by a filter. A schema that
-      # advertised more would put filters in the interface that the read then
-      # refuses. Read-only for the same reason, on the write side.
+      # A column advertises exactly the filters the search endpoint answers on
+      # it, taken from the measured table and derived by the operator table --
+      # never written by hand here, so a column cannot offer a filter the
+      # translator would refuse. A column the table does not carry advertises
+      # none, which is how a refusal is spelled in a schema.
+      #
+      # The primary key is the exception, and it is not a filter: `id equals X`
+      # and `id in [...]` are answered by the record endpoint.
+      #
+      # No column is sortable: Intercom takes no sort on either search endpoint
+      # and ignores the one it is sent. Read-only, this lot writing nothing.
       def add_column(name, type, is_primary_key: false)
-        operators = is_primary_key ? [Operators::EQUAL, Operators::IN] : []
         add_field(name, ColumnSchema.new(column_type: type,
-                                         filter_operators: operators,
+                                         filter_operators: column_operators(name, is_primary_key),
                                          is_primary_key: is_primary_key,
                                          is_read_only: true,
                                          is_sortable: false,
@@ -104,7 +129,15 @@ module ForestAdminDatasourceIntercom
 
       private
 
-      def fetch_records(filter)
+      def column_operators(name, is_primary_key)
+        return [Operators::EQUAL, Operators::IN] if is_primary_key
+
+        field = search_endpoint.field(name)
+
+        field ? Query::OperatorTable.forest_operators(field) : []
+      end
+
+      def fetch_records(caller, filter)
         ids = id_lookup(filter)
         # The window is cut out of the ids rather than out of the records they
         # read: Intercom reads them one request each, so paging after the read
@@ -113,13 +146,37 @@ module ForestAdminDatasourceIntercom
         # having been dropped by the truncation before the window was applied.
         return records_by_ids(page_window(ids, filter)) if ids
 
-        refuse_filter!(filter) unless browsing?(filter)
-
-        listed_records(filter)
+        listed_records(filter, translate(caller, filter))
       end
 
-      def browsing?(filter)
-        filter.nil? || (filter.condition_tree.nil? && blank_search?(filter))
+      # The Intercom query a filter comes down to, or nil for a list view, which
+      # walks the listing endpoint instead. The free-text search is folded into
+      # the condition tree rather than added to the translated query: written as
+      # one tree, it is checked against the nesting Intercom allows like every
+      # other condition, instead of adding a level nothing counted.
+      def translate(caller, filter)
+        tree = combined_tree(filter)
+
+        Query::ConditionTreeTranslator.call(tree, endpoint: search_endpoint, collection: name,
+                                                  timezone: timezone_for(caller))
+      end
+
+      def combined_tree(filter)
+        conditions = [filter&.condition_tree, search_condition(filter)].compact
+        return conditions.first if conditions.size < 2
+
+        ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeFactory.intersect(conditions)
+      end
+
+      # A free-text search reaches Intercom as a condition on the one column its
+      # endpoint matches text on -- per word, not as a substring, which the
+      # README says rather than the interface implying otherwise.
+      def search_condition(filter)
+        return nil if blank_search?(filter)
+
+        refuse_search! if search_column.nil?
+
+        Leaf.new(search_column, Operators::CONTAINS, filter.search.to_s.strip)
       end
 
       def blank_search?(filter)
@@ -163,10 +220,12 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      def listed_records(filter)
+      def listed_records(filter, query)
         offset, limit = translate_page(filter&.page)
 
-        walker.walk(offset: offset, limit: limit) { |per_page, cursor| read_page(per_page: per_page, cursor: cursor) }
+        walker.walk(offset: offset, limit: limit) do |per_page, cursor|
+          read_page(per_page: per_page, cursor: cursor, query: query)
+        end
       end
 
       # A filter with no page asks for every record it matched; the walker reads
@@ -181,13 +240,11 @@ module ForestAdminDatasourceIntercom
       # Exact, and one request: `total_count` counts what the filter names, not
       # what a page happened to hold. An id lookup counts the records it found,
       # which is cheaper still.
-      def count_records(filter)
+      def count_records(caller, filter)
         ids = id_lookup(filter)
         return records_by_ids(ids).size if ids
 
-        refuse_filter!(filter) unless browsing?(filter)
-
-        page = read_page(per_page: 1, cursor: nil)
+        page = read_page(per_page: 1, cursor: nil, query: translate(caller, filter))
         return page.total_count if page.total_count
 
         raise UnsupportedOperatorError,
@@ -205,18 +262,10 @@ module ForestAdminDatasourceIntercom
               'Chart it on a collection read whole, or wait for the bounded group-by of the reporting lot.'
       end
 
-      def refuse_filter!(filter)
-        detail = if filter&.condition_tree
-                   'a condition on this collection'
-                 else
-                   'a free-text search'
-                 end
-
+      def refuse_search!
         raise UnsupportedOperatorError,
-              "#{name} cannot answer #{detail} yet: it reads Intercom's listing endpoint, which takes no filter. " \
-              'Server-side filtering goes through the search endpoint and arrives with the filter translation. ' \
-              'Until then, remove the condition, the scope or the segment carrying it rather than being served a ' \
-              'page that would look filtered without being it.'
+              "#{name} cannot answer a free-text search: #{search_endpoint.path} matches values field by field, " \
+              'and this collection exposes no text column it searches. Filter on a column instead of searching.'
       end
 
       # Intercom accepts a `sort` on these endpoints and ignores it without a

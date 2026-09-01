@@ -38,16 +38,16 @@ module ForestAdminDatasourceIntercom
 
       protected
 
-      def list_endpoint = 'tickets/search'
       def record_endpoint = 'tickets'
       def list_key = 'tickets'
+      def searchable = 'tickets'
       def max_page_size = MAX_TICKETS_PER_PAGE
 
-      # A search rather than a listing, which is the whole reason this hook
-      # exists.
-      def read_page(per_page:, cursor:)
-        client.search_page(list_endpoint, query: MATCH_EVERY_TICKET, list_key: list_key,
-                                          per_page: [per_page, max_page_size].min, starting_after: cursor)
+      # Intercom exposes no `GET /tickets`, so a list view searches too: with the
+      # filter it was given, or with the predicate that matches everything when
+      # it was given none.
+      def read_page(per_page:, cursor:, query: nil)
+        super(per_page: per_page, cursor: cursor, query: query || MATCH_EVERY_TICKET)
       end
 
       def enrich(records, rows, projection)
