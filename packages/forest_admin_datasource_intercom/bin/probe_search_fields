@@ -1,0 +1,254 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Enumerates what Intercom's search endpoints really filter, and with which
+# operators, against a real workspace. The answer is what `search_fields.yml`
+# holds and what the schema derives its filters from -- and it cannot be read
+# off the documentation: measured during lot 1, `/tickets/search` refuses
+# `company_id` with `invalid_field` although a ticket carries one.
+#
+#   INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --endpoint tickets
+#   INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --region eu --out measured.yml
+#
+# It sends one search per (field, operator) cell, asking for a single record,
+# and reads Intercom's refusal codes: `invalid_field` for a field the endpoint
+# does not filter at all -- the rest of its row is then skipped -- `data_invalid`
+# for an operator it refuses on that field, `invalid_value` for a value shape it
+# refuses. Read-only: a search changes nothing, and no payload is printed or
+# written, only field names, operators and error codes.
+#
+# What it writes with `--out` is *evidence*, deliberately not the table itself:
+# `search_fields.yml` carries the prose that says why a column stays refused,
+# and a generated file would drop it. Merge the measurements into the table by
+# hand, which is also where deciding to expose a newly discovered field belongs.
+
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+
+require 'forest_admin_datasource_intercom'
+require 'optparse'
+
+module ProbeSearchFields
+  SearchFields = ForestAdminDatasourceIntercom::Query::SearchFields
+
+  # A cell is probed with the value shapes its field plausibly takes, most
+  # likely first: a wrong shape is refused with `data_invalid` just like an
+  # unsupported operator, so a single attempt would report an operator as
+  # refused when only the value was wrong.
+  VALUES = {
+    'date' => ['1', 1, '2026-01-01'],
+    'number' => [0, '0'],
+    'boolean' => [true, 'true'],
+    'string' => ['forest-probe', 0],
+    'text' => ['forest-probe'],
+    'id_list' => ['forest-probe', 0]
+  }.freeze
+
+  LIST_OPERATORS = %w[IN NIN].freeze
+
+  # A candidate carries no declared type -- discovering it is the point -- so
+  # one is guessed from its name, and the fallbacks above cover a wrong guess.
+  def self.guess_type(field)
+    case field
+    when /(_at|_since|_until)\z/ then 'date'
+    when /\Acount_|_count\z|\Atime_to_|_time\z/ then 'number'
+    when /\A(open|read|is_|has_|.*_participated)/ then 'boolean'
+    when /_ids\z/ then 'id_list'
+    else 'string'
+    end
+  end
+
+  class Probe
+    def initialize(client, endpoint)
+      @client = client
+      @endpoint = endpoint
+    end
+
+    # Every operator of the alphabet on every field of the row: what the table
+    # already declares, plus the candidates. Nothing is assumed from the
+    # declared operators -- an operator missing from the table is exactly what
+    # this is here to find.
+    def run(field, type)
+      results = {}
+
+      SearchFields::KNOWN_OPERATORS.each do |operator|
+        outcome = probe(field, operator, type)
+        return { unfilterable: outcome } if outcome[:code] == 'invalid_field'
+
+        results[operator] = outcome
+      end
+
+      { operators: results }
+    end
+
+    private
+
+    def probe(field, operator, type)
+      last = nil
+
+      VALUES.fetch(type, VALUES['string']).each do |value|
+        outcome = attempt(field, operator, operator_value(operator, value))
+        # `invalid_field` is about the field, not about what was sent with it:
+        # another value shape cannot make a field the endpoint does not filter
+        # appear, so the row ends here rather than paying a request per shape.
+        return outcome if outcome[:ok] || outcome[:code] == 'invalid_field'
+
+        last = outcome
+      end
+
+      last
+    end
+
+    def attempt(field, operator, value)
+      @client.search_page(@endpoint.path, query: { 'field' => field, 'operator' => operator, 'value' => value },
+                                          per_page: 1, list_key: list_key)
+      { ok: true }
+    rescue ForestAdminDatasourceIntercom::APIError => e
+      { ok: false, code: error_code(e), status: e.status }
+    end
+
+    def operator_value(operator, value)
+      LIST_OPERATORS.include?(operator) ? [value] : value
+    end
+
+    # `/tickets/search` answers under `tickets` and `/conversations/search`
+    # under `conversations`; a body read under the wrong key raises before the
+    # outcome is classified.
+    def list_key = @endpoint.name
+
+    def error_code(error)
+      errors = error.body.is_a?(Hash) ? error.body['errors'] : nil
+      first = Array(errors).first
+
+      (first.is_a?(Hash) ? first['code'] : nil) || "http_#{error.status}"
+    end
+  end
+
+  class Report
+    def initialize(endpoint)
+      @endpoint = endpoint
+      @rows = {}
+    end
+
+    def record(field, column, result)
+      @rows[field] = { 'column' => column, 'result' => result }
+    end
+
+    # What the run says about the committed table, which is the only reason to
+    # run it: an operator the table promises and Intercom refuses is a filter
+    # the interface offers and the read cannot honour.
+    def print_diff
+      @rows.each do |field, row|
+        column = row['column']
+        result = row['result']
+
+        if result[:unfilterable]
+          declared = column ? "  <- table declares it on column '#{column}'" : ''
+          puts "  #{field.ljust(42)} NOT FILTERABLE (#{result[:unfilterable][:code]})#{declared}"
+          next
+        end
+
+        print_operators(field, column, result[:operators])
+      end
+    end
+
+    def to_yaml_document
+      { 'endpoint' => @endpoint.name, 'path' => @endpoint.path, 'measured_at' => Time.now.utc.strftime('%Y-%m-%d'),
+        'fields' => @rows.to_h { |field, row| [field, measured_row(row)] } }.to_yaml
+    end
+
+    private
+
+    def print_operators(field, column, outcomes)
+      supported = outcomes.select { |_, outcome| outcome[:ok] }.keys
+      declared = column ? Array(@endpoint.field(column)&.operators) : []
+      puts "  #{field.ljust(42)} #{supported.empty? ? "(no operator answered)" : supported.join(" ")}"
+
+      report_drift(declared - supported, supported - declared)
+    end
+
+    def report_drift(promised, discovered)
+      puts "      ! the table promises #{promised.join(", ")} here, Intercom refuses it" unless promised.empty?
+      puts "      + Intercom also accepts #{discovered.join(", ")}" unless discovered.empty?
+    end
+
+    def measured_row(row)
+      result = row['result']
+      return { 'filterable' => false, 'code' => result[:unfilterable][:code] } if result[:unfilterable]
+
+      { 'filterable' => true,
+        'operators' => result[:operators].select { |_, outcome| outcome[:ok] }.keys,
+        'refused' => result[:operators].reject { |_, outcome| outcome[:ok] }
+                                       .transform_values { |outcome| outcome[:code] } }
+    end
+  end
+
+  class CLI
+    def self.call(argv)
+      new(options(argv)).run
+    end
+
+    def self.options(argv)
+      options = { endpoints: SearchFields.endpoints, region: 'us', token: ENV.fetch('INTERCOM_ACCESS_TOKEN', nil) }
+
+      OptionParser.new do |parser|
+        parser.banner = 'Usage: INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields [options]'
+        parser.on('--endpoint NAME', "one of #{SearchFields.endpoints.join(", ")}") { |v| options[:endpoints] = [v] }
+        parser.on('--region NAME', 'us (default), eu or au') { |v| options[:region] = v }
+        parser.on('--token TOKEN', 'defaults to $INTERCOM_ACCESS_TOKEN') { |v| options[:token] = v }
+        parser.on('--out PATH', 'write the measurements as YAML evidence') { |v| options[:out] = v }
+      end.parse!(argv)
+
+      options
+    end
+
+    def initialize(options)
+      @options = options
+    end
+
+    def run
+      abort('No token: set INTERCOM_ACCESS_TOKEN or pass --token.') if @options[:token].to_s.empty?
+
+      documents = @options[:endpoints].map { |name| probe_endpoint(SearchFields.fetch(name)) }
+      write(documents) if @options[:out]
+      0
+    end
+
+    private
+
+    def probe_endpoint(endpoint)
+      puts "\n#{endpoint.path} -- #{endpoint.fields.size} declared field(s), #{endpoint.candidates.size} candidate(s)"
+      probe = Probe.new(client, endpoint)
+      report = Report.new(endpoint)
+
+      targets(endpoint).each { |field, column, type| report.record(field, column, probe.run(field, type)) }
+      report.print_diff
+      report.to_yaml_document
+    end
+
+    # The declared fields first, with the type the table gives them; then the
+    # candidates, whose type is guessed. A candidate already covered by a
+    # declared field is not probed twice.
+    def targets(endpoint)
+      declared = endpoint.fields.values.map { |field| [field.field, field.column, field.type] }
+      candidates = (endpoint.candidates - declared.map(&:first)).map { |field| [field, nil, guess_type(field)] }
+
+      declared + candidates
+    end
+
+    def guess_type(field) = ProbeSearchFields.guess_type(field)
+
+    def client
+      @client ||= ForestAdminDatasourceIntercom::Client.new(
+        ForestAdminDatasourceIntercom::Configuration.new(access_token: @options[:token], region: @options[:region])
+      )
+    end
+
+    def write(documents)
+      File.write(@options[:out], documents.join("\n"))
+      puts "\nWritten to #{@options[:out]}. Merge the measurements into search_fields.yml by hand: " \
+           'the table carries the prose a generated file would drop.'
+    end
+  end
+end
+
+exit(ProbeSearchFields::CLI.call(ARGV)) if $PROGRAM_NAME == __FILE__

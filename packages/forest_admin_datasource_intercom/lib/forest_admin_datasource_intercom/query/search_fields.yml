@@ -1,0 +1,361 @@
+# The table of (endpoint x field x operator): what Intercom's search endpoints
+# really filter, and with which operators. It is the single source of truth of
+# this datasource's filtering -- the schema derives every column's
+# filter_operators from it, so no collection can advertise a filter the
+# translator would then refuse.
+#
+# `source` is the provenance of a row, and it is not decoration:
+#
+#   measured -- observed against a real workspace, by `bin/probe_search_fields`
+#               or during a spike, and recorded here with the date;
+#   spec     -- read off Intercom's documentation and nothing else.
+#
+# The distinction exists because the two disagree. Measured during lot 1:
+# `company_id` is documented on a ticket and refused by `/tickets/search` with
+# `invalid_field`. A `spec` row is therefore a candidate, never a promise, and
+# the probe is what turns it into one. Run it against the customer's workspace
+# and commit what it writes.
+#
+# `type` decides how a column's Forest operators are derived from the Intercom
+# ones, and how a value reaches the wire:
+#
+#   string   -- an exact-match field
+#   text     -- a field Intercom also matches per word (`~`)
+#   date     -- epoch seconds on the wire, truncated to the UTC day on read
+#   boolean, number
+#   id_list  -- a field holding several ids, matched against one of them
+version: 1
+
+endpoints:
+  conversations:
+    path: conversations/search
+    # Nothing has been probed yet: fill this in with the probe's output.
+    measured_at: null
+    fields:
+      state:
+        field: state
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      open:
+        field: open
+        type: boolean
+        operators: ['=']
+        source: spec
+      read:
+        field: read
+        type: boolean
+        operators: ['=']
+        source: spec
+      priority:
+        field: priority
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      title:
+        field: title
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+      admin_assignee_id:
+        field: admin_assignee_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      team_assignee_id:
+        field: team_assignee_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      contact_ids:
+        field: contact_ids
+        type: id_list
+        operators: ['=', '!=']
+        source: spec
+      source_type:
+        field: source.type
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      source_delivered_as:
+        field: source.delivered_as
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      source_subject:
+        field: source.subject
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+      # The full-text search of the collection: Intercom matches `~` per word,
+      # not as a substring, which the README states rather than the interface
+      # implying otherwise.
+      source_body:
+        field: source.body
+        type: text
+        operators: ['~', '!~']
+        source: spec
+      source_author_email:
+        field: source.author.email
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+      # The date operators are measured, and they are not the same on every
+      # endpoint: `/contacts/search` refuses `>=`, `<=` and `!=` where this one
+      # accepts them (25 August 2026, API 2.16). Whatever this table allows, a
+      # Date column publishes the two bounds alone -- see the translator.
+      created_at:
+        field: created_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: measured
+      updated_at:
+        field: updated_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: measured
+      waiting_since:
+        field: waiting_since
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      snoozed_until:
+        field: snoozed_until
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      closed_at:
+        field: statistics.last_close_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      first_closed_at:
+        field: statistics.first_close_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      closed_by_id:
+        field: statistics.last_closed_by_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      first_contact_reply_at:
+        field: statistics.first_contact_reply_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      last_contact_reply_at:
+        field: statistics.last_contact_reply_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      last_admin_reply_at:
+        field: statistics.last_admin_reply_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: spec
+      reopen_count:
+        field: statistics.count_reopens
+        type: number
+        operators: ['=', '!=', '>', '<']
+        source: spec
+      part_count:
+        field: statistics.count_conversation_parts
+        type: number
+        operators: ['=', '!=', '>', '<']
+        source: spec
+      ai_agent_participated:
+        field: ai_agent_participated
+        type: boolean
+        operators: ['=']
+        source: spec
+    # Columns this collection publishes and will not filter, with the reason an
+    # operator reads when they try. A column absent from both tables is refused
+    # by name too -- these are the ones whose refusal is permanent and has an
+    # explanation worth giving.
+    refused:
+      tag_names:
+        reason: >-
+          Intercom filters conversations by tag id, and this column holds the
+          tag names. Filtering it would mean resolving a name to an id per
+          request, and a name the workspace renamed would silently match
+          nothing.
+        source: spec
+      company_name:
+        reason: >-
+          The conversation carries its company as an object read from the
+          payload; the search endpoint filters no company field.
+        source: spec
+      company_id:
+        reason: >-
+          The search endpoint filters no company field. Measured on
+          `/tickets/search`, which refuses `company_id` with `invalid_field`
+          although a ticket carries one; the same is assumed here until probed.
+        source: spec
+      timeline:
+        reason: >-
+          Built by the agent from the parts of a conversation, which the search
+          endpoint does not read.
+        source: measured
+      contact_name:
+        reason: >-
+          Read from the Contacts endpoint, not from the conversation. Filtering
+          on it arrives with the Contacts collection.
+        source: spec
+      contact_email:
+        reason: >-
+          Read from the Contacts endpoint, not from the conversation. Filter on
+          `source_author_email` instead, which is on the conversation itself.
+        source: spec
+      contact_count:
+        reason: Counted by the agent from the contacts the payload carries.
+        source: measured
+    # What `bin/probe_search_fields` enumerates on top of the fields above:
+    # names the documentation mentions, or that an ops team would plausibly
+    # search on. A candidate that turns out to be filterable becomes a field
+    # above -- with a column to expose it on, or with none, in which case it is
+    # a column the next lot may add.
+    candidates:
+      - id
+      - source.id
+      - source.author.id
+      - source.author.type
+      - source.author.name
+      - statistics.time_to_assignment
+      - statistics.time_to_admin_reply
+      - statistics.time_to_first_close
+      - statistics.median_time_to_reply
+      - statistics.first_assignment_at
+      - statistics.first_admin_reply_at
+      - statistics.last_assignment_at
+      - statistics.count_assignments
+      - conversation_rating.score
+      - conversation_rating.remark
+      - conversation_rating.contact_id
+      - ai_agent.resolution_state
+      - ai_agent.last_answer_type
+      - ai_agent.rating
+      - channel_initiated
+      - tag_ids
+      - teammate_ids
+      - company_id
+      - topics
+
+  tickets:
+    path: tickets/search
+    measured_at: null
+    fields:
+      open:
+        field: open
+        type: boolean
+        operators: ['=']
+        source: spec
+      category:
+        field: category
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      ticket_type_id:
+        field: ticket_type_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      admin_assignee_id:
+        field: admin_assignee_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      team_assignee_id:
+        field: team_assignee_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      contact_ids:
+        field: contact_ids
+        type: id_list
+        operators: ['=', '!=']
+        source: spec
+      created_at:
+        field: created_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: measured
+      updated_at:
+        field: updated_at
+        type: date
+        operators: ['>', '<', '>=', '<=', '=', '!=']
+        source: measured
+    refused:
+      company_id:
+        reason: >-
+          Measured during lot 1: `/tickets/search` refuses `company_id` with
+          `invalid_field`, although a ticket carries one. Filtering tickets by
+          account is not something this endpoint does.
+        source: measured
+      closed_at:
+        reason: >-
+          Derived by the agent from the parts of the ticket. The search endpoint
+          filters nothing of the sort, and ignores a sort on it without a word.
+        source: measured
+      closed_by_name:
+        reason: Derived by the agent from the parts of the ticket.
+        source: measured
+      last_reply_at:
+        reason: Derived by the agent from the parts of the ticket.
+        source: measured
+      last_responder_name:
+        reason: Derived by the agent from the parts of the ticket.
+        source: measured
+      last_responder_type:
+        reason: Derived by the agent from the parts of the ticket.
+        source: measured
+      state_label:
+        reason: >-
+          Read off the state object the ticket embeds. Whether the endpoint
+          filters a ticket state at all, and under which name, is one of the
+          probe's questions.
+        source: spec
+      state_external_label:
+        reason: Read off the state object the ticket embeds.
+        source: spec
+      ticket_type_name:
+        reason: >-
+          Read off the type object the ticket embeds. Filter on
+          `ticket_type_id`, which the endpoint does take.
+        source: spec
+      part_count:
+        reason: Counted by the agent from the parts the payload carries.
+        source: measured
+    # R7, and it is a product decision rather than an implementation choice: a
+    # ticket attribute is filtered as `ticket_attribute.{id}`, and a same-named
+    # attribute carries a different id per ticket type (measured:
+    # `_default_title_` is 14162161 on one type and 14162165 on another). One
+    # union column cannot know which id a row's type uses, so filtering it
+    # server-side would take one collection per ticket type -- more collections
+    # in the interface, and a schema that changes shape when the customer adds a
+    # type. Until the customer says that trade is worth it, the attributes stay
+    # display-only, as lot 1 published them.
+    ticket_attributes:
+      filterable: false
+      reason: >-
+        An Intercom ticket attribute is filtered through an id that differs from
+        one ticket type to the next, so a column showing the attribute of every
+        type at once cannot say which id to filter on. Filter on the ticket type
+        and a native field instead.
+      source: measured
+
+    candidates:
+      - id
+      - ticket_id
+      - state
+      - ticket_state.category
+      - ticket_state.id
+      - state_id
+      - is_shared
+      - previous_state_id
+      - contact_id
+      - source.author.email
+      - source.subject
+      - source.body
+      - title
+      - description
