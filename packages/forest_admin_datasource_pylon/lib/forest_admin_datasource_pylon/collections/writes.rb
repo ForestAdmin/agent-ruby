@@ -46,11 +46,16 @@ module ForestAdminDatasourcePylon
       end
 
       # What the patch may write is settled before the ids are, so a patch naming
-      # nothing writable is not refused for reaching too many records.
+      # nothing writable is refused, and refused for what it names rather than
+      # for how many records it would have reached.
       def update(caller, filter, patch)
         refuse_write('updated') unless write_endpoint?(:update_record)
 
         attributes = writable_attributes(patch)
+        refuse_unwritable_patch(patch) if attributes.empty? && names_fields?(patch)
+        # A patch naming nothing at all asked for nothing: the front sends one on
+        # a form whose every field is a relation, which `Update` writes through
+        # its own route.
         return if attributes.empty?
 
         ids = ids_for(caller, filter, extra_reads: stored_read?(attributes) ? 1 : 0)
@@ -215,11 +220,18 @@ module ForestAdminDatasourcePylon
       # Everything else is dropped rather than refused: the front sends the
       # fields of its form, and a read-only one reaching the payload is the
       # agent's doing, not a request the operator made.
+      #
+      # What that leniency may not do is reduce a whole patch to nothing and let
+      # the edit be reported as performed -- see `refuse_unwritable_patch`. Only
+      # an update needs the guard: a create reduced to nothing still reaches
+      # Pylon, which refuses it with a reason of its own.
       def writable_attributes(data)
         attrs = data.is_a?(Hash) ? data.transform_keys(&:to_s) : {}
 
         attrs.select { |field, _value| writable_column?(field) }
       end
+
+      def names_fields?(data) = data.is_a?(Hash) && data.any?
 
       def writable_column?(field)
         column = schema[:fields][field]
@@ -348,6 +360,22 @@ module ForestAdminDatasourcePylon
 
         named = fields.map { |field| "'#{field}'" }.join(', ')
         raise UnsupportedWriteError, "#{named} cannot be set here on a #{name}: #{detail}"
+      end
+
+      # A patch every key of which was dropped would write nothing and answer
+      # the operator with a successful edit: the route then re-reads the record
+      # and hands back the values it already had, so what they see is their
+      # change reverting with no reason given. Refused instead, naming the keys.
+      #
+      # Nothing is refused while anything remains writable -- a form resending a
+      # read-only column alongside a real edit performs the edit, and the column
+      # is dropped as it always was.
+      def refuse_unwritable_patch(patch)
+        named = patch.keys.map { |field| "'#{field}'" }.join(', ')
+        raise UnsupportedWriteError,
+              "This edit of a #{name} names only #{named}, and none of them can be written here: a read-only " \
+              'column, or a field this collection does not declare. Nothing would reach Pylon, and answering ' \
+              'the edit with a success would report a change that never landed.'
       end
 
       # The count is exact here, the filter having named the ids.

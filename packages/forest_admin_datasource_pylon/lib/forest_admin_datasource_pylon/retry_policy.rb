@@ -3,11 +3,27 @@ module ForestAdminDatasourcePylon
   # place: which statuses and exceptions are worth another attempt, on which
   # verbs, and how long to wait.
   class RetryPolicy
-    # Pylon quotas are per-minute, so a 429 routinely carries a Retry-After of up
-    # to 60s. faraday-retry gives up outright when Retry-After exceeds
-    # max_interval (`return if retry_after > max_interval`), so the cap has to
-    # cover a full rate-limit window or the 429 retry never fires when it matters.
-    DEFAULT_MAX_INTERVAL = 65
+    # What one attempt may be held back before the retry is abandoned instead.
+    # faraday-retry gives up outright when Retry-After exceeds max_interval
+    # (`return if retry_after > max_interval`), so this is also the bound on what
+    # a 429 costs: past it the client raises at once rather than sleeping.
+    #
+    # A fifth of a Pylon window rather than the whole of it, on purpose. Pylon
+    # quotas are per-minute, so a 429 carries a Retry-After of up to 60s, and
+    # honouring it three times over parked the calling thread for three minutes
+    # -- long after the Forest server timed out the request nobody will now read,
+    # and multiplied by the 20 sequential calls a single list view may spend
+    # (`MAX_ID_LOOKUPS`). The figure is what keeps the sleeps of one whole
+    # request under a minute: `max_retries` waits of this, plus the
+    # `RateLimiter::DEFAULT_MAX_WAIT` each of the four attempts may also pay.
+    #
+    # The trade, plainly: a Retry-After past this makes the 429 surface as an
+    # error where it used to be waited out, which is most of them -- the value
+    # being the remainder of the minute window. Absorbing them is `RateLimiter`'s
+    # job, metering each endpoint inside its budget before Pylon has to answer
+    # 429 at all; this retry is the backstop for the traffic the limiter cannot
+    # see, and a backstop may cost less than what it protects.
+    DEFAULT_MAX_INTERVAL = 12
 
     STATUSES = [429, 502, 503, 504].freeze
 
@@ -32,10 +48,9 @@ module ForestAdminDatasourcePylon
     RETRYABLE_METHODS = %i[get head options].freeze
     RETRY_IF = ->(env, _exception) { env[:status] == 429 }
 
-    # The cap for a call that must not hold the boot, deliberately below a
-    # rate-limit window where DEFAULT_MAX_INTERVAL sits above it: a Retry-After
-    # past the cap makes faraday-retry abandon outright, which is what turns a
-    # 429 into an immediate give-up rather than a minute of waiting per attempt.
+    # The same mechanism as DEFAULT_MAX_INTERVAL, tightened for a call that must
+    # not hold the boot: what a request may wait once the agent is serving is
+    # more than an operator watching Rails come up should pay per object type.
     BOOT_MAX_INTERVAL = 2
 
     BACKOFF_FACTOR = 2

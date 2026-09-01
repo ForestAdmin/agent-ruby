@@ -10,6 +10,10 @@ module ForestAdminDatasourcePylon
     # window: the endpoints it reads answer in one response, so reaching this
     # many pages means the API started paginating on its own and the walk is
     # spending more of the per-minute budget than the answer is worth.
+    #
+    # What reaching it costs is the caller's to say: a conversation thread and a
+    # custom-field list are truncated with a warning, where a collection whose
+    # answer is only correct whole is refused. See `refuse_past_cap`.
     MAX_COLLECTED_PAGES = 10
 
     # `next_cursor` is nil as soon as Pylon stops advertising a next page, so
@@ -154,8 +158,20 @@ module ForestAdminDatasourcePylon
       must_succeed(path) { to_search_page(connection.get(path, params).body, path) }
     end
 
+    # The endpoints documented as answering with the whole collection in one
+    # response, `GET /users` and `GET /teams`. The cursor is still followed, the
+    # way `fetch_issue_messages` follows it: Pylon advertises no next page here,
+    # so the walk costs the single request it always did and only does something
+    # the day that changes.
+    #
+    # Past the cap the walk is refused rather than truncated, unlike the thread
+    # and the custom fields: `FetchAllCollection` filters, sorts, counts and
+    # groups in memory over what this returns, and calls the result exact
+    # BECAUSE it is every record Pylon holds. Truncated, that claim would stand
+    # over a fraction of the collection -- a count answered short and presented
+    # as exact, which is the one answer this datasource refuses everywhere else.
     def fetch_all(path, params = {})
-      must_succeed(path) { extract_list(connection.get(path, params).body, path) }
+      must_succeed(path) { collect_pages(path, params, refuse_past_cap: true) }
     end
 
     # Every record of a cursor-paginated GET, no window asked for and no limit
@@ -171,7 +187,10 @@ module ForestAdminDatasourcePylon
     #
     # `conn` is what a caller reading on the boot path hands its own connection
     # through: every page of the walk is then bounded like the first.
-    def collect_pages(path, params = {}, conn: connection)
+    #
+    # `refuse_past_cap` is for the caller whose answer is only correct whole: the
+    # cap then raises instead of logging what it left out. See `fetch_all`.
+    def collect_pages(path, params = {}, conn: connection, refuse_past_cap: false)
       records = []
       cursor = nil
       seen = Set.new
@@ -185,6 +204,8 @@ module ForestAdminDatasourcePylon
         break if page.next_cursor.nil? || page.records.empty? || !seen.add?(page.next_cursor)
 
         if pages >= MAX_COLLECTED_PAGES
+          refuse_pagination_cap(path, pages, records.size) if refuse_past_cap
+
           log_pagination_cap(path, pages, records.size)
           break
         end
@@ -193,6 +214,18 @@ module ForestAdminDatasourcePylon
       end
 
       records
+    end
+
+    # Refused as an APIError, like a body whose shape broke the contract: what
+    # happened is that Pylon started answering an endpoint differently, which no
+    # filter the operator sets and no page they ask for would work around.
+    def refuse_pagination_cap(path, pages, collected)
+      raise APIError,
+            "Pylon paginated #{path} past the #{pages} pages this walk covers (#{collected} records read). " \
+            'That endpoint is documented as answering with the whole collection in one response, which is what ' \
+            'PylonUser and PylonTeam filter, sort and count in memory as an exact answer. Refusing rather ' \
+            'than answering over a fraction of the collection: reading it needs cursor pagination, the way ' \
+            'PylonIssue reads its own.'
     end
 
     def log_pagination_cap(path, pages, collected)

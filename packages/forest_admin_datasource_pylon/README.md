@@ -46,7 +46,9 @@ answering something that looks right and is not. All of these arrive as a 400 ca
   counting the pages a walk collected would answer a fraction of a collection as if it were the
   whole of it, so those are not advertised as countable. `PylonUser` and `PylonTeam` are the
   exception — their endpoint hands back every record, so a count or a group over it is the figure
-  a server-side aggregation would have given.
+  a server-side aggregation would have given. That claim is checked rather than assumed: the read
+  follows a cursor if Pylon ever advertises one, and refuses outright rather than answer over a
+  fraction of the collection should it paginate past what one walk covers.
 - **No sort parameter on `/issues/search`.** Issues always come back newest first. A requested
   order is reported in the log rather than silently swallowed.
 - **No `id` filter on the search endpoints.** A primary-key lookup is short-circuited to
@@ -60,6 +62,10 @@ answering something that looks right and is not. All of these arrive as a 400 ca
 - **Writes are one record per request.** A write reaching more records than one pass covers is
   refused up front; one that fails halfway reports exactly which records were written, so a retry
   can target the untouched ones rather than performing the write twice.
+- **Not every column can be written.** A read-only column sent alongside a real edit is dropped
+  and the edit performed. An edit naming *only* such columns is refused, naming them: it would
+  write nothing, and the record the route reads back would show the operator their change
+  reverting with no reason given.
 
 ## Rate limits
 
@@ -71,6 +77,20 @@ endpoint, in front of the 429 retry rather than instead of it.
 The limiter is a smoother, not a guarantee: past `DEFAULT_MAX_WAIT` a request goes out anyway and
 the 429 retry takes over, with one log line per endpoint per window saying so. Under real
 saturation — several agents or processes on the same token — the retry is the defence.
+
+The retry is bounded, deliberately. A 429 carries a `Retry-After` of up to a full minute, and
+waiting one out on every attempt held the calling thread for minutes on a request the Forest
+server had already timed out. `RetryPolicy::DEFAULT_MAX_INTERVAL` caps what one attempt waits;
+past it the 429 surfaces as an error instead. So a saturated endpoint answers the operator with a
+message rather than with a page that arrives after they gave up. Raise it — or lower
+`max_retries` — to trade the other way:
+
+```ruby
+ForestAdminDatasourcePylon::Datasource.new(
+  api_key: ENV['PYLON_API_KEY'],
+  retry_policy: ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 1, max_interval: 65)
+)
+```
 
 To meter on your own side instead, pass `rate_limiter: nil`:
 

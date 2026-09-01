@@ -541,6 +541,61 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       expect { client.fetch_users }
         .to raise_error(ForestAdminDatasourcePylon::APIError, /users: HTTP 500 boom/)
     end
+
+    # Documented unpaginated, so this costs the one request it always did: with
+    # no `pagination` block advertised the walk leaves after the first page.
+    it 'spends a single request while Pylon advertises no next page' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true' })
+                                         .to_return(json('data' => [{ 'id' => 'u1' }]))
+
+      client.fetch_users
+
+      expect(WebMock).to have_requested(:get, "#{base}/users")
+        .with(query: { 'include_deactivated' => 'true' }).once
+    end
+  end
+
+  # `FetchAllCollection` filters, sorts and counts in memory and calls the
+  # result exact because it holds every record Pylon has. The day Pylon starts
+  # paginating these endpoints, a first page read as "everything" would keep
+  # that claim over a fraction of the collection.
+  describe 'an endpoint documented unpaginated that starts paginating' do
+    def page(records, cursor: nil)
+      body = { 'data' => records }
+      body['pagination'] = { 'cursor' => cursor, 'has_next_page' => true } if cursor
+      json(body)
+    end
+
+    it 'follows the cursor and answers with every page' do
+      stub_request(:get, "#{base}/teams").with(query: {}).to_return(page([{ 'id' => 't1' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/teams").with(query: { 'cursor' => 'c1' }).to_return(page([{ 'id' => 't2' }]))
+
+      expect(client.fetch_teams).to eq([{ 'id' => 't1' }, { 'id' => 't2' }])
+    end
+
+    it 'keeps the query parameters of the first page on the next one' do
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true' })
+                                         .to_return(page([{ 'id' => 'u1' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/users").with(query: { 'include_deactivated' => 'true', 'cursor' => 'c1' })
+                                         .to_return(page([{ 'id' => 'u2' }]))
+
+      expect(client.fetch_users).to eq([{ 'id' => 'u1' }, { 'id' => 'u2' }])
+    end
+
+    # Where the thread and the custom fields are truncated with a warning, this
+    # is refused: a count answered short and presented as exact is the one
+    # answer the datasource refuses everywhere else.
+    it 'refuses to answer over a fraction of the collection past the page cap' do
+      served = 0
+      stub_request(:get, %r{/teams}).to_return do
+        served += 1
+        page([{ 'id' => "t#{served}" }], cursor: "c#{served}")
+      end
+
+      expect { client.fetch_teams }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /Pylon paginated teams past the 10 pages/)
+      expect(served).to eq(described_class::MAX_COLLECTED_PAGES)
+    end
   end
 
   describe '#fetch_user' do
@@ -755,6 +810,17 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
 
         expect(client.me).to eq('id' => 'org_1')
         expect(WebMock).to have_requested(:get, "#{base}/me").twice
+      end
+
+      # The bound on what a 429 costs, on the served path and not only on the
+      # boot one: a Retry-After is the remainder of the minute window, and
+      # honouring it `max_retries` times over held the calling thread for
+      # minutes on a request the Forest server had already timed out.
+      it 'gives up at once on a 429 carrying a whole rate-limit window' do
+        stub_request(:get, "#{base}/me").to_return(status: 429, headers: { 'Retry-After' => '60' })
+
+        expect { client.me }.to raise_error(ForestAdminDatasourcePylon::APIError)
+        expect(WebMock).to have_requested(:get, "#{base}/me").once
       end
 
       it 'gives up without retrying when Retry-After exceeds the cap' do

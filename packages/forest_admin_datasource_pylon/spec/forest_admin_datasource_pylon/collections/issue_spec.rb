@@ -620,6 +620,22 @@ module ForestAdminDatasourcePylon
         expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to eq([])
       end
 
+      # Which records the window holds is only known once the residual has run,
+      # so `records_by_id` applies it first and slices second. Slicing the ids
+      # first would cut this page out of i1..i3 and then drop i1 from it -- a
+      # page answered with the records left over, silently missing i3.
+      it 'applies the leftover conditions before it cuts the page window' do
+        %w[i1 i2 i3].each do |id|
+          state = id == 'i1' ? 'closed' : 'new'
+          stub_request(:get, "#{base}/issues/#{id}").to_return(json('data' => issue_payload(id, 'state' => state)))
+        end
+        tree = branch('And', [id_leaf(operators::IN, %w[i1 i2 i3]), leaf('state', operators::EQUAL, 'new')])
+
+        rows = collection.list(nil, filter(condition_tree: tree, page: page(1, 1)), %w[id])
+
+        expect(rows).to eq([{ 'id' => 'i3' }])
+      end
+
       # `tags` holds a list whose Pylon membership semantics have no in-memory
       # counterpart: the lookup is refused rather than silently mis-filtered.
       it 'refuses a leftover condition it cannot evaluate in memory' do

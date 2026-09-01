@@ -13,11 +13,22 @@ RSpec.describe ForestAdminDatasourcePylon::RetryPolicy do
   end
 
   describe 'DEFAULT_MAX_INTERVAL' do
-    # faraday-retry gives up outright when Retry-After exceeds max_interval, and
-    # Pylon quotas are per-minute, so a cap below 60s silently disables the 429
-    # retry on exactly the throttled endpoints it exists for.
-    it 'covers a full Pylon rate-limit window' do
-      expect(described_class::DEFAULT_MAX_INTERVAL).to be >= 60
+    # faraday-retry gives up outright when Retry-After exceeds max_interval, so
+    # this constant is what one 429 costs. Pylon quotas are per-minute: a cap
+    # covering a whole window let three retries park the calling thread for
+    # three minutes, on a request the Forest server had long since timed out.
+    it 'stays well inside a Pylon rate-limit window' do
+      expect(described_class::DEFAULT_MAX_INTERVAL).to be < 20
+    end
+
+    # The whole request, not one attempt: `max_retries` sleeps of this, plus one
+    # `RateLimiter::DEFAULT_MAX_WAIT` per attempt, is what a caller can spend
+    # before it hears back.
+    it 'bounds the sleep of one request under a minute' do
+      policy = described_class.new
+      throttled = (policy.max_retries + 1) * ForestAdminDatasourcePylon::RateLimiter::DEFAULT_MAX_WAIT
+
+      expect((policy.max_retries * policy.max_interval) + throttled).to be < 60
     end
   end
 
@@ -26,10 +37,10 @@ RSpec.describe ForestAdminDatasourcePylon::RetryPolicy do
       expect(described_class.boot.max_retries).to eq(1)
     end
 
-    # The mirror image of DEFAULT_MAX_INTERVAL: faraday-retry abandons when
-    # Retry-After exceeds the cap, which is how a 429 costs a boot nothing.
-    it 'caps the wait below a Pylon rate-limit window' do
-      expect(described_class.boot.max_interval).to be < 60
+    # The same mechanism as DEFAULT_MAX_INTERVAL, tightened: a 429 has to cost a
+    # boot less than it costs a request the agent is already serving.
+    it 'caps the wait below what a served request waits' do
+      expect(described_class.boot.max_interval).to be < described_class::DEFAULT_MAX_INTERVAL
     end
 
     it 'still absorbs a hiccup Pylon answered without a Retry-After' do

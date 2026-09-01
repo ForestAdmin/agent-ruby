@@ -156,19 +156,41 @@ module ForestAdminDatasourcePylon
         expect(WebMock).to have_requested(:patch, "#{base}/issues/i2").with(body: { 'state' => 'closed' })
       end
 
-      it 'sends nothing when every key of the patch is read-only' do
-        issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'number' => 9, 'link' => 'http://x')
-
+      # Writing nothing and answering with a success would have the route re-read
+      # the record and hand back the values it already had: the operator watches
+      # their change revert, with no reason given.
+      it 'refuses a patch every key of which was dropped, naming them' do
+        expect { issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'number' => 9, 'link' => 'http://x') }
+          .to raise_error(UnsupportedWriteError, /names only 'number', 'link', and none of them can be written/)
         expect(WebMock).not_to have_requested(:patch, "#{base}/issues/i1")
+      end
+
+      # A form whose every field is a relation sends a patch with nothing in it,
+      # the relations being written through their own route: nothing was asked
+      # for, so nothing is refused.
+      it 'sends nothing, and refuses nothing, for a patch naming no field at all' do
+        expect { issues.update(nil, id_filter(operators::EQUAL, 'i1'), {}) }.not_to raise_error
+        expect(WebMock).not_to have_requested(:patch, "#{base}/issues/i1")
+      end
+
+      # A read-only column alongside a real edit is still dropped: the guard is
+      # about a patch reduced to nothing, not about the leniency itself.
+      it 'drops the dropped keys and writes the rest' do
+        stub_request(:patch, "#{base}/issues/i1").to_return(json('data' => issue_payload('i1')))
+
+        issues.update(nil, id_filter(operators::EQUAL, 'i1'), 'number' => 9, 'title' => 'Louder')
+
+        expect(WebMock).to have_requested(:patch, "#{base}/issues/i1").with(body: { 'title' => 'Louder' })
       end
 
       # The cap bounds a write, and a patch naming nothing writable is not one:
       # it is settled before the ids are, so the selection is never resolved and
-      # never refused for its width.
-      it 'sends nothing, and refuses nothing, when the patch is read-only over a wide selection' do
+      # the refusal names the patch rather than the width.
+      it 'refuses a read-only patch over a wide selection for the patch, not the width' do
         ids = Array.new(21) { |index| "i#{index}" }
 
-        expect { issues.update(nil, id_filter(operators::IN, ids), 'number' => 9) }.not_to raise_error
+        expect { issues.update(nil, id_filter(operators::IN, ids), 'number' => 9) }
+          .to raise_error(UnsupportedWriteError, /names only 'number'/)
         expect(WebMock).not_to have_requested(:patch, %r{/issues/})
       end
 
