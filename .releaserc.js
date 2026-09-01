@@ -31,7 +31,8 @@ module.exports = {
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_zendesk/lib/forest_admin_datasource_zendesk/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb; '+
             'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_mambu_payments/lib/forest_admin_datasource_mambu_payments/version.rb; '+
-            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/version.rb; ',
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/version.rb; '+
+            'sed -i \'s/VERSION = ".*"/VERSION = "${nextRelease.version}"/g\' packages/forest_admin_datasource_pylon/lib/forest_admin_datasource_pylon/version.rb; ',
         successCmd:
             '( cd packages/forest_admin_agent && gem build && gem push forest_admin_agent-*.gem );' +
             '( cd packages/forest_admin_datasource_active_record && gem build && gem push forest_admin_datasource_active_record-*.gem );' +
@@ -45,7 +46,8 @@ module.exports = {
             '( cd packages/forest_admin_datasource_zendesk && gem build && gem push forest_admin_datasource_zendesk-*.gem );' +
             '( cd packages/forest_admin_datasource_snowflake && gem build && gem push forest_admin_datasource_snowflake-*.gem );' +
             '( cd packages/forest_admin_datasource_mambu_payments && gem build && gem push forest_admin_datasource_mambu_payments-*.gem );' +
-            '( cd packages/forest_admin_datasource_graphql_hasura && gem build && gem push forest_admin_datasource_graphql_hasura-*.gem );' ,
+            '( cd packages/forest_admin_datasource_graphql_hasura && gem build && gem push forest_admin_datasource_graphql_hasura-*.gem );' +
+            '( cd packages/forest_admin_datasource_pylon && gem build && gem push forest_admin_datasource_pylon-*.gem );' ,
       },
     ],
     [
@@ -68,6 +70,7 @@ module.exports = {
           'packages/forest_admin_datasource_snowflake/lib/forest_admin_datasource_snowflake/version.rb',
           'packages/forest_admin_datasource_mambu_payments/lib/forest_admin_datasource_mambu_payments/version.rb',
           'packages/forest_admin_datasource_graphql_hasura/lib/forest_admin_datasource_graphql_hasura/version.rb',
+          'packages/forest_admin_datasource_pylon/lib/forest_admin_datasource_pylon/version.rb',
           'package.json'
         ],
       },

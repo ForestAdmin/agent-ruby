@@ -1,0 +1,186 @@
+RSpec.describe ForestAdminDatasourcePylon::Configuration do
+  let(:valid_args) { { api_key: 'pk_test_xyz' } }
+
+  describe '#initialize' do
+    it 'accepts a valid api_key' do
+      expect(described_class.new(**valid_args).api_key).to eq('pk_test_xyz')
+    end
+
+    it 'raises a ConfigurationError when api_key is nil' do
+      expect { described_class.new(api_key: nil) }
+        .to raise_error(ForestAdminDatasourcePylon::ConfigurationError, /api_key/)
+    end
+
+    it 'raises a ConfigurationError when api_key is blank' do
+      expect { described_class.new(api_key: '   ') }
+        .to raise_error(ForestAdminDatasourcePylon::ConfigurationError, /api_key/)
+    end
+
+    it 'defaults to the public Pylon base URL' do
+      expect(described_class.new(**valid_args).base_url).to eq('https://api.usepylon.com')
+    end
+
+    it 'honours an explicit base_url override' do
+      config = described_class.new(**valid_args, base_url: 'https://example.test')
+      expect(config.base_url).to eq('https://example.test')
+    end
+
+    it 'defaults the timeouts' do
+      config = described_class.new(**valid_args)
+      expect([config.open_timeout, config.timeout]).to eq([5, 30])
+    end
+
+    it 'keeps configurable timeouts' do
+      config = described_class.new(**valid_args, open_timeout: 1, timeout: 2)
+      expect([config.open_timeout, config.timeout]).to eq([1, 2])
+    end
+
+    # What is read while the datasource is being constructed is waited on by a
+    # Rails boot, not by a request that has already returned a page.
+    it 'defaults the boot timeouts under the ones every other call gets' do
+      config = described_class.new(**valid_args)
+      expect([config.boot_open_timeout, config.boot_timeout]).to eq([3, 10])
+    end
+
+    it 'keeps configurable boot timeouts' do
+      config = described_class.new(**valid_args, boot_open_timeout: 1, boot_timeout: 2)
+      expect([config.boot_open_timeout, config.boot_timeout]).to eq([1, 2])
+    end
+
+    it 'defaults the boot retry policy to one bounded retry' do
+      policy = described_class.new(**valid_args).boot_retry_policy
+      expect([policy.max_retries, policy.max_interval]).to eq([1, 2])
+    end
+
+    it 'accepts an injected boot retry policy' do
+      policy = ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 0)
+      expect(described_class.new(**valid_args, boot_retry_policy: policy).boot_retry_policy).to be(policy)
+    end
+
+    it 'defaults to a standard retry policy' do
+      expect(described_class.new(**valid_args).retry_policy)
+        .to be_a(ForestAdminDatasourcePylon::RetryPolicy)
+    end
+
+    it 'accepts an injected retry policy' do
+      policy = ForestAdminDatasourcePylon::RetryPolicy.new(max_retries: 9)
+      expect(described_class.new(**valid_args, retry_policy: policy).retry_policy).to be(policy)
+    end
+
+    it 'throttles by default' do
+      expect(described_class.new(**valid_args).rate_limiter)
+        .to be_a(ForestAdminDatasourcePylon::RateLimiter)
+    end
+
+    it 'accepts an injected limiter' do
+      limiter = ForestAdminDatasourcePylon::RateLimiter.new(max_wait: 1)
+      expect(described_class.new(**valid_args, rate_limiter: limiter).rate_limiter).to be(limiter)
+    end
+
+    # One limiter per configuration, so per token: Pylon meters the token, and
+    # two agents holding different ones do not share a budget.
+    it 'gives each configuration its own window' do
+      first = described_class.new(**valid_args)
+      expect(described_class.new(**valid_args).rate_limiter).not_to be(first.rate_limiter)
+    end
+
+    it 'takes the throttling out of the stack when handed nil' do
+      expect(described_class.new(**valid_args, rate_limiter: nil).rate_limiter).to be_nil
+    end
+  end
+
+  describe '#url' do
+    it 'returns the base URL unversioned' do
+      expect(described_class.new(**valid_args).url).to eq('https://api.usepylon.com')
+    end
+
+    it 'trims a trailing slash' do
+      config = described_class.new(**valid_args, base_url: 'https://example.test/')
+      expect(config.url).to eq('https://example.test')
+    end
+  end
+
+  describe '#base_path' do
+    it 'is empty against the API itself, which mounts its endpoints on the host' do
+      expect(described_class.new(**valid_args).base_path).to eq('')
+    end
+
+    # `RateLimits` is keyed on the endpoint, so a base url mounted under a
+    # subpath — an egress proxy, a mock server — has to have that prefix taken
+    # off a path before the table is asked.
+    it 'is the prefix a base url mounted under a subpath puts in front of every path' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon/v1')
+      expect(config.base_path).to eq('/pylon/v1')
+    end
+
+    it 'carries no trailing slash, `url` having trimmed it' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon/')
+      expect(config.base_path).to eq('/pylon')
+    end
+  end
+
+  # Nothing prints a Configuration on purpose: what reaches an `inspect` is a
+  # Rails error page, or a `logger.debug` of the datasource. The default would
+  # print the bearer token in clear in both.
+  describe '#inspect' do
+    it 'masks the api key, and keeps the base url a reader needs to place it' do
+      output = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon').inspect
+
+      expect(output).to include('[FILTERED]', 'https://proxy.test/pylon')
+      expect(output).not_to include('pk_test_xyz')
+    end
+
+    # Masking the Configuration alone is not enough: the token also rides in the
+    # headers of the client's Faraday connections, which `Faraday::Connection`
+    # prints in clear, and every collection reaches those through the
+    # datasource. The whole graph is asserted so a new holder cannot reopen a
+    # path quietly.
+    it 'is masked on every object this package hands out, not on the configuration alone' do
+      stub_custom_fields
+      datasource = ForestAdminDatasourcePylon::Datasource.new(api_key: 'pk_test_xyz')
+      datasource.client.send(:connection)
+
+      [datasource, datasource.client, datasource.configuration,
+       datasource.get_collection('PylonIssue'), datasource.get_collection('PylonUser')].each do |object|
+        expect(object.inspect).not_to include('pk_test_xyz')
+      end
+    end
+
+    it 'keeps each of them worth printing' do
+      stub_custom_fields
+      datasource = ForestAdminDatasourcePylon::Datasource.new(api_key: 'pk_test_xyz')
+
+      expect(datasource.inspect).to include('PylonIssue', 'PylonTeam')
+      expect(datasource.client.inspect).to include('https://api.usepylon.com')
+    end
+
+    # The api key is not the only credential a Configuration holds: an egress
+    # proxy fronting Pylon is configured as a base url carrying its own
+    # user-info, which both places that print the url would print in clear.
+    it 'masks the user-info of a base url on the configuration and on the client' do
+      config = described_class.new(**valid_args, base_url: 'https://svc:s3cret@proxy.internal/pylon')
+
+      [config, ForestAdminDatasourcePylon::Client.new(config)].each do |object|
+        expect(object.inspect).not_to include('s3cret')
+        expect(object.inspect).to include('https://[FILTERED]@proxy.internal/pylon')
+      end
+    end
+
+    # A url with no user-info is printed as it is: the point is to place the
+    # deployment, and mangling every url to mask the one that carries a password
+    # would take that away.
+    it 'leaves a base url carrying no user-info untouched' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon')
+
+      expect(config.redacted_url).to eq('https://proxy.test/pylon')
+    end
+
+    # `base_url` is never validated as parseable, and an inspect raising on the
+    # way to a Rails error page would replace the page with its own failure.
+    it 'prints a base url that does not parse rather than raising on it' do
+      config = described_class.new(**valid_args, base_url: 'ht!tp://not a url')
+
+      expect(config.inspect).to include('ht!tp://not a url', '[FILTERED]')
+    end
+  end
+end
