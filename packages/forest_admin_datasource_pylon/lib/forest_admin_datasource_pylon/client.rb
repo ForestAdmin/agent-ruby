@@ -134,8 +134,12 @@ module ForestAdminDatasourcePylon
     # `Faraday::Connection#inspect` prints those in clear: a Client reaching an
     # `inspect` by accident leaks the credential whatever `Configuration` does
     # about its own. Masked here for that reason, and not only for symmetry.
+    #
+    # The url goes through `redacted_url`, not `url`: a base url fronted by an
+    # egress proxy carries that proxy's credentials in its user-info, and this
+    # is one of the two places that print it.
     def inspect
-      "#<#{self.class.name} base_url=#{@configuration.url.inspect}>"
+      "#<#{self.class.name} base_url=#{@configuration.redacted_url.inspect}>"
     end
 
     private

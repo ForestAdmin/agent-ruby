@@ -41,6 +41,18 @@ module ForestAdminDatasourcePylon
       @base_path ||= URI.parse(url).path
     end
 
+    # The base url as something safe to print. `api_key` is not the only
+    # credential a Configuration holds: the url is operator-supplied, and an
+    # egress proxy fronting Pylon is spelled `https://user:pass@proxy.internal`,
+    # so its user-info is a password too. Whoever prints the url prints this.
+    #
+    # Cut with a regexp rather than through `URI`: nothing validates that the
+    # base url parses, and an `inspect` raising on the way to a Rails error page
+    # would replace the page with its own failure.
+    def redacted_url
+      url.sub(%r{://[^/@]+@}, '://[FILTERED]@')
+    end
+
     # `api_key` is a bearer token, and nothing prints a Configuration on
     # purpose: what reaches an `inspect` is a Rails error page, or a
     # `logger.debug` of something holding one. The default would put the token
@@ -51,7 +63,7 @@ module ForestAdminDatasourcePylon
     # and `Datasource` mask their own. Together they cut every path from an
     # object this package hands out to the credential.
     def inspect
-      "#<#{self.class.name} base_url=#{@base_url.inspect} api_key=[FILTERED]>"
+      "#<#{self.class.name} base_url=#{redacted_url.inspect} api_key=[FILTERED]>"
     end
 
     private

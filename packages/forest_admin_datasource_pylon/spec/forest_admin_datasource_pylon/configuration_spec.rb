@@ -153,5 +153,34 @@ RSpec.describe ForestAdminDatasourcePylon::Configuration do
       expect(datasource.inspect).to include('PylonIssue', 'PylonTeam')
       expect(datasource.client.inspect).to include('https://api.usepylon.com')
     end
+
+    # The api key is not the only credential a Configuration holds: an egress
+    # proxy fronting Pylon is configured as a base url carrying its own
+    # user-info, which both places that print the url would print in clear.
+    it 'masks the user-info of a base url on the configuration and on the client' do
+      config = described_class.new(**valid_args, base_url: 'https://svc:s3cret@proxy.internal/pylon')
+
+      [config, ForestAdminDatasourcePylon::Client.new(config)].each do |object|
+        expect(object.inspect).not_to include('s3cret')
+        expect(object.inspect).to include('https://[FILTERED]@proxy.internal/pylon')
+      end
+    end
+
+    # A url with no user-info is printed as it is: the point is to place the
+    # deployment, and mangling every url to mask the one that carries a password
+    # would take that away.
+    it 'leaves a base url carrying no user-info untouched' do
+      config = described_class.new(**valid_args, base_url: 'https://proxy.test/pylon')
+
+      expect(config.redacted_url).to eq('https://proxy.test/pylon')
+    end
+
+    # `base_url` is never validated as parseable, and an inspect raising on the
+    # way to a Rails error page would replace the page with its own failure.
+    it 'prints a base url that does not parse rather than raising on it' do
+      config = described_class.new(**valid_args, base_url: 'ht!tp://not a url')
+
+      expect(config.inspect).to include('ht!tp://not a url', '[FILTERED]')
+    end
   end
 end
