@@ -24,6 +24,7 @@ module ForestAdminDatasourceIntercom
         # lookup, and a day boundary lands an offset away from where the filter
         # meant it.
         @timezone = identifier.empty? ? 'UTC' : identifier
+        @day_bounds = DayBounds.new(collection: collection, timezone: @timezone)
       end
 
       def call(leaf, field, spelling)
@@ -31,7 +32,8 @@ module ForestAdminDatasourceIntercom
 
         refuse_absence!(leaf, field) if blank?(leaf.value)
 
-        scalar(leaf.value, leaf, field)
+        value = scalar(leaf.value, leaf, field)
+        field.type == 'date' ? @day_bounds.call(value, spelling) : value
       end
 
       private

@@ -78,6 +78,21 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The headline failure this lot had to avoid: Intercom truncates a date
+    # search to the UTC day, so the pair of bounds the toolkit rewrites `today`
+    # into reads as "from tomorrow" and "before today" -- an empty answer to the
+    # most ordinary filter there is -- unless each bound is moved to the day
+    # boundary that makes Intercom answer the day the filter named.
+    describe 'the two bounds an interval is rewritten into' do
+      it 'asks for the day the interval names rather than cancelling out' do
+        tree = branch('And', leaf('created_at', operators::GREATER_THAN, '2026-09-01T00:00:00Z'),
+                      leaf('created_at', operators::LESS_THAN, '2026-09-01T23:59:59Z'))
+
+        expect(translate(tree)['value'].map { |bound| Time.at(bound['value']).utc.iso8601 })
+          .to eq(['2026-08-31T00:00:00Z', '2026-09-02T00:00:00Z'])
+      end
+    end
+
     describe 'what it will not translate' do
       # The whole point of the lot: a condition dropped on the way to Intercom
       # comes back as an unfiltered page that looks filtered.

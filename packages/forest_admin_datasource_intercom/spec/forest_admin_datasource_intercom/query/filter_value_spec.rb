@@ -16,44 +16,88 @@ module ForestAdminDatasourceIntercom
       formatter.call(leaf, field(type), spelling)
     end
 
-    describe 'a date' do
-      # Intercom stores and compares its dates as epoch seconds.
-      it 'sends an ISO8601 timestamp as the second it names' do
-        expect(call('date', '2026-09-01T08:30:00Z')).to eq(1_788_251_400)
+    # Intercom truncates a date search to the UTC day -- measured, and against
+    # its own documentation, which promises the workspace timezone. `>` answers
+    # from the start of the day after the value, `<` before the start of the
+    # day of the value. Sent as they come, the two bounds of an interval cancel
+    # each other out and `today` answers nothing.
+    describe 'a date, and the UTC day Intercom truncates it to' do
+      def bound(value, spelling)
+        Time.at(call('date', value, spelling: spelling,
+                                    operator: spelling == '>' ? operators::GREATER_THAN : operators::LESS_THAN))
+            .utc.iso8601
+      end
+
+      it 'moves a lower bound back a day, so Intercom answers from the day it names' do
+        expect(bound('2026-09-01T08:30:00Z', '>')).to eq('2026-08-31T00:00:00Z')
+      end
+
+      it 'moves an upper bound forward a day, so Intercom answers through the day it names' do
+        expect(bound('2026-09-01T08:30:00Z', '<')).to eq('2026-09-02T00:00:00Z')
+      end
+
+      # An upper bound already sitting on a day boundary names the day to leave
+      # out, which is what Intercom answers on its own.
+      it 'leaves an upper bound already on a UTC day boundary where it is' do
+        expect(bound('2026-09-01T00:00:00Z', '<')).to eq('2026-09-01T00:00:00Z')
+      end
+
+      # The pair the toolkit rewrites `today` into, from a caller in UTC: what
+      # comes back is that day and nothing else.
+      it 'answers the day itself for the two bounds of an interval' do
+        expect(bound('2026-09-01T00:00:00Z', '>')).to eq('2026-08-31T00:00:00Z')
+        expect(bound('2026-09-01T23:59:59Z', '<')).to eq('2026-09-02T00:00:00Z')
       end
 
       it 'keeps the offset an ISO8601 timestamp carries' do
-        expect(call('date', '2026-09-01T10:30:00+02:00')).to eq(1_788_251_400)
+        expect(bound('2026-09-01T10:30:00+02:00', '<')).to eq('2026-09-02T00:00:00Z')
       end
 
       # A day with no time of day is the caller's day: it is the timezone the
-      # filter was written in that says when that day starts, not the server's.
+      # filter was written in that says when that day starts.
       it 'reads a bare date as midnight in the timezone of the caller' do
-        expect(call('date', '2026-09-01')).to eq(Time.utc(2026, 8, 31, 22).to_i)
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        expect(bound('2026-09-01', '>')).to eq('2026-08-30T00:00:00Z')
       end
 
-      it 'reads a Ruby Date the same way' do
-        expect(call('date', Date.new(2026, 9, 1))).to eq(Time.utc(2026, 8, 31, 22).to_i)
+      it 'reads a Ruby Date, a Time, a DateTime and epoch seconds the same way' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        expect(bound(Date.new(2026, 9, 1), '>')).to eq('2026-08-30T00:00:00Z')
+        expect(bound(Time.utc(2026, 9, 1, 8, 30), '<')).to eq('2026-09-02T00:00:00Z')
+        expect(bound(DateTime.new(2026, 9, 1, 8, 30, 0), '<')).to eq('2026-09-02T00:00:00Z')
+        expect(bound(1_788_251_400, '<')).to eq('2026-09-02T00:00:00Z')
       end
 
-      it 'takes a Time and a DateTime as the instant they are' do
-        expect(call('date', Time.utc(2026, 9, 1, 8, 30))).to eq(1_788_251_400)
-        expect(call('date', DateTime.new(2026, 9, 1, 8, 30, 0))).to eq(1_788_251_400)
+      # A window written in another timezone is answered on the UTC days it
+      # overlaps, and an operator has no way of guessing that from the rows.
+      it 'reports the UTC day boundary once, when it is not the day of the caller' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        bound('2026-08-31T22:00:00Z', '>')
+        bound('2026-08-31T23:00:00Z', '>')
+
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).once.with(/truncates a date search/)
       end
 
-      it 'leaves epoch seconds alone' do
-        expect(call('date', 1_788_251_400)).to eq(1_788_251_400)
+      it 'stays quiet when the window and the UTC day are the same day anyway' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        bound('2026-09-01T08:30:00Z', '>')
+
+        expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
       end
 
-      # Falling back to UTC silently would move a day boundary by the offset,
-      # which is the failure a timezone is read for in the first place.
       context 'when the caller names a timezone nothing knows' do
         let(:timezone) { 'Middle-Earth/Shire' }
 
+        # Falling back to UTC silently would move a day boundary by the offset,
+        # which is the failure a timezone is read for in the first place.
         it 'reads the day boundary in UTC and says so' do
           allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
 
-          expect(call('date', '2026-09-01')).to eq(Time.utc(2026, 9, 1).to_i)
+          expect(bound('2026-09-01', '>')).to eq('2026-08-31T00:00:00Z')
           expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/unknown timezone/)
         end
       end
@@ -62,17 +106,17 @@ module ForestAdminDatasourceIntercom
         let(:timezone) { '  ' }
 
         it 'reads the day boundary in UTC' do
-          expect(call('date', '2026-09-01')).to eq(Time.utc(2026, 9, 1).to_i)
+          expect(bound('2026-09-01', '>')).to eq('2026-08-31T00:00:00Z')
         end
       end
 
       it 'refuses a string that is not a date' do
-        expect { call('date', 'last tuesday') }
+        expect { call('date', 'last tuesday', spelling: '>') }
           .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
       end
 
       it 'refuses a value that is not a date at all' do
-        expect { call('date', { 'day' => 1 }) }
+        expect { call('date', { 'day' => 1 }, spelling: '>') }
           .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
       end
     end
@@ -121,8 +165,7 @@ module ForestAdminDatasourceIntercom
 
     describe 'a list' do
       it 'formats every value of an IN the way the field takes it' do
-        expect(call('date', %w[2026-09-01 2026-09-02], spelling: 'IN', operator: operators::IN))
-          .to eq([Time.utc(2026, 8, 31, 22).to_i, Time.utc(2026, 9, 1, 22).to_i])
+        expect(call('number', ['4', 5.0], spelling: 'IN', operator: operators::IN)).to eq([4, 5])
       end
 
       # A filter matching everything is not what an empty list was asked for.
