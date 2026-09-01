@@ -74,8 +74,14 @@ module ForestAdminDatasourcePylon
               "Unknown CloseIssue scopes: #{unknown.join(", ")}. Allowed: #{SCOPE_KEYS.join(", ")}."
       end
 
+      # Through `to_s`, like the scopes: an action registers under the name it is
+      # given, and a Symbol reaching the schema breaks the agent rather than the
+      # action -- `GeneratorAction.get_action_slug` calls `strip` on it, and
+      # `GeneratorCollection` sorts the names of a collection's actions, which
+      # raises as soon as a Symbol sits beside a String. It also makes
+      # `:Resolve` and `'Resolve'` the one name they read as.
       def name_for(scope_key, opts)
-        opts[NAME_OPTIONS[scope_key]] || NAMES[scope_key]
+        (opts[NAME_OPTIONS[scope_key]] || NAMES[scope_key]).to_s
       end
 
       # `add_action` keys a collection's actions by name, so two variants sharing

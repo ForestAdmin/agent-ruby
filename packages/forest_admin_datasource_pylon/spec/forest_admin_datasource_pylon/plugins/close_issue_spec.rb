@@ -68,6 +68,21 @@ module ForestAdminDatasourcePylon
         expect(collection_customizer.registered.keys).to contain_exactly('Resolve', 'Resolve all')
       end
 
+      # An action registers under the name it is given, and a Symbol reaching the
+      # schema breaks the agent rather than the action: `get_action_slug` calls
+      # `strip` on it, and `GeneratorCollection` sorts a collection's action
+      # names, which raises as soon as a Symbol sits beside a String.
+      it 'registers a name given as a symbol as the string the schema needs' do
+        register(action_name: :resolve, bulk_action_name: 'Resolve all')
+
+        expect(collection_customizer.registered.keys).to contain_exactly('resolve', 'Resolve all')
+      end
+
+      it 'reads a symbol and a string naming the same action as the collision they are' do
+        expect { register(action_name: :Resolve, bulk_action_name: 'Resolve') }
+          .to raise_error(forest_exception, /both resolve to 'Resolve'/)
+      end
+
       # `add_action` keys the actions by name, so the bulk registration would
       # overwrite the single one: the panel would offer one action, scoped for
       # the wrong selection, and nothing would say the other had gone.
