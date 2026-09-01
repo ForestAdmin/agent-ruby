@@ -55,12 +55,16 @@ module ForestAdminDatasourceIntercom
         # what stops it from filtering on them, since the filter is written by id
         # and the id differs from one type to the next.
         #
+        # The value is read under the name the workspace gave it and written
+        # under the column name the schema publishes; the two differ whenever the
+        # first could not travel through a Forest query string.
+        #
         # A ticket of another type simply does not carry the key: the column
         # reads as absent rather than as empty.
         def attribute_values_of(values)
           held = values.is_a?(Hash) ? values : {}
 
-          attribute_columns.to_h { |attribute| [attribute.name, coerce(held[attribute.name], attribute)] }
+          attribute_columns.to_h { |attribute| [attribute.column_name, coerce(held[attribute.name], attribute)] }
         end
 
         # A date attribute comes back as epoch seconds like every other Intercom

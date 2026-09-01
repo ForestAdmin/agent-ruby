@@ -1,4 +1,5 @@
 require_relative 'forest_admin_datasource_intercom/version'
+require 'cgi/escape'
 require 'json'
 require 'logger'
 require 'set'

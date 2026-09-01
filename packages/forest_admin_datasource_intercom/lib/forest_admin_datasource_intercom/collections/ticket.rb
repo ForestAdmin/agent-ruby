@@ -105,20 +105,21 @@ module ForestAdminDatasourceIntercom
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by
-      # `TicketAttributesIntrospector`; an attribute whose name is already a
-      # column of this collection is skipped rather than silently overwriting it.
+      # `TicketAttributesIntrospector`, which is also where a workspace's own
+      # name is turned into one a Forest query string can carry. An attribute
+      # landing on a native column is skipped rather than overwriting it.
       def register_attribute_columns
         @attribute_columns = @attributes.reject { |attribute| collides?(attribute) }
-        @attribute_columns.each { |attribute| add_column(attribute.name, attribute.column_type) }
+        @attribute_columns.each { |attribute| add_column(attribute.column_name, attribute.column_type) }
       end
 
       def collides?(attribute)
-        return false unless fields.key?(attribute.name)
+        return false unless fields.key?(attribute.column_name)
 
         ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} skips the ticket attribute '#{attribute.name}': a native " \
-          'column already carries that name, and overwriting it would show the attribute where the operator ' \
-          'expects the ticket field.'
+          "[forest_admin_datasource_intercom] #{name} skips the ticket attribute #{attribute.name.inspect}: a " \
+          "native column already carries the name #{attribute.column_name.inspect}, and overwriting it would show " \
+          'the attribute where the operator expects the ticket field.'
         )
         true
       end

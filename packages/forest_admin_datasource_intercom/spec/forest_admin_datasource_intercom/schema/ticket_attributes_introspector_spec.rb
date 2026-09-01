@@ -43,6 +43,56 @@ module ForestAdminDatasourceIntercom
           .to eq([{ '1' => '14162161', '2' => '14162165' }])
       end
 
+      # Forest lists the fields of a request in a comma-separated query
+      # parameter: a comma in a column name splits the projection into fields no
+      # collection has, and the agent rejects the page with a 400 before reading
+      # anything. Measured on a real workspace, several attributes carry one.
+      it 'takes the commas out of a column name, keeping the name the payload uses' do
+        stub_types(ticket_type('1', 'Bug', attribute("ID de l'objet (immo, facture, user)", '9001')))
+
+        expect(introspector.attributes.first)
+          .to have_attributes(name: "ID de l'objet (immo, facture, user)",
+                              column_name: "ID de l'objet (immo facture user)")
+      end
+
+      # A colon is how Forest names a field through a relation.
+      it 'takes a colon out too' do
+        stub_types(ticket_type('1', 'Bug', attribute('Scope: mobile', '9001')))
+
+        expect(introspector.attributes.first.column_name).to eq('Scope mobile')
+      end
+
+      # Intercom hands the names back HTML-escaped, which is an artefact of where
+      # they were typed rather than part of the name.
+      it 'unescapes what Intercom escaped' do
+        stub_types(ticket_type('1', 'Bug', attribute('Ce que j&#39;ai vérifié &amp; validé', '9001')))
+
+        expect(introspector.attributes.first.column_name).to eq("Ce que j'ai vérifié & validé")
+      end
+
+      it 'leaves a name that needs nothing alone' do
+        stub_types(ticket_type('1', 'Bug', attribute('Severity', '9001')))
+
+        expect(introspector.attributes.first).to have_attributes(name: 'Severity', column_name: 'Severity')
+      end
+
+      # Two different attributes landing on one column would otherwise share an
+      # entry, and the second's values would be read under the first's name --
+      # wrong values rather than missing ones.
+      it 'leaves out a second attribute that reads as an existing column' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_types(ticket_type('1', 'Bug', attribute('Scope, mobile', '9001'), attribute('Scope mobile', '9002')))
+
+        expect(introspector.attributes.map(&:name)).to eq(['Scope, mobile'])
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/is left out/)
+      end
+
+      it 'leaves out an attribute whose name is nothing but separators' do
+        stub_types(ticket_type('1', 'Bug', attribute(' , : ', '9001')))
+
+        expect(introspector.attributes).to be_empty
+      end
+
       it 'maps the Intercom data types onto what Forest renders' do
         stub_types(ticket_type('1', 'Bug', attribute('n', '1', data_type: 'integer'),
                                attribute('d', '2', data_type: 'decimal'),

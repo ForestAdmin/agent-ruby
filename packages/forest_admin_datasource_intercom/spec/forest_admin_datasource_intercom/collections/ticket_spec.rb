@@ -7,12 +7,15 @@ module ForestAdminDatasourceIntercom
     # introspection before the stub of it exists.
     let(:base) { Configuration::REGION_HOSTS[:us] }
     let(:operators) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators }
-    let(:attributes) do
-      [Schema::TicketAttributesIntrospector::Attribute.new(name: '_default_title_', column_type: 'String',
-                                                           data_type: 'string',
-                                                           ids_by_ticket_type: { '1' => '14162161' }),
-       Schema::TicketAttributesIntrospector::Attribute.new(name: 'Due', column_type: 'Date', data_type: 'datetime',
-                                                           ids_by_ticket_type: { '2' => '9002' })]
+    let(:attributes) { [attribute('_default_title_'), attribute('Due', column_type: 'Date')] }
+
+    # `column_name` is what the schema publishes and `name` the key the payload
+    # uses; they differ when the workspace's own name cannot travel through a
+    # Forest query string.
+    def attribute(name, column_name: nil, column_type: 'String')
+      Schema::TicketAttributesIntrospector::Attribute.new(name: name, column_name: column_name || name,
+                                                          column_type: column_type, data_type: 'string',
+                                                          ids_by_ticket_type: { '1' => '9001' })
     end
 
     def json(payload, status = 200)
@@ -104,10 +107,8 @@ module ForestAdminDatasourceIntercom
       # the operator expects the ticket field.
       it 'skips an attribute whose name a native column already carries' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
-        clashing = Schema::TicketAttributesIntrospector::Attribute.new(name: 'category', column_type: 'String',
-                                                                       data_type: 'string', ids_by_ticket_type: {})
 
-        collection = described_class.new(datasource, attributes: [clashing])
+        collection = described_class.new(datasource, attributes: [attribute('category')])
 
         expect(collection.fields['category'].column_type).to eq('String')
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/skips the ticket attribute/)
@@ -161,6 +162,29 @@ module ForestAdminDatasourceIntercom
         stub_search(ticket('1'))
 
         expect(rows.first['_default_title_']).to eq('Facture manquante')
+      end
+
+      # Forest lists the fields of a request in a comma-separated query
+      # parameter, so a column name carrying one splits the projection into
+      # fields no collection has -- a 400 before the page is ever read. The
+      # introspector renames such an attribute; the value is still read under the
+      # name Intercom keys it by.
+      it 'reads a renamed attribute under the name the payload uses' do
+        renamed = attribute('ID de l\'objet (immo, facture)', column_name: "ID de l'objet (immo facture)")
+        collection = described_class.new(datasource, attributes: [renamed])
+        stub_search(ticket('1', 'ticket_attributes' => { 'ID de l\'objet (immo, facture)' => 'immo_42' }))
+
+        row = collection.list(nil, filter, nil).first
+
+        expect(row["ID de l'objet (immo facture)"]).to eq('immo_42')
+      end
+
+      # The invariant behind the rename, asserted on the whole schema rather than
+      # on one column.
+      it 'publishes no column name a Forest query string could not carry' do
+        collection = described_class.new(datasource, attributes: [attribute('Scope', column_name: 'Scope')])
+
+        expect(collection.fields.keys.grep(/[,:]/)).to be_empty
       end
 
       it 'leaves an attribute of another ticket type absent rather than empty' do

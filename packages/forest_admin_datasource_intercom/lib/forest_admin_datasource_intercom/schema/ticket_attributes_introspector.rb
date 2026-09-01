@@ -28,7 +28,20 @@ module ForestAdminDatasourceIntercom
 
       DEFAULT_COLUMN_TYPE = 'String'.freeze
 
-      Attribute = Struct.new(:name, :column_type, :data_type, :ids_by_ticket_type, keyword_init: true)
+      # What a column name may not contain, and it has nothing to do with
+      # Intercom: Forest lists the fields of a request in a **comma-separated**
+      # query parameter, and uses a colon to name a field through a relation.
+      # A workspace names its ticket attributes in free text -- measured, one is
+      # called `ID de l'objet en question (immo, facture, user)` -- and a comma
+      # in there splits the projection into fields no collection has, which the
+      # agent rejects as a 400 before the page is ever read.
+      UNSAFE_IN_A_COLUMN_NAME = /[,:]/
+
+      # `name` is the key the payload uses, `column_name` the one the schema
+      # publishes; they differ whenever the workspace's own name cannot travel
+      # through Forest's query string.
+      Attribute = Struct.new(:name, :column_name, :column_type, :data_type, :ids_by_ticket_type,
+                             keyword_init: true)
 
       def initialize(client)
         @client = client
@@ -61,15 +74,52 @@ module ForestAdminDatasourceIntercom
       def collect(ticket_type, union)
         type_id = ticket_type['id'].to_s
         definitions(ticket_type).each do |definition|
-          name = definition['name'].to_s
-          # An archived attribute is not offered any more, and a nameless one has
-          # nothing to be a column of.
-          next if name.empty? || definition['archived']
+          entry = entry_for(definition, union)
+          next if entry.nil?
 
-          entry = union[name] ||= Attribute.new(name: name, column_type: column_type_for(definition),
-                                                data_type: definition['data_type'], ids_by_ticket_type: {})
           entry.ids_by_ticket_type[type_id] = definition['id'].to_s
         end
+      end
+
+      # The union is keyed by column name rather than by the workspace's own,
+      # since that is what has to be unique in a schema. Two different attributes
+      # landing on one column would otherwise share an entry, and the second's
+      # values would be read under the first's name -- wrong values rather than
+      # missing ones, which is worse.
+      def entry_for(definition, union)
+        name = definition['name'].to_s
+        # An archived attribute is not offered any more, and a nameless one has
+        # nothing to be a column of.
+        return nil if name.empty? || definition['archived']
+
+        column = column_name_for(name)
+        return nil if column.empty?
+
+        entry = union[column]
+        return union[column] = attribute_from(name, column, definition) if entry.nil?
+        return entry if entry.name == name
+
+        warn_collision(name, entry.name, column)
+        nil
+      end
+
+      def attribute_from(name, column, definition)
+        Attribute.new(name: name, column_name: column, column_type: column_type_for(definition),
+                      data_type: definition['data_type'], ids_by_ticket_type: {})
+      end
+
+      # Intercom hands these back HTML-escaped -- `Ce que j&#39;ai vérifié` --
+      # which is an artefact of where they were typed, not part of the name.
+      def column_name_for(name)
+        CGI.unescapeHTML(name).gsub(UNSAFE_IN_A_COLUMN_NAME, ' ').squeeze(' ').strip
+      end
+
+      def warn_collision(name, kept, column)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] the ticket attribute #{name.inspect} is left out: it reads as the " \
+          "column #{column.inspect}, which #{kept.inspect} already carries. Rename one of them in Intercom to " \
+          'publish both.'
+        )
       end
 
       def definitions(ticket_type)
