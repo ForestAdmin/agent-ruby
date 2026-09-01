@@ -34,11 +34,10 @@ module ForestAdminDatasourceIntercom
     describe 'the type guessed for a candidate field' do
       # A candidate is a name and nothing else -- discovering what it is is the
       # point -- so the value shape sent with it is guessed from that name.
-      it 'reads a timestamp, a count, a flag and a list of ids off the name' do
+      it 'reads a timestamp, a count and a flag off the name' do
         expect(described_class.guess_type('statistics.last_close_at')).to eq('date')
         expect(described_class.guess_type('count_reopens')).to eq('number')
         expect(described_class.guess_type('open')).to eq('boolean')
-        expect(described_class.guess_type('contact_ids')).to eq('id_list')
         expect(described_class.guess_type('state')).to eq('string')
       end
     end

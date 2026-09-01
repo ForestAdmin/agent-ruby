@@ -23,7 +23,6 @@
 #   text     -- a field Intercom also matches per word (`~`)
 #   date     -- epoch seconds on the wire, truncated to the UTC day on read
 #   boolean, number
-#   id_list  -- a field holding several ids, matched against one of them
 version: 1
 
 endpoints:
@@ -65,11 +64,6 @@ endpoints:
       team_assignee_id:
         field: team_assignee_id
         type: string
-        operators: ['=', '!=']
-        source: spec
-      contact_ids:
-        field: contact_ids
-        type: id_list
         operators: ['=', '!=']
         source: spec
       source_type:
@@ -174,6 +168,14 @@ endpoints:
     # by name too -- these are the ones whose refusal is permanent and has an
     # explanation worth giving.
     refused:
+      contact_ids:
+        reason: >-
+          Intercom does match a conversation against one of its contact ids, but
+          the column holds the list and is therefore typed Json, whose filter
+          values the agent's own validator requires to be Json too -- an id
+          would be rejected before this datasource saw it. Filtering by contact
+          arrives with the Contacts collection and a relation.
+        source: measured
       tag_names:
         reason: >-
           Intercom filters conversations by tag id, and this column holds the
@@ -270,11 +272,6 @@ endpoints:
         type: string
         operators: ['=', '!=']
         source: spec
-      contact_ids:
-        field: contact_ids
-        type: id_list
-        operators: ['=', '!=']
-        source: spec
       created_at:
         field: created_at
         type: date
@@ -286,6 +283,14 @@ endpoints:
         operators: ['>', '<', '>=', '<=', '=', '!=']
         source: measured
     refused:
+      contact_ids:
+        reason: >-
+          Intercom does match a ticket against one of its contact ids, but
+          the column holds the list and is therefore typed Json, whose filter
+          values the agent's own validator requires to be Json too -- an id
+          would be rejected before this datasource saw it. Filtering by contact
+          arrives with the Contacts collection and a relation.
+        source: measured
       company_id:
         reason: >-
           Measured during lot 1: `/tickets/search` refuses `company_id` with

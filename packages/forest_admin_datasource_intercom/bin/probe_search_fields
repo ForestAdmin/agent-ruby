@@ -39,8 +39,7 @@ module ProbeSearchFields
     'number' => [0, '0'],
     'boolean' => [true, 'true'],
     'string' => ['forest-probe', 0],
-    'text' => ['forest-probe'],
-    'id_list' => ['forest-probe', 0]
+    'text' => ['forest-probe']
   }.freeze
 
   LIST_OPERATORS = %w[IN NIN].freeze
@@ -52,7 +51,6 @@ module ProbeSearchFields
     when /(_at|_since|_until)\z/ then 'date'
     when /\Acount_|_count\z|\Atime_to_|_time\z/ then 'number'
     when /\A(open|read|is_|has_|.*_participated)/ then 'boolean'
-    when /_ids\z/ then 'id_list'
     else 'string'
     end
   end

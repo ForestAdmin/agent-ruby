@@ -22,7 +22,10 @@ module ForestAdminDatasourceIntercom
       # `$`, and the membership pair. Which of them an endpoint honours on a
       # given field is the table's business; this is only the alphabet.
       KNOWN_OPERATORS = ['=', '!=', '>', '<', '>=', '<=', '~', '!~', '^', '$', 'IN', 'NIN'].freeze
-      KNOWN_TYPES = %w[string text date boolean number id_list].freeze
+      # Read off the operator table rather than listed again here: a type with
+      # no spelling of its own would pass this validation and raise when the
+      # schema asked what to publish on it.
+      KNOWN_TYPES = OperatorTable.types
       KNOWN_SOURCES = %w[measured spec].freeze
 
       # `source` says where a row comes from, and `measured?` is what the boot
