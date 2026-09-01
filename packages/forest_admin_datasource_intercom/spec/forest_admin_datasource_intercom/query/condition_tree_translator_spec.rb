@@ -93,6 +93,50 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # Over either limit Intercom answers a 400 whose body names neither the
+    # limit nor the part of the filter that reached it.
+    describe 'the limits of the search DSL, checked before the request leaves' do
+      def leaves(count)
+        Array.new(count) { |index| leaf('state', operators::EQUAL, "state-#{index}") }
+      end
+
+      it 'takes a group nested one level inside another' do
+        tree = branch('And', leaf('open', operators::EQUAL, true),
+                      branch('Or', *leaves(2)))
+
+        expect(translate(tree)['value'].last['operator']).to eq('OR')
+      end
+
+      it 'refuses a group inside a group inside a group, naming the shape' do
+        tree = branch('And', leaf('open', operators::EQUAL, true),
+                      branch('Or', leaf('read', operators::EQUAL, true),
+                             branch('And', *leaves(2))))
+
+        expect { translate(tree) }
+          .to raise_error(UnsupportedOperatorError, /nests a search 2 levels deep and this one reaches 3/)
+      end
+
+      # A branch carrying a single condition is unwrapped, so it spends no level:
+      # the agent wraps a scope and a segment one branch at a time.
+      it 'does not spend a level on the branches the agent wraps around one condition' do
+        tree = branch('And', branch('And', branch('And', leaf('open', operators::EQUAL, true))))
+
+        expect(translate(tree)).to eq({ 'field' => 'open', 'operator' => '=', 'value' => true })
+      end
+
+      it 'takes a group of fifteen conditions' do
+        expect(translate(branch('Or', *leaves(15)))['value'].size).to eq(15)
+      end
+
+      # A scope, a segment and a filter add up; and a condition naming several
+      # values arrives expanded into one condition per value, Intercom taking no
+      # membership operator on these fields.
+      it 'refuses a group of sixteen, and says what brings it back under' do
+        expect { translate(branch('Or', *leaves(16))) }
+          .to raise_error(UnsupportedOperatorError, /takes 15 conditions per group and this Or carries 16/)
+      end
+    end
+
     describe 'what it will not translate' do
       # The whole point of the lot: a condition dropped on the way to Intercom
       # comes back as an unfiltered page that looks filtered.

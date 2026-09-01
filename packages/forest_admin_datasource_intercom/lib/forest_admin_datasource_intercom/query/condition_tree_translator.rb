@@ -20,6 +20,15 @@ module ForestAdminDatasourceIntercom
 
       AGGREGATORS = { 'and' => 'AND', 'or' => 'OR' }.freeze
 
+      # Intercom nests a search two levels deep and takes fifteen conditions per
+      # group. Both are checked here rather than left to the API: over either,
+      # Intercom answers a 400 whose body names neither the limit nor the part of
+      # the filter that reached it, and an operator reading it has no way of
+      # knowing that their segment plus their scope plus their own filter is what
+      # went over.
+      MAX_DEPTH = 2
+      MAX_GROUP_SIZE = 15
+
       def self.call(condition_tree, endpoint:, collection:, timezone: nil)
         return nil if condition_tree.nil?
 
@@ -32,9 +41,9 @@ module ForestAdminDatasourceIntercom
         @value = FilterValue.new(collection: collection, timezone: timezone)
       end
 
-      def translate(node)
+      def translate(node, depth = 1)
         case node
-        when Branch then translate_branch(node)
+        when Branch then translate_branch(node, depth)
         when Leaf then translate_leaf(node)
         else raise UnsupportedOperatorError, "#{@collection} cannot read #{node.class} as a condition."
         end
@@ -42,7 +51,7 @@ module ForestAdminDatasourceIntercom
 
       private
 
-      def translate_branch(branch)
+      def translate_branch(branch, depth)
         conditions = Array(branch.conditions)
         refuse_empty_branch!(branch) if conditions.empty?
 
@@ -54,9 +63,34 @@ module ForestAdminDatasourceIntercom
         # builds a tree one branch at a time -- a scope, then a segment, then the
         # operator's own filter -- and the nesting Intercom allows is shallow
         # enough that a wrapper around nothing is a level worth not spending.
-        return translate(conditions.first) if conditions.size == 1
+        return translate(conditions.first, depth) if conditions.size == 1
 
-        { 'operator' => operator, 'value' => conditions.map { |condition| translate(condition) } }
+        refuse_too_deep!(depth) if depth > MAX_DEPTH
+        refuse_too_wide!(branch, conditions.size) if conditions.size > MAX_GROUP_SIZE
+
+        { 'operator' => operator, 'value' => conditions.map { |condition| translate(condition, depth + 1) } }
+      end
+
+      # What reaches this depth is a group inside a group inside a group. The
+      # message names the shape rather than a number, since the tree an operator
+      # can act on is the segment and the scope they wrote, not the one the agent
+      # assembled out of them.
+      def refuse_too_deep!(depth)
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot answer this filter: Intercom nests a search #{MAX_DEPTH} levels deep and this " \
+              "one reaches #{depth}. A group inside a group inside a group is one level too many -- flatten the " \
+              'segment, the scope or the filter carrying the innermost one.'
+      end
+
+      # Fifteen is reached without trying: a scope, a segment and a filter add up,
+      # and a condition naming several values is expanded into one condition per
+      # value on the way here, Intercom taking no membership operator on these
+      # fields.
+      def refuse_too_wide!(branch, size)
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot answer this filter: Intercom takes #{MAX_GROUP_SIZE} conditions per group and " \
+              "this #{branch.aggregator} carries #{size}. A filter naming several values counts one condition per " \
+              'value here, so narrowing the list, the segment or the scope is what brings it back under the limit.'
       end
 
       def aggregator(branch)
