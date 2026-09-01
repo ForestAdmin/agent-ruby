@@ -1,3 +1,10 @@
+# [1.41.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.1...v1.41.0) (2026-09-01)
+
+
+### Features
+
+* **datasource-pylon:** Pylon datasource for the Ruby agent (EXT-4) ([#369](https://github.com/ForestAdmin/agent-ruby/issues/369)) ([cf20168](https://github.com/ForestAdmin/agent-ruby/commit/cf20168abed896a1d70d1841eb7c18967908fd26)), closes [#380](https://github.com/ForestAdmin/agent-ruby/issues/380)
+
 ## [1.40.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.0...v1.40.1) (2026-08-28)
 
 

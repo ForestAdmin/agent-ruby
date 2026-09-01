@@ -1,3 +1,3 @@
 module ForestAdminDatasourcePylon
-  VERSION = "1.39.4"
+  VERSION = "1.41.0"
 end
