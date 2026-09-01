@@ -150,6 +150,34 @@ module ForestAdminDatasourceIntercom
         expect { client.me }.to raise_error(APIError, /me: HTTP 429 rate_limit_exceeded/)
       end
 
+      # A body that failed to parse is a payload, not an error: on a 200 it is
+      # customer content, and this message is shown in the interface and
+      # collected by whatever watches the agent (R10).
+      it 'names a body it could not read rather than quoting it' do
+        stub_request(:get, "#{base}/me")
+          .to_return(json('Bonjour, voici mon RIB FR76 3000 4000 0500 0012 3456 789'))
+
+        expect { client.me }.to raise_error(APIError) { |error|
+          expect(error.message).to eq('Intercom API call failed: me: the response could not be read as JSON')
+          # Faraday hands a parsing error an unfinished response, so there is no
+          # body to keep here -- which suits this one: the point is that the
+          # payload does not travel with the error.
+          expect(error.body).to be_nil
+        }
+      end
+
+      # The same guard, one level down: a parser raising on its own would
+      # otherwise reach the catch-all, whose message is the exception's -- and
+      # a JSON parser quotes what it choked on.
+      it 'says as little when a parser raises outside Faraday' do
+        stub_request(:get, "#{base}/me").to_raise(JSON::ParserError.new("unexpected token 'mon RIB FR76'"))
+
+        expect { client.me }.to raise_error(APIError) { |error|
+          expect(error.message).to include('could not be read as JSON')
+          expect(error.message).not_to include('RIB')
+        }
+      end
+
       # Whatever else goes wrong on the way, a caller of this client only ever
       # has to rescue APIError -- and the message names the operation, since a
       # failure with no endpoint in it is a failure nobody can place.

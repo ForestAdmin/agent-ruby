@@ -1,0 +1,235 @@
+# Forest — Intercom datasource
+
+Surface [Intercom](https://www.intercom.com) conversations, tickets, teammates, teams, ticket types
+and ticket states as Forest collections.
+
+This is **lot 1: read only**. Rows, record details, exact counts and the conversation thread work;
+server-side filtering, writes, business actions, contacts and companies arrive in the lots after it
+— see "What is not here yet".
+
+## Installation
+
+```ruby
+# Gemfile
+gem 'forest_admin_datasource_intercom'
+```
+
+## Usage
+
+```ruby
+# app/lib/forest_admin_rails/create_agent.rb
+ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(
+  ForestAdminDatasourceIntercom::Datasource.new(
+    access_token: ENV['INTERCOM_ACCESS_TOKEN'],
+    region: :eu # :us (default), :eu or :au
+  )
+)
+```
+
+The token is the access token of a private app, created in Intercom's Developer Hub under
+*Configure › Authentication*. OAuth is out of scope: it belongs to a control plane distributing a
+connector, not to an agent reading one workspace.
+
+`Client#me` is the health check — it returns the admin the token belongs to, and is the one call
+that verifies the pinned API version was honoured.
+
+### Configuration
+
+| Option | Default | What it is for |
+| --- | --- | --- |
+| `access_token` | — | Required. The private app's bearer token. |
+| `region` | `:us` | `:us`, `:eu`, `:au`. A workspace answers in its own region only. |
+| `base_url` | from `region` | Wins over `region`. For an egress proxy or a mock server. |
+| `api_version` | `'2.16'` | Sent as `Intercom-Version` on every request. |
+| `open_timeout` / `timeout` | `5` / `30` | A request that already has a page on screen. |
+| `boot_open_timeout` / `boot_timeout` | `3` / `10` | The one read performed while the agent starts. |
+| `retry_policy` | `RetryPolicy.new` | Statuses, verbs and backoff. |
+| `boot_retry_policy` | `RetryPolicy.boot` | One quick retry; gives up rather than waiting a 429 out. |
+| `rate_limiter` | `RateLimiter.new` | `nil` takes the pacing out of the stack. |
+
+**Pin the region explicitly.** `api.intercom.io` does route to the right one, but a workspace under
+GDPR wants its requests reaching the European host and nothing else.
+
+**The version is pinned on purpose.** Without the header a request follows the workspace's own
+default version, which an operator can change on Intercom's side — and the payloads change shape
+underneath. Intercom echoes the version it served, so `me` compares the two and logs a warning when
+the pin was not honoured, rather than raising: running against a version we did not ask for still
+beats not running.
+
+### Token permissions
+
+A read-only token is enough, and is what to recommend for this lot. A permission the token lacks
+costs **columns or a collection, never the boot of the agent**: the ticket-type introspection
+degrades to no attribute column, and a collection whose endpoint answers 403 fails its own page.
+
+## Collections
+
+| Collection | Endpoint | Paginated | Countable |
+| --- | --- | --- | --- |
+| `IntercomConversation` | `GET /conversations`, `GET /conversations/{id}` | cursor | yes, exactly |
+| `IntercomTicket` | `POST /tickets/search`, `GET /tickets/{id}` | cursor | yes, exactly |
+| `IntercomAdmin` | `GET /admins` | read whole | yes, exactly |
+| `IntercomTeam` | `GET /teams` | read whole | yes, exactly |
+| `IntercomTicketType` | `GET /ticket_types` | read whole | yes, exactly |
+| `IntercomTicketState` | `GET /ticket_states` | read whole | yes, exactly |
+
+Two tiers, and they behave differently on purpose.
+
+**Read whole** — admins, teams, ticket types, ticket states. Their endpoints answer in one response,
+so filtering, sorting, paging and counting them in memory is *exact*: the records in hand are every
+record Intercom holds. These are the only collections that can be filtered, sorted and grouped in
+this lot, and the only ones a chart may group by. The cost is bandwidth, not correctness.
+
+**Cursor** — conversations and tickets. What is in hand is a page of something far larger, so
+nothing is filtered or sorted in memory. Three routes and no fourth: no condition walks the listing,
+`id equals X` reads the record through its own endpoint, and **anything else is refused** with a
+message naming the lot that will answer it.
+
+## What the API cannot do, and what this does about it
+
+Where Forest asks for something Intercom has no equivalent for, this datasource **refuses with a
+message naming the reason** rather than answering something that looks right and is not. Those
+arrive as a 400 carrying the text.
+
+- **No offset pagination.** Intercom hands out the page after a cursor and documents that jumping to
+  page N is unsupported, so reaching page 20 costs 20 sequential requests. The walk is capped at 50
+  pages / 7 500 records and every truncation is logged, naming the window it stopped in.
+- **Duplicates on a moving dataset.** Intercom documents that records modified between two paginated
+  requests can be served twice; the walk deduplicates by id. The missed counterpart is inherent to
+  cursor pagination and cannot be repaired — it is documented rather than papered over.
+- **A sort is accepted and ignored.** Measured: `sort` on these endpoints raises nothing and changes
+  nothing. Since the lack of support is undetectable at runtime, no column is declared sortable and
+  a requested order is reported in the log. The rows come back in the order the API imposes.
+- **No aggregate endpoint.** Counting is free and exact — `total_count` counts what the query names,
+  not what a page held — so the record counter is one request. Anything beyond a count is refused on
+  the cursor collections: grouping over the pages a walk collected would look exact while answering
+  a fraction.
+- **`per_page` is refused past 150**, with `invalid_per_page` and no silent downgrade, so the page
+  size is bounded before the request leaves. Tickets are bounded far lower still: **25**, because
+  the search response carries the whole timeline of every ticket and Intercom offers no field
+  selection. Provisional, pending measurement against real response sizes.
+- **No `GET /tickets` at all.** Even an unfiltered ticket list goes through `POST /tickets/search`
+  with a predicate matching everything.
+- **The envelope key is not always `data`.** Measured: `/tickets/search` answers under `tickets`,
+  `/admins` under `admins`, `/teams` under `teams`. A response carrying neither the expected key nor
+  `data` is refused rather than read as an empty page.
+
+## Conversations
+
+The row carries what a queue is read for: state, priority, assignee and team ids, the company, the
+tags, and the lifecycle Intercom keeps in `statistics` — `closed_at`, `closed_by_id`,
+`first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at`, `reopen_count`.
+
+**The timeline opens on `source`, not on the parts.** The message that started the conversation
+lives there; a thread built from the parts alone opens on the first reply and loses what the
+customer actually asked. Every entry keeps its `part_type` — an assignment, a note and a reply are
+different events.
+
+Intercom returns the parts **only when retrieving a single conversation**, so:
+
+- a record detail gets its timeline for free;
+- a list view asking for the `timeline` column pays one request per row, bounded to 10. The rows past
+  that keep a `nil`, which reads as *unknown* — never as an empty thread.
+
+A conversation is capped at its **500 most recent parts**; a very long thread is therefore partial,
+and says so nowhere but here.
+
+Contact name and e-mail are denormalized onto the row by **one bulk read per page**, not one per
+row, and only when the projection names them. A failure there costs those two columns, not the page.
+
+## Tickets
+
+A ticket carries **no `statistics` block** — measured against a workspace of 81 142 tickets — so
+neither a closure date nor a last responder exists as a field. Both are derived from the parts,
+which ride along in the search response whether or not anything asks for them, and therefore cost
+nothing:
+
+| Column | Derived from |
+| --- | --- |
+| `closed_at`, `closed_by_name` | the last transition into a state of category `resolved` |
+| `last_reply_at`, `last_responder_name`, `last_responder_type` | the last `comment` part |
+
+Four things to know about them:
+
+- a ticket is not "closed" on Intercom, it enters a **resolved** state;
+- the state-change event is matched on its **prefix**, not on `ticket_state_updated_by_admin`: a
+  workspace running workflows closes tickets through other variants, and an invisible closure is
+  worse than an absent column;
+- a transition whose target equals the previous state is ignored — measured, they exist;
+- **a resolved ticket showing no closure date may have been closed all the same**: past the 500-part
+  ceiling the transition falls out of the window. That case is detected and logged, since a Date
+  column cannot say "unknown".
+
+Both columns are **display only**, and not temporarily: `/tickets/search` filters on neither and
+ignores a sort, so neither advertises an operator.
+
+The attributes a workspace declares on its ticket types are introspected once at boot and published
+as the **union** of every type's, keyed by name the way the payload is. Filtering one is a different
+matter: Intercom filters an attribute by id (`ticket_attribute.{id}`), and the same name carries a
+different id from one ticket type to the next — measured, `_default_title_` is `14162161` on one
+type and `14162165` on another. A union column has no single id to translate to, so filtering on a
+ticket attribute means one collection per ticket type. The ids are kept per type for the lot that
+will need them.
+
+## Rate limits
+
+Intercom meters the app and, above it, the whole workspace — 25 000 requests a minute shared with
+every other private app the customer runs — and allocates that budget in **10-second windows**: the
+measured `x-ratelimit-limit` is 1667, not 10 000. A burst therefore takes a 429 while the minute's
+budget is barely touched, which is why what matters is the instantaneous rate.
+
+The limiter is driven by the headers Intercom returns on every response rather than by a table: it
+waits out the reset when the window is spent, and counts its own in-flight requests down so several
+of them do not go out on the same stale figure. A reset further out than a window is a clock
+disagreement rather than a window emptying — the request goes through and the log says so, once per
+window.
+
+It sits **in front of** the 429 retry, not instead of it: the retry remains the defence against the
+part of the workspace budget spent by traffic this process cannot see. Pass `rate_limiter: nil` to
+meter on your own side instead.
+
+## Privacy
+
+The body of a conversation is raw personal data, and this datasource is built on that assumption.
+
+- **Nothing logs a body.** Logs carry the operation, the counts and Intercom's request id — never
+  content. A response that fails to parse is reported by name, never quoted: a JSON parser opens its
+  message with the characters it choked on, and on a 200 those are the payload.
+- **`display_as=plaintext` on every conversation read.** The bodies are HTML written by end
+  customers; rendering third-party HTML inside Forest is neither safe nor useful.
+- **The regional host is configurable** so a workspace's data stays in its region.
+- Ticket list pages carry customer message bodies whether or not anything asks for them — Intercom
+  offers no field selection. Restrict the body columns with Forest's field-level permissions where
+  that matters.
+
+## Boot-time introspection
+
+Constructing the datasource performs exactly **one** read: `GET /ticket_types`, for the attribute
+columns of `IntercomTicket`. It runs on the boot connection — short timeouts, one quick retry — so a
+slow Intercom cannot turn a Rails boot into minutes the operator sits through, and it degrades to no
+attribute column rather than to a failed boot.
+
+Everything else is read when a collection is listed, so an agent boots whatever Intercom is doing.
+
+## What is not here yet
+
+| Lot | What it brings |
+| --- | --- |
+| 2 | Filter translation into Intercom's search DSL, free-text search, per-endpoint operator tables, UTC date bounds |
+| 3 | Writes and business actions: reply, close, snooze, reopen, assign, tag, convert |
+| 4 | Contacts and companies, and the relations promoted from today's denormalized columns |
+| 5 | Notes, tags, segments |
+| 6 | Bounded group-by and the reporting export |
+
+## Development
+
+```bash
+cd packages/forest_admin_datasource_intercom
+BUNDLE_GEMFILE=Gemfile-test bundle install
+BUNDLE_GEMFILE=Gemfile-test bundle exec rspec
+bundle exec rubocop # from the repository root
+```
+
+Specs stub the HTTP layer with WebMock. Every payload they feed in is **hand-written from the
+OpenAPI 2.16 specification**, never captured from a workspace: a conversation body is personal data,
+and a fixture is read by everyone who clones the repository.

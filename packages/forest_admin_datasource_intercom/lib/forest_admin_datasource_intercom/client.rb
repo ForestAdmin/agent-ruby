@@ -242,9 +242,12 @@ module ForestAdminDatasourceIntercom
       value.nil? || value.to_s.empty?
     end
 
+    # `JSON::ParserError` alongside Faraday's own errors: on its own it would
+    # reach the catch-all below, whose message is the exception's -- and a JSON
+    # parser opens its message with what it choked on.
     def must_succeed(operation)
       yield
-    rescue Faraday::Error => e
+    rescue Faraday::Error, JSON::ParserError => e
       raise api_error(operation, e)
     rescue APIError
       # Already mapped, with its status intact; re-wrapping would erase it --
@@ -258,20 +261,54 @@ module ForestAdminDatasourceIntercom
     # so a smart action can show the operator the real reason instead of
     # "failed".
     def api_error(operation, error)
-      response = error.respond_to?(:response) ? error.response : nil
-      status = response.is_a?(Hash) ? response[:status] : nil
-      body   = parse_body(response.is_a?(Hash) ? response[:body] : nil)
-      detail = status ? "HTTP #{status} #{error_message(body)}".strip : "#{error.class}: #{error.message}"
+      response = response_of(error)
+      status = response[:status]
+      body   = parse_body(response[:body])
 
-      APIError.new("Intercom API call failed: #{operation}: #{detail}", status: status, body: body)
+      APIError.new("Intercom API call failed: #{operation}: #{failure_detail(error, status, body)}",
+                   status: status, body: body)
+    end
+
+    # Faraday hands the status and the body back in a plain hash on most errors
+    # and in its own `Env` on a parsing error; both answer `[]`.
+    def response_of(error)
+      response = error.respond_to?(:response) ? error.response : nil
+      return { status: nil, body: nil } unless response.respond_to?(:[])
+
+      { status: response[:status], body: response[:body] }
+    end
+
+    # A body that could not be parsed is named, never quoted: the parser's own
+    # message opens with the characters it choked on, and on a 200 those are the
+    # payload -- a conversation body, most of the time (R10).
+    def failure_detail(error, status, body)
+      return unreadable_detail(status) if parse_failure?(error)
+      return "#{error.class}: #{error.message}" unless status
+
+      "HTTP #{status} #{error_message(body)}".strip
+    end
+
+    def unreadable_detail(status)
+      detail = 'the response could not be read as JSON'
+      status ? "#{detail} (HTTP #{status})" : detail
+    end
+
+    def parse_failure?(error)
+      error.is_a?(Faraday::ParsingError) || error.is_a?(JSON::ParserError)
     end
 
     # Intercom answers a failure with `{ "type": "error.list", "request_id":
     # "...", "errors": [{ "code": ..., "message": ... }] }`. The request id is
     # what its support asks for first, so it is appended after the truncation
     # rather than being what a long body pushes out.
+    #
+    # A body of any other shape is *not* echoed here. This message travels into
+    # the interface and into whatever collects the agent's errors, and the body
+    # of a response that failed to parse is a payload rather than an error --
+    # conversation bodies included (R10). Its size is reported instead, and the
+    # body itself stays on the exception for whoever inspects one.
     def error_message(parsed)
-      return parsed.to_s[0, 500] unless parsed.is_a?(Hash)
+      return "(unreadable body, #{parsed.to_s.bytesize} bytes)" unless parsed.is_a?(Hash)
 
       message = join_errors(parsed['errors'])
       message = parsed.to_json if message.empty?
