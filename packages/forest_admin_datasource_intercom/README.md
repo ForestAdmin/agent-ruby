@@ -66,7 +66,7 @@ degrades to no attribute column, and a collection whose endpoint answers 403 fai
 
 | Collection | Endpoint | Paginated | Countable |
 | --- | --- | --- | --- |
-| `IntercomConversation` | `GET /conversations`, `GET /conversations/{id}` | cursor | yes, exactly |
+| `IntercomConversation` | `GET /conversations`, `POST /conversations/search`, `GET /conversations/{id}` | cursor | yes, exactly |
 | `IntercomTicket` | `POST /tickets/search`, `GET /tickets/{id}` | cursor | yes, exactly |
 | `IntercomAdmin` | `GET /admins` | read whole | yes, exactly |
 | `IntercomTeam` | `GET /teams` | read whole | yes, exactly |
@@ -82,8 +82,9 @@ this lot, and the only ones a chart may group by. The cost is bandwidth, not cor
 
 **Cursor** — conversations and tickets. What is in hand is a page of something far larger, so
 nothing is filtered or sorted in memory. Three routes and no fourth: no condition walks the listing,
-`id equals X` reads the record through its own endpoint, and **anything else is refused** with a
-message naming the lot that will answer it.
+`id equals X` reads the record through its own endpoint, and anything else is translated into
+Intercom's search DSL and walked through the search endpoint. What the translation cannot express is
+**refused by name** — see [Filtering](#filtering).
 
 ## What the API cannot do, and what this does about it
 
@@ -97,6 +98,9 @@ arrive as a 400 carrying the text.
 - **Duplicates on a moving dataset.** Intercom documents that records modified between two paginated
   requests can be served twice; the walk deduplicates by id. The missed counterpart is inherent to
   cursor pagination and cannot be repaired — it is documented rather than papered over.
+- **A search takes no sort at all.** Neither search endpoint accepts one, so **no column of
+  `IntercomConversation` or `IntercomTicket` is sortable** and an explicit order is reported in the
+  log. The only collections Intercom sorts are the ones read whole, in memory.
 - **A sort is accepted and ignored.** Measured: `sort` on these endpoints raises nothing and changes
   nothing. Since the lack of support is undetectable at runtime, no column is declared sortable and
   a requested order is reported in the log. The rows come back in the order the API imposes.
@@ -113,6 +117,106 @@ arrive as a 400 carrying the text.
 - **The envelope key is not always `data`.** Measured: `/tickets/search` answers under `tickets`,
   `/admins` under `admins`, `/teams` under `teams`. A response carrying neither the expected key nor
   `data` is refused rather than read as an empty page.
+
+## Filtering
+
+`POST /conversations/search` and `POST /tickets/search` answer the condition trees Forest sends, on
+the fields Intercom really filters and with the operators each endpoint really validates. Anything
+else is **refused with a message naming what to change** — a condition dropped on the way out comes
+back as an unfiltered page that looks filtered, which is the one answer this datasource must not
+give. A refusal costs no request: it is raised before anything leaves the process.
+
+### The table is measured, not documented
+
+The fields a search endpoint filters are not the fields its specification lists. Measured:
+`/tickets/search` refuses `company_id` with `invalid_field` although every ticket carries one. So
+the source of truth is a committed table — `lib/forest_admin_datasource_intercom/query/search_fields.yml`
+— one row per column, each carrying its provenance:
+
+| `source` | What it means |
+| --- | --- |
+| `measured` | observed against a real workspace, by `bin/probe_search_fields` or during the spike |
+| `spec` | read off Intercom's documentation, and therefore still a candidate |
+
+Every `filter_operators` a column publishes is **derived** from that table, so a column cannot
+advertise a filter the translator would then refuse, and a column the table does not carry
+advertises nothing at all.
+
+To measure a workspace of your own:
+
+```bash
+INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --endpoint tickets --out measured.yml
+```
+
+It sends one search per (field, operator) cell, reads Intercom's refusal codes — `invalid_field` for
+a field the endpoint does not filter, `data_invalid` for an operator it refuses on that field — and
+prints what the committed table promises that Intercom refuses, plus what Intercom accepts that the
+table does not know about. It writes evidence rather than rewriting the table, which carries the
+prose a generated file would drop.
+
+### A date filter is day-granular, and the day is the UTC one
+
+Intercom truncates a date search to the day, at the **UTC** boundary — measured, and against its own
+documentation, which promises the workspace's timezone. `> V` answers from the start of the day
+*after* V; `< V` answers before the start of V's own day.
+
+Sent as they come, the two bounds an interval is rewritten into cancel each other out: `today`
+reaches the datasource as `> 00:00` and `< 23:59` of one day, which Intercom reads as "from
+tomorrow" *and* "before today" — no rows at all, to the most ordinary filter there is. So each bound
+is moved to the boundary that makes Intercom answer the day the filter named.
+
+What follows from that:
+
+- a bound naming a time of day matches **from the start of that day, or through the end of it**. It
+  is the granularity the Intercom interface itself filters on;
+- a caller in UTC gets exactly the day they asked for;
+- a caller in another timezone gets the UTC days their window overlaps — up to a day wider at each
+  end — and the agent logs that once per filter;
+- a date column publishes `>` and `<` only, and no equality. Everything an operator actually uses —
+  `before`, `after`, `today`, `yesterday`, `past`, `future`, the whole `previous_*` family — is
+  rewritten by the agent into a pair of those bounds. An equality on an instant is what stays out,
+  and a day-granular filter could not have honoured it anyway.
+
+### What is filterable
+
+| Collection | Filterable on |
+| --- | --- |
+| `IntercomConversation` | `state`, `priority`, `open`, `read`, `title`, `admin_assignee_id`, `team_assignee_id`, `source_type`, `source_subject`, `source_body`, `source_delivered_as`, `source_author_email`, `closed_by_id`, `reopen_count`, `part_count`, `ai_agent_participated`, and the dates `created_at`, `updated_at`, `waiting_since`, `snoozed_until`, `closed_at`, `first_closed_at`, `first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at` |
+| `IntercomTicket` | `open`, `category`, `ticket_type_id`, `admin_assignee_id`, `team_assignee_id`, `created_at`, `updated_at` |
+
+**Free-text search** is answered on `IntercomConversation` only, through `~` on `source.body` — the
+message that opened the conversation. Intercom matches it **per word, not as a substring**: searching
+`fact` does not find `facture`. `IntercomTicket` exposes no text column this endpoint matches and
+refuses a search by name.
+
+### What is not filterable, and why
+
+- **the columns a ticket derives from its parts** — `closed_at`, `closed_by_name`, `last_reply_at`,
+  `last_responder_name`, `last_responder_type`. They exist nowhere in Intercom; `/tickets/search`
+  filters none of them and ignores a sort on them without a word;
+- **the account of a ticket** — `company_id`, refused by the endpoint itself with `invalid_field`;
+- **the ticket attributes** — filtered as `ticket_attribute.{id}`, and the same attribute carries a
+  different id per ticket type, so a union column has no single id to translate to. See
+  [Tickets](#tickets);
+- **the tag names, the company name and the contact identity of a conversation** — read from
+  somewhere the search endpoint does not filter, or filtered by an id the column does not hold;
+- **absence** — `present`, `blank` and `missing` are derived by the agent from an equality and
+  rewritten into a comparison with an empty value. Intercom's search matches values and has no
+  operator for the lack of one, so the rewritten condition is refused rather than sent as a
+  comparison against the empty string;
+- **group-by**, on either cursor collection: there is no aggregate endpoint, and grouping over the
+  pages a walk collected would look exact while answering a fraction.
+
+### The limits of a search, checked before the request leaves
+
+Intercom nests a search **two levels** deep and takes **fifteen conditions per group**. Past either
+it answers a 400 whose body names neither the limit nor the part of the filter that reached it, so
+both are checked here and refused with a message naming what to simplify.
+
+Fifteen is reached without trying: a scope, a segment and an operator's own filter add up, and a
+condition naming several values arrives expanded into **one condition per value** — Intercom accepts
+no membership operator on these fields. Branches carrying a single condition are unwrapped and spend
+no level.
 
 ## Conversations
 
@@ -160,16 +264,18 @@ Four things to know about them:
   ceiling the transition falls out of the window. That case is detected and logged, since a Date
   column cannot say "unknown".
 
-Both columns are **display only**, and not temporarily: `/tickets/search` filters on neither and
-ignores a sort, so neither advertises an operator.
+Both are **display only**, and not temporarily: `/tickets/search` filters on neither and ignores a
+sort, so neither advertises an operator.
 
 The attributes a workspace declares on its ticket types are introspected once at boot and published
 as the **union** of every type's, keyed by name the way the payload is. Filtering one is a different
 matter: Intercom filters an attribute by id (`ticket_attribute.{id}`), and the same name carries a
 different id from one ticket type to the next — measured, `_default_title_` is `14162161` on one
 type and `14162165` on another. A union column has no single id to translate to, so filtering on a
-ticket attribute means one collection per ticket type. The ids are kept per type for the lot that
-will need them.
+ticket attribute means one collection per ticket type — more collections in the interface, and a
+schema that changes shape whenever the customer adds a type. Until that trade is worth paying for,
+the attributes stay display-only and advertise no operator. The ids are kept per type so the day the
+answer changes costs no second boot round trip.
 
 ## Rate limits
 
@@ -215,7 +321,6 @@ Everything else is read when a collection is listed, so an agent boots whatever 
 
 | Lot | What it brings |
 | --- | --- |
-| 2 | Filter translation into Intercom's search DSL, free-text search, per-endpoint operator tables, UTC date bounds |
 | 3 | Writes and business actions: reply, close, snooze, reopen, assign, tag, convert |
 | 4 | Contacts and companies, and the relations promoted from today's denormalized columns |
 | 5 | Notes, tags, segments |

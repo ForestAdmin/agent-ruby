@@ -74,6 +74,26 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The README is where an operator reads what they may filter on before the
+    # interface shows it to them, so it is checked against the table rather than
+    # left to drift from it.
+    describe 'the README section the table feeds' do
+      let(:filterable) do
+        File.read(File.expand_path('../../../README.md', __dir__), encoding: 'UTF-8')[
+          /### What is filterable\n(.*?)\n### /m, 1
+        ]
+      end
+
+      it 'lists exactly the columns each endpoint filters' do
+        { 'IntercomConversation' => 'conversations', 'IntercomTicket' => 'tickets' }.each do |collection, endpoint|
+          row = filterable.lines.find { |line| line.start_with?("| `#{collection}` |") }
+          listed = row.to_s.scan(/`([a-z_]+)`/).flatten
+
+          expect(listed).to match_array(described_class.fetch(endpoint).filterable_columns)
+        end
+      end
+    end
+
     describe 'a table that cannot be trusted' do
       it 'refuses an operator Intercom has no spelling for' do
         expect { table(fields: { 'created_at' => field_row('operators' => ['~=']) }) }
