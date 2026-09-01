@@ -146,6 +146,16 @@ module ForestAdminDatasourcePylon
         expect(filter).to include('value' => '2026-08-06T22:00:00Z')
       end
 
+      # Kept as it came, a padded identifier passes the blank guard and then
+      # fails the zone lookup, and the bound falls back to UTC -- a day boundary
+      # off by the offset, which is what the guard exists to prevent.
+      it 'reads a timezone carrying whitespace as the zone it names' do
+        filter = translate(leaf('created_at', operators::GREATER_THAN, Date.new(2026, 8, 7)),
+                           timezone: '  Europe/Paris  ')
+
+        expect(filter).to include('value' => '2026-08-06T22:00:00Z')
+      end
+
       # Declaring only the bare comparisons on a Date column is enough: the
       # toolkit rewrites every interval operator into the pair of bounds Pylon
       # accepts, which is also why `time_range` never has to be emitted.

@@ -40,8 +40,11 @@ module ForestAdminDatasourcePylon
 
         state = normalize_state(opts[:state])
 
-        normalize_scopes(opts[:scopes]).each do |scope_key|
-          collection_customizer.add_action(name_for(scope_key, opts),
+        names = normalize_scopes(opts[:scopes]).to_h { |scope_key| [scope_key, name_for(scope_key, opts)] }
+        refuse_colliding_names(names)
+
+        names.each do |scope_key, name|
+          collection_customizer.add_action(name,
                                            build_action(datasource, SCOPES[scope_key], state, opts[:issue_id_field]))
         end
       end
@@ -73,6 +76,22 @@ module ForestAdminDatasourcePylon
 
       def name_for(scope_key, opts)
         opts[NAME_OPTIONS[scope_key]] || NAMES[scope_key]
+      end
+
+      # `add_action` keys a collection's actions by name, so two variants sharing
+      # one leave the second overwriting the first: the single-record action
+      # disappears from the panel and what stays answers with the other scope --
+      # a bulk action offered on one record, or the reverse. Refused at
+      # registration, like the other configurations this plugin will not perform
+      # quietly.
+      def refuse_colliding_names(names)
+        collision = names.values.tally.find { |_name, count| count > 1 }
+        return if collision.nil?
+
+        raise ForestException,
+              "CloseIssue registers one action per scope, and #{names.keys.join(" and ")} both resolve to " \
+              "'#{collision.first}'. Give :action_name and :bulk_action_name different values, or register " \
+              'a single scope.'
       end
 
       def build_action(datasource, scope, state, issue_id_field)

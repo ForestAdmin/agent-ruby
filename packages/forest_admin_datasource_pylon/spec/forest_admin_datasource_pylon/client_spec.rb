@@ -593,8 +593,27 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
       end
 
       expect { client.fetch_teams }
-        .to raise_error(ForestAdminDatasourcePylon::APIError, /Pylon paginated teams past the 10 pages/)
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /past the 10 pages one walk covers/)
       expect(served).to eq(described_class::MAX_COLLECTED_PAGES)
+    end
+
+    # Only a `next_cursor` Pylon left out is Pylon saying there is nothing more.
+    # Every other stop leaves records behind, and the walk used to take two of
+    # them for the end of the collection.
+    it 'refuses a page answered empty while advertising another' do
+      stub_request(:get, "#{base}/teams").with(query: {}).to_return(page([], cursor: 'c1'))
+
+      expect { client.fetch_teams }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /answered an empty page while advertising another/)
+    end
+
+    it 'refuses a cursor Pylon answered twice' do
+      stub_request(:get, "#{base}/teams").with(query: {}).to_return(page([{ 'id' => 't1' }], cursor: 'c1'))
+      stub_request(:get, "#{base}/teams").with(query: { 'cursor' => 'c1' })
+                                         .to_return(page([{ 'id' => 't2' }], cursor: 'c1'))
+
+      expect { client.fetch_teams }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /answered a cursor it had already answered/)
     end
   end
 

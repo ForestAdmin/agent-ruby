@@ -12,8 +12,14 @@ module ForestAdminDatasourcePylon
       # being typed that way.
       DATE_ONLY = /\A\d{4}-\d{2}-\d{2}\z/
 
+      # The identifier is stored stripped, not only checked stripped: kept as it
+      # came, a `" Europe/Paris "` passes the blank guard and then fails the zone
+      # lookup, and `format_date` falls back to UTC -- a day boundary quietly off
+      # by the offset, which is the failure this guard exists to prevent.
       def initialize(timezone: nil)
-        @timezone = timezone.to_s.strip.empty? ? 'UTC' : timezone
+        identifier = timezone.to_s.strip
+
+        @timezone = identifier.empty? ? 'UTC' : identifier
       end
 
       # `time` says the operator this value travels with is one of Pylon's time

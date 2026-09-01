@@ -185,15 +185,18 @@ module ForestAdminDatasourcePylon
     # `params` ride along on every page, cursor included: a mandatory parameter
     # dropped on the second request answers a different question than the first.
     #
-    # An empty page, a cursor that does not move and a cursor already followed
-    # all stop the loop: none happens today, but a walk driven by a remote value
-    # stops on its own terms rather than collecting the same page twice over.
+    # An empty page, a cursor that does not move, a cursor already followed and
+    # the page cap all stop the loop: none happens today, but a walk driven by a
+    # remote value stops on its own terms rather than collecting the same page
+    # twice over.
+    #
+    # Only `next_cursor` being nil is Pylon saying there is nothing more. Every
+    # other stop leaves records behind, and `refuse_past_cap` is which of the two
+    # answers the caller wants to those: a warning and a short list, or a refusal.
+    # See `fetch_all`, whose answer is only correct whole.
     #
     # `conn` is what a caller reading on the boot path hands its own connection
     # through: every page of the walk is then bounded like the first.
-    #
-    # `refuse_past_cap` is for the caller whose answer is only correct whole: the
-    # cap then raises instead of logging what it left out. See `fetch_all`.
     def collect_pages(path, params = {}, conn: connection, refuse_past_cap: false)
       records = []
       cursor = nil
@@ -205,12 +208,13 @@ module ForestAdminDatasourcePylon
         page = to_search_page(conn.get(path, query).body, path)
         records.concat(page.records)
         pages += 1
-        break if page.next_cursor.nil? || page.records.empty? || !seen.add?(page.next_cursor)
+        break if page.next_cursor.nil?
 
-        if pages >= MAX_COLLECTED_PAGES
-          refuse_pagination_cap(path, pages, records.size) if refuse_past_cap
+        reason = truncation_reason(page, pages, seen)
+        if reason
+          refuse_truncated_walk(path, reason, pages, records.size) if refuse_past_cap
 
-          log_pagination_cap(path, pages, records.size)
+          log_truncated_walk(path, reason, pages, records.size)
           break
         end
 
@@ -220,22 +224,33 @@ module ForestAdminDatasourcePylon
       records
     end
 
+    # Why a walk stopped short of the end Pylon would have declared, or nil when
+    # it may go on. `seen` is fed here, once per page and only for a cursor that
+    # could still be followed.
+    def truncation_reason(page, pages, seen)
+      return 'it answered an empty page while advertising another' if page.records.empty?
+      return 'it answered a cursor it had already answered' unless seen.add?(page.next_cursor)
+      return "it paginated past the #{MAX_COLLECTED_PAGES} pages one walk covers" if pages >= MAX_COLLECTED_PAGES
+
+      nil
+    end
+
     # Refused as an APIError, like a body whose shape broke the contract: what
     # happened is that Pylon started answering an endpoint differently, which no
     # filter the operator sets and no page they ask for would work around.
-    def refuse_pagination_cap(path, pages, collected)
+    def refuse_truncated_walk(path, reason, pages, collected)
       raise APIError,
-            "Pylon paginated #{path} past the #{pages} pages this walk covers (#{collected} records read). " \
+            "Pylon left the walk of #{path} short after #{pages} page(s) / #{collected} record(s): #{reason}. " \
             'That endpoint is documented as answering with the whole collection in one response, which is what ' \
             'PylonUser and PylonTeam filter, sort and count in memory as an exact answer. Refusing rather ' \
             'than answering over a fraction of the collection: reading it needs cursor pagination, the way ' \
             'PylonIssue reads its own.'
     end
 
-    def log_pagination_cap(path, pages, collected)
+    def log_truncated_walk(path, reason, pages, collected)
       ForestAdminDatasourcePylon.logger.warn(
         "[forest_admin_datasource_pylon] Stopped paginating #{path} after #{pages} page(s) / " \
-        "#{collected} record(s); the rest is left out."
+        "#{collected} record(s): #{reason}; the rest is left out."
       )
     end
 

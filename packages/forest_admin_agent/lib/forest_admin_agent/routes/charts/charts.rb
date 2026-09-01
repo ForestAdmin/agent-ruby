@@ -237,7 +237,11 @@ module ForestAdminAgent
                                         field: aggregate_field_name(args))
           result = context.collection.aggregate(context.caller, filter, aggregation)
 
-          result[0]['value'] || 0
+          # `Aggregation#apply` groups the records it is given, so a filter
+          # matching none of them answers with no row at all -- which is what an
+          # in-memory aggregation hands back for an empty selection. Indexing
+          # that answered a value chart with a 500 where the figure is zero.
+          result.first&.[]('value') || 0
         end
 
         # The permission root stays the chart's own collection, which the leaderboard call site does

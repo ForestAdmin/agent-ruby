@@ -182,6 +182,24 @@ module ForestAdminAgent
             )
           end
 
+          # `Aggregation#apply` groups the records it is given, so a filter
+          # matching none of them answers with no row at all. Indexing that
+          # answered the chart with a 500 where the figure is zero.
+          it 'returns zero when the filter matched no record' do
+            args[:params] = args[:params].merge({
+                                                  aggregateFieldName: 'price',
+                                                  aggregator: 'Sum',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Value',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([])
+
+            result = chart.handle_request(args)
+
+            expect(result[:content][:data][:attributes][:value]).to eq(countCurrent: 0, countPrevious: nil)
+          end
+
           it 'return a valueChart with previous filter' do
             args[:params] = args[:params].merge({
                                                   aggregateFieldName: 'price',

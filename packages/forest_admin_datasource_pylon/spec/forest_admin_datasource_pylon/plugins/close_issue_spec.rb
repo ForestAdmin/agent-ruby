@@ -68,6 +68,22 @@ module ForestAdminDatasourcePylon
         expect(collection_customizer.registered.keys).to contain_exactly('Resolve', 'Resolve all')
       end
 
+      # `add_action` keys the actions by name, so the bulk registration would
+      # overwrite the single one: the panel would offer one action, scoped for
+      # the wrong selection, and nothing would say the other had gone.
+      it 'refuses two variants resolving to the same name' do
+        expect { register(action_name: 'Resolve', bulk_action_name: 'Resolve') }
+          .to raise_error(forest_exception, /both resolve to 'Resolve'/)
+        expect(collection_customizer.registered).to be_empty
+      end
+
+      # The same name is what a single-scope registration is entitled to.
+      it 'accepts a name colliding with the variant it does not register' do
+        register(scopes: %i[bulk], bulk_action_name: 'Close Pylon issue')
+
+        expect(collection_customizer.registered.keys).to contain_exactly('Close Pylon issue')
+      end
+
       it 'raises a ForestException on an unknown scope' do
         expect { register(scopes: %i[single weird]) }.to raise_error(forest_exception, /Unknown.*weird/)
       end

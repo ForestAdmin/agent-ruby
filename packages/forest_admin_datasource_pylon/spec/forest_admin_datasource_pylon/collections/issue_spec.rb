@@ -455,6 +455,18 @@ module ForestAdminDatasourcePylon
           expect(read(entry('nps', 'n/a'))['nps']).to be_nil
         end
 
+        # Reached through a Float, an integer past 2**53 comes back with its last
+        # digits rewritten -- displayed as one value and compared as another.
+        it 'keeps every digit of an integer a Float could not hold' do
+          expect(read(entry('nps', '9007199254740993'))['nps']).to be(9_007_199_254_740_993)
+        end
+
+        # `Integer("012")` is 10, Ruby reading the leading zero as octal: base 10
+        # is passed explicitly, or a zero-padded value would be renumbered.
+        it 'reads a zero-padded integer in base ten' do
+          expect(read(entry('nps', '012'))['nps']).to be(12)
+        end
+
         [[true, true], ['true', true], [false, false], ['false', false], ['0', false]].each do |raw, expected|
           it "reads a boolean answered as #{raw.inspect} as #{expected}" do
             expect(read(entry('vip', raw))['vip']).to be(expected)

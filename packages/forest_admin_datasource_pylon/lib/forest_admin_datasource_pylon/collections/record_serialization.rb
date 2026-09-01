@@ -53,8 +53,17 @@ module ForestAdminDatasourcePylon
       # looks like.
       #
       # A number that cannot be read reads as absent rather than as zero.
+      #
+      # Integers are parsed as integers rather than reached through a Float: past
+      # 2**53 the intermediate loses the last digits, and `"9007199254740993"`
+      # would be both displayed and compared as ...992. Base 10 is passed
+      # explicitly -- `Integer("012")` is 10, Ruby reading a leading zero as
+      # octal, which would silently renumber every zero-padded value Pylon holds.
       def coerce_number(value)
         return value if value.is_a?(Numeric)
+
+        integer = Integer(value, 10, exception: false)
+        return integer unless integer.nil?
 
         float = Float(value, exception: false)
         return nil if float.nil?
