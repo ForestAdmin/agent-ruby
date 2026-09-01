@@ -106,6 +106,12 @@ module ForestAdminDatasourceIntercom
       it 'declares no column groupable' do
         expect(collection.fields.values.map(&:is_groupable).uniq).to eq([false])
       end
+
+      # This lot writes nothing: an editable column would offer a Save that
+      # reaches an `update` the collection does not implement.
+      it 'declares every column read-only' do
+        expect(collection.fields.values.map(&:is_read_only).uniq).to eq([true])
+      end
     end
 
     describe '#list' do

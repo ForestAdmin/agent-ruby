@@ -87,12 +87,13 @@ module ForestAdminDatasourceIntercom
       # collection can honour neither -- except on the primary key, which is
       # answered by the record endpoint rather than by a filter. A schema that
       # advertised more would put filters in the interface that the read then
-      # refuses.
+      # refuses. Read-only for the same reason, on the write side.
       def add_column(name, type, is_primary_key: false)
         operators = is_primary_key ? [Operators::EQUAL, Operators::IN] : []
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: operators,
                                          is_primary_key: is_primary_key,
+                                         is_read_only: true,
                                          is_sortable: false,
                                          is_groupable: false))
       end

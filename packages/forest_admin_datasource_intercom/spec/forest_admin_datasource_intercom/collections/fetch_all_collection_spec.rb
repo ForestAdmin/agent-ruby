@@ -62,8 +62,14 @@ module ForestAdminDatasourceIntercom
     describe 'columns' do
       it 'declares a scalar column filterable, sortable and groupable' do
         expect(collection.fields['name'])
-          .to have_attributes(is_sortable: true, is_groupable: true, is_read_only: false)
+          .to have_attributes(is_sortable: true, is_groupable: true)
         expect(collection.fields['name'].filter_operators).to include(operators::EQUAL)
+      end
+
+      # This lot writes nothing: an editable column would offer a Save that
+      # reaches an `update` the collection does not implement.
+      it 'declares every column read-only' do
+        expect(collection.fields.values.map(&:is_read_only).uniq).to eq([true])
       end
 
       # A list has no in-memory counterpart for any of the three.

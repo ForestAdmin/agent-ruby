@@ -77,10 +77,15 @@ module ForestAdminDatasourceIntercom
       # anything asked of them. A Json column is neither, nor filterable: it
       # holds a list, and what a filter on it would mean has no in-memory
       # counterpart.
+      #
+      # Every column is read-only: this lot writes nothing, and an editable
+      # column would offer a Save that reaches an `update` the collection does
+      # not implement.
       def add_column(name, type, is_primary_key: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: self.class.operators_for(type),
                                          is_primary_key: is_primary_key,
+                                         is_read_only: true,
                                          is_sortable: type != 'Json',
                                          is_groupable: type != 'Json'))
       end
