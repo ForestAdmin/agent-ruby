@@ -229,6 +229,19 @@ module ForestAdminDatasourceIntercom
         expect(ids(rows)).to eq(%w[1 2])
       end
 
+      # A pointing collection pages through the records it named, and every page
+      # must name different ones: cut out of the records instead of out of the
+      # ids, the window would render the same rows on page 1 and page 2 -- and
+      # a page past the cap would come back empty, its ids having been dropped
+      # by the truncation before the window was applied.
+      it 'reads only the ids the page window names' do
+        stub_record('2', conversation('2'))
+        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 1, limit: 1)
+        tree = leaf('id', operators::IN, %w[1 2 3])
+
+        expect(ids(collection.list(nil, filter(condition_tree: tree, page: page), %w[id]))).to eq(%w[2])
+      end
+
       it 'reads the first of too many and says the result is truncated' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         asked = (1..(Collections::CursorCollection::MAX_ID_READS + 3)).map(&:to_s)
@@ -272,6 +285,17 @@ module ForestAdminDatasourceIntercom
       it 'reports the order it did not get' do
         stub_list(conversation('1'))
         sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'created_at', ascending: false }])
+
+        collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/ignores a sort/)
+      end
+
+      # `?sort=-id` is an order the operator asked for, not the ascending default
+      # the agent injects when a request names none.
+      it 'reports an explicit descending order on the primary key' do
+        stub_list(conversation('1'))
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'id', ascending: false }])
 
         collection.list(nil, filter(sort: sort), %w[id])
 

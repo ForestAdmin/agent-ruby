@@ -106,7 +106,12 @@ module ForestAdminDatasourceIntercom
 
       def fetch_records(filter)
         ids = id_lookup(filter)
-        return records_by_ids(ids) if ids
+        # The window is cut out of the ids rather than out of the records they
+        # read: Intercom reads them one request each, so paging after the read
+        # would pay for a whole page to hand back a slice of it -- and page 2 of
+        # a set larger than the cap would come back empty, the records it names
+        # having been dropped by the truncation before the window was applied.
+        return records_by_ids(page_window(ids, filter)) if ids
 
         refuse_filter!(filter) unless browsing?(filter)
 
@@ -230,9 +235,17 @@ module ForestAdminDatasourceIntercom
       end
 
       def default_pk_sort?(clauses)
-        clauses.size == 1 &&
-          (clauses.first[:field] || clauses.first['field']).to_s == primary_key &&
-          (clauses.first[:ascending] || clauses.first['ascending']) != false
+        return false unless clauses.size == 1
+
+        clause = clauses.first
+        return false unless (clause[:field] || clause['field']).to_s == primary_key
+
+        # `key?` rather than `||`: a descending clause carries `false`, which an
+        # `||` fallback reads as "absent" -- so an explicit `?sort=-id` would be
+        # taken for the ascending default the agent injects, and the one order
+        # Intercom silently drops would go unreported.
+        ascending = clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
+        ascending != false
       end
 
       def warn_truncated_ids(asked)
