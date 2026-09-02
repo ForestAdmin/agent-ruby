@@ -253,6 +253,15 @@ module ForestAdminDatasourceCustomizer
               )
           end
 
+          # The request path, not the boot path: an RPC agent resolves nothing from the base facade, so
+          # an extended search reaching this relation must not 500 over a Debug line.
+          it 'searches on where no logger is resolvable' do
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(nil)
+
+            expect(decorated.searched_fields('martin', true).map { |field| field[:path] })
+              .to eq(['pan_last4'])
+          end
+
           # Its targets stay out of both, so no footprint entry ever needs the several collections
           # `leaf_collection_names` would answer for a polymorphic leaf.
           it 'keeps its columns out of the footprint and out of what the search reads' do
@@ -429,12 +438,22 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
-          it 'refuses excluding a column the search never reads, which would change nothing' do
-            expect { decorated.replace_search(exclude_fields: ['holder_id']) }
-              .to raise_error(
-                ForestAdminDatasourceToolkit::Exceptions::ForestException,
-                "Cannot exclude 'holder_id' from the search: the search does not read it"
-              )
+          # Refusing it would stop the agent booting the day a column named defensively turns
+          # unsearchable — the one configuration that only became more correct.
+          it 'reports rather than refuses excluding a column the search never reads' do
+            logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+            expect { decorated.replace_search(exclude_fields: ['holder_id']) }.not_to raise_error
+            expect(logger).to have_received(:log).with(
+              'Debug',
+              "Excluding 'holder_id' from the search on cards changes nothing: the search does not read it"
+            )
+          end
+
+          it 'still raises on a name that resolves to nothing, which is a typo' do
+            expect { decorated.replace_search(exclude_fields: ['holder_ids']) }
+              .to raise_error(ForestAdminDatasourceToolkit::Exceptions::ForestException, /holder_ids/)
           end
 
           it 'refuses searching and excluding the same path, rather than letting one win silently' do

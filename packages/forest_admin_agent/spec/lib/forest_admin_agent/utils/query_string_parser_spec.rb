@@ -1224,6 +1224,19 @@ module ForestAdminAgent
           expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
         end
 
+        # Honouring it would discard the term the URL carried, which widens the result set — the same
+        # reason an explicit null is read as absent.
+        it 'reads an empty string in the subset query as absent too' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: '' } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
         it 'falls back to the query string when the subset query is not a hash' do
           args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: 'nope' } } } }
 

@@ -232,8 +232,8 @@ module ForestAdminAgent
       end
 
       # Presence, not truth: with +||+ a +false+ in the select-all body would silently lose to the
-      # query string. An explicit +null+ there is read as absent rather than as "no search", so it
-      # cannot widen a result set by discarding the term the URL carried.
+      # query string. An explicit +null+ or +''+ there is read as absent rather than as "no search",
+      # so neither can widen a result set by discarding the term the URL carried.
       def self.subset_or_query(args, key)
         subset = begin
           args.dig(:params, :data, :attributes, :all_records_subset_query)
@@ -241,7 +241,7 @@ module ForestAdminAgent
           nil
         end
 
-        return subset[key] if subset.is_a?(Hash) && !subset[key].nil?
+        return subset[key] if subset.is_a?(Hash) && !subset[key].nil? && subset[key] != ''
 
         begin
           args.dig(:params, key)

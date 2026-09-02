@@ -172,15 +172,23 @@ module ForestAdminDatasourceCustomizer
         end
 
         # Unlike a selected path, a bare to-one relation is legal here: it drops every path through it,
-        # where naming the target's columns would have to be revisited each time it gains one. What is
-        # refused is a name the search never reads either way — a to-many, a depth-2 path, a column no
-        # term can match — because excluding it silently changes nothing.
+        # where naming the target's columns would have to be revisited each time it gains one.
+        #
+        # A name the search does not read is reported rather than refused. An exclusion states an
+        # intent that only becomes more true as the schema moves — a column turning unsearchable
+        # satisfies "never search this" — so refusing it would stop the agent booting over a
+        # configuration that was defensive on purpose. A typo still raises, from +get_field_schema+.
         def excluded_field(path)
           schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
 
-          return schema if excludable?(path, schema)
+          unless excludable?(path, schema)
+            ForestAdminAgent::Facades::Container.logger&.log(
+              'Debug',
+              "Excluding '#{path}' from the search on #{name} changes nothing: the search does not read it"
+            )
+          end
 
-          raise ForestException, "Cannot exclude '#{path}' from the search: the search does not read it"
+          schema
         end
 
         def excludable?(path, schema)
@@ -269,7 +277,7 @@ module ForestAdminDatasourceCustomizer
             fields.push([name, field]) if field.type == 'Column' && searchable_field?(field)
 
             if POLYMORPHIC_TYPES.include?(field.type) && extended
-              ForestAdminAgent::Facades::Container.logger.log(
+              ForestAdminAgent::Facades::Container.logger&.log(
                 'Debug',
                 "We're not searching through #{self.name}.#{name} because it's a polymorphic relation. " \
                 "You can override the default search behavior with 'replace_search'. " \
