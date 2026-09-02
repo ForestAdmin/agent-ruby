@@ -1,3 +1,10 @@
+# [1.42.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.41.0...v1.42.0) (2026-09-02)
+
+
+### Features
+
+* **datasource-customizer:** let replace_search take a field selection so a narrowed search is permission-checked ([#382](https://github.com/ForestAdmin/agent-ruby/issues/382)) ([add4b1b](https://github.com/ForestAdmin/agent-ruby/commit/add4b1be29aaadfbf18c83a20de852729d6379e4))
+
 # [1.41.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.1...v1.41.0) (2026-09-01)
 
 
