@@ -24,6 +24,7 @@ module ForestAdminDatasourceCustomizer
           assert_selection_resolves(replacer)
           @replacer = replacer
           @disabled_search = false
+          warn_extended_search_refused if handler
           mark_schema_as_dirty
         end
 
@@ -75,6 +76,17 @@ module ForestAdminDatasourceCustomizer
 
         private
 
+        # Said at boot rather than left to the first user who trips the 403, since a block installed
+        # before this version was served.
+        def warn_extended_search_refused
+          ForestAdminAgent::Facades::Container.logger.log(
+            'Warn',
+            "An extended search on #{name} will be refused: a `replace_search` block names no field, " \
+            'so the agent cannot check what it reads against the caller\'s permissions. Declaring the ' \
+            'search with `replace_search(include_fields: [...])` makes it checkable.'
+          )
+        end
+
         def handler
           @replacer.respond_to?(:call) ? @replacer : nil
         end
@@ -96,7 +108,7 @@ module ForestAdminDatasourceCustomizer
 
           field_paths(replacer[:only_fields]).each { |path| selected_field(path) }
           field_paths(replacer[:include_fields]).each { |path| selected_field(path) }
-          field_paths(replacer[:exclude_fields]).each { |path| resolved_field(path) }
+          field_paths(replacer[:exclude_fields]).each { |path| excluded_field(path) }
         end
 
         def insignificant_search?(search)
@@ -132,9 +144,21 @@ module ForestAdminDatasourceCustomizer
           defaults = only_fields ? {} : get_fields(extended).to_h
           selected = field_paths(only_fields) + field_paths(selection[:include_fields])
 
+          excluded = field_paths(selection[:exclude_fields])
+
           defaults
             .merge(selected.to_h { |path| resolved_field(path) })
-            .except(*field_paths(selection[:exclude_fields]))
+            .reject { |path, _schema| excluded?(path, excluded) }
+        end
+
+        # An excluded relation drops every path through it: naming the target's columns one by one
+        # would have to be revisited each time it gains one.
+        def excluded?(path, excluded)
+          excluded.any? { |name| path == name || path.start_with?("#{name}:") }
+        end
+
+        def excluded_field(path)
+          ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
         end
 
         def field_paths(names)

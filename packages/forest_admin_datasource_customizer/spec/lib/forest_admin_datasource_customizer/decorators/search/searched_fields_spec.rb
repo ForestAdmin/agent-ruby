@@ -293,6 +293,29 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe '#replace_search with a callable replacer' do
+          let(:logger) { instance_double(ForestAdminAgent::Services::LoggerService, log: nil) }
+
+          before { allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger) }
+
+          it 'warns at boot that an extended search there will be refused' do
+            decorated.replace_search(->(value, _extended, _context) { { field: 'pan_last4', value: value } })
+
+            expect(logger).to have_received(:log).with(
+              'Warn',
+              'An extended search on cards will be refused: a `replace_search` block names no field, ' \
+              "so the agent cannot check what it reads against the caller's permissions. Declaring the " \
+              'search with `replace_search(include_fields: [...])` makes it checkable.'
+            )
+          end
+
+          it 'says nothing for a field selection, which is checkable' do
+            decorated.replace_search(include_fields: ['holder:national_id'])
+
+            expect(logger).not_to have_received(:log)
+          end
+        end
+
         describe '#replace_search with an unresolvable field selection' do
           it 'names the field it cannot resolve rather than searching nothing for good' do
             expect { decorated.replace_search(only_fields: ['pan_last_four']) }
@@ -344,6 +367,14 @@ module ForestAdminDatasourceCustomizer
                 ForestAdminDatasourceToolkit::Exceptions::ForestException,
                 "Cannot search on 'holder_id': its Number column declares no filter operator a search term can use"
               )
+          end
+
+          it 'excludes every path through a relation named bare, which no column list could keep up with' do
+            decorated.replace_search(exclude_fields: ['holder'])
+
+            expect(decorated.searched_fields('martin', true)).to eq(
+              [{ path: 'pan_last4', collections: ['cards'] }]
+            )
           end
 
           it 'still accepts excluding that column, which only has to exist to be dropped' do

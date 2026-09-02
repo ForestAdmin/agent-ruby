@@ -37,8 +37,12 @@ module ForestAdminDatasourceCustomizer
     # A relation path into a collection the role cannot read is refused; own columns carry no check,
     # there being no field-level permissions. A block names nothing, so its extended half is refused.
     #
-    # Resolved in declaration order, at boot: put +replace_search+ after the +add_field+ /
-    # +add_relation+ calls it depends on.
+    # An included relation path is read on a plain search too, so +searchExtended=0+ no longer means
+    # no relation traversal; with +only_fields+, +extended+ becomes inert entirely.
+    #
+    # Names resolve against the collection below this layer, and +rename_field+ sits above it: a field
+    # renamed +name+ -> +title+ is named +name+ here. Resolved in declaration order, at boot, so put
+    # +replace_search+ after the +add_field+ / +add_relation+ calls it depends on.
     #
     # Example:
     #   collection.replace_search(include_fields: ['project:name'], exclude_fields: ['description'])
