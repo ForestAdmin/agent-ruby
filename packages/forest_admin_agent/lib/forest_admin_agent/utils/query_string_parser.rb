@@ -10,6 +10,7 @@ module ForestAdminAgent
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
       POLYMORPHIC_TARGET_WILDCARD = '*'.freeze
+      FALSY_SEARCH_EXTENDED = [nil, false, 0, '0', 'false', ''].freeze
 
       def self.parse_condition_tree(collection, args)
         filters = begin
@@ -230,21 +231,43 @@ module ForestAdminAgent
         Page.new(offset: 0, limit: limit&.to_i)
       end
 
+      # Presence, not truth: with +||+ a +false+ in the select-all body would silently lose to the
+      # query string. An explicit +null+ or +''+ there is read as absent rather than as "no search",
+      # so neither can widen a result set by discarding the term the URL carried.
+      def self.subset_or_query(args, key)
+        subset = begin
+          args.dig(:params, :data, :attributes, :all_records_subset_query)
+        rescue StandardError
+          nil
+        end
+
+        return subset[key] if subset.is_a?(Hash) && !subset[key].nil? && subset[key] != ''
+
+        begin
+          args.dig(:params, key)
+        rescue StandardError
+          nil
+        end
+      end
+
       def self.parse_search(collection, args)
-        search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
+        search = subset_or_query(args, :search)
 
-        raise BadRequestError, 'Collection is not searchable' if search && !collection.is_searchable?
+        return nil if search.nil?
 
-        search
+        raise BadRequestError, 'Collection is not searchable' unless collection.is_searchable?
+
+        unless search.is_a?(String) || search.is_a?(Numeric)
+          raise BadRequestError, 'Search must be a string or a number'
+        end
+
+        search.to_s
       end
 
       def self.parse_search_extended(args)
-        extended = args.dig(:params, :data, :attributes, :all_records_subset_query,
-                            :searchExtended) || args.dig(:params, :searchExtended)
+        extended = subset_or_query(args, :searchExtended)
 
-        return false if extended.nil?
-
-        extended != '0'
+        !FALSY_SEARCH_EXTENDED.include?(extended.is_a?(String) ? extended.downcase : extended)
       end
 
       def self.parse_sort(collection, args)

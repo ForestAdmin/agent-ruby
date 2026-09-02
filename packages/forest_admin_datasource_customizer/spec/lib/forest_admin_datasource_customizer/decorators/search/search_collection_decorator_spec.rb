@@ -219,13 +219,18 @@ module ForestAdminDatasourceCustomizer
             end
           end
 
-          context 'when the given field is a column' do
-            it 'adds a condition to return records matching the search value' do
+          context 'when the collection carries no searchable column' do
+            # Used to answer an empty filter, which `intersect` reads as no restriction at all: every
+            # row came back for a term that matched nothing.
+            it 'matches nothing rather than every record' do
               filter = Filter.new(search: 'a search value')
               search_collection_decorator = described_class.new(@collection_user, datasource)
               refined_filter = search_collection_decorator.refine_filter(caller, filter)
 
-              expect(refined_filter.to_h).to eq(Filter.new.to_h)
+              expect(refined_filter).to have_attributes(
+                search: nil,
+                condition_tree: have_attributes(aggregator: 'Or', conditions: [])
+              )
             end
           end
 
@@ -600,7 +605,7 @@ module ForestAdminDatasourceCustomizer
                   refined_filter = search_collection_decorator.refine_filter(caller, filter)
                   expect(refined_filter).to have_attributes(
                     search: nil,
-                    condition_tree: nil
+                    condition_tree: have_attributes(aggregator: 'Or', conditions: [])
                   )
                 end
               end

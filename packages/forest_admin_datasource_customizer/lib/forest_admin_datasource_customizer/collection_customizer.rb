@@ -31,8 +31,33 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.schema.get_collection(@name).override_schema(countable: false) }
     end
 
-    def replace_search(&definition)
-      push_customization { @stack.search.get_collection(@name).replace_search(definition) }
+    # On a natively searchable datasource, a selection does not narrow that search — it replaces it
+    # with the agent's own per-column one.
+    #
+    # A relation path into a collection the role cannot read is refused; own columns carry no check,
+    # there being no field-level permissions. A block names nothing, so its extended half is refused
+    # where permissions are enabled.
+    #
+    # An included relation path is read on a plain search too, so +searchExtended=0+ no longer means
+    # no relation traversal; with +only_fields+, +extended+ becomes inert entirely.
+    #
+    # Names resolve against the collection below this layer, and +rename_field+ sits above it: a field
+    # renamed +name+ -> +title+ is named +name+ here. Resolved in declaration order, at boot, so put
+    # +replace_search+ after the +add_field+ / +add_relation+ calls it depends on.
+    #
+    # Example:
+    #   collection.replace_search(include_fields: ['project:name'], exclude_fields: ['description'])
+    #   collection.replace_search { |value, _extended, _context| { field: 'name', operator: Operators::CONTAINS, value: value } }
+    def replace_search(include_fields: nil, exclude_fields: nil, only_fields: nil, &definition)
+      selection = {
+        include_fields: include_fields,
+        exclude_fields: exclude_fields,
+        only_fields: only_fields
+      }.compact
+
+      assert_search_replacement(selection, definition, only_fields: only_fields)
+
+      push_customization { @stack.search.get_collection(@name).replace_search(definition || selection) }
     end
 
     # Disable the search bar
@@ -309,6 +334,30 @@ module ForestAdminDatasourceCustomizer
     end
 
     private
+
+    def assert_search_replacement(selection, definition, only_fields:)
+      if definition && selection.any?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              'replace_search accepts either a block or a field selection, not both'
+      end
+
+      if definition.nil? && selection.empty?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              'replace_search needs a block, or one of include_fields, exclude_fields, only_fields'
+      end
+
+      empty = selection.select { |_name, names| Array(names).empty? }
+      if empty.any?
+        raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+              "replace_search cannot take an empty #{empty.keys.join(" or ")}: use disable_search to " \
+              'turn the search bar off'
+      end
+
+      return unless only_fields && selection.keys != [:only_fields]
+
+      raise ForestAdminDatasourceToolkit::Exceptions::ForestException,
+            'replace_search accepts only_fields on its own, not alongside include_fields or exclude_fields'
+    end
 
     def push_customization(&customization)
       @stack.queue_customization(customization)

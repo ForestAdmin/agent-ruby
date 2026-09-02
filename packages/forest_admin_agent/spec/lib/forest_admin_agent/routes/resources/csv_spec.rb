@@ -66,9 +66,16 @@ module ForestAdminAgent
           csv.handle_request(args)
 
           expect(read_guard_calls[:query_fields]).to eq(
-            [{ collection: 'user', applies: %i[filter sort search] }]
+            [{ collection: 'user', applies: %i[filter sort search search_extended] }]
           )
           expect(read_guard_calls[:projections]).to eq([{ collection: 'user', named_by_caller: false }])
+        end
+
+        it 'hands the guard the extended flag it parsed, not a default' do
+          args[:params][:searchExtended] = '1'
+          csv.handle_request(args)
+
+          expect(read_guard_calls[:search_extended]).to eq([true])
         end
 
         context 'when call csv' do

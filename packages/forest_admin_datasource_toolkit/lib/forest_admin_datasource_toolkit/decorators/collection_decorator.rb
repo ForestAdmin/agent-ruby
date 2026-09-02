@@ -85,6 +85,12 @@ module ForestAdminDatasourceToolkit
         @child_collection.searched_fields(search, extended)
       end
 
+      def search_handler?
+        return false unless @child_collection.is_a?(CollectionDecorator)
+
+        @child_collection.search_handler?
+      end
+
       protected
 
       def mark_schema_as_dirty

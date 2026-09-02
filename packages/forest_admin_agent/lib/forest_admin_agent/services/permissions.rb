@@ -330,11 +330,16 @@ module ForestAdminAgent
       end
 
       def collect_search_usages(collection, search, search_extended, usages)
-        return if search.nil? || !collection.respond_to?(:searched_fields)
+        # The stack discards a blank search instead of running it, so there is nothing to authorize.
+        return if search.nil? || search.strip.empty?
 
-        searched = collection.searched_fields(search, search_extended)
+        searched = collection.searched_fields(search, search_extended) if collection.respond_to?(:searched_fields)
 
-        return if searched.nil?
+        if searched.nil?
+          assert_extended_search_checkable(collection, search_extended)
+
+          return
+        end
 
         published = collection.datasource.collections
 
@@ -342,6 +347,25 @@ module ForestAdminAgent
           assert_search_target_exposed(field, published)
           usages << { action: 'search on', path: field[:path], collections: field[:collections] }
         end
+      end
+
+      # Only a callable `replace_search` is a footprint this stack could have described and did not; a
+      # native child search, or no search decorator at all, builds no condition here. A plain search is
+      # served in either case — the extended flag is the caller's own, so the exemption stops there.
+      def assert_extended_search_checkable(collection, search_extended)
+        return unless search_extended
+        return unless describes_own_search?(collection)
+        return unless permission_system?
+
+        raise ForbiddenError,
+              "You cannot run an extended search on the '#{collection.name}' collection: the fields " \
+              'it reaches cannot be determined, so they cannot be checked against your permissions.'
+      end
+
+      # Reaches the search decorator only through `CollectionDecorator#search_handler?`: drop that
+      # delegation and this answers false for every collection.
+      def describes_own_search?(collection)
+        collection.respond_to?(:search_handler?) && collection.search_handler?
       end
 
       # `searched_fields` answers below the publication layer — deliberately, so a field hidden by

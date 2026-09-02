@@ -1197,10 +1197,79 @@ module ForestAdminAgent
           expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
         end
 
-        it 'converts the query search parameter as string' do
-          args = { params: { search: 1234 } }
+        [[1234, '1234'], [12.5, '12.5']].each do |value, expected|
+          it "converts #{value.inspect} to #{expected.inspect}" do
+            args = { params: { search: value } }
 
-          expect(described_class.parse_search(collection_user, args)).to eq(1234)
+            expect(described_class.parse_search(collection_user, args)).to eq(expected)
+          end
+        end
+
+        it 'falls back to the query string when the subset query does not name a search' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # An explicit null there must not discard the term the URL carried: dropping a search widens
+        # the result set.
+        it 'reads an explicit null in the subset query as absent, not as no search' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: nil } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # Honouring it would discard the term the URL carried, which widens the result set — the same
+        # reason an explicit null is read as absent.
+        it 'reads an empty string in the subset query as absent too' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: '' } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'falls back to the query string when the subset query is not a hash' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: 'nope' } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'answers nil rather than raising when the body is shaped unexpectedly' do
+          args = { params: { search: 'searched argument', data: { attributes: [1] } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # Every consumer strips it, so a value that cannot be one term is a request error rather than
+        # a `NoMethodError` deeper in the stack — or a search for the string an Array prints as.
+        [['x'], { a: '1' }, true, false].each do |value|
+          it "refuses #{value.inspect}, which cannot be a search term" do
+            args = { params: { search: value } }
+
+            expect { described_class.parse_search(collection_user, args) }
+              .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
+          end
+        end
+
+        it 'refuses a body value the query string would otherwise mask' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: false } } }
+            }
+          }
+
+          expect { described_class.parse_search(collection_user, args) }
+            .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
         end
 
         it 'works when passed in the body (actions)' do
@@ -1231,6 +1300,37 @@ module ForestAdminAgent
           args = { params: { searchExtended: '0' } }
 
           expect(described_class.parse_search_extended(args)).to be(false)
+        end
+
+        [false, 0, 'false', 'FALSE', ''].each do |falsy|
+          it "reads #{falsy.inspect} as not extended" do
+            expect(described_class.parse_search_extended({ params: { searchExtended: falsy } })).to be(false)
+          end
+        end
+
+        it 'reads an absent parameter as not extended' do
+          expect(described_class.parse_search_extended({ params: {} })).to be(false)
+        end
+
+        it 'keeps reading an unrecognised value as extended, as it always did' do
+          expect(described_class.parse_search_extended({ params: { searchExtended: 'yes' } })).to be(true)
+        end
+
+        it 'lets the subset query say no while the query string still carries the flag' do
+          args = {
+            params: {
+              searchExtended: '1',
+              data: { attributes: { all_records_subset_query: { searchExtended: false } } }
+            }
+          }
+
+          expect(described_class.parse_search_extended(args)).to be(false)
+        end
+
+        it 'falls back to the query string when the subset query does not name the flag' do
+          args = { params: { searchExtended: '1', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search_extended(args)).to be(true)
         end
       end
 
