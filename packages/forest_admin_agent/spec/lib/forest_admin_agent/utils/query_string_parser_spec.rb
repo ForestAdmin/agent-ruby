@@ -1197,10 +1197,43 @@ module ForestAdminAgent
           expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
         end
 
-        it 'converts the query search parameter as string' do
-          args = { params: { search: 1234 } }
+        [[1234, '1234'], [12.5, '12.5']].each do |value, expected|
+          it "converts #{value.inspect} to #{expected.inspect}" do
+            args = { params: { search: value } }
 
-          expect(described_class.parse_search(collection_user, args)).to eq('1234')
+            expect(described_class.parse_search(collection_user, args)).to eq(expected)
+          end
+        end
+
+        it 'falls back to the query string when the subset query does not name a search' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # An explicit null there must not discard the term the URL carried: dropping a search widens
+        # the result set.
+        it 'reads an explicit null in the subset query as absent, not as no search' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: nil } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'falls back to the query string when the subset query is not a hash' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: 'nope' } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'answers nil rather than raising when the body is shaped unexpectedly' do
+          args = { params: { search: 'searched argument', data: { attributes: [1] } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
         end
 
         # Every consumer strips it, so a value that cannot be one term is a request error rather than

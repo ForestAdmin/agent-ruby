@@ -231,15 +231,27 @@ module ForestAdminAgent
         Page.new(offset: 0, limit: limit&.to_i)
       end
 
+      # Presence, not truth: with +||+ a +false+ in the select-all body would silently lose to the
+      # query string. An explicit +null+ there is read as absent rather than as "no search", so it
+      # cannot widen a result set by discarding the term the URL carried.
+      def self.subset_or_query(args, key)
+        subset = begin
+          args.dig(:params, :data, :attributes, :all_records_subset_query)
+        rescue StandardError
+          nil
+        end
+
+        return subset[key] if subset.is_a?(Hash) && !subset[key].nil?
+
+        begin
+          args.dig(:params, key)
+        rescue StandardError
+          nil
+        end
+      end
+
       def self.parse_search(collection, args)
-        # Presence, not truth, for the same reason as the flag below: `false` is a value here, and
-        # +||+ would read it as absent.
-        subset = args.dig(:params, :data, :attributes, :all_records_subset_query)
-        search = if subset.is_a?(Hash) && subset.key?(:search)
-                   subset[:search]
-                 else
-                   args.dig(:params, :search)
-                 end
+        search = subset_or_query(args, :search)
 
         return nil if search.nil?
 
@@ -249,19 +261,11 @@ module ForestAdminAgent
           raise BadRequestError, 'Search must be a string or a number'
         end
 
-        # Every layer that consumes this strips it: the permission guard, `refine_filter`, and
-        # `insignificant_search?`.
         search.to_s
       end
 
       def self.parse_search_extended(args)
-        # `key?` rather than `||`: a real +false+ here is falsy, and would lose to the query string.
-        subset = args.dig(:params, :data, :attributes, :all_records_subset_query)
-        extended = if subset.is_a?(Hash) && subset.key?(:searchExtended)
-                     subset[:searchExtended]
-                   else
-                     args.dig(:params, :searchExtended)
-                   end
+        extended = subset_or_query(args, :searchExtended)
 
         !FALSY_SEARCH_EXTENDED.include?(extended.is_a?(String) ? extended.downcase : extended)
       end
