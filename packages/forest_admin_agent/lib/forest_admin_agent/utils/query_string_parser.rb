@@ -232,18 +232,26 @@ module ForestAdminAgent
       end
 
       def self.parse_search(collection, args)
-        search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
+        # Presence, not truth, for the same reason as the flag below: `false` is a value here, and
+        # +||+ would read it as absent.
+        subset = args.dig(:params, :data, :attributes, :all_records_subset_query)
+        search = if subset.is_a?(Hash) && subset.key?(:search)
+                   subset[:search]
+                 else
+                   args.dig(:params, :search)
+                 end
 
-        raise BadRequestError, 'Collection is not searchable' if search && !collection.is_searchable?
+        return nil if search.nil?
 
-        if search && !search.is_a?(String) && !search.is_a?(Numeric)
+        raise BadRequestError, 'Collection is not searchable' unless collection.is_searchable?
+
+        unless search.is_a?(String) || search.is_a?(Numeric)
           raise BadRequestError, 'Search must be a string or a number'
         end
 
         # Every layer that consumes this strips it: the permission guard, `refine_filter`, and
-        # `insignificant_search?`. A number reaching them raises, and `?search[]=x` would search the
-        # string an Array prints as.
-        search&.to_s
+        # `insignificant_search?`.
+        search.to_s
       end
 
       def self.parse_search_extended(args)

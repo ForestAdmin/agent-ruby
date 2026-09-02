@@ -354,8 +354,8 @@ module ForestAdminAgent
       # served in either case — the extended flag is the caller's own, so the exemption stops there.
       def assert_extended_search_checkable(collection, search_extended)
         return unless search_extended
-        return unless permission_system?
         return unless describes_own_search?(collection)
+        return unless permission_system?
 
         raise ForbiddenError,
               "You cannot run an extended search on the '#{collection.name}' collection: the fields " \

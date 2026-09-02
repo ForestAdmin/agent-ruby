@@ -409,6 +409,16 @@ module ForestAdminAgent
             .not_to raise_error
         end
 
+        # `permission_system?` fetches `/liana/v4/permissions/environment` cold; `describes_own_search?`
+        # is local. Every extended search on a nil footprint reached that fetch.
+        it 'does not reach the permission system for a search it will not refuse' do
+          permissions = build_permissions([])
+
+          permissions.assert_can_read_query_fields(cards, search: 'martin', search_extended: true)
+
+          expect(permissions).not_to have_received(:permission_system?)
+        end
+
         it 'accepts a filter once the collection it reaches is readable' do
           permissions = build_permissions(%w[accounts])
 

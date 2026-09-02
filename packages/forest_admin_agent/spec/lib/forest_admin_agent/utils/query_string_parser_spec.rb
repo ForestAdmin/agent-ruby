@@ -1205,13 +1205,25 @@ module ForestAdminAgent
 
         # Every consumer strips it, so a value that cannot be one term is a request error rather than
         # a `NoMethodError` deeper in the stack — or a search for the string an Array prints as.
-        [['x'], { a: '1' }, true].each do |value|
+        [['x'], { a: '1' }, true, false].each do |value|
           it "refuses #{value.inspect}, which cannot be a search term" do
             args = { params: { search: value } }
 
             expect { described_class.parse_search(collection_user, args) }
               .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
           end
+        end
+
+        it 'refuses a body value the query string would otherwise mask' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: false } } }
+            }
+          }
+
+          expect { described_class.parse_search(collection_user, args) }
+            .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
         end
 
         it 'works when passed in the body (actions)' do
