@@ -383,10 +383,10 @@ module ForestAdminAgent
 
         # `refine_filter` discards a blank search instead of running it, so refusing one would 403 a
         # request that searches nothing.
-        it 'serves a blank search with the extended flag on, which runs no search at all' do
-          permissions = build_permissions([])
+        ['', '   '].each do |blank|
+          it "serves #{blank.inspect} with the extended flag on, which runs no search at all" do
+            permissions = build_permissions([])
 
-          ['', '   '].each do |blank|
             expect do
               permissions.assert_can_read_query_fields(
                 searchable_cards(nil, search_handler: true), search: blank, search_extended: true

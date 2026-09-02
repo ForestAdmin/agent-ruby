@@ -58,6 +58,14 @@ module ForestAdminAgent
           expect(read_guard_calls[:query_fields]).to eq([{ collection: 'user', applies: %i[filter search search_extended] }])
         end
 
+        it 'hands the guard the extended flag it parsed, not a default' do
+          ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
+          args[:params][:searchExtended] = '1'
+          count.handle_request(args)
+
+          expect(read_guard_calls[:search_extended]).to eq([true])
+        end
+
         context 'when collection is countable' do
           it 'return an serialized content' do
             ForestAdminAgent::Facades::Container.datasource.get_collection('user').enable_count
