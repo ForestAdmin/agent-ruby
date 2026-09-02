@@ -288,8 +288,49 @@ module ForestAdminDatasourceCustomizer
           end
 
           it 'matches nothing rather than everything once every searchable field is excluded' do
-            expect(refined({ exclude_fields: %w[id pan_last4 holder_id holder:id holder:national_id] }).condition_tree)
+            expect(refined({ exclude_fields: %w[id pan_last4 holder:id holder:national_id] }).condition_tree)
               .to have_attributes(aggregator: 'Or', conditions: [])
+          end
+        end
+
+        # The fixture above has no searchable column whose name the relation only prefixes, so the
+        # `:` boundary in the exclusion cannot be told apart there.
+        describe '#replace_search excluding a relation whose name prefixes a column' do
+          let(:datasource) do
+            build_datasource_with_collections(
+              [
+                build_collection(
+                  name: 'cards',
+                  schema: {
+                    fields: {
+                      'id' => build_numeric_primary_key,
+                      'holder_note' => build_column(column_type: 'String',
+                                                    filter_operators: [Operators::I_CONTAINS]),
+                      'holder_id' => build_column(column_type: 'Number'),
+                      'holder' => build_many_to_one(foreign_collection: 'holders', foreign_key: 'holder_id')
+                    }
+                  }
+                ),
+                build_collection(
+                  name: 'holders',
+                  schema: {
+                    fields: {
+                      'id' => build_numeric_primary_key,
+                      'national_id' => build_column(column_type: 'String',
+                                                    filter_operators: [Operators::I_CONTAINS])
+                    }
+                  }
+                )
+              ]
+            )
+          end
+
+          it 'keeps a sibling column the relation name only prefixes' do
+            decorated.replace_search(exclude_fields: ['holder'])
+
+            expect(decorated.searched_fields('martin', true)).to eq(
+              [{ path: 'holder_note', collections: ['cards'] }]
+            )
           end
         end
 
@@ -298,15 +339,26 @@ module ForestAdminDatasourceCustomizer
 
           before { allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger) }
 
-          it 'warns at boot that an extended search there will be refused' do
+          it 'warns at boot that an extended search there is refused where permissions are on' do
             decorated.replace_search(->(value, _extended, _context) { { field: 'pan_last4', value: value } })
 
             expect(logger).to have_received(:log).with(
               'Warn',
-              'An extended search on cards will be refused: a `replace_search` block names no field, ' \
-              "so the agent cannot check what it reads against the caller's permissions. Declaring the " \
-              'search with `replace_search(include_fields: [...])` makes it checkable.'
+              'An extended search on cards is refused where permissions are enabled: a ' \
+              '`replace_search` block names no field, so the agent cannot check what it reads against ' \
+              "the caller's permissions. Declaring the search with " \
+              '`replace_search(include_fields: [...])` makes it checkable.'
             )
+          end
+
+          # The RPC agent runs its own `AgentFactory` subclass, so the base facade's container is never
+          # built there and `logger` answers nil.
+          it 'installs the block anyway where no logger is resolvable' do
+            allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(nil)
+
+            expect { decorated.replace_search(->(value, _extended, _context) { { field: 'pan_last4', value: value } }) }
+              .not_to raise_error
+            expect(decorated.searched_fields('martin', true)).to be_nil
           end
 
           it 'says nothing for a field selection, which is checkable' do
@@ -377,12 +429,20 @@ module ForestAdminDatasourceCustomizer
             )
           end
 
-          it 'still accepts excluding that column, which only has to exist to be dropped' do
-            decorated.replace_search(exclude_fields: ['holder_id'])
+          it 'refuses excluding a column the search never reads, which would change nothing' do
+            expect { decorated.replace_search(exclude_fields: ['holder_id']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Cannot exclude 'holder_id' from the search: the search does not read it"
+              )
+          end
 
-            expect(decorated.searched_fields('martin', false)).to eq(
-              [{ path: 'pan_last4', collections: ['cards'] }]
-            )
+          it 'refuses searching and excluding the same path, rather than letting one win silently' do
+            expect { decorated.replace_search(include_fields: ['holder:national_id'], exclude_fields: ['holder']) }
+              .to raise_error(
+                ForestAdminDatasourceToolkit::Exceptions::ForestException,
+                "Cannot both search and exclude 'holder:national_id'"
+              )
           end
 
           it 'leaves the previous selection in place when it refuses a new one' do

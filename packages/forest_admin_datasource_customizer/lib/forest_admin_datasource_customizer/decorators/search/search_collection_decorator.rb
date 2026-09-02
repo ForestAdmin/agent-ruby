@@ -76,14 +76,21 @@ module ForestAdminDatasourceCustomizer
 
         private
 
-        # Said at boot rather than left to the first user who trips the 403, since a block installed
-        # before this version was served.
+        # Warned at boot, not left to the first caller who trips the 403: blocks installed before this
+        # version were served. Nil-guarded because the RPC agent runs its own +AgentFactory+ subclass,
+        # so the base facade's container is never built there — a customization must not become a boot
+        # failure over a warning.
         def warn_extended_search_refused
-          ForestAdminAgent::Facades::Container.logger.log(
+          logger = ForestAdminAgent::Facades::Container.logger
+
+          return if logger.nil?
+
+          logger.log(
             'Warn',
-            "An extended search on #{name} will be refused: a `replace_search` block names no field, " \
-            'so the agent cannot check what it reads against the caller\'s permissions. Declaring the ' \
-            'search with `replace_search(include_fields: [...])` makes it checkable.'
+            "An extended search on #{name} is refused where permissions are enabled: a " \
+            '`replace_search` block names no field, so the agent cannot check what it reads against ' \
+            "the caller's permissions. Declaring the search with " \
+            '`replace_search(include_fields: [...])` makes it checkable.'
           )
         end
 
@@ -106,9 +113,18 @@ module ForestAdminDatasourceCustomizer
         def assert_selection_resolves(replacer)
           return if replacer.nil? || replacer.respond_to?(:call)
 
-          field_paths(replacer[:only_fields]).each { |path| selected_field(path) }
-          field_paths(replacer[:include_fields]).each { |path| selected_field(path) }
-          field_paths(replacer[:exclude_fields]).each { |path| excluded_field(path) }
+          selected = field_paths(replacer[:only_fields]) + field_paths(replacer[:include_fields])
+          excluded = field_paths(replacer[:exclude_fields])
+
+          selected.each { |path| selected_field(path) }
+          excluded.each { |path| excluded_field(path) }
+
+          overlap = selected.select { |path| excluded?(path, excluded) }
+
+          return if overlap.empty?
+
+          raise ForestException,
+                "Cannot both search and exclude #{overlap.map { |path| "'#{path}'" }.join(", ")}"
         end
 
         def insignificant_search?(search)
@@ -151,14 +167,26 @@ module ForestAdminDatasourceCustomizer
             .reject { |path, _schema| excluded?(path, excluded) }
         end
 
-        # An excluded relation drops every path through it: naming the target's columns one by one
-        # would have to be revisited each time it gains one.
         def excluded?(path, excluded)
           excluded.any? { |name| path == name || path.start_with?("#{name}:") }
         end
 
+        # Unlike a selected path, a bare to-one relation is legal here: it drops every path through it,
+        # where naming the target's columns would have to be revisited each time it gains one. What is
+        # refused is a name the search never reads either way — a to-many, a depth-2 path, a column no
+        # term can match — because excluding it silently changes nothing.
         def excluded_field(path)
-          ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
+          schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
+
+          return schema if excludable?(path, schema)
+
+          raise ForestException, "Cannot exclude '#{path}' from the search: the search does not read it"
+        end
+
+        def excludable?(path, schema)
+          return path.count(':') <= 1 && searchable_field?(schema) if schema.type == 'Column'
+
+          !path.include?(':') && TO_ONE_RELATIONS.include?(schema.type)
         end
 
         def field_paths(names)
@@ -178,8 +206,8 @@ module ForestAdminDatasourceCustomizer
           [path, schema]
         end
 
-        # `get_fields` skips such a column silently; here it is refused, because a Number or UUID column
-        # reaching `build_condition` gets an EQUAL leaf its datasource never declared.
+        # A Number, Enum or UUID column reaching `build_condition` gets an EQUAL leaf its datasource
+        # never declared, and `get_fields` skips it silently — so a named one is refused instead.
         def selected_field(path)
           resolved = resolved_field(path)
           schema = resolved.last

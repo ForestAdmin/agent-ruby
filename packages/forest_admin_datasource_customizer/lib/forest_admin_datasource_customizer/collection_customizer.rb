@@ -35,7 +35,8 @@ module ForestAdminDatasourceCustomizer
     # with the agent's own per-column one.
     #
     # A relation path into a collection the role cannot read is refused; own columns carry no check,
-    # there being no field-level permissions. A block names nothing, so its extended half is refused.
+    # there being no field-level permissions. A block names nothing, so its extended half is refused
+    # where permissions are enabled.
     #
     # An included relation path is read on a plain search too, so +searchExtended=0+ no longer means
     # no relation traversal; with +only_fields+, +extended+ becomes inert entirely.
