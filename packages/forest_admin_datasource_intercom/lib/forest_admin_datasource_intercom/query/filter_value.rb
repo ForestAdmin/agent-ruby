@@ -18,13 +18,8 @@ module ForestAdminDatasourceIntercom
 
       def initialize(collection:, timezone: nil)
         @collection = collection
-        identifier = timezone.to_s.strip
-        # Stored stripped rather than only checked stripped: kept as it came, a
-        # `" Europe/Paris "` passes the blank guard and then fails the zone
-        # lookup, and a day boundary lands an offset away from where the filter
-        # meant it.
-        @timezone = identifier.empty? ? 'UTC' : identifier
-        @day_bounds = DayBounds.new(collection: collection, timezone: @timezone)
+        @zone = CallerZone.new(timezone)
+        @day_bounds = DayBounds.new(collection: collection, timezone: @zone.name)
       end
 
       def call(leaf, field, spelling)
@@ -67,7 +62,7 @@ module ForestAdminDatasourceIntercom
       def epoch(value, leaf)
         case value
         when DateTime then value.to_time.to_i
-        when Date then start_of_day(value)
+        when Date then @zone.start_of_day(value)
         when Time then value.to_i
         when Numeric then seconds(value, leaf)
         when String then parse(value, leaf)
@@ -86,24 +81,17 @@ module ForestAdminDatasourceIntercom
         refuse_value!(leaf, value, 'a date')
       end
 
+      # `Time.parse` is called for what it refuses, not for what it returns:
+      # it raises on a string naming no date, where `Time.zone.parse` answers
+      # today -- a filter on `last tuesday` coming back as a filter on today is
+      # the silent wrong answer this datasource exists not to give.
       def parse(value, leaf)
-        return start_of_day(Date.parse(value)) if DATE_ONLY.match?(value)
+        return @zone.start_of_day(Date.parse(value)) if DATE_ONLY.match?(value)
 
-        Time.parse(value).to_i
+        Time.parse(value)
+        @zone.timestamp(value)
       rescue ArgumentError, TypeError
         refuse_value!(leaf, value, 'a date')
-      end
-
-      # A day with no time of day is the caller's day, not the server's: it is
-      # the timezone the filter was written in that says when that day starts.
-      def start_of_day(date)
-        Time.use_zone(@timezone) { Time.zone.local(date.year, date.month, date.day).to_i }
-      rescue ArgumentError
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] unknown timezone #{@timezone.inspect}, reading the day boundary of a " \
-          'date filter in UTC instead.'
-        )
-        Time.utc(date.year, date.month, date.day).to_i
       end
 
       # The agent casts every Number column with `to_f`, so an integer field

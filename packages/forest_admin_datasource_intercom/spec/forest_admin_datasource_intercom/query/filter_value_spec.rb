@@ -53,6 +53,23 @@ module ForestAdminDatasourceIntercom
         expect(bound('2026-09-01T10:30:00+02:00', '<')).to eq('2026-09-02T00:00:00Z')
       end
 
+      # `FilterFactory` writes the bounds of a previous period with strftime
+      # and no offset at all, so a chart comparing to the previous month sends
+      # `2026-08-01 00:00:00` meaning the caller's midnight. Read in the
+      # process timezone it is a different instant, and a midnight moved by any
+      # offset lands on another UTC day once truncated -- a whole day of rows
+      # beside the ones the chart named.
+      it 'reads a timestamp carrying no offset in the timezone of the caller' do
+        # Paris midnight on 1 September is 2026-08-31T22:00:00Z, whose UTC day
+        # is the 31st, so `>` must answer from the 31st and sit on the 30th.
+        expect(bound('2026-09-01 00:00:00', '>')).to eq('2026-08-30T00:00:00Z')
+      end
+
+      it 'reads a whole previous-period window in the timezone of the caller' do
+        expect(bound('2026-08-01 00:00:00', '>')).to eq('2026-07-30T00:00:00Z')
+        expect(bound('2026-09-01 00:00:00', '<')).to eq('2026-09-01T00:00:00Z')
+      end
+
       # A day with no time of day is the caller's day: it is the timezone the
       # filter was written in that says when that day starts.
       it 'reads a bare date as midnight in the timezone of the caller' do
@@ -98,6 +115,13 @@ module ForestAdminDatasourceIntercom
           allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
 
           expect(bound('2026-09-01', '>')).to eq('2026-08-31T00:00:00Z')
+          expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/unknown timezone/)
+        end
+
+        it 'reads a timestamp carrying no offset in UTC and says so' do
+          allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+          expect(bound('2026-09-01 00:00:00', '>')).to eq('2026-08-31T00:00:00Z')
           expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/unknown timezone/)
         end
       end
