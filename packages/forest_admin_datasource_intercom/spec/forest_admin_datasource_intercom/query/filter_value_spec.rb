@@ -119,6 +119,20 @@ module ForestAdminDatasourceIntercom
         expect { call('date', { 'day' => 1 }, spelling: '>') }
           .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
       end
+
+      # `to_i` raises a FloatDomainError on either, which would leave the read
+      # with an error naming a float where the operator asked for a date. The
+      # number branch already refuses them; a date is no different.
+      it 'refuses a cast that overflowed to Infinity, and a NaN' do
+        expect { call('date', Float::INFINITY, spelling: '>') }
+          .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
+        expect { call('date', Float::NAN, spelling: '>') }
+          .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
+      end
+
+      it 'reads a finite number as the epoch seconds Intercom stores' do
+        expect(bound(1_767_225_600, '>')).to eq('2025-12-31T00:00:00Z')
+      end
     end
 
     describe 'a number' do

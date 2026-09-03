@@ -31,6 +31,21 @@ endpoints:
     # Nothing has been probed yet: fill this in with the probe's output.
     measured_at: null
     fields:
+      # The primary key, and the one column whose Forest operators are not
+      # derived from this table: every collection publishes `equal` and `in` on
+      # its key whatever is written here, the toolkit refusing a collection
+      # whose key carries neither. It has to be declared all the same, or the
+      # schema advertises a filter the translator has no row to write -- which
+      # is what a record detail becomes the moment a permission scope turns
+      # `id equals X` into an `and` the record endpoint cannot answer alone.
+      #
+      # A bare `id equals X` still reads the record endpoint, one request
+      # instead of a search. This row is for the compound case.
+      id:
+        field: id
+        type: string
+        operators: ['=', 'IN']
+        source: spec
       state:
         field: state
         type: string
@@ -218,7 +233,6 @@ endpoints:
     # above -- with a column to expose it on, or with none, in which case it is
     # a column the next lot may add.
     candidates:
-      - id
       - source.id
       - source.author.id
       - source.author.type
@@ -247,6 +261,15 @@ endpoints:
     path: tickets/search
     measured_at: null
     fields:
+      # The primary key, declared here for the same reason as on conversations:
+      # the schema publishes `equal` and `in` on it whatever this table says,
+      # so a row has to exist for the translator to write. `GET /tickets/{id}`
+      # answers the key on its own; the search answers it in an `and`.
+      id:
+        field: id
+        type: string
+        operators: ['=', 'IN']
+        source: spec
       open:
         field: open
         type: boolean
@@ -350,7 +373,6 @@ endpoints:
       source: measured
 
     candidates:
-      - id
       - ticket_id
       - state
       - ticket_state.category

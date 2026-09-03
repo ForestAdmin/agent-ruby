@@ -68,10 +68,22 @@ module ForestAdminDatasourceIntercom
         case value
         when DateTime then value.to_time.to_i
         when Date then start_of_day(value)
-        when Time, Numeric then value.to_i
+        when Time then value.to_i
+        when Numeric then seconds(value, leaf)
         when String then parse(value, leaf)
         else refuse_value!(leaf, value, 'a date')
         end
+      end
+
+      # An Infinity or a NaN -- a cast that overflowed above this datasource --
+      # makes `Integer()` raise a FloatDomainError naming a float where the
+      # operator asked for a date, and a Complex a RangeError, which is the
+      # same class one level up. Refused like every other value the field
+      # cannot take, for the reason `number` refuses them too.
+      def seconds(value, leaf)
+        Integer(value)
+      rescue RangeError, TypeError
+        refuse_value!(leaf, value, 'a date')
       end
 
       def parse(value, leaf)

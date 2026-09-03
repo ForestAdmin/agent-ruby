@@ -34,6 +34,27 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # A bare `id equals X` never reaches here -- the collection reads the record
+    # endpoint instead, one request rather than a search. What does reach here
+    # is the key nested in an `and`: a permission scope, a segment, or a second
+    # filter alongside it, which the record endpoint cannot answer on its own.
+    describe 'the primary key, once something else is filtered alongside it' do
+      it 'writes the key as the search field it is' do
+        tree = branch('And', leaf('id', operators::EQUAL, '42'), leaf('state', operators::EQUAL, 'open'))
+
+        expect(translate(tree)).to eq({ 'operator' => 'AND',
+                                        'value' => [{ 'field' => 'id', 'operator' => '=', 'value' => '42' },
+                                                    { 'field' => 'state', 'operator' => '=', 'value' => 'open' }] })
+      end
+
+      it 'writes a membership on the key as the list Intercom takes' do
+        tree = branch('And', leaf('id', operators::IN, %w[1 2]), leaf('open', operators::EQUAL, true))
+
+        expect(translate(tree)['value'].first)
+          .to eq({ 'field' => 'id', 'operator' => 'IN', 'value' => %w[1 2] })
+      end
+    end
+
     describe 'a branch' do
       it 'groups its conditions under the aggregator Intercom spells in capitals' do
         tree = branch('Or', leaf('state', operators::EQUAL, 'open'), leaf('state', operators::EQUAL, 'snoozed'))
@@ -147,7 +168,7 @@ module ForestAdminDatasourceIntercom
 
       it 'refuses a column nothing declares, listing the ones it takes' do
         expect { translate(leaf('nope', operators::EQUAL, 'x')) }
-          .to raise_error(UnsupportedOperatorError, /takes no filter on it. Filter on one of: state, open/)
+          .to raise_error(UnsupportedOperatorError, /takes no filter on it. Filter on one of: id, state, open/)
       end
 
       # None of these collections declares a relation yet, so a `relation:field`

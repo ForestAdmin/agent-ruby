@@ -16,6 +16,11 @@ module ForestAdminDatasourceIntercom
         .new(field, operator, value)
     end
 
+    def branch(aggregator, *conditions)
+      ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+        .new(aggregator, conditions)
+    end
+
     def json(payload, status = 200)
       { status: status, body: payload.to_json, headers: { 'Content-Type' => 'application/json' } }
     end
@@ -238,6 +243,33 @@ module ForestAdminDatasourceIntercom
 
         expect { collection.list(nil, filter(condition_tree: leaf('id', operators::EQUAL, '1')), %w[id]) }
           .to raise_error(APIError)
+      end
+
+      # A permission scope turns the record detail into `id equals X and <the
+      # scope>`, which the record endpoint cannot answer: the ids name a wider
+      # set than the scope does, and reading them alone would serve a record the
+      # scope excludes. It goes to the search, where the key is a field like any
+      # other -- and the whole condition travels, or none of it does.
+      it 'reads the key through the search once a scope is filtered alongside it' do
+        search = stub_search(conversation('1'))
+        tree = branch('And', leaf('id', operators::EQUAL, '1'), leaf('state', operators::EQUAL, 'closed'))
+
+        expect(ids(collection.list(nil, filter(condition_tree: tree), %w[id]))).to eq(%w[1])
+        expect(search).to have_been_requested
+      end
+
+      it 'sends the scope and the key as the one query, neither dropped' do
+        stub_search(conversation('1'))
+        tree = branch('And', leaf('id', operators::IN, %w[1 2]), leaf('open', operators::EQUAL, false))
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expected = { 'operator' => 'AND',
+                     'value' => [{ 'field' => 'id', 'operator' => 'IN', 'value' => %w[1 2] },
+                                 { 'field' => 'open', 'operator' => '=', 'value' => false }] }
+
+        expect(a_request(:post, "#{base}/conversations/search")
+                 .with(query: hash_including({}), body: hash_including('query' => expected))).to have_been_made
       end
     end
 

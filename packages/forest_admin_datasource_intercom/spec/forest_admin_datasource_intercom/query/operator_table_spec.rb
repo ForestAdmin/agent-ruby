@@ -71,6 +71,40 @@ module ForestAdminDatasourceIntercom
           end
         end
       end
+
+      # Walked from the schema rather than from the table, which is the only way
+      # to see the primary key: `add_column` writes its operators by hand -- the
+      # toolkit refuses a collection whose key carries neither `equal` nor `in`
+      # -- so the loop above, reading the table, could never reach the one
+      # column no row of the table is derived from. A column the schema
+      # publishes and the table cannot spell is a filter the translator refuses
+      # at read time, which is what a record detail hits the moment a scope
+      # nests `id equals X` in an `and`.
+      it 'is a set the table can express, for every column the datasource publishes' do
+        cursor_collections.each do |collection|
+          endpoint = collection.send(:search_endpoint)
+
+          collection.fields.each do |column, schema|
+            published = Array(schema.respond_to?(:filter_operators) ? schema.filter_operators : nil)
+            next if published.empty?
+
+            searchable = endpoint.field(column)
+            expect(searchable).not_to be_nil,
+                                      "#{collection.name}.#{column} publishes #{published.join(", ")} and " \
+                                      "#{endpoint.path} carries no row to translate it"
+            expect(published - described_class.forest_operators(searchable))
+              .to be_empty, "#{collection.name}.#{column} publishes an operator the translator would refuse"
+          end
+        end
+      end
+    end
+
+    # Only the two collections a search endpoint backs: the reference ones are
+    # read whole and filtered in memory, and publish no operator from a table.
+    def cursor_collections
+      datasource = Datasource.new(access_token: 's3cr3t', rate_limiter: nil)
+
+      datasource.collections.each_value.grep(Collections::CursorCollection)
     end
   end
 end

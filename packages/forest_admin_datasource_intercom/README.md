@@ -181,8 +181,13 @@ What follows from that:
 
 | Collection | Filterable on |
 | --- | --- |
-| `IntercomConversation` | `state`, `priority`, `open`, `read`, `title`, `admin_assignee_id`, `team_assignee_id`, `source_type`, `source_subject`, `source_body`, `source_delivered_as`, `source_author_email`, `closed_by_id`, `reopen_count`, `part_count`, `ai_agent_participated`, and the dates `created_at`, `updated_at`, `waiting_since`, `snoozed_until`, `closed_at`, `first_closed_at`, `first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at` |
-| `IntercomTicket` | `open`, `category`, `ticket_type_id`, `admin_assignee_id`, `team_assignee_id`, `created_at`, `updated_at` |
+| `IntercomConversation` | `id`, `state`, `priority`, `open`, `read`, `title`, `admin_assignee_id`, `team_assignee_id`, `source_type`, `source_subject`, `source_body`, `source_delivered_as`, `source_author_email`, `closed_by_id`, `reopen_count`, `part_count`, `ai_agent_participated`, and the dates `created_at`, `updated_at`, `waiting_since`, `snoozed_until`, `closed_at`, `first_closed_at`, `first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at` |
+| `IntercomTicket` | `id`, `open`, `category`, `ticket_type_id`, `admin_assignee_id`, `team_assignee_id`, `created_at`, `updated_at` |
+
+**The primary key** is filterable like any other column, but a filter naming it *alone* is not
+answered by a search: `id equals X` and `id in [...]` read the record endpoint directly, one request
+per record. The search answers it only when something else is filtered alongside it — a permission
+scope, a segment, or a second filter.
 
 **Free-text search** is answered on `IntercomConversation` only, through `~` on `source.body` — the
 message that opened the conversation. Intercom matches it **per word, not as a substring**: searching
