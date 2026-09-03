@@ -16,6 +16,11 @@ module ForestAdminDatasourceIntercom
         .new(field, operator, value)
     end
 
+    def branch(aggregator, *conditions)
+      ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+        .new(aggregator, conditions)
+    end
+
     def json(payload, status = 200)
       { status: status, body: payload.to_json, headers: { 'Content-Type' => 'application/json' } }
     end
@@ -69,6 +74,14 @@ module ForestAdminDatasourceIntercom
       stub_request(:get, "#{base}/conversations").with(query: query).to_return(json(body))
     end
 
+    def stub_search(*records, total: nil, next_cursor: nil)
+      body = { 'type' => 'conversation.list', 'conversations' => records,
+               'total_count' => total || records.size, 'pages' => { 'type' => 'pages', 'page' => 1 } }
+      body['pages']['next'] = { 'starting_after' => next_cursor } if next_cursor
+
+      stub_request(:post, "#{base}/conversations/search").with(query: hash_including({})).to_return(json(body))
+    end
+
     def stub_record(id, payload, status = 200)
       stub_request(:get, "#{base}/conversations/#{id}").with(query: hash_including({})).to_return(json(payload, status))
     end
@@ -82,14 +95,32 @@ module ForestAdminDatasourceIntercom
         expect(collection.name).to eq('IntercomConversation')
       end
 
-      # Intercom ignores a sort on this endpoint without a word and filters
-      # nothing on the listing, so a column advertising either would put in the
-      # interface what the read then refuses.
-      it 'declares every column unsortable and unfilterable, except the primary key' do
-        others = collection.fields.except('id')
+      # Neither search endpoint takes a sort, and Intercom ignores the one it is
+      # sent without a word, so no column of this tier may advertise one.
+      it 'declares every column unsortable' do
+        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+      end
 
-        expect(others.values.map(&:is_sortable).uniq).to eq([false])
-        expect(others.values.map(&:filter_operators).flatten.uniq).to be_empty
+      # Derived from the measured table, never written by hand: a column
+      # advertises exactly what the search endpoint answers on it.
+      it 'advertises the filters the search endpoint answers, and only those' do
+        expect(collection.fields['state'].filter_operators).to eq(%w[equal not_equal])
+        expect(collection.fields['created_at'].filter_operators).to eq(%w[greater_than less_than])
+        expect(collection.fields['source_body'].filter_operators).to eq(%w[contains i_contains not_contains])
+      end
+
+      # A column the table does not carry advertises nothing, which is how a
+      # refusal is spelled in a schema: the tag names, the company, the timeline
+      # and the contact identity are all read from somewhere the endpoint does
+      # not filter.
+      it 'advertises no filter on a column the endpoint does not filter' do
+        %w[tag_names company_name contact_email timeline contact_ids].each do |column|
+          expect(collection.fields[column].filter_operators).to be_empty, "#{column} advertises a filter"
+        end
+      end
+
+      it 'is searchable, Intercom matching text on the body of the first message' do
+        expect(collection.is_searchable?).to be(true)
       end
 
       # The record detail is `id equals X`, answered by the record endpoint
@@ -213,6 +244,33 @@ module ForestAdminDatasourceIntercom
         expect { collection.list(nil, filter(condition_tree: leaf('id', operators::EQUAL, '1')), %w[id]) }
           .to raise_error(APIError)
       end
+
+      # A permission scope turns the record detail into `id equals X and <the
+      # scope>`, which the record endpoint cannot answer: the ids name a wider
+      # set than the scope does, and reading them alone would serve a record the
+      # scope excludes. It goes to the search, where the key is a field like any
+      # other -- and the whole condition travels, or none of it does.
+      it 'reads the key through the search once a scope is filtered alongside it' do
+        search = stub_search(conversation('1'))
+        tree = branch('And', leaf('id', operators::EQUAL, '1'), leaf('state', operators::EQUAL, 'closed'))
+
+        expect(ids(collection.list(nil, filter(condition_tree: tree), %w[id]))).to eq(%w[1])
+        expect(search).to have_been_requested
+      end
+
+      it 'sends the scope and the key as the one query, neither dropped' do
+        stub_search(conversation('1'))
+        tree = branch('And', leaf('id', operators::IN, %w[1 2]), leaf('open', operators::EQUAL, false))
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expected = { 'operator' => 'AND',
+                     'value' => [{ 'field' => 'id', 'operator' => 'IN', 'value' => %w[1 2] },
+                                 { 'field' => 'open', 'operator' => '=', 'value' => false }] }
+
+        expect(a_request(:post, "#{base}/conversations/search")
+                 .with(query: hash_including({}), body: hash_including('query' => expected))).to have_been_made
+      end
     end
 
     describe '#list of several records by id' do
@@ -229,6 +287,19 @@ module ForestAdminDatasourceIntercom
         expect(ids(rows)).to eq(%w[1 2])
       end
 
+      # A pointing collection pages through the records it named, and every page
+      # must name different ones: cut out of the records instead of out of the
+      # ids, the window would render the same rows on page 1 and page 2 -- and
+      # a page past the cap would come back empty, its ids having been dropped
+      # by the truncation before the window was applied.
+      it 'reads only the ids the page window names' do
+        stub_record('2', conversation('2'))
+        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 1, limit: 1)
+        tree = leaf('id', operators::IN, %w[1 2 3])
+
+        expect(ids(collection.list(nil, filter(condition_tree: tree, page: page), %w[id]))).to eq(%w[2])
+      end
+
       it 'reads the first of too many and says the result is truncated' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         asked = (1..(Collections::CursorCollection::MAX_ID_READS + 3)).map(&:to_s)
@@ -241,25 +312,101 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    describe 'a filter Intercom answers' do
+      # A condition switches the read from the listing to the search endpoint,
+      # which is the only one that takes a filter.
+      it 'searches instead of listing, with the query the translator wrote' do
+        search = stub_search
+        tree = leaf('state', operators::EQUAL, 'open')
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expect(search.with(body: hash_including('query' => { 'field' => 'state', 'operator' => '=',
+                                                             'value' => 'open' }))).to have_been_made
+      end
+
+      # The bodies are HTML written by end customers (R10), and a filtered read
+      # must not come back as markup where an unfiltered one comes back as text.
+      it 'asks the search for plain text too' do
+        search = stub_search
+
+        collection.list(nil, filter(condition_tree: leaf('open', operators::EQUAL, true)), %w[id])
+
+        expect(search.with(query: hash_including('display_as' => 'plaintext'))).to have_been_made
+      end
+
+      it 'walks the search cursor for the window a list view asked for' do
+        stub_request(:post, "#{base}/conversations/search")
+          .with(query: hash_including({}))
+          .to_return(json({ 'conversations' => [conversation('1'), conversation('2')],
+                            'pages' => { 'next' => { 'starting_after' => 'c2' } } }))
+        stub_request(:post, "#{base}/conversations/search")
+          .with(query: hash_including({}),
+                body: hash_including('pagination' => hash_including('starting_after' => 'c2')))
+          .to_return(json('conversations' => [conversation('3')]))
+        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 2, limit: 1)
+
+        rows = collection.list(nil, filter(condition_tree: leaf('open', operators::EQUAL, true), page: page), %w[id])
+
+        expect(ids(rows)).to eq(%w[3])
+      end
+
+      # Per word rather than as a substring, which the README says out loud.
+      it 'answers a free-text search on the body of the message that opened the conversation' do
+        search = stub_search
+        searched = ForestAdminDatasourceToolkit::Components::Query::Filter.new(search: ' facture ')
+
+        collection.list(nil, searched, %w[id])
+
+        expect(search.with(body: hash_including('query' => { 'field' => 'source.body', 'operator' => '~',
+                                                             'value' => 'facture' }))).to have_been_made
+      end
+
+      # Written as one tree rather than added to the translated query: the
+      # nesting Intercom allows is then checked over the whole of it.
+      it 'ands a free-text search with the condition it came with' do
+        search = stub_search
+        searched = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
+          search: 'facture', condition_tree: leaf('open', operators::EQUAL, true)
+        )
+
+        collection.list(nil, searched, %w[id])
+
+        expect(search.with { |request| JSON.parse(request.body)['query']['operator'] == 'AND' }).to have_been_made
+      end
+
+      # The date bounds Intercom answers are the ones the day rule moved, which
+      # is what makes an interval answer the day it names.
+      it 'sends a date bound on the UTC day boundary that answers the day asked for' do
+        search = stub_search
+        tree = leaf('created_at', operators::GREATER_THAN, '2026-09-01T08:30:00Z')
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expect(search.with(body: hash_including('query' => hash_including('value' => Time.utc(2026, 8,
+                                                                                              31).to_i))))
+          .to have_been_made
+      end
+    end
+
     describe 'a filter it cannot honour' do
-      # Translating a Forest tree into Intercom's search DSL is the next lot.
-      # Until then a page that looks filtered without being it is the one answer
-      # this datasource must not give.
-      it 'refuses a condition on anything but the primary key' do
-        expect { collection.list(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'open')), %w[id]) }
-          .to raise_error(UnsupportedOperatorError, /cannot answer a condition/)
+      # A condition dropped on the way to Intercom comes back as an unfiltered
+      # page that looks filtered, which is the one answer this datasource must
+      # not give.
+      it 'refuses a condition on a column the endpoint does not filter' do
+        expect { collection.list(nil, filter(condition_tree: leaf('tag_names', operators::EQUAL, 'billing')), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /cannot filter "tag_names"/)
       end
 
-      it 'refuses a free-text search' do
-        searched = ForestAdminDatasourceToolkit::Components::Query::Filter.new(search: 'facture')
-
-        expect { collection.list(nil, searched, %w[id]) }
-          .to raise_error(UnsupportedOperatorError, /cannot answer a free-text search/)
+      it 'refuses an operator the endpoint does not answer on that column' do
+        expect { collection.list(nil, filter(condition_tree: leaf('state', operators::CONTAINS, 'op')), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /answers equal, not_equal on "state"/)
       end
 
-      it 'says where the filtering will come from, so the message is actionable' do
-        expect { collection.list(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'open')), %w[id]) }
-          .to raise_error(UnsupportedOperatorError, /search endpoint.*filter translation/m)
+      it 'makes no request at all when it refuses' do
+        expect { collection.list(nil, filter(condition_tree: leaf('tag_names', operators::EQUAL, 'x')), %w[id]) }
+          .to raise_error(UnsupportedOperatorError)
+        expect(a_request(:post, "#{base}/conversations/search")).not_to have_been_made
       end
     end
 
@@ -272,6 +419,17 @@ module ForestAdminDatasourceIntercom
       it 'reports the order it did not get' do
         stub_list(conversation('1'))
         sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'created_at', ascending: false }])
+
+        collection.list(nil, filter(sort: sort), %w[id])
+
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/ignores a sort/)
+      end
+
+      # `?sort=-id` is an order the operator asked for, not the ascending default
+      # the agent injects when a request names none.
+      it 'reports an explicit descending order on the primary key' do
+        stub_list(conversation('1'))
+        sort = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'id', ascending: false }])
 
         collection.list(nil, filter(sort: sort), %w[id])
 
@@ -322,11 +480,22 @@ module ForestAdminDatasourceIntercom
           .to raise_error(UnsupportedOperatorError, /can only be counted/)
       end
 
-      it 'refuses a condition it could not honour on the list either' do
+      # `total_count` is exact on a search too, so a filtered count is one
+      # request over the whole filtered set rather than over a page of it.
+      it 'counts a filtered collection through the search, in one request' do
+        stub_search(total: 1_234)
+
+        value = collection.aggregate(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'open')),
+                                     aggregation('Count')).first['value']
+
+        expect(value).to eq(1_234)
+      end
+
+      it 'refuses to count what it refuses to list' do
         expect do
-          collection.aggregate(nil, filter(condition_tree: leaf('state', operators::EQUAL, 'open')),
+          collection.aggregate(nil, filter(condition_tree: leaf('tag_names', operators::EQUAL, 'billing')),
                                aggregation('Count'))
-        end.to raise_error(UnsupportedOperatorError, /cannot answer a condition/)
+        end.to raise_error(UnsupportedOperatorError, /cannot filter "tag_names"/)
       end
 
       # Counting the pages a walk collected would answer a fraction as if it

@@ -94,13 +94,42 @@ module ForestAdminDatasourceIntercom
         expect(collection.fields['Due'].column_type).to eq('Date')
       end
 
-      # `/tickets/search` filters none of these and ignores a sort without
-      # saying so, so nothing but the primary key may advertise anything.
-      it 'declares every column unfilterable and unsortable, except the primary key' do
-        others = collection.fields.except('id')
+      # `/tickets/search` ignores a sort without saying so, on every column.
+      it 'declares every column unsortable' do
+        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+      end
 
-        expect(others.values.map(&:filter_operators).flatten.uniq).to be_empty
-        expect(others.values.map(&:is_sortable).uniq).to eq([false])
+      it 'advertises the filters the search endpoint answers, and only those' do
+        expect(collection.fields['category'].filter_operators).to eq(%w[equal not_equal])
+        expect(collection.fields['created_at'].filter_operators).to eq(%w[greater_than less_than])
+      end
+
+      # Measured during lot 1: `/tickets/search` refuses `company_id` with
+      # `invalid_field` although a ticket carries one. Filtering tickets by
+      # account is not something this endpoint does.
+      it 'advertises no filter on the account, which the endpoint refuses' do
+        expect(collection.fields['company_id'].filter_operators).to be_empty
+      end
+
+      # Derived by the agent from the parts of the ticket. A column advertising a
+      # filter the read cannot honour is what this lot exists to prevent.
+      it 'advertises no filter on the columns derived from the parts' do
+        %w[closed_at closed_by_name last_reply_at last_responder_name last_responder_type].each do |column|
+          expect(collection.fields[column].filter_operators).to be_empty, "#{column} advertises a filter"
+        end
+      end
+
+      # R7: an attribute is filtered through an id that differs from one ticket
+      # type to the next, so the union column cannot say which id to use.
+      it 'advertises no filter on a ticket attribute while the arbitration stands' do
+        expect(collection.fields['Due'].filter_operators).to be_empty
+        expect(collection.fields['_default_title_'].filter_operators).to be_empty
+      end
+
+      # Intercom matches text field by field, and this endpoint exposes none
+      # this collection carries.
+      it 'is not searchable' do
+        expect(collection).not_to be_is_searchable
       end
 
       # An attribute overwriting a native column would show the attribute where
@@ -206,13 +235,45 @@ module ForestAdminDatasourceIntercom
         expect(rows(%w[id], condition_tree: leaf('id', operators::EQUAL, '1')).map { |row| row['id'] }).to eq(%w[1])
       end
 
-      it 'refuses a condition it cannot honour' do
+      # The search carries the filter it was given, in place of the predicate
+      # that matches everything.
+      it 'searches with the query the translator wrote' do
+        search = stub_search(ticket('1'), body: { 'query' => { 'field' => 'category', 'operator' => '=',
+                                                               'value' => 'request' } })
+
+        rows(%w[id], condition_tree: leaf('category', operators::EQUAL, 'request'))
+
+        expect(search).to have_been_made
+      end
+
+      it 'refuses a condition on a column the endpoint does not filter, by name' do
         expect { rows(%w[id], condition_tree: leaf('state_category', operators::EQUAL, 'resolved')) }
-          .to raise_error(UnsupportedOperatorError, /cannot answer a condition/)
+          .to raise_error(UnsupportedOperatorError, /cannot filter "state_category"/)
+      end
+
+      # The account, measured as refused by the endpoint itself.
+      it 'refuses a condition on the account with the measurement as its reason' do
+        expect { rows(%w[id], condition_tree: leaf('company_id', operators::EQUAL, '696dd')) }
+          .to raise_error(UnsupportedOperatorError, /invalid_field/)
+      end
+
+      it 'refuses a free-text search, having no text column the endpoint matches' do
+        searched = ForestAdminDatasourceToolkit::Components::Query::Filter.new(search: 'facture')
+
+        expect { collection.list(nil, searched, %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /cannot answer a free-text search/)
       end
     end
 
     describe '#aggregate' do
+      it 'counts a filtered collection through the total_count of its search' do
+        stub_search(total: 12, body: { 'query' => { 'field' => 'open', 'operator' => '=', 'value' => true } })
+        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('open', operators::EQUAL, true)),
+                                    aggregation).first['value']).to eq(12)
+      end
+
       it 'counts through the total_count of the search, exactly' do
         stub_search(ticket('1'), total: 81_142)
         aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')

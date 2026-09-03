@@ -25,12 +25,22 @@ module ForestAdminDatasourceIntercom
 
       def initialize(datasource)
         super(datasource, 'IntercomConversation')
+        # The one collection of this datasource Intercom matches text on: `~` on
+        # `source.body`, which is the message that opened the conversation.
+        enable_search
       end
 
       protected
 
       def list_endpoint = 'conversations'
       def list_key = 'conversations'
+      def searchable = 'conversations'
+      def search_column = 'source_body'
+
+      # Sent on the search too, where Intercom does not document it: the bodies
+      # are HTML written by end customers (R10), and a parameter it ignores costs
+      # a query string while the one it honours saves every filtered row from
+      # coming back as markup.
       def read_params = { 'display_as' => 'plaintext' }
 
       # The contact identity and the timeline, each read only when the projection
