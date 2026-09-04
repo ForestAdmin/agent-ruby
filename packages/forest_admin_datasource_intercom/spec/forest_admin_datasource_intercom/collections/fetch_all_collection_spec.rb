@@ -53,6 +53,14 @@ module ForestAdminDatasourceIntercom
         .equivalent_tree?(operator, described_class::IN_MEMORY_OPERATORS, column_type)
     end
 
+    # A projection naming nothing asks for every declared column, `team_names`
+    # among them, so a list with no projection reads the teams as well.
+    before do
+      stub_request(:get, "#{base}/teams")
+        .to_return(status: 200, body: { 'type' => 'team.list', 'teams' => [] }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+    end
+
     # The count and the group are taken over every record Intercom holds, not
     # over a page of them, which is what makes them exact.
     it 'is countable' do

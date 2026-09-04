@@ -25,7 +25,7 @@ module ForestAdminDatasourceIntercom
     # plainly: a row whose foreign key is null matches no relation filter, the
     # way a join drops it, negated filters included. A ticket with no assignee is
     # not "assigned to someone other than Marie".
-    module Relations
+    module Relations # rubocop:disable Metrics/ModuleLength
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       ManyToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema
       Filter = ForestAdminDatasourceToolkit::Components::Query::Filter
@@ -39,6 +39,20 @@ module ForestAdminDatasourceIntercom
       # the two tiers spell "match nothing" differently -- in memory an `in []`
       # says it, while Intercom's search DSL has no way to.
       NOTHING = :matches_nothing
+
+      # The group a relation condition expands into, told apart from a group the
+      # operator wrote. Two things hang on the difference: this one may be
+      # inlined into a parent aggregating the same way -- the level it adds is
+      # one nobody budgeted for -- and a tier refusing it can name the relation
+      # rather than a shape the operator never wrote.
+      class RelationBranch < Branch
+        attr_reader :relation_field
+
+        def initialize(aggregator, conditions, relation_field)
+          @relation_field = relation_field
+          super(aggregator, conditions)
+        end
+      end
 
       protected
 
@@ -65,19 +79,27 @@ module ForestAdminDatasourceIntercom
       # foreign keys are read, since a projection naming `assignee:name` does not
       # have to name `admin_assignee_id`.
       #
-      # One request per relation per page, never one per row.
+      # One request per target *collection* per page -- never one per row, and
+      # never twice for two relations that point at the same collection: a
+      # ticket's `state` and `previous_state` are one read of `/ticket_states`,
+      # over the ids both of them name.
       def embed_relations(caller, records, rows, projection)
-        relations_asked(projection).each do |name, sub_projection|
-          relation = fields[name]
-          next unless relation.is_a?(ManyToOneSchema)
+        asked = many_to_one_asked(projection)
+        return if asked.empty?
 
-          key = relation.foreign_key
-          ids = records.filter_map { |record| record[key] }.uniq
-          targets = indexed_targets(caller, relation, ids, sub_projection)
+        indexed = indexed_targets(caller, records, asked)
+
+        asked.each do |name, relation, wanted|
+          rows_of_target = indexed[relation.foreign_collection]
 
           # Nil rather than absent when an id names no record: a teammate who
-          # left the workspace reads as no teammate, not as a broken row.
-          records.each_with_index { |record, index| rows[index][name] = targets[record[key]] }
+          # left the workspace reads as no teammate, not as a broken row. Sliced
+          # back to what this relation asked for, the read having been widened to
+          # the union of what every relation on that collection did.
+          records.each_with_index do |record, index|
+            target_row = rows_of_target[record[relation.foreign_key]]
+            rows[index][name] = target_row&.slice(*wanted)
+          end
         end
       end
 
@@ -107,18 +129,36 @@ module ForestAdminDatasourceIntercom
         Projection.new(Array(projection).map(&:to_s)).relations
       end
 
-      # The target's own key travels with the projection whether or not it was
-      # asked for: it is what the rows are indexed by here, and what makes the
-      # nested row a link rather than a label in the interface.
-      def indexed_targets(caller, relation, ids, sub_projection)
+      # The many-to-one relations the projection named, each with the columns it
+      # asked of its target. The target's own key travels with them whether or
+      # not it was asked for: it is what the rows are indexed by here, and what
+      # makes the nested row a link rather than a label in the interface.
+      def many_to_one_asked(projection)
+        relations_asked(projection).filter_map do |name, sub_projection|
+          relation = fields[name]
+          next unless relation.is_a?(ManyToOneSchema)
+
+          [name, relation, Array(sub_projection).map(&:to_s).union([relation.foreign_key_target])]
+        end
+      end
+
+      def indexed_targets(caller, records, asked)
+        asked.group_by { |_, relation, _| relation.foreign_collection }
+             .transform_values { |group| target_rows(caller, records, group) }
+      end
+
+      # One read per target collection, over the ids every relation pointing at
+      # it names and the union of the columns they asked for.
+      def target_rows(caller, records, group)
+        relation = group.first[1]
+        ids = group.flat_map { |_, rel, _| records.filter_map { |record| record[rel.foreign_key] } }.uniq
         return {} if ids.empty?
 
         target = relation.foreign_key_target
-        wanted = Projection.new(Array(sub_projection).map(&:to_s).union([target]))
+        wanted = Projection.new(group.flat_map { |_, _, columns| columns }.uniq)
         filter = Filter.new(condition_tree: Leaf.new(target, Operators::IN, ids))
 
-        foreign_collection(relation).list(caller, filter, wanted)
-                                    .to_h { |row| [row[target], row] }
+        foreign_collection(relation).list(caller, filter, wanted).to_h { |row| [row[target], row] }
       end
 
       def rewrite_branch(caller, branch, &builder)
@@ -126,13 +166,39 @@ module ForestAdminDatasourceIntercom
 
         if branch.aggregator.to_s.casecmp('or').zero?
           kept = rewritten.reject { |node| node == NOTHING }
-          kept.empty? ? NOTHING : Branch.new(branch.aggregator, kept)
+          kept.empty? ? NOTHING : Branch.new(branch.aggregator, absorb_groups(branch.aggregator, kept))
         elsif rewritten.include?(NOTHING)
           NOTHING
         else
-          Branch.new(branch.aggregator, rewritten)
+          Branch.new(branch.aggregator, absorb_groups(branch.aggregator, rewritten))
         end
       end
+
+      # A relation group aggregating the way its parent does is inlined into it:
+      # `or(x, or(a, b))` is `or(x, a, b)` and one level shallower. The level it
+      # saves is one nothing budgeted for -- what a tier measured its nesting
+      # limit against is the tree the operator wrote, not the equalities a
+      # relation expands into afterwards.
+      #
+      # Only a relation group is inlined. A group the operator wrote is what
+      # their filter means, and flattening it would spend on one group the
+      # conditions two groups were holding.
+      def absorb_groups(aggregator, nodes)
+        absorbed = nodes.flat_map do |node|
+          inlinable_group?(node, aggregator) ? Array(node.conditions) : [node]
+        end
+
+        absorb_relation_group?(absorbed.size) ? absorbed : nodes
+      end
+
+      def inlinable_group?(node, aggregator)
+        node.is_a?(RelationBranch) && node.aggregator.to_s.casecmp(aggregator.to_s).zero?
+      end
+
+      # Hook for a tier that bounds how many conditions a group may hold: past
+      # that, the nested form is the one that fits, and the level it costs is
+      # spent rather than the width.
+      def absorb_relation_group?(_size) = true
 
       def rewrite_relation_leaf(caller, leaf)
         name, path = leaf.field.to_s.split(':', 2)

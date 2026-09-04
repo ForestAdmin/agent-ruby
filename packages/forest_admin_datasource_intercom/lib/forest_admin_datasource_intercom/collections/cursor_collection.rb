@@ -188,11 +188,22 @@ module ForestAdminDatasourceIntercom
       # relation condition matching more records than that is refused rather than
       # sent -- and refused here, where the message can name the relation the
       # operator filtered on rather than the key it resolved to.
+      #
+      # It also costs a level of nesting, which is why it is built as the group
+      # `Relations` can tell from one the operator wrote: inlined into a parent
+      # that aggregates the same way, it costs none.
       def relation_group(key, ids, leaf)
         refuse_fan_out!(leaf, key, ids) if ids.size > Query::ConditionTreeTranslator::MAX_GROUP_SIZE
         return Leaf.new(key, Operators::EQUAL, ids.first) if ids.size == 1
 
-        Branch.new('Or', ids.map { |id| Leaf.new(key, Operators::EQUAL, id) })
+        RelationBranch.new('Or', ids.map { |id| Leaf.new(key, Operators::EQUAL, id) }, leaf.field)
+      end
+
+      # Inlining a relation group into its parent trades a level of nesting for
+      # width, and Intercom bounds both. Past the conditions a group may hold,
+      # the nested form is the one it answers.
+      def absorb_relation_group?(size)
+        size <= Query::ConditionTreeTranslator::MAX_GROUP_SIZE
       end
 
       # A relation this endpoint filters nothing through. It is navigable all the

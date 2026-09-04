@@ -51,6 +51,16 @@ module ForestAdminDatasourceIntercom
         asked.reject { |field| field.include?(':') }.to_h { |field| [field, record[field]] }
       end
 
+      # Whether a projection asks for a column. No projection at all asks for
+      # every declared column, which is how `project` reads it -- an enrichment
+      # guarded on the column being named would leave nil the very column the
+      # projection publishes.
+      def column_asked?(projection, column)
+        asked = Array(projection).map(&:to_s)
+
+        asked.empty? || asked.include?(column)
+      end
+
       # The window a list view asked for, cut out of records already in hand.
       #
       # A filter with no page -- or a page naming no limit -- asks for every

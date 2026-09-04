@@ -53,6 +53,13 @@ module ForestAdminDatasourceIntercom
         expect(WebMock).to have_requested(:get, "#{base}/admins").once
       end
 
+      it 'names them when the projection names no column at all' do
+        stub_teams('id' => '814865', 'name' => 'Support', 'admin_ids' => [493_881])
+        stub_admins('id' => '493881', 'name' => 'Alice')
+
+        expect(collection.list(nil, filter, nil).first['admin_names']).to eq(['Alice'])
+      end
+
       it 'reads nothing when no projection asks for the names' do
         stub_teams('id' => '814865', 'name' => 'Support', 'admin_ids' => [493_881])
 

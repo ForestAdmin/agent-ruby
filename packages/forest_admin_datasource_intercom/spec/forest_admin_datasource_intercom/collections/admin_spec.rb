@@ -40,11 +40,22 @@ module ForestAdminDatasourceIntercom
       stub_admins('type' => 'admin', 'id' => '1', 'name' => 'Alice', 'email' => 'alice@acme.test',
                   'job_title' => 'Support', 'away_mode_enabled' => true, 'away_mode_reassign' => false,
                   'has_inbox_seat' => true, 'team_ids' => [814_865])
+      stub_teams('id' => '814865', 'name' => 'Support')
 
       expect(collection.list(nil, filter, nil))
         .to eq([{ 'id' => '1', 'name' => 'Alice', 'email' => 'alice@acme.test', 'job_title' => 'Support',
                   'away_mode_enabled' => true, 'away_mode_reassign' => false, 'has_inbox_seat' => true,
-                  'team_names' => nil }])
+                  'team_names' => ['Support'] }])
+    end
+
+    # A projection naming nothing asks for every declared column, which is how
+    # `project` reads it -- so the enrichment has to read it that way too, or the
+    # one column the projection publishes comes back nil.
+    it 'fills the derived names when the projection names no column at all' do
+      stub_admins('id' => '1', 'name' => 'Alice', 'team_ids' => [814_865])
+      stub_teams('id' => '814865', 'name' => 'Support')
+
+      expect(collection.list(nil, filter, nil).first['team_names']).to eq(['Support'])
     end
 
     # Intercom types a team id as a number here and as a string on the team

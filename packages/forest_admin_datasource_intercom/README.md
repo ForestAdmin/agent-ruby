@@ -61,8 +61,14 @@ beats not running.
 A read-only token is enough, and is what to recommend for this lot. A permission the token lacks
 costs **columns or a collection, never the boot of the agent**: the ticket-type introspection
 degrades to no attribute column, a collection whose endpoint answers 403 fails its own page, and a
-token that cannot read `/admins` or `/teams` leaves the membership names empty without touching the
-relation, which reads them from the other side.
+token that cannot read `/admins` or `/teams` leaves the `admin_names` / `team_names` column empty
+rather than failing the page it is on.
+
+A **relation is the exception**, and it is worth knowing before scoping a token: resolving one reads
+the target endpoint, and that read is not guarded the way the names above are. A token denied
+`/admins` fails any page projecting `admin_assignee:name`, and fails the related list behind
+`IntercomTeam#admins` — the failure lands on the collection being read, not on the one that was
+denied. Scope the token to the endpoints in the table below, or to none of them.
 
 ## Collections
 
@@ -94,7 +100,14 @@ Intercom's search DSL and walked through the search endpoint. What the translati
 Intercom joins nothing: a ticket carries an assignee id, and the teammate behind it is a second read
 of a second endpoint. What makes eight relations affordable is that every collection on the far end
 is read whole in one request — so a relation resolves for a **whole page at the price of one read**,
-never one read per row, and it resolves *exactly*.
+never one read per row. The price is per target *collection*, not per relation: a ticket's `state`
+and `previous_state` are one read of `/ticket_states`, over the ids both of them name.
+
+*Exactly*, with one bound worth naming: "read whole" is what the endpoint answers, and `fetch_all`
+stops after [`MAX_COLLECTED_PAGES`](lib/forest_admin_datasource_intercom/client.rb) pages if Intercom
+paginates one of these on its own — it logs when it does. A workspace whose `/admins` or `/teams`
+runs past that cap resolves the relations pointing at the records it dropped as empty. The figure is
+sized for reference collections, which is what every target here is.
 
 | Collection | Relation | Target | Filterable through |
 | --- | --- | --- | --- |
@@ -277,7 +290,11 @@ That is exact, and it has three visible edges:
 - Intercom takes no membership operator on these fields, so several matches become **one equality per
   match**, inside an `OR` — which counts against the fifteen conditions a group allows. A relation
   condition matching more records than that is refused by name rather than sent and answered with a
-  400 naming neither the limit nor the filter that hit it.
+  400 naming neither the limit nor the filter that hit it. That `OR` is **inlined into a parent that
+  aggregates the same way**, so it costs no level of nesting where it does not have to: the two
+  levels Intercom allows are spent on the filter that was written, not on the expansion of a
+  relation. Where inlining it would take the parent past fifteen conditions it stays nested, width
+  being the scarcer of the two.
 - A condition the target matched **no record** with names no row, and the DSL cannot say so: the
   search is skipped entirely rather than sent as a filter that would come back with everything.
 - A relation whose foreign key the endpoint does not filter — the ticket `state` — is refused with a
@@ -287,6 +304,11 @@ That is exact, and it has three visible edges:
 
 On the collections read whole the same condition costs nothing: they filter in memory, so the ids go
 in as a plain membership and none of the DSL's limits apply.
+
+A **many-to-many is published unfilterable** — `admins` and `teams` — and a condition written on one
+anyway, in a scope or a segment, is refused before it reaches this datasource: the agent's own
+validator answers a 400 naming the field and its type. Filter on a column of the collection next
+door instead.
 
 ### The limits of a search, checked before the request leaves
 

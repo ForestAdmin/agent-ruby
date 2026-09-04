@@ -35,7 +35,7 @@ module ForestAdminDatasourceIntercom
       # asked for them: one read of `/teams` for the whole page. A token that
       # cannot read them costs the column and nothing else.
       def enrich(records, rows, projection)
-        return unless Array(projection).map(&:to_s).include?('team_names')
+        return unless column_asked?(projection, 'team_names')
 
         names = team_names
         records.each_with_index do |record, index|
