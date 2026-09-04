@@ -60,7 +60,9 @@ beats not running.
 
 A read-only token is enough, and is what to recommend for this lot. A permission the token lacks
 costs **columns or a collection, never the boot of the agent**: the ticket-type introspection
-degrades to no attribute column, and a collection whose endpoint answers 403 fails its own page.
+degrades to no attribute column, a collection whose endpoint answers 403 fails its own page, and a
+token that cannot read `/admins` or `/teams` leaves the membership names empty without touching the
+relation, which reads them from the other side.
 
 ## Collections
 
@@ -70,12 +72,13 @@ degrades to no attribute column, and a collection whose endpoint answers 403 fai
 | `IntercomTicket` | `POST /tickets/search`, `GET /tickets/{id}` | cursor | yes, exactly |
 | `IntercomAdmin` | `GET /admins` | read whole | yes, exactly |
 | `IntercomTeam` | `GET /teams` | read whole | yes, exactly |
+| `IntercomTeamMembership` | `GET /teams` | read whole | yes, exactly |
 | `IntercomTicketType` | `GET /ticket_types` | read whole | yes, exactly |
 | `IntercomTicketState` | `GET /ticket_states` | read whole | yes, exactly |
 
 Two tiers, and they behave differently on purpose.
 
-**Read whole** — admins, teams, ticket types, ticket states. Their endpoints answer in one response,
+**Read whole** — admins, teams, team memberships, ticket types, ticket states. Their endpoints answer in one response,
 so filtering, sorting, paging and counting them in memory is *exact*: the records in hand are every
 record Intercom holds. These are the only collections that can be filtered, sorted and grouped in
 this lot, and the only ones a chart may group by. The cost is bandwidth, not correctness.
@@ -85,6 +88,52 @@ nothing is filtered or sorted in memory. Three routes and no fourth: no conditio
 `id equals X` reads the record through its own endpoint, and anything else is translated into
 Intercom's search DSL and walked through the search endpoint. What the translation cannot express is
 **refused by name** — see [Filtering](#filtering).
+
+## Relations
+
+Intercom joins nothing: a ticket carries an assignee id, and the teammate behind it is a second read
+of a second endpoint. What makes eight relations affordable is that every collection on the far end
+is read whole in one request — so a relation resolves for a **whole page at the price of one read**,
+never one read per row, and it resolves *exactly*.
+
+| Collection | Relation | Target | Filterable through |
+| --- | --- | --- | --- |
+| `IntercomConversation` | `admin_assignee`, `closed_by` | `IntercomAdmin` | yes |
+| `IntercomConversation` | `team_assignee` | `IntercomTeam` | yes |
+| `IntercomTicket` | `admin_assignee` | `IntercomAdmin` | yes |
+| `IntercomTicket` | `team_assignee` | `IntercomTeam` | yes |
+| `IntercomTicket` | `ticket_type` | `IntercomTicketType` | yes |
+| `IntercomTicket` | `state`, `previous_state` | `IntercomTicketState` | **no** — read and navigate only |
+| `IntercomTeam` | `admins` | `IntercomAdmin` | no (many-to-many) |
+| `IntercomAdmin` | `teams` | `IntercomTeam` | no (many-to-many) |
+| `IntercomTeamMembership` | `team`, `admin` | `IntercomTeam`, `IntercomAdmin` | yes |
+
+Every one of them is **read-only**: this lot writes nothing, and Intercom exposes no endpoint that
+writes a team membership at all.
+
+**`IntercomTeamMembership` exists because Intercom's does not.** The workspace carries the
+membership on the team (`admin_ids`) and on the teammate (`team_ids`) both and exposes no resource
+for the pair, while a many-to-many needs a collection to travel through. It is synthesized from
+`GET /teams`, one record per pair, keyed `teamId:adminId`. Without it, both sides read as an array of
+ids nobody can click.
+
+Alongside it, a team names its teammates (`admin_names`) and a teammate its teams (`team_names`) on
+the row itself, so a list view reads without a join. **Those replace the arrays of ids** the first
+lots published: one readable form plus a relation to navigate, rather than two ways to read one fact.
+They are read only when a projection asks for them, and a token that cannot read the other side
+costs the column and nothing else — never the page, and never the relation.
+
+The same rule settled the ticket labels: `state_label` and `ticket_type_name` stay on the row,
+`state_category` and `state_external_label` are gone — they are a hop away, on the `state` relation,
+and neither was ever filterable, so no segment, scope or saved filter could rest on them.
+
+A relation reads its target **undecorated**, so a permission scope or a segment defined on the target
+does not narrow what a relation resolves — the same way a native datasource joins a table without
+applying the scopes of the collection mapped to it.
+
+One semantic worth stating plainly: **a row whose foreign key is null matches no relation filter**,
+the way a join drops it, negated filters included. A ticket with no assignee is not "assigned to
+someone other than Marie".
 
 ## What the API cannot do, and what this does about it
 
@@ -200,6 +249,9 @@ refuses a search by name.
   `last_responder_name`, `last_responder_type`. They exist nowhere in Intercom; `/tickets/search`
   filters none of them and ignores a sort on them without a word;
 - **the account of a ticket** — `company_id`, refused by the endpoint itself with `invalid_field`;
+- **the state of a ticket** — the measured table carries no filter on a state id, so `state_id`,
+  `previous_state_id` and the `state` relation are read and navigated rather than filtered. Whether
+  the endpoint filters one at all is one of the probe's open questions;
 - **the ticket attributes** — filtered as `ticket_attribute.{id}`, and the same attribute carries a
   different id per ticket type, so a union column has no single id to translate to. See
   [Tickets](#tickets);
@@ -211,6 +263,30 @@ refuses a search by name.
   comparison against the empty string;
 - **group-by**, on either cursor collection: there is no aggregate endpoint, and grouping over the
   pages a walk collected would look exact while answering a fraction.
+
+### Through a relation
+
+A relation is published filterable as soon as *any* column of its target is — the agent decides that,
+not this datasource — so the interface offers `admin_assignee:name` the moment the relation exists.
+What Intercom is really filtered on is the foreign key: the **target says which of its records
+match**, over every record it holds rather than over a page, and the ids it names become the
+condition the search carries.
+
+That is exact, and it has three visible edges:
+
+- Intercom takes no membership operator on these fields, so several matches become **one equality per
+  match**, inside an `OR` — which counts against the fifteen conditions a group allows. A relation
+  condition matching more records than that is refused by name rather than sent and answered with a
+  400 naming neither the limit nor the filter that hit it.
+- A condition the target matched **no record** with names no row, and the DSL cannot say so: the
+  search is skipped entirely rather than sent as a filter that would come back with everything.
+- A relation whose foreign key the endpoint does not filter — the ticket `state` — is refused with a
+  message saying which of the two it is: the relation is there to be read and navigated. Whether
+  `/tickets/search` filters a state id at all is one of the probe's open questions; the answer lands
+  in the table, not in an assumption.
+
+On the collections read whole the same condition costs nothing: they filter in memory, so the ids go
+in as a plain membership and none of the DSL's limits apply.
 
 ### The limits of a search, checked before the request leaves
 
@@ -327,7 +403,7 @@ Everything else is read when a collection is listed, so an agent boots whatever 
 | Lot | What it brings |
 | --- | --- |
 | 3 | Writes and business actions: reply, close, snooze, reopen, assign, tag, convert |
-| 4 | Contacts and companies, and the relations promoted from today's denormalized columns |
+| 4 | Contacts and companies, and the relations towards them promoted from today's denormalized columns |
 | 5 | Notes, tags, segments |
 | 6 | Bounded group-by and the reporting export |
 

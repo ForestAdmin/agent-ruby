@@ -30,6 +30,10 @@ module ForestAdminDatasourceIntercom
     def register_collections
       add_collection(Collections::Admin.new(self))
       add_collection(Collections::Team.new(self))
+      # The join Intercom does not expose: without it the membership of a team is
+      # an array of ids on either side, since a many-to-many needs a collection
+      # to travel through.
+      add_collection(Collections::TeamMembership.new(self))
       add_collection(Collections::TicketType.new(self))
       add_collection(Collections::TicketState.new(self))
       add_collection(Collections::Conversation.new(self))

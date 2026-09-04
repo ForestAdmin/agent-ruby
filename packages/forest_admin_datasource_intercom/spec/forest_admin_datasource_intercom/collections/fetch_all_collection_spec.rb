@@ -74,14 +74,14 @@ module ForestAdminDatasourceIntercom
 
       # A list has no in-memory counterpart for any of the three.
       it 'declares a Json column neither filterable nor sortable' do
-        expect(collection.fields['team_ids'])
+        expect(collection.fields['team_names'])
           .to have_attributes(column_type: 'Json', is_sortable: false, is_groupable: false, filter_operators: [])
       end
 
       # A filter the UI offers and the collection then answers by emptying the
       # page is the failure this whole datasource is built to avoid.
       it 'advertises only operators it can actually evaluate' do
-        advertised = collection.fields.flat_map do |_name, column|
+        advertised = collection.fields.select { |_, field| field.type == 'Column' }.flat_map do |_name, column|
           column.filter_operators.map { |operator| [operator, column.column_type] }
         end
 

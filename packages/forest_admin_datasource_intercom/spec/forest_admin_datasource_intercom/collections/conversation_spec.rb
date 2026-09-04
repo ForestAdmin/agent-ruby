@@ -25,6 +25,12 @@ module ForestAdminDatasourceIntercom
       { status: status, body: payload.to_json, headers: { 'Content-Type' => 'application/json' } }
     end
 
+    # The columns alone: a relation carries neither operators nor an order, and
+    # what it may be filtered through is asserted on its own below.
+    def columns
+      collection.fields.select { |_, field| field.type == 'Column' }
+    end
+
     # Hand-written from the OpenAPI 2.16 spec, never captured from a workspace:
     # a conversation body is personal data.
     def conversation(id, overrides = {})
@@ -98,7 +104,7 @@ module ForestAdminDatasourceIntercom
       # Neither search endpoint takes a sort, and Intercom ignores the one it is
       # sent without a word, so no column of this tier may advertise one.
       it 'declares every column unsortable' do
-        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+        expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
       # Derived from the measured table, never written by hand: a column
@@ -135,13 +141,61 @@ module ForestAdminDatasourceIntercom
 
       # No aggregate endpoint, so no group-by may be offered.
       it 'declares no column groupable' do
-        expect(collection.fields.values.map(&:is_groupable).uniq).to eq([false])
+        expect(columns.values.map(&:is_groupable).uniq).to eq([false])
       end
 
       # This lot writes nothing: an editable column would offer a Save that
       # reaches an `update` the collection does not implement.
       it 'declares every column read-only' do
         expect(collection.fields.values.map(&:is_read_only).uniq).to eq([true])
+      end
+    end
+
+    # All three targets are read whole in one request, and
+    # `/conversations/search` takes a filter on each of the three keys -- so
+    # these relations can be read, navigated and filtered through alike, unlike
+    # the state of a ticket.
+    describe 'the relations to the reference collections' do
+      it 'points every id at the collection that reads it' do
+        expect(collection.fields['admin_assignee'])
+          .to have_attributes(type: 'ManyToOne', foreign_collection: 'IntercomAdmin',
+                              foreign_key: 'admin_assignee_id', foreign_key_target: 'id', is_read_only: true)
+        expect(collection.fields['team_assignee'])
+          .to have_attributes(foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
+        expect(collection.fields['closed_by'])
+          .to have_attributes(foreign_collection: 'IntercomAdmin', foreign_key: 'closed_by_id')
+      end
+
+      # The account is on the payload as a whole object, so the name is already a
+      # column; the Companies collection arrives with lot 4, and a relation whose
+      # target is missing is a schema the agent refuses to boot on.
+      it 'declares no relation towards the account' do
+        expect(collection.fields.keys).not_to include('company')
+      end
+
+      it 'nests the teammate who closed it, reading the teammates once for the page' do
+        stub_list(conversation('1'), conversation('2'))
+        stub_request(:get, "#{base}/admins")
+          .to_return(json('type' => 'admin.list', 'admins' => [{ 'id' => '493881', 'name' => 'Alice' }]))
+
+        rows = collection.list(nil, filter, ['id', 'closed_by:name'])
+
+        expect(rows).to eq([{ 'id' => '1', 'closed_by' => { 'name' => 'Alice', 'id' => '493881' } },
+                            { 'id' => '2', 'closed_by' => { 'name' => 'Alice', 'id' => '493881' } }])
+        expect(WebMock).to have_requested(:get, "#{base}/admins").once
+      end
+
+      it 'filters on the foreign key the target resolved to' do
+        stub_request(:get, "#{base}/admins")
+          .to_return(json('type' => 'admin.list', 'admins' => [{ 'id' => '493881', 'name' => 'Alice' }]))
+        stub_search(conversation('1'))
+
+        collection.list(nil, filter(condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/conversations/search")
+          .with(query: hash_including({}),
+                body: hash_including('query' => { 'field' => 'admin_assignee_id', 'operator' => '=',
+                                                  'value' => '493881' }))
       end
     end
 

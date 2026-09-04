@@ -16,6 +16,10 @@ module ForestAdminDatasourceIntercom
     #   refuses by name: an unfiltered page served in answer to a filter is the
     #   one failure this datasource is built to avoid.
     #
+    # A condition through a relation is resolved before any of that: the target
+    # collection is asked which of its records match, and what reaches Intercom
+    # is a condition on the foreign key. See `Relations`.
+    #
     # Counting is the exception that costs nothing: `total_count` is exact on
     # every response, filter included, so the record counter is one request.
     # Long by line count only: half of it is the refusals, and a refusal that
@@ -39,8 +43,14 @@ module ForestAdminDatasourceIntercom
         warn_ignored_sort(filter&.sort)
 
         records = fetch_records(caller, filter)
-        rows = records.map { |record| project(serialize(record), projection) }
+        # Serialized whole and projected afterwards rather than the other way
+        # round: a projection reaching through a relation names no foreign key,
+        # and the key is where the relation is read from.
+        serialized = records.map { |record| serialize(record) }
+        rows = serialized.map { |record| project(record, projection) }
+
         enrich(records, rows, projection)
+        embed_relations(caller, serialized, rows, projection)
         rows
       end
 
@@ -146,7 +156,13 @@ module ForestAdminDatasourceIntercom
         # having been dropped by the truncation before the window was applied.
         return records_by_ids(page_window(ids, filter)) if ids
 
-        listed_records(filter, translate(caller, filter))
+        query = translate(caller, filter)
+        # A condition through a relation the target matched no record with names
+        # no row, and Intercom's DSL cannot say so: the read is skipped rather
+        # than sent as a filter that would come back with everything.
+        return [] if query == NOTHING
+
+        listed_records(filter, query)
       end
 
       # The Intercom query a filter comes down to, or nil for a list view, which
@@ -155,10 +171,51 @@ module ForestAdminDatasourceIntercom
       # one tree, it is checked against the nesting Intercom allows like every
       # other condition, instead of adding a level nothing counted.
       def translate(caller, filter)
-        tree = combined_tree(filter)
+        tree = rewrite_relation_conditions(caller, combined_tree(filter)) do |key, ids, leaf|
+          relation_group(key, ids, leaf)
+        end
+        return NOTHING if tree == NOTHING
 
         Query::ConditionTreeTranslator.call(tree, endpoint: search_endpoint, collection: name,
                                                   timezone: timezone_for(caller))
+      end
+
+      # The ids the target matched, written as the filter Intercom does take on
+      # the foreign key: a group of equalities, its DSL offering no membership
+      # operator on these fields.
+      #
+      # That group counts against the fifteen conditions Intercom allows, so a
+      # relation condition matching more records than that is refused rather than
+      # sent -- and refused here, where the message can name the relation the
+      # operator filtered on rather than the key it resolved to.
+      def relation_group(key, ids, leaf)
+        refuse_fan_out!(leaf, key, ids) if ids.size > Query::ConditionTreeTranslator::MAX_GROUP_SIZE
+        return Leaf.new(key, Operators::EQUAL, ids.first) if ids.size == 1
+
+        Branch.new('Or', ids.map { |id| Leaf.new(key, Operators::EQUAL, id) })
+      end
+
+      # A relation this endpoint filters nothing through. It is navigable all the
+      # same -- the read costs nothing, the target being read whole -- and saying
+      # which of the two it is, is the whole point of the message.
+      def check_relation_filterable!(leaf, relation)
+        key = relation.foreign_key
+        refuse_unfilterable_key!(leaf, key) if search_endpoint.field(key).nil?
+      end
+
+      def refuse_unfilterable_key!(leaf, key)
+        raise UnsupportedOperatorError,
+              "#{name} cannot filter #{leaf.field.inspect}: the relation resolves to #{key.inspect}, on " \
+              "which #{search_endpoint.path} takes no filter. The relation is there to be read and " \
+              "navigated; filter on one of: #{search_endpoint.filterable_columns.join(", ")}."
+      end
+
+      def refuse_fan_out!(leaf, key, ids)
+        raise UnsupportedOperatorError,
+              "#{name} cannot filter #{leaf.field.inspect}: it names #{ids.size} records, " \
+              "#{search_endpoint.path} answers #{key.inspect} one value at a time, and Intercom takes " \
+              "#{Query::ConditionTreeTranslator::MAX_GROUP_SIZE} conditions per group. Narrow the condition " \
+              "on the relation, or filter on #{key.inspect} itself."
       end
 
       def combined_tree(filter)
@@ -244,7 +301,10 @@ module ForestAdminDatasourceIntercom
         ids = id_lookup(filter)
         return records_by_ids(ids).size if ids
 
-        page = read_page(per_page: 1, cursor: nil, query: translate(caller, filter))
+        query = translate(caller, filter)
+        return 0 if query == NOTHING
+
+        page = read_page(per_page: 1, cursor: nil, query: query)
         return page.total_count if page.total_count
 
         raise UnsupportedOperatorError,

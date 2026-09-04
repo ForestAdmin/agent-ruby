@@ -57,8 +57,12 @@ module ForestAdminDatasourceIntercom
 
       def list(caller, filter, projection)
         records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
+        window = page_window(records, filter)
+        rows = window.map { |record| project(record, projection) }
 
-        page_window(records, filter).map { |record| project(record, projection) }
+        enrich(window, rows, projection)
+        embed_relations(caller, window, rows, projection)
+        rows
       end
 
       # Exact, like the filter and the sort above it, which is why these columns
@@ -90,6 +94,12 @@ module ForestAdminDatasourceIntercom
                                          is_groupable: type != 'Json'))
       end
 
+      # Hook for what a row needs beyond the endpoint this collection reads --
+      # a name held on the other side of a membership, say. Called with the rows
+      # of the page only, and with the projection, so a column nobody asked for
+      # costs no request.
+      def enrich(_records, _rows, _projection); end
+
       # Every record of the collection, straight from its endpoint.
       def fetch_all = raise(NotImplementedError, "#{self.class} did not implement fetch_all")
 
@@ -104,6 +114,13 @@ module ForestAdminDatasourceIntercom
         records = fetch_all.map { |entity| serialize(entity) }
         tree = filter&.condition_tree
         return records if tree.nil?
+
+        # A condition through a relation becomes a membership on the foreign key:
+        # this tier filters in memory, where a list of ids costs no more than one
+        # id and none of Intercom's group limits apply -- they bound its search
+        # DSL, which nothing here goes through.
+        tree = rewrite_relation_conditions(caller, tree) { |key, ids, _| Leaf.new(key, Operators::IN, ids) }
+        return [] if tree == NOTHING
 
         refuse_unevaluable!(tree)
         tree.apply(records, self, timezone_for(caller))
