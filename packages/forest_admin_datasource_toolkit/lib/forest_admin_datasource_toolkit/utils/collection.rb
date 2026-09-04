@@ -56,10 +56,15 @@ module ForestAdminDatasourceToolkit
           field.origin_key == relation_field.foreign_key
       end
 
+      # ValidationError rather than a bare ForestException, for the same reason as
+      # below: every one of these three names a field the request asked for -- a
+      # filter, a sort, a scope written against another schema, a condition
+      # reaching through a relation that is not one this can traverse. That is a
+      # 400 the caller can read and fix, not a 500 saying the agent broke.
       def self.get_field_schema(collection, field_name)
         fields = collection.schema[:fields]
         unless field_name.include?(':')
-          raise ForestException, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
+          raise ValidationError, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
 
           return fields[field_name]
         end
@@ -67,10 +72,11 @@ module ForestAdminDatasourceToolkit
         association_name = field_name.split(':')[0]
         relation_schema = fields[association_name]
 
-        raise ForestException, "Relation not found #{collection.name}.#{association_name}" unless relation_schema
+        raise ValidationError, "Relation not found #{collection.name}.#{association_name}" unless relation_schema
 
         if relation_schema.type != 'ManyToOne' && relation_schema.type != 'OneToOne'
-          raise ForestException, "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
+          raise ValidationError,
+                "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
         end
 
         get_field_schema(

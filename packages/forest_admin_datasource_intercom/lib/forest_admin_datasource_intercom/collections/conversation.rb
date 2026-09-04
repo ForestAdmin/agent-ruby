@@ -10,7 +10,7 @@ module ForestAdminDatasourceIntercom
     # customers, and rendering third-party HTML inside Forest is neither safe nor
     # useful (R10).
     # Long by line count only: most of it declares the columns, one call each.
-    class Conversation < CursorCollection
+    class Conversation < CursorCollection # rubocop:disable Metrics/ClassLength
       include ContactIdentity
       include Conversation::Serializer
       include Conversation::Timeline
@@ -69,18 +69,38 @@ module ForestAdminDatasourceIntercom
         add_column('updated_at', 'Date')
         add_column('waiting_since', 'Date')
         add_column('snoozed_until', 'Date')
-        add_column('admin_assignee_id', 'String')
-        add_column('team_assignee_id', 'String')
-        # The conversation carries its company as a whole object, so the account
-        # name is free here -- unlike on a ticket, which carries the id alone.
-        add_column('company_id', 'String')
-        add_column('company_name', 'String')
+        define_assignment_columns
         define_contact_columns
         define_source_columns
         define_statistics_columns
         add_column('tag_names', 'Json')
         add_column('ai_agent_participated', 'Boolean')
         add_column('timeline', 'Json')
+        define_relations
+      end
+
+      # Who the conversation sits with, and who closed it. All three targets are
+      # read whole in one request, and `/conversations/search` takes a filter on
+      # each of the three keys -- so these relations can be read, navigated and
+      # filtered through alike.
+      #
+      # No relation towards the company: a conversation carries its account as a
+      # whole object, so the name is already on the row, and the Companies
+      # collection arrives with lot 4.
+      def define_relations
+        add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
+        add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
+        add_many_to_one('closed_by', foreign_collection: 'IntercomAdmin', foreign_key: 'closed_by_id')
+      end
+
+      # Who the conversation sits with, and which account it belongs to. The
+      # conversation carries its company as a whole object, so the account name
+      # is free here -- unlike on a ticket, which carries the id alone.
+      def define_assignment_columns
+        add_column('admin_assignee_id', 'String')
+        add_column('team_assignee_id', 'String')
+        add_column('company_id', 'String')
+        add_column('company_name', 'String')
       end
 
       # The contact identity is denormalized onto the row rather than declared as

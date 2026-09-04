@@ -37,10 +37,10 @@ module ForestAdminDatasourceIntercom
         def state_of(attrs)
           state = attrs['ticket_state'].is_a?(Hash) ? attrs['ticket_state'] : {}
 
+          # `internal_label` is what the support team reads. The category and the
+          # customer-facing label are a hop away, on the `state` relation.
           { 'state_id' => stringify_id(state['id']),
-            'state_category' => state['category'],
             'state_label' => state['internal_label'],
-            'state_external_label' => state['external_label'],
             'previous_state_id' => stringify_id(attrs['previous_ticket_state_id']) }
         end
 
