@@ -410,8 +410,13 @@ Intercom returns the parts **only when retrieving a single conversation**, so:
 A conversation is capped at its **500 most recent parts**; a very long thread is therefore partial,
 and says so nowhere but here.
 
-Contact name and e-mail are denormalized onto the row by **one bulk read per page**, not one per
-row, and only when the projection names them. A failure there costs those two columns, not the page.
+**The internal notes of the team are in the thread**, next to what the customer was told. That is
+what a thread is on Intercom, and publishing half of it would be the more surprising answer — but it
+is worth knowing before opening the collection to a role that should not read them.
+
+The contact's name is denormalized onto the row by **one bulk read per page**, not one per row, and
+only when the projection names it. A failure there costs that column, not the page. The e-mail is a
+hop away, on the `contact` relation.
 
 ## Tickets
 
@@ -438,6 +443,15 @@ Four things to know about them:
 
 Both are **display only**, and not temporarily: `/tickets/search` filters on neither and ignores a
 sort, so neither advertises an operator.
+
+**The thread is published too, and it is free here.** The same `timeline` column a conversation
+carries — who said what, when, and through which kind of event, internal notes and state changes
+included — built from the parts the response already holds. No request per row and no cap: where a
+conversation read from a listing carries no parts at all and leaves the column `nil` for *unknown*,
+a ticket always carries them, so an empty list means an empty thread. Both reads ask Intercom for
+`display_as=plaintext`: the bodies are HTML written by end customers, and rendering third-party
+markup inside Forest is neither safe nor useful. The 500-part ceiling applies here as well, which is
+the same truncation that can hide a closure date.
 
 The attributes a workspace declares on its ticket types are introspected once at boot and published
 as the **union** of every type's, keyed by name the way the payload is. Filtering one is a different

@@ -361,6 +361,12 @@ endpoints:
       part_count:
         reason: Counted by the agent from the parts the payload carries.
         source: measured
+      timeline:
+        reason: >-
+          Built by the agent from the parts of the ticket, which the search
+          endpoint does not read. Filter on `last_reply_at` or on the state
+          instead.
+        source: measured
     # R7, and it is a product decision rather than an implementation choice: a
     # ticket attribute is filtered as `ticket_attribute.{id}`, and a same-named
     # attribute carries a different id per ticket type (measured:

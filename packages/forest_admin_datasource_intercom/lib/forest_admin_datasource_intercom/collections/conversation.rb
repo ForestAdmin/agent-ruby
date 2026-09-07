@@ -10,9 +10,11 @@ module ForestAdminDatasourceIntercom
     # customers, and rendering third-party HTML inside Forest is neither safe nor
     # useful (R10).
     # Long by line count only: most of it declares the columns, one call each.
-    class Conversation < CursorCollection
+    class Conversation < CursorCollection # rubocop:disable Metrics/ClassLength
       include ContactIdentity
       include Conversation::Serializer
+      # The shared thread, then the hooks this collection puts over it.
+      include Collections::Timeline
       include Conversation::Timeline
 
       # How many conversations of one page may have their timeline read. The

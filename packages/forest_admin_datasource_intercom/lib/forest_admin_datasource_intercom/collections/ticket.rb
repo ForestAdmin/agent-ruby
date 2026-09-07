@@ -18,6 +18,9 @@ module ForestAdminDatasourceIntercom
       include ContactIdentity
       include Ticket::Serializer
       include Ticket::DerivedColumns
+      # The same thread a conversation publishes, and free here: the parts are
+      # in the response whether or not anything asks for them.
+      include Timeline
 
       # Intercom accepts 150. This is not that: it is what keeps one page of
       # tickets, timelines included, a response an agent can hold and an operator
@@ -43,6 +46,13 @@ module ForestAdminDatasourceIntercom
       def searchable = 'tickets'
       def max_page_size = MAX_TICKETS_PER_PAGE
 
+      # The part bodies are HTML written by end customers, and rendering
+      # third-party HTML inside Forest is neither safe nor useful (R10). Sent on
+      # the search, where Intercom does not document it: a parameter it ignores
+      # costs a query string, while the one it honours saves every row of the
+      # thread from coming back as markup.
+      def read_params = { 'display_as' => 'plaintext' }
+
       # Intercom exposes no `GET /tickets`, so a list view searches too: with the
       # filter it was given, or with the predicate that matches everything when
       # it was given none.
@@ -54,6 +64,7 @@ module ForestAdminDatasourceIntercom
 
         embed_contact_identity(records, rows, wanted)
         embed_derived_columns(records, rows, wanted)
+        embed_timeline(records, rows, wanted)
       end
 
       private
@@ -84,6 +95,7 @@ module ForestAdminDatasourceIntercom
         define_contact_columns
         define_derived_columns
         add_column('part_count', 'Number')
+        add_column('timeline', 'Json')
         # Before the attribute columns rather than after: a workspace attribute
         # whose name lands on a relation is then skipped with a warning, the way
         # one landing on a column already is. Declared after, it would collide
@@ -128,6 +140,20 @@ module ForestAdminDatasourceIntercom
                                           foreign_key: 'previous_state_id')
         add_many_to_one('ticket_type', foreign_collection: 'IntercomTicketType', foreign_key: 'ticket_type_id')
         add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
+      end
+
+      # Costs no request, unlike a conversation's: Intercom returns the parts of
+      # a ticket in the search response and offers no way to ask it not to, so
+      # the page pays for them whatever the projection says. Building the thread
+      # out of them is what is guarded here.
+      #
+      # An empty list means an empty thread, and says so -- where a conversation
+      # read from a listing carries no parts at all and its timeline stays nil,
+      # which reads as unknown.
+      def embed_timeline(records, rows, projection)
+        return unless projection.include?('timeline')
+
+        records.each_with_index { |record, index| rows[index]['timeline'] = build_timeline(record) }
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by
