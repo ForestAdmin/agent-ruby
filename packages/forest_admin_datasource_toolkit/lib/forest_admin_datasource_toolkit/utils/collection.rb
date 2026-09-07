@@ -167,7 +167,14 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |r| r[foreign_relation] }
+            # Compacted: a through row whose target the foreign collection no
+            # longer answers -- a record deleted, outside the caller's reach, or
+            # dropped by a datasource that reads its targets in bounded pages --
+            # carries a nil where a record was expected, and every consumer of a
+            # related list down to the JSON:API serializer reads a row by key.
+            # A join whose other side is gone yields no row, it does not yield an
+            # empty one.
+            return records.filter_map { |r| r[foreign_relation] }
           end
         end
 

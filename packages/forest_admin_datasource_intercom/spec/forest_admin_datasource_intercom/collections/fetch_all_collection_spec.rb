@@ -193,10 +193,29 @@ module ForestAdminDatasourceIntercom
         expect(ids(rows)).to eq(%w[2 1 3])
       end
 
-      it 'drops a clause naming a column it does not carry' do
+      # An order asked for and not honoured is reported everywhere else in this
+      # datasource, and a related list through a many-to-many reaches this tier
+      # with the columns of the collection it *reaches* rather than the one it
+      # travels through -- `Filter#nest` prefixes the condition tree and not the
+      # sort. Dropped in silence, that is the one order nothing would report.
+      it 'drops a clause naming a column it does not carry, and says so' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
         rows = collection.list(nil, filter(sort: sort({ field: 'unknown', ascending: true })), nil)
 
         expect(ids(rows)).to eq(%w[2 1 3])
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/sort on "unknown", which it does not carry/)
+      end
+
+      it 'keeps the clauses it does carry alongside the one it drops' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        rows = collection.list(
+          nil, filter(sort: sort({ field: 'unknown', ascending: true }, { field: 'name', ascending: true })), nil
+        )
+
+        expect(ids(rows)).to eq(%w[1 2 3])
       end
     end
 

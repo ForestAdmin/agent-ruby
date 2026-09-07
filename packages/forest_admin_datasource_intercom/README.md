@@ -130,6 +130,13 @@ for the pair, while a many-to-many needs a collection to travel through. It is s
 `GET /teams`, one record per pair, keyed `teamId:adminId`. Without it, both sides read as an array of
 ids nobody can click.
 
+Two consequences of travelling through it are worth knowing. A **related list of teammates is
+ordered by the membership, not by the teammate**: the agent hands the through collection the columns
+of the collection the relation reaches, so an order on `name` or `email` cannot be resolved there and
+is logged rather than silently dropped. And a `admin_ids` entry naming a teammate `/admins` does not
+answer -- one who left, one outside the token's reach -- **drops out of the related list** instead of
+appearing as an empty row.
+
 Alongside it, a team names its teammates (`admin_names`) and a teammate its teams (`team_names`) on
 the row itself, so a list view reads without a join. **Those replace the arrays of ids** the first
 lots published: one readable form plus a relation to navigate, rather than two ways to read one fact.

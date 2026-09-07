@@ -130,6 +130,43 @@ module ForestAdminDatasourceIntercom
 
         expect(rows).to eq([{ 'id' => '493881', 'name' => 'Alice' }])
       end
+
+      # `admin_ids` names a teammate `/admins` does not answer -- one who left
+      # the workspace, one outside the token's reach, one past the page cap of a
+      # large workspace. The membership nests a nil under the relation, which is
+      # right on a row an operator reads; unwrapped into a related list it would
+      # be a row holding nothing, and the serializer reads a row by key.
+      it 'drops a teammate the workspace no longer answers, rather than listing an empty row' do
+        stub_teams('id' => '814865', 'admin_ids' => [493_881, 999_999])
+        stub_admins('id' => '493881', 'name' => 'Alice')
+        query = ForestAdminDatasourceToolkit::Components::Query
+
+        rows = ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
+          collection, %w[814865], 'admins', nil, query::Filter.new, query::Projection.new(%w[id name])
+        )
+
+        expect(rows).to eq([{ 'id' => '493881', 'name' => 'Alice' }])
+      end
+
+      # The membership is handed the columns of the collection the relation
+      # reaches, `Filter#nest` prefixing the condition tree and not the sort. It
+      # cannot order on them, and says so rather than answering an order it did
+      # not honour.
+      it 'reports the order it cannot honour on a related list' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_teams('id' => '814865', 'admin_ids' => [493_881, 493_882])
+        stub_admins({ 'id' => '493881', 'name' => 'Zoe' }, { 'id' => '493882', 'name' => 'Alice' })
+        query = ForestAdminDatasourceToolkit::Components::Query
+
+        ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
+          collection, %w[814865], 'admins', nil,
+          query::Filter.new(sort: query::Sort.new([{ field: 'name', ascending: true }])),
+          query::Projection.new(%w[id name])
+        )
+
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/sort on "name", which it does not carry/)
+      end
     end
   end
 end

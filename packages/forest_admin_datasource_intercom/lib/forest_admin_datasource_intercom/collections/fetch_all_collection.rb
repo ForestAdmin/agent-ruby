@@ -17,7 +17,7 @@ module ForestAdminDatasourceIntercom
     # Each read re-reads the endpoint, so an operator sees what Intercom holds
     # now rather than what it held when the process booted. One request per list
     # against a 10 000-a-minute budget is not a figure any list view approaches.
-    class FetchAllCollection < BaseCollection
+    class FetchAllCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       # The filters a column may advertise, per column type. Restricted to what
       # the toolkit can evaluate in memory, since the in-memory pass is the only
       # pass there is here: an operator with no equivalence makes `match` answer
@@ -173,17 +173,34 @@ module ForestAdminDatasourceIntercom
 
       # A sort clause naming a field this collection does not carry is dropped:
       # ordering by a column that is not there would compare nil to nil on every
-      # row and leave the order to the tie-break.
+      # row and leave the order to the tie-break. Reported when it happens,
+      # rather than dropped in silence -- an order asked for and not honoured is
+      # reported everywhere else in this datasource, and there is one route that
+      # reaches this tier with a clause it cannot resolve: a related list through
+      # a many-to-many is served by the collection it travels through, and
+      # `Filter#nest` prefixes the condition tree without prefixing the sort, so
+      # the membership is handed the columns of the collection it reaches.
       def sort_clauses(sort)
-        Array(sort).filter_map do |clause|
-          field = clause[:field] || clause['field']
-          next unless fields.key?(field)
+        known, unknown = Array(sort).partition { |clause| fields.key?(sort_field(clause)) }
+        warn_unsortable(unknown) unless unknown.empty?
 
+        known.map do |clause|
           # `key?` rather than `||`: a descending clause carries `false`, which an
           # `||` fallback would read as "absent" and turn back into ascending.
           ascending = clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
-          [field, ascending != false]
+          [sort_field(clause), ascending != false]
         end
+      end
+
+      def sort_field(clause) = clause[:field] || clause['field']
+
+      def warn_unsortable(clauses)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] #{name} was asked to sort on " \
+          "#{clauses.map { |clause| sort_field(clause).inspect }.join(", ")}, which it does not carry; the rows " \
+          'come back in the order Intercom returned them. A related list through a many-to-many is ordered by the ' \
+          'columns of the collection it travels through, not by those of the collection it reaches.'
+        )
       end
 
       def compare_clauses(left, right, clauses)
