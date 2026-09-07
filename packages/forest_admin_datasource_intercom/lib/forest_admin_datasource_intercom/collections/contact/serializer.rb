@@ -13,7 +13,7 @@ module ForestAdminDatasourceIntercom
           native(attrs)
             .merge(account_of(attrs['companies']))
             .merge(location_of(attrs['location']))
-            .merge(attribute_columns_for(attrs))
+            .merge(attribute_values(attrs['custom_attributes']))
         end
 
         private
@@ -95,15 +95,6 @@ module ForestAdminDatasourceIntercom
 
           { 'location_country' => attrs['country'], 'location_region' => attrs['region'],
             'location_city' => attrs['city'] }
-        end
-
-        # Nil rather than absent for an attribute the contact does not carry:
-        # the column exists on every row, and an absent key would read as a
-        # record missing it.
-        def attribute_columns_for(attrs)
-          values = attrs['custom_attributes'].is_a?(Hash) ? attrs['custom_attributes'] : {}
-
-          @attributes.to_h { |attribute| [attribute.column_name, values[attribute.name]] }
         end
 
         def domain_of(email)

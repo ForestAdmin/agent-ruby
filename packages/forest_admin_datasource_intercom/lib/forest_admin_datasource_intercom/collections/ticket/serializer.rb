@@ -7,6 +7,11 @@ module ForestAdminDatasourceIntercom
       module Serializer
         protected
 
+        # Intercom keys the attribute values by **name**, which is what lets a
+        # single collection display the union of every ticket type's -- and what
+        # stops it from filtering on them, the filter being written by an id
+        # that differs from one type to the next. A ticket of another type
+        # simply does not carry the key, and the column reads as empty.
         def serialize(ticket)
           attrs = ticket.is_a?(Hash) ? ticket : {}
 
@@ -14,7 +19,7 @@ module ForestAdminDatasourceIntercom
             .merge(state_of(attrs))
             .merge(type_of(attrs['ticket_type']))
             .merge(contact_columns_for(attrs))
-            .merge(attribute_values_of(attrs['ticket_attributes']))
+            .merge(attribute_values(attrs['ticket_attributes']))
             .merge(derived_columns_for(attrs))
         end
 
@@ -48,32 +53,6 @@ module ForestAdminDatasourceIntercom
           attrs = ticket_type.is_a?(Hash) ? ticket_type : {}
 
           { 'ticket_type_id' => stringify_id(attrs['id']), 'ticket_type_name' => attrs['name'] }
-        end
-
-        # Intercom keys the values by attribute **name**, which is what lets a
-        # single collection display the union of every type's attributes -- and
-        # what stops it from filtering on them, since the filter is written by id
-        # and the id differs from one type to the next.
-        #
-        # The value is read under the name the workspace gave it and written
-        # under the column name the schema publishes; the two differ whenever the
-        # first could not travel through a Forest query string.
-        #
-        # A ticket of another type simply does not carry the key: the column
-        # reads as absent rather than as empty.
-        def attribute_values_of(values)
-          held = values.is_a?(Hash) ? values : {}
-
-          attribute_columns.to_h { |attribute| [attribute.column_name, coerce(held[attribute.name], attribute)] }
-        end
-
-        # A date attribute comes back as epoch seconds like every other Intercom
-        # date; the rest is handed over as it came.
-        def coerce(value, attribute)
-          return nil if value.nil?
-          return stamp(value) if attribute.column_type == 'Date' && value.is_a?(Numeric)
-
-          value
         end
       end
     end

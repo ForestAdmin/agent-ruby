@@ -115,6 +115,26 @@ module ForestAdminDatasourceIntercom
         expect(collection.fields['arr'].filter_operators).to be_empty
       end
 
+      it 'skips an attribute whose name a native column already carries, and says which' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_data_attributes('company', { 'name' => 'name', 'data_type' => 'string', 'custom' => true,
+                                          'api_writable' => true, 'archived' => false })
+        stub_page(company('co1', 'custom_attributes' => { 'name' => 'Not the account name' }),
+                  page: 1, per_page: 15)
+
+        expect(rows(nil, page: page(0, 15)).first['name']).to eq('Company co1')
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/skips the company attribute "name"/)
+      end
+
+      it 'reads a date attribute as a date' do
+        stub_data_attributes('company', { 'name' => 'renewal', 'data_type' => 'date', 'custom' => true,
+                                          'api_writable' => true, 'archived' => false })
+        stub_page(company('co1', 'custom_attributes' => { 'renewal' => 1_700_000_000 }), page: 1, per_page: 15)
+
+        expect(rows(%w[id renewal], page: page(0, 15)).first['renewal']).to eq('2023-11-14T22:13:20Z')
+      end
+
       it 'reads its value off the payload' do
         stub_page(company('co1', 'custom_attributes' => { 'arr' => 12_000 }))
 

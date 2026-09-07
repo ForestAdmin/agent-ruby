@@ -20,6 +20,7 @@ module ForestAdminDatasourceIntercom
     # operators looking at a list at the same time.
     class Company < OffsetCollection
       include Company::Serializer
+      include CustomAttributes
 
       # The column each lookup is written on, and the query parameter Intercom
       # answers it under. They happen to share a name; keeping the mapping
@@ -49,8 +50,11 @@ module ForestAdminDatasourceIntercom
         add_column('name', 'String')
         define_profile_columns
         define_activity_columns
-        define_attribute_columns
+        # Before the attribute columns, so an attribute whose name lands on the
+        # relation is skipped with a warning rather than taking the boot with
+        # it.
         add_one_to_many('contacts', foreign_collection: 'IntercomContact', origin_key: 'company_id')
+        register_attribute_columns
       end
 
       def define_profile_columns
@@ -75,9 +79,7 @@ module ForestAdminDatasourceIntercom
       # Typed from `GET /data_attributes?model=company`, and unfilterable for
       # the same reason as everything else here: this collection is looked up,
       # not searched.
-      def define_attribute_columns
-        @attributes.each { |attribute| add_column(attribute.column_name, attribute.column_type) }
-      end
+      def attribute_kind = 'company'
     end
   end
 end

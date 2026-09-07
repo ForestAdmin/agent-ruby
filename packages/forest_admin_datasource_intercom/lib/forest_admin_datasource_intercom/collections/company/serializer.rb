@@ -13,7 +13,7 @@ module ForestAdminDatasourceIntercom
             'plan_name' => plan['name'],
             'user_count' => attrs['user_count'],
             'session_count' => attrs['session_count']
-          ).merge(dates_of(attrs)).merge(attribute_columns_for(attrs))
+          ).merge(dates_of(attrs)).merge(attribute_values(attrs['custom_attributes']))
         end
 
         private
@@ -37,14 +37,6 @@ module ForestAdminDatasourceIntercom
             'last_request_at' => stamp(attrs['last_request_at']),
             'remote_created_at' => stamp(attrs['remote_created_at'])
           }
-        end
-
-        # Nil rather than absent for an attribute the company does not carry:
-        # the column exists on every row.
-        def attribute_columns_for(attrs)
-          values = attrs['custom_attributes'].is_a?(Hash) ? attrs['custom_attributes'] : {}
-
-          @attributes.to_h { |attribute| [attribute.column_name, values[attribute.name]] }
         end
       end
     end

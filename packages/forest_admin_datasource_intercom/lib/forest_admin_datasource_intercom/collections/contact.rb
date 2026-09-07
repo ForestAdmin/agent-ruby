@@ -24,6 +24,7 @@ module ForestAdminDatasourceIntercom
     # Long by line count only: most of it declares the columns, one call each.
     class Contact < CursorCollection # rubocop:disable Metrics/ClassLength
       include Contact::Serializer
+      include CustomAttributes
 
       # `/contacts/search` demands a query, so a read with no condition of its
       # own -- a list view asking for an order -- sends the least noisy
@@ -63,8 +64,12 @@ module ForestAdminDatasourceIntercom
         define_date_columns
         define_reachability_columns
         define_device_columns
-        define_attribute_columns
+        # Before the attribute columns rather than after: a workspace attribute
+        # whose name lands on a relation is then skipped with a warning, the way
+        # one landing on a column already is. Declared after, it would collide
+        # and take the boot with it.
         define_relations
+        register_attribute_columns
       end
 
       def define_identity_columns
@@ -117,9 +122,7 @@ module ForestAdminDatasourceIntercom
       # offers no filter it has not seen work. `api_writable` travels on the
       # introspected attribute for lot 4b, not on the column -- everything here
       # is read-only.
-      def define_attribute_columns
-        @attributes.each { |attribute| add_column(attribute.column_name, attribute.column_type) }
-      end
+      def attribute_kind = 'contact'
 
       # The owner is a teammate, read whole in one request, and
       # `/contacts/search` filters on the key -- so that relation is readable,

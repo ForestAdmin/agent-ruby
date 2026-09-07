@@ -154,6 +154,42 @@ module ForestAdminDatasourceIntercom
         expect(collection.fields['paid_subscriber'].is_sortable).to be(false)
       end
 
+      # Measured on a real workspace, and it took the agent's boot with it: the
+      # toolkit refuses a field declared twice, so an attribute landing on a
+      # native column has to be skipped -- and skipped rather than renamed,
+      # since the operator expects the record's own key under `id`.
+      it 'skips an attribute whose name a native column already carries, and says which' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_data_attributes('contact', { 'name' => 'id', 'data_type' => 'string', 'custom' => true,
+                                          'api_writable' => true, 'archived' => false })
+        stub_list(contact('1', 'custom_attributes' => { 'id' => 'erp-42' }))
+
+        expect { collection }.not_to raise_error
+        expect(rows(nil).first['id']).to eq('1')
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/skips the contact attribute "id"/)
+      end
+
+      # Relations are declared before these columns for exactly this reason.
+      it 'skips one landing on a relation name too' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_data_attributes('contact', { 'name' => 'company', 'data_type' => 'string', 'custom' => true,
+                                          'api_writable' => true, 'archived' => false })
+
+        expect(collection.fields['company'])
+          .to be_a(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+      end
+
+      # A custom date arrives as epoch seconds like every other Intercom date,
+      # and a Date column handed an integer renders as one.
+      it 'reads a date attribute as a date' do
+        stub_data_attributes('contact', { 'name' => 'renewal', 'data_type' => 'date', 'custom' => true,
+                                          'api_writable' => true, 'archived' => false })
+        stub_list(contact('1', 'custom_attributes' => { 'renewal' => 1_700_000_000 }))
+
+        expect(rows(%w[id renewal]).first['renewal']).to eq('2023-11-14T22:13:20Z')
+      end
+
       it 'reads its value off the payload, nil where the contact carries none' do
         stub_list(contact('1', 'custom_attributes' => { 'paid_subscriber' => true }), contact('2'))
 
