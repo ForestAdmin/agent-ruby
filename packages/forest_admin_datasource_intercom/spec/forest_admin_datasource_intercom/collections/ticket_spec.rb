@@ -31,6 +31,11 @@ module ForestAdminDatasourceIntercom
         .new(field, operator, value)
     end
 
+    def branch(aggregator, *conditions)
+      ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+        .new(aggregator, conditions)
+    end
+
     # Hand-written from the shape measured on a real workspace: the state comes
     # embedded, the company as a bare id, and the parts ride along.
     def ticket(id, overrides = {})
@@ -64,6 +69,14 @@ module ForestAdminDatasourceIntercom
         'created_at' => at, 'author' => { 'type' => type, 'id' => '1', 'name' => by } }
     end
 
+    def stub_admins(*admins)
+      stub_request(:get, "#{base}/admins").to_return(json('type' => 'admin.list', 'admins' => admins))
+    end
+
+    def stub_ticket_states(*states)
+      stub_request(:get, "#{base}/ticket_states").to_return(json('type' => 'list', 'data' => states))
+    end
+
     def stub_search(*records, total: nil, body: nil)
       answer = { 'type' => 'ticket.list', 'tickets' => records, 'total_count' => total || records.size,
                  'pages' => { 'type' => 'pages', 'page' => 1 } }
@@ -77,16 +90,24 @@ module ForestAdminDatasourceIntercom
       collection.list(nil, filter(**options), projection)
     end
 
+    # The columns alone: a relation carries neither operators nor an order.
+    def columns
+      collection.fields.select { |_, field| field.type == 'Column' }
+    end
+
     describe 'schema' do
       it 'is named IntercomTicket' do
         expect(collection.name).to eq('IntercomTicket')
       end
 
-      # The state travels embedded, so its labels cost nothing and the row does
-      # not depend on IntercomTicketState to be readable.
-      it 'flattens the embedded state into its labels' do
-        expect(collection.fields.keys)
-          .to include('state_id', 'state_category', 'state_label', 'state_external_label', 'previous_state_id')
+      # The state travels embedded, so its label costs nothing and the row does
+      # not depend on IntercomTicketState to be readable. One label and not
+      # three: the category and the customer-facing label are a hop away, on the
+      # relation, and neither was ever filterable -- so no segment or scope could
+      # rest on them.
+      it 'flattens the embedded state into one label, the rest being a hop away' do
+        expect(collection.fields.keys).to include('state_id', 'state_label', 'previous_state_id')
+        expect(collection.fields.keys).not_to include('state_category', 'state_external_label')
       end
 
       it 'carries the attributes of every ticket type in union' do
@@ -96,7 +117,7 @@ module ForestAdminDatasourceIntercom
 
       # `/tickets/search` ignores a sort without saying so, on every column.
       it 'declares every column unsortable' do
-        expect(collection.fields.values.map(&:is_sortable).uniq).to eq([false])
+        expect(columns.values.map(&:is_sortable).uniq).to eq([false])
       end
 
       it 'advertises the filters the search endpoint answers, and only those' do
@@ -180,7 +201,7 @@ module ForestAdminDatasourceIntercom
 
         expect(rows.first)
           .to include('id' => '1', 'ticket_id' => '11', 'category' => 'request', 'open' => true,
-                      'state_id' => '19', 'state_category' => 'in_progress', 'state_label' => 'En cours Tech',
+                      'state_id' => '19', 'state_label' => 'En cours Tech',
                       'previous_state_id' => '14', 'ticket_type_name' => 'Bug',
                       'company_id' => '696dd52099f73812610d9c7b', 'admin_assignee_id' => '493881')
       end
@@ -262,6 +283,253 @@ module ForestAdminDatasourceIntercom
 
         expect { collection.list(nil, searched, %w[id]) }
           .to raise_error(UnsupportedOperatorError, /cannot answer a free-text search/)
+      end
+    end
+
+    # Every target is read whole in one request, so a relation resolves for a
+    # whole page at the price of a single read -- which is what makes eight of
+    # them affordable at all.
+    describe 'the relations to the reference collections' do
+      it 'points every id at the collection that reads it' do
+        expect(collection.fields['admin_assignee'])
+          .to have_attributes(type: 'ManyToOne', foreign_collection: 'IntercomAdmin',
+                              foreign_key: 'admin_assignee_id', foreign_key_target: 'id', is_read_only: true)
+        expect(collection.fields['team_assignee'])
+          .to have_attributes(foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
+        expect(collection.fields['state'])
+          .to have_attributes(foreign_collection: 'IntercomTicketState', foreign_key: 'state_id')
+        expect(collection.fields['previous_state'])
+          .to have_attributes(foreign_collection: 'IntercomTicketState', foreign_key: 'previous_state_id')
+        expect(collection.fields['ticket_type'])
+          .to have_attributes(foreign_collection: 'IntercomTicketType', foreign_key: 'ticket_type_id')
+      end
+
+      # Declared before the attribute columns, so a workspace attribute whose
+      # name lands on a relation is skipped with a warning the way one landing on
+      # a column is. Declared after, it would collide and take the boot with it.
+      it 'keeps the relation when a ticket attribute carries its name' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        collection = described_class.new(datasource, attributes: [attribute('state')])
+
+        expect(collection.fields['state'].type).to eq('ManyToOne')
+      end
+
+      it 'nests the assignee under the relation, reading the teammates once for the page' do
+        stub_search(ticket('1'), ticket('2'))
+        stub_admins('id' => '493881', 'name' => 'Alice', 'email' => 'alice@acme.test')
+
+        rows = collection.list(nil, filter, ['id', 'admin_assignee:name'])
+
+        expect(rows).to eq([{ 'id' => '1', 'admin_assignee' => { 'name' => 'Alice', 'id' => '493881' } },
+                            { 'id' => '2', 'admin_assignee' => { 'name' => 'Alice', 'id' => '493881' } }])
+        expect(WebMock).to have_requested(:get, "#{base}/admins").once
+      end
+
+      # A teammate who left the workspace: the row reads as unassigned rather
+      # than as a page that could not be served.
+      it 'nests nothing when the id names no teammate' do
+        stub_search(ticket('1'))
+        stub_admins('id' => '493882', 'name' => 'Bruno')
+
+        expect(collection.list(nil, filter, ['id', 'admin_assignee:name']).first)
+          .to eq({ 'id' => '1', 'admin_assignee' => nil })
+      end
+
+      it 'reads no relation the projection did not name' do
+        stub_search(ticket('1'))
+
+        collection.list(nil, filter, %w[id state_label])
+
+        expect(WebMock).not_to have_requested(:get, "#{base}/admins")
+      end
+
+      # The price of a relation is one read per target *collection*, not one per
+      # relation: `state` and `previous_state` name the same endpoint, and it is
+      # read once, over the ids both of them point at.
+      it 'reads a collection two relations point at once, not once per relation' do
+        stub_search(ticket('1'))
+        stub_ticket_states({ 'id' => '19', 'internal_label' => 'En cours Tech' },
+                           { 'id' => '14', 'internal_label' => 'Recu' })
+
+        rows = collection.list(nil, filter, ['id', 'state:internal_label', 'previous_state:internal_label'])
+
+        expect(rows.first).to eq({ 'id' => '1',
+                                   'state' => { 'internal_label' => 'En cours Tech', 'id' => '19' },
+                                   'previous_state' => { 'internal_label' => 'Recu', 'id' => '14' } })
+        expect(WebMock).to have_requested(:get, "#{base}/ticket_states").once
+      end
+
+      # One read for two relations means one projection for two, and each of them
+      # still gets the columns it asked for rather than the union.
+      it 'nests under each relation only the columns that relation asked for' do
+        stub_search(ticket('1'))
+        stub_ticket_states({ 'id' => '19', 'category' => 'in_progress', 'internal_label' => 'En cours Tech' },
+                           { 'id' => '14', 'category' => 'submitted', 'internal_label' => 'Recu' })
+
+        rows = collection.list(nil, filter, ['id', 'state:category', 'previous_state:internal_label'])
+
+        expect(rows.first).to eq({ 'id' => '1',
+                                   'state' => { 'category' => 'in_progress', 'id' => '19' },
+                                   'previous_state' => { 'internal_label' => 'Recu', 'id' => '14' } })
+      end
+    end
+
+    # A relation is published filterable as soon as any column of its target is,
+    # so the interface offers `admin_assignee:name` the moment the relation
+    # exists. What Intercom is really filtered on is the foreign key: the target
+    # says which of its records match -- over every record it holds, not over a
+    # page -- and the ids it names are what the search carries.
+    describe 'a condition through a relation' do
+      it 'filters on the foreign key the target resolved to' do
+        stub_admins('id' => '493881', 'name' => 'Alice')
+        stub_search(ticket('1'))
+
+        rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
+
+        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+          .with(body: hash_including('query' => { 'field' => 'admin_assignee_id', 'operator' => '=',
+                                                  'value' => '493881' }))
+      end
+
+      # Intercom takes no membership operator on these fields, so several matches
+      # become several conditions -- which is also why the group has a ceiling.
+      it 'writes a group of equalities when the target matched several records' do
+        stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Alice' })
+        stub_search(ticket('1'))
+
+        rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
+
+        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+          .with(body: hash_including('query' => {
+                                       'operator' => 'OR',
+                                       'value' => [{ 'field' => 'admin_assignee_id', 'operator' => '=',
+                                                     'value' => '493881' },
+                                                   { 'field' => 'admin_assignee_id', 'operator' => '=',
+                                                     'value' => '493882' }]
+                                     }))
+      end
+
+      # No row can satisfy it, and Intercom's DSL has no way of saying so: the
+      # search is skipped rather than sent as a filter that would come back with
+      # every ticket.
+      it 'answers nothing, and reads nothing, when the target matched no record' do
+        stub_admins('id' => '493881', 'name' => 'Alice')
+
+        expect(rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Zoe'))).to be_empty
+        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+      end
+
+      it 'counts none of them either, without a request' do
+        stub_admins('id' => '493881', 'name' => 'Alice')
+        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+
+        counted = collection.aggregate(nil, filter(condition_tree: leaf('admin_assignee:name',
+                                                                        operators::EQUAL, 'Zoe')), aggregation)
+
+        expect(counted).to eq([{ 'group' => {}, 'value' => 0 }])
+        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+      end
+
+      # A relation group nested inside the tree the agent assembled: a scope, a
+      # segment and the operator's own filter, and the group counts as one of
+      # them.
+      it 'nests the group inside the condition it was written next to' do
+        stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Alice' })
+        stub_search(ticket('1'))
+        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+                      leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+          .with(body: hash_including('query' => {
+                                       'operator' => 'AND',
+                                       'value' => [{ 'field' => 'category', 'operator' => '=',
+                                                     'value' => 'request' },
+                                                   { 'operator' => 'OR',
+                                                     'value' => [{ 'field' => 'admin_assignee_id',
+                                                                   'operator' => '=', 'value' => '493881' },
+                                                                 { 'field' => 'admin_assignee_id',
+                                                                   'operator' => '=', 'value' => '493882' }] }]
+                                     }))
+      end
+
+      # Intercom nests a search two levels deep, and the group a relation expands
+      # into is a level nobody wrote. Inlined into a parent aggregating the same
+      # way, it costs none -- without which a scope plus a "match any" filter
+      # carrying one relation condition would be refused for a nesting the
+      # operator cannot find in their own filter.
+      it 'inlines the group into a parent that aggregates the same way' do
+        stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Alice' })
+        stub_search(ticket('1'))
+        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+                      branch('Or', leaf('open', operators::EQUAL, true),
+                             leaf('admin_assignee:name', operators::EQUAL, 'Alice')))
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+          .with(body: hash_including('query' => {
+                                       'operator' => 'AND',
+                                       'value' => [{ 'field' => 'category', 'operator' => '=',
+                                                     'value' => 'request' },
+                                                   { 'operator' => 'OR',
+                                                     'value' => [{ 'field' => 'open', 'operator' => '=',
+                                                                   'value' => true },
+                                                                 { 'field' => 'admin_assignee_id',
+                                                                   'operator' => '=', 'value' => '493881' },
+                                                                 { 'field' => 'admin_assignee_id',
+                                                                   'operator' => '=', 'value' => '493882' }] }]
+                                     }))
+      end
+
+      # Inlining trades a level of nesting for width, and Intercom bounds both.
+      # Past fifteen conditions the nested form is the one that fits, so the
+      # group stays where it was rather than emptying the budget it was spared.
+      it 'leaves the group nested when inlining it would pass fifteen conditions' do
+        stub_admins(*(1..3).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
+        stub_search(ticket('1'))
+        others = (1..14).map { |index| leaf('category', operators::NOT_EQUAL, "c#{index}") }
+        tree = branch('Or', *others, leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
+
+        collection.list(nil, filter(condition_tree: tree), %w[id])
+
+        expect(WebMock).to(have_requested(:post, "#{base}/tickets/search").with do |request|
+          query = JSON.parse(request.body)['query']
+          query['value'].size == 15 && query['value'].last['operator'] == 'OR' &&
+            query['value'].last['value'].size == 3
+        end)
+      end
+
+      it 'reads nothing when a relation condition inside an and matches nothing' do
+        stub_admins('id' => '493881', 'name' => 'Alice')
+        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+                      leaf('admin_assignee:name', operators::EQUAL, 'Zoe'))
+
+        expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to be_empty
+        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+      end
+
+      # Fifteen conditions per group is Intercom's limit, and a relation reaches
+      # it without trying. Refused by name rather than sent and answered with a
+      # 400 naming neither the limit nor the filter that hit it.
+      it 'refuses a relation condition matching more records than a group holds' do
+        stub_admins(*(1..16).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
+
+        expect { rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice')) }
+          .to raise_error(UnsupportedOperatorError, /names 16 records.*15 conditions per group/m)
+      end
+
+      # `/tickets/search` filters no state id -- the table carries none -- so the
+      # state relation is there to be read and navigated, and the message says
+      # which of the two it is rather than naming a column the operator never
+      # wrote. Refused before the target is read, a refusal that spends a request
+      # costing exactly what it refuses.
+      it 'refuses a condition through a relation the endpoint filters nothing on' do
+        expect { rows(%w[id], condition_tree: leaf('state:category', operators::EQUAL, 'in_progress')) }
+          .to raise_error(UnsupportedOperatorError, %r{resolves to "state_id", on which tickets/search takes no})
+        expect(WebMock).not_to have_requested(:get, /ticket_states/)
       end
     end
 

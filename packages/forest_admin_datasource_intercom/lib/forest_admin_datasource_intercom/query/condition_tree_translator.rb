@@ -65,7 +65,7 @@ module ForestAdminDatasourceIntercom
         # enough that a wrapper around nothing is a level worth not spending.
         return translate(conditions.first, depth) if conditions.size == 1
 
-        refuse_too_deep!(depth) if depth > MAX_DEPTH
+        refuse_too_deep!(branch, depth) if depth > MAX_DEPTH
         refuse_too_wide!(branch, conditions.size) if conditions.size > MAX_GROUP_SIZE
 
         { 'operator' => operator, 'value' => conditions.map { |condition| translate(condition, depth + 1) } }
@@ -75,11 +75,27 @@ module ForestAdminDatasourceIntercom
       # message names the shape rather than a number, since the tree an operator
       # can act on is the segment and the scope they wrote, not the one the agent
       # assembled out of them.
-      def refuse_too_deep!(depth)
+      def refuse_too_deep!(branch, depth)
         raise UnsupportedOperatorError,
               "#{@collection} cannot answer this filter: Intercom nests a search #{MAX_DEPTH} levels deep and this " \
-              "one reaches #{depth}. A group inside a group inside a group is one level too many -- flatten the " \
-              'segment, the scope or the filter carrying the innermost one.'
+              "one reaches #{depth}. #{deepening_cause(branch)}"
+      end
+
+      # A group the operator wrote is theirs to flatten. A group a relation
+      # expanded into is not: it is the several records the relation matched,
+      # written one equality each because Intercom takes no membership operator
+      # on a foreign key -- and telling them to flatten a nesting they never
+      # wrote is a refusal they cannot act on.
+      def deepening_cause(branch)
+        field = branch.respond_to?(:relation_field) ? branch.relation_field : nil
+
+        if field.nil?
+          'A group inside a group inside a group is one level too many -- flatten the segment, the scope or the ' \
+            'filter carrying the innermost one.'
+        else
+          "The innermost group is what #{field.inspect} expanded into, one equality per record it matched: narrow " \
+            'that condition until it names a single record, or lift it out of the groups nesting it.'
+        end
       end
 
       # Fifteen is reached without trying: a scope, a segment and a filter add up,

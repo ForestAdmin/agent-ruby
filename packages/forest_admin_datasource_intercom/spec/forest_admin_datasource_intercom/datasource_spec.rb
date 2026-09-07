@@ -8,11 +8,12 @@ module ForestAdminDatasourceIntercom
 
     # The reference collections come first: they are what turns an assignee id
     # into a teammate and a state id into a label. Conversations follow, Tickets
-    # next.
+    # next. The membership sits with the two collections it joins: a many-to-many
+    # needs a collection to travel through, and Intercom exposes none.
     it 'publishes the collections of the lot' do
       expect(datasource.collections.keys)
-        .to eq(%w[IntercomAdmin IntercomTeam IntercomTicketType IntercomTicketState IntercomConversation
-                  IntercomTicket])
+        .to eq(%w[IntercomAdmin IntercomTeam IntercomTeamMembership IntercomTicketType IntercomTicketState
+                  IntercomConversation IntercomTicket])
     end
 
     # The one read a boot performs: the attributes a workspace declares on its

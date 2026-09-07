@@ -85,23 +85,46 @@ module ForestAdminDatasourceIntercom
         define_contact_columns
         define_derived_columns
         add_column('part_count', 'Number')
+        # Before the attribute columns rather than after: a workspace attribute
+        # whose name lands on a relation is then skipped with a warning, the way
+        # one landing on a column already is. Declared after, it would collide
+        # and take the boot with it.
+        define_relations
         register_attribute_columns
       end
 
-      # The state arrives embedded as a whole object, so its labels cost nothing.
-      # `IntercomTicketState` remains a collection of its own -- it is the list of
-      # what a state can be -- but a row does not depend on it to be readable.
+      # The state arrives embedded as a whole object, so its label costs nothing:
+      # a queue reads without a join. One label and not three -- the category and
+      # the customer-facing label are read through the `state` relation, which is
+      # where every field of a state lives. Neither of the two was ever
+      # filterable, so nothing that could be saved in a segment or a scope
+      # depended on them.
       def define_state_columns
         add_column('state_id', 'String')
-        add_column('state_category', 'String')
         add_column('state_label', 'String')
-        add_column('state_external_label', 'String')
         add_column('previous_state_id', 'String')
       end
 
       def define_type_columns
         add_column('ticket_type_id', 'String')
         add_column('ticket_type_name', 'String')
+      end
+
+      # The four reference collections a ticket points at. Every target is read
+      # whole in one request, so a relation resolves for a page at the price of a
+      # single read.
+      #
+      # Only two of them can be filtered *through*: `/tickets/search` takes a
+      # filter on `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`,
+      # and none on a state id -- which the refusal names when a filter reaches
+      # for it, rather than letting the interface offer what the endpoint drops.
+      def define_relations
+        add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
+        add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
+        add_many_to_one('state', foreign_collection: 'IntercomTicketState', foreign_key: 'state_id')
+        add_many_to_one('previous_state', foreign_collection: 'IntercomTicketState',
+                                          foreign_key: 'previous_state_id')
+        add_many_to_one('ticket_type', foreign_collection: 'IntercomTicketType', foreign_key: 'ticket_type_id')
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by
@@ -118,8 +141,8 @@ module ForestAdminDatasourceIntercom
 
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} skips the ticket attribute #{attribute.name.inspect}: a " \
-          "native column already carries the name #{attribute.column_name.inspect}, and overwriting it would show " \
-          'the attribute where the operator expects the ticket field.'
+          "native column or relation already carries the name #{attribute.column_name.inspect}, and overwriting " \
+          'it would show the attribute where the operator expects the ticket field.'
         )
         true
       end

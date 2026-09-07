@@ -53,6 +53,14 @@ module ForestAdminDatasourceIntercom
         .equivalent_tree?(operator, described_class::IN_MEMORY_OPERATORS, column_type)
     end
 
+    # A projection naming nothing asks for every declared column, `team_names`
+    # among them, so a list with no projection reads the teams as well.
+    before do
+      stub_request(:get, "#{base}/teams")
+        .to_return(status: 200, body: { 'type' => 'team.list', 'teams' => [] }.to_json,
+                   headers: { 'Content-Type' => 'application/json' })
+    end
+
     # The count and the group are taken over every record Intercom holds, not
     # over a page of them, which is what makes them exact.
     it 'is countable' do
@@ -74,14 +82,14 @@ module ForestAdminDatasourceIntercom
 
       # A list has no in-memory counterpart for any of the three.
       it 'declares a Json column neither filterable nor sortable' do
-        expect(collection.fields['team_ids'])
+        expect(collection.fields['team_names'])
           .to have_attributes(column_type: 'Json', is_sortable: false, is_groupable: false, filter_operators: [])
       end
 
       # A filter the UI offers and the collection then answers by emptying the
       # page is the failure this whole datasource is built to avoid.
       it 'advertises only operators it can actually evaluate' do
-        advertised = collection.fields.flat_map do |_name, column|
+        advertised = collection.fields.select { |_, field| field.type == 'Column' }.flat_map do |_name, column|
           column.filter_operators.map { |operator| [operator, column.column_type] }
         end
 
@@ -185,10 +193,29 @@ module ForestAdminDatasourceIntercom
         expect(ids(rows)).to eq(%w[2 1 3])
       end
 
-      it 'drops a clause naming a column it does not carry' do
+      # An order asked for and not honoured is reported everywhere else in this
+      # datasource, and a related list through a many-to-many reaches this tier
+      # with the columns of the collection it *reaches* rather than the one it
+      # travels through -- `Filter#nest` prefixes the condition tree and not the
+      # sort. Dropped in silence, that is the one order nothing would report.
+      it 'drops a clause naming a column it does not carry, and says so' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
         rows = collection.list(nil, filter(sort: sort({ field: 'unknown', ascending: true })), nil)
 
         expect(ids(rows)).to eq(%w[2 1 3])
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/sort on "unknown", which it does not carry/)
+      end
+
+      it 'keeps the clauses it does carry alongside the one it drops' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        rows = collection.list(
+          nil, filter(sort: sort({ field: 'unknown', ascending: true }, { field: 'name', ascending: true })), nil
+        )
+
+        expect(ids(rows)).to eq(%w[1 2 3])
       end
     end
 

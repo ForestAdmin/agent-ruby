@@ -134,7 +134,21 @@ module ForestAdminDatasourceIntercom
                              branch('And', *leaves(2))))
 
         expect { translate(tree) }
-          .to raise_error(UnsupportedOperatorError, /nests a search 2 levels deep and this one reaches 3/)
+          .to raise_error(UnsupportedOperatorError,
+                          /nests a search 2 levels deep and this one reaches 3.*flatten the segment/m)
+      end
+
+      # The innermost group is sometimes not one the operator wrote: a relation
+      # expands into one equality per record it matched, and telling them to
+      # flatten a nesting they never wrote is a refusal they cannot act on.
+      it 'names the relation when the innermost group is what one expanded into' do
+        relation_group = Collections::Relations::RelationBranch.new('Or', leaves(2), 'admin_assignee:name')
+        tree = branch('Or', leaf('open', operators::EQUAL, true),
+                      branch('And', leaf('read', operators::EQUAL, true), relation_group))
+
+        expect { translate(tree) }
+          .to raise_error(UnsupportedOperatorError,
+                          /"admin_assignee:name" expanded into, one equality per record it matched/)
       end
 
       # A branch carrying a single condition is unwrapped, so it spends no level:
