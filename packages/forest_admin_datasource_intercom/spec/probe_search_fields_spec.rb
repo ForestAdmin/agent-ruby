@@ -151,7 +151,7 @@ module ForestAdminDatasourceIntercom
       end
 
       it 'refuses an endpoint the table does not declare' do
-        expect { described_class.call(['--endpoint', 'contacts', '--token', 's3cr3t']) }
+        expect { described_class.call(['--endpoint', 'companies', '--token', 's3cr3t']) }
           .to raise_error(ConfigurationError, /Unknown Intercom search endpoint/)
       end
 
@@ -159,6 +159,8 @@ module ForestAdminDatasourceIntercom
         out = File.join(Dir.tmpdir, 'intercom-probe.yml')
         stub_search(code: 'invalid_field')
         stub_request(:post, "#{base}/conversations/search")
+          .to_return(json({ 'type' => 'error.list', 'errors' => [{ 'code' => 'invalid_field' }] }, 400))
+        stub_request(:post, "#{base}/contacts/search")
           .to_return(json({ 'type' => 'error.list', 'errors' => [{ 'code' => 'invalid_field' }] }, 400))
 
         expect { described_class.call(['--token', 's3cr3t', '--out', out]) }.to output(/NOT FILTERABLE/).to_stdout

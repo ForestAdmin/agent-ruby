@@ -514,11 +514,15 @@ module ForestAdminDatasourceIntercom
       # Fifteen conditions per group is Intercom's limit, and a relation reaches
       # it without trying. Refused by name rather than sent and answered with a
       # 400 naming neither the limit nor the filter that hit it.
+      #
+      # "more than fifteen" rather than a count: the target is read one record
+      # past what a group holds and no further, so what is known is that it does
+      # not fit -- see `match_page`.
       it 'refuses a relation condition matching more records than a group holds' do
-        stub_admins(*(1..16).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
+        stub_admins(*(1..20).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
 
         expect { rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice')) }
-          .to raise_error(UnsupportedOperatorError, /names 16 records.*15 conditions per group/m)
+          .to raise_error(UnsupportedOperatorError, /names more than 15 records.*15 conditions per group/m)
       end
 
       # `/tickets/search` filters no state id -- the table carries none -- so the

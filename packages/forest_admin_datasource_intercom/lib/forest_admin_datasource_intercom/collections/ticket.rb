@@ -46,9 +46,8 @@ module ForestAdminDatasourceIntercom
       # Intercom exposes no `GET /tickets`, so a list view searches too: with the
       # filter it was given, or with the predicate that matches everything when
       # it was given none.
-      def read_page(per_page:, cursor:, query: nil)
-        super(per_page: per_page, cursor: cursor, query: query || MATCH_EVERY_TICKET)
-      end
+      def searchable_only? = true
+      def match_all_query = MATCH_EVERY_TICKET
 
       def enrich(records, rows, projection)
         wanted = Array(projection).map(&:to_s)
@@ -110,14 +109,17 @@ module ForestAdminDatasourceIntercom
         add_column('ticket_type_name', 'String')
       end
 
-      # The four reference collections a ticket points at. Every target is read
-      # whole in one request, so a relation resolves for a page at the price of a
-      # single read.
+      # The reference collections a ticket points at, and the contact who opened
+      # it. Every reference target is read whole in one request, so those
+      # relations resolve for a page at the price of a single read; the contact
+      # is read from `/contacts/search`, one request for the page as well.
       #
-      # Only two of them can be filtered *through*: `/tickets/search` takes a
-      # filter on `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`,
-      # and none on a state id -- which the refusal names when a filter reaches
-      # for it, rather than letting the interface offer what the endpoint drops.
+      # Which of them can be filtered *through* is the measured table's
+      # business, not this method's: `/tickets/search` takes a filter on
+      # `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`, none on a
+      # state id, and `contact_ids` is a `spec` row the probe has yet to
+      # confirm. Where the endpoint filters nothing, the traversal is refused by
+      # name rather than left for the interface to offer and the API to drop.
       def define_relations
         add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
         add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
@@ -125,6 +127,7 @@ module ForestAdminDatasourceIntercom
         add_many_to_one('previous_state', foreign_collection: 'IntercomTicketState',
                                           foreign_key: 'previous_state_id')
         add_many_to_one('ticket_type', foreign_collection: 'IntercomTicketType', foreign_key: 'ticket_type_id')
+        add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by

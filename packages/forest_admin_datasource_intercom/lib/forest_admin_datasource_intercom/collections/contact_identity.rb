@@ -1,17 +1,22 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The contact of a conversation or of a ticket, denormalized onto the row.
+    # The contact of a conversation or of a ticket, on the row itself.
     #
     # Intercom nests only the ids -- `{"type": "contact.list", "contacts":
-    # [{"id": "..."}]}` -- so a name and an e-mail cost a read. That read is done
-    # once per page, for every row at once, and never per row: a page of 25 rows
-    # is one request, not 25.
+    # [{"id": "..."}]}` -- so a name costs a read. That read is done once per
+    # page, for every row at once, and never per row: a page of 25 rows is one
+    # request, not 25.
     #
-    # It stays a pair of columns rather than a relation because the Contacts
-    # collection arrives in lot 4, and a relation whose target collection is
-    # missing is a schema the agent refuses to boot on.
+    # **Three columns, where lot 1 published four.** Now that the Contacts
+    # collection exists, the identity is a relation, and the rule lot 2.5 set
+    # for the ticket labels applies here too: one readable label on the row plus
+    # the relation to navigate, rather than two ways to read one fact.
+    # `contact_email` is gone -- it is one hop away, on `contact:email` -- and
+    # `contact_ids` gave way to `contact_id`, which is a foreign key rather than
+    # a Json blob no filter could reach. The list of every contact of a group
+    # conversation is the `contacts` relation.
     module ContactIdentity
-      COLUMNS = %w[contact_name contact_email].freeze
+      COLUMNS = %w[contact_name].freeze
 
       # How many ids one `id in [...]` read carries. A page holds fewer than this
       # in practice; the chunk keeps the request bounded if it ever does not.
@@ -20,22 +25,23 @@ module ForestAdminDatasourceIntercom
       private
 
       def define_contact_columns
-        add_column('contact_ids', 'Json')
+        add_column('contact_id', 'String')
         add_column('contact_count', 'Number')
         add_column('contact_name', 'String')
-        add_column('contact_email', 'String')
       end
 
       # A group conversation, or a ticket opened for several people, has more
       # than one contact: the row names the first and counts them, rather than
-      # presenting one of several as the one.
+      # presenting one of several as the one. The `contact` relation resolves
+      # that same first contact, so the column and the relation cannot disagree;
+      # the others are reached through the contact's own conversations.
       def contact_columns_for(attrs)
         ids = nested_list(attrs['contacts'], 'contacts').filter_map { |contact| stringify_id(contact['id']) }
 
-        { 'contact_ids' => ids, 'contact_count' => ids.size,
+        { 'contact_id' => ids.first, 'contact_count' => ids.size,
           # Filled by the bulk read below, and left nil when the projection did
-          # not ask for them.
-          'contact_name' => nil, 'contact_email' => nil }
+          # not ask for it.
+          'contact_name' => nil }
       end
 
       def first_contact_id(record)
@@ -50,12 +56,11 @@ module ForestAdminDatasourceIntercom
         records.each_with_index do |record, index|
           identity = identities[first_contact_id(record)] || {}
           rows[index]['contact_name'] = identity['name'] if rows[index].key?('contact_name')
-          rows[index]['contact_email'] = identity['email'] if rows[index].key?('contact_email')
         end
       end
 
-      # A failure costs the two columns and nothing else: an identity that could
-      # not be read is not a page that could not be served.
+      # A failure costs the column and nothing else: an identity that could not
+      # be read is not a page that could not be served.
       def contact_identities(records)
         ids = records.filter_map { |record| first_contact_id(record) }.uniq
         return {} if ids.empty?
@@ -69,7 +74,7 @@ module ForestAdminDatasourceIntercom
       rescue APIError => e
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} could not read the contacts of this page (HTTP " \
-          "#{e.status || "-"}); the name and e-mail columns are left empty for it."
+          "#{e.status || "-"}); the name column is left empty for it."
         )
         {}
       end

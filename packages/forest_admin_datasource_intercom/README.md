@@ -250,8 +250,10 @@ What follows from that:
 
 | Collection | Filterable on |
 | --- | --- |
-| `IntercomConversation` | `id`, `state`, `priority`, `open`, `read`, `title`, `admin_assignee_id`, `team_assignee_id`, `source_type`, `source_subject`, `source_body`, `source_delivered_as`, `source_author_email`, `closed_by_id`, `reopen_count`, `part_count`, `ai_agent_participated`, and the dates `created_at`, `updated_at`, `waiting_since`, `snoozed_until`, `closed_at`, `first_closed_at`, `first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at` |
-| `IntercomTicket` | `id`, `open`, `category`, `ticket_type_id`, `admin_assignee_id`, `team_assignee_id`, `created_at`, `updated_at` |
+| `IntercomConversation` | `id`, `state`, `priority`, `open`, `read`, `title`, `admin_assignee_id`, `team_assignee_id`, `source_type`, `source_subject`, `source_body`, `source_delivered_as`, `source_author_email`, `closed_by_id`, `reopen_count`, `part_count`, `ai_agent_participated`, `contact_id`, and the dates `created_at`, `updated_at`, `waiting_since`, `snoozed_until`, `closed_at`, `first_closed_at`, `first_contact_reply_at`, `last_contact_reply_at`, `last_admin_reply_at` |
+| `IntercomTicket` | `id`, `open`, `category`, `ticket_type_id`, `admin_assignee_id`, `team_assignee_id`, `contact_id`, `created_at`, `updated_at` |
+| `IntercomContact` | `id`, `role`, `name`, `email`, `email_domain`, `phone`, `external_id`, `owner_id`, `unsubscribed_from_emails`, `has_hard_bounced`, `marked_email_as_spam`, `language_override`, `browser`, `browser_language`, `os`, `location_country`, `location_region`, `location_city`, and the dates `created_at`, `updated_at`, `signed_up_at`, `last_seen_at`, `last_contacted_at`, `last_replied_at`, `last_email_opened_at`, `last_email_clicked_at` |
+| `IntercomCompany` | `id`, `company_id`, `name` — four lookups and no search endpoint, see [Companies](#companies) |
 
 **The primary key** is filterable like any other column, but a filter naming it *alone* is not
 answered by a search: `id equals X` and `id in [...]` read the record endpoint directly, one request

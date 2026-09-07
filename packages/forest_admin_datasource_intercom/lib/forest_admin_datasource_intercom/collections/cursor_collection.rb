@@ -40,9 +40,7 @@ module ForestAdminDatasourceIntercom
       end
 
       def list(caller, filter, projection)
-        warn_ignored_sort(filter&.sort)
-
-        records = fetch_records(caller, filter)
+        records = fetch_records(caller, filter, server_sort(filter))
         # Serialized whole and projected afterwards rather than the other way
         # round: a projection reaching through a relation names no foreign key,
         # and the key is where the relation is read from.
@@ -101,15 +99,20 @@ module ForestAdminDatasourceIntercom
       # One page of the collection. A listing for conversations, a search for
       # tickets -- Intercom exposes no `GET /tickets` at all -- so the endpoint
       # and its shape belong to the collection, while walking it does not.
-      def read_page(per_page:, cursor:, query: nil)
+      def read_page(per_page:, cursor:, query: nil, sort: nil)
         size = [per_page, max_page_size].min
+        # The listing endpoint neither filters nor sorts, and a collection whose
+        # records are only reachable through the search has no listing at all.
+        # Either way what routes the read to the search is a query, so the one
+        # that matches everything stands in for the condition there is none of.
+        query ||= match_all_query if sort || searchable_only?
 
         if query.nil?
           client.list_page(list_endpoint, per_page: size, starting_after: cursor,
                                           params: read_params, list_key: list_key)
         else
           client.search_page(search_endpoint.path, query: query, per_page: size, starting_after: cursor,
-                                                   params: read_params, list_key: list_key)
+                                                   params: read_params, list_key: list_key, sort: sort)
         end
       end
 
@@ -122,15 +125,41 @@ module ForestAdminDatasourceIntercom
       # The primary key is the exception, and it is not a filter: `id equals X`
       # and `id in [...]` are answered by the record endpoint.
       #
-      # No column is sortable: Intercom takes no sort on either search endpoint
-      # and ignores the one it is sent. Read-only, this lot writing nothing.
+      # A column is sortable only where the measured table says the endpoint
+      # sorts, which is `/contacts/search` and nowhere else: the other two
+      # accept a `sort` and ignore it without a word, so a sortable column there
+      # would promise an order that never happens.
       def add_column(name, type, is_primary_key: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: column_operators(name, is_primary_key),
                                          is_primary_key: is_primary_key,
                                          is_read_only: true,
-                                         is_sortable: false,
+                                         is_sortable: sortable_column?(name),
                                          is_groupable: false))
+      end
+
+      def sortable_column?(name)
+        search_endpoint.field(name)&.sortable? == true
+      end
+
+      # The Intercom query standing in for the condition a read has none of.
+      # Two collections need one and for different reasons: Intercom exposes no
+      # `GET /tickets` at all, and an order is applied by the search endpoint
+      # alone. Nil where the listing endpoint answers both, which is where a
+      # sort is reported as ignored rather than dropped.
+      def match_all_query = nil
+
+      # Whether every read of this collection goes through the search, listing
+      # or not.
+      def searchable_only? = false
+
+      # Bounded, unlike the tier read whole: one more than a group may hold is
+      # all it takes to know the fan-out will not fit, and reading further would
+      # walk a whole collection to refuse it afterwards.
+      def match_page
+        ForestAdminDatasourceToolkit::Components::Query::Page.new(
+          offset: 0, limit: Query::ConditionTreeTranslator::MAX_GROUP_SIZE + 1
+        )
       end
 
       def walker
@@ -147,7 +176,7 @@ module ForestAdminDatasourceIntercom
         field ? Query::OperatorTable.forest_operators(field) : []
       end
 
-      def fetch_records(caller, filter)
+      def fetch_records(caller, filter, sort = nil)
         ids = id_lookup(filter)
         # The window is cut out of the ids rather than out of the records they
         # read: Intercom reads them one request each, so paging after the read
@@ -162,7 +191,7 @@ module ForestAdminDatasourceIntercom
         # than sent as a filter that would come back with everything.
         return [] if query == NOTHING
 
-        listed_records(filter, query)
+        listed_records(filter, query, sort)
       end
 
       # The Intercom query a filter comes down to, or nil for a list view, which
@@ -221,9 +250,14 @@ module ForestAdminDatasourceIntercom
               "navigated; filter on one of: #{search_endpoint.filterable_columns.join(", ")}."
       end
 
-      def refuse_fan_out!(leaf, key, ids)
+      def refuse_fan_out!(leaf, key, _ids)
+        # "more than", never a count: the target is read one record past what a
+        # group may hold, so what is known is that it does not fit -- printing
+        # 16 where a workspace holds three thousand would read as a number the
+        # operator could go and narrow by one.
         raise UnsupportedOperatorError,
-              "#{name} cannot filter #{leaf.field.inspect}: it names #{ids.size} records, " \
+              "#{name} cannot filter #{leaf.field.inspect}: it names more than " \
+              "#{Query::ConditionTreeTranslator::MAX_GROUP_SIZE} records, " \
               "#{search_endpoint.path} answers #{key.inspect} one value at a time, and Intercom takes " \
               "#{Query::ConditionTreeTranslator::MAX_GROUP_SIZE} conditions per group. Narrow the condition " \
               "on the relation, or filter on #{key.inspect} itself."
@@ -288,11 +322,11 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      def listed_records(filter, query)
+      def listed_records(filter, query, sort = nil)
         offset, limit = translate_page(filter&.page)
 
         walker.walk(offset: offset, limit: limit) do |per_page, cursor|
-          read_page(per_page: per_page, cursor: cursor, query: query)
+          read_page(per_page: per_page, cursor: cursor, query: query, sort: sort)
         end
       end
 
@@ -315,7 +349,13 @@ module ForestAdminDatasourceIntercom
         query = translate(caller, filter)
         return 0 if query == NOTHING
 
-        page = read_page(per_page: 1, cursor: nil, query: query)
+        exact_count(read_page(per_page: 1, cursor: nil, query: query))
+      end
+
+      # The count Intercom answered, or nothing at all. Counting the pages a
+      # walk collected would answer a fraction of the collection as if it were
+      # the whole of it, which is the one thing this tier does not do.
+      def exact_count(page)
         return page.total_count if page.total_count
 
         raise UnsupportedOperatorError,
@@ -339,33 +379,65 @@ module ForestAdminDatasourceIntercom
               'and this collection exposes no text column it searches. Filter on a column instead of searching.'
       end
 
-      # Intercom accepts a `sort` on these endpoints and ignores it without a
-      # word -- measured -- so an order the operator asked for and did not get
-      # has to be reported here or nowhere. The ascending primary-key sort the
-      # agent injects when a request names none is not one of those.
-      def warn_ignored_sort(sort)
-        clauses = Array(sort)
-        return if clauses.empty? || default_pk_sort?(clauses)
+      # The order Intercom will really apply, written the way the client sends
+      # it -- or nil, and the order the operator asked for is then reported
+      # rather than dropped in silence.
+      #
+      # The ascending primary-key sort the agent injects when a request names
+      # none is neither honoured nor reported: it is not an order anybody asked
+      # for, and `/contacts/search` does not sort on an id anyway.
+      def server_sort(filter)
+        clauses = Array(filter&.sort)
+        return nil if clauses.empty? || default_pk_sort?(clauses)
 
+        honoured = honourable_sort(clauses)
+        warn_ignored_sort(clauses) if honoured.nil?
+        honoured
+      end
+
+      # One clause, on a column the measured table says the endpoint sorts.
+      # Intercom takes a single `{ field, order }` and nothing composite, so a
+      # second clause is not half-honoured: honouring the first alone would
+      # order the page by something the operator did not ask for.
+      def honourable_sort(clauses)
+        return nil unless clauses.size == 1
+
+        clause = clauses.first
+        field = search_endpoint.field(sort_field(clause).to_s)
+        return nil unless field&.sortable?
+
+        { field: field.field, ascending: ascending?(clause) }
+      end
+
+      # Intercom accepts a `sort` on the other two endpoints and ignores it
+      # without a word -- measured -- so an order asked for and not applied has
+      # to be reported here or nowhere.
+      def warn_ignored_sort(clauses)
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} was asked to sort on " \
-          "#{clauses.map { |clause| clause[:field] || clause["field"] }.join(", ")}, and Intercom ignores a sort on " \
-          'this endpoint without reporting it. The rows come back in the order the API imposes.'
+          "#{clauses.map { |clause| sort_field(clause) }.join(", ")}, which Intercom does not sort this " \
+          'collection on -- and it ignores a sort it refuses without reporting it. The rows come back in the ' \
+          'order the API imposes.'
         )
+      end
+
+      def sort_field(clause) = clause[:field] || clause['field']
+
+      # `key?` rather than `||`: a descending clause carries `false`, which an
+      # `||` fallback reads as "absent" -- so an explicit `?sort=-id` would be
+      # taken for the ascending default the agent injects, and the one order
+      # Intercom silently drops would go unreported.
+      def ascending?(clause)
+        clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
       end
 
       def default_pk_sort?(clauses)
         return false unless clauses.size == 1
 
         clause = clauses.first
-        return false unless (clause[:field] || clause['field']).to_s == primary_key
+        return false unless sort_field(clause).to_s == primary_key
 
-        # `key?` rather than `||`: a descending clause carries `false`, which an
-        # `||` fallback reads as "absent" -- so an explicit `?sort=-id` would be
-        # taken for the ascending default the agent injects, and the one order
-        # Intercom silently drops would go unreported.
-        ascending = clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
-        ascending != false
+        ascending?(clause) != false
       end
 
       def warn_truncated_ids(asked)

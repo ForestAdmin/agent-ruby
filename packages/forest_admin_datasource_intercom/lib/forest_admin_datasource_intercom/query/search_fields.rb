@@ -31,8 +31,13 @@ module ForestAdminDatasourceIntercom
       # `source` says where a row comes from, and `measured?` is what the boot
       # report and the README section read: a row taken from the documentation is
       # a candidate the probe has not confirmed.
-      Field = Struct.new(:column, :field, :type, :operators, :source, keyword_init: true) do
+      # `sortable` is the one thing here Intercom answers on a single endpoint:
+      # `/contacts/search` takes a `sort`, the other two take one and ignore it
+      # without a word. Absent reads as false, so a table saying nothing leaves
+      # a column unsortable rather than promising an order.
+      Field = Struct.new(:column, :field, :type, :operators, :source, :sortable, keyword_init: true) do
         def measured? = source == 'measured'
+        def sortable? = sortable == true
       end
 
       # A column that stays unfilterable, and why. The reason travels into the
@@ -43,7 +48,7 @@ module ForestAdminDatasourceIntercom
       end
 
       Endpoint = Struct.new(:name, :path, :measured_at, :fields, :refused, :candidates, :ticket_attributes,
-                            keyword_init: true) do
+                            :custom_attributes, keyword_init: true) do
         # Whether the probe has run against a real workspace for this endpoint.
         # False means every `spec` row is still a candidate.
         def measured? = !measured_at.nil?
@@ -51,6 +56,7 @@ module ForestAdminDatasourceIntercom
         def field(column) = fields[column]
         def refusal(column) = refused[column]
         def filterable_columns = fields.keys
+        def sortable_columns = fields.values.select(&:sortable?).map(&:column)
         def unmeasured_fields = fields.values.reject(&:measured?)
       end
 
@@ -84,14 +90,16 @@ module ForestAdminDatasourceIntercom
             fields: fields(name, definition['fields']),
             refused: refusals(name, definition['refused']),
             candidates: Array(definition['candidates']).freeze,
-            ticket_attributes: definition['ticket_attributes']
+            ticket_attributes: definition['ticket_attributes'],
+            custom_attributes: definition['custom_attributes']
           ).freeze
         end
 
         def fields(endpoint, declared)
           (declared || {}).to_h do |column, row|
             field = Field.new(column: column, field: row.fetch('field'), type: row.fetch('type'),
-                              operators: Array(row['operators']).freeze, source: row.fetch('source')).freeze
+                              operators: Array(row['operators']).freeze, source: row.fetch('source'),
+                              sortable: row.fetch('sortable', false)).freeze
             validate_field!(endpoint, field)
 
             [column, field]
@@ -112,6 +120,16 @@ module ForestAdminDatasourceIntercom
           validate_source!(endpoint, field.column, field)
           validate_type!(endpoint, field)
           validate_operators!(endpoint, field)
+          validate_sortable!(endpoint, field)
+        end
+
+        # Anything but a boolean, `"true"` above all: YAML reads it as a string,
+        # which is truthy in Ruby and would publish a sortable column out of a
+        # typo the file cannot otherwise show.
+        def validate_sortable!(endpoint, field)
+          return if [true, false].include?(field.sortable)
+
+          malformed!(endpoint, field.column, "sortable #{field.sortable.inspect} is neither true nor false")
         end
 
         def validate_type!(endpoint, field)

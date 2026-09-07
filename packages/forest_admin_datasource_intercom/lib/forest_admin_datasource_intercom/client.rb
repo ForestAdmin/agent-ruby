@@ -24,7 +24,9 @@ module ForestAdminDatasourceIntercom
     # callers never have to know how the absence is spelled on the wire.
     # `total_count` is exact, filter included, which is what makes Forest's
     # record counter and its "number of" charts one request each.
-    Page = Struct.new(:records, :next_cursor, :total_count, keyword_init: true)
+    # `total_pages` is filled by the one endpoint that paginates by offset and
+    # nil everywhere else: a cursor page has no notion of how many there are.
+    Page = Struct.new(:records, :next_cursor, :total_count, :total_pages, keyword_init: true)
 
     def initialize(configuration)
       @configuration = configuration
@@ -65,12 +67,42 @@ module ForestAdminDatasourceIntercom
     # translator wrote, and it travels in the body; `params` is what still
     # belongs in the query string -- `display_as` above all, which is not part
     # of the search payload.
-    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data', params: {})
+    # `sort` is honoured by `/contacts/search` alone. The other two search
+    # endpoints accept one and ignore it without a word -- measured -- so the
+    # collections that read them never send one, and the parameter is here for
+    # the one that does. `{ field:, ascending: }`, translated to Intercom's own
+    # spelling on the way out.
+    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data', params: {}, sort: nil)
       pagination = { 'per_page' => self.class.bounded_per_page(per_page) }
       pagination['starting_after'] = starting_after unless blank?(starting_after)
       body = { 'query' => query, 'pagination' => pagination }
+      body['sort'] = sort_clause(sort) if sort
 
       must_succeed(path) { to_page(post(path, body, params: params).body, path, list_key) }
+    end
+
+    # One page of an endpoint that paginates by **offset** rather than by
+    # cursor. `POST /companies/list` is the only one, and it is what lets the
+    # Companies collection answer page 7 of a list view with one request
+    # instead of walking six pages to reach it. Intercom counts pages from 1.
+    def offset_page(path, page:, per_page:, params: {}, list_key: 'data')
+      query = params.merge('page' => [page.to_i, 1].max,
+                           'per_page' => self.class.bounded_per_page(per_page))
+
+      must_succeed(path) { to_page(post(path, {}, params: query).body, path, list_key) }
+    end
+
+    # An exact lookup, and the shape surprise that comes with it: `GET
+    # /companies?name=` answers the company itself where `?tag_id=` answers a
+    # list. A record is read here as a page of one, so a caller writes one route
+    # rather than testing the envelope.
+    def lookup_page(path, params:, list_key: 'data')
+      must_succeed(path) do
+        body = get(path, params).body
+        next Page.new(records: [body], next_cursor: nil, total_count: 1) if single_record?(body, list_key)
+
+        to_page(body, path, list_key)
+      end
     end
 
     # One record from its own endpoint. Raises on a 404 like on any other
@@ -98,8 +130,11 @@ module ForestAdminDatasourceIntercom
     # parameter in the specification is not a promise that a large workspace
     # answers in one response, and a truncated reference collection would show
     # an operator a state list missing its last states.
-    def fetch_all(path, list_key: 'data', boot: false)
-      must_succeed(path) { collect_pages(path, list_key: list_key, boot: boot) }
+    # `params` is what narrows the endpoint rather than what pages it:
+    # `/data_attributes` answers the attributes of contacts and those of
+    # companies under `?model=`, and both are read whole.
+    def fetch_all(path, list_key: 'data', params: {}, boot: false)
+      must_succeed(path) { collect_pages(path, list_key: list_key, params: params, boot: boot) }
     end
 
     # The page size Intercom accepts, whatever was asked for.
@@ -149,13 +184,28 @@ module ForestAdminDatasourceIntercom
       )
     end
 
-    def collect_pages(path, list_key:, boot:)
+    # Intercom spells an order `{ "field": "...", "order": "descending" }`,
+    # and answers `data_invalid` on anything else -- so the clause is written
+    # here rather than by the caller, whose vocabulary is Forest's.
+    def sort_clause(sort)
+      { 'field' => sort[:field].to_s, 'order' => sort[:ascending] == false ? 'descending' : 'ascending' }
+    end
+
+    # A record rather than a listing: no list under either key, and an id where
+    # a record carries one. An empty listing is not one of these -- it answers
+    # `data` as an empty array, which is a page of nothing rather than a record.
+    def single_record?(body, list_key)
+      body.is_a?(Hash) && !body[list_key].is_a?(Array) && !body['data'].is_a?(Array) && body.key?('id')
+    end
+
+    def collect_pages(path, list_key:, params:, boot:)
       records = []
       cursor = nil
       pages = 0
 
       loop do
-        body = get(path, cursor.nil? ? nil : { 'starting_after' => cursor }, boot: boot).body
+        query = cursor.nil? ? params : params.merge('starting_after' => cursor)
+        body = get(path, query.empty? ? nil : query, boot: boot).body
         records.concat(extract_entities(body, path, list_key))
         pages += 1
         cursor = next_cursor(body, path)
@@ -199,7 +249,8 @@ module ForestAdminDatasourceIntercom
     def to_page(body, operation, list_key)
       Page.new(records: extract_entities(body, operation, list_key),
                next_cursor: next_cursor(body, operation),
-               total_count: extract_count(body))
+               total_count: extract_count(body),
+               total_pages: extract_total_pages(body))
     end
 
     # Absent on the last page, which is how the walk knows it is done. An older
@@ -234,6 +285,14 @@ module ForestAdminDatasourceIntercom
     def extract_count(body)
       count = body['total_count'] if body.is_a?(Hash)
       count.is_a?(Numeric) ? count.to_i : nil
+    end
+
+    # How many pages the offset tier has to read through, when the endpoint
+    # counts them. nil on a cursor page, which counts nothing.
+    def extract_total_pages(body)
+      pages = body['pages'] if body.is_a?(Hash)
+      total = pages['total_pages'] if pages.is_a?(Hash)
+      total.is_a?(Numeric) ? total.to_i : nil
     end
 
     def refuse_body_shape(operation, detail)

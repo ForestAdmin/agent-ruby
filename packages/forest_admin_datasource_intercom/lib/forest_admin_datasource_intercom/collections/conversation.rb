@@ -10,7 +10,7 @@ module ForestAdminDatasourceIntercom
     # customers, and rendering third-party HTML inside Forest is neither safe nor
     # useful (R10).
     # Long by line count only: most of it declares the columns, one call each.
-    class Conversation < CursorCollection # rubocop:disable Metrics/ClassLength
+    class Conversation < CursorCollection
       include ContactIdentity
       include Conversation::Serializer
       include Conversation::Timeline
@@ -85,12 +85,21 @@ module ForestAdminDatasourceIntercom
       # filtered through alike.
       #
       # No relation towards the company: a conversation carries its account as a
-      # whole object, so the name is already on the row, and the Companies
-      # collection arrives with lot 4.
+      # whole object, so the name is already on the row, and Intercom filters no
+      # company field on this endpoint -- the relation would be navigable and
+      # not filterable, where the column is already readable.
+      #
+      # The contact is a relation as of lot 4, and a filterable one: the
+      # endpoint matches a conversation against one of its contact ids
+      # (measured), so `contact:email` resolves against `/contacts/search` and
+      # is rewritten onto the key. A group conversation names its first contact
+      # here, like the column does; every contact of it is a hop away, through
+      # that contact's own conversations.
       def define_relations
         add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
         add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
         add_many_to_one('closed_by', foreign_collection: 'IntercomAdmin', foreign_key: 'closed_by_id')
+        add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
       end
 
       # Who the conversation sits with, and which account it belongs to. The
@@ -101,19 +110,6 @@ module ForestAdminDatasourceIntercom
         add_column('team_assignee_id', 'String')
         add_column('company_id', 'String')
         add_column('company_name', 'String')
-      end
-
-      # The contact identity is denormalized onto the row rather than declared as
-      # a relation: the Contacts collection arrives in lot 4, and a relation whose
-      # target collection is missing is a schema the agent refuses to boot on.
-      #
-      # A group conversation has several contacts; the row carries the first and
-      # says how many there are, rather than pretending there is one.
-      def define_contact_columns
-        add_column('contact_ids', 'Json')
-        add_column('contact_count', 'Number')
-        add_column('contact_name', 'String')
-        add_column('contact_email', 'String')
       end
 
       # The message that opened the conversation lives in `source`, not in the

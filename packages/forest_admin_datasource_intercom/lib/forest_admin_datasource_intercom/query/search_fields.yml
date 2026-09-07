@@ -178,19 +178,26 @@ endpoints:
         type: boolean
         operators: ['=']
         source: spec
+      # The foreign key of the `contact` relation, and the reason lot 4 could
+      # turn the denormalized contact columns into one: Intercom matches a
+      # conversation against one of the contacts it carries. The column is
+      # singular and the wire field plural on purpose -- the row names its first
+      # contact, the endpoint asks "is this contact one of yours".
+      #
+      # `!=` is deliberately absent: on a field holding a list, "not that
+      # contact" is a question Intercom's DSL does not clearly answer, and the
+      # one thing this table may not do is publish a filter whose meaning is a
+      # guess.
+      contact_id:
+        field: contact_ids
+        type: string
+        operators: ['=']
+        source: measured
     # Columns this collection publishes and will not filter, with the reason an
     # operator reads when they try. A column absent from both tables is refused
     # by name too -- these are the ones whose refusal is permanent and has an
     # explanation worth giving.
     refused:
-      contact_ids:
-        reason: >-
-          Intercom does match a conversation against one of its contact ids, but
-          the column holds the list and is therefore typed Json, whose filter
-          values the agent's own validator requires to be Json too -- an id
-          would be rejected before this datasource saw it. Filtering by contact
-          arrives with the Contacts collection and a relation.
-        source: measured
       tag_names:
         reason: >-
           Intercom filters conversations by tag id, and this column holds the
@@ -216,13 +223,10 @@ endpoints:
         source: measured
       contact_name:
         reason: >-
-          Read from the Contacts endpoint, not from the conversation. Filtering
-          on it arrives with the Contacts collection.
-        source: spec
-      contact_email:
-        reason: >-
-          Read from the Contacts endpoint, not from the conversation. Filter on
-          `source_author_email` instead, which is on the conversation itself.
+          Read from the Contacts endpoint, not from the conversation. Filter
+          through the `contact` relation, which resolves against
+          `/contacts/search` and rewrites onto the contact id -- or on
+          `source_author_email`, which is on the conversation itself.
         source: spec
       contact_count:
         reason: Counted by the agent from the contacts the payload carries.
@@ -305,15 +309,18 @@ endpoints:
         type: date
         operators: ['>', '<', '>=', '<=', '=', '!=']
         source: measured
+      # The foreign key of the `contact` relation. `spec` rather than
+      # `measured`, and the difference is visible to an operator: it is what
+      # decides whether the contacts of a ticket can be filtered at all, and the
+      # probe has not run on this endpoint. If Intercom refuses it, this row
+      # moves to the refused table and the relation stays navigable without
+      # being filterable -- the way `state` already is.
+      contact_id:
+        field: contact_ids
+        type: string
+        operators: ['=']
+        source: spec
     refused:
-      contact_ids:
-        reason: >-
-          Intercom does match a ticket against one of its contact ids, but
-          the column holds the list and is therefore typed Json, whose filter
-          values the agent's own validator requires to be Json too -- an id
-          would be rejected before this datasource saw it. Filtering by contact
-          arrives with the Contacts collection and a relation.
-        source: measured
       company_id:
         reason: >-
           Measured during lot 1: `/tickets/search` refuses `company_id` with
@@ -380,9 +387,229 @@ endpoints:
       - state_id
       - is_shared
       - previous_state_id
-      - contact_id
+      - company_ids
       - source.author.email
       - source.subject
       - source.body
       - title
       - description
+
+  # The one endpoint of the whole API that sorts. `sortable: true` is what a
+  # column reads to publish `isSortable`, and it appears nowhere else in this
+  # file on purpose: `/conversations/search` accepts a `sort` and ignores it
+  # without a word (measured), so a row that stayed silent there would be a
+  # column promising an order Intercom never applies.
+  #
+  # The set is deliberately narrower than what the documentation implies. It
+  # says the results may be sorted by any attribute; nothing has been measured,
+  # and a sort Intercom refuses is a list view that fails rather than one that
+  # comes back unordered. These are the fields an ops team orders a contact list
+  # by, and the probe is what may widen the set.
+  contacts:
+    path: contacts/search
+    measured_at: null
+    fields:
+      # Measured rather than taken from the documentation: lot 1 reads the
+      # contacts of a page through `id IN [...]` on this endpoint, which is the
+      # membership operator every other field refuses.
+      id:
+        field: id
+        type: string
+        operators: ['=', 'IN']
+        source: measured
+      role:
+        field: role
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      name:
+        field: name
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+        sortable: true
+      email:
+        field: email
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+        sortable: true
+      # Derived by the agent from the address, and filtered by Intercom all the
+      # same: the endpoint carries a field of its own for it, which is what
+      # makes "everyone at this customer" a filter rather than a wildcard.
+      email_domain:
+        field: email_domain
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      phone:
+        field: phone
+        type: text
+        operators: ['=', '!=', '~', '!~', '^', '$']
+        source: spec
+      external_id:
+        field: external_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      owner_id:
+        field: owner_id
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      # Measured on 25 August 2026, API 2.16, and this is the asymmetry the
+      # per-endpoint table exists for: `/conversations/search` and
+      # `/tickets/search` accept `>=`, `<=` and `!=` on a date where this
+      # endpoint answers `data_invalid`. `IN` is refused on a date everywhere.
+      #
+      # Nothing is lost that an operator can see: a Date column publishes the
+      # two bounds alone whatever this table allows -- see the operator table --
+      # and the toolkit derives `before`, `after`, `today` and the whole
+      # `previous_*` family from them.
+      created_at:
+        field: created_at
+        type: date
+        operators: ['>', '<']
+        source: measured
+        sortable: true
+      updated_at:
+        field: updated_at
+        type: date
+        operators: ['>', '<']
+        source: measured
+        sortable: true
+      signed_up_at:
+        field: signed_up_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+        sortable: true
+      last_seen_at:
+        field: last_seen_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+        sortable: true
+      last_contacted_at:
+        field: last_contacted_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+        sortable: true
+      last_replied_at:
+        field: last_replied_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+        sortable: true
+      last_email_opened_at:
+        field: last_email_opened_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+      last_email_clicked_at:
+        field: last_email_clicked_at
+        type: date
+        operators: ['>', '<']
+        source: spec
+      unsubscribed_from_emails:
+        field: unsubscribed_from_emails
+        type: boolean
+        operators: ['=']
+        source: spec
+      has_hard_bounced:
+        field: has_hard_bounced
+        type: boolean
+        operators: ['=']
+        source: spec
+      marked_email_as_spam:
+        field: marked_email_as_spam
+        type: boolean
+        operators: ['=']
+        source: spec
+      language_override:
+        field: language_override
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      browser:
+        field: browser
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      browser_language:
+        field: browser_language
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      os:
+        field: os
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      location_country:
+        field: location.country
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      location_region:
+        field: location.region
+        type: string
+        operators: ['=', '!=']
+        source: spec
+      location_city:
+        field: location.city
+        type: string
+        operators: ['=', '!=']
+        source: spec
+    refused:
+      avatar:
+        reason: >-
+          The url of the contact's picture. Nothing filters an image, and
+          Intercom's search does not carry the field.
+        source: spec
+      company_id:
+        reason: >-
+          The first of the companies the contact belongs to, read off the
+          payload. `/contacts/search` filters no company field, so a company
+          list is reached from the company side -- open the company and read
+          its contacts.
+        source: spec
+      company_count:
+        reason: Counted by the agent from the companies the payload carries.
+        source: spec
+      session_count:
+        reason: >-
+          On the contact payload and not in the search DSL. Filter on
+          `last_seen_at` instead, which the endpoint does take.
+        source: spec
+    # Contact custom attributes are filtered as `custom_attributes.{name}` --
+    # by name, unlike a ticket attribute, which carries a different id per
+    # ticket type. So the obstacle is not R7 here, it is measurement: the
+    # operator set Intercom answers on a custom attribute of each data type has
+    # not been probed, and this package does not publish a filter it has not
+    # seen work. They ship typed and display-only, and the probe is what turns
+    # that around.
+    custom_attributes:
+      filterable: false
+      reason: >-
+        Contact custom attributes are published for reading only: which
+        operators Intercom answers on `custom_attributes.{name}` has not been
+        measured on a real workspace, and this datasource does not offer a
+        filter it has not seen work. Filter on a native field instead.
+      source: spec
+    candidates:
+      - tag_ids
+      - segment_id
+      - company_id
+      - companies.id
+      - companies.name
+      - android_app_name
+      - android_last_seen_at
+      - ios_app_name
+      - ios_last_seen_at
+      - utm_source
+      - utm_campaign
+      - utm_medium
+      - referrer
+      - session_count

@@ -120,7 +120,7 @@ module ForestAdminDatasourceIntercom
       # and the contact identity are all read from somewhere the endpoint does
       # not filter.
       it 'advertises no filter on a column the endpoint does not filter' do
-        %w[tag_names company_name contact_email timeline contact_ids].each do |column|
+        %w[tag_names company_name contact_name timeline contact_count].each do |column|
           expect(collection.fields[column].filter_operators).to be_empty, "#{column} advertises a filter"
         end
       end
@@ -245,13 +245,14 @@ module ForestAdminDatasourceIntercom
           .to include('closed_at' => nil, 'reopen_count' => nil)
       end
 
-      # A group conversation has several contacts: the row names how many rather
-      # than presenting one of them as the one.
-      it 'carries the contact ids and their count' do
+      # A group conversation has several contacts: the row names the first, says
+      # how many there are, and the relation resolves that same first one -- the
+      # column and the relation cannot disagree.
+      it 'names the first contact and counts them' do
         stub_list(conversation('1'))
 
         expect(collection.list(nil, filter, nil).first)
-          .to include('contact_ids' => %w[c1 c2], 'contact_count' => 2)
+          .to include('contact_id' => 'c1', 'contact_count' => 2)
       end
 
       it 'narrows the row to the projection' do
@@ -573,14 +574,18 @@ module ForestAdminDatasourceIntercom
                           'data' => [{ 'id' => 'c1', 'name' => 'Camille', 'email' => 'camille@acme.test' }]))
       end
 
-      # Denormalized rather than declared as a relation: the Contacts collection
-      # arrives in lot 4, and a relation whose target is missing is a schema the
-      # agent refuses to boot on.
+      # One label on the row plus the relation to navigate, which is the rule
+      # lot 2.5 set for the ticket labels: `contact_email` is gone, it is a hop
+      # away on `contact:email`.
       it 'reads the identity of the page in one request and puts it on the row' do
-        row = collection.list(nil, filter, %w[id contact_name contact_email]).first
+        row = collection.list(nil, filter, %w[id contact_name]).first
 
-        expect(row).to include('contact_name' => 'Camille', 'contact_email' => 'camille@acme.test')
+        expect(row).to include('contact_name' => 'Camille')
         expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+      end
+
+      it 'no longer publishes the e-mail the relation carries' do
+        expect(collection.fields.keys).not_to include('contact_email', 'contact_ids')
       end
 
       it 'asks for the contacts of the page by id' do
