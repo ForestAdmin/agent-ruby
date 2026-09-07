@@ -199,6 +199,33 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The other half of the 360 degrees: `IntercomContact#conversations` is a
+    # one-to-many, and the agent serves it by listing this collection on the key
+    # -- so what makes that list possible is this endpoint filtering on a
+    # contact id at all. The column is singular and the wire field plural: the
+    # row names its first contact, the endpoint asks whether a contact is one of
+    # the conversation's.
+    describe 'the conversations of a contact' do
+      it 'filters on the contact id the relation resolves to' do
+        stub_search(conversation('1'))
+
+        collection.list(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/conversations/search")
+          .with(query: hash_including({}),
+                body: hash_including('query' => { 'field' => 'contact_ids', 'operator' => '=', 'value' => 'c1' }))
+      end
+
+      it 'counts them in one request' do
+        stub_search(conversation('1'), total: 37)
+
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')),
+                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation
+                                      .new(operation: 'Count')))
+          .to eq([{ 'group' => {}, 'value' => 37 }])
+      end
+    end
+
     describe '#list' do
       it 'reads the listing endpoint as plain text and pages by cursor' do
         stub_list(conversation('1'))

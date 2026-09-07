@@ -380,6 +380,23 @@ module ForestAdminDatasourceIntercom
     # exists. What Intercom is really filtered on is the foreign key: the target
     # says which of its records match -- over every record it holds, not over a
     # page -- and the ids it names are what the search carries.
+    # `IntercomContact#tickets` is a one-to-many the agent serves by listing this
+    # collection on the key. The row it rests on is `spec`, not `measured`:
+    # whether `/tickets/search` filters on a contact id at all is one of the
+    # probe's questions, and the answer moves the row into the table or into the
+    # refusals.
+    describe 'the tickets of a contact' do
+      it 'filters on the contact id the relation resolves to' do
+        stub_search(ticket('1'))
+
+        collection.list(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+          .with(body: hash_including('query' => { 'field' => 'contact_ids', 'operator' => '=',
+                                                  'value' => 'c1' }))
+      end
+    end
+
     describe 'a condition through a relation' do
       it 'filters on the foreign key the target resolved to' do
         stub_admins('id' => '493881', 'name' => 'Alice')
