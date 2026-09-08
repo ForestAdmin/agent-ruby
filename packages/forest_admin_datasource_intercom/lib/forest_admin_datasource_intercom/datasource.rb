@@ -36,17 +36,29 @@ module ForestAdminDatasourceIntercom
       add_collection(Collections::TeamMembership.new(self))
       add_collection(Collections::TicketType.new(self))
       add_collection(Collections::TicketState.new(self))
+      # Contacts and Companies before the collections that point at them, so a
+      # relation is declared next to a target the datasource already holds.
+      # Each carries the custom attributes its workspace defines, read at boot:
+      # they cannot be discovered from a payload, a contact carrying the values
+      # of the attributes it happens to have been given.
+      add_collection(Collections::Contact.new(self, attributes: model_attributes('contact')))
+      add_collection(Collections::Company.new(self, attributes: model_attributes('company')))
       add_collection(Collections::Conversation.new(self))
-      # The one boot-time read of the datasource: the attributes a workspace
-      # defines on its ticket types, which are columns of the Tickets collection
-      # and cannot be discovered from a ticket payload -- a ticket carries the
-      # values of its own type only. It degrades to no attribute column rather
-      # than to a failed boot.
+      # The attributes a workspace defines on its ticket types, which are
+      # columns of the Tickets collection and cannot be discovered from a ticket
+      # payload either -- a ticket carries the values of its own type only.
       add_collection(Collections::Ticket.new(self, attributes: ticket_attributes))
     end
 
+    # The three boot-time reads of the datasource. Each degrades to no attribute
+    # column rather than to a failed boot: a token missing a permission costs
+    # the columns it could not read, never the agent.
     def ticket_attributes
       Schema::TicketAttributesIntrospector.new(@client).attributes
+    end
+
+    def model_attributes(model)
+      Schema::DataAttributesIntrospector.new(@client, model: model).attributes
     end
   end
 end

@@ -81,7 +81,7 @@ module ForestAdminDatasourceIntercom
       answer = { 'type' => 'ticket.list', 'tickets' => records, 'total_count' => total || records.size,
                  'pages' => { 'type' => 'pages', 'page' => 1 } }
 
-      request = stub_request(:post, "#{base}/tickets/search")
+      request = stub_request(:post, "#{base}/tickets/search").with(query: hash_including({}))
       request = request.with(body: hash_including(body)) if body
       request.to_return(json(answer))
     end
@@ -173,7 +173,7 @@ module ForestAdminDatasourceIntercom
 
         rows(%w[id])
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('query' => { 'field' => 'created_at', 'operator' => '>', 'value' => '0' }))
       end
 
@@ -186,7 +186,7 @@ module ForestAdminDatasourceIntercom
 
         pagination = hash_including('per_page' => described_class::MAX_TICKETS_PER_PAGE)
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('pagination' => pagination))
       end
 
@@ -251,7 +251,7 @@ module ForestAdminDatasourceIntercom
 
       # A record detail goes to its own endpoint, which is not the search one.
       it 'reads one ticket through the record endpoint' do
-        stub_request(:get, "#{base}/tickets/1").to_return(json(ticket('1')))
+        stub_request(:get, "#{base}/tickets/1").with(query: hash_including({})).to_return(json(ticket('1')))
 
         expect(rows(%w[id], condition_tree: leaf('id', operators::EQUAL, '1')).map { |row| row['id'] }).to eq(%w[1])
       end
@@ -380,6 +380,77 @@ module ForestAdminDatasourceIntercom
     # exists. What Intercom is really filtered on is the foreign key: the target
     # says which of its records match -- over every record it holds, not over a
     # page -- and the ids it names are what the search carries.
+    # `IntercomContact#tickets` is a one-to-many the agent serves by listing this
+    # collection on the key. The row it rests on is `spec`, not `measured`:
+    # whether `/tickets/search` filters on a contact id at all is one of the
+    # probe's questions, and the answer moves the row into the table or into the
+    # refusals.
+    describe 'the tickets of a contact' do
+      it 'filters on the contact id the relation resolves to' do
+        stub_search(ticket('1'))
+
+        collection.list(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')), %w[id])
+
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
+          .with(body: hash_including('query' => { 'field' => 'contact_ids', 'operator' => '=',
+                                                  'value' => 'c1' }))
+      end
+    end
+
+    # The exchange itself, which lot 1 paid for and did not publish: the parts
+    # ride along in every ticket response, so the thread costs no request.
+    describe 'the thread' do
+      it 'names who said what, when, and through which kind of event' do
+        stub_search(ticket('1', parts(comment(at: 1_700_001_000, by: 'Camille', type: 'contact'),
+                                      comment(at: 1_700_002_000, by: 'Alice'))))
+
+        expect(rows(%w[id timeline]).first['timeline'])
+          .to eq([{ 'id' => 'c1700001000', 'part_type' => 'comment', 'created_at' => '2023-11-14T22:30:00Z',
+                    'author_type' => 'contact', 'author_name' => 'Camille', 'author_email' => nil,
+                    'body' => 'Je regarde.', 'attachment_count' => 0, 'redacted' => nil },
+                  { 'id' => 'c1700002000', 'part_type' => 'comment', 'created_at' => '2023-11-14T22:46:40Z',
+                    'author_type' => 'admin', 'author_name' => 'Alice', 'author_email' => nil,
+                    'body' => 'Je regarde.', 'attachment_count' => 0, 'redacted' => nil }])
+      end
+
+      # An assignment, an internal note and a reply are not the same event, and
+      # a thread that flattens them reads as an exchange that never happened the
+      # way it did. Which also means the team's internal notes are in there.
+      it 'keeps the internal notes and the state changes, each under its own type' do
+        stub_search(ticket('1', parts(comment(at: 1_700_001_000, part_type: 'note'),
+                                      state_change('resolved', at: 1_700_002_000))))
+
+        expect(rows(%w[id timeline]).first['timeline'].map { |entry| entry['part_type'] })
+          .to eq(%w[note ticket_state_updated_by_admin])
+      end
+
+      # Empty means empty here, and says so: the parts are in every response,
+      # unlike a conversation read from a listing, whose timeline stays nil
+      # because nothing is known.
+      it 'answers an empty thread on a ticket nothing happened to' do
+        stub_search(ticket('1'))
+
+        expect(rows(%w[id timeline]).first['timeline']).to eq([])
+      end
+
+      it 'builds nothing when the projection does not name it' do
+        stub_search(ticket('1', parts(comment(at: 1_700_001_000))))
+
+        expect(rows(%w[id]).first).to eq('id' => '1')
+      end
+
+      # The bodies are HTML written by end customers, and rendering third-party
+      # HTML inside Forest is neither safe nor useful (R10).
+      it 'asks Intercom for plain text rather than markup' do
+        stub_search(ticket('1'))
+
+        rows(%w[id timeline])
+
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
+          .with(query: { 'display_as' => 'plaintext' })
+      end
+    end
+
     describe 'a condition through a relation' do
       it 'filters on the foreign key the target resolved to' do
         stub_admins('id' => '493881', 'name' => 'Alice')
@@ -387,7 +458,7 @@ module ForestAdminDatasourceIntercom
 
         rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('query' => { 'field' => 'admin_assignee_id', 'operator' => '=',
                                                   'value' => '493881' }))
       end
@@ -400,7 +471,7 @@ module ForestAdminDatasourceIntercom
 
         rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('query' => {
                                        'operator' => 'OR',
                                        'value' => [{ 'field' => 'admin_assignee_id', 'operator' => '=',
@@ -417,7 +488,7 @@ module ForestAdminDatasourceIntercom
         stub_admins('id' => '493881', 'name' => 'Alice')
 
         expect(rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Zoe'))).to be_empty
-        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).not_to have_requested(:post, %r{#{base}/tickets/search})
       end
 
       it 'counts none of them either, without a request' do
@@ -428,7 +499,7 @@ module ForestAdminDatasourceIntercom
                                                                         operators::EQUAL, 'Zoe')), aggregation)
 
         expect(counted).to eq([{ 'group' => {}, 'value' => 0 }])
-        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).not_to have_requested(:post, %r{#{base}/tickets/search})
       end
 
       # A relation group nested inside the tree the agent assembled: a scope, a
@@ -442,7 +513,7 @@ module ForestAdminDatasourceIntercom
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('query' => {
                                        'operator' => 'AND',
                                        'value' => [{ 'field' => 'category', 'operator' => '=',
@@ -469,7 +540,7 @@ module ForestAdminDatasourceIntercom
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
 
-        expect(WebMock).to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).to have_requested(:post, %r{#{base}/tickets/search})
           .with(body: hash_including('query' => {
                                        'operator' => 'AND',
                                        'value' => [{ 'field' => 'category', 'operator' => '=',
@@ -495,7 +566,7 @@ module ForestAdminDatasourceIntercom
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
 
-        expect(WebMock).to(have_requested(:post, "#{base}/tickets/search").with do |request|
+        expect(WebMock).to(have_requested(:post, %r{#{base}/tickets/search}).with do |request|
           query = JSON.parse(request.body)['query']
           query['value'].size == 15 && query['value'].last['operator'] == 'OR' &&
             query['value'].last['value'].size == 3
@@ -508,17 +579,21 @@ module ForestAdminDatasourceIntercom
                       leaf('admin_assignee:name', operators::EQUAL, 'Zoe'))
 
         expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to be_empty
-        expect(WebMock).not_to have_requested(:post, "#{base}/tickets/search")
+        expect(WebMock).not_to have_requested(:post, %r{#{base}/tickets/search})
       end
 
       # Fifteen conditions per group is Intercom's limit, and a relation reaches
       # it without trying. Refused by name rather than sent and answered with a
       # 400 naming neither the limit nor the filter that hit it.
+      #
+      # "more than fifteen" rather than a count: the target is read one record
+      # past what a group holds and no further, so what is known is that it does
+      # not fit -- see `match_page`.
       it 'refuses a relation condition matching more records than a group holds' do
-        stub_admins(*(1..16).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
+        stub_admins(*(1..20).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
 
         expect { rows(%w[id], condition_tree: leaf('admin_assignee:name', operators::EQUAL, 'Alice')) }
-          .to raise_error(UnsupportedOperatorError, /names 16 records.*15 conditions per group/m)
+          .to raise_error(UnsupportedOperatorError, /names more than 15 records.*15 conditions per group/m)
       end
 
       # `/tickets/search` filters no state id -- the table carries none -- so the

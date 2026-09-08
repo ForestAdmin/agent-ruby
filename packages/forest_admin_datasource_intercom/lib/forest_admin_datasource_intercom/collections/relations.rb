@@ -28,6 +28,7 @@ module ForestAdminDatasourceIntercom
     module Relations # rubocop:disable Metrics/ModuleLength
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       ManyToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema
+      OneToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::OneToManySchema
       Filter = ForestAdminDatasourceToolkit::Components::Query::Filter
       Projection = ForestAdminDatasourceToolkit::Components::Query::Projection
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
@@ -63,6 +64,22 @@ module ForestAdminDatasourceIntercom
         add_field(name, ManyToOneSchema.new(foreign_collection: foreign_collection,
                                             foreign_key: foreign_key,
                                             foreign_key_target: 'id',
+                                            is_read_only: true))
+      end
+
+      # The other side of a many-to-one, and the whole point of the 360 degrees:
+      # a contact's conversations, a company's contacts. The agent serves it by
+      # listing the target on `origin_key equals <this record's id>`, so the
+      # target has to be able to answer that condition -- which is what makes
+      # this declarable here and not everywhere.
+      #
+      # Published unfilterable by the agent (`GeneratorField`), so unlike a
+      # many-to-one it carries no risk of offering a filter this datasource
+      # would then refuse.
+      def add_one_to_many(name, foreign_collection:, origin_key:)
+        add_field(name, OneToManySchema.new(foreign_collection: foreign_collection,
+                                            origin_key: origin_key,
+                                            origin_key_target: 'id',
                                             is_read_only: true))
       end
 
@@ -224,12 +241,24 @@ module ForestAdminDatasourceIntercom
       # over every record Intercom holds rather than over a page of them.
       def matching_ids(caller, relation, leaf)
         target = relation.foreign_key_target
+        filter = Filter.new(condition_tree: leaf, page: match_page)
 
         foreign_collection(relation)
-          .list(caller, Filter.new(condition_tree: leaf), Projection.new([target]))
+          .list(caller, filter, Projection.new([target]))
           .filter_map { |row| row[target] }
           .uniq
       end
+
+      # How much of the target a relation condition may read. Unbounded here:
+      # the tier that answers one in memory holds every record already, and
+      # cutting the read short would drop ids its `in` can carry for free.
+      #
+      # The tier whose target is a page of something larger overrides it -- see
+      # `CursorCollection`. Resolving `contact:email contains "@"` against a
+      # workspace's whole contact list, to then refuse the fan-out it comes to,
+      # would spend a full cursor walk on a filter that was never going to be
+      # answered.
+      def match_page = nil
 
       # The target as the datasource holds it, undecorated -- so a permission
       # scope or a segment defined on the target does not narrow what a relation

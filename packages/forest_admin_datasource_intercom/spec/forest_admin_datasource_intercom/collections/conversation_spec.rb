@@ -120,7 +120,7 @@ module ForestAdminDatasourceIntercom
       # and the contact identity are all read from somewhere the endpoint does
       # not filter.
       it 'advertises no filter on a column the endpoint does not filter' do
-        %w[tag_names company_name contact_email timeline contact_ids].each do |column|
+        %w[tag_names company_name contact_name timeline contact_count].each do |column|
           expect(collection.fields[column].filter_operators).to be_empty, "#{column} advertises a filter"
         end
       end
@@ -199,6 +199,33 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The other half of the 360 degrees: `IntercomContact#conversations` is a
+    # one-to-many, and the agent serves it by listing this collection on the key
+    # -- so what makes that list possible is this endpoint filtering on a
+    # contact id at all. The column is singular and the wire field plural: the
+    # row names its first contact, the endpoint asks whether a contact is one of
+    # the conversation's.
+    describe 'the conversations of a contact' do
+      it 'filters on the contact id the relation resolves to' do
+        stub_search(conversation('1'))
+
+        collection.list(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')), %w[id])
+
+        expect(WebMock).to have_requested(:post, "#{base}/conversations/search")
+          .with(query: hash_including({}),
+                body: hash_including('query' => { 'field' => 'contact_ids', 'operator' => '=', 'value' => 'c1' }))
+      end
+
+      it 'counts them in one request' do
+        stub_search(conversation('1'), total: 37)
+
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('contact_id', operators::EQUAL, 'c1')),
+                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation
+                                      .new(operation: 'Count')))
+          .to eq([{ 'group' => {}, 'value' => 37 }])
+      end
+    end
+
     describe '#list' do
       it 'reads the listing endpoint as plain text and pages by cursor' do
         stub_list(conversation('1'))
@@ -245,13 +272,14 @@ module ForestAdminDatasourceIntercom
           .to include('closed_at' => nil, 'reopen_count' => nil)
       end
 
-      # A group conversation has several contacts: the row names how many rather
-      # than presenting one of them as the one.
-      it 'carries the contact ids and their count' do
+      # A group conversation has several contacts: the row names the first, says
+      # how many there are, and the relation resolves that same first one -- the
+      # column and the relation cannot disagree.
+      it 'names the first contact and counts them' do
         stub_list(conversation('1'))
 
         expect(collection.list(nil, filter, nil).first)
-          .to include('contact_ids' => %w[c1 c2], 'contact_count' => 2)
+          .to include('contact_id' => 'c1', 'contact_count' => 2)
       end
 
       it 'narrows the row to the projection' do
@@ -573,14 +601,18 @@ module ForestAdminDatasourceIntercom
                           'data' => [{ 'id' => 'c1', 'name' => 'Camille', 'email' => 'camille@acme.test' }]))
       end
 
-      # Denormalized rather than declared as a relation: the Contacts collection
-      # arrives in lot 4, and a relation whose target is missing is a schema the
-      # agent refuses to boot on.
+      # One label on the row plus the relation to navigate, which is the rule
+      # lot 2.5 set for the ticket labels: `contact_email` is gone, it is a hop
+      # away on `contact:email`.
       it 'reads the identity of the page in one request and puts it on the row' do
-        row = collection.list(nil, filter, %w[id contact_name contact_email]).first
+        row = collection.list(nil, filter, %w[id contact_name]).first
 
-        expect(row).to include('contact_name' => 'Camille', 'contact_email' => 'camille@acme.test')
+        expect(row).to include('contact_name' => 'Camille')
         expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+      end
+
+      it 'no longer publishes the e-mail the relation carries' do
+        expect(collection.fields.keys).not_to include('contact_email', 'contact_ids')
       end
 
       it 'asks for the contacts of the page by id' do

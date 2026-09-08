@@ -18,6 +18,10 @@ module ForestAdminDatasourceIntercom
       include ContactIdentity
       include Ticket::Serializer
       include Ticket::DerivedColumns
+      include CustomAttributes
+      # The same thread a conversation publishes, and free here: the parts are
+      # in the response whether or not anything asks for them.
+      include Timeline
 
       # Intercom accepts 150. This is not that: it is what keeps one page of
       # tickets, timelines included, a response an agent can hold and an operator
@@ -43,18 +47,25 @@ module ForestAdminDatasourceIntercom
       def searchable = 'tickets'
       def max_page_size = MAX_TICKETS_PER_PAGE
 
+      # The part bodies are HTML written by end customers, and rendering
+      # third-party HTML inside Forest is neither safe nor useful (R10). Sent on
+      # the search, where Intercom does not document it: a parameter it ignores
+      # costs a query string, while the one it honours saves every row of the
+      # thread from coming back as markup.
+      def read_params = { 'display_as' => 'plaintext' }
+
       # Intercom exposes no `GET /tickets`, so a list view searches too: with the
       # filter it was given, or with the predicate that matches everything when
       # it was given none.
-      def read_page(per_page:, cursor:, query: nil)
-        super(per_page: per_page, cursor: cursor, query: query || MATCH_EVERY_TICKET)
-      end
+      def searchable_only? = true
+      def match_all_query = MATCH_EVERY_TICKET
 
       def enrich(records, rows, projection)
         wanted = Array(projection).map(&:to_s)
 
         embed_contact_identity(records, rows, wanted)
         embed_derived_columns(records, rows, wanted)
+        embed_timeline(records, rows, wanted)
       end
 
       private
@@ -85,6 +96,7 @@ module ForestAdminDatasourceIntercom
         define_contact_columns
         define_derived_columns
         add_column('part_count', 'Number')
+        add_column('timeline', 'Json')
         # Before the attribute columns rather than after: a workspace attribute
         # whose name lands on a relation is then skipped with a warning, the way
         # one landing on a column already is. Declared after, it would collide
@@ -110,14 +122,17 @@ module ForestAdminDatasourceIntercom
         add_column('ticket_type_name', 'String')
       end
 
-      # The four reference collections a ticket points at. Every target is read
-      # whole in one request, so a relation resolves for a page at the price of a
-      # single read.
+      # The reference collections a ticket points at, and the contact who opened
+      # it. Every reference target is read whole in one request, so those
+      # relations resolve for a page at the price of a single read; the contact
+      # is read from `/contacts/search`, one request for the page as well.
       #
-      # Only two of them can be filtered *through*: `/tickets/search` takes a
-      # filter on `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`,
-      # and none on a state id -- which the refusal names when a filter reaches
-      # for it, rather than letting the interface offer what the endpoint drops.
+      # Which of them can be filtered *through* is the measured table's
+      # business, not this method's: `/tickets/search` takes a filter on
+      # `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`, none on a
+      # state id, and `contact_ids` is a `spec` row the probe has yet to
+      # confirm. Where the endpoint filters nothing, the traversal is refused by
+      # name rather than left for the interface to offer and the API to drop.
       def define_relations
         add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
         add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
@@ -125,31 +140,27 @@ module ForestAdminDatasourceIntercom
         add_many_to_one('previous_state', foreign_collection: 'IntercomTicketState',
                                           foreign_key: 'previous_state_id')
         add_many_to_one('ticket_type', foreign_collection: 'IntercomTicketType', foreign_key: 'ticket_type_id')
+        add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
+      end
+
+      # Costs no request, unlike a conversation's: Intercom returns the parts of
+      # a ticket in the search response and offers no way to ask it not to, so
+      # the page pays for them whatever the projection says. Building the thread
+      # out of them is what is guarded here.
+      #
+      # An empty list means an empty thread, and says so -- where a conversation
+      # read from a listing carries no parts at all and its timeline stays nil,
+      # which reads as unknown.
+      def embed_timeline(records, rows, projection)
+        return unless projection.include?('timeline')
+
+        records.each_with_index { |record, index| rows[index]['timeline'] = build_timeline(record) }
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by
       # `TicketAttributesIntrospector`, which is also where a workspace's own
-      # name is turned into one a Forest query string can carry. An attribute
-      # landing on a native column is skipped rather than overwriting it.
-      def register_attribute_columns
-        @attribute_columns = @attributes.reject { |attribute| collides?(attribute) }
-        @attribute_columns.each { |attribute| add_column(attribute.column_name, attribute.column_type) }
-      end
-
-      def collides?(attribute)
-        return false unless fields.key?(attribute.column_name)
-
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} skips the ticket attribute #{attribute.name.inspect}: a " \
-          "native column or relation already carries the name #{attribute.column_name.inspect}, and overwriting " \
-          'it would show the attribute where the operator expects the ticket field.'
-        )
-        true
-      end
-
-      def attribute_columns
-        @attribute_columns || []
-      end
+      # name is turned into one a Forest query string can carry.
+      def attribute_kind = 'ticket'
     end
   end
 end

@@ -15,8 +15,27 @@ module ForestAdminDatasourceIntercom
       # The schema derives its filters from this file, so a malformed row is a
       # boot failure rather than a column nobody can explain. Reading it here is
       # what turns that guarantee into a test.
-      it 'reads the two search endpoints' do
-        expect(described_class.endpoints).to eq(%w[conversations tickets])
+      it 'reads the three search endpoints' do
+        expect(described_class.endpoints).to eq(%w[conversations tickets contacts])
+      end
+
+      # The asymmetry the per-endpoint table exists for, asserted on the file
+      # that ships rather than on a table a spec built: a date is bounded on
+      # every endpoint, and only two of them take the closed bounds and the
+      # inequality.
+      it 'carries the measured date restrictions of /contacts/search' do
+        expect(described_class.fetch('contacts').field('created_at').operators).to eq(['>', '<'])
+        expect(described_class.fetch('conversations').field('created_at').operators)
+          .to include('>=', '<=', '!=')
+      end
+
+      # Intercom sorts one endpoint and ignores the sort it is sent on the other
+      # two, so a sortable column outside contacts would promise an order that
+      # never happens.
+      it 'declares a sortable column on the one endpoint that sorts' do
+        expect(described_class.fetch('contacts').sortable_columns).not_to be_empty
+        expect(described_class.fetch('conversations').sortable_columns).to be_empty
+        expect(described_class.fetch('tickets').sortable_columns).to be_empty
       end
 
       it 'names the path each endpoint is searched through' do
@@ -85,7 +104,8 @@ module ForestAdminDatasourceIntercom
       end
 
       it 'lists exactly the columns each endpoint filters' do
-        { 'IntercomConversation' => 'conversations', 'IntercomTicket' => 'tickets' }.each do |collection, endpoint|
+        { 'IntercomConversation' => 'conversations', 'IntercomTicket' => 'tickets',
+          'IntercomContact' => 'contacts' }.each do |collection, endpoint|
           row = filterable.lines.find { |line| line.start_with?("| `#{collection}` |") }
           listed = row.to_s.scan(/`([a-z_]+)`/).flatten
 
@@ -109,6 +129,14 @@ module ForestAdminDatasourceIntercom
       it 'refuses a field declaring no operator, and says where it belongs' do
         expect { table(fields: { 'created_at' => field_row('operators' => []) }) }
           .to raise_error(ConfigurationError, /belongs in the refused table/)
+      end
+
+      # YAML reads an unquoted `true` as a boolean and a quoted one as a string,
+      # which is truthy in Ruby: a typo would publish a sortable column the
+      # endpoint never sorts.
+      it 'refuses a sortable flag that is not a boolean' do
+        expect { table(fields: { 'created_at' => field_row('sortable' => 'true') }) }
+          .to raise_error(ConfigurationError, /sortable "true" is neither true nor false/)
       end
 
       it 'refuses a provenance that is neither measured nor read off the documentation' do
@@ -140,8 +168,8 @@ module ForestAdminDatasourceIntercom
       end
 
       it 'refuses an endpoint nothing declares, rather than filtering nothing' do
-        expect { described_class.fetch('contacts') }
-          .to raise_error(ConfigurationError, /Unknown Intercom search endpoint "contacts"/)
+        expect { described_class.fetch('companies') }
+          .to raise_error(ConfigurationError, /Unknown Intercom search endpoint "companies"/)
       end
 
       it 'is measured once the probe has stamped a date on it' do
