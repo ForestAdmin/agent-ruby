@@ -25,12 +25,7 @@ module ForestAdminDatasourceIntercom
     # Long by line count only: half of it is the refusals, and a refusal that
     # does not say what to do instead is a refusal an operator cannot act on.
     class CursorCollection < BaseCollection # rubocop:disable Metrics/ClassLength
-      Aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation
-
-      # How many records an `id in [...]` read may fetch. One request per id --
-      # Intercom has no "read these records" endpoint -- so the fan-out is
-      # bounded rather than turned into a rate limit halfway through a page.
-      MAX_ID_READS = 25
+      include RecordsById
 
       # Countable, and exactly: unlike the pages a walk collected, `total_count`
       # is the whole dataset the filter names.
@@ -38,6 +33,13 @@ module ForestAdminDatasourceIntercom
         super
         enable_count
       end
+
+      # One request per id here, so a relation pointing at this tier resolves a
+      # slice at a time and is refused past what a slice may hold -- see
+      # `Relations#target_rows`. The collection that reads its ids in bulk
+      # widens both; see `Contact`.
+      def ids_per_read = max_id_reads
+      def max_resolvable_ids = max_id_reads
 
       def list(caller, filter, projection)
         records = fetch_records(caller, filter, server_sort(filter))
@@ -166,6 +168,11 @@ module ForestAdminDatasourceIntercom
         @walker ||= Pagination::CursorWalker.new
       end
 
+      # How many records a bulk read by id may fetch. A hook rather than the
+      # constant, since the collection that reads its ids in bulk answers far
+      # more of them for the same request count.
+      def max_id_reads = MAX_ID_READS
+
       private
 
       def column_operators(name, is_primary_key)
@@ -183,7 +190,16 @@ module ForestAdminDatasourceIntercom
         # would pay for a whole page to hand back a slice of it -- and page 2 of
         # a set larger than the cap would come back empty, the records it names
         # having been dropped by the truncation before the window was applied.
-        return records_by_ids(page_window(ids, filter)) if ids
+        if ids
+          # Which is also why an order cannot be honoured on this route: the
+          # window is cut in the order the ids were named, so sorting what comes
+          # back would order a slice picked by something else. Reported rather
+          # than dropped in silence, like every other order this tier cannot
+          # apply -- `server_sort` stayed quiet, having found a column Intercom
+          # does sort.
+          warn_unordered_ids(sort) if sort
+          return records_by_ids(page_window(ids, filter))
+        end
 
         query = translate(caller, filter)
         # A condition through a relation the target matched no record with names
@@ -281,46 +297,10 @@ module ForestAdminDatasourceIntercom
         Leaf.new(search_column, Operators::CONTAINS, filter.search.to_s.strip)
       end
 
-      def blank_search?(filter)
-        search = filter.respond_to?(:search) ? filter.search : nil
-        search.nil? || search.to_s.strip.empty?
-      end
-
-      # A record detail is `id equals X`, and a bulk read of related records is
-      # `id in [...]`. Only a bare leaf on the primary key takes this route: an
-      # `and` also carrying a scope names a narrower set than the ids do, and
-      # answering it with the ids alone would serve records the scope excludes.
-      def id_lookup(filter)
-        tree = filter&.condition_tree
-        return nil unless tree.is_a?(Leaf) && tree.field.to_s == primary_key
-        return nil unless blank_search?(filter)
-
-        case tree.operator
-        when Operators::EQUAL then [tree.value].compact.map(&:to_s)
-        when Operators::IN then Array(tree.value).compact.map(&:to_s)
-        end
-      end
-
-      def primary_key
-        @primary_key ||= fields.find do |_name, field|
-          field.respond_to?(:is_primary_key) && field.is_primary_key
-        end&.first
-      end
-
-      # A record the operator can no longer reach -- deleted, or outside the
-      # token's scope -- reads as "no record" rather than as a failed page.
-      def records_by_ids(ids)
-        wanted = ids.first(MAX_ID_READS)
-        warn_truncated_ids(ids.size) if ids.size > wanted.size
-
-        wanted.filter_map do |id|
-          client.fetch_record(record_endpoint, id, params: read_params)
-        rescue APIError => e
-          raise unless e.status == 404
-
-          nil
-        end
-      end
+      # The records of this tier carry bodies written by end customers, so every
+      # read of one asks Intercom for plain text (R10). `BaseCollection` reads
+      # this on the way to the record endpoint.
+      def record_read_params = read_params
 
       def listed_records(filter, query, sort = nil)
         offset, limit = translate_page(filter&.page)
@@ -344,33 +324,12 @@ module ForestAdminDatasourceIntercom
       # which is cheaper still.
       def count_records(caller, filter)
         ids = id_lookup(filter)
-        return records_by_ids(ids).size if ids
+        return count_by_ids(ids) if ids
 
         query = translate(caller, filter)
         return 0 if query == NOTHING
 
         exact_count(read_page(per_page: 1, cursor: nil, query: query))
-      end
-
-      # The count Intercom answered, or nothing at all. Counting the pages a
-      # walk collected would answer a fraction of the collection as if it were
-      # the whole of it, which is the one thing this tier does not do.
-      def exact_count(page)
-        return page.total_count if page.total_count
-
-        raise UnsupportedOperatorError,
-              "#{name} cannot be counted: Intercom answered this listing without a total_count, and counting the " \
-              'pages the agent walked would answer a fraction of the collection as if it were the whole of it.'
-      end
-
-      def refuse_unsupported_aggregation!(aggregation)
-        return if aggregation.is_a?(Aggregation) && aggregation.operation.to_s.casecmp('count').zero? &&
-                  Array(aggregation.groups).empty? && aggregation.field.nil?
-
-        raise UnsupportedOperatorError,
-              "#{name} can only be counted: Intercom exposes no aggregate endpoint, and grouping or summing the " \
-              'pages the agent walked would answer a fraction of the collection as if it were the whole of it. ' \
-              'Chart it on a collection read whole, or wait for the bounded group-by of the reporting lot.'
       end
 
       def refuse_search!
@@ -421,29 +380,14 @@ module ForestAdminDatasourceIntercom
         )
       end
 
-      def sort_field(clause) = clause[:field] || clause['field']
-
-      # `key?` rather than `||`: a descending clause carries `false`, which an
-      # `||` fallback reads as "absent" -- so an explicit `?sort=-id` would be
-      # taken for the ascending default the agent injects, and the one order
-      # Intercom silently drops would go unreported.
-      def ascending?(clause)
-        clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
-      end
-
-      def default_pk_sort?(clauses)
-        return false unless clauses.size == 1
-
-        clause = clauses.first
-        return false unless sort_field(clause).to_s == primary_key
-
-        ascending?(clause) != false
-      end
-
-      def warn_truncated_ids(asked)
+      # `sort` here is the clause `server_sort` found the endpoint does honour,
+      # which is why nothing has reported it yet: it is this route, not the
+      # column, that cannot carry it.
+      def warn_unordered_ids(sort)
         ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} was asked for #{asked} records by id and read the first " \
-          "#{MAX_ID_READS}: Intercom reads them one request each. The result is truncated."
+          "[forest_admin_datasource_intercom] #{name} was asked to sort on #{sort[:field].inspect} while reading " \
+          'records by id, which Intercom reads by id and in no order. The rows come back in the order the ids ' \
+          'were named.'
         )
       end
     end

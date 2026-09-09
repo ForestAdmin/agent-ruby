@@ -83,16 +83,34 @@ module ForestAdminDatasourceIntercom
         private
 
         def endpoint(name, definition)
+          filterable = fields(name, definition['fields'])
+          refused = refusals(name, definition['refused'])
+          validate_no_overlap!(name, filterable, refused)
+
           Endpoint.new(
             name: name,
             path: definition.fetch('path'),
             measured_at: definition['measured_at'],
-            fields: fields(name, definition['fields']),
-            refused: refusals(name, definition['refused']),
+            fields: filterable,
+            refused: refused,
             candidates: Array(definition['candidates']).freeze,
             ticket_attributes: definition['ticket_attributes'],
             custom_attributes: definition['custom_attributes']
           ).freeze
+        end
+
+        # A column filed as both filterable and refused. `Endpoint#field` is
+        # consulted first, so the filterable row would win and the refusal --
+        # with the reason an operator reads -- would be ignored in silence. The
+        # file is rewritten by a script, so this is the shape a bad rewrite
+        # takes, and it fails at load rather than producing a schema nobody can
+        # explain.
+        def validate_no_overlap!(endpoint, filterable, refused)
+          both = filterable.keys & refused.keys
+          return if both.empty?
+
+          malformed!(endpoint, both.join(', '),
+                     'it is declared filterable and refused at once; the refusal would be ignored')
         end
 
         def fields(endpoint, declared)
@@ -120,7 +138,22 @@ module ForestAdminDatasourceIntercom
           validate_source!(endpoint, field.column, field)
           validate_type!(endpoint, field)
           validate_operators!(endpoint, field)
+          validate_publishable!(endpoint, field)
           validate_sortable!(endpoint, field)
+        end
+
+        # Operators the DSL spells, none of which this column's *type* can carry:
+        # a `date` row declaring `~` passes the alphabet above and publishes
+        # nothing, `OperatorTable` mapping no Forest operator onto it. The result
+        # is a column the table calls filterable that no filter can reach, and
+        # the translator refusing every request on it -- the same
+        # advertise-then-refuse this package exists to prevent, one layer lower.
+        def validate_publishable!(endpoint, field)
+          return unless OperatorTable.forest_operators(field).empty?
+
+          malformed!(endpoint, field.column,
+                     "none of #{field.operators.join(", ")} is an operator Intercom answers on a " \
+                     "#{field.type}, so the column would publish no filter at all")
         end
 
         # Anything but a boolean, `"true"` above all: YAML reads it as a string,

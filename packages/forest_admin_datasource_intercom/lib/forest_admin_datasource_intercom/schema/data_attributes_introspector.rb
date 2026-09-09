@@ -16,6 +16,8 @@ module ForestAdminDatasourceIntercom
     # needs to tell an attribute it may write from one Intercom fills in
     # itself -- re-reading it later would be a second boot-time round trip.
     class DataAttributesIntrospector
+      include AttributeNaming
+
       # Intercom's attribute data types, mapped onto what Forest can render.
       COLUMN_TYPES = {
         'string' => 'String', 'integer' => 'Number', 'float' => 'Number', 'decimal' => 'Number',
@@ -23,13 +25,6 @@ module ForestAdminDatasourceIntercom
       }.freeze
 
       DEFAULT_COLUMN_TYPE = 'String'.freeze
-
-      # What a column name may not contain, and it has nothing to do with
-      # Intercom: Forest lists the fields of a request in a comma-separated
-      # query parameter and names a field through a relation with a colon. A
-      # workspace names its attributes in free text, and a comma in there splits
-      # the projection into fields no collection has.
-      UNSAFE_IN_A_COLUMN_NAME = /[,:]/
 
       # `name` is the key `custom_attributes` uses, `column_name` the one the
       # schema publishes; they differ whenever the workspace's own name cannot
@@ -94,26 +89,10 @@ module ForestAdminDatasourceIntercom
                       data_type: definition['data_type'], api_writable: definition['api_writable'] == true)
       end
 
-      # Intercom hands these back HTML-escaped -- `Ce que j&#39;ai vérifié` --
-      # which is an artefact of where they were typed, not part of the name.
-      def column_name_for(name)
-        CGI.unescapeHTML(name).gsub(UNSAFE_IN_A_COLUMN_NAME, ' ').squeeze(' ').strip
-      end
-
-      def warn_collision(name, kept, column)
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] the #{@model} attribute #{name.inspect} is left out: it reads as the " \
-          "column #{column.inspect}, which #{kept.inspect} already carries. Rename one of them in Intercom to " \
-          'publish both.'
-        )
-      end
-
-      # An unknown data type reads as a string rather than being dropped:
-      # showing the value Intercom sent beats hiding a column because its type
-      # is new.
-      def column_type_for(definition)
-        COLUMN_TYPES.fetch(definition['data_type'].to_s, DEFAULT_COLUMN_TYPE)
-      end
+      # These are declared per model, so that is what the log calls them: it is
+      # the workspace's own vocabulary, and where the operator goes to rename
+      # the one that was left out.
+      def attribute_kind = @model
     end
   end
 end

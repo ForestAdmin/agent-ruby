@@ -50,7 +50,7 @@ module ForestAdminDatasourceIntercom
       end
 
       def embed_contact_identity(records, rows, projection)
-        return unless (COLUMNS & projection).any?
+        return unless any_column_asked?(projection, COLUMNS)
 
         identities = contact_identities(records)
         records.each_with_index do |record, index|

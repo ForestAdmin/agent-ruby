@@ -14,6 +14,9 @@ module ForestAdminDatasourceIntercom
       # timezone of whoever wrote the filter rather than in the server's.
       DATE_ONLY = /\A\d{4}-\d{2}-\d{2}\z/
 
+      # What `Date._parse` has to have found for a string to name a day at all.
+      DATE_PARTS = %i[year mon mday].freeze
+
       INTEGER = /\A-?\d+\z/
 
       def initialize(collection:, timezone: nil)
@@ -81,17 +84,32 @@ module ForestAdminDatasourceIntercom
         refuse_value!(leaf, value, 'a date')
       end
 
-      # `Time.parse` is called for what it refuses, not for what it returns:
-      # it raises on a string naming no date, where `Time.zone.parse` answers
-      # today -- a filter on `last tuesday` coming back as a filter on today is
-      # the silent wrong answer this datasource exists not to give.
+      # What the string names is read before it is trusted, rather than being
+      # handed to a parser that completes what is missing. `Time.zone.parse`
+      # answers today for a string naming no date at all -- a filter on `last
+      # tuesday` coming back as a filter on today is the silent wrong answer
+      # this datasource exists not to give -- and `Time.parse`, which raises on
+      # that one, *accepts* a time of day on its own and fills the date in from
+      # the server's clock: `"12:00"` would have travelled as a bound on
+      # whichever day the request happened to run.
+      #
+      # A date is a year, a month and a day. Anything short of the three is
+      # refused rather than completed, `"Jan 2026"` included -- what it means is
+      # the caller's to say, not this class's to guess.
       def parse(value, leaf)
         return @zone.start_of_day(Date.parse(value)) if DATE_ONLY.match?(value)
 
-        Time.parse(value)
+        refuse_value!(leaf, value, 'a date') unless dated?(value)
+
         @zone.timestamp(value)
       rescue ArgumentError, TypeError
         refuse_value!(leaf, value, 'a date')
+      end
+
+      def dated?(value)
+        parts = Date._parse(value)
+
+        DATE_PARTS.all? { |part| parts.key?(part) }
       end
 
       # The agent casts every Number column with `to_f`, so an integer field

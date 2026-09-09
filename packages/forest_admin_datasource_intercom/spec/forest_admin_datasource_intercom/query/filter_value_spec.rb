@@ -144,6 +144,29 @@ module ForestAdminDatasourceIntercom
           .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
       end
 
+      # `Time.parse` accepts a time of day on its own and fills the date in from
+      # the server's clock, so this would have travelled as a bound on whichever
+      # day the request happened to run -- a filter whose answer changes at
+      # midnight and never says why.
+      it 'refuses a time of day rather than completing it from today' do
+        expect { call('date', '12:00', spelling: '>') }
+          .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
+      end
+
+      # A month names a range, and which end of it the operator meant is theirs
+      # to say rather than this class's to guess.
+      it 'refuses a date missing its day' do
+        expect { call('date', 'Jan 2026', spelling: '>') }
+          .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
+      end
+
+      # It carries the three parts a date needs and still names no day: the
+      # parser is what says so, and its complaint is not a bound to send on.
+      it 'refuses a date whose parts are out of range' do
+        expect { call('date', '2026-13-45', spelling: '>') }
+          .to raise_error(UnsupportedOperatorError, /Intercom expects a date on this field/)
+      end
+
       # Reading either as epoch seconds raises a FloatDomainError, which would
       # leave the read with an error naming a float where the operator asked
       # for a date. The number branch already refuses them; a date is no

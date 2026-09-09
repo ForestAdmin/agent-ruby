@@ -61,11 +61,9 @@ module ForestAdminDatasourceIntercom
       def match_all_query = MATCH_EVERY_TICKET
 
       def enrich(records, rows, projection)
-        wanted = Array(projection).map(&:to_s)
-
-        embed_contact_identity(records, rows, wanted)
-        embed_derived_columns(records, rows, wanted)
-        embed_timeline(records, rows, wanted)
+        embed_contact_identity(records, rows, projection)
+        embed_derived_columns(records, rows, projection)
+        embed_timeline(records, rows, projection)
       end
 
       private
@@ -152,7 +150,7 @@ module ForestAdminDatasourceIntercom
       # read from a listing carries no parts at all and its timeline stays nil,
       # which reads as unknown.
       def embed_timeline(records, rows, projection)
-        return unless projection.include?('timeline')
+        return unless column_asked?(projection, 'timeline')
 
         records.each_with_index { |record, index| rows[index]['timeline'] = build_timeline(record) }
       end

@@ -139,13 +139,16 @@ module ForestAdminDatasourceIntercom
         "#{@endpoint.path} takes no filter on it. Filter on one of: #{@endpoint.filterable_columns.join(", ")}."
       end
 
-      # A relation reaches the translator as `relation:field`. None of the
-      # collections this endpoint serves declares one yet, so the condition can
-      # only come from a scope or a segment written against a schema this
-      # datasource does not have.
-      def relation_reason(column)
-        "#{@collection} declares no relation, so #{column.inspect} names a field it cannot reach. Filter on one " \
-          "of its own columns: #{@endpoint.filterable_columns.join(", ")}."
+      # A relation reaches the translator as `relation:field`, and it should not:
+      # `Relations#rewrite_relation_conditions` trades every one of them for a
+      # condition on the foreign key before a tree gets this far, or refuses it
+      # by name -- with the relations the collection does declare. So this is
+      # the message for a caller that skipped that pass, and it names what this
+      # endpoint filters rather than a relation nobody resolved.
+      def relation_reason(_column)
+        "#{@endpoint.path} filters columns, not paths through a relation -- those are resolved against the " \
+          'collection they point at before a condition reaches here. Filter on one of: ' \
+          "#{@endpoint.filterable_columns.join(", ")}."
       end
 
       def refuse_operator!(leaf, field)

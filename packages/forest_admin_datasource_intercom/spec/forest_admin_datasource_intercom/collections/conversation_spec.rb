@@ -227,6 +227,17 @@ module ForestAdminDatasourceIntercom
     end
 
     describe '#list' do
+      # No projection at all asks for every declared column, `contact_name` and
+      # `timeline` included, so an all-columns read pays for both enrichments --
+      # the identity read of the page, and the detail read the parts are only
+      # returned by. Guarding them on a column being *named* would leave nil the
+      # very columns the row publishes.
+      before do
+        stub_request(:post, "#{base}/contacts/search")
+          .to_return(json('type' => 'list', 'data' => [{ 'id' => 'c1', 'name' => 'Camille' }]))
+        stub_record('1', conversation('1'))
+      end
+
       it 'reads the listing endpoint as plain text and pages by cursor' do
         stub_list(conversation('1'))
 
@@ -286,6 +297,18 @@ module ForestAdminDatasourceIntercom
         stub_list(conversation('1'))
 
         expect(collection.list(nil, filter, %w[id state])).to eq([{ 'id' => '1', 'state' => 'closed' }])
+      end
+
+      # The counterpart of the guard above: a row that publishes a column has
+      # that column filled, rather than carrying the nil the projection put
+      # there.
+      it 'fills the enriched columns of an all-columns read' do
+        stub_list(conversation('1'))
+
+        row = collection.list(nil, filter, nil).first
+
+        expect(row['contact_name']).to eq('Camille')
+        expect(row['timeline']).to be_an(Array)
       end
 
       it 'walks the cursor until the window is covered' do

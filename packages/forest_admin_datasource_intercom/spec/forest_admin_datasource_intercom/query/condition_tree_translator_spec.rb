@@ -185,11 +185,14 @@ module ForestAdminDatasourceIntercom
           .to raise_error(UnsupportedOperatorError, /takes no filter on it. Filter on one of: id, state, open/)
       end
 
-      # None of these collections declares a relation yet, so a `relation:field`
-      # can only come from a scope or a segment written against another schema.
-      it 'refuses a condition on a relation by name' do
+      # A `relation:field` is traded for a condition on the foreign key before a
+      # tree reaches this translation, or refused by the collection with the
+      # relations it does declare. Reaching here means that pass was skipped, so
+      # the message names what the endpoint filters rather than a relation
+      # nobody resolved.
+      it 'refuses a path through a relation, naming what it does filter' do
         expect { translate(leaf('contact:email', operators::EQUAL, 'camille@acme.test')) }
-          .to raise_error(UnsupportedOperatorError, /declares no relation/)
+          .to raise_error(UnsupportedOperatorError, /filters columns, not paths through a relation/)
       end
 
       it 'refuses an operator the endpoint does not answer on that field' do

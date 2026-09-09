@@ -148,7 +148,7 @@ module ForestAdminDatasourceIntercom
     # The client holds the connections whose headers carry the access token in
     # clear, and Faraday prints those headers on `inspect`.
     def inspect
-      "#<#{self.class.name} url=#{@configuration.url.inspect}>"
+      "#<#{self.class.name} url=#{@configuration.redacted_url.inspect}>"
     end
 
     private

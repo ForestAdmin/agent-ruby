@@ -62,18 +62,34 @@ module ForestAdminDatasourceIntercom
           records.concat(fresh(page.records, seen_ids))
           pages += 1
 
-          break if stop?(page, seen_cursors)
+          # The only silent exits: Intercom said there is no page left, or the
+          # window asked for is covered. Everything below hands back less than
+          # was asked for, and says so.
+          break if page.next_cursor.nil?
           break if needed && records.size >= needed
-
-          if capped?(pages, records.size)
-            log_truncation(offset: offset, limit: limit, pages: pages, collected: records.size)
-            break
-          end
+          break if cut_short?(page, seen_cursors, pages, records: records.size, window: window_of(offset, limit))
 
           cursor = page.next_cursor
         end
 
         records
+      end
+
+      # Whether the walk is handing back less than it was asked for, and which
+      # of the two reasons it is. Both are logged here rather than by the
+      # caller: a page that looks like the whole answer and is not is the
+      # failure this datasource exists to avoid, so there is no route out of
+      # this walk that is short and quiet.
+      def cut_short?(page, seen_cursors, pages, records:, window:)
+        if stalled?(page, seen_cursors)
+          log_stalled(window: window, pages: pages, collected: records)
+        elsif capped?(pages, records)
+          log_truncation(window: window, pages: pages, collected: records)
+        else
+          return false
+        end
+
+        true
       end
 
       # Intercom documents that "if items are modified between paginated
@@ -90,14 +106,18 @@ module ForestAdminDatasourceIntercom
         records.select { |record| record['id'].nil? || seen_ids.add?(record['id']) }
       end
 
-      # An empty page, a cursor that does not move and a cursor already followed
-      # all stop the walk. Intercom does none of the three today -- `pages.next`
-      # is simply absent on the last page -- but a walk driven by a remote value
-      # stops on its own terms rather than on the caps only: a cycle wider than
-      # one page would otherwise collect the same pages until a cap cut it
-      # short.
-      def stop?(page, seen_cursors)
-        page.next_cursor.nil? || page.records.empty? || !seen_cursors.add?(page.next_cursor)
+      # A page that advertises a next cursor and holds nothing, and a cursor
+      # already followed. Intercom does neither today -- `pages.next` is simply
+      # absent on the last page -- but a walk driven by a remote value stops on
+      # its own terms rather than on the caps only: a cycle wider than one page
+      # would otherwise collect the same pages until a cap cut it short.
+      #
+      # Which is exactly why it is reported. Stopping here means Intercom said
+      # there was more and this could not follow it, so the answer is short of
+      # what was asked -- a truncation like the caps below, and the same rule
+      # applies: never silent.
+      def stalled?(page, seen_cursors)
+        page.records.empty? || !seen_cursors.add?(page.next_cursor)
       end
 
       def capped?(pages, collected)
@@ -113,13 +133,24 @@ module ForestAdminDatasourceIntercom
         Client.bounded_per_page(budget)
       end
 
-      def log_truncation(offset:, limit:, pages:, collected:)
-        window = limit ? "offset=#{offset} limit=#{limit}" : "every record past offset=#{offset}"
+      def log_truncation(window:, pages:, collected:)
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] Stopped paginating after #{pages} page(s) / " \
           "#{collected} record(s) while fetching #{window}; results are truncated. " \
           'Narrow the filter to reach records past this point.'
         )
+      end
+
+      def log_stalled(window:, pages:, collected:)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] Stopped paginating after #{pages} page(s) / " \
+          "#{collected} record(s) while fetching #{window}: Intercom advertised a next page this could not " \
+          'follow -- an empty page, or a cursor already read. Results are truncated.'
+        )
+      end
+
+      def window_of(offset, limit)
+        limit ? "offset=#{offset} limit=#{limit}" : "every record past offset=#{offset}"
       end
     end
   end

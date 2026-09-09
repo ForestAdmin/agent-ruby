@@ -149,6 +149,25 @@ module ForestAdminDatasourceIntercom
           .to raise_error(ConfigurationError, /tickets.company_id/)
       end
 
+      # Operators the DSL does spell, none of which the column's *type* can
+      # carry: `OperatorTable` maps no Forest operator onto `~` for a date, so
+      # the column would be called filterable and publish nothing, and the
+      # translator would refuse every request on it.
+      it 'refuses operators the column type cannot publish' do
+        expect { table(fields: { 'created_at' => field_row('operators' => ['~']) }) }
+          .to raise_error(ConfigurationError, /none of ~ is an operator Intercom answers on a date/)
+      end
+
+      # `Endpoint#field` is consulted before `#refusal`, so the filterable row
+      # would win and the reason an operator reads would be dropped in silence.
+      # The file is script-rewritten, which is the shape a bad rewrite takes.
+      it 'refuses a column declared filterable and refused at once' do
+        expect do
+          table(fields: { 'created_at' => field_row },
+                refused: { 'created_at' => { 'reason' => 'no', 'source' => 'spec' } })
+        end.to raise_error(ConfigurationError, /filterable and refused at once/)
+      end
+
       it 'names the endpoint and the column it choked on' do
         expect { table(fields: { 'created_at' => field_row('type' => 'timestamp') }) }
           .to raise_error(ConfigurationError, /search_fields\.yml is malformed at tickets\.created_at/)

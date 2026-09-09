@@ -109,16 +109,33 @@ exact lookups and nothing else. See [Companies](#companies).
 ## Relations
 
 Intercom joins nothing: a ticket carries an assignee id, and the teammate behind it is a second read
-of a second endpoint. What makes eight relations affordable is that every collection on the far end
-is read whole in one request — so a relation resolves for a **whole page at the price of one read**,
-never one read per row. The price is per target *collection*, not per relation: a ticket's `state`
-and `previous_state` are one read of `/ticket_states`, over the ids both of them name.
+of a second endpoint. What makes these relations affordable is what the collection on the far end
+costs to read by id, and the three tiers do not cost the same:
 
-*Exactly*, with one bound worth naming: "read whole" is what the endpoint answers, and `fetch_all`
-stops after [`MAX_COLLECTED_PAGES`](lib/forest_admin_datasource_intercom/client.rb) pages if Intercom
-paginates one of these on its own — it logs when it does. A workspace whose `/admins` or `/teams`
-runs past that cap resolves the relations pointing at the records it dropped as empty. The figure is
-sized for reference collections, which is what every target here is.
+| Target | Read by id | A page of rows costs | Fan-out |
+| --- | --- | --- | --- |
+| `IntercomAdmin`, `IntercomTeam`, `IntercomTicketState`, `IntercomTicketType` | read whole | **one request**, whatever the page holds | unbounded |
+| `IntercomContact` | `id IN [...]`, 100 at a time | one request per 100 distinct contacts | unbounded |
+| `IntercomCompany` | `GET /companies/{id}` | **one request per distinct account** | bounded, see below |
+
+The price is per target *collection*, not per relation: a ticket's `state` and `previous_state` are
+one read of `/ticket_states`, over the ids both of them name.
+
+**The one relation with a ceiling is `IntercomContact#company`.** There is no bulk read for a
+company — `/companies/scroll` is [deliberately rejected](#companies) — so each distinct account on
+the page costs a request, and past
+[`MAX_RELATION_READS`](lib/forest_admin_datasource_intercom/collections/offset_collection.rb)
+distinct accounts the read is **refused by name** rather than resolved for the first slice and left
+nil for the rest. Every page size a list view offers sits under that figure; an export or a segment
+resolved whole does not, and the message says to leave the column out or read fewer rows at a time.
+The alternative — a nil where an account exists — is the one answer this datasource must not give,
+and a log line nobody reads is not a substitute for it.
+
+*Exactly*, with one more bound worth naming: "read whole" is what the endpoint answers, and
+`fetch_all` stops after [`MAX_COLLECTED_PAGES`](lib/forest_admin_datasource_intercom/client.rb) pages
+if Intercom paginates one of these on its own — it logs when it does. A workspace whose `/admins` or
+`/teams` runs past that cap resolves the relations pointing at the records it dropped as empty. The
+figure is sized for reference collections, which is what the first tier above is.
 
 | Collection | Relation | Target | Filterable through |
 | --- | --- | --- | --- |
@@ -201,9 +218,12 @@ arrive as a 400 carrying the text.
 
 - **No offset pagination, except on companies.** Intercom hands out the page after a cursor and
   documents that jumping to page N is unsupported, so reaching page 20 costs 20 sequential requests.
-  The walk is capped at 50 pages / 7 500 records and every truncation is logged, naming the window
-  it stopped in. `POST /companies/list` is the exception and takes a page number, which is why
-  companies escape the walker and its caps entirely.
+  The walk is capped at 50 pages / 7 500 records and **every route out of it that is short of what
+  was asked for is logged**, naming the window it stopped in: the two caps, and the two defensive
+  stops — a page that advertises a next cursor and holds nothing, and a cursor already followed.
+  Intercom does neither of the last two today, which is exactly why they are reported rather than
+  taken for the end of the data. `POST /companies/list` is the exception and takes a page number,
+  which is why companies escape the walker and its caps entirely.
 - **Duplicates on a moving dataset.** Intercom documents that records modified between two paginated
   requests can be served twice; the walk deduplicates by id. The missed counterpart is inherent to
   cursor pagination and cannot be repaired — it is documented rather than papered over.
@@ -213,7 +233,9 @@ arrive as a 400 carrying the text.
   Since that is undetectable at runtime, no column of `IntercomConversation`, `IntercomTicket` or
   `IntercomCompany` is declared sortable and a requested order is reported in the log. The
   collections read whole sort in memory, exactly, and Contacts sort server-side on the columns the
-  measured table declares — see [Contacts](#contacts).
+  measured table declares — see [Contacts](#contacts). One route of Contacts cannot carry it either:
+  a read by id cuts the window in the order the ids were named, so ordering what comes back would
+  order a slice picked by something else. That order is reported in the log too.
 - **No aggregate endpoint.** Counting is free and exact — `total_count` counts what the query names,
   not what a page held — so the record counter is one request. Anything beyond a count is refused on
   the cursor collections: grouping over the pages a walk collected would look exact while answering
@@ -236,7 +258,7 @@ else is **refused with a message naming what to change** — a condition dropped
 back as an unfiltered page that looks filtered, which is the one answer this datasource must not
 give. A refusal costs no request: it is raised before anything leaves the process.
 
-### The table is measured, not documented
+### The table is data, and it says where each row comes from
 
 The fields a search endpoint filters are not the fields its specification lists. Measured:
 `/tickets/search` refuses `company_id` with `invalid_field` although every ticket carries one. So
@@ -250,11 +272,38 @@ the source of truth is a committed table — `lib/forest_admin_datasource_interc
 
 Every `filter_operators` a column publishes is **derived** from that table, so a column cannot
 advertise a filter the translator would then refuse, and a column the table does not carry
-advertises nothing at all.
+advertises nothing at all. That is the mechanism, and it holds whatever the rows say.
 
-To measure a workspace of your own:
+**What the rows say today is mostly `spec`: 19 of 85 are measured, and no endpoint has been probed
+end to end** — all three carry `measured_at: null`, which is what `Endpoint#measured?` reports. The
+measured rows are the ones a spike went out of its way to check: the date operators on each
+endpoint, which disagree between them, and `id IN` on `/contacts/search`. Everything else is
+Intercom's documentation, and the disagreement above is why that is a candidate rather than a
+promise.
+
+So the first thing to do against a customer's workspace is to run the probe. The rows worth watching
+first, in the order they will hurt:
+
+1. **`admin_assignee_id` and `team_assignee_id`**, on both search endpoints. Typed `string` here;
+   Intercom documents them as `Integer` and answers `data_invalid` on a value whose type it does not
+   accept. These carry the `admin_assignee` and `team_assignee` relations — the filter an ops team
+   reaches for first — so a wrong type here is the most expensive `spec` row in the file;
+2. **`state_id` on `/tickets/search`** — the table carries no filter on it at all, which is what
+   keeps the `state` relation read-only. If the endpoint does filter one, a support queue becomes
+   filterable by state;
+3. **`contact_ids` on `/tickets/search`** — the contact relation of a ticket rests on it;
+4. **the operators Intercom answers on `custom_attributes.{name}`**, per data type, which is the only
+   thing keeping those columns display-only;
+5. **whether `POST /conversations/search` honours `display_as=plaintext`** — it is sent either way,
+   and an ignored parameter costs a query string where the honoured one saves every filtered row
+   from coming back as markup.
+
+To measure a workspace of your own. The probe is a repo tool, not part of the published gem — `bin/`
+is excluded from `spec.files` — so it runs from a clone of `agent-ruby`, in this package's
+directory:
 
 ```bash
+cd packages/forest_admin_datasource_intercom
 INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --endpoint tickets --out measured.yml
 ```
 
@@ -301,10 +350,17 @@ answered by a search: `id equals X` and `id in [...]` read the record endpoint d
 per record. The search answers it only when something else is filtered alongside it — a permission
 scope, a segment, or a second filter.
 
-**Free-text search** is answered on `IntercomConversation` only, through `~` on `source.body` — the
-message that opened the conversation. Intercom matches it **per word, not as a substring**: searching
-`fact` does not find `facture`. `IntercomTicket` exposes no text column this endpoint matches and
-refuses a search by name.
+**Free-text search** is answered on two collections, each on the one column its endpoint matches text
+on:
+
+| Collection | Searched on |
+| --- | --- |
+| `IntercomConversation` | `~` on `source.body` — the message that opened the conversation |
+| `IntercomContact` | `~` on `email` — what an ops team types when they are looking for someone |
+
+Intercom matches `~` **per word, not as a substring**: searching `fact` does not find `facture`, and
+searching `acme` does not find `camille@acme.test`. `IntercomTicket` exposes no text column its
+endpoint matches and refuses a search by name; `IntercomCompany` has no search endpoint at all.
 
 ### What is not filterable, and why
 
@@ -315,7 +371,18 @@ refuses a search by name.
   that adds those collections;
 - **a contact's `company_id`, `company_count`, `avatar` and `session_count`** — the endpoint filters
   none of them. Reach the contacts of an account from the account instead, through its `contacts`
-  relation, which is one request;
+  relation, which `GET /companies/{id}/contacts` answers in one request — **and answers alone**. That
+  endpoint returns the contacts of the account whole and narrows nothing, so a `company_id equals X`
+  carrying anything else cannot be answered at all: there is no request that takes both halves.
+  Which means the related list of an account **is refused as soon as a permission scope or a segment
+  is defined on `IntercomContact`**, since that is what the agent intersects into the condition. The
+  refusal names the condition it could not carry alongside the account. Resolving it properly would
+  mean reading the account's contact ids first and handing `id IN [...]` plus the rest of the tree to
+  `/contacts/search` — which that endpoint does answer, and which is not in this lot;
+- **a set of ids, counted.** `id in [...]` reads one record per id (100 at a time on contacts), so
+  counting a set means reading it, and past what a bulk read fetches the count is refused rather
+  than answered with the number the truncation left. A collection that advertises an exact count does
+  not answer 25 to a question about forty records;
 - **the custom attributes of a contact or a company.** They are filtered as
   `custom_attributes.{name}`, by name — the ambiguity that keeps ticket attributes display-only does
   not arise here — but which operators Intercom answers on each data type has not been measured, and
@@ -494,6 +561,20 @@ so without that route the contacts of an account would be a refusal rather than 
 equality only: an `and` also carrying a permission scope names a narrower set than the account does,
 and answering it with the account alone would serve contacts the scope excludes.
 
+That is a limit worth knowing before scoping permissions, because it is not a slower route but no
+route at all: the account endpoint returns its contacts whole and narrows nothing, and the search
+filters no company field, so **a scope or a segment on this collection turns the related list of an
+account into a refusal**. The message names the condition it could not carry alongside the account,
+rather than telling the operator to open the account and read its contacts — which is what they were
+doing. What would answer it is a read of the account's contact ids followed by `id IN [...]` plus the
+rest of the tree on `/contacts/search`, which that endpoint takes; it is not in this lot.
+
+One more thing the two routes do not agree on, and it is visible: the `company_id` column names **the
+first** of the accounts a contact belongs to, and the `company` relation resolves that same first
+one — while `company_id equals X` returns **every** contact of X. So an account's related list can
+show a contact whose `company` points somewhere else. The column is the payload's reading; the filter
+is the account endpoint's, and it is the more useful of the two.
+
 **A merged contact reads as gone, not as an error.** Intercom drops it from the listing and from the
 search, and the record lives on under the id it was merged into. A row pointing at the old id comes
 back empty rather than failing the page.
@@ -517,6 +598,13 @@ expiring after a minute, cannot serve two operators looking at a list at the sam
 A contact carries its accounts as a list of ids and nothing else, so **projecting `company:name` on
 a contact list costs one request per distinct account on the page**. Reading the account from the
 contact's record page, or listing contacts from the account, both cost one.
+
+Which is why that projection is the one relation of the datasource with a ceiling: past
+[`MAX_RELATION_READS`](lib/forest_admin_datasource_intercom/collections/offset_collection.rb)
+distinct accounts on a single read, it is **refused rather than resolved for part of the rows**. Every
+page size a list view offers stays under it. A read that does not — an export, which batches a
+thousand rows at a time, or a segment resolved whole — has to leave the column out. See
+[Relations](#relations).
 
 Custom attributes are introspected at boot the same way, from `GET /data_attributes?model=company`,
 and published display-only for the same reason.

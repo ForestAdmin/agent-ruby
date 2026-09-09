@@ -20,13 +20,7 @@ module ForestAdminDatasourceIntercom
     # Long by line count only: half of it is the refusals, and a refusal that
     # does not say what to do instead is one an operator cannot act on.
     class OffsetCollection < BaseCollection # rubocop:disable Metrics/ClassLength
-      Aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation
-
-      # How many records an `id in [...]` read may fetch. One request per id --
-      # Intercom has no "read these records" endpoint here either -- so the
-      # fan-out is bounded rather than turned into a rate limit halfway through
-      # a page.
-      MAX_ID_READS = 25
+      include RecordsById
 
       # What one page holds when the read names no window: a relation resolving
       # its target, a segment, a customizer. A list view always names one.
@@ -36,10 +30,30 @@ module ForestAdminDatasourceIntercom
       # figure only ever applies to a read with no window of its own.
       MAX_COLLECTED_PAGES = 10
 
+      # What a read that *does* name a window may collect before it is cut
+      # short. A window is its own bound, so the page count above must not apply
+      # to it: a window needing eleven pages would come back one page short
+      # while the warning blamed it for naming no window -- which it did name.
+      # This is the backstop for a window nothing sane asked for, and it is the
+      # cursor walker's own record budget, that tier being bounded the same way.
+      MAX_COLLECTED_RECORDS = Pagination::CursorWalker::MAX_RECORDS
+
+      # How many records of this collection one relation read may resolve.
+      # Higher than `MAX_ID_READS`, which bounds a single request batch, and
+      # deliberately above every page size a list view offers: a page naming one
+      # account per row resolves, and a read naming more -- an export, a
+      # segment resolved whole -- is refused by name rather than answered with
+      # a nil where an account exists. There is no bulk read for a company, so
+      # each one costs a request and the figure is what an operator waits for.
+      MAX_RELATION_READS = 100
+
       def initialize(datasource, name)
         super
         enable_count
       end
+
+      def ids_per_read = MAX_ID_READS
+      def max_resolvable_ids = MAX_RELATION_READS
 
       def list(caller, filter, projection)
         warn_ignored_sort(filter&.sort)
@@ -110,7 +124,7 @@ module ForestAdminDatasourceIntercom
 
       def count_records(filter)
         ids = id_lookup(filter)
-        return records_by_ids(ids).size if ids
+        return count_by_ids(ids) if ids
 
         lookup = lookup_condition(filter)
         return looked_up_records(lookup).size if lookup
@@ -145,7 +159,7 @@ module ForestAdminDatasourceIntercom
           records.concat(answer.records)
           read += 1
           break if last_page?(answer, page) || (wanted && records.size >= wanted)
-          break if cap_reached?(read, records.size)
+          break if cap_reached?(read, records.size, wanted)
 
           page += 1
         end
@@ -161,14 +175,31 @@ module ForestAdminDatasourceIntercom
         answer.records.empty? || (answer.total_pages && page >= answer.total_pages)
       end
 
-      def cap_reached?(read, collected)
-        return false if read < MAX_COLLECTED_PAGES
+      # Which of the two caps applies, and the reason that goes with it: a read
+      # with no window of its own is stopped by the page count, a read that
+      # named one by the record budget. Telling a list view it named no window
+      # is exactly the confusion these two keep apart.
+      def cap_reached?(read, collected, wanted)
+        if wanted
+          return false if collected < MAX_COLLECTED_RECORDS
 
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] Stopped reading #{name} after #{read} page(s) / #{collected} " \
-          'record(s); the rest is left out. This read named no window of its own, and a list view always does.'
-        )
+          warn_capped("#{collected} record(s)",
+                      'this read named a window larger than one answer may hold')
+        else
+          return false if read < MAX_COLLECTED_PAGES
+
+          warn_capped("#{read} page(s) / #{collected} record(s)",
+                      'this read named no window of its own, and a list view always does')
+        end
+
         true
+      end
+
+      def warn_capped(reached, reason)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] Stopped reading #{name} after #{reached}; the rest is left out: " \
+          "#{reason}."
+        )
       end
 
       # A filter with no page asks for every record it matched; nil is how the
@@ -180,46 +211,12 @@ module ForestAdminDatasourceIntercom
         [page.offset.to_i.clamp(0, nil), limit.positive? ? limit : nil]
       end
 
-      # A record detail is `id equals X`, and a bulk read of related records is
-      # `id in [...]`. Only a bare leaf on the primary key takes this route: an
-      # `and` also carrying a scope names a narrower set than the ids do.
-      def id_lookup(filter)
-        tree = filter&.condition_tree
-        return nil unless tree.is_a?(Leaf) && tree.field.to_s == primary_key
-
-        case tree.operator
-        when Operators::EQUAL then [tree.value].compact.map(&:to_s)
-        when Operators::IN then Array(tree.value).compact.map(&:to_s)
-        end
-      end
-
       def lookup_condition(filter)
         tree = filter&.condition_tree
         return nil unless tree.is_a?(Leaf) && tree.operator == Operators::EQUAL
 
         parameter = lookups[tree.field.to_s]
         parameter && { parameter => tree.value.to_s }
-      end
-
-      def primary_key
-        @primary_key ||= fields.find do |_name, field|
-          field.respond_to?(:is_primary_key) && field.is_primary_key
-        end&.first
-      end
-
-      # A record the operator can no longer reach -- deleted, or outside the
-      # token's scope -- reads as "no record" rather than as a failed page.
-      def records_by_ids(ids)
-        wanted = ids.first(MAX_ID_READS)
-        warn_truncated_ids(ids.size) if ids.size > wanted.size
-
-        wanted.filter_map do |id|
-          client.fetch_record(record_endpoint, id)
-        rescue APIError => e
-          raise unless e.status == 404
-
-          nil
-        end
       end
 
       # An exact lookup answers few records -- one, for the keys this publishes
@@ -230,14 +227,6 @@ module ForestAdminDatasourceIntercom
         warn_truncated_lookup(params) if answer.next_cursor
 
         answer.records
-      end
-
-      def exact_count(page)
-        return page.total_count if page.total_count
-
-        raise UnsupportedOperatorError,
-              "#{name} cannot be counted: Intercom answered this listing without a total_count, and counting the " \
-              'pages the agent read would answer a fraction of the collection as if it were the whole of it.'
       end
 
       def refuse_condition!(tree)
@@ -251,15 +240,6 @@ module ForestAdminDatasourceIntercom
               'collection next door.'
       end
 
-      def refuse_unsupported_aggregation!(aggregation)
-        return if aggregation.is_a?(Aggregation) && aggregation.operation.to_s.casecmp('count').zero? &&
-                  Array(aggregation.groups).empty? && aggregation.field.nil?
-
-        raise UnsupportedOperatorError,
-              "#{name} can only be counted: Intercom exposes no aggregate endpoint, and grouping or summing the " \
-              'pages the agent read would answer a fraction of the collection as if it were the whole of it.'
-      end
-
       # Intercom takes no order on this listing at all -- there is no parameter
       # for one -- so an order asked for and not applied is reported here or
       # nowhere. The ascending primary-key sort the agent injects when a request
@@ -270,25 +250,8 @@ module ForestAdminDatasourceIntercom
 
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} was asked to sort on " \
-          "#{clauses.map { |clause| clause[:field] || clause["field"] }.join(", ")}, and Intercom takes no order " \
+          "#{clauses.map { |clause| sort_field(clause) }.join(", ")}, and Intercom takes no order " \
           'on this listing. The rows come back in the order the API imposes.'
-        )
-      end
-
-      def default_pk_sort?(clauses)
-        return false unless clauses.size == 1
-
-        clause = clauses.first
-        return false unless (clause[:field] || clause['field']).to_s == primary_key
-
-        ascending = clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
-        ascending != false
-      end
-
-      def warn_truncated_ids(asked)
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} was asked for #{asked} records by id and read the first " \
-          "#{MAX_ID_READS}: Intercom reads them one request each. The result is truncated."
         )
       end
 

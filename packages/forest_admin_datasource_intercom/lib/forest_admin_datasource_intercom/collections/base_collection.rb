@@ -27,6 +27,17 @@ module ForestAdminDatasourceIntercom
         datasource.client
       end
 
+      # What one relation read may ask of this collection as its *target*: how
+      # many ids it resolves in a single `list`, and how many it resolves at
+      # all. Both nil here -- the tier read whole answers any number of ids for
+      # the one request it already pays. `Relations` asks the target rather than
+      # assuming, the cost of an id being the target's business.
+      #
+      # Public because that is who calls them: the collection holding the
+      # relation, on the collection at the other end of it.
+      def ids_per_read = nil
+      def max_resolvable_ids = nil
+
       protected
 
       def define_schema = raise(NotImplementedError, "#{self.class} did not implement define_schema")
@@ -59,6 +70,14 @@ module ForestAdminDatasourceIntercom
         asked = Array(projection).map(&:to_s)
 
         asked.empty? || asked.include?(column)
+      end
+
+      # Whether a projection asks for any of a group of columns, read the same
+      # way: no projection at all asks for every one of them.
+      def any_column_asked?(projection, columns)
+        asked = Array(projection).map(&:to_s)
+
+        asked.empty? || columns.any? { |column| asked.include?(column) }
       end
 
       # The window a list view asked for, cut out of records already in hand.
@@ -115,6 +134,38 @@ module ForestAdminDatasourceIntercom
         return nil unless seconds.is_a?(Numeric) && seconds.positive?
 
         Time.at(seconds).utc.iso8601
+      end
+
+      # --- Reading a sort clause -------------------------------------------
+      #
+      # Forest hands a clause keyed with symbols or with strings depending on
+      # where it was written, and all three tiers have to read one.
+
+      def primary_key
+        @primary_key ||= fields.find do |_name, field|
+          field.respond_to?(:is_primary_key) && field.is_primary_key
+        end&.first
+      end
+
+      def sort_field(clause) = clause[:field] || clause['field']
+
+      # `key?` rather than `||`: a descending clause carries `false`, which an
+      # `||` fallback reads as "absent" -- so an explicit `?sort=-id` would be
+      # taken for the ascending default the agent injects.
+      def ascending?(clause)
+        clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
+      end
+
+      # The ascending primary-key sort the agent injects when a request names
+      # none. Not an order anybody asked for, so a tier that cannot honour one
+      # stays quiet about this one.
+      def default_pk_sort?(clauses)
+        return false unless clauses.size == 1
+
+        clause = clauses.first
+        return false unless sort_field(clause).to_s == primary_key
+
+        ascending?(clause) != false
       end
     end
   end

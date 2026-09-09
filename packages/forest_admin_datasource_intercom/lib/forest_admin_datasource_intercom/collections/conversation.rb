@@ -10,7 +10,7 @@ module ForestAdminDatasourceIntercom
     # customers, and rendering third-party HTML inside Forest is neither safe nor
     # useful (R10).
     # Long by line count only: most of it declares the columns, one call each.
-    class Conversation < CursorCollection # rubocop:disable Metrics/ClassLength
+    class Conversation < CursorCollection
       include ContactIdentity
       include Conversation::Serializer
       # The shared thread, then the hooks this collection puts over it.
@@ -49,10 +49,8 @@ module ForestAdminDatasourceIntercom
       # names it: neither is on the conversation payload, and a page that never
       # asked for them must not pay for them.
       def enrich(records, rows, projection)
-        wanted = Array(projection).map(&:to_s)
-
-        embed_contact_identity(records, rows, wanted)
-        embed_timeline(records, rows, wanted)
+        embed_contact_identity(records, rows, projection)
+        embed_timeline(records, rows, projection)
       end
 
       private
@@ -145,7 +143,7 @@ module ForestAdminDatasourceIntercom
       # its timeline is free; one read from the listing does not, and pays a
       # request. Rows past the cap keep the nil the projection put there.
       def embed_timeline(records, rows, projection)
-        return unless projection.include?('timeline')
+        return unless column_asked?(projection, 'timeline')
 
         budget = MAX_TIMELINE_READS
         missing = 0

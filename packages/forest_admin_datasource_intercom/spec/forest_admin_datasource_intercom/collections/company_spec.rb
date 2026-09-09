@@ -190,7 +190,29 @@ module ForestAdminDatasourceIntercom
         (1..10).each { |number| stub_page(company("c#{number}"), page: number, per_page: 150, total_pages: 99) }
 
         expect(rows(%w[id]).size).to eq(10)
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/Stopped reading IntercomCompany/)
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/Stopped reading IntercomCompany.*named no window of its own/)
+      end
+
+      # A window is its own bound, so the page cap must not apply to it: a
+      # window needing eleven pages would come back one page short while the
+      # warning blamed it for naming no window -- which it did name. The record
+      # budget is what bounds a window nothing sane asked for, and it says so
+      # in its own words.
+      it 'reads past the page cap for a window that needs it' do
+        (1..12).each { |number| stub_page(company("c#{number}"), page: number, per_page: 150, total_pages: 12) }
+
+        expect(rows(%w[id], page: page(0, 1800)).size).to eq(12)
+      end
+
+      it 'stops a window on the record budget, and says which cap it hit' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_const('ForestAdminDatasourceIntercom::Collections::OffsetCollection::MAX_COLLECTED_RECORDS', 2)
+        (1..4).each { |number| stub_page(company("c#{number}"), page: number, per_page: 150, total_pages: 99) }
+
+        expect(rows(%w[id], page: page(0, 1800)).size).to eq(2)
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/named a window larger than one answer may hold/)
       end
 
       it 'counts what Intercom counted, in one request' do
@@ -250,6 +272,65 @@ module ForestAdminDatasourceIntercom
         stub_request(:get, "#{base}/companies/co1").to_return(json(company('co1')))
 
         expect(count(condition_tree: leaf('id', operators::EQUAL, 'co1'))).to eq([{ 'group' => {}, 'value' => 1 }])
+      end
+
+      # Counting a set of ids means reading it, so past what a bulk read fetches
+      # the count is refused rather than answered with the number the truncation
+      # left: this collection advertises an exact count, and 25 where the
+      # question named forty records is not one.
+      it 'refuses to count more ids than it will read' do
+        expect { count(condition_tree: leaf('id', operators::IN, (1..40).map { |n| "co#{n}" })) }
+          .to raise_error(UnsupportedOperatorError, /cannot count 40 records by id/)
+      end
+
+      # The `in` this comes from is a membership: it matches a record once,
+      # where a read by id would fetch a repeated value twice and hand it back
+      # as two rows carrying one id.
+      it 'reads a value named twice once' do
+        stub_request(:get, "#{base}/companies/co1").to_return(json(company('co1')))
+
+        expect(rows(%w[id], condition_tree: leaf('id', operators::IN, %w[co1 co1]))).to eq([{ 'id' => 'co1' }])
+        expect(WebMock).to have_requested(:get, "#{base}/companies/co1").once
+      end
+    end
+
+    # A relation pointing at this collection resolves it by id, and Intercom has
+    # no bulk read for a company: the fan-out is sliced by what one batch holds
+    # and refused past what the tier resolves at all, rather than answered with a
+    # nil where an account exists.
+    describe 'as the target of a relation' do
+      subject(:contacts) { datasource.get_collection('IntercomContact') }
+
+      # An unfiltered, unsorted contact list reads the listing endpoint; the
+      # search is for the routes that filter.
+      def stub_contact_list(*records)
+        stub_request(:get, "#{base}/contacts")
+          .with(query: hash_including({}))
+          .to_return(json('type' => 'list', 'data' => records, 'total_count' => records.size, 'pages' => {}))
+      end
+
+      def contact_of(company_id)
+        { 'type' => 'contact', 'id' => "c#{company_id}",
+          'companies' => { 'type' => 'list', 'data' => [{ 'type' => 'company', 'id' => company_id }],
+                           'total_count' => 1 } }
+      end
+
+      it 'slices the fan-out into batches rather than truncating it' do
+        stub_contact_list(*(1..30).map { |n| contact_of("co#{n}") })
+        stub_request(:get, %r{#{base}/companies/co\d+}).to_return do |request|
+          json(company(request.uri.path.split('/').last))
+        end
+
+        rows = contacts.list(nil, filter, %w[id company:name])
+
+        expect(rows.filter_map { |row| row['company'] }.size).to eq(30)
+      end
+
+      it 'refuses a fan-out past what it resolves, naming the relation' do
+        stub_contact_list(*(1..120).map { |n| contact_of("co#{n}") })
+
+        expect { contacts.list(nil, filter, %w[id company:name]) }
+          .to raise_error(UnsupportedOperatorError, /cannot resolve company over this read: it names 120/)
       end
 
       # `GET /companies?name=` answers the company itself where a listing would

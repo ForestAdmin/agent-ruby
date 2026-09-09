@@ -18,6 +18,19 @@ module ForestAdminDatasourceIntercom
   #
   # One limiter per Configuration, hence per token, since that is what Intercom
   # meters.
+  #
+  # **What it does not do**, and deliberately: it paces, it does not queue. A
+  # caller that finds the window spent computes the delay to the reset and
+  # sleeps it, and it reserves nothing while it waits -- so a hundred callers
+  # arriving in a spent window all compute the same delay and all wake at the
+  # reset, and past that instant `remaining` is still zero while the wait
+  # computes as elapsed, which lets them through unmetered until the first
+  # response reports the new window. Two things make that acceptable rather
+  # than a bug to work around: the burst is bounded by the callers that were
+  # already blocked, and the 429 retry behind this is what absorbs it -- this
+  # sits in front of that retry, it does not replace it. A real reservation
+  # would mean guessing the boundaries of a window Intercom has not reported
+  # yet, and a wrong guess suppresses the figures it later sends.
   class RateLimiter
     # Intercom's allocation window. Only used as the ceiling below: the reset
     # instant itself always comes from the response.

@@ -365,6 +365,41 @@ module ForestAdminDatasourceIntercom
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/asked for 400 records by id/)
         expect(WebMock).to have_requested(:post, "#{base}/contacts/search").times(3)
       end
+
+      # The window is cut in the order the ids were named, so ordering what
+      # comes back would order a slice picked by something else. This is the one
+      # route of the collection Intercom does sort where an order cannot be
+      # honoured, so `server_sort` stayed quiet and this has to speak.
+      it 'reports an order this route cannot apply, on a column Intercom does sort' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_search(contact('1'))
+
+        rows(%w[id], condition_tree: leaf('id', operators::IN, %w[1 2]),
+                     sort: sort({ field: 'name', ascending: true }))
+
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/sort on "name" while reading/)
+      end
+
+      # The `in` this comes from is a membership: it matches a record once.
+      it 'reads a value named twice once' do
+        stub_search(contact('1'))
+
+        rows(%w[id], condition_tree: leaf('id', operators::IN, %w[1 1]))
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search")
+          .with(body: hash_including('query' => { 'field' => 'id', 'operator' => 'IN', 'value' => %w[1] }))
+      end
+
+      # Counting a set of ids means reading it, so past what a bulk read fetches
+      # the count is refused rather than answered with the number the truncation
+      # left -- this collection advertises an exact count.
+      it 'refuses to count more ids than it will read' do
+        expect do
+          collection.aggregate(nil, filter(condition_tree: leaf('id', operators::IN, (1..400).map(&:to_s))),
+                               ForestAdminDatasourceToolkit::Components::Query::Aggregation
+                                 .new(operation: 'Count'))
+        end.to raise_error(UnsupportedOperatorError, /cannot count 400 records by id/)
+      end
     end
 
     describe 'the contacts of an account' do
@@ -406,12 +441,33 @@ module ForestAdminDatasourceIntercom
 
       # An `and` also carrying a scope names a narrower set than the account
       # does, and answering it with the account alone would serve contacts the
-      # scope excludes.
+      # scope excludes. There is no request that answers both halves either:
+      # the account endpoint narrows nothing and the search filters no company
+      # field, which is what a related list runs into the moment a scope or a
+      # segment exists on this collection.
       it 'refuses to take the route for anything but a bare equality' do
         expect do
           rows(%w[id], condition_tree: branch('And', leaf('company_id', operators::EQUAL, 'co1'),
                                               leaf('role', operators::EQUAL, 'user')))
-        end.to raise_error(UnsupportedOperatorError, /cannot filter "company_id"/)
+        end.to raise_error(UnsupportedOperatorError, %r{GET /companies/\{id\}/contacts})
+      end
+
+      # The refusal names the half that does not fit rather than telling the
+      # operator to read the account's contacts -- which is what they asked for.
+      it 'names the condition filtered alongside the account' do
+        expect do
+          rows(%w[id], condition_tree: branch('And', leaf('company_id', operators::EQUAL, 'co1'),
+                                              leaf('role', operators::EQUAL, 'user')))
+        end.to raise_error(UnsupportedOperatorError, /condition on role/)
+      end
+
+      it 'refuses the count of a narrowed account the same way' do
+        expect do
+          collection.aggregate(nil,
+                               filter(condition_tree: branch('And', leaf('company_id', operators::EQUAL, 'co1'),
+                                                             leaf('role', operators::EQUAL, 'user'))),
+                               ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))
+        end.to raise_error(UnsupportedOperatorError, %r{GET /companies/\{id\}/contacts})
       end
     end
 

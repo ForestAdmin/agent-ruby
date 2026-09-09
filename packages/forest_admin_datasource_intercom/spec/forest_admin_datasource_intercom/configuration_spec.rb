@@ -84,6 +84,34 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # `URI::HTTPS` is a `URI::HTTP`, so a cleartext base_url is accepted -- a
+    # mock server is one, and that is half of what the parameter is for. What it
+    # costs is the bearer header crossing that network in clear, and the token
+    # reads the whole workspace.
+    describe 'a cleartext base_url' do
+      before { allow(ForestAdminDatasourceIntercom.logger).to receive(:warn) }
+
+      it 'is accepted, and says the access token travels in clear over it' do
+        described_class.new(access_token: 's3cr3t', base_url: 'http://proxy.internal/intercom')
+
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/is not https, and every request carries the Intercom access token/)
+      end
+
+      it 'says nothing about a loopback host, which is nobody else s network' do
+        described_class.new(access_token: 's3cr3t', base_url: 'http://localhost:4010')
+        described_class.new(access_token: 's3cr3t', base_url: 'http://intercom.localhost')
+
+        expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
+      end
+
+      it 'says nothing about https' do
+        described_class.new(access_token: 's3cr3t', base_url: 'https://intercom.test')
+
+        expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
+      end
+    end
+
     describe '#inspect' do
       it 'never prints the bearer token' do
         expect(configuration.inspect).to include('[FILTERED]')
@@ -92,6 +120,16 @@ module ForestAdminDatasourceIntercom
 
       it 'still names the host and version, which is what one inspects it for' do
         expect(configuration.inspect).to include('https://api.intercom.io', '2.16')
+      end
+
+      # A credentialed egress proxy is the other reason to set a base_url, and
+      # `URI` accepts its credentials in the url: printing it verbatim would put
+      # a second secret exactly where this keeps the first one from going.
+      it 'masks the credentials of a base_url that carries them' do
+        configured = described_class.new(access_token: 's3cr3t', base_url: 'https://bob:hunter2@proxy.test/api')
+
+        expect(configured.inspect).not_to include('hunter2', 'bob')
+        expect(configured.inspect).to include('https://[FILTERED]@proxy.test/api')
       end
     end
   end

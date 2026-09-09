@@ -151,12 +151,31 @@ module ForestAdminDatasourceIntercom
       # not it was asked for: it is what the rows are indexed by here, and what
       # makes the nested row a link rather than a label in the interface.
       def many_to_one_asked(projection)
-        relations_asked(projection).filter_map do |name, sub_projection|
-          relation = fields[name]
+        relations_asked(projection).filter_map do |relation_name, sub_projection|
+          relation = fields[relation_name]
           next unless relation.is_a?(ManyToOneSchema)
 
-          [name, relation, Array(sub_projection).map(&:to_s).union([relation.foreign_key_target])]
+          columns = Array(sub_projection).map(&:to_s)
+          refuse_two_hop_projection!(relation_name, relation, columns)
+
+          [relation_name, relation, columns.union([relation.foreign_key_target])]
         end
+      end
+
+      # `admin_assignee:teams:name` is a projection Forest's own parser builds
+      # and this cannot answer: it nests one target row under the relation name,
+      # not a tree of them, so the second hop would be dropped by the target's
+      # projection and the column would come back missing from a row that looks
+      # complete. Refused by name, like the filter that reaches that deep --
+      # `refuse_two_hops!` is its counterpart.
+      def refuse_two_hop_projection!(relation_name, relation, columns)
+        deep = columns.select { |column| column.include?(':') }
+        return if deep.empty?
+
+        raise UnsupportedOperatorError,
+              "#{name} cannot read #{deep.map { |column| "#{relation_name}:#{column}".inspect }.join(", ")}: it " \
+              'reaches through two relations, and this datasource resolves one. Read the column from a record ' \
+              "page of #{relation.foreign_collection}, one hop away."
       end
 
       def indexed_targets(caller, records, asked)
@@ -166,16 +185,56 @@ module ForestAdminDatasourceIntercom
 
       # One read per target collection, over the ids every relation pointing at
       # it names and the union of the columns they asked for.
+      #
+      # The ids are sliced by what the target resolves in one read, and the
+      # fan-out is refused past what it resolves at all. Neither is a detail:
+      # a bulk read by id is bounded on every tier -- Intercom offers no "read
+      # these records" endpoint, so one of them pays a request per id -- and
+      # handing the whole page's keys to that bound would resolve the first
+      # slice and leave the rest of the rows carrying a nil where a record
+      # exists. A relation answered for part of a page is the failure this
+      # datasource is built to avoid, so it is named instead.
       def target_rows(caller, records, group)
         relation = group.first[1]
         ids = group.flat_map { |_, rel, _| records.filter_map { |record| record[rel.foreign_key] } }.uniq
         return {} if ids.empty?
 
+        collection = foreign_collection(relation)
+        refuse_relation_fan_out!(group, collection, ids.size) if beyond_reach?(collection, ids.size)
+
         target = relation.foreign_key_target
         wanted = Projection.new(group.flat_map { |_, _, columns| columns }.uniq)
-        filter = Filter.new(condition_tree: Leaf.new(target, Operators::IN, ids))
 
-        foreign_collection(relation).list(caller, filter, wanted).to_h { |row| [row[target], row] }
+        read_targets(caller, collection, target, ids, wanted).to_h { |row| [row[target], row] }
+      end
+
+      def beyond_reach?(collection, count)
+        limit = collection.max_resolvable_ids
+
+        !limit.nil? && count > limit
+      end
+
+      def read_targets(caller, collection, target, ids, wanted)
+        chunk = collection.ids_per_read
+        slices = chunk ? ids.each_slice(chunk).to_a : [ids]
+
+        slices.flat_map do |slice|
+          collection.list(caller, Filter.new(condition_tree: Leaf.new(target, Operators::IN, slice)), wanted)
+        end
+      end
+
+      # Names the relations rather than the key they resolve to: what the
+      # operator can act on is the column they put in the view or the export,
+      # and how many rows they asked for at once.
+      def refuse_relation_fan_out!(group, collection, count)
+        asked = group.map { |relation_name, _, _| relation_name }.join(', ')
+
+        raise UnsupportedOperatorError,
+              "#{name} cannot resolve #{asked} over this read: it names #{count} distinct #{collection.name} " \
+              'records and Intercom has no bulk read for that collection, so this resolves at most ' \
+              "#{collection.max_resolvable_ids} of them per read -- one request each. Read fewer rows at a time, " \
+              'or leave the relation out of the projection: a relation resolved for part of a page would show no ' \
+              'record where one exists.'
       end
 
       def rewrite_branch(caller, branch, &builder)

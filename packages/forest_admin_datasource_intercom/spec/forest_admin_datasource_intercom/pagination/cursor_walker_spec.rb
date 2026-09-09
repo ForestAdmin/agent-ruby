@@ -65,15 +65,23 @@ module ForestAdminDatasourceIntercom
         expect(asked.size).to eq(1)
       end
 
-      it 'stops on an empty page' do
+      # Stopping here is a truncation like a cap: Intercom said there was a next
+      # page and this could not follow it, so the window is short of what was
+      # asked -- and a short answer is never silent.
+      it 'stops on an empty page, and says the result is truncated' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
         records = walker.walk(offset: 0, limit: 10, &source(page([], next_cursor: 'c1')))
 
         expect(records).to be_empty
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/advertised a next page this could not follow/)
       end
 
       # None of this happens against Intercom today, but a walk driven by a
       # remote value stops on its own terms rather than on the caps only.
-      it 'stops on a cursor it has already followed' do
+      it 'stops on a cursor it has already followed, and says the result is truncated' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         pages = source(page([record('a')], next_cursor: 'loop'),
                        page([record('b')], next_cursor: 'loop'),
                        page([record('c')], next_cursor: 'loop'))
@@ -81,6 +89,18 @@ module ForestAdminDatasourceIntercom
         walker.walk(offset: 0, limit: 10, &pages)
 
         expect(asked.size).to eq(2)
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/advertised a next page this could not follow/)
+      end
+
+      # The window was covered: there is nothing short about the answer, so the
+      # cursor that did not move is not worth a word.
+      it 'stays quiet when a stalled cursor comes after the window was covered' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        walker.walk(offset: 0, limit: 1, &source(page([record('a')], next_cursor: 'loop')))
+
+        expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
       end
 
       # Intercom documents duplicates on a dataset that moves between two

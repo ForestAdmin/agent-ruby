@@ -7,6 +7,18 @@ require 'time'
 require 'uri'
 require 'yaml'
 require 'zeitwerk'
+# `Time.zone` and `Time.use_zone`, which is how a date filter is read in the
+# timezone the caller wrote it in -- see `Query::CallerZone`. Required here
+# rather than relied on: the toolkit happens to pull ActiveSupport in far
+# enough for these to exist, but that is its business and not a contract, and a
+# `require` of this gem on its own left them undefined.
+#
+# Both lines: `active_support/time` brings `Time.zone`, and the bare
+# `active_support` brings the autoload table `Time.use_zone` reaches into for
+# `ActiveSupport::IsolatedExecutionState`. Without the second, the first raises
+# a NameError on the first date filter rather than at load.
+require 'active_support'
+require 'active_support/time'
 require 'faraday'
 require 'faraday/retry'
 require 'forest_admin_datasource_toolkit'

@@ -12,6 +12,10 @@ module ForestAdminDatasourceIntercom
 
     DEFAULT_REGION = :us
 
+    # Where a cleartext base_url reaches nobody else's network, so the bearer
+    # header crossing it in clear is not worth a word.
+    LOOPBACK_HOSTS = %w[localhost 127.0.0.1 ::1 [::1] 0.0.0.0].freeze
+
     # Without an explicit version a request follows the workspace's own default,
     # which an operator can change on Intercom's side -- and the payloads change
     # shape under us. Pinned to what the spike ran against; 2.14 and 2.16 both
@@ -60,6 +64,15 @@ module ForestAdminDatasourceIntercom
       @base_path ||= URI.parse(url).path
     end
 
+    # The url with any credentials in it masked. `URI` accepts them --
+    # `https://user:pass@proxy/...` -- and a credentialed egress proxy is one of
+    # the two reasons to set a `base_url` at all, so printing the url verbatim
+    # would put a second secret exactly where this class keeps the first one
+    # from going. Read by `Client#inspect` too, which prints the same url.
+    def redacted_url
+      @redacted_url ||= url.sub(%r{\A([a-zA-Z][\w+.-]*://)[^/@]*@}, '\1[FILTERED]@')
+    end
+
     # `access_token` is a bearer credential, and nothing prints a Configuration
     # on purpose: what reaches an `inspect` is a Rails error page, or a
     # `logger.debug` of something holding one. The default would put the token
@@ -67,7 +80,8 @@ module ForestAdminDatasourceIntercom
     # reason -- together they cut every path from an object this package hands
     # out to the credential.
     def inspect
-      "#<#{self.class.name} url=#{url.inspect} api_version=#{@api_version.inspect} access_token=[FILTERED]>"
+      "#<#{self.class.name} url=#{redacted_url.inspect} api_version=#{@api_version.inspect} " \
+        'access_token=[FILTERED]>'
     end
 
     private
@@ -96,13 +110,33 @@ module ForestAdminDatasourceIntercom
       return if @base_url.nil?
 
       uri = URI.parse(@base_url)
-      return if uri.is_a?(URI::HTTP) && !blank?(uri.host)
+      return warn_cleartext!(uri) if uri.is_a?(URI::HTTP) && !blank?(uri.host)
 
       raise ConfigurationError,
             "ForestAdminDatasourceIntercom base_url must be an absolute http(s) url, got #{@base_url.inspect}"
     rescue URI::InvalidURIError
       raise ConfigurationError,
             "ForestAdminDatasourceIntercom base_url is not a valid url: #{@base_url.inspect}"
+    end
+
+    # `URI::HTTPS` is a `URI::HTTP`, so plain http passes above -- and it is
+    # worth passing: a mock server in a test suite is one, and that is half of
+    # what `base_url` is for. What it costs is `Authorization: Bearer <token>`
+    # travelling in clear to whatever sits at the other end, and that token
+    # reads the whole workspace. Named rather than allowed in silence; a
+    # loopback host is nobody else's network, so it says nothing there.
+    def warn_cleartext!(uri)
+      return if uri.scheme == 'https' || loopback?(uri.host)
+
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] base_url #{redacted_url.inspect} is not https, and every request " \
+        'carries the Intercom access token as a bearer header. Anything on the path can read it and use it ' \
+        'against the workspace. Use https, or terminate TLS before the network this crosses.'
+      )
+    end
+
+    def loopback?(host)
+      LOOPBACK_HOSTS.include?(host.to_s.downcase) || host.to_s.downcase.end_with?('.localhost')
     end
 
     def blank?(value)

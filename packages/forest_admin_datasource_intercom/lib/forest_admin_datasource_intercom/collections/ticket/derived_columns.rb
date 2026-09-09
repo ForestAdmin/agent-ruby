@@ -31,6 +31,10 @@ module ForestAdminDatasourceIntercom
         # the person waiting.
         REPLY_PART = 'comment'.freeze
 
+        # The columns a truncated timeline leaves unknown rather than empty, and
+        # therefore the ones whose presence in a projection is worth a warning.
+        CLOSURE_COLUMNS = %w[closed_at closed_by_name].freeze
+
         private
 
         def define_derived_columns
@@ -60,7 +64,7 @@ module ForestAdminDatasourceIntercom
         # operator when a value is missing because the timeline was truncated
         # rather than because the event never happened.
         def embed_derived_columns(records, _rows, projection)
-          return unless (%w[closed_at closed_by_name] & projection).any?
+          return unless any_column_asked?(projection, CLOSURE_COLUMNS)
 
           unknown = records.count { |record| closure_unknown?(record) }
           warn_unknown_closures(unknown) if unknown.positive?

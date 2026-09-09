@@ -17,6 +17,8 @@ module ForestAdminDatasourceIntercom
     # translation of the next lot will need, and reading them again would cost a
     # second boot-time round trip.
     class TicketAttributesIntrospector
+      include AttributeNaming
+
       # Intercom's attribute data types, mapped onto what Forest can render. A
       # `list` is a single choice among values the workspace defined, so it reads
       # as a string rather than as a Json blob; `files` is a list of attachments
@@ -27,15 +29,6 @@ module ForestAdminDatasourceIntercom
       }.freeze
 
       DEFAULT_COLUMN_TYPE = 'String'.freeze
-
-      # What a column name may not contain, and it has nothing to do with
-      # Intercom: Forest lists the fields of a request in a **comma-separated**
-      # query parameter, and uses a colon to name a field through a relation.
-      # A workspace names its ticket attributes in free text -- measured, one is
-      # called `ID de l'objet en question (immo, facture, user)` -- and a comma
-      # in there splits the projection into fields no collection has, which the
-      # agent rejects as a 400 before the page is ever read.
-      UNSAFE_IN_A_COLUMN_NAME = /[,:]/
 
       # `name` is the key the payload uses, `column_name` the one the schema
       # publishes; they differ whenever the workspace's own name cannot travel
@@ -108,20 +101,6 @@ module ForestAdminDatasourceIntercom
                       data_type: definition['data_type'], ids_by_ticket_type: {})
       end
 
-      # Intercom hands these back HTML-escaped -- `Ce que j&#39;ai vérifié` --
-      # which is an artefact of where they were typed, not part of the name.
-      def column_name_for(name)
-        CGI.unescapeHTML(name).gsub(UNSAFE_IN_A_COLUMN_NAME, ' ').squeeze(' ').strip
-      end
-
-      def warn_collision(name, kept, column)
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] the ticket attribute #{name.inspect} is left out: it reads as the " \
-          "column #{column.inspect}, which #{kept.inspect} already carries. Rename one of them in Intercom to " \
-          'publish both.'
-        )
-      end
-
       def definitions(ticket_type)
         return [] unless ticket_type.is_a?(Hash)
 
@@ -132,11 +111,10 @@ module ForestAdminDatasourceIntercom
         list.is_a?(Array) ? list : []
       end
 
-      # An unknown data type reads as a string rather than being dropped: showing
-      # the value Intercom sent beats hiding a column because its type is new.
-      def column_type_for(definition)
-        COLUMN_TYPES.fetch(definition['data_type'].to_s, DEFAULT_COLUMN_TYPE)
-      end
+      # These are declared per ticket type, and that is what the log calls
+      # them: the workspace's own vocabulary, and where the operator goes to
+      # rename the one that was left out.
+      def attribute_kind = 'ticket'
     end
   end
 end

@@ -184,15 +184,8 @@ module ForestAdminDatasourceIntercom
         known, unknown = Array(sort).partition { |clause| fields.key?(sort_field(clause)) }
         warn_unsortable(unknown) unless unknown.empty?
 
-        known.map do |clause|
-          # `key?` rather than `||`: a descending clause carries `false`, which an
-          # `||` fallback would read as "absent" and turn back into ascending.
-          ascending = clause.key?(:ascending) ? clause[:ascending] : clause['ascending']
-          [sort_field(clause), ascending != false]
-        end
+        known.map { |clause| [sort_field(clause), ascending?(clause) != false] }
       end
-
-      def sort_field(clause) = clause[:field] || clause['field']
 
       def warn_unsortable(clauses)
         ForestAdminDatasourceIntercom.logger.warn(

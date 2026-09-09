@@ -95,6 +95,15 @@ module ForestAdminDatasourceIntercom
       collection.fields.select { |_, field| field.type == 'Column' }
     end
 
+    # No projection at all asks for every declared column, `contact_name`
+    # included, so the reads below pay the identity read of the page -- guarding
+    # it on the column being *named* would leave nil the very column the row
+    # publishes. The blocks that assert on the identity itself stub over this.
+    before do
+      stub_request(:post, "#{base}/contacts/search")
+        .to_return(json('type' => 'list', 'data' => [{ 'id' => 'c1', 'name' => 'Camille' }]))
+    end
+
     describe 'schema' do
       it 'is named IntercomTicket' do
         expect(collection.name).to eq('IntercomTicket')
@@ -342,6 +351,18 @@ module ForestAdminDatasourceIntercom
         collection.list(nil, filter, %w[id state_label])
 
         expect(WebMock).not_to have_requested(:get, "#{base}/admins")
+      end
+
+      # Forest's own parser builds a two-hop path, and this nests one target row
+      # under the relation name rather than a tree of them: the second hop would
+      # be dropped by the target's projection and the column would come back
+      # missing from a row that looks complete. Refused by name, like the filter
+      # that reaches that deep.
+      it 'refuses a projection reaching through two relations' do
+        stub_search(ticket('1'))
+
+        expect { collection.list(nil, filter, ['id', 'admin_assignee:teams:name']) }
+          .to raise_error(UnsupportedOperatorError, /reaches through two relations/)
       end
 
       # The price of a relation is one read per target *collection*, not one per

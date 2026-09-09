@@ -49,12 +49,22 @@ module ForestAdminDatasourceIntercom
         enable_search
       end
 
+      # This endpoint answers `id IN [...]`, so a hundred ids cost one request
+      # rather than a hundred: a relation pointing here resolves a whole page of
+      # rows for a handful of requests, and there is no fan-out to refuse. That
+      # is why `max_resolvable_ids` is nil where the other two tiers bound it --
+      # the read is proportional to the rows already collected, and the walk
+      # that collected them is bounded.
+      def ids_per_read = IDS_PER_READ
+      def max_resolvable_ids = nil
+
       protected
 
       def list_endpoint = 'contacts'
       def searchable = 'contacts'
       def search_column = 'email'
       def match_all_query = MATCH_EVERY_CONTACT
+      def max_id_reads = MAX_IDS_READ
 
       private
 
@@ -142,7 +152,10 @@ module ForestAdminDatasourceIntercom
       # `GET /companies/{id}/contacts` can. Anything else goes the usual way.
       def fetch_records(caller, filter, sort = nil)
         company = company_lookup(filter)
-        return super unless company
+        unless company
+          refuse_narrowed_company!(filter) if narrowed_company?(filter)
+          return super
+        end
 
         warn_ignored_sort(Array(filter&.sort)) if sort
         offset, limit = translate_page(filter&.page)
@@ -154,7 +167,10 @@ module ForestAdminDatasourceIntercom
 
       def count_records(caller, filter)
         company = company_lookup(filter)
-        return super unless company
+        unless company
+          refuse_narrowed_company!(filter) if narrowed_company?(filter)
+          return super
+        end
 
         exact_count(read_company_page(company, per_page: 1, cursor: nil))
       end
@@ -170,6 +186,45 @@ module ForestAdminDatasourceIntercom
         tree.value&.to_s
       end
 
+      # The same equality, and something filtered alongside it. There is no
+      # request that answers both halves: `GET /companies/{id}/contacts` narrows
+      # nothing it returns, and `/contacts/search` filters no company field at
+      # all -- which is what the related list of an account runs into the moment
+      # a permission scope or a segment is defined on this collection.
+      #
+      # Refused here rather than left to the translator, whose reason for
+      # `company_id` is "open the company and read its contacts" -- which is
+      # exactly what this caller was doing.
+      def narrowed_company?(filter)
+        tree = filter&.condition_tree
+        return false if tree.nil? || tree.is_a?(Leaf)
+
+        tree.some_leaf { |leaf| leaf.field.to_s == 'company_id' && leaf.operator == Operators::EQUAL }
+      end
+
+      def refuse_narrowed_company!(filter)
+        raise UnsupportedOperatorError,
+              "#{name} cannot answer this filter: the contacts of an account are read through " \
+              'GET /companies/{id}/contacts, which returns them whole and narrows nothing, and ' \
+              "#{search_endpoint.path} filters no company field -- so the account and the " \
+              "#{narrowing_cause(filter)} cannot be asked for in one request. Read the account's contacts " \
+              'without it, or filter on a column this collection is searched on: ' \
+              "#{search_endpoint.filterable_columns.join(", ")}."
+      end
+
+      # A scope and a segment are what put a condition next to the account's in
+      # practice, and the operator can act on neither the same way -- so the
+      # message names what it can see rather than guessing.
+      def narrowing_cause(filter)
+        others = []
+        filter.condition_tree.some_leaf do |leaf|
+          others << leaf.field.to_s unless leaf.field.to_s == 'company_id'
+          false
+        end
+
+        others.empty? ? 'condition filtered alongside it' : "condition on #{others.uniq.join(", ")}"
+      end
+
       def read_company_page(company, per_page:, cursor:)
         client.list_page("companies/#{Faraday::Utils.escape(company)}/contacts",
                          per_page: [per_page, max_page_size].min, starting_after: cursor)
@@ -180,7 +235,7 @@ module ForestAdminDatasourceIntercom
       # through. A contact that was merged away is simply absent from the
       # answer -- the row reads as gone, not as a failure.
       def records_by_ids(ids)
-        wanted = ids.first(MAX_IDS_READ)
+        wanted = ids.first(max_id_reads)
         warn_truncated_ids(ids.size) if ids.size > wanted.size
 
         wanted.each_slice(IDS_PER_READ).flat_map do |chunk|
@@ -193,7 +248,7 @@ module ForestAdminDatasourceIntercom
       def warn_truncated_ids(asked)
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} was asked for #{asked} records by id and read the first " \
-          "#{MAX_IDS_READ}: Intercom reads them #{IDS_PER_READ} at a time. The result is truncated."
+          "#{max_id_reads}: Intercom reads them #{IDS_PER_READ} at a time. The result is truncated."
         )
       end
     end
