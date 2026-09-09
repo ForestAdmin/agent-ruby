@@ -900,12 +900,13 @@ module ForestAdminAgent
       end
 
       describe 'warning that the relation read checks are off' do
-        # `@options` is what `setup` holds when it calls this, so the spec hands over the same thing.
+        after { Services::Permissions.skip_relation_read_permissions = false }
+
         def boot_with(skip)
           instance = described_class.instance
           logger = instance_spy(Services::LoggerService)
           instance.instance_variable_set(:@logger, logger)
-          instance.instance_variable_set(:@options, { skip_relation_read_permissions: skip })
+          Services::Permissions.skip_relation_read_permissions = skip
 
           instance.send(:warn_relation_read_permissions_skipped)
 
@@ -922,6 +923,46 @@ module ForestAdminAgent
 
         it 'stays quiet while the checks are on' do
           expect(boot_with(false)).not_to have_received(:log)
+        end
+      end
+
+      # `Facades::Container` resolves against `AgentFactory.instance`, so a host that subclasses
+      # this factory — `ForestAdminRpcAgent::Agent`, with its own singleton — has no container
+      # there. Reading the option through the facade left it ignored on exactly those hosts, which
+      # kept the checks on while the operator had asked for them off.
+      describe 'carrying skip_relation_read_permissions out of the options' do
+        let(:options) do
+          {
+            auth_secret: 'cba803d01a4d43b55010cab41fa1ea1f1f51a95e',
+            env_secret: '89719c6d8e2e2de2694c2f220fe2dbf02d5289487364daf1e4c6b13733ed0cdb',
+            is_production: false,
+            schema_path: File.join('tmp', '.forestadmin-schema.json')
+          }
+        end
+
+        after { Services::Permissions.skip_relation_read_permissions = false }
+
+        it 'takes the value setup was handed' do
+          described_class.instance.setup(options.merge(skip_relation_read_permissions: true))
+
+          expect(Services::Permissions.skip_relation_read_permissions?).to be true
+        end
+
+        it 'defaults to keeping the checks on when the host declares nothing' do
+          Services::Permissions.skip_relation_read_permissions = true
+
+          described_class.instance.setup(options)
+
+          expect(Services::Permissions.skip_relation_read_permissions?).to be false
+        end
+
+        it 'answers without resolving the base facade container' do
+          allow(Facades::Container).to receive(:config_from_cache).and_raise(
+            NoMethodError, "undefined method `resolve' for nil"
+          )
+          Services::Permissions.skip_relation_read_permissions = true
+
+          expect(Services::Permissions.skip_relation_read_permissions?).to be true
         end
       end
     end

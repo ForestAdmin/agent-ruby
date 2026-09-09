@@ -35,16 +35,18 @@ module ForestAdminAgent
         ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
       end
 
-      # Read tolerantly rather than through `Facades::Container.cache`, which raises on a key a
-      # third-party host never declared. A class method so the chart route and the capabilities
-      # route can ask without an instance, and so the route specs that fake this service with an
+      # Set once from the options `AgentFactory#setup` was handed, rather than resolved from
+      # `Facades::Container`: that answers from `AgentFactory.instance`, so a host subclassing the
+      # factory — `ForestAdminRpcAgent::Agent` has its own singleton — would leave the option
+      # ignored and the checks silently on. A class method so the chart and capabilities routes can
+      # ask without an instance, and so the route specs faking this service with an
       # `instance_double` do not each have to stub one more message.
+      class << self
+        attr_writer :skip_relation_read_permissions
+      end
+
       def self.skip_relation_read_permissions?
-        Facades::Container.config_from_cache&.dig(:skip_relation_read_permissions) == true
-      rescue StandardError
-        # No readable config is not permission to skip the checks: keep them on. `setup` asks this
-        # before the container is resolvable on some hosts, and `config_from_cache` raises there.
-        false
+        @skip_relation_read_permissions == true
       end
 
       def can?(action, collection, allow_fetch: false)

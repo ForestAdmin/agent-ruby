@@ -22,6 +22,8 @@ module ForestAdminAgent
 
       def setup(options)
         @options = options
+        Services::Permissions.skip_relation_read_permissions =
+          options.to_h[:skip_relation_read_permissions] == true
         @has_env_secret = !options.to_h[:env_secret].nil?
         @customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
         build_container
@@ -343,11 +345,8 @@ module ForestAdminAgent
       end
 
       # An auditor reading the boot log should see the weakened posture without reading the config.
-      # Read from the options `setup` was handed rather than through `Facades::Container`, which
-      # resolves against `AgentFactory.instance` and so answers nothing on a host that subclasses
-      # this factory — `ForestAdminRpcAgent::Agent` has its own singleton.
       def warn_relation_read_permissions_skipped
-        return unless @options.to_h[:skip_relation_read_permissions] == true
+        return unless Services::Permissions.skip_relation_read_permissions?
 
         @logger.log(
           'Warn',
