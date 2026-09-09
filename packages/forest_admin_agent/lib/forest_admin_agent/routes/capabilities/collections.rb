@@ -68,7 +68,8 @@ module ForestAdminAgent
                 canUseProjectionViaHeader: true,
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
-                canUseAuditTrail: audit_trail_enabled?
+                canUseAuditTrail: audit_trail_enabled?,
+                checksRelationReadPermissions: !Services::Permissions.skip_relation_read_permissions?
               }
             },
             status: 200

@@ -202,8 +202,9 @@ module ForestAdminAgent
             )
 
             # A count exposes the cardinality of the relation, which `/relationships/<name>/count`
-            # puts behind `browse`. No path names it, so nothing above sees it.
-            if aggregation.field.nil?
+            # puts behind `browse`. No path names it, so nothing above sees it. It arrived with the
+            # related-read checks, so it goes away with them.
+            if aggregation.field.nil? && !Services::Permissions.skip_relation_read_permissions?
               context.permissions.can?(:browse, context.datasource.get_collection(field.foreign_collection))
             end
 

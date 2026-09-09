@@ -27,6 +27,7 @@ module ForestAdminAgent
         build_container
         build_cache
         build_logger
+        warn_relation_read_permissions_skipped
       end
 
       def add_datasource(datasource, options = {})
@@ -339,6 +340,20 @@ module ForestAdminAgent
 
       def should_skip_schema_update?
         Facades::Container.cache(:skip_schema_update) == true
+      end
+
+      # An auditor reading the boot log should see the weakened posture without reading the config.
+      # Read from the options `setup` was handed rather than through `Facades::Container`, which
+      # resolves against `AgentFactory.instance` and so answers nothing on a host that subclasses
+      # this factory — `ForestAdminRpcAgent::Agent` has its own singleton.
+      def warn_relation_read_permissions_skipped
+        return unless @options.to_h[:skip_relation_read_permissions] == true
+
+        @logger.log(
+          'Warn',
+          '[ForestAdmin] skip_relation_read_permissions is true: columns of collections the caller ' \
+          'has no read permission on are served when a relation path reaches them'
+        )
       end
 
       def log_schema_skip
