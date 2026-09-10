@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.42.0...v1.43.0) (2026-09-10)
+
+
+### Features
+
+* add option to skip rbac ([#388](https://github.com/ForestAdmin/agent-ruby/issues/388)) ([3894104](https://github.com/ForestAdmin/agent-ruby/commit/3894104288956335caff7ad9947e5c3ca812a706))
+
 # [1.42.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.41.0...v1.42.0) (2026-09-02)
 
 
