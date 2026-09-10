@@ -66,7 +66,10 @@ module ForestAdminAgent
 
         # An absent permission system is not a denial: `can?` allows everything there, and answering
         # anything else would redact every relation on a deployment that granted nothing to check.
-        return allowed.merge(to_check.to_h { |name| [name, true] }) unless permission_system?
+        # `skip_relation_read_permissions` is the operator asking for that same answer on purpose.
+        if skip_relation_read_permissions? || !permission_system?
+          return allowed.merge(to_check.to_h { |name| [name, true] })
+        end
 
         @read_permissions ||= {}
         missing = to_check - @read_permissions.keys
@@ -273,6 +276,10 @@ module ForestAdminAgent
         names.any? && names.all? { |name| allowed[name] }
       end
 
+      def skip_relation_read_permissions?
+        Facades::Container.config_from_cache[:skip_relation_read_permissions] == true
+      end
+
       def leaf_label(names)
         names.empty? ? 'an unresolved polymorphic relation' : "the '#{names.join("' or '")}' collection"
       end
@@ -356,6 +363,8 @@ module ForestAdminAgent
         return unless search_extended
         return unless describes_own_search?(collection)
         return unless permission_system?
+        # Refused ahead of `read_permissions`, so the skip has to be read here as well.
+        return if skip_relation_read_permissions?
 
         raise ForbiddenError,
               "You cannot run an extended search on the '#{collection.name}' collection: the fields " \

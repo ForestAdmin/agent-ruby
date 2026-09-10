@@ -613,6 +613,90 @@ module ForestAdminAgent
           )
         end
       end
+
+      # The option lifts the read checks this whole suite pins. It lifts nothing else: whether the
+      # caller may browse, read or export the collection it is querying is a different question,
+      # asked by the route through `can?`, and still answered.
+      describe 'with skip_relation_read_permissions' do
+        def unchecked_permissions(readable = [])
+          permissions = build_permissions(readable)
+          allow(permissions).to receive(:skip_relation_read_permissions?).and_return(true)
+
+          permissions
+        end
+
+        def searchable_cards(searched, search_handler: false)
+          double = instance_double(
+            ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator,
+            name: 'cards',
+            datasource: datasource
+          )
+          allow(double).to receive_messages(searched_fields: searched, search_handler?: search_handler)
+
+          double
+        end
+
+        it 'serves a field the caller named on a collection it cannot read' do
+          projection = unchecked_permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban]), named_by_caller: true
+          )
+
+          expect(projection).to eq(%w[id account:iban])
+        end
+
+        it 'keeps an unnamed projection whole instead of dropping a path' do
+          projection = unchecked_permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban holder:*]), named_by_caller: false
+          )
+
+          expect(projection).to eq(%w[id account:iban holder:*])
+        end
+
+        it 'serves a filter on a collection the caller cannot read' do
+          condition_tree = Nodes::ConditionTreeLeaf.new('account:iban', Operators::EQUAL, 'FR76')
+
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(cards, condition_tree: condition_tree)
+          end.not_to raise_error
+        end
+
+        it 'serves a sort on a collection the caller cannot read' do
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(
+              cards, sort: [{ field: 'account:iban', ascending: false }]
+            )
+          end.not_to raise_error
+        end
+
+        # Refused before any permission is resolved, so the skip has to be read there too and not
+        # only where the collections are looked up.
+        it 'serves an extended search the stack cannot describe' do
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(
+              searchable_cards(nil, search_handler: true), search: 'martin', search_extended: true
+            )
+          end.not_to raise_error
+        end
+
+        it 'answers every collection readable without fetching permissions' do
+          permissions = unchecked_permissions
+
+          expect(permissions.read_permissions('cards', %w[accounts organizations])).to eq(
+            { 'cards' => true, 'accounts' => true, 'organizations' => true }
+          )
+          expect(permissions).not_to have_received(:get_collections_permissions_data)
+        end
+
+        it 'still refuses the collection being queried' do
+          permissions = unchecked_permissions
+          allow(permissions).to receive(:permission_allowed?).and_return(false)
+
+          expect { permissions.can?(:browse, cards) }.to raise_error(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError,
+            "You don't have permission to browse this collection."
+          )
+        end
+      end
     end
   end
 end

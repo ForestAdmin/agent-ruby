@@ -68,7 +68,8 @@ module ForestAdminAgent
                 canUseProjectionViaHeader: true,
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
-                canUseAuditTrail: audit_trail_enabled?
+                canUseAuditTrail: audit_trail_enabled?,
+                checksRelationReadPermissions: !skip_relation_read_permissions?
               }
             },
             status: 200
@@ -82,6 +83,10 @@ module ForestAdminAgent
         # its History tab on this.
         def audit_trail_enabled?
           !::ForestAdminAgent::AuditTrail.store.nil?
+        end
+
+        def skip_relation_read_permissions?
+          ForestAdminAgent::Facades::Container.config_from_cache[:skip_relation_read_permissions] == true
         end
       end
     end

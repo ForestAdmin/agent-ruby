@@ -31,6 +31,7 @@ module ForestAdminRails
   setting :limit_export_size, default: nil
   setting :append_schema_path, default: nil
   setting :skip_schema_update, default: false
+  setting :skip_relation_read_permissions, default: false
   setting :disable_route_cache, default: false
   setting :rpc_max_polling_threads, default: nil
   setting :workflow_executor_url, default: nil

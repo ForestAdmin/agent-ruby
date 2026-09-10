@@ -23,6 +23,7 @@ module ForestAdminRpcAgent
   setting :project_dir, default: Dir.pwd
   setting :schema_path, default: File.join(Dir.pwd, '.forestadmin-rpc-schema.json')
   setting :skip_schema_update, default: false
+  setting :skip_relation_read_permissions, default: false
   setting :logger_level, default: 'info'
   setting :logger, default: nil
   setting :customize_error_message, default: nil

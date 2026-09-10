@@ -569,6 +569,33 @@ module ForestAdminAgent
             end
           end
 
+          # This browse arrived with the related-read checks, so the option that lifts them lifts it
+          # too: a count leaderboard that worked before them works again.
+          it 'skips that browse once skip_relation_read_permissions is on' do
+            args[:params] = args[:params].merge({
+                                                  labelFieldName: 'author',
+                                                  relationshipFieldName: 'bookReviews',
+                                                  aggregator: 'Count',
+                                                  aggregateFieldName: '',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Leaderboard',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              skip_relation_read_permissions: true
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
+            allow(permissions).to receive(:can?)
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            review = @datasource.get_collection('review')
+            allow(review).to receive(:aggregate).and_return([])
+
+            chart.handle_request(args)
+
+            expect(permissions).not_to have_received(:can?)
+            expect(review).to have_received(:aggregate)
+          end
+
           it 'refuses a count leaderboard the caller cannot browse the counted collection for' do
             args[:params] = args[:params].merge({
                                                   labelFieldName: 'author',
