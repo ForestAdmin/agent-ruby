@@ -69,7 +69,7 @@ module ForestAdminAgent
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
                 canUseAuditTrail: audit_trail_enabled?,
-                checksRelationReadPermissions: !Services::Permissions.skip_relation_read_permissions?
+                checksRelationReadPermissions: !skip_relation_read_permissions?
               }
             },
             status: 200
@@ -81,6 +81,10 @@ module ForestAdminAgent
         # True only where the store the record-history route reads from exists — the same lookup that route
         # mounts itself on, so the capability cannot drift from what the routes actually serve. The front gates
         # its History tab on this.
+        def skip_relation_read_permissions?
+          ForestAdminAgent::Facades::Container.config_from_cache[:skip_relation_read_permissions] == true
+        end
+
         def audit_trail_enabled?
           !::ForestAdminAgent::AuditTrail.store.nil?
         end

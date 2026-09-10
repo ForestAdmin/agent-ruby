@@ -35,20 +35,6 @@ module ForestAdminAgent
         ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
       end
 
-      # Set once from the options `AgentFactory#setup` was handed, rather than resolved from
-      # `Facades::Container`: that answers from `AgentFactory.instance`, so a host subclassing the
-      # factory — `ForestAdminRpcAgent::Agent` has its own singleton — would leave the option
-      # ignored and the checks silently on. A class method so the chart and capabilities routes can
-      # ask without an instance, and so the route specs faking this service with an
-      # `instance_double` do not each have to stub one more message.
-      class << self
-        attr_writer :skip_relation_read_permissions
-      end
-
-      def self.skip_relation_read_permissions?
-        @skip_relation_read_permissions == true
-      end
-
       def can?(action, collection, allow_fetch: false)
         return true unless permission_system?
 
@@ -81,7 +67,7 @@ module ForestAdminAgent
         # An absent permission system is not a denial: `can?` allows everything there, and answering
         # anything else would redact every relation on a deployment that granted nothing to check.
         # `skip_relation_read_permissions` is the operator asking for that same answer on purpose.
-        if self.class.skip_relation_read_permissions? || !permission_system?
+        if skip_relation_read_permissions? || !permission_system?
           return allowed.merge(to_check.to_h { |name| [name, true] })
         end
 
@@ -290,6 +276,10 @@ module ForestAdminAgent
         names.any? && names.all? { |name| allowed[name] }
       end
 
+      def skip_relation_read_permissions?
+        Facades::Container.config_from_cache[:skip_relation_read_permissions] == true
+      end
+
       def leaf_label(names)
         names.empty? ? 'an unresolved polymorphic relation' : "the '#{names.join("' or '")}' collection"
       end
@@ -374,7 +364,7 @@ module ForestAdminAgent
         return unless describes_own_search?(collection)
         return unless permission_system?
         # Refused ahead of `read_permissions`, so the skip has to be read here as well.
-        return if self.class.skip_relation_read_permissions?
+        return if skip_relation_read_permissions?
 
         raise ForbiddenError,
               "You cannot run an extended search on the '#{collection.name}' collection: the fields " \

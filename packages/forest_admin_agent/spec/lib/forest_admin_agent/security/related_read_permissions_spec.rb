@@ -619,9 +619,10 @@ module ForestAdminAgent
       # asked by the route through `can?`, and still answered.
       describe 'with skip_relation_read_permissions' do
         def unchecked_permissions(readable = [])
-          allow(described_class).to receive(:skip_relation_read_permissions?).and_return(true)
+          permissions = build_permissions(readable)
+          allow(permissions).to receive(:skip_relation_read_permissions?).and_return(true)
 
-          build_permissions(readable)
+          permissions
         end
 
         def searchable_cards(searched, search_handler: false)

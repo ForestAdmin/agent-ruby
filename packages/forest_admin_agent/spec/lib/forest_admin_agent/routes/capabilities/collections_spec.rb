@@ -95,11 +95,12 @@ module ForestAdminAgent
           # The frontend prunes projections on this flag, so announcing it wrong either hides
           # columns the agent serves or lets the frontend ask for ones it refuses.
           it 'announces the relation read checks as off once the option turns them off' do
-            ForestAdminAgent::Services::Permissions.skip_relation_read_permissions = true
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              skip_relation_read_permissions: true
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
 
             expect(result[:content][:agentCapabilities][:checksRelationReadPermissions]).to be false
-          ensure
-            ForestAdminAgent::Services::Permissions.skip_relation_read_permissions = false
           end
 
           it 'returns agentCapabilities' do

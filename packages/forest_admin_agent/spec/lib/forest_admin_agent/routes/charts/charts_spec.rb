@@ -581,8 +581,10 @@ module ForestAdminAgent
                                                   type: 'Leaderboard',
                                                   timezone: 'Europe/Paris'
                                                 })
-            allow(ForestAdminAgent::Services::Permissions).to receive(:skip_relation_read_permissions?)
-              .and_return(true)
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              skip_relation_read_permissions: true
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
             allow(permissions).to receive(:can?)
             allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
             review = @datasource.get_collection('review')
