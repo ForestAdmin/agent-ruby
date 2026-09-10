@@ -7,8 +7,12 @@
 # off the documentation: measured during lot 1, `/tickets/search` refuses
 # `company_id` with `invalid_field` although a ticket carries one.
 #
-#   INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --endpoint tickets
-#   INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --region eu --out measured.yml
+#   INTERCOM_ACCESS_TOKEN=... forest_admin_intercom_probe --endpoint tickets
+#   INTERCOM_ACCESS_TOKEN=... forest_admin_intercom_probe --region eu --out measured.yml
+#
+# Shipped with the gem rather than left in the repository: what it measures is
+# the customer's workspace, and the operator running it has the gem installed
+# and not a clone of the agent.
 #
 # It sends one search per (field, operator) cell, asking for a single record,
 # and reads Intercom's refusal codes: `invalid_field` for a field the endpoint
@@ -29,6 +33,17 @@ require 'optparse'
 
 module ProbeSearchFields
   SearchFields = ForestAdminDatasourceIntercom::Query::SearchFields
+
+  # Whether this file is being run as the command rather than loaded by a
+  # spec. The basenames and not the paths: RubyGems installs an executable
+  # behind a stub of its own and `load`s this file from it, so `$PROGRAM_NAME`
+  # is the stub while `__FILE__` is this file -- comparing the two would make
+  # the shipped command exit without doing anything, which is the one thing
+  # shipping it was for. A spec loading it runs under `rspec`, whose basename
+  # is not this one.
+  def self.invoked_as_command?(program_name)
+    File.basename(program_name.to_s) == File.basename(__FILE__)
+  end
 
   # A cell is probed with the value shapes its field plausibly takes, most
   # likely first: a wrong shape is refused with `data_invalid` just like an
@@ -189,7 +204,7 @@ module ProbeSearchFields
       options = { endpoints: SearchFields.endpoints, region: 'us', token: ENV.fetch('INTERCOM_ACCESS_TOKEN', nil) }
 
       OptionParser.new do |parser|
-        parser.banner = 'Usage: INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields [options]'
+        parser.banner = 'Usage: INTERCOM_ACCESS_TOKEN=... forest_admin_intercom_probe [options]'
         parser.on('--endpoint NAME', "one of #{SearchFields.endpoints.join(", ")}") { |v| options[:endpoints] = [v] }
         parser.on('--region NAME', 'us (default), eu or au') { |v| options[:region] = v }
         parser.on('--token TOKEN', 'defaults to $INTERCOM_ACCESS_TOKEN') { |v| options[:token] = v }
@@ -249,4 +264,4 @@ module ProbeSearchFields
   end
 end
 
-exit(ProbeSearchFields::CLI.call(ARGV)) if $PROGRAM_NAME == __FILE__
+exit(ProbeSearchFields::CLI.call(ARGV)) if ProbeSearchFields.invoked_as_command?($PROGRAM_NAME)

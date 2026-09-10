@@ -222,7 +222,8 @@ module ForestAdminDatasourceIntercom
         return NOTHING if tree == NOTHING
 
         Query::ConditionTreeTranslator.call(tree, endpoint: search_endpoint, collection: name,
-                                                  timezone: timezone_for(caller))
+                                                  timezone: timezone_for(caller),
+                                                  attribute_columns: attribute_column_names)
       end
 
       # The ids the target matched, written as the filter Intercom does take on

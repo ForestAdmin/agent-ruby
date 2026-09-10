@@ -222,11 +222,20 @@ module ForestAdminDatasourceIntercom
       # An exact lookup answers few records -- one, for the keys this publishes
       # -- so it is read as a single page. More than that page holds is reported
       # rather than dropped in silence.
+      #
+      # A lookup naming no record is an empty page, not a failure: Intercom
+      # answers this route with a 404 where a search endpoint would answer an
+      # empty list, and a filter matching nothing is the most ordinary thing a
+      # list view does. Read the way a record read by its id already is.
       def looked_up_records(params)
         answer = client.lookup_page(lookup_path, params: params)
         warn_truncated_lookup(params) if answer.next_cursor
 
         answer.records
+      rescue APIError => e
+        raise unless e.status == 404
+
+        []
       end
 
       def refuse_condition!(tree)

@@ -17,18 +17,46 @@ module ForestAdminDatasourceIntercom
                   IntercomContact IntercomCompany IntercomConversation IntercomTicket])
     end
 
-    # The three reads a boot performs, and no fourth: the attributes a workspace
-    # declares on its ticket types, on its contacts and on its companies are
-    # columns of those collections, and a payload carries the values of the
+    # The four reads a boot performs, and no fifth: `/me`, which is where
+    # Intercom echoes the API version it served, and the attributes a workspace
+    # declares on its ticket types, on its contacts and on its companies --
+    # columns of those collections, since a payload carries the values of the
     # attributes that record happens to have been given, never their
     # definitions.
-    it 'introspects the workspace attributes while registering, and reads nothing else' do
+    it 'checks the version and introspects the workspace attributes, and reads nothing else' do
       datasource
 
+      expect(WebMock).to have_requested(:get, %r{/me}).once
       expect(WebMock).to have_requested(:get, /ticket_types/).once
       expect(WebMock).to have_requested(:get, /data_attributes/).with(query: { 'model' => 'contact' }).once
       expect(WebMock).to have_requested(:get, /data_attributes/).with(query: { 'model' => 'company' }).once
       expect(WebMock).not_to have_requested(:get, %r{conversations|admins|teams|companies/list})
+    end
+
+    # Intercom serves the workspace's own default when the pin is not honoured
+    # and the payload shapes differ between versions. The echo is the only
+    # place that shows, and reading it at boot is what turns the check from
+    # code that exists into code that runs.
+    it 'reports a workspace serving another API version than the pinned one' do
+      allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+      stub_me(version: '2.11')
+
+      datasource
+
+      expect(ForestAdminDatasourceIntercom.logger)
+        .to have_received(:warn).with(/asked Intercom for API version 2\.16 and it served 2\.11/)
+    end
+
+    # Degrades like the attribute reads: a token that cannot reach `/me` costs
+    # the check, never the agent.
+    it 'boots without the check when the token cannot read /me' do
+      allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+      stub_request(:get, %r{/me}).to_return(status: 403, body: '{}',
+                                            headers: { 'Content-Type' => 'application/json' })
+
+      expect(datasource.collections.keys).to include('IntercomTicket')
+      expect(ForestAdminDatasourceIntercom.logger)
+        .to have_received(:warn).with(%r{could not read /me at boot \(HTTP 403\)})
     end
 
     # A token without that permission costs the attribute columns, never the
@@ -54,6 +82,7 @@ module ForestAdminDatasourceIntercom
     end
 
     it 'configures a client from the options it is handed' do
+      stub_me(base: 'https://api.eu.intercom.io')
       stub_ticket_types(base: 'https://api.eu.intercom.io')
       stub_data_attributes('contact', base: 'https://api.eu.intercom.io')
       stub_data_attributes('company', base: 'https://api.eu.intercom.io')

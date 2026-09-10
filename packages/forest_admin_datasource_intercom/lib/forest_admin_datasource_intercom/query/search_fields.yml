@@ -6,7 +6,7 @@
 #
 # `source` is the provenance of a row, and it is not decoration:
 #
-#   measured -- observed against a real workspace, by `bin/probe_search_fields`
+#   measured -- observed against a real workspace, by `forest_admin_intercom_probe`
 #               or during a spike, and recorded here with the date;
 #   spec     -- read off Intercom's documentation and nothing else.
 #
@@ -231,7 +231,13 @@ endpoints:
       contact_count:
         reason: Counted by the agent from the contacts the payload carries.
         source: measured
-    # What `bin/probe_search_fields` enumerates on top of the fields above:
+      source_author_name:
+        reason: >-
+          The endpoint matches the author of the opening message by e-mail
+          alone -- `source.author.email` is a field, `source.author.name` is
+          not. Filter on `source_author_email`.
+        source: spec
+    # What `forest_admin_intercom_probe` enumerates on top of the fields above:
     # names the documentation mentions, or that an ops team would plausibly
     # search on. A candidate that turns out to be filterable becomes a field
     # above -- with a column to expose it on, or with none, in which case it is
@@ -350,13 +356,43 @@ endpoints:
           filters a ticket state at all, and under which name, is one of the
           probe's questions.
         source: spec
-      state_external_label:
-        reason: Read off the state object the ticket embeds.
-        source: spec
       ticket_type_name:
         reason: >-
           Read off the type object the ticket embeds. Filter on
           `ticket_type_id`, which the endpoint does take.
+        source: spec
+      ticket_id:
+        reason: >-
+          The number the support team says out loud, which is not the id the
+          API answers by. The search endpoint carries no field for it. Filter
+          on `id`, which takes the value the url and the record page use.
+        source: spec
+      is_shared:
+        reason: >-
+          Whether the ticket is visible to the customer. On the payload and not
+          in the search DSL; the probe lists it as a candidate.
+        source: spec
+      state_id:
+        reason: >-
+          Read off the state object the ticket embeds. The endpoint takes no
+          filter on a ticket state under any name this table knows, which is
+          what keeps the `state` relation navigable without being filterable.
+          Whether it filters one at all is the probe's second question. Filter
+          on `open` or on `category` meanwhile.
+        source: spec
+      previous_state_id:
+        reason: >-
+          The state the ticket left, read off its payload. Filterable no more
+          than the state it is in, and for the same reason.
+        source: spec
+      contact_name:
+        reason: >-
+          Read from the Contacts endpoint, not from the ticket. Filter through
+          the `contact` relation, which resolves against `/contacts/search` and
+          rewrites onto `contact_ids`.
+        source: spec
+      contact_count:
+        reason: Counted by the agent from the contacts the payload carries.
         source: spec
       part_count:
         reason: Counted by the agent from the parts the payload carries.

@@ -27,12 +27,19 @@ require 'forest_admin_datasource_intercom'
 # and a fixture is read by everyone who clones the repo.
 WebMock.disable_net_connect!(allow_localhost: true)
 
-# A datasource introspects the ticket-type attributes and the contact and
-# company attributes while it registers its collections, so every spec building
-# one issues those three reads. The base url is not taken from the datasource on
-# purpose: reading it would build the datasource, and boot the very reads this
-# stubs.
+# A datasource checks the API version it was served and introspects the
+# ticket-type attributes and the contact and company attributes while it
+# registers its collections, so every spec building one issues those four
+# reads. The base url is not taken from the datasource on purpose: reading it
+# would build the datasource, and boot the very reads this stubs.
 module IntercomBootStubs
+  def stub_me(base: ForestAdminDatasourceIntercom::Configuration::REGION_HOSTS[:us],
+              version: ForestAdminDatasourceIntercom::Configuration::DEFAULT_API_VERSION)
+    stub_request(:get, "#{base}/me")
+      .to_return(status: 200, body: { 'type' => 'admin', 'id' => '1', 'email' => 'ops@example.test' }.to_json,
+                 headers: { 'Content-Type' => 'application/json', 'Intercom-Version' => version })
+  end
+
   def stub_ticket_types(*types, base: ForestAdminDatasourceIntercom::Configuration::REGION_HOSTS[:us])
     stub_request(:get, "#{base}/ticket_types")
       .to_return(status: 200, body: { 'type' => 'list', 'data' => types }.to_json,
@@ -63,6 +70,7 @@ RSpec.configure do |config|
 
   config.before do
     WebMock.reset!
+    stub_me
     stub_ticket_types
     stub_data_attributes('contact')
     stub_data_attributes('company')

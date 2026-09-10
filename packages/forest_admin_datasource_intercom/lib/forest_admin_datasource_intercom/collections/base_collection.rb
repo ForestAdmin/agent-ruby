@@ -101,6 +101,13 @@ module ForestAdminDatasourceIntercom
         @column_names ||= fields.select { |_, field| field.is_a?(ColumnSchema) }.keys
       end
 
+      # The columns a workspace's own attributes became. None here; the
+      # collections that carry any override this through `CustomAttributes`.
+      # The translator reads them to answer a filter on one with the refusal
+      # covering the family rather than with the message for a column nobody
+      # declared.
+      def attribute_column_names = []
+
       # The timezone in-memory date comparisons are evaluated in. The caller's,
       # since that is whose "today" the filter was written against.
       def timezone_for(caller)

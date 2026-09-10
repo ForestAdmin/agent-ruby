@@ -156,6 +156,16 @@ module ForestAdminDatasourceIntercom
         expect(collection.fields['_default_title_'].filter_operators).to be_empty
       end
 
+      # The schema advertises no filter, but a scope, a segment or a customizer
+      # can still send one -- and the reason it is refused with is the
+      # arbitration itself rather than "this column is not in the table", which
+      # is what an attribute column would otherwise get: its name is the
+      # workspace's, so no row can carry it.
+      it 'refuses a filter on a ticket attribute with the arbitration as its reason' do
+        expect { rows(%w[id], condition_tree: leaf('Due', operators::EQUAL, 'x')) }
+          .to raise_error(UnsupportedOperatorError, /differs from one ticket type to the next/)
+      end
+
       # Intercom matches text field by field, and this endpoint exposes none
       # this collection carries.
       it 'is not searchable' do

@@ -157,7 +157,7 @@ module ForestAdminDatasourceIntercom
           return super
         end
 
-        warn_ignored_sort(Array(filter&.sort)) if sort
+        warn_unordered_company_contacts(Array(filter&.sort)) if sort
         offset, limit = translate_page(filter&.page)
 
         walker.walk(offset: offset, limit: limit) do |per_page, cursor|
@@ -225,9 +225,18 @@ module ForestAdminDatasourceIntercom
         others.empty? ? 'condition filtered alongside it' : "condition on #{others.uniq.join(", ")}"
       end
 
+      # An account Intercom no longer answers for -- deleted, or moved outside
+      # the token's reach between the moment the row was rendered and the
+      # moment its related list was opened -- reads as an account with no
+      # contact rather than as a failed page, the way a record read by its id
+      # already does.
       def read_company_page(company, per_page:, cursor:)
         client.list_page("companies/#{Faraday::Utils.escape(company)}/contacts",
                          per_page: [per_page, max_page_size].min, starting_after: cursor)
+      rescue APIError => e
+        raise unless e.status == 404
+
+        Client::Page.new(records: [], next_cursor: nil, total_count: 0)
       end
 
       # One request per hundred ids instead of one per id: this endpoint answers
@@ -243,6 +252,21 @@ module ForestAdminDatasourceIntercom
                                                    query: { 'field' => 'id', 'operator' => 'IN',
                                                             'value' => chunk }).records
         end
+      end
+
+      # `sort` here is the clause `server_sort` found `/contacts/search` does
+      # honour, which is why nothing has reported it yet: it is this route that
+      # cannot carry the order, not the column. Saying Intercom does not sort
+      # this collection would be wrong -- it is the one collection it sorts --
+      # so this is the counterpart of `warn_unordered_ids`, for the other route
+      # that leaves the search behind.
+      def warn_unordered_company_contacts(clauses)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] #{name} was asked to sort on " \
+          "#{clauses.map { |clause| sort_field(clause) }.join(", ")} while reading the contacts of an account, " \
+          'which Intercom answers through GET /companies/{id}/contacts -- a route that takes no order, unlike ' \
+          'the search this collection is otherwise read through. The rows come back in the order the API imposes.'
+        )
       end
 
       def warn_truncated_ids(asked)

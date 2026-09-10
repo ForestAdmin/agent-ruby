@@ -25,6 +25,12 @@ module ForestAdminDatasourceIntercom
 
       def attribute_columns = @attribute_columns || []
 
+      # What the translator needs of them: the names the schema published, so a
+      # filter reaching one is refused with the reason the table carries for
+      # the whole family rather than with the message for a column that is not
+      # in it.
+      def attribute_column_names = attribute_columns.map(&:column_name)
+
       # What the log calls these, which is the workspace's own vocabulary: a
       # ticket attribute is declared per ticket type, a contact attribute per
       # model.

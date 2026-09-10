@@ -7,6 +7,7 @@ module ForestAdminDatasourceIntercom
       @configuration = Configuration.new(access_token: access_token, **options)
       @client = Client.new(@configuration)
 
+      verify_api_version
       register_collections
     end
 
@@ -50,9 +51,30 @@ module ForestAdminDatasourceIntercom
       add_collection(Collections::Ticket.new(self, attributes: ticket_attributes))
     end
 
-    # The three boot-time reads of the datasource. Each degrades to no attribute
-    # column rather than to a failed boot: a token missing a permission costs
-    # the columns it could not read, never the agent.
+    # The one boot read that is not about a column, and the only place the
+    # pinned API version can be checked: Intercom serves the workspace's own
+    # default when the pin is not honoured, echoes what it served in a response
+    # header, and the payload shapes differ between versions -- the silent
+    # drift this package refuses everywhere else. `Client#me` reads that echo
+    # and reports a mismatch; nothing else in the datasource calls it, so
+    # leaving it uncalled left the check as code that never ran.
+    #
+    # Degrades like the three attribute reads below: a token that cannot reach
+    # `/me` costs the check, never the boot.
+    def verify_api_version
+      @client.me(boot: true)
+    rescue APIError => e
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] could not read /me at boot (HTTP #{e.status || "-"}); the API " \
+        'version Intercom serves was not checked against the pinned one, and a workspace serving another one ' \
+        'answers payloads of another shape.'
+      )
+    end
+
+    # The three attribute reads of the boot, alongside the version check above.
+    # Each degrades to no attribute column rather than to a failed boot: a
+    # token missing a permission costs the columns it could not read, never
+    # the agent.
     def ticket_attributes
       Schema::TicketAttributesIntrospector.new(@client).attributes
     end

@@ -29,15 +29,21 @@ module ForestAdminDatasourceIntercom
       MAX_DEPTH = 2
       MAX_GROUP_SIZE = 15
 
-      def self.call(condition_tree, endpoint:, collection:, timezone: nil)
+      def self.call(condition_tree, endpoint:, collection:, timezone: nil, attribute_columns: [])
         return nil if condition_tree.nil?
 
-        new(endpoint: endpoint, collection: collection, timezone: timezone).translate(condition_tree)
+        new(endpoint: endpoint, collection: collection, timezone: timezone,
+            attribute_columns: attribute_columns).translate(condition_tree)
       end
 
-      def initialize(endpoint:, collection:, timezone: nil)
+      # `attribute_columns` are the columns a workspace's own attributes became,
+      # which no row of the table can name: they are discovered at boot. They
+      # share one refusal, carried by the endpoint, and passing them here is
+      # what lets it be read instead of the generic message.
+      def initialize(endpoint:, collection:, timezone: nil, attribute_columns: [])
         @endpoint = endpoint
         @collection = collection
+        @attribute_columns = Array(attribute_columns).map(&:to_s)
         @value = FilterValue.new(collection: collection, timezone: timezone)
       end
 
@@ -133,7 +139,7 @@ module ForestAdminDatasourceIntercom
       def unfilterable_reason(column)
         return relation_reason(column) if column.include?(':')
 
-        refusal = @endpoint.refusal(column)
+        refusal = @endpoint.refusal(column) || attribute_refusal(column)
         return refusal.reason if refusal
 
         "#{@endpoint.path} takes no filter on it. Filter on one of: #{@endpoint.filterable_columns.join(", ")}."
@@ -149,6 +155,12 @@ module ForestAdminDatasourceIntercom
         "#{@endpoint.path} filters columns, not paths through a relation -- those are resolved against the " \
           'collection they point at before a condition reaches here. Filter on one of: ' \
           "#{@endpoint.filterable_columns.join(", ")}."
+      end
+
+      # A column the table cannot carry a row for, the workspace having named it:
+      # the endpoint's one refusal for the whole family answers for it.
+      def attribute_refusal(column)
+        @attribute_columns.include?(column) ? @endpoint.attribute_refusal : nil
       end
 
       def refuse_operator!(leaf, field)

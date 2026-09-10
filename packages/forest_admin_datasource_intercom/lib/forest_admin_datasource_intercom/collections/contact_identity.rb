@@ -49,6 +49,14 @@ module ForestAdminDatasourceIntercom
         contact.is_a?(Hash) ? stringify_id(contact['id']) : nil
       end
 
+      # The Contacts endpoint as the table spells it, rather than a path written
+      # a second time here: this is the same `/contacts/search` the Contacts
+      # collection reads itself through, and a table that renamed it would
+      # otherwise leave this one behind.
+      def contact_search_path
+        @contact_search_path ||= Query::SearchFields.fetch('contacts').path
+      end
+
       def embed_contact_identity(records, rows, projection)
         return unless any_column_asked?(projection, COLUMNS)
 
@@ -66,9 +74,9 @@ module ForestAdminDatasourceIntercom
         return {} if ids.empty?
 
         ids.each_slice(CONTACT_CHUNK).with_object({}) do |chunk, indexed|
-          page = client.search_page('contacts/search', per_page: chunk.size,
-                                                       query: { 'field' => 'id', 'operator' => 'IN',
-                                                                'value' => chunk })
+          page = client.search_page(contact_search_path, per_page: chunk.size,
+                                                         query: { 'field' => 'id', 'operator' => 'IN',
+                                                                  'value' => chunk })
           page.records.each { |contact| indexed[contact['id'].to_s] = contact }
         end
       rescue APIError => e

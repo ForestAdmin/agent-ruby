@@ -436,7 +436,35 @@ module ForestAdminDatasourceIntercom
         rows(%w[id], condition_tree: leaf('company_id', operators::EQUAL, 'co1'),
                      sort: sort({ field: 'name', ascending: true }))
 
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/sort on name/)
+        # Named for what it is: this collection *is* the one Intercom sorts, so
+        # the reason is the route, not the column.
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/sort on name while reading the contacts of an account/)
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/a route that takes no order, unlike the search/)
+      end
+
+      # An account Intercom no longer answers for -- deleted, or moved out of
+      # the token's reach between the moment the row was rendered and the
+      # moment its related list was opened -- reads as an account with no
+      # contact rather than as a failed page.
+      it 'reads an account Intercom no longer answers for as one with no contact' do
+        stub_request(:get, "#{base}/companies/gone/contacts").with(query: hash_including({}))
+                                                             .to_return(json({ 'type' => 'error.list' }, 404))
+
+        expect(rows(%w[id], condition_tree: leaf('company_id', operators::EQUAL, 'gone'))).to eq([])
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('company_id', operators::EQUAL, 'gone')),
+                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation
+                                      .new(operation: 'Count')))
+          .to eq([{ 'group' => {}, 'value' => 0 }])
+      end
+
+      it 'raises where Intercom refused the account for another reason' do
+        stub_request(:get, "#{base}/companies/co1/contacts").with(query: hash_including({}))
+                                                            .to_return(json({ 'type' => 'error.list' }, 500))
+
+        expect { rows(%w[id], condition_tree: leaf('company_id', operators::EQUAL, 'co1')) }
+          .to raise_error(APIError, /HTTP 500/)
       end
 
       # An `and` also carrying a scope names a narrower set than the account

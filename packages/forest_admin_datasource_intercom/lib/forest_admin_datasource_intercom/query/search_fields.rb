@@ -4,7 +4,7 @@ module ForestAdminDatasourceIntercom
     # filter, and hands it to the schema and to the translator as objects rather
     # than as nested hashes.
     #
-    # The table is data rather than code for one reason: `bin/probe_search_fields`
+    # The table is data rather than code for one reason: `forest_admin_intercom_probe`
     # rewrites it from a real workspace. Anything derived from it -- which
     # columns are filterable, with which Forest operators, and what an operator
     # is told about the ones that are not -- therefore follows a measurement
@@ -47,8 +47,8 @@ module ForestAdminDatasourceIntercom
         def measured? = source == 'measured'
       end
 
-      Endpoint = Struct.new(:name, :path, :measured_at, :fields, :refused, :candidates, :ticket_attributes,
-                            :custom_attributes, keyword_init: true) do
+      Endpoint = Struct.new(:name, :path, :measured_at, :fields, :refused, :candidates, :attribute_refusal,
+                            keyword_init: true) do
         # Whether the probe has run against a real workspace for this endpoint.
         # False means every `spec` row is still a candidate.
         def measured? = !measured_at.nil?
@@ -60,7 +60,10 @@ module ForestAdminDatasourceIntercom
         def unmeasured_fields = fields.values.reject(&:measured?)
       end
 
-      class << self
+      # Long by line count only: it is one parse method and one validation per
+      # thing the file can get wrong, and a validation that does not say what
+      # is wrong is one nobody can act on.
+      class << self # rubocop:disable Metrics/ClassLength
         def fetch(name)
           table[name.to_s] ||
             raise(ConfigurationError, "Unknown Intercom search endpoint #{name.inspect}; " \
@@ -94,9 +97,43 @@ module ForestAdminDatasourceIntercom
             fields: filterable,
             refused: refused,
             candidates: Array(definition['candidates']).freeze,
-            ticket_attributes: definition['ticket_attributes'],
-            custom_attributes: definition['custom_attributes']
+            attribute_refusal: attribute_refusal(name, definition)
           ).freeze
+        end
+
+        # The refusal that covers a whole family of columns rather than one:
+        # the attributes a workspace defines, whose names are unknown until the
+        # datasource boots and which therefore cannot have a row each. Spelled
+        # `ticket_attributes` on the endpoint that carries them per ticket type
+        # and `custom_attributes` on the ones that carry them per model, since
+        # that is the workspace's own vocabulary and what an operator goes and
+        # renames.
+        #
+        # Read by the translator, which is the point: without it a filter on
+        # such a column falls back on the generic "takes no filter on it",
+        # where this says why -- and the reason is the arbitration, not an
+        # oversight.
+        def attribute_refusal(endpoint, definition)
+          column = %w[ticket_attributes custom_attributes].find { |key| definition.key?(key) }
+          return nil if column.nil?
+
+          row = definition.fetch(column)
+          refusal = Refusal.new(column: column, reason: squish(row.fetch('reason')), source: row.fetch('source'))
+          validate_source!(endpoint, column, refusal)
+          validate_attributes_unfilterable!(endpoint, column, row)
+
+          refusal.freeze
+        end
+
+        # `filterable: true` is a state nothing here implements: the whole
+        # block is a refusal, and a rewrite flipping the flag would publish
+        # nothing new while making the file say the opposite of what it does.
+        def validate_attributes_unfilterable!(endpoint, column, row)
+          return if row.fetch('filterable') == false
+
+          malformed!(endpoint, column,
+                     "filterable #{row["filterable"].inspect} is not something this reads; the attribute columns " \
+                     'are published for display only, and the block exists to say why')
         end
 
         # A column filed as both filterable and refused. `Endpoint#field` is

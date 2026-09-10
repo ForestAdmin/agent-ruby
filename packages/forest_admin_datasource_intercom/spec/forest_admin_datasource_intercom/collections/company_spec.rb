@@ -360,6 +360,41 @@ module ForestAdminDatasourceIntercom
           .to eq([{ 'group' => {}, 'value' => 1 }])
       end
 
+      # Intercom answers this route with a 404 where a search endpoint would
+      # answer an empty list, and a filter matching nothing is the most
+      # ordinary thing a list view does: it reads as no record rather than as a
+      # failure the operator sees as "Unexpected error".
+      it 'answers a lookup naming no record with an empty page' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Nope' })
+                                               .to_return(json({ 'type' => 'error.list',
+                                                                 'errors' => [{ 'code' => 'company_not_found',
+                                                                                'message' => 'Company Not Found' }] },
+                                                               404))
+
+        expect(rows(%w[id], condition_tree: leaf('name', operators::EQUAL, 'Nope'))).to eq([])
+      end
+
+      it 'counts a lookup naming no record as none' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Nope' })
+                                               .to_return(json({ 'type' => 'error.list',
+                                                                 'errors' => [{ 'code' => 'company_not_found',
+                                                                                'message' => 'Company Not Found' }] },
+                                                               404))
+
+        expect(count(condition_tree: leaf('name', operators::EQUAL, 'Nope')))
+          .to eq([{ 'group' => {}, 'value' => 0 }])
+      end
+
+      # A 404 is the only status read as an absence: anything else is a failure
+      # this must not answer an empty page to.
+      it 'raises on a lookup Intercom refused for another reason' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Acme' })
+                                               .to_return(json({ 'type' => 'error.list' }, 500))
+
+        expect { rows(%w[id], condition_tree: leaf('name', operators::EQUAL, 'Acme')) }
+          .to raise_error(APIError, /HTTP 500/)
+      end
+
       it 'reports a lookup Intercom answered with more than one page' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Acme' })

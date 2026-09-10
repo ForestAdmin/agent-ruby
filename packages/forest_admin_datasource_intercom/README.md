@@ -267,19 +267,21 @@ the source of truth is a committed table — `lib/forest_admin_datasource_interc
 
 | `source` | What it means |
 | --- | --- |
-| `measured` | observed against a real workspace, by `bin/probe_search_fields` or during the spike |
+| `measured` | observed against a real workspace, by `forest_admin_intercom_probe` or during the spike |
 | `spec` | read off Intercom's documentation, and therefore still a candidate |
 
 Every `filter_operators` a column publishes is **derived** from that table, so a column cannot
 advertise a filter the translator would then refuse, and a column the table does not carry
 advertises nothing at all. That is the mechanism, and it holds whatever the rows say.
 
-**What the rows say today is mostly `spec`: 19 of 85 are measured, and no endpoint has been probed
+**What the rows say today is mostly `spec`: 18 of 89 are measured, and no endpoint has been probed
 end to end** — all three carry `measured_at: null`, which is what `Endpoint#measured?` reports. The
 measured rows are the ones a spike went out of its way to check: the date operators on each
-endpoint, which disagree between them, and `id IN` on `/contacts/search`. Everything else is
-Intercom's documentation, and the disagreement above is why that is a candidate rather than a
-promise.
+endpoint, which disagree between them, `id IN` on `/contacts/search`, `contact_ids` on
+`/conversations/search`, and the refusals a read confirmed — `company_id` on `/tickets/search`
+above all, alongside the columns the agent derives rather than reads. Everything else is Intercom's
+documentation, and the disagreement above is why that is a candidate rather than a promise. Those
+two figures are asserted against the file, so they cannot drift from it.
 
 So the first thing to do against a customer's workspace is to run the probe. The rows worth watching
 first, in the order they will hurt:
@@ -298,13 +300,13 @@ first, in the order they will hurt:
    and an ignored parameter costs a query string where the honoured one saves every filtered row
    from coming back as markup.
 
-To measure a workspace of your own. The probe is a repo tool, not part of the published gem — `bin/`
-is excluded from `spec.files` — so it runs from a clone of `agent-ruby`, in this package's
-directory:
+To measure a workspace of your own. The probe ships with the gem — it is what measures the
+customer's workspace, and whoever runs it there has the gem installed rather than a clone of
+`agent-ruby` — so `bundle install` puts it on the path of the application the datasource is
+mounted in:
 
 ```bash
-cd packages/forest_admin_datasource_intercom
-INTERCOM_ACCESS_TOKEN=... bin/probe_search_fields --endpoint tickets --out measured.yml
+INTERCOM_ACCESS_TOKEN=... bundle exec forest_admin_intercom_probe --endpoint tickets --out measured.yml
 ```
 
 It sends one search per (field, operator) cell, reads Intercom's refusal codes — `invalid_field` for
@@ -642,15 +644,22 @@ The body of a conversation is raw personal data, and this datasource is built on
 
 ## Boot-time introspection
 
-Constructing the datasource performs exactly **three** reads, and they are all of the same kind:
-`GET /ticket_types` for the attribute columns of `IntercomTicket`, and
+Constructing the datasource performs exactly **four** reads.
+
+Three are of one kind: `GET /ticket_types` for the attribute columns of `IntercomTicket`, and
 `GET /data_attributes?model=contact` and `?model=company` for those of `IntercomContact` and
 `IntercomCompany`. A payload carries the values of the attributes that record happens to have been
 given, never their definitions, which is why they cannot be discovered from the records.
 
-All three run on the boot connection — short timeouts, one quick retry — so a slow Intercom cannot
-turn a Rails boot into minutes the operator sits through, and each degrades to no attribute column
-rather than to a failed boot.
+The fourth is `GET /me`, and it reads no column: Intercom echoes in a response header the API
+version it served, and it serves the workspace's own default when the pin is not honoured — whose
+payloads are shaped differently from the ones this expects. That echo is the only place the
+substitution shows, so it is checked while the agent starts and reported as a warning.
+
+All four run on the boot connection — short timeouts, one quick retry — so a slow Intercom cannot
+turn a Rails boot into minutes the operator sits through, and each degrades to a warning rather
+than to a failed boot: a token missing a permission costs the columns it could not read, or the
+version check, never the agent.
 
 `api_writable` is read alongside each attribute and kept, although every column of this lot is
 published read-only: it is what tells an attribute the API may write from one Intercom fills in
@@ -668,7 +677,7 @@ Everything else is read when a collection is listed, so an agent boots whatever 
 | 6 | Bounded group-by and the reporting export |
 
 Two questions this lot leaves in the table rather than in an assumption, both for
-`bin/probe_search_fields` to answer against the customer's workspace: whether `/tickets/search`
+`forest_admin_intercom_probe` to answer against the customer's workspace: whether `/tickets/search`
 filters on `contact_ids`, and which operators `/contacts/search` answers on a custom attribute.
 
 ## Development
@@ -679,6 +688,10 @@ BUNDLE_GEMFILE=Gemfile-test bundle install
 BUNDLE_GEMFILE=Gemfile-test bundle exec rspec
 bundle exec rubocop # from the repository root
 ```
+
+`exe/forest_admin_intercom_probe` ships with the gem rather than living in the repository alone:
+what it measures is the customer's workspace, and whoever runs it there has the gem installed and
+not a clone of this repository. From a checkout it runs in place, `exe/forest_admin_intercom_probe`.
 
 Specs stub the HTTP layer with WebMock. Every payload they feed in is **hand-written from the
 OpenAPI 2.16 specification**, never captured from a workspace: a conversation body is personal data,

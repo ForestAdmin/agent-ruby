@@ -1,12 +1,31 @@
 require 'tmpdir'
 
-load File.expand_path('../bin/probe_search_fields', __dir__)
+load File.expand_path('../exe/forest_admin_intercom_probe', __dir__)
 
 module ForestAdminDatasourceIntercom
   RSpec.describe ProbeSearchFields do
     let(:base) { Configuration::REGION_HOSTS[:us] }
     let(:endpoint) { Query::SearchFields.fetch('tickets') }
     let(:client) { Client.new(Configuration.new(access_token: 's3cr3t', rate_limiter: nil)) }
+
+    # The gem installs this as `forest_admin_intercom_probe`, and RubyGems runs
+    # it through a stub that `load`s it -- so `$PROGRAM_NAME` is the stub and
+    # not this file. A guard comparing the two paths would ship a command that
+    # exits without doing anything.
+    describe '.invoked_as_command?' do
+      it 'runs behind the stub RubyGems installs' do
+        expect(described_class.invoked_as_command?('/usr/local/bin/forest_admin_intercom_probe')).to be(true)
+      end
+
+      it 'runs when the file is the command itself' do
+        expect(described_class.invoked_as_command?(File.expand_path('../exe/forest_admin_intercom_probe',
+                                                                    __dir__))).to be(true)
+      end
+
+      it 'stays out of the way of whatever else loads it' do
+        expect(described_class.invoked_as_command?('/usr/local/bin/rspec')).to be(false)
+      end
+    end
 
     def json(payload, status = 200)
       { status: status, body: payload.to_json, headers: { 'Content-Type' => 'application/json' } }

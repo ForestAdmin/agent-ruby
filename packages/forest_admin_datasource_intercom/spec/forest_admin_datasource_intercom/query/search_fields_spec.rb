@@ -1,10 +1,15 @@
 module ForestAdminDatasourceIntercom
   RSpec.describe Query::SearchFields do
-    def table(fields: {}, refused: {}, path: 'tickets/search', measured_at: nil, candidates: [])
-      described_class.build(
-        'endpoints' => { 'tickets' => { 'path' => path, 'measured_at' => measured_at, 'fields' => fields,
-                                        'refused' => refused, 'candidates' => candidates } }
-      )['tickets']
+    def table(fields: {}, refused: {}, measured_at: nil, attributes: nil)
+      definition = { 'path' => 'tickets/search', 'measured_at' => measured_at, 'fields' => fields,
+                     'refused' => refused, 'candidates' => [] }
+      definition['ticket_attributes'] = attributes if attributes
+
+      described_class.build('endpoints' => { 'tickets' => definition })['tickets']
+    end
+
+    def attributes_row(overrides = {})
+      { 'filterable' => false, 'reason' => 'display only', 'source' => 'spec' }.merge(overrides)
     end
 
     def field_row(overrides = {})
@@ -61,8 +66,26 @@ module ForestAdminDatasourceIntercom
                                    'last_responder_type')
       end
 
+      # The columns a workspace's own attributes become cannot have a row each
+      # -- their names are discovered at boot -- so the endpoint carries one
+      # refusal for the whole family, and the translator reads it in place of
+      # the message for a column nobody declared.
       it 'keeps the ticket attributes unfilterable while the arbitration stands' do
-        expect(described_class.fetch('tickets').ticket_attributes['filterable']).to be(false)
+        refusal = described_class.fetch('tickets').attribute_refusal
+
+        expect(refusal.reason).to include('differs from one ticket type to the next')
+        expect(refusal).to be_measured
+      end
+
+      it 'carries the same refusal for the custom attributes of a contact' do
+        expect(described_class.fetch('contacts').attribute_refusal.reason)
+          .to include('custom_attributes.{name}')
+      end
+
+      # `/conversations/search` has no attribute family of its own, and a nil
+      # here is what makes the translator fall back on the column message.
+      it 'carries none where the endpoint declares no attribute family' do
+        expect(described_class.fetch('conversations').attribute_refusal).to be_nil
       end
 
       # Until the probe runs against the customer's workspace, the date rows are
@@ -93,6 +116,36 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The table is checked in one direction by the schema itself: a column
+    # publishes exactly the operators its row allows, so it cannot advertise a
+    # filter the translator would refuse. This is the other direction, and it
+    # is what the refusal reasons are worth: a column the table says nothing
+    # about falls back on the generic "takes no filter on it", which is the one
+    # refusal an operator cannot act on -- and a row whose column was dropped
+    # survives its own collection, which is how `state_external_label` outlived
+    # the schema by two lots.
+    #
+    # The datasource boots here with no workspace attribute, those columns
+    # being named by the workspace rather than by the table; they are covered
+    # by `attribute_refusal` instead.
+    describe 'the columns of the collections it answers for' do
+      let(:datasource) { Datasource.new(access_token: 's3cr3t', rate_limiter: nil) }
+
+      { 'IntercomConversation' => 'conversations', 'IntercomTicket' => 'tickets',
+        'IntercomContact' => 'contacts' }.each do |collection_name, endpoint_name|
+        it "names every column of #{collection_name}, as filterable or as refused" do
+          endpoint = described_class.fetch(endpoint_name)
+          columns = datasource.get_collection(collection_name).fields
+                              .select { |_, field| field.is_a?(ForestAdminDatasourceToolkit::Schema::ColumnSchema) }
+                              .keys
+          named = endpoint.filterable_columns + endpoint.refused.keys
+
+          expect(columns - named).to be_empty
+          expect(named - columns).to be_empty
+        end
+      end
+    end
+
     # The README is where an operator reads what they may filter on before the
     # interface shows it to them, so it is checked against the table rather than
     # left to drift from it.
@@ -111,6 +164,20 @@ module ForestAdminDatasourceIntercom
 
           expect(listed).to match_array(described_class.fetch(endpoint).filterable_columns)
         end
+      end
+
+      # How much of the table a measurement backs is the first thing the README
+      # says about it, and a figure typed by hand is a figure that drifts the
+      # next time a row moves.
+      it 'counts the measured rows the way the file does' do
+        rows = described_class.endpoints.flat_map do |name|
+          endpoint = described_class.fetch(name)
+
+          endpoint.fields.values + endpoint.refused.values
+        end
+        readme = File.read(File.expand_path('../../../README.md', __dir__), encoding: 'UTF-8')
+
+        expect(readme).to include("#{rows.count(&:measured?)} of #{rows.size} are measured")
       end
     end
 
@@ -166,6 +233,19 @@ module ForestAdminDatasourceIntercom
           table(fields: { 'created_at' => field_row },
                 refused: { 'created_at' => { 'reason' => 'no', 'source' => 'spec' } })
         end.to raise_error(ConfigurationError, /filterable and refused at once/)
+      end
+
+      # The block is a refusal from end to end, so a rewrite flipping the flag
+      # would leave the file saying the opposite of what the package does with
+      # it -- publish nothing.
+      it 'refuses an attribute family declared filterable' do
+        expect { table(attributes: attributes_row('filterable' => true)) }
+          .to raise_error(ConfigurationError, /tickets.ticket_attributes: filterable true is not something/)
+      end
+
+      it 'refuses an attribute family with no provenance of its own' do
+        expect { table(attributes: attributes_row('source' => 'hearsay')) }
+          .to raise_error(ConfigurationError, /tickets.ticket_attributes: source "hearsay"/)
       end
 
       it 'names the endpoint and the column it choked on' do
