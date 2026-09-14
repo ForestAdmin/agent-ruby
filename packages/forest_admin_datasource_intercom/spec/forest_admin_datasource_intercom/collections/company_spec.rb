@@ -49,12 +49,17 @@ module ForestAdminDatasourceIntercom
         'remote_created_at' => 1_394_531_169, 'custom_attributes' => {} }.merge(overrides)
     end
 
+    # `pages.next` is what the real endpoint sends on every page but the last,
+    # and it points at a page number rather than at a cursor -- the shape the
+    # collection has to read for a list view to open at all.
     def stub_page(*companies, page: 1, per_page: 15, total_pages: 1, total: nil)
+      pages = { 'type' => 'pages', 'page' => page, 'per_page' => per_page, 'total_pages' => total_pages }
+      pages['next'] = "#{base}/companies?per_page=#{per_page}&page=#{page + 1}" if page < total_pages
+
       stub_request(:post, "#{base}/companies/list")
         .with(query: { 'page' => page.to_s, 'per_page' => per_page.to_s })
         .to_return(json('type' => 'list', 'data' => companies, 'total_count' => total || companies.size,
-                        'pages' => { 'type' => 'pages', 'page' => page, 'per_page' => per_page,
-                                     'total_pages' => total_pages }))
+                        'pages' => pages))
     end
 
     def rows(projection = %w[id], **options)
@@ -169,6 +174,19 @@ module ForestAdminDatasourceIntercom
         expect(rows(%w[id], page: page(0, 15)).size).to eq(1)
         expect(WebMock).not_to have_requested(:post, "#{base}/companies/list")
           .with(query: { 'page' => '2', 'per_page' => '15' })
+      end
+
+      # The same advertisement, spelled as an object rather than as a url. Both
+      # name a page and neither carries a cursor, and a list view opens on both.
+      it 'reads a page whose next is advertised as an object' do
+        stub_request(:post, "#{base}/companies/list")
+          .with(query: { 'page' => '1', 'per_page' => '2' })
+          .to_return(json('type' => 'list', 'data' => [company('a'), company('b')], 'total_count' => 4,
+                          'pages' => { 'type' => 'pages', 'page' => 1, 'per_page' => 2, 'total_pages' => 2,
+                                       'next' => { 'page' => 2 } }))
+        stub_page(company('c'), company('d'), page: 2, per_page: 2, total_pages: 2)
+
+        expect(rows(%w[id], page: page(1, 2)).map { |row| row['id'] }).to eq(%w[b c])
       end
 
       it 'stops on a page Intercom answers empty' do

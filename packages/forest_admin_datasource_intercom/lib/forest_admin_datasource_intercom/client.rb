@@ -89,7 +89,7 @@ module ForestAdminDatasourceIntercom
       query = params.merge('page' => [page.to_i, 1].max,
                            'per_page' => self.class.bounded_per_page(per_page))
 
-      must_succeed(path) { to_page(post(path, {}, params: query).body, path, list_key) }
+      must_succeed(path) { to_offset_page(post(path, {}, params: query).body, path, list_key) }
     end
 
     # An exact lookup, and the shape surprise that comes with it: `GET
@@ -249,6 +249,17 @@ module ForestAdminDatasourceIntercom
     def to_page(body, operation, list_key)
       Page.new(records: extract_entities(body, operation, list_key),
                next_cursor: next_cursor(body, operation),
+               total_count: extract_count(body),
+               total_pages: extract_total_pages(body))
+    end
+
+    # The offset tier addresses the page after this one by number, and Intercom
+    # advertises it the same way -- `pages.next` there is a page, not a cursor.
+    # Reading it as one is what made the Companies list refuse a perfectly
+    # ordinary answer, so this page is built without it.
+    def to_offset_page(body, operation, list_key)
+      Page.new(records: extract_entities(body, operation, list_key),
+               next_cursor: nil,
                total_count: extract_count(body),
                total_pages: extract_total_pages(body))
     end
