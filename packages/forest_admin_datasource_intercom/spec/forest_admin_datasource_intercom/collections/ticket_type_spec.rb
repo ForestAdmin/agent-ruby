@@ -2,7 +2,12 @@ module ForestAdminDatasourceIntercom
   RSpec.describe Collections::TicketType do
     subject(:collection) { described_class.new(datasource) }
 
-    let(:datasource) { Datasource.new(access_token: 's3cr3t', rate_limiter: nil) }
+    # The reference store is off here, and only here: `/ticket_types` is the one
+    # reference endpoint the boot also reads -- for the ticket attributes -- so
+    # the suite's boot stub would be the answer these examples get, rather than
+    # the payload each of them installs. What the store does is covered by
+    # `Cache` and by the client, on an endpoint nothing reads at boot.
+    let(:datasource) { Datasource.new(access_token: 's3cr3t', rate_limiter: nil, reference_cache_ttl: 0) }
     let(:base) { datasource.configuration.url }
 
     def filter

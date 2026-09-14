@@ -30,6 +30,40 @@ module ForestAdminDatasourceIntercom
 
     def initialize(configuration)
       @configuration = configuration
+      # Named per instance rather than per class: two datasources are two
+      # workspaces, and a scope shared between them would hand one the other's
+      # answer. A handful of clients live in a process, so a symbol each costs
+      # nothing.
+      @scope_key = :"forest_admin_datasource_intercom_read_scope_#{object_id}"
+    end
+
+    # Deduplicates the reads issued while **one page is being built**, and not
+    # one instant longer.
+    #
+    # A page of tickets asks Intercom for the same contacts twice: once for the
+    # `contact_name` column, once for the `contact` relation, with the same ids
+    # in the same order. The two callers are far apart -- an enrichment and a
+    # relation embed -- and neither can see the other, so the deduplication
+    # happens where both requests pass.
+    #
+    # Scoped to the call rather than timed like `Cache`, because what travels
+    # through here is the customer's own records: reading a contact twice while
+    # rendering one page is waste, and reading it from a store on the next page
+    # would show an operator a row they have just edited in its previous state.
+    #
+    # Per thread, so two requests served concurrently never share a scope.
+    # Re-entrant: a nested read joins the scope already open instead of opening
+    # a second one -- a related list resolves relations of its own, and the
+    # innermost `ensure` would otherwise close the outer scope halfway through.
+    def with_read_scope
+      return yield unless Thread.current[@scope_key].nil?
+
+      Thread.current[@scope_key] = {}
+      begin
+        yield
+      ensure
+        Thread.current[@scope_key] = nil
+      end
     end
 
     # Health check: the admin the token belongs to, plus its workspace. Enough
@@ -78,7 +112,9 @@ module ForestAdminDatasourceIntercom
       body = { 'query' => query, 'pagination' => pagination }
       body['sort'] = sort_clause(sort) if sort
 
-      must_succeed(path) { to_page(post(path, body, params: params).body, path, list_key) }
+      within_read_scope(['search', path, body, params, list_key]) do
+        must_succeed(path) { to_page(post(path, body, params: params).body, path, list_key) }
+      end
     end
 
     # One page of an endpoint that paginates by **offset** rather than by
@@ -111,9 +147,11 @@ module ForestAdminDatasourceIntercom
     def fetch_record(path, id, params: {}, boot: false)
       operation = "#{path}/#{id}"
 
-      must_succeed(operation) do
-        body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
-        body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
+      within_read_scope(['record', path, id, params]) do
+        must_succeed(operation) do
+          body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
+          body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
+        end
       end
     end
 
@@ -133,8 +171,26 @@ module ForestAdminDatasourceIntercom
     # `params` is what narrows the endpoint rather than what pages it:
     # `/data_attributes` answers the attributes of contacts and those of
     # companies under `?model=`, and both are read whole.
+    #
+    # Held for the configured window rather than re-read on every page: these
+    # are the workspace's own lists, every relation of this datasource resolves
+    # through one of them, and a ticket list projecting four relations spends
+    # four sequential round trips here. See `Cache` for what the window trades,
+    # and `Configuration#reference_cache_ttl` for how to close it.
+    #
+    # `boot` is not part of the key: it selects the connection a read travels
+    # on -- shorter timeouts while the agent starts -- not what comes back. The
+    # ticket types read at boot are the ticket types a list view reads.
+    #
+    # Frozen on the way in. Every caller maps or indexes what it gets, so
+    # nothing needs to mutate the array, and a caller that started to would
+    # otherwise be editing what the next page reads.
     def fetch_all(path, list_key: 'data', params: {}, boot: false)
-      must_succeed(path) { collect_pages(path, list_key: list_key, params: params, boot: boot) }
+      @configuration.reference_cache.fetch(['fetch_all', path, list_key, params]) do
+        must_succeed(path) do
+          collect_pages(path, list_key: list_key, params: params, boot: boot).freeze
+        end
+      end
     end
 
     # The page size Intercom accepts, whatever was asked for.
@@ -152,6 +208,20 @@ module ForestAdminDatasourceIntercom
     end
 
     private
+
+    # The answer already given for `key` while this page was being built, or the
+    # block's. Outside a scope -- a smart action, a boot read -- the block runs
+    # as it always did: nothing is remembered where nothing opened a scope.
+    #
+    # A block that raises writes nothing, so a failed read is not replayed to
+    # the rest of the page as an answer.
+    def within_read_scope(key)
+      scope = Thread.current[@scope_key]
+      return yield if scope.nil?
+      return scope[key] if scope.key?(key)
+
+      scope[key] = yield
+    end
 
     # The raw response rather than its body: the quota headers are read by the
     # throttle, and the version echo by `verify_pinned_version`.
@@ -414,6 +484,52 @@ module ForestAdminDatasourceIntercom
       body
     end
 
+    # Which adapter every connection of this client is built on, resolved once.
+    #
+    # A ticket list is seven requests to one host, and Faraday's default adapter
+    # opens a socket and negotiates TLS for each of them -- handshakes that cost
+    # more than several of the requests they carry. The persistent adapter pools
+    # the connection instead, which is why it is the default here and a runtime
+    # dependency of the gem.
+    #
+    # Resolved rather than assumed: a deployment that excluded the gem falls
+    # back to Faraday's default and says so once, instead of failing to boot
+    # over an optimisation. `Configuration#adapter` overrides both -- a name, or
+    # a `[name, options]` pair.
+    def adapter
+      @adapter ||= begin
+        name, options = Array(@configuration.adapter || Configuration::DEFAULT_ADAPTER)
+        # The options travel with the name they were written for: a `pool_size`
+        # meant for the persistent adapter says nothing to the one it fell back
+        # to.
+        adapter_registered?(name) ? [name, options || {}] : [fallback_adapter(name), {}]
+      end
+    end
+
+    # Registered by Faraday, which is what `f.adapter` looks the name up in --
+    # and `lookup_middleware` raises rather than answering nil when it is not.
+    # The persistent adapter registers itself when its gem is required, and that
+    # require is here rather than at the top of the file so an absent gem is a
+    # fallback rather than a LoadError on the first `require` of this package.
+    def adapter_registered?(name)
+      require 'faraday/net_http_persistent' if name == :net_http_persistent
+
+      !Faraday::Adapter.lookup_middleware(name).nil?
+    rescue LoadError, Faraday::Error
+      false
+    end
+
+    def fallback_adapter(name)
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] the #{name.inspect} Faraday adapter is not available; falling back " \
+        "to #{Faraday.default_adapter.inspect}. Every request then opens its own connection and negotiates TLS " \
+        'again, which a page resolving several relations pays for once per request. Add the ' \
+        'faraday-net_http_persistent gem, or set an adapter this process can load.'
+      )
+
+      Faraday.default_adapter
+    end
+
     def connection
       @connection ||= build_connection(
         retry_policy: @configuration.retry_policy,
@@ -448,12 +564,15 @@ module ForestAdminDatasourceIntercom
     # the same on every connection this builds, the limiter included -- a second
     # limiter would meter in a window of its own and spend the budget twice.
     def build_connection(retry_policy:, timeout:, open_timeout:)
+      name, options = adapter
+
       Faraday.new(url: @configuration.url) do |f|
         f.request :json
         f.response :raise_error
         f.response :json
         f.request :retry, **retry_policy.to_faraday_options
         f.use Throttle, limiter: @configuration.rate_limiter if @configuration.rate_limiter
+        f.adapter(name, **options)
         f.headers['Authorization'] = "Bearer #{@configuration.access_token}"
         f.headers['Accept'] = 'application/json'
         f.headers['Intercom-Version'] = @configuration.api_version

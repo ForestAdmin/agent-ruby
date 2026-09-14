@@ -41,17 +41,23 @@ module ForestAdminDatasourceIntercom
       def ids_per_read = max_id_reads
       def max_resolvable_ids = max_id_reads
 
+      # The read scope spans the whole page rather than any one step of it: the
+      # enrichment and the relation embed below ask Intercom for the same
+      # contacts, from two places that cannot see each other. See
+      # `Client#with_read_scope`.
       def list(caller, filter, projection)
-        records = fetch_records(caller, filter, server_sort(filter))
-        # Serialized whole and projected afterwards rather than the other way
-        # round: a projection reaching through a relation names no foreign key,
-        # and the key is where the relation is read from.
-        serialized = records.map { |record| serialize(record) }
-        rows = serialized.map { |record| project(record, projection) }
+        client.with_read_scope do
+          records = fetch_records(caller, filter, server_sort(filter))
+          # Serialized whole and projected afterwards rather than the other way
+          # round: a projection reaching through a relation names no foreign
+          # key, and the key is where the relation is read from.
+          serialized = records.map { |record| serialize(record) }
+          rows = serialized.map { |record| project(record, projection) }
 
-        enrich(records, rows, projection)
-        embed_relations(caller, serialized, rows, projection)
-        rows
+          enrich(records, rows, projection)
+          embed_relations(caller, serialized, rows, projection)
+          rows
+        end
       end
 
       # Count only, and never a group: Intercom exposes no aggregate endpoint,

@@ -56,13 +56,15 @@ module ForestAdminDatasourceIntercom
       end
 
       def list(caller, filter, projection)
-        records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
-        window = page_window(records, filter)
-        rows = window.map { |record| project(record, projection) }
+        client.with_read_scope do
+          records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
+          window = page_window(records, filter)
+          rows = window.map { |record| project(record, projection) }
 
-        enrich(window, rows, projection)
-        embed_relations(caller, window, rows, projection)
-        rows
+          enrich(window, rows, projection)
+          embed_relations(caller, window, rows, projection)
+          rows
+        end
       end
 
       # Exact, like the filter and the sort above it, which is why these columns

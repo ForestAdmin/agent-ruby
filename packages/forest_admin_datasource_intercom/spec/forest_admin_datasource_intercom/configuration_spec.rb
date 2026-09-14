@@ -112,6 +112,47 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    describe 'the reference store' do
+      it 'holds the workspace lists for a minute by default' do
+        expect(configuration.reference_cache_ttl).to eq(60)
+        expect(configuration.reference_cache).to be_enabled
+      end
+
+      # A deployment that would rather pay the request than hold a list.
+      it 'is off at a ttl of zero' do
+        configured = described_class.new(access_token: 's3cr3t', reference_cache_ttl: 0)
+
+        expect(configured.reference_cache).not_to be_enabled
+      end
+
+      # One store per token, like the rate limiter: what it holds is one
+      # workspace's own lists.
+      it 'is one store, handed to every read of this configuration' do
+        store = configuration.reference_cache
+
+        expect(configuration.reference_cache).to be(store)
+      end
+
+      it 'refuses a window that runs backwards' do
+        expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: -1) }
+          .to raise_error(ConfigurationError, /reference_cache_ttl must be zero or more/)
+      end
+    end
+
+    describe 'the adapter' do
+      # Seven requests to one host is seven TLS handshakes without keep-alive.
+      it 'defaults to none, the client resolving the persistent one' do
+        expect(configuration.adapter).to be_nil
+        expect(described_class::DEFAULT_ADAPTER.first).to eq(:net_http_persistent)
+      end
+
+      it 'takes the one it was given' do
+        configured = described_class.new(access_token: 's3cr3t', adapter: :net_http)
+
+        expect(configured.adapter).to eq(:net_http)
+      end
+    end
+
     describe '#inspect' do
       it 'never prints the bearer token' do
         expect(configuration.inspect).to include('[FILTERED]')
