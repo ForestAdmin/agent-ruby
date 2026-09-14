@@ -84,10 +84,11 @@ module ForestAdminAgent
       end
 
       # Rack hands header values back as raw bytes. A column named after a workspace's own free
-      # text -- `Ce que j'ai verifie` -- reaches us either as UTF-8 or, from a browser (which
+      # text -- `Ce que j'ai vérifié` -- reaches us either as UTF-8 or, from a browser (which
       # sends a header value as one byte per code unit), as Latin-1. Left tagged BINARY it
       # matches no schema key, and interpolating it into the not-found message raises
-      # Encoding::CompatibilityError before that 400 is ever built.
+      # Encoding::CompatibilityError before that 400 is ever built. The fallback cannot raise
+      # in turn: ISO-8859-1 defines all 256 bytes, and each maps to a character UTF-8 can hold.
       def self.decode_header_value(value)
         return if value.nil?
 
