@@ -421,6 +421,39 @@ module ForestAdminAgent
             )
           end
 
+          it 'reads a field name sent as raw UTF-8 bytes' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+"title,Ce que j'ai vérifié").force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'reads a field name sent as Latin-1 bytes, as a browser encodes a header value' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = "title,Ce que j'ai vérifié".encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'raise a dedicated error when an unknown field and an existing one both hold accents' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+'champ inconnu à moi').force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*champ inconnu à moi/
+            )
+          end
+
           it 'raise a dedicated error when the header contains an unknown field' do
             args = { headers: { 'HTTP_FOREST_PROJECTION' => 'field-that-do-not-exist' }, params: {} }
 
