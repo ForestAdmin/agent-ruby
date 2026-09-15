@@ -35,6 +35,10 @@ module ForestAdminDatasourceIntercom
       @now = now || -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
       @mutex = Mutex.new
       @entries = {}
+      # Bumped by `clear`, and carried by every read that is about to fetch, so
+      # a response already in flight when the store was dropped cannot land in
+      # it afterwards. See `fetch`.
+      @generation = 0
     end
 
     def enabled? = @ttl.positive?
@@ -50,14 +54,22 @@ module ForestAdminDatasourceIntercom
     #
     # A block that raises writes nothing: a failure is not an answer, and
     # caching one would keep an outage alive for the length of the window.
+    #
+    # The generation is read before the block rather than after, which is what
+    # makes `clear` mean something: a read that started earlier answers what
+    # Intercom held earlier, and writing it once the store has been dropped
+    # would hold that answer for a further window -- defeating the one call
+    # `clear` exists for, a customizer that has just written to the workspace
+    # and wants the next page to show it.
     def fetch(key)
       return yield unless enabled?
 
       hit = read(key)
       return hit.value if hit
 
+      generation = @mutex.synchronize { @generation }
       value = yield
-      write(key, value)
+      write(key, value, generation)
       value
     end
 
@@ -68,7 +80,10 @@ module ForestAdminDatasourceIntercom
     # team or a ticket type into the workspace and wants the next page to show
     # it. Documented in the README beside the ttl.
     def clear
-      @mutex.synchronize { @entries.clear }
+      @mutex.synchronize do
+        @entries.clear
+        @generation += 1
+      end
     end
 
     private
@@ -90,10 +105,15 @@ module ForestAdminDatasourceIntercom
     # Expired entries are dropped on the way past rather than by a sweeper: the
     # keys are a handful of endpoints, so the walk is short and there is no
     # thread to own.
-    def write(key, value)
+    #
+    # A write from before a `clear` is dropped rather than stored: the store it
+    # was going to land in no longer exists.
+    def write(key, value, generation)
       now = @now.call
 
       @mutex.synchronize do
+        next if generation != @generation
+
         @entries.delete_if { |_, entry| entry.expires_at <= now }
         @entries[key] = Entry.new(value, now + @ttl)
       end

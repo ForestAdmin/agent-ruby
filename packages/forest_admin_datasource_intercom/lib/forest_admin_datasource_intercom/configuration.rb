@@ -47,9 +47,26 @@ module ForestAdminDatasourceIntercom
     # Resolved rather than hardcoded, so a deployment that cannot load the
     # persistent adapter -- or would rather not pool -- falls back to Faraday's
     # default instead of failing to boot. `adapter: :net_http` opts out
-    # explicitly; `adapter: [:net_http_persistent, { pool_size: 25 }]` sizes the
-    # pool for a wider thread pool than the default.
-    DEFAULT_ADAPTER = [:net_http_persistent, { pool_size: 10 }].freeze
+    # explicitly; `adapter: [:net_http_persistent, { pool_size: 50 }]` sizes the
+    # pool for a wider thread pool than this.
+    #
+    # **The pool is read against the server's thread count, not against this
+    # datasource.** net-http-persistent hands out one connection per checkout
+    # and queues the rest; a thread that waits more than half a second for one
+    # gets a `ConnectionPool::TimeoutError`, which reaches the caller as a
+    # Faraday timeout accusing Intercom of being slow. That wait is not
+    # configurable through the adapter, and the POST the searches travel on is
+    # not a verb the retry policy replays -- so a pool narrower than the threads
+    # that can reach it costs an operator their page.
+    #
+    # 25 is therefore set above the thread counts a Rails agent is deployed
+    # with -- Puma's default is 5, and a pool this size still covers a worker
+    # configured well past it -- rather than at the concurrency this datasource
+    # expects. The gem's own default is the open-file limit over four, which
+    # bounds nothing; what the figure here buys is a ceiling on the sockets one
+    # process holds against Intercom, and it is only worth having while it stays
+    # clear of the queueing above.
+    DEFAULT_ADAPTER = [:net_http_persistent, { pool_size: 25 }].freeze
 
     attr_reader :access_token, :region, :base_url, :api_version, :open_timeout, :timeout,
                 :retry_policy, :rate_limiter, :boot_open_timeout, :boot_timeout, :boot_retry_policy,

@@ -47,7 +47,7 @@ that verifies the pinned API version was honoured.
 | `boot_retry_policy` | `RetryPolicy.boot` | One quick retry; gives up rather than waiting a 429 out. |
 | `rate_limiter` | `RateLimiter.new` | `nil` takes the pacing out of the stack. |
 | `reference_cache_ttl` | `60` | Seconds the workspace's reference lists are held for. `0` re-reads them every time. |
-| `adapter` | persistent | The Faraday adapter. `:net_http` opts out of keep-alive; `[name, options]` sizes a pool. |
+| `adapter` | persistent, 25 connections | The Faraday adapter. `:net_http` opts out of keep-alive; `[name, options]` sizes the pool, which is read against the server's thread count. |
 
 **Pin the region explicitly.** `api.intercom.io` does route to the right one, but a workspace under
 GDPR wants its requests reaching the European host and nothing else.
@@ -639,6 +639,20 @@ no longer.
 default adapter, and they cost more than some of the requests they carry, so the client builds on
 the persistent adapter. A deployment that cannot load it falls back with a warning rather than
 failing to boot.
+
+The pool holds 25 connections, and that figure is read against **the web server's thread count**
+rather than against this datasource. A thread that finds the pool full waits half a second for a
+connection and then fails — and it fails as a Faraday timeout, which reads as Intercom being slow
+rather than as the pool being narrow. The searches a list view is built on travel over POST, which
+the retry policy does not replay, so that failure costs an operator their page. Size the pool above
+the threads that can reach it if the server runs wide:
+
+```ruby
+ForestAdminDatasourceIntercom::Datasource.new(
+  access_token: ENV.fetch('INTERCOM_ACCESS_TOKEN'),
+  adapter: [:net_http_persistent, { pool_size: 50 }]
+)
+```
 
 Measured on a page of 15 tickets projecting five relations
 ([`ticket_list_budget_spec.rb`](spec/forest_admin_datasource_intercom/collections/ticket_list_budget_spec.rb)):

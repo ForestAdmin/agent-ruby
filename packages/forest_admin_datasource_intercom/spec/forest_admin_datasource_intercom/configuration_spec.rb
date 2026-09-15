@@ -164,6 +164,16 @@ module ForestAdminDatasourceIntercom
         expect(described_class::DEFAULT_ADAPTER.first).to eq(:net_http_persistent)
       end
 
+      # A pool narrower than the threads that can reach it queues them for half
+      # a second and then fails the request -- as a Faraday timeout, over a POST
+      # the retry policy does not replay, so an operator loses their page and
+      # the message accuses Intercom. The figure is only worth having while it
+      # stays clear of the thread counts a Rails agent is deployed with; a
+      # change lowering it is a change that makes that failure reachable.
+      it 'pools well above the threads a web server can point at it' do
+        expect(described_class::DEFAULT_ADAPTER.last[:pool_size]).to be >= 25
+      end
+
       it 'takes the one it was given' do
         configured = described_class.new(access_token: 's3cr3t', adapter: :net_http)
 

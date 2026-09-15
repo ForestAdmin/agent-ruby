@@ -58,6 +58,30 @@ module ForestAdminDatasourceIntercom
       expect(cache.fetch('key') { 'second' }).to eq('second')
     end
 
+    # The block runs outside the mutex, so a read can still be in flight when
+    # the store is dropped -- which is what calling `clear` from inside one
+    # stands for here. Its answer is what Intercom held *before* the write the
+    # `clear` was called for, and storing it would hold that stale answer for a
+    # further window: exactly what `clear` exists to prevent.
+    it 'drops the write of a read that started before clear' do
+      cache.fetch('key') do
+        cache.clear
+        'read before the clear'
+      end
+
+      expect(cache.fetch('key') { 'read after it' }).to eq('read after it')
+    end
+
+    # And the store is usable again afterwards: the generation guard refuses the
+    # writes that predate the clear, not every write that follows it.
+    it 'holds what is read after a clear' do
+      cache.fetch('key') { 'first' }
+      cache.clear
+      cache.fetch('key') { 'second' }
+
+      expect(cache.fetch('key') { 'third' }).to eq('second')
+    end
+
     # Expired entries are dropped on the way past rather than by a sweeper, so
     # a store written to for hours does not grow by one entry per window.
     it 'drops expired entries as it writes' do
