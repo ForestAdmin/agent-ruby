@@ -37,6 +37,11 @@ module ForestAdminDatasourceIntercom
       # may name. Both are far above what a page asks for; they keep a scope or
       # a customizer naming thousands of ids from turning one list view into a
       # rate limit.
+      #
+      # `ContactIdentity::CONTACT_CHUNK` is this figure: the enrichment reading
+      # the `contact_name` column and the relation reading the contact have to
+      # chunk the same way, or the two requests are two bodies and the page pays
+      # for both.
       IDS_PER_READ = 100
       MAX_IDS_READ = 300
 

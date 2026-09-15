@@ -58,12 +58,14 @@ module ForestAdminDatasourceIntercom
       def list(caller, filter, projection)
         warn_ignored_sort(filter&.sort)
 
-        records = fetch_records(filter)
-        serialized = records.map { |record| serialize(record) }
-        rows = serialized.map { |record| project(record, projection) }
+        client.with_read_scope do
+          records = fetch_records(filter)
+          serialized = records.map { |record| serialize(record) }
+          rows = serialized.map { |record| project(record, projection) }
 
-        embed_relations(caller, serialized, rows, projection)
-        rows
+          embed_relations(caller, serialized, rows, projection)
+          rows
+        end
       end
 
       # Count only, and never a group: `total_count` is exact on every listing,

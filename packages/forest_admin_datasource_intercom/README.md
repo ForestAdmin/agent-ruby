@@ -46,6 +46,8 @@ that verifies the pinned API version was honoured.
 | `retry_policy` | `RetryPolicy.new` | Statuses, verbs and backoff. |
 | `boot_retry_policy` | `RetryPolicy.boot` | One quick retry; gives up rather than waiting a 429 out. |
 | `rate_limiter` | `RateLimiter.new` | `nil` takes the pacing out of the stack. |
+| `reference_cache_ttl` | `60` | Seconds the workspace's reference lists are held for. `0` re-reads them every time. |
+| `adapter` | persistent, 25 connections | The Faraday adapter. `:net_http` opts out of keep-alive; `[name, options]` sizes the pool, which is read against the server's thread count. |
 
 **Pin the region explicitly.** `api.intercom.io` does route to the right one, but a workspace under
 GDPR wants its requests reaching the European host and nothing else.
@@ -610,6 +612,61 @@ thousand rows at a time, or a segment resolved whole — has to leave the column
 
 Custom attributes are introspected at boot the same way, from `GET /data_attributes?model=company`,
 and published display-only for the same reason.
+
+## What a page costs, and what is held
+
+A list view is a handful of requests rather than one: Intercom joins nothing, so every relation on
+the page is a read of its own, and they are issued one after another. Two things keep that from
+being paid twice.
+
+**The workspace's reference lists are held for `reference_cache_ttl`** — the teammates, the teams,
+the ticket types and the ticket states, the tier read whole. They are what four of a ticket's five
+relations resolve through, and they change a few times a year; without a window, every page, every
+count and every filter traversing one of them re-reads all four. What the window trades is bounded
+staleness: a teammate added mid-session appears within the minute rather than on the next request.
+Set `reference_cache_ttl: 0` to pay the requests instead, or drop what is held without waiting the
+window out — a customizer that has just written to the workspace can call
+`datasource.configuration.reference_cache.clear`.
+
+**Records are never held.** What the search and listing endpoints answer is the customer's data, and
+serving a page of it from a store would show an operator a row they have just edited in its previous
+state. The one deduplication that applies to records is scoped to a single page being built: a
+ticket list asks for the same contacts twice — once for the `contact_name` column, once for the
+`contact` relation — and the second read is answered by the first, for the length of that call and
+no longer.
+
+**Connections are reused.** Several requests to one host means several TLS handshakes on Faraday's
+default adapter, and they cost more than some of the requests they carry, so the client builds on
+the persistent adapter. A deployment that cannot load it falls back with a warning rather than
+failing to boot.
+
+The pool holds 25 connections, and that figure is read against **the web server's thread count**
+rather than against this datasource. A thread that finds the pool full waits half a second for a
+connection and then fails — and it fails as a Faraday timeout, which reads as Intercom being slow
+rather than as the pool being narrow. The searches a list view is built on travel over POST, which
+the retry policy does not replay, so that failure costs an operator their page. Size the pool above
+the threads that can reach it if the server runs wide:
+
+```ruby
+ForestAdminDatasourceIntercom::Datasource.new(
+  access_token: ENV.fetch('INTERCOM_ACCESS_TOKEN'),
+  adapter: [:net_http_persistent, { pool_size: 50 }]
+)
+```
+
+Measured on a page of 15 tickets projecting five relations
+([`ticket_list_budget_spec.rb`](spec/forest_admin_datasource_intercom/collections/ticket_list_budget_spec.rb)):
+
+| | Requests |
+| --- | --- |
+| Before | 7 |
+| First page after boot | 5 |
+| Every page after it, within the window | 2 |
+
+What none of this touches is the search response itself. Intercom offers no field selection, so a
+page of tickets carries every ticket's whole timeline whatever the projection says — which is why
+[`MAX_TICKETS_PER_PAGE`](lib/forest_admin_datasource_intercom/collections/ticket.rb) is 25, and why
+asking for 50 or 100 rows a page, or for page 5, costs that response two, four or three times over.
 
 ## Rate limits
 

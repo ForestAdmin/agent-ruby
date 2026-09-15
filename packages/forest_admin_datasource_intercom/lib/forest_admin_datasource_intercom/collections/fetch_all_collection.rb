@@ -14,9 +14,15 @@ module ForestAdminDatasourceIntercom
     # is a single page of something larger. The cost is bandwidth, not
     # correctness.
     #
-    # Each read re-reads the endpoint, so an operator sees what Intercom holds
-    # now rather than what it held when the process booted. One request per list
-    # against a 10 000-a-minute budget is not a figure any list view approaches.
+    # The response itself is held for `Configuration#reference_cache_ttl` rather
+    # than re-read by every page: these are the four lists every relation of the
+    # datasource resolves through, and a ticket list projecting four of them
+    # spent four sequential round trips on lists that change a few times a year.
+    # So an operator sees what Intercom held within the window rather than what
+    # it holds at this instant -- bounded staleness, on the workspace's own
+    # configuration and never on its records. `Client#fetch_all` is where that
+    # happens and `Cache` is where the trade is argued; `reference_cache_ttl: 0`
+    # buys the freshness back at the price of the requests.
     class FetchAllCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       # The filters a column may advertise, per column type. Restricted to what
       # the toolkit can evaluate in memory, since the in-memory pass is the only
@@ -56,13 +62,15 @@ module ForestAdminDatasourceIntercom
       end
 
       def list(caller, filter, projection)
-        records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
-        window = page_window(records, filter)
-        rows = window.map { |record| project(record, projection) }
+        client.with_read_scope do
+          records = sort_in_memory(filtered_records(caller, filter), filter&.sort)
+          window = page_window(records, filter)
+          rows = window.map { |record| project(record, projection) }
 
-        enrich(window, rows, projection)
-        embed_relations(caller, window, rows, projection)
-        rows
+          enrich(window, rows, projection)
+          embed_relations(caller, window, rows, projection)
+          rows
+        end
       end
 
       # Exact, like the filter and the sort above it, which is why these columns

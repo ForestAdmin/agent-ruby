@@ -110,12 +110,26 @@ module ForestAdminDatasourceIntercom
         expect(collection.list(nil, filter, %w[id email])).to eq([{ 'id' => '1', 'email' => '1@acme.test' }])
       end
 
-      # Freshness over rate-limit thrift: nothing is kept from the previous list,
-      # so an operator sees the teammates the workspace has now.
-      it 'reads the endpoint again on the next list' do
+      # The workspace's own lists are held for the configured window rather than
+      # re-read by every page: they are what four relations of a ticket list
+      # resolve through, and they change a few times a year. See `Cache`.
+      it 'serves the next list from the store, within the window' do
         stub_admins(admin('1'))
 
         2.times { collection.list(nil, filter, nil) }
+
+        expect(WebMock).to have_requested(:get, "#{base}/admins").once
+      end
+
+      # The escape hatch, for a deployment that would rather pay the request
+      # than hold a list for a minute.
+      it 'reads the endpoint again on the next list when the store is off' do
+        unstored = Collections::Admin.new(
+          Datasource.new(access_token: 's3cr3t', rate_limiter: nil, reference_cache_ttl: 0)
+        )
+        stub_admins(admin('1'))
+
+        2.times { unstored.list(nil, filter, nil) }
 
         expect(WebMock).to have_requested(:get, "#{base}/admins").twice
       end

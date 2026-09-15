@@ -477,6 +477,255 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The workspace's own lists, held for the configured window rather than
+    # re-read by every page that resolves a relation through one of them.
+    describe '#fetch_all caching' do
+      before { stub_request(:get, "#{base}/teams").to_return(json('teams' => [{ 'id' => '1' }])) }
+
+      it 'reads the endpoint once within the window' do
+        2.times { client.fetch_all('teams', list_key: 'teams') }
+
+        expect(WebMock).to have_requested(:get, "#{base}/teams").once
+      end
+
+      it 'answers the second read with the same records' do
+        first = client.fetch_all('teams', list_key: 'teams')
+
+        expect(client.fetch_all('teams', list_key: 'teams')).to eq(first)
+      end
+
+      # `boot` picks the connection a read travels on -- shorter timeouts while
+      # the agent starts -- not what comes back, so the ticket types read at boot
+      # are the ticket types a list view reads.
+      it 'shares one entry between the boot read and the later one' do
+        client.fetch_all('teams', list_key: 'teams', boot: true)
+        client.fetch_all('teams', list_key: 'teams')
+
+        expect(WebMock).to have_requested(:get, "#{base}/teams").once
+      end
+
+      # `/data_attributes` answers the contact attributes and the company ones
+      # under `?model=`, and both are read whole.
+      it 'tells two reads of one endpoint apart by their params' do
+        stub_request(:get, "#{base}/data_attributes").with(query: hash_including({}))
+                                                     .to_return(json('data' => []))
+
+        client.fetch_all('data_attributes', params: { 'model' => 'contact' })
+        client.fetch_all('data_attributes', params: { 'model' => 'company' })
+
+        expect(WebMock).to have_requested(:get, "#{base}/data_attributes").with(query: { 'model' => 'contact' })
+        expect(WebMock).to have_requested(:get, "#{base}/data_attributes").with(query: { 'model' => 'company' })
+      end
+
+      it 'hands back a frozen list, nothing downstream owning what the next page reads' do
+        expect(client.fetch_all('teams', list_key: 'teams')).to be_frozen
+      end
+
+      # A 403 rather than a 500: the latter is retried, and the retry would eat
+      # the answer this example checks is read afresh.
+      it 'caches no failure' do
+        stub_request(:get, "#{base}/admins").to_return(json({}, 403), json('admins' => [{ 'id' => '1' }]))
+
+        expect { client.fetch_all('admins', list_key: 'admins') }.to raise_error(APIError)
+        expect(client.fetch_all('admins', list_key: 'admins').size).to eq(1)
+      end
+
+      context 'with the store off' do
+        let(:configuration) do
+          Configuration.new(access_token: 's3cr3t', retry_policy: retry_policy, rate_limiter: nil,
+                            reference_cache_ttl: 0)
+        end
+
+        it 'reads the endpoint on every call' do
+          2.times { client.fetch_all('teams', list_key: 'teams') }
+
+          expect(WebMock).to have_requested(:get, "#{base}/teams").twice
+        end
+      end
+    end
+
+    # The other half: the same read issued twice while a single page is being
+    # built, from two callers that cannot see each other.
+    describe '#with_read_scope' do
+      before do
+        stub_request(:post, "#{base}/contacts/search").to_return(json('data' => [{ 'id' => 'c1' }]))
+        stub_request(:get, %r{#{base}/contacts/c1}).to_return(json('id' => 'c1'))
+      end
+
+      def search
+        client.search_page('contacts/search', query: { 'field' => 'id', 'operator' => 'IN', 'value' => ['c1'] },
+                                              per_page: 1)
+      end
+
+      it 'issues one request for two identical searches' do
+        client.with_read_scope { 2.times { search } }
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+      end
+
+      it 'answers the second search with the first page' do
+        pages = client.with_read_scope { [search, search] }
+
+        expect(pages.first.records).to eq(pages.last.records)
+      end
+
+      it 'issues one request for two reads of one record' do
+        client.with_read_scope { 2.times { client.fetch_record('contacts', 'c1') } }
+
+        expect(WebMock).to have_requested(:get, "#{base}/contacts/c1").once
+      end
+
+      it 'tells two searches apart by their query' do
+        client.with_read_scope do
+          search
+          client.search_page('contacts/search', query: { 'field' => 'id', 'operator' => 'IN', 'value' => ['c2'] },
+                                                per_page: 1)
+        end
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      it 'remembers nothing outside a scope' do
+        2.times { search }
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      # A page is one scope, and the next page is another: what travels here is
+      # the customer's own records, and holding them would show an operator a row
+      # they have just edited in its previous state.
+      it 'remembers nothing from one scope to the next' do
+        2.times { client.with_read_scope { search } }
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      # A related list resolves relations of its own, and the inner `ensure`
+      # would otherwise close the scope the outer read is still building in.
+      it 'joins the scope already open rather than opening a second one' do
+        client.with_read_scope do
+          search
+          client.with_read_scope { search }
+          search
+        end
+
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").once
+      end
+
+      it 'closes the scope even when the page fails' do
+        expect { client.with_read_scope { raise APIError, 'boom' } }.to raise_error(APIError)
+
+        2.times { search }
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      it 'remembers no failure' do
+        stub_request(:post, "#{base}/companies/search").to_return(json({}, 500), json('data' => []))
+
+        client.with_read_scope do
+          expect { client.search_page('companies/search', query: {}, per_page: 1) }.to raise_error(APIError)
+          client.search_page('companies/search', query: {}, per_page: 1)
+        end
+
+        expect(WebMock).to have_requested(:post, "#{base}/companies/search").twice
+      end
+    end
+
+    # Seven requests to one host is seven TLS handshakes on the default adapter.
+    describe 'connection reuse' do
+      it 'builds its connections on the persistent adapter' do
+        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
+        client.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me").with(headers: { 'Connection' => 'keep-alive' })
+      end
+
+      # An optimisation nothing can load is a warning and a slower request, not
+      # a boot that fails.
+      it 'falls back to Faraday\'s default when the adapter is not registered, and says so' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        unloadable = described_class.new(
+          Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: :no_such_adapter)
+        )
+        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
+
+        unloadable.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me")
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/adapter is not available/)
+      end
+
+      it 'takes the adapter the configuration names' do
+        configured = described_class.new(
+          Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: :net_http)
+        )
+        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
+
+        configured.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me")
+      end
+
+      # Faraday looks a name up by symbol, so a string used to fall through to
+      # the default adapter -- keep-alive lost, and the warning naming the
+      # adapter it fell back to as the one that was unavailable.
+      it 'keeps the connection alive for a name spelled as a string' do
+        configured = described_class.new(
+          Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: 'net_http_persistent')
+        )
+        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
+
+        configured.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me").with(headers: { 'Connection' => 'keep-alive' })
+      end
+    end
+
+    # What a pooled connection costs: a socket the server closed while it was
+    # idle fails the next request that reuses it, where a client opening one per
+    # request could not meet the case. On a GET the retry policy already
+    # absorbed it; the searches every list view is built on travel on POST.
+    describe 'a connection dropped under keep-alive' do
+      it 'retries a search, which reads despite travelling on POST' do
+        stub_request(:post, "#{base}/contacts/search")
+          .to_raise(Faraday::ConnectionFailed).then
+          .to_return(json('data' => [{ 'id' => 'c1' }]))
+
+        page = client.search_page('contacts/search', query: {}, per_page: 1)
+
+        expect(page.records.size).to eq(1)
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      # The other read Intercom answers on POST, and the reason the exemption is
+      # scoped to paths rather than to the verb.
+      it 'retries the offset listing' do
+        stub_request(:post, "#{base}/companies/list").with(query: hash_including({}))
+                                                     .to_raise(Faraday::ConnectionFailed).then
+                                                     .to_return(json('data' => []))
+
+        expect(client.offset_page('companies/list', page: 1, per_page: 1).records).to eq([])
+        expect(WebMock).to have_requested(:post, "#{base}/companies/list")
+          .with(query: hash_including({})).twice
+      end
+
+      # The persistent adapter re-raises its own error for what it does not
+      # recognise -- a host found down while a pooled connection is reset -- so
+      # the policy names the class it cannot reference. Required here rather
+      # than at the top of the file: nothing guarantees the optional gem is
+      # loaded before this example runs.
+      it 'retries the adapter error a dropped connection can surface as' do
+        require 'net/http/persistent'
+        stub_request(:get, "#{base}/me")
+          .to_raise(Net::HTTP::Persistent::Error.new('host down: api.intercom.io:443')).then
+          .to_return(json('type' => 'admin'))
+
+        client.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me").twice
+      end
+    end
+
     describe '#inspect' do
       it 'never prints the token its connections carry' do
         expect(client.inspect).to include(base)

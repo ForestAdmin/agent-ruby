@@ -30,6 +30,63 @@ module ForestAdminDatasourceIntercom
       it 'absorbs a dropped connection, which faraday-retry does not by default' do
         expect(options[:exceptions]).to include(Faraday::ConnectionFailed)
       end
+
+      # The persistent adapter re-raises its own error for the part of its
+      # surface it does not translate, and the gem is optional -- so the class
+      # is named rather than referenced, and faraday-retry skips a name nothing
+      # defined.
+      it 'absorbs the adapter error a dropped connection can also surface as' do
+        expect(options[:exceptions]).to include('Net::HTTP::Persistent::Error')
+      end
+
+      context 'when a pooled connection was dropped' do
+        let(:dropped) { Faraday::ConnectionFailed.new('closed') }
+
+        def env(path)
+          { status: nil, url: URI.parse("https://api.intercom.io/#{path}") }
+        end
+
+        # Keep-alive is what makes this ordinary rather than impossible: a socket
+        # the server closed while it was idle fails the next request that reuses
+        # it, and every list view of this datasource is built on one of these.
+        it 'replays the reads Intercom answers through POST' do
+          %w[contacts/search tickets/search conversations/search companies/list].each do |path|
+            expect(options[:retry_if].call(env(path), dropped)).to be(true)
+          end
+        end
+
+        # The guarantee the exemption had to leave intact, and the reason it is
+        # scoped to paths rather than to the verb.
+        it 'never replays a POST that writes' do
+          %w[conversations tickets contacts conversations/123/reply].each do |path|
+            expect(options[:retry_if].call(env(path), dropped)).to be(false)
+          end
+        end
+
+        it 'leaves a GET to the methods list, which already replays it' do
+          expect(options[:retry_if].call(env('me'), dropped)).to be(false)
+          expect(options[:methods]).to include(:get)
+        end
+      end
+    end
+
+    describe '.connection_failure?' do
+      it "knows Faraday's own" do
+        expect(described_class).to be_connection_failure(Faraday::ConnectionFailed.new('closed'))
+      end
+
+      # Raised when resetting a pooled connection finds the host down, and it
+      # reaches Faraday unwrapped: the adapter translates the messages it
+      # recognises -- a timeout, a refused connection -- and re-raises the rest.
+      it "knows the persistent adapter's, which it cannot name outright" do
+        require 'net/http/persistent'
+
+        expect(described_class).to be_connection_failure(Net::HTTP::Persistent::Error.new('host down'))
+      end
+
+      it 'takes nothing else for one' do
+        expect(described_class).not_to be_connection_failure(Faraday::TimeoutError.new('slow'))
+      end
     end
 
     describe '.boot' do

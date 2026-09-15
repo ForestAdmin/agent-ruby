@@ -112,6 +112,95 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    describe 'the reference store' do
+      it 'holds the workspace lists for a minute by default' do
+        expect(configuration.reference_cache_ttl).to eq(60)
+        expect(configuration.reference_cache).to be_enabled
+      end
+
+      # A deployment that would rather pay the request than hold a list.
+      it 'is off at a ttl of zero' do
+        configured = described_class.new(access_token: 's3cr3t', reference_cache_ttl: 0)
+
+        expect(configured.reference_cache).not_to be_enabled
+      end
+
+      # One store per token, like the rate limiter: what it holds is one
+      # workspace's own lists.
+      it 'is one store, handed to every read of this configuration' do
+        store = configuration.reference_cache
+
+        expect(configuration.reference_cache).to be(store)
+      end
+
+      it 'refuses a window that runs backwards' do
+        expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: -1) }
+          .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+      end
+
+      # A window that never closes is not a long window: it holds the workspace
+      # lists until the process restarts, which is the one thing the store was
+      # built not to do.
+      it 'refuses a window that never closes' do
+        expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: Float::INFINITY) }
+          .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+      end
+
+      # Each of these used to coerce to a window of zero and turn the store off
+      # without a word -- an unset environment variable, above all, on the one
+      # option whose whole point is to be on.
+      [nil, 'sixty', '60', Float::NAN, [60]].each do |value|
+        it "refuses #{value.inspect}, rather than reading it as a window of zero" do
+          expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: value) }
+            .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+        end
+      end
+    end
+
+    describe 'the adapter' do
+      # Seven requests to one host is seven TLS handshakes without keep-alive.
+      it 'defaults to none, the client resolving the persistent one' do
+        expect(configuration.adapter).to be_nil
+        expect(described_class::DEFAULT_ADAPTER.first).to eq(:net_http_persistent)
+      end
+
+      # A pool narrower than the threads that can reach it queues them for half
+      # a second and then fails the request -- as a Faraday timeout, over a POST
+      # the retry policy does not replay, so an operator loses their page and
+      # the message accuses Intercom. The figure is only worth having while it
+      # stays clear of the thread counts a Rails agent is deployed with; a
+      # change lowering it is a change that makes that failure reachable.
+      it 'pools well above the threads a web server can point at it' do
+        expect(described_class::DEFAULT_ADAPTER.last[:pool_size]).to be >= 25
+      end
+
+      it 'takes the one it was given' do
+        configured = described_class.new(access_token: 's3cr3t', adapter: :net_http)
+
+        expect(configured.adapter).to eq(:net_http)
+      end
+
+      # Faraday's registry is keyed by symbol, so a name spelled as a string --
+      # what a YAML config hands over -- missed every lookup and lost the
+      # keep-alive it was asking for, behind a warning naming the adapter it was
+      # falling back to as the one that was unavailable.
+      it 'reads a name spelled as a string, and the options with it' do
+        configured = described_class.new(access_token: 's3cr3t',
+                                         adapter: ['net_http_persistent', { 'pool_size' => 25 }])
+
+        expect(configured.adapter).to eq([:net_http_persistent, { pool_size: 25 }])
+      end
+
+      # Refused at boot like every other option, rather than degrading into a
+      # warning on whichever request happened to be first.
+      [{ pool_size: 3 }, 7, %i[net_http_persistent pool_size], [:net_http_persistent, { 3 => 1 }]].each do |value|
+        it "refuses #{value.inspect}" do
+          expect { described_class.new(access_token: 's3cr3t', adapter: value) }
+            .to raise_error(ConfigurationError, /adapter must be an adapter name or a \[name, options\] pair/)
+        end
+      end
+    end
+
     describe '#inspect' do
       it 'never prints the bearer token' do
         expect(configuration.inspect).to include('[FILTERED]')
