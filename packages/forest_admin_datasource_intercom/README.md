@@ -624,7 +624,9 @@ the ticket types and the ticket states, the tier read whole. They are what four 
 relations resolve through, and they change a few times a year; without a window, every page, every
 count and every filter traversing one of them re-reads all four. What the window trades is bounded
 staleness: a teammate added mid-session appears within the minute rather than on the next request.
-Set `reference_cache_ttl: 0` to pay the requests instead.
+Set `reference_cache_ttl: 0` to pay the requests instead, or drop what is held without waiting the
+window out — a customizer that has just written to the workspace can call
+`datasource.configuration.reference_cache.clear`.
 
 **Records are never held.** What the search and listing endpoints answer is the customer's data, and
 serving a page of it from a store would show an operator a row they have just edited in its previous
@@ -639,7 +641,7 @@ the persistent adapter. A deployment that cannot load it falls back with a warni
 failing to boot.
 
 Measured on a page of 15 tickets projecting five relations
-([`request_budget_spec.rb`](spec/forest_admin_datasource_intercom/request_budget_spec.rb)):
+([`ticket_list_budget_spec.rb`](spec/forest_admin_datasource_intercom/collections/ticket_list_budget_spec.rb)):
 
 | | Requests |
 | --- | --- |

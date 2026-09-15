@@ -61,6 +61,12 @@ module ForestAdminDatasourceIntercom
       value
     end
 
+    # Drops everything held, without waiting the window out. Nothing inside this
+    # package calls it: the window is what expires an entry, and no read here
+    # writes. It is reachable through `Configuration#reference_cache` for the
+    # one case the window cannot serve -- a customizer that has just written a
+    # team or a ticket type into the workspace and wants the next page to show
+    # it. Documented in the README beside the ttl.
     def clear
       @mutex.synchronize { @entries.clear }
     end

@@ -35,6 +35,24 @@ module ForestAdminDatasourceIntercom
       # answer. A handful of clients live in a process, so a symbol each costs
       # nothing.
       @scope_key = :"forest_admin_datasource_intercom_read_scope_#{object_id}"
+      # Both connections built here rather than memoized on first use. Neither
+      # reaches the network -- and what a lazy reader would hand the thread
+      # that lost the race is no longer a spare object but a pool of open
+      # sockets, nothing left to close it. The adapter is resolved once for the
+      # two of them, so a fallback is reported at boot rather than on whichever
+      # request happened to be first.
+      @adapter = resolve_adapter
+      @connection = build_connection(retry_policy: @configuration.retry_policy,
+                                     timeout: @configuration.timeout,
+                                     open_timeout: @configuration.open_timeout)
+      # For what is read while the datasource is being constructed -- the
+      # custom-attribute introspection above all: short timeouts and one quick
+      # retry, so a slow Intercom cannot turn a Rails boot into minutes of
+      # waiting. Built apart from the one above, which keeps the patience every
+      # later request is entitled to.
+      @boot_connection = build_connection(retry_policy: @configuration.boot_retry_policy,
+                                          timeout: @configuration.boot_timeout,
+                                          open_timeout: @configuration.boot_open_timeout)
     end
 
     # Deduplicates the reads issued while **one page is being built**, and not
@@ -51,10 +69,22 @@ module ForestAdminDatasourceIntercom
     # rendering one page is waste, and reading it from a store on the next page
     # would show an operator a row they have just edited in its previous state.
     #
-    # Per thread, so two requests served concurrently never share a scope.
+    # Held in fiber-local storage, which is what `Thread.current[]` is, and
+    # deliberately: it is the narrower of the two, so two requests served
+    # concurrently never share a scope whether the server gives each of them a
+    # thread or a fiber. A thread-local would be read across the fibers of one
+    # thread, which on a fiber-scheduled server is two pages sharing a scope.
+    # What the narrow choice costs is a read crossing into a fiber of its own --
+    # it opens a scope there and pays the request, which is the behaviour of
+    # before this existed.
+    #
     # Re-entrant: a nested read joins the scope already open instead of opening
     # a second one -- a related list resolves relations of its own, and the
     # innermost `ensure` would otherwise close the outer scope halfway through.
+    #
+    # Two callers are handed the same object back, the records included, so what
+    # travels through here is read and not edited -- the discipline the frozen
+    # reference lists of `fetch_all` make enforceable, and this one asks for.
     def with_read_scope
       return yield unless Thread.current[@scope_key].nil?
 
@@ -182,9 +212,11 @@ module ForestAdminDatasourceIntercom
     # on -- shorter timeouts while the agent starts -- not what comes back. The
     # ticket types read at boot are the ticket types a list view reads.
     #
-    # Frozen on the way in. Every caller maps or indexes what it gets, so
-    # nothing needs to mutate the array, and a caller that started to would
-    # otherwise be editing what the next page reads.
+    # The list is frozen on the way in -- shallowly, which is the depth that
+    # matters: every caller maps or indexes it, so a `<<` or a `sort!` on what
+    # the next page is going to read is the mistake worth making impossible.
+    # The records inside stay mutable and nothing edits them; walking a page of
+    # JSON to freeze it on every read would buy a rule no caller is testing.
     def fetch_all(path, list_key: 'data', params: {}, boot: false)
       @configuration.reference_cache.fetch(['fetch_all', path, list_key, params]) do
         must_succeed(path) do
@@ -208,6 +240,10 @@ module ForestAdminDatasourceIntercom
     end
 
     private
+
+    # Readers rather than builders: both connections are built in the
+    # constructor, where what distinguishes them is argued.
+    attr_reader :connection, :boot_connection
 
     # The answer already given for `key` while this page was being built, or the
     # block's. Outside a scope -- a smart action, a boot read -- the block runs
@@ -495,15 +531,13 @@ module ForestAdminDatasourceIntercom
     # Resolved rather than assumed: a deployment that excluded the gem falls
     # back to Faraday's default and says so once, instead of failing to boot
     # over an optimisation. `Configuration#adapter` overrides both -- a name, or
-    # a `[name, options]` pair.
-    def adapter
-      @adapter ||= begin
-        name, options = Array(@configuration.adapter || Configuration::DEFAULT_ADAPTER)
-        # The options travel with the name they were written for: a `pool_size`
-        # meant for the persistent adapter says nothing to the one it fell back
-        # to.
-        adapter_registered?(name) ? [name, options || {}] : [fallback_adapter(name), {}]
-      end
+    # a `[name, options]` pair, normalised there.
+    def resolve_adapter
+      name, options = Array(@configuration.adapter || Configuration::DEFAULT_ADAPTER)
+      # The options travel with the name they were written for: a `pool_size`
+      # meant for the persistent adapter says nothing to the one it fell back
+      # to.
+      adapter_registered?(name) ? [name, options || {}] : [fallback_adapter(name), {}]
     end
 
     # Registered by Faraday, which is what `f.adapter` looks the name up in --
@@ -530,27 +564,6 @@ module ForestAdminDatasourceIntercom
       Faraday.default_adapter
     end
 
-    def connection
-      @connection ||= build_connection(
-        retry_policy: @configuration.retry_policy,
-        timeout: @configuration.timeout,
-        open_timeout: @configuration.open_timeout
-      )
-    end
-
-    # For what is read while the datasource is being constructed -- the
-    # custom-attribute introspection above all: short timeouts and one quick
-    # retry, so a slow Intercom cannot turn a Rails boot into minutes of
-    # waiting. Memoized separately from `connection`, which keeps the patience
-    # every later request is entitled to.
-    def boot_connection
-      @boot_connection ||= build_connection(
-        retry_policy: @configuration.boot_retry_policy,
-        timeout: @configuration.boot_timeout,
-        open_timeout: @configuration.boot_open_timeout
-      )
-    end
-
     # Middleware order is deliberate: `raise_error` sits outside the JSON parser
     # so it raises with an already-parsed body, and `retry` sits innermost so it
     # inspects raw statuses -- behind `raise_error` it would never see a 429.
@@ -564,7 +577,7 @@ module ForestAdminDatasourceIntercom
     # the same on every connection this builds, the limiter included -- a second
     # limiter would meter in a window of its own and spend the budget twice.
     def build_connection(retry_policy:, timeout:, open_timeout:)
-      name, options = adapter
+      name, options = @adapter
 
       Faraday.new(url: @configuration.url) do |f|
         f.request :json

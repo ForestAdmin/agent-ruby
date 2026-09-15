@@ -20,7 +20,14 @@ module ForestAdminDatasourceIntercom
 
       # How many ids one `id in [...]` read carries. A page holds fewer than this
       # in practice; the chunk keeps the request bounded if it ever does not.
-      CONTACT_CHUNK = 100
+      #
+      # Taken from the Contacts collection rather than written again, because
+      # the two have to agree for `Client#with_read_scope` to see one request
+      # where there are two: this read and the one the `contact` relation
+      # issues name the same ids, and a different chunk size makes them two
+      # different request bodies. `ticket_list_budget_spec` is the guard, but a
+      # single figure is what keeps it from ever being tripped.
+      CONTACT_CHUNK = Contact::IDS_PER_READ
 
       private
 

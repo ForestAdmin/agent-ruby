@@ -135,7 +135,25 @@ module ForestAdminDatasourceIntercom
 
       it 'refuses a window that runs backwards' do
         expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: -1) }
-          .to raise_error(ConfigurationError, /reference_cache_ttl must be zero or more/)
+          .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+      end
+
+      # A window that never closes is not a long window: it holds the workspace
+      # lists until the process restarts, which is the one thing the store was
+      # built not to do.
+      it 'refuses a window that never closes' do
+        expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: Float::INFINITY) }
+          .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+      end
+
+      # Each of these used to coerce to a window of zero and turn the store off
+      # without a word -- an unset environment variable, above all, on the one
+      # option whose whole point is to be on.
+      [nil, 'sixty', '60', Float::NAN, [60]].each do |value|
+        it "refuses #{value.inspect}, rather than reading it as a window of zero" do
+          expect { described_class.new(access_token: 's3cr3t', reference_cache_ttl: value) }
+            .to raise_error(ConfigurationError, /reference_cache_ttl must be a finite number/)
+        end
       end
     end
 
@@ -150,6 +168,26 @@ module ForestAdminDatasourceIntercom
         configured = described_class.new(access_token: 's3cr3t', adapter: :net_http)
 
         expect(configured.adapter).to eq(:net_http)
+      end
+
+      # Faraday's registry is keyed by symbol, so a name spelled as a string --
+      # what a YAML config hands over -- missed every lookup and lost the
+      # keep-alive it was asking for, behind a warning naming the adapter it was
+      # falling back to as the one that was unavailable.
+      it 'reads a name spelled as a string, and the options with it' do
+        configured = described_class.new(access_token: 's3cr3t',
+                                         adapter: ['net_http_persistent', { 'pool_size' => 25 }])
+
+        expect(configured.adapter).to eq([:net_http_persistent, { pool_size: 25 }])
+      end
+
+      # Refused at boot like every other option, rather than degrading into a
+      # warning on whichever request happened to be first.
+      [{ pool_size: 3 }, 7, %i[net_http_persistent pool_size], [:net_http_persistent, { 3 => 1 }]].each do |value|
+        it "refuses #{value.inspect}" do
+          expect { described_class.new(access_token: 's3cr3t', adapter: value) }
+            .to raise_error(ConfigurationError, /adapter must be an adapter name or a \[name, options\] pair/)
+        end
       end
     end
 

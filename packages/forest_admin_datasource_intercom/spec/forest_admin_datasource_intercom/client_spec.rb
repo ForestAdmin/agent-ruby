@@ -665,6 +665,65 @@ module ForestAdminDatasourceIntercom
 
         expect(WebMock).to have_requested(:get, "#{base}/me")
       end
+
+      # Faraday looks a name up by symbol, so a string used to fall through to
+      # the default adapter -- keep-alive lost, and the warning naming the
+      # adapter it fell back to as the one that was unavailable.
+      it 'keeps the connection alive for a name spelled as a string' do
+        configured = described_class.new(
+          Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: 'net_http_persistent')
+        )
+        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
+
+        configured.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me").with(headers: { 'Connection' => 'keep-alive' })
+      end
+    end
+
+    # What a pooled connection costs: a socket the server closed while it was
+    # idle fails the next request that reuses it, where a client opening one per
+    # request could not meet the case. On a GET the retry policy already
+    # absorbed it; the searches every list view is built on travel on POST.
+    describe 'a connection dropped under keep-alive' do
+      it 'retries a search, which reads despite travelling on POST' do
+        stub_request(:post, "#{base}/contacts/search")
+          .to_raise(Faraday::ConnectionFailed).then
+          .to_return(json('data' => [{ 'id' => 'c1' }]))
+
+        page = client.search_page('contacts/search', query: {}, per_page: 1)
+
+        expect(page.records.size).to eq(1)
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").twice
+      end
+
+      # The other read Intercom answers on POST, and the reason the exemption is
+      # scoped to paths rather than to the verb.
+      it 'retries the offset listing' do
+        stub_request(:post, "#{base}/companies/list").with(query: hash_including({}))
+                                                     .to_raise(Faraday::ConnectionFailed).then
+                                                     .to_return(json('data' => []))
+
+        expect(client.offset_page('companies/list', page: 1, per_page: 1).records).to eq([])
+        expect(WebMock).to have_requested(:post, "#{base}/companies/list")
+          .with(query: hash_including({})).twice
+      end
+
+      # The persistent adapter re-raises its own error for what it does not
+      # recognise -- a host found down while a pooled connection is reset -- so
+      # the policy names the class it cannot reference. Required here rather
+      # than at the top of the file: nothing guarantees the optional gem is
+      # loaded before this example runs.
+      it 'retries the adapter error a dropped connection can surface as' do
+        require 'net/http/persistent'
+        stub_request(:get, "#{base}/me")
+          .to_raise(Net::HTTP::Persistent::Error.new('host down: api.intercom.io:443')).then
+          .to_return(json('type' => 'admin'))
+
+        client.me
+
+        expect(WebMock).to have_requested(:get, "#{base}/me").twice
+      end
     end
 
     describe '#inspect' do

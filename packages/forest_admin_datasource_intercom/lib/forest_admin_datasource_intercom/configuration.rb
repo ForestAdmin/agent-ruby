@@ -1,5 +1,9 @@
 module ForestAdminDatasourceIntercom
-  class Configuration
+  # Long by line count only: every option of the datasource is declared here
+  # with the reason it has the default it has, and next to the check that
+  # refuses the shapes it cannot mean. Splitting the checks off would put an
+  # option and its meaning in two files.
+  class Configuration # rubocop:disable Metrics/ClassLength
     # A workspace is hosted in one region and answers in that region only. The
     # host is therefore a configuration parameter rather than a constant:
     # `api.intercom.io` does route to the right region, but a customer under
@@ -75,8 +79,8 @@ module ForestAdminDatasourceIntercom
       @boot_open_timeout = boot_open_timeout
       @boot_timeout      = boot_timeout
       @boot_retry_policy = boot_retry_policy
-      @reference_cache_ttl = reference_cache_ttl.to_f
-      @adapter = adapter
+      @reference_cache_ttl = reference_cache_ttl
+      @adapter = normalize_adapter(adapter)
       validate!
       # One store per Configuration, hence per token, like the rate limiter:
       # what it holds is a workspace's own lists, and two workspaces do not
@@ -128,11 +132,55 @@ module ForestAdminDatasourceIntercom
       validate_base_url!
       raise ConfigurationError, 'ForestAdminDatasourceIntercom api_version cannot be empty' if blank?(@api_version)
 
-      return unless @reference_cache_ttl.negative?
+      validate_reference_cache_ttl!
+    end
+
+    # A number, and a real one. Coercing first and checking the sign afterwards
+    # is what let every shape nobody thought of through as a window of zero: a
+    # `nil`, an unset environment variable, a string that is not a figure --
+    # each of them turning the store off in silence, where this is the one
+    # option whose whole purpose is to be on. `Infinity` went the other way and
+    # held every list until the process restarted.
+    #
+    # Seconds rather than a duration object, and an Integer is a Numeric: what
+    # this refuses is the typo, not the spelling.
+    def validate_reference_cache_ttl!
+      return if @reference_cache_ttl.is_a?(Numeric) && @reference_cache_ttl.finite? &&
+                !@reference_cache_ttl.negative?
 
       raise ConfigurationError,
-            'ForestAdminDatasourceIntercom reference_cache_ttl must be zero or more seconds, got ' \
-            "#{@reference_cache_ttl}"
+            'ForestAdminDatasourceIntercom reference_cache_ttl must be a finite number of seconds, zero or ' \
+            "more, got #{@reference_cache_ttl.inspect}"
+    end
+
+    # Faraday's adapter registry is keyed by symbol, so `adapter:
+    # 'net_http_persistent'` -- the spelling a YAML config hands over, and the
+    # one the README's table invites -- missed every lookup and silently cost
+    # the keep-alive it was asking for, behind a warning saying the adapter it
+    # was falling back to was unavailable. Normalised here, where the region
+    # already is, and the shape refused at boot like every other option rather
+    # than degrading on the first request.
+    #
+    # What is *not* decided here is whether the name resolves: that depends on
+    # what the process can load, and falling back is the client's answer.
+    def normalize_adapter(adapter)
+      return nil if adapter.nil?
+
+      name, options = adapter.is_a?(Array) ? adapter : [adapter, nil]
+      refuse_adapter!(adapter) unless name.respond_to?(:to_sym)
+      refuse_adapter!(adapter) unless options.nil? || namable_hash?(options)
+
+      options.nil? ? name.to_sym : [name.to_sym, options.to_h { |key, value| [key.to_sym, value] }]
+    end
+
+    def namable_hash?(options)
+      options.is_a?(Hash) && options.keys.all? { |key| key.respond_to?(:to_sym) }
+    end
+
+    def refuse_adapter!(adapter)
+      raise ConfigurationError,
+            'ForestAdminDatasourceIntercom adapter must be an adapter name or a [name, options] pair, got ' \
+            "#{adapter.inspect}"
     end
 
     def validate_region!

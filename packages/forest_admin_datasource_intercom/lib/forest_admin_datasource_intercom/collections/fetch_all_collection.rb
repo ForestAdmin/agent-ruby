@@ -14,9 +14,15 @@ module ForestAdminDatasourceIntercom
     # is a single page of something larger. The cost is bandwidth, not
     # correctness.
     #
-    # Each read re-reads the endpoint, so an operator sees what Intercom holds
-    # now rather than what it held when the process booted. One request per list
-    # against a 10 000-a-minute budget is not a figure any list view approaches.
+    # The response itself is held for `Configuration#reference_cache_ttl` rather
+    # than re-read by every page: these are the four lists every relation of the
+    # datasource resolves through, and a ticket list projecting four of them
+    # spent four sequential round trips on lists that change a few times a year.
+    # So an operator sees what Intercom held within the window rather than what
+    # it holds at this instant -- bounded staleness, on the workspace's own
+    # configuration and never on its records. `Client#fetch_all` is where that
+    # happens and `Cache` is where the trade is argued; `reference_cache_ttl: 0`
+    # buys the freshness back at the price of the requests.
     class FetchAllCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       # The filters a column may advertise, per column type. Restricted to what
       # the toolkit can evaluate in memory, since the in-memory pass is the only

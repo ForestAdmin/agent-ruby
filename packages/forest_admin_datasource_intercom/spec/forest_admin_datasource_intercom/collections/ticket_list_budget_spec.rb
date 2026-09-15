@@ -53,6 +53,12 @@ module ForestAdminDatasourceIntercom
 
     # Counted at the HTTP layer rather than per stub: what matters is the number
     # of round trips, whichever endpoint they reach.
+    #
+    # WebMock registers callbacks globally and offers no way to remove one, so
+    # the reset takes every callback with it. Nothing else in this suite
+    # registers any -- this is the only spec that counts requests rather than
+    # asserting them -- and leaving this one in place would have it counting
+    # into a dead hash for the rest of the run.
     def requests_of
       calls = Hash.new(0)
       WebMock.after_request { |request, _| calls["#{request.method.to_s.upcase} #{request.uri.path}"] += 1 }
@@ -63,19 +69,44 @@ module ForestAdminDatasourceIntercom
     end
 
     before do
+      # The suite stubs `/ticket_types` empty for the boot read every datasource
+      # issues; this one installs the type its tickets carry, so the relation
+      # resolves to a row rather than to nil and the budget below is the budget
+      # of a page that answered.
+      stub_ticket_types({ 'id' => '1', 'name' => 'Bug' })
       stub_request(:get, "#{base}/admins")
         .to_return(json('type' => 'admin.list',
                         'admins' => [{ 'id' => '493881', 'name' => 'Alice', 'team_ids' => [12] }]))
       stub_request(:get, "#{base}/teams")
         .to_return(json('type' => 'team.list', 'teams' => [{ 'id' => '12', 'name' => 'Support' }]))
       stub_request(:get, "#{base}/ticket_states")
-        .to_return(json('type' => 'list', 'data' => [{ 'id' => '19' }, { 'id' => '14' }]))
+        .to_return(json('type' => 'list',
+                        'data' => [{ 'id' => '19', 'internal_label' => 'En cours' },
+                                   { 'id' => '14', 'internal_label' => 'Soumis' }]))
       stub_request(:post, "#{base}/tickets/search").with(query: hash_including({})).to_return(search_answer)
       stub_request(:post, "#{base}/contacts/search")
         .to_return(json('type' => 'list',
                         'data' => (1..15).map { |index| { 'id' => "c#{index}", 'name' => "Contact #{index}" } }))
       # The boot reads, so the counts below are the page's own.
       datasource
+    end
+
+    # A budget is only a budget if the page it counts is a page. Without this,
+    # a change resolving every relation to nil would spend the same requests and
+    # read here as an improvement -- the five reads would still be issued, and
+    # nothing would be asserting that any of them landed on a row.
+    it 'answers a page whose five relations are resolved' do
+      row = list_page.first
+
+      expect(row).to include(
+        'id' => '1', 'state_label' => 'En cours', 'contact_name' => 'Contact 1',
+        'admin_assignee' => { 'id' => '493881', 'name' => 'Alice' },
+        'team_assignee' => { 'id' => '12', 'name' => 'Support' },
+        'state' => { 'id' => '19', 'internal_label' => 'En cours' },
+        'previous_state' => { 'id' => '14', 'internal_label' => 'Soumis' },
+        'ticket_type' => { 'id' => '1', 'name' => 'Bug' },
+        'contact' => { 'id' => 'c1', 'name' => 'Contact 1' }
+      )
     end
 
     # The first page after a boot pays for the workspace lists it is the first to
