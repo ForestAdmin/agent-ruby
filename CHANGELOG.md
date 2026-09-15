@@ -1,3 +1,10 @@
+## [1.43.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.0...v1.43.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **agent:** decode a Forest-Projection header whose field names are not ASCII ([#390](https://github.com/ForestAdmin/agent-ruby/issues/390)) ([80a8ceb](https://github.com/ForestAdmin/agent-ruby/commit/80a8ceb3b4a0e9d0e654db6a5945113b156500f6))
+
 # [1.43.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.42.0...v1.43.0) (2026-09-10)
 
 
