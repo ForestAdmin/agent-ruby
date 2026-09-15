@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.1...v1.44.0) (2026-09-15)
+
+
+### Features
+
+* **rpc:** mark collection as rpc handles regex ([#255](https://github.com/ForestAdmin/agent-ruby/issues/255)) ([a7f15ae](https://github.com/ForestAdmin/agent-ruby/commit/a7f15ae32c705a4a91fe4215c8a535755b3c7f33))
+
 ## [1.43.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.0...v1.43.1) (2026-09-15)
 
 
