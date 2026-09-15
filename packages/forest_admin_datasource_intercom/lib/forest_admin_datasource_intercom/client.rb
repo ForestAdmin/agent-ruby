@@ -1,0 +1,598 @@
+module ForestAdminDatasourceIntercom
+  # Every call to Intercom goes through here. Hand-written on Faraday rather
+  # than through the official `intercom` gem: that one maps the JSON onto
+  # objects, and what this datasource needs is the parts it hides -- the raw
+  # payload, because a custom attribute is a key nobody declared in advance;
+  # the quota headers, because the pacing is driven by them; and Intercom's own
+  # error body, because that text is what an operator reads when an action
+  # fails.
+  # Long by line count only: the public surface is one method per endpoint, and
+  # the rest is the envelope and error handling every one of them shares.
+  class Client # rubocop:disable Metrics/ClassLength
+    # `per_page=200` is refused with `invalid_per_page` -- "must be an integer
+    # between 0 and 150". There is no silent downgrade, so a page size is bounded
+    # before it is sent or the list view breaks rather than shrinks.
+    MAX_PER_PAGE = 150
+
+    # Bounds `fetch_all`, which asks for a whole reference collection rather than
+    # a window: those endpoints answer in one response, so reaching this many
+    # pages means Intercom started paginating on its own and the read is spending
+    # more than the answer is worth.
+    MAX_COLLECTED_PAGES = 10
+
+    # `next_cursor` is nil as soon as Intercom stops advertising a next page, so
+    # callers never have to know how the absence is spelled on the wire.
+    # `total_count` is exact, filter included, which is what makes Forest's
+    # record counter and its "number of" charts one request each.
+    # `total_pages` is filled by the one endpoint that paginates by offset and
+    # nil everywhere else: a cursor page has no notion of how many there are.
+    Page = Struct.new(:records, :next_cursor, :total_count, :total_pages, keyword_init: true)
+
+    def initialize(configuration)
+      @configuration = configuration
+      # Named per instance rather than per class: two datasources are two
+      # workspaces, and a scope shared between them would hand one the other's
+      # answer. A handful of clients live in a process, so a symbol each costs
+      # nothing.
+      @scope_key = :"forest_admin_datasource_intercom_read_scope_#{object_id}"
+      # Both connections built here rather than memoized on first use. Neither
+      # reaches the network -- and what a lazy reader would hand the thread
+      # that lost the race is no longer a spare object but a pool of open
+      # sockets, nothing left to close it. The adapter is resolved once for the
+      # two of them, so a fallback is reported at boot rather than on whichever
+      # request happened to be first.
+      @adapter = resolve_adapter
+      @connection = build_connection(retry_policy: @configuration.retry_policy,
+                                     timeout: @configuration.timeout,
+                                     open_timeout: @configuration.open_timeout)
+      # For what is read while the datasource is being constructed -- the
+      # custom-attribute introspection above all: short timeouts and one quick
+      # retry, so a slow Intercom cannot turn a Rails boot into minutes of
+      # waiting. Built apart from the one above, which keeps the patience every
+      # later request is entitled to.
+      @boot_connection = build_connection(retry_policy: @configuration.boot_retry_policy,
+                                          timeout: @configuration.boot_timeout,
+                                          open_timeout: @configuration.boot_open_timeout)
+    end
+
+    # Deduplicates the reads issued while **one page is being built**, and not
+    # one instant longer.
+    #
+    # A page of tickets asks Intercom for the same contacts twice: once for the
+    # `contact_name` column, once for the `contact` relation, with the same ids
+    # in the same order. The two callers are far apart -- an enrichment and a
+    # relation embed -- and neither can see the other, so the deduplication
+    # happens where both requests pass.
+    #
+    # Scoped to the call rather than timed like `Cache`, because what travels
+    # through here is the customer's own records: reading a contact twice while
+    # rendering one page is waste, and reading it from a store on the next page
+    # would show an operator a row they have just edited in its previous state.
+    #
+    # Held in fiber-local storage, which is what `Thread.current[]` is, and
+    # deliberately: it is the narrower of the two, so two requests served
+    # concurrently never share a scope whether the server gives each of them a
+    # thread or a fiber. A thread-local would be read across the fibers of one
+    # thread, which on a fiber-scheduled server is two pages sharing a scope.
+    # What the narrow choice costs is a read crossing into a fiber of its own --
+    # it opens a scope there and pays the request, which is the behaviour of
+    # before this existed.
+    #
+    # Re-entrant: a nested read joins the scope already open instead of opening
+    # a second one -- a related list resolves relations of its own, and the
+    # innermost `ensure` would otherwise close the outer scope halfway through.
+    #
+    # Two callers are handed the same object back, the records included, so what
+    # travels through here is read and not edited -- the discipline the frozen
+    # reference lists of `fetch_all` make enforceable, and this one asks for.
+    def with_read_scope
+      return yield unless Thread.current[@scope_key].nil?
+
+      Thread.current[@scope_key] = {}
+      begin
+        yield
+      ensure
+        Thread.current[@scope_key] = nil
+      end
+    end
+
+    # Health check: the admin the token belongs to, plus its workspace. Enough
+    # to prove the credentials are usable, and the one call that verifies the
+    # pinned API version was honoured -- Intercom echoes the version it served
+    # in a response header.
+    #
+    # `boot: true` runs it on the short-timeout connection, for a caller
+    # checking the token while the agent is still starting.
+    def me(boot: false)
+      must_succeed('me') do
+        response = get('me', boot: boot)
+        verify_pinned_version(response)
+        response.body
+      end
+    end
+
+    # One page of a cursor-paginated listing. `starting_after` is what the
+    # previous page advertised; nil asks for the first one.
+    #
+    # `CursorWalker` is what turns the offset/limit window a list view asks for
+    # into a sequence of these.
+    #
+    # `list_key` is the key the endpoint puts its records under, and it is not
+    # `data` everywhere: `/tickets/search` answers under `tickets` (measured), so
+    # a caller names its own and `data` stays the fallback.
+    def list_page(path, per_page:, starting_after: nil, params: {}, list_key: 'data', boot: false)
+      query = params.merge('per_page' => self.class.bounded_per_page(per_page))
+      query['starting_after'] = starting_after unless blank?(starting_after)
+
+      must_succeed(path) { to_page(get(path, query, boot: boot).body, path, list_key) }
+    end
+
+    # One page of a search endpoint. The query is the one the condition-tree
+    # translator wrote, and it travels in the body; `params` is what still
+    # belongs in the query string -- `display_as` above all, which is not part
+    # of the search payload.
+    # `sort` is honoured by `/contacts/search` alone. The other two search
+    # endpoints accept one and ignore it without a word -- measured -- so the
+    # collections that read them never send one, and the parameter is here for
+    # the one that does. `{ field:, ascending: }`, translated to Intercom's own
+    # spelling on the way out.
+    def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data', params: {}, sort: nil)
+      pagination = { 'per_page' => self.class.bounded_per_page(per_page) }
+      pagination['starting_after'] = starting_after unless blank?(starting_after)
+      body = { 'query' => query, 'pagination' => pagination }
+      body['sort'] = sort_clause(sort) if sort
+
+      within_read_scope(['search', path, body, params, list_key]) do
+        must_succeed(path) { to_page(post(path, body, params: params).body, path, list_key) }
+      end
+    end
+
+    # One page of an endpoint that paginates by **offset** rather than by
+    # cursor. `POST /companies/list` is the only one, and it is what lets the
+    # Companies collection answer page 7 of a list view with one request
+    # instead of walking six pages to reach it. Intercom counts pages from 1.
+    def offset_page(path, page:, per_page:, params: {}, list_key: 'data')
+      query = params.merge('page' => [page.to_i, 1].max,
+                           'per_page' => self.class.bounded_per_page(per_page))
+
+      must_succeed(path) { to_offset_page(post(path, {}, params: query).body, path, list_key) }
+    end
+
+    # An exact lookup, and the shape surprise that comes with it: `GET
+    # /companies?name=` answers the company itself where `?tag_id=` answers a
+    # list. A record is read here as a page of one, so a caller writes one route
+    # rather than testing the envelope.
+    def lookup_page(path, params:, list_key: 'data')
+      must_succeed(path) do
+        body = get(path, params).body
+        next Page.new(records: [body], next_cursor: nil, total_count: 1) if single_record?(body, list_key)
+
+        to_page(body, path, list_key)
+      end
+    end
+
+    # One record from its own endpoint. Raises on a 404 like on any other
+    # failure: what a missing record means -- a stale link, a record outside the
+    # token's scope, a deletion -- is the caller's to decide, not the client's.
+    def fetch_record(path, id, params: {}, boot: false)
+      operation = "#{path}/#{id}"
+
+      within_read_scope(['record', path, id, params]) do
+        must_succeed(operation) do
+          body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
+          body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
+        end
+      end
+    end
+
+    # Every record of an endpoint that answers in one response: the reference
+    # collections -- admins, teams, ticket types, ticket states -- whose paths
+    # declare no pagination parameter at all.
+    #
+    # `list_key` is the key the endpoint puts its records under. Intercom is not
+    # consistent about it: `/admins` answers `{"type": "admin.list", "admins":
+    # [...]}` where `/ticket_types` answers the `data` envelope every paginated
+    # listing uses, so the collection names its own and `data` is the fallback.
+    #
+    # A cursor is followed if one is advertised, defensively: no pagination
+    # parameter in the specification is not a promise that a large workspace
+    # answers in one response, and a truncated reference collection would show
+    # an operator a state list missing its last states.
+    # `params` is what narrows the endpoint rather than what pages it:
+    # `/data_attributes` answers the attributes of contacts and those of
+    # companies under `?model=`, and both are read whole.
+    #
+    # Held for the configured window rather than re-read on every page: these
+    # are the workspace's own lists, every relation of this datasource resolves
+    # through one of them, and a ticket list projecting four relations spends
+    # four sequential round trips here. See `Cache` for what the window trades,
+    # and `Configuration#reference_cache_ttl` for how to close it.
+    #
+    # `boot` is not part of the key: it selects the connection a read travels
+    # on -- shorter timeouts while the agent starts -- not what comes back. The
+    # ticket types read at boot are the ticket types a list view reads.
+    #
+    # The list is frozen on the way in -- shallowly, which is the depth that
+    # matters: every caller maps or indexes it, so a `<<` or a `sort!` on what
+    # the next page is going to read is the mistake worth making impossible.
+    # The records inside stay mutable and nothing edits them; walking a page of
+    # JSON to freeze it on every read would buy a rule no caller is testing.
+    def fetch_all(path, list_key: 'data', params: {}, boot: false)
+      @configuration.reference_cache.fetch(['fetch_all', path, list_key, params]) do
+        must_succeed(path) do
+          collect_pages(path, list_key: list_key, params: params, boot: boot).freeze
+        end
+      end
+    end
+
+    # The page size Intercom accepts, whatever was asked for.
+    def self.bounded_per_page(size)
+      value = size.to_i
+      return 1 if value < 1
+
+      [value, MAX_PER_PAGE].min
+    end
+
+    # The client holds the connections whose headers carry the access token in
+    # clear, and Faraday prints those headers on `inspect`.
+    def inspect
+      "#<#{self.class.name} url=#{@configuration.redacted_url.inspect}>"
+    end
+
+    private
+
+    # Readers rather than builders: both connections are built in the
+    # constructor, where what distinguishes them is argued.
+    attr_reader :connection, :boot_connection
+
+    # The answer already given for `key` while this page was being built, or the
+    # block's. Outside a scope -- a smart action, a boot read -- the block runs
+    # as it always did: nothing is remembered where nothing opened a scope.
+    #
+    # A block that raises writes nothing, so a failed read is not replayed to
+    # the rest of the page as an answer.
+    def within_read_scope(key)
+      scope = Thread.current[@scope_key]
+      return yield if scope.nil?
+      return scope[key] if scope.key?(key)
+
+      scope[key] = yield
+    end
+
+    # The raw response rather than its body: the quota headers are read by the
+    # throttle, and the version echo by `verify_pinned_version`.
+    def get(path, params = nil, boot: false)
+      (boot ? boot_connection : connection).get(path, params)
+    end
+
+    def post(path, body, params: {}, boot: false)
+      http = boot ? boot_connection : connection
+
+      http.post(path) do |request|
+        request.params.update(params) unless params.nil? || params.empty?
+        request.body = body
+      end
+    end
+
+    # Intercom serves the version its workspace defaults to when the pin is not
+    # honoured, and the payloads differ between versions. The echo is the only
+    # way to notice, and noticing at boot is worth more than a schema that
+    # drifts silently -- so this reports rather than raises: the agent still runs
+    # against a version it did not ask for, which is better than not running.
+    def verify_pinned_version(response)
+      served = response.headers['intercom-version'] if response.respond_to?(:headers)
+      return if served.nil? || served.to_s == @configuration.api_version
+
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] asked Intercom for API version #{@configuration.api_version} " \
+        "and it served #{served}. Payload shapes may differ from the ones this datasource expects; check the " \
+        "workspace's default version in the Developer Hub."
+      )
+    end
+
+    # Intercom spells an order `{ "field": "...", "order": "descending" }`,
+    # and answers `data_invalid` on anything else -- so the clause is written
+    # here rather than by the caller, whose vocabulary is Forest's.
+    def sort_clause(sort)
+      { 'field' => sort[:field].to_s, 'order' => sort[:ascending] == false ? 'descending' : 'ascending' }
+    end
+
+    # A record rather than a listing: no list under either key, and an id where
+    # a record carries one. An empty listing is not one of these -- it answers
+    # `data` as an empty array, which is a page of nothing rather than a record.
+    def single_record?(body, list_key)
+      body.is_a?(Hash) && !body[list_key].is_a?(Array) && !body['data'].is_a?(Array) && body.key?('id')
+    end
+
+    def collect_pages(path, list_key:, params:, boot:)
+      records = []
+      cursor = nil
+      pages = 0
+
+      loop do
+        query = cursor.nil? ? params : params.merge('starting_after' => cursor)
+        body = get(path, query.empty? ? nil : query, boot: boot).body
+        records.concat(extract_entities(body, path, list_key))
+        pages += 1
+        cursor = next_cursor(body, path)
+        break if cursor.nil?
+
+        if pages >= MAX_COLLECTED_PAGES
+          log_collection_cap(path, pages, records.size)
+          break
+        end
+      end
+
+      records
+    end
+
+    # The records under the key the endpoint uses, or under `data`. Anything
+    # else is refused rather than read as an empty page: `Array()` would turn the
+    # envelope into `[key, value]` pairs a collection would serialize into rows
+    # holding nothing -- a page that looks answered and is empty -- and a
+    # reference collection silently read as empty is a state column with no
+    # values and an assignee shown as a raw id.
+    def extract_entities(body, operation, list_key)
+      return [] if body.nil? || body == ''
+
+      entities = body.is_a?(Hash) ? (body[list_key] || body['data']) : nil
+      return entities if entities.is_a?(Array)
+
+      detail = list_key == 'data' ? "'data' is not a list" : "neither '#{list_key}' nor 'data' is a list"
+      refuse_body_shape(operation, detail)
+    end
+
+    def log_collection_cap(path, pages, collected)
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] Stopped reading #{path} after #{pages} page(s) / " \
+        "#{collected} record(s); the rest is left out. This endpoint is read whole on purpose, so a workspace " \
+        'this large needs the collection bounded rather than listed.'
+      )
+    end
+
+    # Intercom wraps a listing in `{ "type": "list", "data": [...],
+    # "total_count": N, "pages": { "next": { "starting_after": "..." } } }`.
+    def to_page(body, operation, list_key)
+      Page.new(records: extract_entities(body, operation, list_key),
+               next_cursor: next_cursor(body, operation),
+               total_count: extract_count(body),
+               total_pages: extract_total_pages(body))
+    end
+
+    # The offset tier addresses the page after this one by number, and Intercom
+    # advertises it the same way -- `pages.next` there is a page, not a cursor.
+    # Reading it as one is what made the Companies list refuse a perfectly
+    # ordinary answer, so this page is built without it.
+    def to_offset_page(body, operation, list_key)
+      Page.new(records: extract_entities(body, operation, list_key),
+               next_cursor: nil,
+               total_count: extract_count(body),
+               total_pages: extract_total_pages(body))
+    end
+
+    # Absent on the last page, which is how the walk knows it is done. An older
+    # API version spells it as a url instead of an object -- and one can be
+    # served despite the pin, which is what the version echo warns about -- so
+    # the cursor is read out of its query string rather than the page being
+    # taken for the last one.
+    #
+    # Anything else is refused, an advertised page whose cursor cannot be read
+    # included: taking it for the last page would truncate the answer silently,
+    # which is worse than a failure naming what it could not read.
+    def next_cursor(body, operation)
+      advertised = body.is_a?(Hash) && body['pages'].is_a?(Hash) ? body['pages']['next'] : nil
+      return nil if advertised.nil?
+
+      cursor = case advertised
+               when Hash then advertised['starting_after']
+               when String then cursor_from_url(advertised)
+               end
+
+      presence(cursor) || refuse_body_shape(operation, "'pages.next' carries no cursor this can follow")
+    end
+
+    def cursor_from_url(url)
+      Faraday::Utils.parse_query(URI.parse(url).query.to_s)['starting_after']
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # nil rather than 0 when Intercom sends no count: zero is an answer, and
+    # this is the absence of one.
+    def extract_count(body)
+      count = body['total_count'] if body.is_a?(Hash)
+      count.is_a?(Numeric) ? count.to_i : nil
+    end
+
+    # How many pages the offset tier has to read through, when the endpoint
+    # counts them. nil on a cursor page, which counts nothing.
+    def extract_total_pages(body)
+      pages = body['pages'] if body.is_a?(Hash)
+      total = pages['total_pages'] if pages.is_a?(Hash)
+      total.is_a?(Numeric) ? total.to_i : nil
+    end
+
+    def refuse_body_shape(operation, detail)
+      raise APIError.new("Intercom API call failed: #{operation}: unexpected response shape, #{detail}", status: nil)
+    end
+
+    def presence(value)
+      blank?(value) ? nil : value
+    end
+
+    def blank?(value)
+      value.nil? || value.to_s.empty?
+    end
+
+    # `JSON::ParserError` alongside Faraday's own errors: on its own it would
+    # reach the catch-all below, whose message is the exception's -- and a JSON
+    # parser opens its message with what it choked on.
+    def must_succeed(operation)
+      yield
+    rescue Faraday::Error, JSON::ParserError => e
+      raise api_error(operation, e)
+    rescue APIError
+      # Already mapped, with its status intact; re-wrapping would erase it --
+      # a 404 read as "no such record" rather than as a failure, above all.
+      raise
+    rescue StandardError => e
+      raise APIError, "Intercom API call failed: #{operation}: #{e.class}: #{e.message}"
+    end
+
+    # Builds an APIError preserving the HTTP status and Intercom's own error body
+    # so a smart action can show the operator the real reason instead of
+    # "failed".
+    def api_error(operation, error)
+      response = response_of(error)
+      status = response[:status]
+      body   = parse_body(response[:body])
+
+      APIError.new("Intercom API call failed: #{operation}: #{failure_detail(error, status, body)}",
+                   status: status, body: body)
+    end
+
+    # Faraday hands the status and the body back in a plain hash on most errors
+    # and in its own `Env` on a parsing error; both answer `[]`.
+    def response_of(error)
+      response = error.respond_to?(:response) ? error.response : nil
+      return { status: nil, body: nil } unless response.respond_to?(:[])
+
+      { status: response[:status], body: response[:body] }
+    end
+
+    # A body that could not be parsed is named, never quoted: the parser's own
+    # message opens with the characters it choked on, and on a 200 those are the
+    # payload -- a conversation body, most of the time (R10).
+    def failure_detail(error, status, body)
+      return unreadable_detail(status) if parse_failure?(error)
+      return "#{error.class}: #{error.message}" unless status
+
+      "HTTP #{status} #{error_message(body)}".strip
+    end
+
+    def unreadable_detail(status)
+      detail = 'the response could not be read as JSON'
+      status ? "#{detail} (HTTP #{status})" : detail
+    end
+
+    def parse_failure?(error)
+      error.is_a?(Faraday::ParsingError) || error.is_a?(JSON::ParserError)
+    end
+
+    # Intercom answers a failure with `{ "type": "error.list", "request_id":
+    # "...", "errors": [{ "code": ..., "message": ... }] }`. The request id is
+    # what its support asks for first, so it is appended after the truncation
+    # rather than being what a long body pushes out.
+    #
+    # A body of any other shape is *not* echoed here. This message travels into
+    # the interface and into whatever collects the agent's errors, and the body
+    # of a response that failed to parse is a payload rather than an error --
+    # conversation bodies included (R10). Its size is reported instead, and the
+    # body itself stays on the exception for whoever inspects one.
+    def error_message(parsed)
+      return "(unreadable body, #{parsed.to_s.bytesize} bytes)" unless parsed.is_a?(Hash)
+
+      message = join_errors(parsed['errors'])
+      message = parsed.to_json if message.empty?
+
+      append_request_id(message[0, 500], parsed['request_id'])
+    end
+
+    def join_errors(errors)
+      Array(errors).filter_map do |error|
+        next error unless error.is_a?(Hash)
+
+        [error['code'], error['message']].compact.join(': ')
+      end.join('; ')
+    end
+
+    def append_request_id(message, request_id)
+      return message unless request_id
+
+      "#{message} (request_id: #{request_id})"
+    end
+
+    def parse_body(body)
+      return body unless body.is_a?(String) && !body.empty?
+
+      JSON.parse(body)
+    rescue JSON::ParserError
+      body
+    end
+
+    # Which adapter every connection of this client is built on, resolved once.
+    #
+    # A ticket list is seven requests to one host, and Faraday's default adapter
+    # opens a socket and negotiates TLS for each of them -- handshakes that cost
+    # more than several of the requests they carry. The persistent adapter pools
+    # the connection instead, which is why it is the default here and a runtime
+    # dependency of the gem.
+    #
+    # Resolved rather than assumed: a deployment that excluded the gem falls
+    # back to Faraday's default and says so once, instead of failing to boot
+    # over an optimisation. `Configuration#adapter` overrides both -- a name, or
+    # a `[name, options]` pair, normalised there.
+    def resolve_adapter
+      name, options = Array(@configuration.adapter || Configuration::DEFAULT_ADAPTER)
+      # The options travel with the name they were written for: a `pool_size`
+      # meant for the persistent adapter says nothing to the one it fell back
+      # to.
+      adapter_registered?(name) ? [name, options || {}] : [fallback_adapter(name), {}]
+    end
+
+    # Registered by Faraday, which is what `f.adapter` looks the name up in --
+    # and `lookup_middleware` raises rather than answering nil when it is not.
+    # The persistent adapter registers itself when its gem is required, and that
+    # require is here rather than at the top of the file so an absent gem is a
+    # fallback rather than a LoadError on the first `require` of this package.
+    def adapter_registered?(name)
+      require 'faraday/net_http_persistent' if name == :net_http_persistent
+
+      !Faraday::Adapter.lookup_middleware(name).nil?
+    rescue LoadError, Faraday::Error
+      false
+    end
+
+    def fallback_adapter(name)
+      ForestAdminDatasourceIntercom.logger.warn(
+        "[forest_admin_datasource_intercom] the #{name.inspect} Faraday adapter is not available; falling back " \
+        "to #{Faraday.default_adapter.inspect}. Every request then opens its own connection and negotiates TLS " \
+        'again, which a page resolving several relations pays for once per request. Add the ' \
+        'faraday-net_http_persistent gem, or set an adapter this process can load.'
+      )
+
+      Faraday.default_adapter
+    end
+
+    # Middleware order is deliberate: `raise_error` sits outside the JSON parser
+    # so it raises with an already-parsed body, and `retry` sits innermost so it
+    # inspects raw statuses -- behind `raise_error` it would never see a 429.
+    #
+    # The throttle goes inside `retry`, which is what makes a replay wait for
+    # the window like a first attempt, and what lets the 429's own headers reach
+    # the limiter: outside it, the middleware would run once for a request that
+    # reached Intercom three times.
+    #
+    # How long a request may take is the caller's to state; everything else is
+    # the same on every connection this builds, the limiter included -- a second
+    # limiter would meter in a window of its own and spend the budget twice.
+    def build_connection(retry_policy:, timeout:, open_timeout:)
+      name, options = @adapter
+
+      Faraday.new(url: @configuration.url) do |f|
+        f.request :json
+        f.response :raise_error
+        f.response :json
+        f.request :retry, **retry_policy.to_faraday_options
+        f.use Throttle, limiter: @configuration.rate_limiter if @configuration.rate_limiter
+        f.adapter(name, **options)
+        f.headers['Authorization'] = "Bearer #{@configuration.access_token}"
+        f.headers['Accept'] = 'application/json'
+        f.headers['Intercom-Version'] = @configuration.api_version
+        f.headers['User-Agent'] = "forest_admin_datasource_intercom/#{VERSION}"
+        f.options.open_timeout = open_timeout
+        f.options.timeout = timeout
+      end
+    end
+  end
+end
