@@ -46,9 +46,17 @@ module ForestAdminRpcAgent
       )
     end
 
+    # Regexp patterns are matched with `match?`, i.e. unanchored: /rpc_/ also matches "admin_rpc_logs".
+    # Anchor patterns (e.g. /^rpc_/) to avoid unintentionally catching unrelated collections.
     def mark_collections_as_rpc(*names)
       @rpc_collections.push(*names)
       self
+    end
+
+    def rpc_collection?(name)
+      @rpc_collections.any? do |pattern|
+        pattern.is_a?(Regexp) ? pattern.match?(name) : pattern == name
+      end
     end
 
     private
@@ -83,7 +91,7 @@ module ForestAdminRpcAgent
       datasource.collections.each_value do |collection|
         relations = {}
 
-        if @rpc_collections.include?(collection.name)
+        if rpc_collection?(collection.name)
           extract_rpc_collection_relations(collection, relations)
         else
           collections << build_normal_collection_payload(collection, relations)
@@ -159,9 +167,9 @@ module ForestAdminRpcAgent
 
     def relation_targets_rpc_collection?(relation)
       if relation.type == 'PolymorphicManyToOne'
-        relation.foreign_collections.any? { |fc| @rpc_collections.include?(fc) }
+        relation.foreign_collections.any? { |fc| rpc_collection?(fc) }
       else
-        @rpc_collections.include?(relation.foreign_collection)
+        rpc_collection?(relation.foreign_collection)
       end
     end
   end
