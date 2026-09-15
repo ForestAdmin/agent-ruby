@@ -255,6 +255,40 @@ module ForestAdminRpcAgent
       end
     end
 
+    describe '#rpc_collection?' do
+      it 'matches an exact string pattern' do
+        instance.mark_collections_as_rpc('users')
+
+        expect(instance.rpc_collection?('users')).to be true
+        expect(instance.rpc_collection?('orders')).to be false
+      end
+
+      it 'matches a regex pattern' do
+        instance.mark_collections_as_rpc(/^rpc_/)
+
+        expect(instance.rpc_collection?('rpc_users')).to be true
+        expect(instance.rpc_collection?('users')).to be false
+      end
+
+      it 'matches when any of several mixed patterns matches' do
+        instance.mark_collections_as_rpc('users', /^admin_/)
+
+        expect(instance.rpc_collection?('users')).to be true
+        expect(instance.rpc_collection?('admin_logs')).to be true
+        expect(instance.rpc_collection?('orders')).to be false
+      end
+
+      it 'returns false when no pattern is registered' do
+        expect(instance.rpc_collection?('users')).to be false
+      end
+
+      it 'matches unanchored patterns as a substring, not only as a prefix' do
+        instance.mark_collections_as_rpc(/rpc_/)
+
+        expect(instance.rpc_collection?('admin_rpc_logs')).to be true
+      end
+    end
+
     describe 'etag in cached_schema' do
       let(:customizer) { instance_double(ForestAdminDatasourceCustomizer::DatasourceCustomizer) }
 
@@ -403,6 +437,61 @@ module ForestAdminRpcAgent
         expect(instance.cached_schema[:rpc_relations]['NormalCollection']).to have_key('rpc_ref')
       end
 
+      it 'extracts relations into rpc_relations when the foreign_collection matches a regex pattern' do
+        rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        relation_field = instance_double(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        allow(relation_field).to receive_messages(
+          type: 'ManyToOne',
+          foreign_collection: 'rpc_orders'
+        )
+
+        allow(rpc_collection).to receive_messages(name: 'rpc_orders', schema: { fields: {} })
+        allow(normal_collection).to receive_messages(
+          name: 'NormalCollection',
+          schema: { fields: { 'rpc_ref' => relation_field } }
+        )
+        allow(datasource).to receive_messages(
+          collections: { 'rpc_orders' => rpc_collection, 'NormalCollection' => normal_collection },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc(/^rpc_/)
+        instance.send_schema
+
+        expect(instance.cached_schema[:rpc_relations]).to have_key('NormalCollection')
+        expect(instance.cached_schema[:rpc_relations]['NormalCollection']).to have_key('rpc_ref')
+      end
+
+      it 'keeps the relation in fields when the foreign_collection matches no rpc pattern' do
+        normal_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
+        normal_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+        relation_field = instance_double(ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema)
+        allow(relation_field).to receive_messages(
+          type: 'ManyToOne',
+          foreign_collection: 'NormalCollection2'
+        )
+
+        allow(normal_collection1).to receive_messages(
+          name: 'NormalCollection1',
+          schema: { fields: { 'other' => relation_field } }
+        )
+        allow(normal_collection2).to receive_messages(name: 'NormalCollection2', schema: { fields: {} })
+        allow(datasource).to receive_messages(
+          collections: { 'NormalCollection1' => normal_collection1, 'NormalCollection2' => normal_collection2 },
+          live_query_connections: {}
+        )
+
+        instance.mark_collections_as_rpc(/^rpc_/)
+        instance.send_schema
+
+        expect(instance.cached_schema[:rpc_relations]).not_to have_key('NormalCollection1')
+        normal_schema = instance.cached_schema[:collections].find { |c| c[:name] == 'NormalCollection1' }
+        expect(normal_schema[:fields]).to have_key('other')
+      end
+
       it 'does not extract relations between RPC collections' do
         rpc_collection1 = instance_double(ForestAdminDatasourceToolkit::Collection)
         rpc_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
@@ -464,6 +553,41 @@ module ForestAdminRpcAgent
 
           expect(instance.cached_schema[:rpc_relations]).to have_key('RpcCollection')
           expect(instance.cached_schema[:rpc_relations]['RpcCollection']).to have_key('commentable')
+        end
+
+        it 'extracts polymorphic relation when a foreign collection matches a regex pattern' do
+          normal_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+          rpc_collection = instance_double(ForestAdminDatasourceToolkit::Collection)
+
+          polymorphic_field = instance_double(
+            ForestAdminDatasourceToolkit::Schema::Relations::PolymorphicManyToOneSchema
+          )
+          allow(polymorphic_field).to receive_messages(
+            type: 'PolymorphicManyToOne',
+            foreign_collections: %w[rpc_orders NormalCollection2]
+          )
+
+          allow(normal_collection).to receive_messages(
+            name: 'NormalCollection',
+            schema: { fields: { 'commentable' => polymorphic_field } }
+          )
+          allow(rpc_collection).to receive_messages(name: 'rpc_orders', schema: { fields: {} })
+          normal_collection2 = instance_double(ForestAdminDatasourceToolkit::Collection)
+          allow(normal_collection2).to receive_messages(name: 'NormalCollection2', schema: { fields: {} })
+          allow(datasource).to receive_messages(
+            collections: {
+              'NormalCollection' => normal_collection,
+              'rpc_orders' => rpc_collection,
+              'NormalCollection2' => normal_collection2
+            },
+            live_query_connections: {}
+          )
+
+          instance.mark_collections_as_rpc(/^rpc_/)
+          instance.send_schema
+
+          expect(instance.cached_schema[:rpc_relations]).to have_key('NormalCollection')
+          expect(instance.cached_schema[:rpc_relations]['NormalCollection']).to have_key('commentable')
         end
 
         it 'does not extract polymorphic relation from RPC collection when all targets are RPC' do

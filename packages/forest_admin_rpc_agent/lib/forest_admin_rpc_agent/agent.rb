@@ -46,18 +46,20 @@ module ForestAdminRpcAgent
       )
     end
 
+    # Regexp patterns are matched with `match?`, i.e. unanchored: /rpc_/ also matches "admin_rpc_logs".
+    # Anchor patterns (e.g. /^rpc_/) to avoid unintentionally catching unrelated collections.
     def mark_collections_as_rpc(*names)
       @rpc_collections.push(*names)
       self
     end
-
-    private
 
     def rpc_collection?(name)
       @rpc_collections.any? do |pattern|
         pattern.is_a?(Regexp) ? pattern.match?(name) : pattern == name
       end
     end
+
+    private
 
     def should_skip_schema_update?
       ForestAdminRpcAgent::Facades::Container.cache(:skip_schema_update) == true
