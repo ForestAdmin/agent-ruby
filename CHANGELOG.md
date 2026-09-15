@@ -1,3 +1,31 @@
+## [1.43.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.0...v1.43.1) (2026-09-15)
+
+
+### Bug Fixes
+
+* **agent:** decode a Forest-Projection header whose field names are not ASCII ([#390](https://github.com/ForestAdmin/agent-ruby/issues/390)) ([80a8ceb](https://github.com/ForestAdmin/agent-ruby/commit/80a8ceb3b4a0e9d0e654db6a5945113b156500f6))
+
+# [1.43.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.42.0...v1.43.0) (2026-09-10)
+
+
+### Features
+
+* add option to skip rbac ([#388](https://github.com/ForestAdmin/agent-ruby/issues/388)) ([3894104](https://github.com/ForestAdmin/agent-ruby/commit/3894104288956335caff7ad9947e5c3ca812a706))
+
+# [1.42.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.41.0...v1.42.0) (2026-09-02)
+
+
+### Features
+
+* **datasource-customizer:** let replace_search take a field selection so a narrowed search is permission-checked ([#382](https://github.com/ForestAdmin/agent-ruby/issues/382)) ([add4b1b](https://github.com/ForestAdmin/agent-ruby/commit/add4b1be29aaadfbf18c83a20de852729d6379e4))
+
+# [1.41.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.1...v1.41.0) (2026-09-01)
+
+
+### Features
+
+* **datasource-pylon:** Pylon datasource for the Ruby agent (EXT-4) ([#369](https://github.com/ForestAdmin/agent-ruby/issues/369)) ([cf20168](https://github.com/ForestAdmin/agent-ruby/commit/cf20168abed896a1d70d1841eb7c18967908fd26)), closes [#380](https://github.com/ForestAdmin/agent-ruby/issues/380)
+
 ## [1.40.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.40.0...v1.40.1) (2026-08-28)
 
 

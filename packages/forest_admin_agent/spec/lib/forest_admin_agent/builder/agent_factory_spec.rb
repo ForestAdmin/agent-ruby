@@ -898,6 +898,32 @@ module ForestAdminAgent
           end
         end
       end
+
+      describe 'warning that the relation read checks are off' do
+        # `@options` is what `setup` holds when it calls this, so the spec hands over the same thing.
+        def boot_with(skip)
+          instance = described_class.instance
+          logger = instance_spy(Services::LoggerService)
+          instance.instance_variable_set(:@logger, logger)
+          instance.instance_variable_set(:@options, { skip_relation_read_permissions: skip })
+
+          instance.send(:warn_relation_read_permissions_skipped)
+
+          logger
+        end
+
+        it 'warns on boot so the weakened posture shows in the log' do
+          expect(boot_with(true)).to have_received(:log).with(
+            'Warn',
+            '[ForestAdmin] skip_relation_read_permissions is true: columns of collections the ' \
+            'caller has no read permission on are served when a relation path reaches them'
+          )
+        end
+
+        it 'stays quiet while the checks are on' do
+          expect(boot_with(false)).not_to have_received(:log)
+        end
+      end
     end
   end
 end

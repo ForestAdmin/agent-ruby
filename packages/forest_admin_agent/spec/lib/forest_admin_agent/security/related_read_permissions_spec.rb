@@ -248,13 +248,13 @@ module ForestAdminAgent
           Nodes::ConditionTreeLeaf.new(field, Operators::EQUAL, 'FR76')
         end
 
-        def searchable_cards(searched)
+        def searchable_cards(searched, search_handler: false)
           double = instance_double(
-            ForestAdminDatasourceToolkit::Decorators::CollectionDecorator,
+            ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator,
             name: 'cards',
             datasource: datasource
           )
-          allow(double).to receive(:searched_fields).and_return(searched)
+          allow(double).to receive_messages(searched_fields: searched, search_handler?: search_handler)
 
           double
         end
@@ -353,18 +353,70 @@ module ForestAdminAgent
             )
         end
 
-        # A replaced search: the handler picks the fields, the caller only supplies the text.
+        # A replaced search: the block picks the fields, the caller only supplies the text.
         it 'serves the request when the stack cannot say what a search reaches' do
           permissions = build_permissions([])
 
-          expect { permissions.assert_can_read_query_fields(searchable_cards(nil), search: 'martin') }
-            .not_to raise_error
+          expect do
+            permissions.assert_can_read_query_fields(
+              searchable_cards(nil, search_handler: true), search: 'martin'
+            )
+          end.not_to raise_error
+        end
+
+        # The flag is the caller's: the same term with it off and on differs by exactly the rows
+        # matched through a relation, so an unverifiable traversal is refused where a plain search is
+        # served.
+        it 'refuses the extended half of that same search' do
+          permissions = build_permissions([])
+
+          expect do
+            permissions.assert_can_read_query_fields(
+              searchable_cards(nil, search_handler: true), search: 'martin', search_extended: true
+            )
+          end.to raise_error(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError,
+            "You cannot run an extended search on the 'cards' collection: the fields it reaches " \
+            'cannot be determined, so they cannot be checked against your permissions.'
+          )
+        end
+
+        # `refine_filter` discards a blank search instead of running it, so refusing one would 403 a
+        # request that searches nothing.
+        ['', '   '].each do |blank|
+          it "serves #{blank.inspect} with the extended flag on, which runs no search at all" do
+            permissions = build_permissions([])
+
+            expect do
+              permissions.assert_can_read_query_fields(
+                searchable_cards(nil, search_handler: true), search: blank, search_extended: true
+              )
+            end.not_to raise_error
+          end
         end
 
         it 'checks nothing on a collection that cannot answer what a search reaches' do
           permissions = build_permissions([])
 
           expect { permissions.assert_can_read_query_fields(cards, search: 'martin') }.not_to raise_error
+        end
+
+        # Refusing here would 403 every collection the search decorator does not sit on.
+        it 'serves the extended search of a collection that cannot answer at all' do
+          permissions = build_permissions([])
+
+          expect { permissions.assert_can_read_query_fields(cards, search: 'martin', search_extended: true) }
+            .not_to raise_error
+        end
+
+        # `permission_system?` fetches `/liana/v4/permissions/environment` cold; `describes_own_search?`
+        # is local. Every extended search on a nil footprint reached that fetch.
+        it 'does not reach the permission system for a search it will not refuse' do
+          permissions = build_permissions([])
+
+          permissions.assert_can_read_query_fields(cards, search: 'martin', search_extended: true)
+
+          expect(permissions).not_to have_received(:permission_system?)
         end
 
         it 'accepts a filter once the collection it reaches is readable' do
@@ -380,6 +432,125 @@ module ForestAdminAgent
           permissions = build_permissions([])
 
           expect { permissions.assert_can_read_query_fields(cards) }.not_to raise_error
+        end
+
+        # The examples above hand the guard a stubbed footprint to pin its policy. These drive a real
+        # search decorator instead, so what the decorator reports and what the guard does with it are
+        # checked together.
+        describe 'through a real replace_search field selection' do
+          def cards_searching(replacer)
+            decorator = ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator.new(
+              cards, datasource
+            )
+            decorator.replace_search(replacer)
+
+            decorator
+          end
+
+          it 'refuses an included relation path the caller cannot read' do
+            permissions = build_permissions([])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }
+              .to raise_error(
+                ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                "You cannot search on 'account:iban': you are not allowed to read the 'accounts' collection."
+              )
+          end
+
+          it 'serves the same search once the collection the path reaches is readable' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
+          end
+
+          # What a field selection buys over a callable: the callable names no field, so a plain search
+          # reads the same column unchecked for a role that cannot read the collection it belongs to,
+          # and its extended half is refused outright rather than checked.
+          it 'serves a plain search a callable describes, which names no field to check' do
+            permissions = build_permissions([])
+            collection = cards_searching(
+              ->(value, _extended, _context) { { field: 'account:iban', operator: Operators::EQUAL, value: value } }
+            )
+
+            expect { permissions.assert_can_read_query_fields(collection, search: 'FR76') }.not_to raise_error
+          end
+
+          it 'refuses the extended search of that callable, where the selection is checked instead' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching(
+              ->(value, _extended, _context) { { field: 'account:iban', operator: Operators::EQUAL, value: value } }
+            )
+
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'FR76', search_extended: true)
+            end.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              /You cannot run an extended search on the 'cards' collection/
+            )
+          end
+
+          it 'serves the extended search of the equivalent field selection' do
+            permissions = build_permissions(%w[accounts])
+            collection = cards_searching({ include_fields: ['account:iban'] })
+
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'FR76', search_extended: true)
+            end.not_to raise_error
+          end
+
+          # Refusing here would take extended search off every natively searchable datasource.
+          it 'serves an extended search the child collection runs natively' do
+            permissions = build_permissions([])
+            native = datasource.get_collection('cards')
+            allow(native).to receive(:schema).and_return(native.schema.merge(searchable: true))
+            collection = ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator.new(
+              native, datasource
+            )
+
+            expect(collection.searched_fields('martin', true)).to be_nil
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'martin', search_extended: true)
+            end.not_to raise_error
+          end
+
+          # The only example that goes through the stack the routes hand the guard: without it, the
+          # delegation going missing looks exactly like the refusal being correctly narrowed.
+          it 'refuses a callable extended search through a booted customizer stack' do
+            permissions = build_permissions([])
+            customizer = ForestAdminDatasourceCustomizer::DatasourceCustomizer.new
+            customizer.add_datasource(datasource, {})
+            customizer.customize_collection('cards') do |collection|
+              collection.replace_search do |value, _extended, _context|
+                { field: 'pan_last4', operator: Operators::EQUAL, value: value }
+              end
+            end
+            top = customizer.datasource({}).get_collection('cards')
+
+            expect(top).not_to be_a(ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator)
+            expect(top.searched_fields('martin', true)).to be_nil
+            expect do
+              permissions.assert_can_read_query_fields(top, search: 'martin', search_extended: true)
+            end.to raise_error(
+              ForestAdminAgent::Http::Exceptions::ForbiddenError,
+              /You cannot run an extended search on the 'cards' collection/
+            )
+          end
+
+          # `can?` allows everything without a permission system, so a refusal there would be the one
+          # denial no grant could lift.
+          it 'serves the callable extended search when no permission system is enabled' do
+            permissions = described_class.new(caller)
+            allow(permissions).to receive(:permission_system?).and_return(false)
+            collection = cards_searching(
+              ->(value, _extended, _context) { { field: 'pan_last4', operator: Operators::EQUAL, value: value } }
+            )
+
+            expect do
+              permissions.assert_can_read_query_fields(collection, search: 'FR76', search_extended: true)
+            end.not_to raise_error
+          end
         end
       end
 
@@ -439,6 +610,90 @@ module ForestAdminAgent
 
           expect(permissions.read_permissions('cards', %w[accounts])).to eq(
             { 'cards' => true, 'accounts' => true }
+          )
+        end
+      end
+
+      # The option lifts the read checks this whole suite pins. It lifts nothing else: whether the
+      # caller may browse, read or export the collection it is querying is a different question,
+      # asked by the route through `can?`, and still answered.
+      describe 'with skip_relation_read_permissions' do
+        def unchecked_permissions(readable = [])
+          permissions = build_permissions(readable)
+          allow(permissions).to receive(:skip_relation_read_permissions?).and_return(true)
+
+          permissions
+        end
+
+        def searchable_cards(searched, search_handler: false)
+          double = instance_double(
+            ForestAdminDatasourceCustomizer::Decorators::Search::SearchCollectionDecorator,
+            name: 'cards',
+            datasource: datasource
+          )
+          allow(double).to receive_messages(searched_fields: searched, search_handler?: search_handler)
+
+          double
+        end
+
+        it 'serves a field the caller named on a collection it cannot read' do
+          projection = unchecked_permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban]), named_by_caller: true
+          )
+
+          expect(projection).to eq(%w[id account:iban])
+        end
+
+        it 'keeps an unnamed projection whole instead of dropping a path' do
+          projection = unchecked_permissions.redact_projection(
+            cards, Projection.new(%w[id account:iban holder:*]), named_by_caller: false
+          )
+
+          expect(projection).to eq(%w[id account:iban holder:*])
+        end
+
+        it 'serves a filter on a collection the caller cannot read' do
+          condition_tree = Nodes::ConditionTreeLeaf.new('account:iban', Operators::EQUAL, 'FR76')
+
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(cards, condition_tree: condition_tree)
+          end.not_to raise_error
+        end
+
+        it 'serves a sort on a collection the caller cannot read' do
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(
+              cards, sort: [{ field: 'account:iban', ascending: false }]
+            )
+          end.not_to raise_error
+        end
+
+        # Refused before any permission is resolved, so the skip has to be read there too and not
+        # only where the collections are looked up.
+        it 'serves an extended search the stack cannot describe' do
+          expect do
+            unchecked_permissions.assert_can_read_query_fields(
+              searchable_cards(nil, search_handler: true), search: 'martin', search_extended: true
+            )
+          end.not_to raise_error
+        end
+
+        it 'answers every collection readable without fetching permissions' do
+          permissions = unchecked_permissions
+
+          expect(permissions.read_permissions('cards', %w[accounts organizations])).to eq(
+            { 'cards' => true, 'accounts' => true, 'organizations' => true }
+          )
+          expect(permissions).not_to have_received(:get_collections_permissions_data)
+        end
+
+        it 'still refuses the collection being queried' do
+          permissions = unchecked_permissions
+          allow(permissions).to receive(:permission_allowed?).and_return(false)
+
+          expect { permissions.can?(:browse, cards) }.to raise_error(
+            ForestAdminAgent::Http::Exceptions::ForbiddenError,
+            "You don't have permission to browse this collection."
           )
         end
       end

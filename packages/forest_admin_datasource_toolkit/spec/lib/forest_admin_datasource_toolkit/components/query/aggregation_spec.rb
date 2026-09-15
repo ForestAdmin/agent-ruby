@@ -71,6 +71,17 @@ module ForestAdminDatasourceToolkit
             expect(aggregation.apply(records, 'Europe/Paris')).to eq([{ group: {}, value: 2 }])
           end
 
+          # `Max` compared with `<`, so it kept the smallest value it saw: every
+          # Max chart over an in-memory aggregation answered with the minimum.
+          it 'answers Max with the greatest value and Min with the smallest' do
+            records = [{ 'id' => 3 }, { 'id' => 7 }, { 'id' => 5 }]
+
+            expect(described_class.new(operation: 'Max', field: 'id').apply(records, 'Europe/Paris'))
+              .to eq([{ group: {}, value: 7 }])
+            expect(described_class.new(operation: 'Min', field: 'id').apply(records, 'Europe/Paris'))
+              .to eq([{ group: {}, value: 3 }])
+          end
+
           it 'works with group field on year' do
             aggregation = described_class.new(operation: 'Avg', field: 'field',
                                               groups: [{ field: 'groupField', operation: 'Year' }])

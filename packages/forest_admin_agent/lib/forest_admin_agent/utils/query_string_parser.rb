@@ -10,6 +10,7 @@ module ForestAdminAgent
       DEFAULT_ITEMS_PER_PAGE = '15'.freeze
       DEFAULT_PAGE_TO_SKIP = '1'.freeze
       POLYMORPHIC_TARGET_WILDCARD = '*'.freeze
+      FALSY_SEARCH_EXTENDED = [nil, false, 0, '0', 'false', ''].freeze
 
       def self.parse_condition_tree(collection, args)
         filters = begin
@@ -49,7 +50,7 @@ module ForestAdminAgent
       end
 
       def self.parse_projection_from_header(collection, args)
-        header = args.dig(:headers, 'HTTP_FOREST_PROJECTION')&.to_s&.strip
+        header = decode_header_value(args.dig(:headers, 'HTTP_FOREST_PROJECTION'))&.strip
 
         return if header.nil? || header.empty?
 
@@ -80,6 +81,21 @@ module ForestAdminAgent
           projection: parse_projection(collection, args),
           named_by_caller: !(fields.nil? || fields == '')
         }
+      end
+
+      # Rack hands header values back as raw bytes. A column named after a workspace's own free
+      # text -- `Ce que j'ai vérifié` -- reaches us either as UTF-8 or, from a browser (which
+      # sends a header value as one byte per code unit), as Latin-1. Left tagged BINARY it
+      # matches no schema key, and interpolating it into the not-found message raises
+      # Encoding::CompatibilityError before that 400 is ever built. The fallback cannot raise
+      # in turn: ISO-8859-1 defines all 256 bytes, and each maps to a character UTF-8 can hold.
+      def self.decode_header_value(value)
+        return if value.nil?
+
+        utf8 = value.to_s.dup.force_encoding(Encoding::UTF_8)
+        return utf8 if utf8.valid_encoding?
+
+        utf8.force_encoding(Encoding::ISO_8859_1).encode(Encoding::UTF_8)
       end
 
       def self.add_polymorphic_type_fields(collection, requested_field_names)
@@ -196,7 +212,7 @@ module ForestAdminAgent
               "Available fields are: [#{available_fields}]. " \
               'Please check if the field name is correct.'
       end
-      private_class_method :add_polymorphic_type_fields, :build_projection_fields,
+      private_class_method :decode_header_value, :add_polymorphic_type_fields, :build_projection_fields,
                            :build_header_projection_fields, :get_field,
                            :expand_polymorphic_leaf, :nested_polymorphic_linkage_fields,
                            :polymorphic_linkage_columns, :each_field_along_path,
@@ -230,21 +246,43 @@ module ForestAdminAgent
         Page.new(offset: 0, limit: limit&.to_i)
       end
 
+      # Presence, not truth: with +||+ a +false+ in the select-all body would silently lose to the
+      # query string. An explicit +null+ or +''+ there is read as absent rather than as "no search",
+      # so neither can widen a result set by discarding the term the URL carried.
+      def self.subset_or_query(args, key)
+        subset = begin
+          args.dig(:params, :data, :attributes, :all_records_subset_query)
+        rescue StandardError
+          nil
+        end
+
+        return subset[key] if subset.is_a?(Hash) && !subset[key].nil? && subset[key] != ''
+
+        begin
+          args.dig(:params, key)
+        rescue StandardError
+          nil
+        end
+      end
+
       def self.parse_search(collection, args)
-        search = args.dig(:params, :data, :attributes, :all_records_subset_query, :search) || args.dig(:params, :search)
+        search = subset_or_query(args, :search)
 
-        raise BadRequestError, 'Collection is not searchable' if search && !collection.is_searchable?
+        return nil if search.nil?
 
-        search
+        raise BadRequestError, 'Collection is not searchable' unless collection.is_searchable?
+
+        unless search.is_a?(String) || search.is_a?(Numeric)
+          raise BadRequestError, 'Search must be a string or a number'
+        end
+
+        search.to_s
       end
 
       def self.parse_search_extended(args)
-        extended = args.dig(:params, :data, :attributes, :all_records_subset_query,
-                            :searchExtended) || args.dig(:params, :searchExtended)
+        extended = subset_or_query(args, :searchExtended)
 
-        return false if extended.nil?
-
-        extended != '0'
+        !FALSY_SEARCH_EXTENDED.include?(extended.is_a?(String) ? extended.downcase : extended)
       end
 
       def self.parse_sort(collection, args)

@@ -421,6 +421,67 @@ module ForestAdminAgent
             )
           end
 
+          it 'reads a field name sent as raw UTF-8 bytes' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+"title,Ce que j'ai vérifié").force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'reads a field name sent as Latin-1 bytes, as a browser encodes a header value' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = "title,Ce que j'ai vérifié".encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'raise a dedicated error when an unknown field and an existing one both hold accents' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+'champ inconnu à moi').force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*champ inconnu à moi/
+            )
+          end
+
+          it 'reads a relation field name that is not ASCII, sent as Latin-1' do
+            collection.datasource.get_collection('Person').add_fields(
+              { 'prénom' => ColumnSchema.new(column_type: 'String') }
+            )
+            header = 'title,author:prénom'.encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', 'author:prénom'])
+            )
+          end
+
+          it 'turns any byte a header can carry into a 400, never an encoding crash' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+
+            outcomes = (0..255).map do |byte|
+              args = { headers: { 'HTTP_FOREST_PROJECTION' => byte.chr(Encoding::BINARY) }, params: {} }
+
+              begin
+                described_class.parse_projection_from_header(collection, args)
+              rescue Http::Exceptions::BadRequestError => e
+                e
+              end
+            end
+
+            expect(outcomes).to all(be_nil.or(be_a(Http::Exceptions::BadRequestError)))
+          end
+
           it 'raise a dedicated error when the header contains an unknown field' do
             args = { headers: { 'HTTP_FOREST_PROJECTION' => 'field-that-do-not-exist' }, params: {} }
 
@@ -709,6 +770,27 @@ module ForestAdminAgent
               /Invalid Forest-Projection header:.*Unexpected nested field email under generic relation/
             )
           end
+
+          it 'expands a polymorphic relation whose name is not ASCII and adds its type field' do
+            collection.add_fields(
+              {
+                'propriétaire_id' => ColumnSchema.new(column_type: 'Number'),
+                'propriétaire_type' => ColumnSchema.new(column_type: 'String'),
+                'propriétaire' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'propriétaire_type',
+                  foreign_collections: ['User'],
+                  foreign_key_targets: { 'User' => 'id' },
+                  foreign_key: 'propriétaire_id'
+                )
+              }
+            )
+            header = 'id,propriétaire'.encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['id', 'propriétaire:*', 'propriétaire_type'])
+            )
+          end
         end
       end
 
@@ -747,6 +829,16 @@ module ForestAdminAgent
 
           expect(described_class.parse_requested_projection(collection, args)).to eq(
             { projection: Projection.new(%w[title author:name]), named_by_caller: true }
+          )
+        end
+
+        it 'reports a projection header whose field name is not ASCII as named by the caller' do
+          collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+          header = "title,Ce que j'ai vérifié".encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+          args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(['title', "Ce que j'ai vérifié"]), named_by_caller: true }
           )
         end
 
@@ -1197,10 +1289,79 @@ module ForestAdminAgent
           expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
         end
 
-        it 'converts the query search parameter as string' do
-          args = { params: { search: 1234 } }
+        [[1234, '1234'], [12.5, '12.5']].each do |value, expected|
+          it "converts #{value.inspect} to #{expected.inspect}" do
+            args = { params: { search: value } }
 
-          expect(described_class.parse_search(collection_user, args)).to eq(1234)
+            expect(described_class.parse_search(collection_user, args)).to eq(expected)
+          end
+        end
+
+        it 'falls back to the query string when the subset query does not name a search' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # An explicit null there must not discard the term the URL carried: dropping a search widens
+        # the result set.
+        it 'reads an explicit null in the subset query as absent, not as no search' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: nil } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # Honouring it would discard the term the URL carried, which widens the result set — the same
+        # reason an explicit null is read as absent.
+        it 'reads an empty string in the subset query as absent too' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: '' } } }
+            }
+          }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'falls back to the query string when the subset query is not a hash' do
+          args = { params: { search: 'searched argument', data: { attributes: { all_records_subset_query: 'nope' } } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        it 'answers nil rather than raising when the body is shaped unexpectedly' do
+          args = { params: { search: 'searched argument', data: { attributes: [1] } } }
+
+          expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+
+        # Every consumer strips it, so a value that cannot be one term is a request error rather than
+        # a `NoMethodError` deeper in the stack — or a search for the string an Array prints as.
+        [['x'], { a: '1' }, true, false].each do |value|
+          it "refuses #{value.inspect}, which cannot be a search term" do
+            args = { params: { search: value } }
+
+            expect { described_class.parse_search(collection_user, args) }
+              .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
+          end
+        end
+
+        it 'refuses a body value the query string would otherwise mask' do
+          args = {
+            params: {
+              search: 'searched argument',
+              data: { attributes: { all_records_subset_query: { search: false } } }
+            }
+          }
+
+          expect { described_class.parse_search(collection_user, args) }
+            .to raise_error(Http::Exceptions::BadRequestError, 'Search must be a string or a number')
         end
 
         it 'works when passed in the body (actions)' do
@@ -1231,6 +1392,37 @@ module ForestAdminAgent
           args = { params: { searchExtended: '0' } }
 
           expect(described_class.parse_search_extended(args)).to be(false)
+        end
+
+        [false, 0, 'false', 'FALSE', ''].each do |falsy|
+          it "reads #{falsy.inspect} as not extended" do
+            expect(described_class.parse_search_extended({ params: { searchExtended: falsy } })).to be(false)
+          end
+        end
+
+        it 'reads an absent parameter as not extended' do
+          expect(described_class.parse_search_extended({ params: {} })).to be(false)
+        end
+
+        it 'keeps reading an unrecognised value as extended, as it always did' do
+          expect(described_class.parse_search_extended({ params: { searchExtended: 'yes' } })).to be(true)
+        end
+
+        it 'lets the subset query say no while the query string still carries the flag' do
+          args = {
+            params: {
+              searchExtended: '1',
+              data: { attributes: { all_records_subset_query: { searchExtended: false } } }
+            }
+          }
+
+          expect(described_class.parse_search_extended(args)).to be(false)
+        end
+
+        it 'falls back to the query string when the subset query does not name the flag' do
+          args = { params: { searchExtended: '1', data: { attributes: { all_records_subset_query: {} } } } }
+
+          expect(described_class.parse_search_extended(args)).to be(true)
         end
       end
 

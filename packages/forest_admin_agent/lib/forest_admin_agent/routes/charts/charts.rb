@@ -55,6 +55,10 @@ module ForestAdminAgent
           field.nil? || field.to_s.empty? ? nil : field
         end
 
+        def skip_relation_read_permissions?
+          ForestAdminAgent::Facades::Container.config_from_cache[:skip_relation_read_permissions] == true
+        end
+
         def validate_and_get_type(type)
           chart_types = %w[Value Objective Pie Line Leaderboard]
           unless chart_types.include?(type)
@@ -202,8 +206,9 @@ module ForestAdminAgent
             )
 
             # A count exposes the cardinality of the relation, which `/relationships/<name>/count`
-            # puts behind `browse`. No path names it, so nothing above sees it.
-            if aggregation.field.nil?
+            # puts behind `browse`. No path names it, so nothing above sees it. It arrived with the
+            # related-read checks, so it goes away with them.
+            if aggregation.field.nil? && !skip_relation_read_permissions?
               context.permissions.can?(:browse, context.datasource.get_collection(field.foreign_collection))
             end
 
@@ -237,7 +242,11 @@ module ForestAdminAgent
                                         field: aggregate_field_name(args))
           result = context.collection.aggregate(context.caller, filter, aggregation)
 
-          result[0]['value'] || 0
+          # `Aggregation#apply` groups the records it is given, so a filter
+          # matching none of them answers with no row at all -- which is what an
+          # in-memory aggregation hands back for an empty selection. Indexing
+          # that answered a value chart with a 500 where the figure is zero.
+          result.first&.[]('value') || 0
         end
 
         # The permission root stays the chart's own collection, which the leaderboard call site does

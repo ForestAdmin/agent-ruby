@@ -187,7 +187,7 @@ module ForestAdminDatasourceToolkit
 
             summary['Count'] += 1
             summary['Min'] = value if min.nil? || value < min
-            summary['Max'] = value if max.nil? || value < max
+            summary['Max'] = value if max.nil? || value > max
           end
 
           summary['Sum'] += value if value.is_a?(Numeric)

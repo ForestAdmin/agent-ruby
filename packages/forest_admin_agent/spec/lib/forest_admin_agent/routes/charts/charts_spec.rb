@@ -182,6 +182,24 @@ module ForestAdminAgent
             )
           end
 
+          # `Aggregation#apply` groups the records it is given, so a filter
+          # matching none of them answers with no row at all. Indexing that
+          # answered the chart with a 500 where the figure is zero.
+          it 'returns zero when the filter matched no record' do
+            args[:params] = args[:params].merge({
+                                                  aggregateFieldName: 'price',
+                                                  aggregator: 'Sum',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Value',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([])
+
+            result = chart.handle_request(args)
+
+            expect(result[:content][:data][:attributes][:value]).to eq(countCurrent: 0, countPrevious: nil)
+          end
+
           it 'return a valueChart with previous filter' do
             args[:params] = args[:params].merge({
                                                   aggregateFieldName: 'price',
@@ -549,6 +567,33 @@ module ForestAdminAgent
               expect(action).to eq(:browse)
               expect(collection.name).to eq('review')
             end
+          end
+
+          # This browse arrived with the related-read checks, so the option that lifts them lifts it
+          # too: a count leaderboard that worked before them works again.
+          it 'skips that browse once skip_relation_read_permissions is on' do
+            args[:params] = args[:params].merge({
+                                                  labelFieldName: 'author',
+                                                  relationshipFieldName: 'bookReviews',
+                                                  aggregator: 'Count',
+                                                  aggregateFieldName: '',
+                                                  sourceCollectionName: 'book',
+                                                  type: 'Leaderboard',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            configured = ForestAdminAgent::Facades::Container.config_from_cache.merge(
+              skip_relation_read_permissions: true
+            )
+            allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
+            allow(permissions).to receive(:can?)
+            allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            review = @datasource.get_collection('review')
+            allow(review).to receive(:aggregate).and_return([])
+
+            chart.handle_request(args)
+
+            expect(permissions).not_to have_received(:can?)
+            expect(review).to have_received(:aggregate)
           end
 
           it 'refuses a count leaderboard the caller cannot browse the counted collection for' do

@@ -34,11 +34,15 @@ module ForestAdminDatasourceToolkit
               )
             end
 
+            # Recurses through `match`, not through `every_leaf` / `some_leaf`:
+            # those walk down to the leaves and would apply this branch's
+            # aggregator to a nested one's, reading `And(a, Or(b, c))` as
+            # `And(a, b, c)`.
             def match(record, collection, timezone)
               if @aggregator == 'And'
-                every_leaf { |condition| condition.match(record, collection, timezone) }
+                @conditions.all? { |condition| condition.match(record, collection, timezone) }
               else
-                some_leaf { |condition| condition.match(record, collection, timezone) }
+                @conditions.any? { |condition| condition.match(record, collection, timezone) }
               end
             end
 

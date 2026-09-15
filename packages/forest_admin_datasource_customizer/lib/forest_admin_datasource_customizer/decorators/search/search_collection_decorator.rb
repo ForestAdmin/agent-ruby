@@ -4,6 +4,7 @@ module ForestAdminDatasourceCustomizer
       class SearchCollectionDecorator < ForestAdminDatasourceToolkit::Decorators::CollectionDecorator
         include ForestAdminDatasourceToolkit::Schema
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminDatasourceToolkit::Exceptions
 
         POLYMORPHIC_TYPES = %w[PolymorphicManyToOne PolymorphicOneToOne].freeze
         TO_ONE_RELATIONS = %w[ManyToOne OneToOne].freeze
@@ -20,8 +21,10 @@ module ForestAdminDatasourceCustomizer
         end
 
         def replace_search(replacer)
+          assert_selection_resolves(replacer)
           @replacer = replacer
           @disabled_search = false
+          warn_extended_search_refused if handler
           mark_schema_as_dirty
         end
 
@@ -33,27 +36,20 @@ module ForestAdminDatasourceCustomizer
           # Search string is not significant
           return filter.override({ search: nil }) if !filter || !filter.search || filter.search.strip&.empty?
 
-          # Implement search ourselves
-          if @replacer || !@child_collection.schema[:searchable]
-            ctx = ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext.new(self, caller)
-            tree = default_replacer(filter.search, filter.search_extended)
-
-            if @replacer
-              plain_tree = @replacer.call(filter.search, filter.search_extended, ctx)
-              tree = ConditionTreeFactory.from_plain_object(plain_tree)
-            end
-
-            # Note that if no fields are searchable with the provided searchString, the conditions
-            # array might be empty, which will create a condition returning zero records
-            # (this is the desired behavior).
-            return filter.override({
-                                     condition_tree: ConditionTreeFactory.intersect([filter.condition_tree, tree]),
-                                     search: nil
-                                   })
-          end
-
           # Let sub-collection deal with the search
-          filter
+          return filter unless implements_search?
+
+          tree = if handler
+                   ctx = ForestAdminDatasourceCustomizer::Context::CollectionCustomizationContext.new(self, caller)
+                   ConditionTreeFactory.from_plain_object(handler.call(filter.search, filter.search_extended, ctx))
+                 else
+                   search_condition_tree(filter.search, filter.search_extended)
+                 end
+
+          filter.override({
+                            condition_tree: ConditionTreeFactory.intersect([filter.condition_tree, tree]),
+                            search: nil
+                          })
         end
 
         # Answers against +@child_collection+, which is what the search actually reads: a field
@@ -63,21 +59,72 @@ module ForestAdminDatasourceCustomizer
         # field the search cannot match — a number column for a word, a uuid column for anything
         # else — is left out rather than reported as reached.
         #
-        # +nil+ whenever this layer does not choose the fields — a replacer is installed, or the
-        # child collection searches natively — because then no enumeration made here is true.
+        # +nil+ whenever this layer does not choose the fields — a callable replacer is installed, or
+        # the child collection searches natively — because then no enumeration made here is true.
         def searched_fields(search, extended)
           return nil unless enumerable_search?
           return [] if insignificant_search?(search)
 
-          get_fields(extended).filter_map do |path, schema|
+          searchable_fields(extended).filter_map do |path, schema|
             searched_field(path) if build_condition(path, schema, search)
           end
         end
 
+        def search_handler?
+          !handler.nil?
+        end
+
         private
 
+        # Warned at boot, not left to the first caller who trips the 403: blocks installed before this
+        # version were served. Nil-guarded because the RPC agent runs its own +AgentFactory+ subclass,
+        # so the base facade's container is never built there — a customization must not become a boot
+        # failure over a warning.
+        def warn_extended_search_refused
+          logger = ForestAdminAgent::Facades::Container.logger
+
+          return if logger.nil?
+
+          logger.log(
+            'Warn',
+            "An extended search on #{name} is refused where permissions are enabled: a " \
+            '`replace_search` block names no field, so the agent cannot check what it reads against ' \
+            "the caller's permissions. Declaring the search with " \
+            '`replace_search(include_fields: [...])` makes it checkable.'
+          )
+        end
+
+        def handler
+          @replacer.respond_to?(:call) ? @replacer : nil
+        end
+
+        def field_selection
+          @replacer.respond_to?(:call) ? nil : @replacer
+        end
+
+        def implements_search?
+          !@replacer.nil? || !@child_collection.schema[:searchable]
+        end
+
         def enumerable_search?
-          @replacer.nil? && !@child_collection.schema[:searchable]
+          handler.nil? && implements_search?
+        end
+
+        def assert_selection_resolves(replacer)
+          return if replacer.nil? || replacer.respond_to?(:call)
+
+          selected = field_paths(replacer[:only_fields]) + field_paths(replacer[:include_fields])
+          excluded = field_paths(replacer[:exclude_fields])
+
+          selected.each { |path| selected_field(path) }
+          excluded.each { |path| excluded_field(path) }
+
+          overlap = selected.select { |path| excluded?(path, excluded) }
+
+          return if overlap.empty?
+
+          raise ForestException,
+                "Cannot both search and exclude #{overlap.map { |path| "'#{path}'" }.join(", ")}"
         end
 
         def insignificant_search?(search)
@@ -93,14 +140,93 @@ module ForestAdminDatasourceCustomizer
           }
         end
 
-        def default_replacer(search, extended)
-          searchable_fields = get_fields(extended)
-
-          conditions = searchable_fields.map do |field, schema|
+        def search_condition_tree(search, extended)
+          conditions = searchable_fields(extended).filter_map do |field, schema|
             build_condition(field, schema, search)
           end
 
+          return ConditionTreeFactory.match_none if conditions.empty?
+
           ConditionTreeFactory.union(conditions)
+        end
+
+        # Both the condition tree +refine_filter+ builds and the footprint +searched_fields+ reports
+        # come from here: a path the search reads without appearing in the footprint is a column read
+        # unchecked.
+        def searchable_fields(extended)
+          selection = field_selection || {}
+          only_fields = selection[:only_fields]
+
+          defaults = only_fields ? {} : get_fields(extended).to_h
+          selected = field_paths(only_fields) + field_paths(selection[:include_fields])
+
+          excluded = field_paths(selection[:exclude_fields])
+
+          defaults
+            .merge(selected.to_h { |path| resolved_field(path) })
+            .reject { |path, _schema| excluded?(path, excluded) }
+        end
+
+        def excluded?(path, excluded)
+          excluded.any? { |name| path == name || path.start_with?("#{name}:") }
+        end
+
+        # Unlike a selected path, a bare to-one relation is legal here: it drops every path through it,
+        # where naming the target's columns would have to be revisited each time it gains one.
+        #
+        # A name the search does not read is reported rather than refused. An exclusion states an
+        # intent that only becomes more true as the schema moves — a column turning unsearchable
+        # satisfies "never search this" — so refusing it would stop the agent booting over a
+        # configuration that was defensive on purpose. A typo still raises, from +get_field_schema+.
+        def excluded_field(path)
+          schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
+
+          unless excludable?(path, schema)
+            ForestAdminAgent::Facades::Container.logger&.log(
+              'Debug',
+              "Excluding '#{path}' from the search on #{name} changes nothing: the search does not read it"
+            )
+          end
+
+          schema
+        end
+
+        def excludable?(path, schema)
+          return path.count(':') <= 1 && searchable_field?(schema) if schema.type == 'Column'
+
+          !path.include?(':') && TO_ONE_RELATIONS.include?(schema.type)
+        end
+
+        def field_paths(names)
+          Array(names).map(&:to_s)
+        end
+
+        # Strict where an end-user term would be interpreted: this list is written by the developer,
+        # so a name that names nothing, or names a relation the search cannot compare a term to, is a
+        # mistake to report.
+        def resolved_field(path)
+          schema = ForestAdminDatasourceToolkit::Utils::Collection.get_field_schema(@child_collection, path)
+
+          unless schema.type == 'Column'
+            raise ForestException, "Cannot search on '#{path}': a #{schema.type} is not a column"
+          end
+
+          [path, schema]
+        end
+
+        # A Number, Enum or UUID column reaching `build_condition` gets an EQUAL leaf its datasource
+        # never declared, and `get_fields` skips it silently — so a named one is refused instead.
+        def selected_field(path)
+          resolved = resolved_field(path)
+          schema = resolved.last
+
+          unless searchable_field?(schema)
+            raise ForestException,
+                  "Cannot search on '#{path}': its #{schema.column_type} column declares no filter " \
+                  'operator a search term can use'
+          end
+
+          resolved
         end
 
         def build_condition(field, schema, search_string)
@@ -151,7 +277,7 @@ module ForestAdminDatasourceCustomizer
             fields.push([name, field]) if field.type == 'Column' && searchable_field?(field)
 
             if POLYMORPHIC_TYPES.include?(field.type) && extended
-              ForestAdminAgent::Facades::Container.logger.log(
+              ForestAdminAgent::Facades::Container.logger&.log(
                 'Debug',
                 "We're not searching through #{self.name}.#{name} because it's a polymorphic relation. " \
                 "You can override the default search behavior with 'replace_search'. " \
