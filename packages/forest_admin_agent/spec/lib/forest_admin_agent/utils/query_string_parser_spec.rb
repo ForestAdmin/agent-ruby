@@ -421,6 +421,67 @@ module ForestAdminAgent
             )
           end
 
+          it 'reads a field name sent as raw UTF-8 bytes' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+"title,Ce que j'ai vérifié").force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'reads a field name sent as Latin-1 bytes, as a browser encodes a header value' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = "title,Ce que j'ai vérifié".encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', "Ce que j'ai vérifié"])
+            )
+          end
+
+          it 'raise a dedicated error when an unknown field and an existing one both hold accents' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+            header = (+'champ inconnu à moi').force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect do
+              described_class.parse_projection_from_header(collection, args)
+            end.to raise_error(
+              Http::Exceptions::BadRequestError,
+              /Invalid Forest-Projection header:.*champ inconnu à moi/
+            )
+          end
+
+          it 'reads a relation field name that is not ASCII, sent as Latin-1' do
+            collection.datasource.get_collection('Person').add_fields(
+              { 'prénom' => ColumnSchema.new(column_type: 'String') }
+            )
+            header = 'title,author:prénom'.encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['title', 'author:prénom'])
+            )
+          end
+
+          it 'turns any byte a header can carry into a 400, never an encoding crash' do
+            collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+
+            outcomes = (0..255).map do |byte|
+              args = { headers: { 'HTTP_FOREST_PROJECTION' => byte.chr(Encoding::BINARY) }, params: {} }
+
+              begin
+                described_class.parse_projection_from_header(collection, args)
+              rescue Http::Exceptions::BadRequestError => e
+                e
+              end
+            end
+
+            expect(outcomes).to all(be_nil.or(be_a(Http::Exceptions::BadRequestError)))
+          end
+
           it 'raise a dedicated error when the header contains an unknown field' do
             args = { headers: { 'HTTP_FOREST_PROJECTION' => 'field-that-do-not-exist' }, params: {} }
 
@@ -709,6 +770,27 @@ module ForestAdminAgent
               /Invalid Forest-Projection header:.*Unexpected nested field email under generic relation/
             )
           end
+
+          it 'expands a polymorphic relation whose name is not ASCII and adds its type field' do
+            collection.add_fields(
+              {
+                'propriétaire_id' => ColumnSchema.new(column_type: 'Number'),
+                'propriétaire_type' => ColumnSchema.new(column_type: 'String'),
+                'propriétaire' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'propriétaire_type',
+                  foreign_collections: ['User'],
+                  foreign_key_targets: { 'User' => 'id' },
+                  foreign_key: 'propriétaire_id'
+                )
+              }
+            )
+            header = 'id,propriétaire'.encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+            args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+            expect(described_class.parse_projection_from_header(collection, args)).to eq(
+              Projection.new(['id', 'propriétaire:*', 'propriétaire_type'])
+            )
+          end
         end
       end
 
@@ -747,6 +829,16 @@ module ForestAdminAgent
 
           expect(described_class.parse_requested_projection(collection, args)).to eq(
             { projection: Projection.new(%w[title author:name]), named_by_caller: true }
+          )
+        end
+
+        it 'reports a projection header whose field name is not ASCII as named by the caller' do
+          collection.add_fields({ "Ce que j'ai vérifié" => ColumnSchema.new(column_type: 'String') })
+          header = "title,Ce que j'ai vérifié".encode(Encoding::ISO_8859_1).force_encoding(Encoding::BINARY)
+          args = { headers: { 'HTTP_FOREST_PROJECTION' => header }, params: {} }
+
+          expect(described_class.parse_requested_projection(collection, args)).to eq(
+            { projection: Projection.new(['title', "Ce que j'ai vérifié"]), named_by_caller: true }
           )
         end
 

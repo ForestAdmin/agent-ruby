@@ -50,7 +50,7 @@ module ForestAdminAgent
       end
 
       def self.parse_projection_from_header(collection, args)
-        header = args.dig(:headers, 'HTTP_FOREST_PROJECTION')&.to_s&.strip
+        header = decode_header_value(args.dig(:headers, 'HTTP_FOREST_PROJECTION'))&.strip
 
         return if header.nil? || header.empty?
 
@@ -81,6 +81,21 @@ module ForestAdminAgent
           projection: parse_projection(collection, args),
           named_by_caller: !(fields.nil? || fields == '')
         }
+      end
+
+      # Rack hands header values back as raw bytes. A column named after a workspace's own free
+      # text -- `Ce que j'ai vérifié` -- reaches us either as UTF-8 or, from a browser (which
+      # sends a header value as one byte per code unit), as Latin-1. Left tagged BINARY it
+      # matches no schema key, and interpolating it into the not-found message raises
+      # Encoding::CompatibilityError before that 400 is ever built. The fallback cannot raise
+      # in turn: ISO-8859-1 defines all 256 bytes, and each maps to a character UTF-8 can hold.
+      def self.decode_header_value(value)
+        return if value.nil?
+
+        utf8 = value.to_s.dup.force_encoding(Encoding::UTF_8)
+        return utf8 if utf8.valid_encoding?
+
+        utf8.force_encoding(Encoding::ISO_8859_1).encode(Encoding::UTF_8)
       end
 
       def self.add_polymorphic_type_fields(collection, requested_field_names)
@@ -197,7 +212,7 @@ module ForestAdminAgent
               "Available fields are: [#{available_fields}]. " \
               'Please check if the field name is correct.'
       end
-      private_class_method :add_polymorphic_type_fields, :build_projection_fields,
+      private_class_method :decode_header_value, :add_polymorphic_type_fields, :build_projection_fields,
                            :build_header_projection_fields, :get_field,
                            :expand_polymorphic_leaf, :nested_polymorphic_linkage_fields,
                            :polymorphic_linkage_columns, :each_field_along_path,
