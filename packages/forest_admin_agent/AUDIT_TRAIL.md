@@ -190,6 +190,13 @@ A record that no longer exists keeps its history: only a record that still exist
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
 audit trail, and the delete event itself is the last thing recorded.
 
+Those rows still carry the column values captured while the record existed, and a scope that can no
+longer be evaluated against the record is evaluated against the values instead: a `delete` row keeps
+its `previousValues` only if they match the scope, a `create` row its `newValues`, and an `update`
+row — a partial diff no scope can be tested against reliably — comes back with both blanked. Action
+rows hold a submitted form and a result summary, not column values, so they are untouched. The row
+itself is always returned: what happened, by whom and when stays visible either way.
+
 ### State route
 
 `GET /forest/_audit-trail/{collection}/{recordId}/state?timestamp=…` returns the record as it stood at

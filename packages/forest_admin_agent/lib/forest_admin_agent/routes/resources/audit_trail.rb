@@ -39,7 +39,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
-          assert_record_in_scope(context, context.collection, args[:params]['id'])
+          withholding_scope = assert_record_in_scope(context, context.collection, args[:params]['id'])
 
           skip, limit = parse_pagination(args)
           filters = {
@@ -54,9 +54,11 @@ module ForestAdminAgent
           # `count` reflects the active filters (not the absolute total) and is independent of the page.
           count = store.count_by_record(**filters)
 
+          data = withhold_out_of_scope_values(history, withholding_scope, context)
+
           {
             name: args[:params]['collection_name'],
-            content: { data: history.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
+            content: { data: data.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
           }
         end
 
@@ -84,6 +86,38 @@ module ForestAdminAgent
         end
 
         private
+
+        # A record that is gone for good bypasses the scope check — there is nothing left to check it against
+        # — but its rows still carry the column values captured while it existed. When those values would
+        # themselves have failed the caller's scope, withhold them; the row itself stays visible either way,
+        # so that it happened, by whom and when still reads.
+        def withhold_out_of_scope_values(entries, scope, context)
+          return entries if scope.nil?
+
+          timezone = context.caller.timezone
+
+          entries.map do |entry|
+            case entry.operation
+            # `delete`'s previous_values and `create`'s new_values both capture every writable column, so the
+            # scope evaluates against them directly.
+            when 'delete'
+              scope.match(entry.previous_values, context.collection, timezone) ? entry : blank(entry, :previous_values)
+            when 'create'
+              scope.match(entry.new_values, context.collection, timezone) ? entry : blank(entry, :new_values)
+            # A partial diff: a scope on a column this particular update never touched can't be evaluated
+            # against it, so withhold rather than risk a false negative. `action`/`action_failed` rows hold a
+            # submitted form and a result summary, not column values, so the scope doesn't apply to them.
+            when 'update'
+              blank(entry, :previous_values, :new_values)
+            else
+              entry
+            end
+          end
+        end
+
+        def blank(entry, *fields)
+          entry.dup.tap { |copy| fields.each { |field| copy[field] = {} } }
+        end
 
         # `availableUsers` rides along on the first fetch only — the front keeps the list it saw — and lists the
         # distinct authors of the entries the current filters match, whatever page was asked for. The identity

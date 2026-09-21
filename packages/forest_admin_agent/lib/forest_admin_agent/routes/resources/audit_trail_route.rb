@@ -9,10 +9,15 @@ module ForestAdminAgent
       module AuditTrailRoute
         include ForestAdminDatasourceToolkit::Components::Query
 
+        # The caller's scope when the record is gone for good, nil otherwise — no scope in effect, or a record
+        # still there and in scope. A scope can't be evaluated against a record that no longer exists, so its
+        # history is served, but the values its rows captured while it existed still have to be tested against
+        # that scope before being handed back.
         def assert_record_in_scope(context, collection, packed_id)
-          scoped_record(context, collection, packed_id)
+          scope = context.permissions.get_scope(collection)
+          return nil if scope.nil? || scoped_record(context, collection, packed_id, nil, scope)
 
-          nil
+          scope
         end
 
         # The record as it stands, read through the caller's permission scope. nil when it no longer exists
@@ -21,11 +26,11 @@ module ForestAdminAgent
         #
         # Authorizing and reading are the same query on purpose: a scoped check followed by an unscoped read
         # would hand back a row the check never covered, the moment the two drifted apart.
-        def scoped_record(context, collection, packed_id, projection = nil)
+        def scoped_record(context, collection, packed_id, projection = nil,
+                          scope = context.permissions.get_scope(collection))
           condition = ConditionTree::ConditionTreeFactory.match_records(
             collection, [Utils::Id.unpack_id(collection, packed_id, with_key: true)]
           )
-          scope = context.permissions.get_scope(collection)
           in_scope = ConditionTree::ConditionTreeFactory.intersect([condition, scope])
           record = first_record(context, collection, in_scope, projection || key_projection(collection))
 
