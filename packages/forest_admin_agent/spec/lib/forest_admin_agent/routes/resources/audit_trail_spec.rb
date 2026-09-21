@@ -18,7 +18,9 @@ module ForestAdminAgent
                   column_type: 'Number', is_primary_key: true,
                   filter_operators: [Operators::IN, Operators::EQUAL]
                 ),
-                'status' => ColumnSchema.new(column_type: 'String')
+                'status' => ColumnSchema.new(column_type: 'String'),
+                # Read-only, so the capture never records it: the audit snapshots hold writable columns only.
+                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true)
               }
             },
             list: [{ 'id' => 4 }]
@@ -308,6 +310,39 @@ module ForestAdminAgent
                                                      new_values: { 'status' => 'mine too' })])
 
             expect(data.first).to include('previousValues' => {}, 'newValues' => {})
+          end
+
+          # A read-only column is never captured, so the snapshot answers nil for it — `!=` would match and an
+          # ordered operator would raise. Neither is an answer about the record that was deleted.
+          it 'withholds when the scope asks about a column the snapshot never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          it 'withholds rather than comparing an ordered operator against a column it never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::LESS_THAN, 10))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # A placeholder is not the value the scope asked about.
+          it 'withholds when the scoped column was captured redacted' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'status' => redacted })],
+                              scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # A read-only primary key never lands in the snapshot; the row's own packed id carries it.
+          it 'matches a scope on the primary key through the row id' do
+            entry = audit_entry('delete', previous_values: { 'status' => 'mine' })
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
           end
 
           # A submitted form and a result summary, not column values.

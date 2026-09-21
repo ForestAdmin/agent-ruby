@@ -94,25 +94,45 @@ module ForestAdminAgent
         def withhold_out_of_scope_values(entries, scope, context)
           return entries if scope.nil?
 
-          timezone = context.caller.timezone
+          entries.map { |entry| withhold(entry, scope, context) }
+        end
 
-          entries.map do |entry|
-            case entry.operation
-            # `delete`'s previous_values and `create`'s new_values both capture every writable column, so the
-            # scope evaluates against them directly.
-            when 'delete'
-              scope.match(entry.previous_values, context.collection, timezone) ? entry : blank(entry, :previous_values)
-            when 'create'
-              scope.match(entry.new_values, context.collection, timezone) ? entry : blank(entry, :new_values)
-            # A partial diff: a scope on a column this particular update never touched can't be evaluated
-            # against it, so withhold rather than risk a false negative. `action`/`action_failed` rows hold a
-            # submitted form and a result summary, not column values, so the scope doesn't apply to them.
-            when 'update'
-              blank(entry, :previous_values, :new_values)
-            else
-              entry
-            end
+        def withhold(entry, scope, context)
+          case entry.operation
+          # `delete`'s previous_values and `create`'s new_values both capture every writable column.
+          when 'delete'
+            in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+          when 'create'
+            in_scope?(entry, entry.new_values, scope, context) ? entry : blank(entry, :new_values)
+          # A partial diff: a scope on a column this particular update never touched can't be evaluated
+          # against it, so withhold rather than risk a false negative. `action`/`action_failed` rows hold a
+          # submitted form and a result summary, not column values, so the scope doesn't apply to them.
+          when 'update'
+            blank(entry, :previous_values, :new_values)
+          else
+            entry
           end
+        end
+
+        # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth
+        # matching. The capture keeps the writable columns, so a scope on anything else — a read-only column, a
+        # relation — reads as nil there and would answer for a value the row never held: `status != 'private'`
+        # would match, and an ordered operator would raise on the nil. A redacted value answers no better.
+        def in_scope?(entry, values, scope, context)
+          snapshot = with_primary_keys(entry, values, context.collection)
+          answerable = scope.projection.all? do |field|
+            snapshot.key?(field) && snapshot[field] != ::ForestAdminAgent::AuditTrail::Recording::REDACTED
+          end
+
+          answerable && scope.match(snapshot, context.collection, context.caller.timezone)
+        end
+
+        # A read-only primary key never lands in the snapshot, so a scope on the id would redact a row that is
+        # squarely in scope. The row's own packed id carries those values.
+        def with_primary_keys(entry, values, collection)
+          keys = entry.record_id.nil? ? {} : Utils::Id.unpack_id(collection, entry.record_id, with_key: true)
+
+          keys.merge(values || {})
         end
 
         def blank(entry, *fields)
