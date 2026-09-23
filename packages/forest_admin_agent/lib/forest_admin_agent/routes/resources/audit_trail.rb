@@ -54,6 +54,9 @@ module ForestAdminAgent
           # `count` reflects the active filters (not the absolute total) and is independent of the page.
           count = store.count_by_record(**filters)
 
+          # Asked again now: the check above ran before these rows were read, so a record deleted in between
+          # answered "present and in scope" for rows that already carry its delete.
+          withholding_scope ||= scope_if_gone_since(context, args)
           data = withhold_out_of_scope_values(history, withholding_scope, context)
 
           {
@@ -86,6 +89,16 @@ module ForestAdminAgent
         end
 
         private
+
+        # Second read of the record, once the rows are in hand, so the answer that decides the withholding is
+        # never older than what it decides on. Skipped without a scope in effect — there is nothing to withhold
+        # then, and nothing to ask. A record moved out of scope rather than deleted raises the 404 it would
+        # raise for a request starting a moment later.
+        def scope_if_gone_since(context, args)
+          return nil if context.permissions.get_scope(context.collection).nil?
+
+          assert_record_in_scope(context, context.collection, args[:params]['id'])
+        end
 
         # A record that is gone for good bypasses the scope check — there is nothing left to check it against
         # — but its rows still carry the column values captured while it existed. When those values would

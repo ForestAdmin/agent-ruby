@@ -235,7 +235,9 @@ module ForestAdminAgent
 
           route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-          expect(collection).to have_received(:list) do |_caller, filter, _projection|
+          # Twice: once before the store read to refuse an out-of-scope record, once after it so the
+          # withholding decision is not older than the rows it applies to.
+          expect(collection).to have_received(:list).twice do |_caller, filter, _projection|
             expect(filter.condition_tree.conditions).to include(scope)
           end
         end
@@ -373,6 +375,24 @@ module ForestAdminAgent
 
             expect(data.first['previousValues']).to eq({ 'status' => 'someone else' })
           end
+        end
+
+        # The scope check runs before the store read, so the record can be deleted in between — and the rows
+        # that come back then already carry its delete.
+        it 'withholds a record deleted between the scope check and the store read' do
+          allow(permissions).to receive(:get_scope)
+            .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+          # Present and in scope when checked; gone, in scope and out, when asked again after the read.
+          allow(collection).to receive(:list).and_return([{ 'id' => 4 }], [], [])
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            operation: 'delete', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'someone else' }, new_values: {}
+          )
+          route = route_with_store(records: [entry])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data].first).to include('operation' => 'delete', 'previousValues' => {})
         end
 
         it 'does not withhold anything when the record still exists in scope' do

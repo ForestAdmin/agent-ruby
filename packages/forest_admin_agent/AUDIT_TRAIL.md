@@ -204,6 +204,12 @@ back from the row's own id, so a scope on the id still matches the record it bel
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
+The record is read twice: once before the rows are fetched, to refuse a record that exists outside the
+caller's scope without touching the audit database, and once after, so the answer that decides the
+withholding is never older than the rows it applies to — a record deleted in between would otherwise have
+answered "present and in scope" for rows that already carry its delete. The second read is skipped when no
+scope is in effect.
+
 **This covers the history route only.** `/state` reconstructs a gone record from the same rows and serves
 it unfiltered, and the correlation routes check the record but not the values, so a caller the withholding
 above protects against can still read those values one request away. Closing that is tracked separately.
