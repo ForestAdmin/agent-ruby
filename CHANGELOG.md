@@ -1,3 +1,10 @@
+## [1.44.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.0...v1.44.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **audit_trail:** withhold out-of-scope values on a deleted record's history [PRD-1226] ([#393](https://github.com/ForestAdmin/agent-ruby/issues/393)) ([85156dc](https://github.com/ForestAdmin/agent-ruby/commit/85156dca2ac0d1f67adeb9f010e6e1c9cb2fd1f0))
+
 # [1.44.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.1...v1.44.0) (2026-09-15)
 
 
