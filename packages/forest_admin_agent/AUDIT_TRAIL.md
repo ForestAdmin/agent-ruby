@@ -190,6 +190,30 @@ A record that no longer exists keeps its history: only a record that still exist
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
 audit trail, and the delete event itself is the last thing recorded.
 
+Those rows still carry the column values captured while the record existed, and a scope that can no
+longer be evaluated against the record is evaluated against the values instead: a `delete` row keeps
+its `previousValues` only if they match the scope, a `create` row its `newValues`, and an `update`
+row — whose two sides are a partial diff — is tested side by side, so each is kept only if its own
+values match. Action rows hold a submitted form and a result summary, not column values, so they are
+untouched. The row itself is always returned: what happened, by whom and when stays visible either way.
+
+A snapshot only answers for the writable columns it captured, so a scope reaching for anything else — a
+read-only column, a relation, a value stored redacted — is not evaluated against it at all and the values
+are withheld: `nil` there is a missing answer, not a passing one. Primary keys are the exception, read
+back from the row's own id, so a scope on the id still matches the record it belongs to. This is also
+what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
+neither side, so both are withheld.
+
+The record is read twice: once before the rows are fetched, to refuse a record that exists outside the
+caller's scope without touching the audit database, and once after, so the answer that decides the
+withholding is never older than the rows it applies to — a record deleted in between would otherwise have
+answered "present and in scope" for rows that already carry its delete. The second read is skipped when no
+scope is in effect.
+
+**This covers the history route only.** `/state` reconstructs a gone record from the same rows and serves
+it unfiltered, and the correlation routes check the record but not the values, so a caller the withholding
+above protects against can still read those values one request away. Closing that is tracked separately.
+
 ### State route
 
 `GET /forest/_audit-trail/{collection}/{recordId}/state?timestamp=…` returns the record as it stood at

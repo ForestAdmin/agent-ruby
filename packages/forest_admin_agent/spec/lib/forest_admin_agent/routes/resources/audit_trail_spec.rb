@@ -18,7 +18,9 @@ module ForestAdminAgent
                   column_type: 'Number', is_primary_key: true,
                   filter_operators: [Operators::IN, Operators::EQUAL]
                 ),
-                'status' => ColumnSchema.new(column_type: 'String')
+                'status' => ColumnSchema.new(column_type: 'String'),
+                # Read-only, so the capture never records it: the audit snapshots hold writable columns only.
+                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true)
               }
             },
             list: [{ 'id' => 4 }]
@@ -233,7 +235,9 @@ module ForestAdminAgent
 
           route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-          expect(collection).to have_received(:list) do |_caller, filter, _projection|
+          # Twice: once before the store read to refuse an out-of-scope record, once after it so the
+          # withholding decision is not older than the rows it applies to.
+          expect(collection).to have_received(:list).twice do |_caller, filter, _projection|
             expect(filter.condition_tree.conditions).to include(scope)
           end
         end
@@ -254,11 +258,155 @@ module ForestAdminAgent
         it 'still serves the history of a deleted record, which is much of the point of an audit trail' do
           allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
           allow(collection).to receive(:list).and_return([])
-          route = route_with_store(records: [double('entry', to_h: { operation: 'delete', record_id: '4' })])
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(operation: 'delete', record_id: '4')
+          route = route_with_store(records: [entry])
 
           result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-          expect(result[:content][:data]).to eq([{ 'operation' => 'delete', 'recordId' => '4' }])
+          expect(result[:content][:data].first).to include('operation' => 'delete', 'recordId' => '4')
+        end
+
+        # A scope can't be evaluated against a record that is gone, so the rows come back — but the column
+        # values they captured while it existed still have to pass that scope.
+        describe 'a deleted record whose captured values fall outside the caller scope' do
+          def audit_entry(operation, previous_values: {}, new_values: {})
+            ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: operation, collection: 'projects', record_id: '4',
+              previous_values: previous_values, new_values: new_values
+            )
+          end
+
+          def history_of(entries, scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            allow(permissions).to receive(:get_scope).and_return(scope)
+            # Empty in scope and empty without it: the record is gone for good.
+            allow(collection).to receive(:list).and_return([])
+            route = route_with_store(records: entries)
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+                 .dig(:content, :data)
+          end
+
+          it 'withholds a delete row whose previous values fail the scope, keeping the row itself' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'someone else' })])
+
+            expect(data.first).to include('operation' => 'delete', 'recordId' => '4', 'previousValues' => {})
+          end
+
+          it 'keeps a delete row whose previous values pass the scope' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })])
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+          end
+
+          it 'keeps a create row whose new values pass the scope, and withholds one that does not' do
+            data = history_of([audit_entry('create', new_values: { 'status' => 'mine' }),
+                               audit_entry('create', new_values: { 'status' => 'someone else' })])
+
+            expect(data.map { |row| row['newValues'] }).to eq([{ 'status' => 'mine' }, {}])
+          end
+
+          # Each side of an update is tested on its own values, so the one that can be proven in scope is
+          # released and the other is not.
+          it 'keeps the side of an update that passes the scope and blanks the one that does not' do
+            data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
+                                                     new_values: { 'status' => 'someone else' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' }, 'newValues' => {})
+          end
+
+          it 'keeps both sides of an update that stayed in scope' do
+            data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
+                                                     new_values: { 'status' => 'mine' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' },
+                                          'newValues' => { 'status' => 'mine' })
+          end
+
+          # A diff that never carried the scoped column answers for neither side.
+          it 'withholds both sides of an update whose diff never touched the scoped column' do
+            data = history_of([audit_entry('update', previous_values: { 'created_at' => 1 },
+                                                     new_values: { 'created_at' => 2 })])
+
+            expect(data.first).to include('previousValues' => {}, 'newValues' => {})
+          end
+
+          # A read-only column is never captured, so the snapshot answers nil for it — `!=` would match and an
+          # ordered operator would raise. Neither is an answer about the record that was deleted.
+          it 'withholds when the scope asks about a column the snapshot never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          it 'withholds rather than comparing an ordered operator against a column it never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::LESS_THAN, 10))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # A placeholder is not the value the scope asked about.
+          it 'withholds when the scoped column was captured redacted' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'status' => redacted })],
+                              scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # A read-only primary key never lands in the snapshot; the row's own packed id carries it.
+          it 'matches a scope on the primary key through the row id' do
+            entry = audit_entry('delete', previous_values: { 'status' => 'mine' })
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+          end
+
+          # A submitted form and a result summary, not column values.
+          it 'leaves action rows untouched' do
+            data = history_of([audit_entry('action', previous_values: { 'amount' => 12 })])
+
+            expect(data.first['previousValues']).to eq({ 'amount' => 12 })
+          end
+
+          it 'leaves every value alone when no scope applies' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'someone else' })], scope: nil)
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'someone else' })
+          end
+        end
+
+        # The scope check runs before the store read, so the record can be deleted in between — and the rows
+        # that come back then already carry its delete.
+        it 'withholds a record deleted between the scope check and the store read' do
+          allow(permissions).to receive(:get_scope)
+            .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+          # Present and in scope when checked; gone, in scope and out, when asked again after the read.
+          allow(collection).to receive(:list).and_return([{ 'id' => 4 }], [], [])
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            operation: 'delete', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'someone else' }, new_values: {}
+          )
+          route = route_with_store(records: [entry])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data].first).to include('operation' => 'delete', 'previousValues' => {})
+        end
+
+        it 'does not withhold anything when the record still exists in scope' do
+          scope = Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine')
+          allow(permissions).to receive(:get_scope).and_return(scope)
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            operation: 'delete', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'archived' }, new_values: {}
+          )
+          route = route_with_store(records: [entry])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data].first['previousValues']).to eq({ 'status' => 'archived' })
         end
 
         # Rows written before an update moved a writable primary key stay under the id they were true of, so

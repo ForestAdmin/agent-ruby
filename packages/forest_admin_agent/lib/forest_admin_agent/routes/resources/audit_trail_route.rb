@@ -9,10 +9,16 @@ module ForestAdminAgent
       module AuditTrailRoute
         include ForestAdminDatasourceToolkit::Components::Query
 
+        # The caller's scope when the record is gone for good, nil otherwise — no scope in effect, or a record
+        # still there and in scope. A scope can't be evaluated against a record that no longer exists, so its
+        # history is served, but the values its rows captured while it existed still have to be tested against
+        # that scope before being handed back.
         def assert_record_in_scope(context, collection, packed_id)
-          scoped_record(context, collection, packed_id)
+          return nil if scoped_record(context, collection, packed_id)
 
-          nil
+          # Nothing there: gone for good, since an out-of-scope record raised above. Without a scope in
+          # effect this reads nil, which is the same answer.
+          context.permissions.get_scope(collection)
         end
 
         # The record as it stands, read through the caller's permission scope. nil when it no longer exists

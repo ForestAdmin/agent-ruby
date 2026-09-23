@@ -39,7 +39,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
-          assert_record_in_scope(context, context.collection, args[:params]['id'])
+          withholding_scope = assert_record_in_scope(context, context.collection, args[:params]['id'])
 
           skip, limit = parse_pagination(args)
           filters = {
@@ -54,9 +54,14 @@ module ForestAdminAgent
           # `count` reflects the active filters (not the absolute total) and is independent of the page.
           count = store.count_by_record(**filters)
 
+          # Asked again now: the check above ran before these rows were read, so a record deleted in between
+          # answered "present and in scope" for rows that already carry its delete.
+          withholding_scope ||= scope_if_gone_since(context, args)
+          data = withhold_out_of_scope_values(history, withholding_scope, context)
+
           {
             name: args[:params]['collection_name'],
-            content: { data: history.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
+            content: { data: data.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
           }
         end
 
@@ -84,6 +89,77 @@ module ForestAdminAgent
         end
 
         private
+
+        # Second read of the record, once the rows are in hand, so the answer that decides the withholding is
+        # never older than what it decides on. Skipped without a scope in effect — there is nothing to withhold
+        # then, and nothing to ask. A record moved out of scope rather than deleted raises the 404 it would
+        # raise for a request starting a moment later.
+        def scope_if_gone_since(context, args)
+          return nil if context.permissions.get_scope(context.collection).nil?
+
+          assert_record_in_scope(context, context.collection, args[:params]['id'])
+        end
+
+        # A record that is gone for good bypasses the scope check — there is nothing left to check it against
+        # — but its rows still carry the column values captured while it existed. When those values would
+        # themselves have failed the caller's scope, withhold them; the row itself stays visible either way,
+        # so that it happened, by whom and when still reads.
+        def withhold_out_of_scope_values(entries, scope, context)
+          return entries if scope.nil?
+
+          entries.map { |entry| withhold(entry, scope, context) }
+        end
+
+        def withhold(entry, scope, context)
+          case entry.operation
+          # `delete`'s previous_values and `create`'s new_values both capture every writable column.
+          when 'delete'
+            in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+          when 'create'
+            in_scope?(entry, entry.new_values, scope, context) ? entry : blank(entry, :new_values)
+          when 'update'
+            withhold_each_side(entry, scope, context)
+          # `action`/`action_failed` rows hold a submitted form and a result summary, not column values, so
+          # the scope doesn't apply to them.
+          else
+            entry
+          end
+        end
+
+        # An update's two sides are a partial diff, so each is tested against its own values: a diff that never
+        # carried the scoped column answers for neither and is withheld by `in_scope?` anyway. Gating the sides
+        # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
+        # row whose new value is out of scope, since that side is tested on its own.
+        def withhold_each_side(entry, scope, context)
+          kept = in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+
+          in_scope?(kept, kept.new_values, scope, context) ? kept : blank(kept, :new_values)
+        end
+
+        # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth
+        # matching. The capture keeps the writable columns, so a scope on anything else — a read-only column, a
+        # relation — reads as nil there and would answer for a value the row never held: `status != 'private'`
+        # would match, and an ordered operator would raise on the nil. A redacted value answers no better.
+        def in_scope?(entry, values, scope, context)
+          snapshot = with_primary_keys(entry, values, context.collection)
+          answerable = scope.projection.all? do |field|
+            snapshot.key?(field) && snapshot[field] != ::ForestAdminAgent::AuditTrail::Recording::REDACTED
+          end
+
+          answerable && scope.match(snapshot, context.collection, context.caller.timezone)
+        end
+
+        # A read-only primary key never lands in the snapshot, so a scope on the id would redact a row that is
+        # squarely in scope. The row's own packed id carries those values.
+        def with_primary_keys(entry, values, collection)
+          keys = entry.record_id.nil? ? {} : Utils::Id.unpack_id(collection, entry.record_id, with_key: true)
+
+          keys.merge(values || {})
+        end
+
+        def blank(entry, *fields)
+          entry.dup.tap { |copy| fields.each { |field| copy[field] = {} } }
+        end
 
         # `availableUsers` rides along on the first fetch only — the front keeps the list it saw — and lists the
         # distinct authors of the entries the current filters match, whatever page was asked for. The identity
