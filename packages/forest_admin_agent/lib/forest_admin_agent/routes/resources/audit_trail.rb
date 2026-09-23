@@ -104,14 +104,23 @@ module ForestAdminAgent
             in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
           when 'create'
             in_scope?(entry, entry.new_values, scope, context) ? entry : blank(entry, :new_values)
-          # A partial diff: a scope on a column this particular update never touched can't be evaluated
-          # against it, so withhold rather than risk a false negative. `action`/`action_failed` rows hold a
-          # submitted form and a result summary, not column values, so the scope doesn't apply to them.
           when 'update'
-            blank(entry, :previous_values, :new_values)
+            withhold_each_side(entry, scope, context)
+          # `action`/`action_failed` rows hold a submitted form and a result summary, not column values, so
+          # the scope doesn't apply to them.
           else
             entry
           end
+        end
+
+        # An update's two sides are a partial diff, so each is tested against its own values: a diff that never
+        # carried the scoped column answers for neither and is withheld by `in_scope?` anyway. Gating the sides
+        # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
+        # row whose new value is out of scope, since that side is tested on its own.
+        def withhold_each_side(entry, scope, context)
+          kept = in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+
+          in_scope?(kept, kept.new_values, scope, context) ? kept : blank(kept, :new_values)
         end
 
         # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth

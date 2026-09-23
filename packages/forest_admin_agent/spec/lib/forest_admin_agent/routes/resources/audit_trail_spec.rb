@@ -303,11 +303,27 @@ module ForestAdminAgent
             expect(data.map { |row| row['newValues'] }).to eq([{ 'status' => 'mine' }, {}])
           end
 
-          # A partial diff can't be scope-tested: a condition on a column this update never touched would
-          # read as a false negative.
-          it 'withholds both sides of an update row unconditionally' do
+          # Each side of an update is tested on its own values, so the one that can be proven in scope is
+          # released and the other is not.
+          it 'keeps the side of an update that passes the scope and blanks the one that does not' do
             data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
-                                                     new_values: { 'status' => 'mine too' })])
+                                                     new_values: { 'status' => 'someone else' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' }, 'newValues' => {})
+          end
+
+          it 'keeps both sides of an update that stayed in scope' do
+            data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
+                                                     new_values: { 'status' => 'mine' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' },
+                                          'newValues' => { 'status' => 'mine' })
+          end
+
+          # A diff that never carried the scoped column answers for neither side.
+          it 'withholds both sides of an update whose diff never touched the scoped column' do
+            data = history_of([audit_entry('update', previous_values: { 'created_at' => 1 },
+                                                     new_values: { 'created_at' => 2 })])
 
             expect(data.first).to include('previousValues' => {}, 'newValues' => {})
           end
