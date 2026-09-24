@@ -199,10 +199,12 @@ untouched. The row itself is always returned: what happened, by whom and when st
 
 A snapshot only answers for the writable columns it captured, so a scope reaching for anything else — a
 read-only column, a relation, a value stored redacted — is not evaluated against it at all and the values
-are withheld: `nil` there is a missing answer, not a passing one. Primary keys are the exception, read
-back from the row's own id, so a scope on the id still matches the record it belongs to — and that id wins
-over the snapshot, which matters for a writable primary key the trail redacts: the placeholder would read
-as unanswered while the id the row is filed under proves what the key was. This is also
+are withheld: `nil` there is a missing answer, not a passing one, and a redacted value answers no better.
+Primary keys are the exception: the packed id fills in whatever the snapshot cannot answer — a read-only key
+it never captured, or a writable one the trail redacts — so a scope on the id still matches the record it
+belongs to. It fills in only what is missing: where a side captured the key itself, that value is the one
+that was true there. Each side of an update is read against the id it was filed under, the row's own id and,
+for the previous side of an update that moved the key, the id it moved from. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 

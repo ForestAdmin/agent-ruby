@@ -114,9 +114,9 @@ module ForestAdminAgent
           case entry.operation
           # `delete`'s previous_values and `create`'s new_values both capture every writable column.
           when 'delete'
-            in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+            in_scope?(entry.previous_values, entry.record_id, scope, context) ? entry : blank(entry, :previous_values)
           when 'create'
-            in_scope?(entry, entry.new_values, scope, context) ? entry : blank(entry, :new_values)
+            in_scope?(entry.new_values, entry.record_id, scope, context) ? entry : blank(entry, :new_values)
           when 'update'
             withhold_each_side(entry, scope, context)
           # `action`/`action_failed` rows hold a submitted form and a result summary, not column values, so
@@ -131,32 +131,37 @@ module ForestAdminAgent
         # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
         # row whose new value is out of scope, since that side is tested on its own.
         def withhold_each_side(entry, scope, context)
-          kept = in_scope?(entry, entry.previous_values, scope, context) ? entry : blank(entry, :previous_values)
+          # An update that moved a writable primary key files its row under the id the record ended up with,
+          # and keeps the one it had on `previous_record_id`. Each side is tested against the id it was true
+          # of, or the new state's id would decide whether the old state is in scope.
+          before = entry.previous_record_id || entry.record_id
+          kept = in_scope?(entry.previous_values, before, scope, context) ? entry : blank(entry, :previous_values)
 
-          in_scope?(kept, kept.new_values, scope, context) ? kept : blank(kept, :new_values)
+          in_scope?(kept.new_values, kept.record_id, scope, context) ? kept : blank(kept, :new_values)
         end
 
         # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth
         # matching. The capture keeps the writable columns, so a scope on anything else — a read-only column, a
         # relation — reads as nil there and would answer for a value the row never held: `status != 'private'`
         # would match, and an ordered operator would raise on the nil. A redacted value answers no better.
-        def in_scope?(entry, values, scope, context)
-          snapshot = with_primary_keys(entry, values, context.collection)
-          answerable = scope.projection.all? do |field|
-            snapshot.key?(field) && snapshot[field] != ::ForestAdminAgent::AuditTrail::Recording::REDACTED
-          end
+        def in_scope?(values, packed_id, scope, context)
+          snapshot = answerable_snapshot(values, packed_id, context.collection)
+          answerable = scope.projection.all? { |field| snapshot.key?(field) }
 
           answerable && scope.match(snapshot, context.collection, context.caller.timezone)
         end
 
-        # A read-only primary key never lands in the snapshot, so a scope on the id would redact a row that is
-        # squarely in scope. The row's own packed id carries those values, and it wins: the same value as the
-        # snapshot's in every case but one — a writable primary key the trail redacts, where the snapshot holds
-        # the placeholder while the id the row is filed under proves what the key was.
-        def with_primary_keys(entry, values, collection)
-          return values || {} if entry.record_id.nil?
+        # What this side of the row can answer about. A redacted value answers nothing, so it is dropped rather
+        # than matched against the placeholder — leaving the field unanswered, which withholds. The packed id
+        # then fills in the primary keys: a read-only one never lands in the snapshot at all, and a writable one
+        # the trail redacts was just dropped, while the id the row was filed under proves what the key was.
+        # It only fills what the snapshot cannot answer: on the side of a row that captured the key itself,
+        # that value is the one that was true there.
+        def answerable_snapshot(values, packed_id, collection)
+          answered = (values || {}).reject { |_, value| value == ::ForestAdminAgent::AuditTrail::Recording::REDACTED }
+          return answered if packed_id.nil?
 
-          (values || {}).merge(Utils::Id.unpack_id(collection, entry.record_id, with_key: true))
+          Utils::Id.unpack_id(collection, packed_id, with_key: true).merge(answered)
         end
 
         def blank(entry, *fields)

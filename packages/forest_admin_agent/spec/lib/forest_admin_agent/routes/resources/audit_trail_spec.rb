@@ -355,6 +355,35 @@ module ForestAdminAgent
             expect(data.first['previousValues']).to eq({})
           end
 
+          # An update that moved a writable primary key files its row under the id the record ended up with and
+          # keeps the old one on `previous_record_id`. The snapshot answers for the key on both sides — unless
+          # the trail redacts it, and then the id each side was filed under is the only thing left to answer
+          # with. Taking the row's id for both sides would let the new state decide about the old one.
+          describe 'an update that moved a redacted primary key' do
+            def renamed_entry
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'update', collection: 'projects', record_id: '9', previous_record_id: '4',
+                previous_values: { 'id' => redacted, 'status' => 'was theirs' },
+                new_values: { 'id' => redacted, 'status' => 'now mine' }
+              )
+            end
+
+            it 'withholds the previous side from a scope that only matches the id it moved to' do
+              data = history_of([renamed_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+              expect(data.first['previousValues']).to eq({})
+              expect(data.first['newValues']).to include('status' => 'now mine')
+            end
+
+            it 'keeps the previous side for a scope that matches the id it moved from' do
+              data = history_of([renamed_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(data.first['previousValues']).to include('status' => 'was theirs')
+              expect(data.first['newValues']).to eq({})
+            end
+          end
+
           # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
           # would read as unanswered, while the id the row is filed under proves what the key was.
           it 'reads a redacted primary key back from the packed id rather than the snapshot' do
