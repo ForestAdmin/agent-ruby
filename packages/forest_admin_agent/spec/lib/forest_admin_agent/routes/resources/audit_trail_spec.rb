@@ -355,6 +355,16 @@ module ForestAdminAgent
             expect(data.first['previousValues']).to eq({})
           end
 
+          # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
+          # would read as unanswered, while the id the row is filed under proves what the key was.
+          it 'reads a redacted primary key back from the packed id rather than the snapshot' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'id' => redacted, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'id' => redacted, 'status' => 'mine' })
+          end
+
           # A read-only primary key never lands in the snapshot; the row's own packed id carries it.
           it 'matches a scope on the primary key through the row id' do
             entry = audit_entry('delete', previous_values: { 'status' => 'mine' })

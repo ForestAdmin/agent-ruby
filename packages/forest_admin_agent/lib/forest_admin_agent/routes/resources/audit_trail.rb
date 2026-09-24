@@ -150,11 +150,13 @@ module ForestAdminAgent
         end
 
         # A read-only primary key never lands in the snapshot, so a scope on the id would redact a row that is
-        # squarely in scope. The row's own packed id carries those values.
+        # squarely in scope. The row's own packed id carries those values, and it wins: the same value as the
+        # snapshot's in every case but one — a writable primary key the trail redacts, where the snapshot holds
+        # the placeholder while the id the row is filed under proves what the key was.
         def with_primary_keys(entry, values, collection)
-          keys = entry.record_id.nil? ? {} : Utils::Id.unpack_id(collection, entry.record_id, with_key: true)
+          return values || {} if entry.record_id.nil?
 
-          keys.merge(values || {})
+          (values || {}).merge(Utils::Id.unpack_id(collection, entry.record_id, with_key: true))
         end
 
         def blank(entry, *fields)
