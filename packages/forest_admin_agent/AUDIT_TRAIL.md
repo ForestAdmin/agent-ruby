@@ -204,7 +204,14 @@ Primary keys are the exception: the packed id fills in whatever the snapshot can
 it never captured, or a writable one the trail redacts — so a scope on the id still matches the record it
 belongs to. It fills in only what is missing: where a side captured the key itself, that value is the one
 that was true there. Each side of an update is read against the id it was filed under, the row's own id and,
-for the previous side of an update that moved the key, the id it moved from. This is also
+for the previous side of an update that moved the key, the id it moved from. A `pending` row is filed under
+the id the record had *before* the write, which may not have landed, so its new side is given no id to fill
+from and answers with what it captured or not at all.
+
+A row the scope cannot be evaluated against at all is withheld, never fatal: an id that stopped decoding
+when the primary key changed shape, or a column captured as `nil` that an ordered operator cannot compare,
+would otherwise fail the whole page — and only for the callers a scope applies to, since an unscoped caller
+never reaches this test. The failure is logged and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 

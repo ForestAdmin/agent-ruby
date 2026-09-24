@@ -137,7 +137,14 @@ module ForestAdminAgent
           before = entry.previous_record_id || entry.record_id
           kept = in_scope?(entry.previous_values, before, scope, context) ? entry : blank(entry, :previous_values)
 
-          in_scope?(kept.new_values, kept.record_id, scope, context) ? kept : blank(kept, :new_values)
+          in_scope?(kept.new_values, after_id(kept), scope, context) ? kept : blank(kept, :new_values)
+        end
+
+        # A pending row is filed under the id the record had *before* the write, since the write may not have
+        # landed: it says nothing about the state the update was moving to, so the new side gets no id to fill
+        # from and falls back on what it captured itself.
+        def after_id(entry)
+          entry.status == ::ForestAdminAgent::AuditTrail::Recording::PENDING ? nil : entry.record_id
         end
 
         # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth
@@ -146,9 +153,17 @@ module ForestAdminAgent
         # would match, and an ordered operator would raise on the nil. A redacted value answers no better.
         def in_scope?(values, packed_id, scope, context)
           snapshot = answerable_snapshot(values, packed_id, context.collection)
-          answerable = scope.projection.all? { |field| snapshot.key?(field) }
+          return false unless scope.projection.all? { |field| snapshot.key?(field) }
 
-          answerable && scope.match(snapshot, context.collection, context.caller.timezone)
+          scope.match(snapshot, context.collection, context.caller.timezone)
+        rescue StandardError => e
+          # Key presence is not answerability: a column captured as nil has its key, and an ordered operator
+          # raises on it — as does an id that no longer decodes against today's schema. Uncaught, either would
+          # fail the whole page, and only for the callers a scope applies to. One withheld row is the smaller
+          # loss, and the same answer the field would have got had it been missing outright.
+          Facades::Container.logger.log('Warn', "[ForestAdmin] Audit row not scope-checkable: #{e.message}")
+
+          false
         end
 
         # What this side of the row can answer about. A redacted value answers nothing, so it is dropped rather

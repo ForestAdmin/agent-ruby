@@ -20,7 +20,9 @@ module ForestAdminAgent
                 ),
                 'status' => ColumnSchema.new(column_type: 'String'),
                 # Read-only, so the capture never records it: the audit snapshots hold writable columns only.
-                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true)
+                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true),
+                # Nullable, so a row can capture it as nil and still hold the key.
+                'budget' => ColumnSchema.new(column_type: 'Number')
               }
             },
             list: [{ 'id' => 4 }]
@@ -382,6 +384,42 @@ module ForestAdminAgent
               expect(data.first['previousValues']).to include('status' => 'was theirs')
               expect(data.first['newValues']).to eq({})
             end
+          end
+
+          # A pending row is filed under the id the record had before the write, so it cannot answer for the
+          # state the update was moving to.
+          it 'gives the new side of a pending update no id to fill from' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '4',
+              status: ForestAdminAgent::AuditTrail::Recording::PENDING,
+              previous_values: { 'id' => redacted, 'status' => 'was mine' },
+              new_values: { 'id' => redacted, 'status' => 'now theirs' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to include('status' => 'was mine')
+            expect(data.first['newValues']).to eq({})
+          end
+
+          # A captured nil holds its key, so the answerability test passes it through to an operator that
+          # cannot compare it. Failing the whole page over one row would take the other rows with it.
+          it 'withholds a row whose captured nil an ordered operator cannot compare' do
+            data = history_of([audit_entry('delete', previous_values: { 'budget' => nil, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('budget', Operators::GREATER_THAN, 1000))
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # An id written under an older schema stops decoding when the primary key changes arity.
+          it 'withholds a row whose stored id no longer decodes rather than failing the page' do
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'delete', collection: 'projects', record_id: '4|legacy',
+              previous_values: { 'status' => 'mine' }, new_values: {}
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
           end
 
           # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
