@@ -20,7 +20,9 @@ module ForestAdminAgent
                 ),
                 'status' => ColumnSchema.new(column_type: 'String'),
                 # Read-only, so the capture never records it: the audit snapshots hold writable columns only.
-                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true)
+                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true),
+                # Nullable, so a row can capture it as nil and still hold the key.
+                'budget' => ColumnSchema.new(column_type: 'Number')
               }
             },
             list: [{ 'id' => 4 }]
@@ -353,6 +355,119 @@ module ForestAdminAgent
                               scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
 
             expect(data.first['previousValues']).to eq({})
+          end
+
+          # An update that moved a writable primary key files its row under the id the record ended up with and
+          # keeps the old one on `previous_record_id`. The snapshot answers for the key on both sides — unless
+          # the trail redacts it, and then the id each side was filed under is the only thing left to answer
+          # with. Taking the row's id for both sides would let the new state decide about the old one.
+          describe 'an update that moved a redacted primary key' do
+            def renamed_entry
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'update', collection: 'projects', record_id: '9', previous_record_id: '4',
+                previous_values: { 'id' => redacted, 'status' => 'was theirs' },
+                new_values: { 'id' => redacted, 'status' => 'now mine' }
+              )
+            end
+
+            it 'withholds the previous side from a scope that only matches the id it moved to' do
+              data = history_of([renamed_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+              expect(data.first['previousValues']).to eq({})
+              expect(data.first['newValues']).to include('status' => 'now mine')
+            end
+
+            it 'keeps the previous side for a scope that matches the id it moved from' do
+              data = history_of([renamed_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(data.first['previousValues']).to include('status' => 'was theirs')
+              expect(data.first['newValues']).to eq({})
+            end
+          end
+
+          # A pending row is filed under the id the record had before the write, so it cannot answer for the
+          # state the update was moving to.
+          it 'gives the new side of a pending update no id to fill from' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '4',
+              status: ForestAdminAgent::AuditTrail::Recording::PENDING,
+              previous_values: { 'id' => redacted, 'status' => 'was mine' },
+              new_values: { 'id' => redacted, 'status' => 'now theirs' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to include('status' => 'was mine')
+            expect(data.first['newValues']).to eq({})
+          end
+
+          # A captured nil holds its key, so the answerability test passes it through to an operator that
+          # cannot compare it. Failing the whole page over one row would take the other rows with it.
+          it 'withholds a row whose captured nil an ordered operator cannot compare' do
+            data = history_of([audit_entry('delete', previous_values: { 'budget' => nil, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('budget', Operators::GREATER_THAN, 1000))
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # An id written under an older schema stops decoding when the primary key changes arity.
+          describe 'a row whose stored id no longer decodes' do
+            def undecodable_entry
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'delete', collection: 'projects', record_id: '4|legacy',
+                previous_values: { 'status' => 'mine' }, new_values: {}
+              )
+            end
+
+            it 'withholds from a scope on the id rather than failing the page' do
+              data = history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+            end
+
+            # The id is all that could not be read. A scope that never asks about it is still answerable
+            # from the columns the row captured.
+            it 'still answers a scope that never asks about the id' do
+              data = history_of([undecodable_entry],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+
+              expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+            end
+
+            it 'logs the id it could not read' do
+              logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+              allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+              history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(logger).to have_received(:log).with('Warn', a_string_including('id not decodable'))
+            end
+          end
+
+          # The packed id fills in only what the snapshot cannot answer. A moved primary key the trail did
+          # not redact is carried by both sides, so neither needs the row's own id, and letting it win would
+          # judge the previous side by the id the record moved to.
+          it 'lets a side that captured the key keep its own, over the id the row is filed under' do
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '9',
+              previous_values: { 'id' => 4, 'status' => 'was theirs' },
+              new_values: { 'id' => 9, 'status' => 'now mine' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+            expect(data.first['previousValues']).to eq({})
+            expect(data.first['newValues']).to eq({ 'id' => 9, 'status' => 'now mine' })
+          end
+
+          # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
+          # would read as unanswered, while the id the row is filed under proves what the key was.
+          it 'reads a redacted primary key back from the packed id rather than the snapshot' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'id' => redacted, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'id' => redacted, 'status' => 'mine' })
           end
 
           # A read-only primary key never lands in the snapshot; the row's own packed id carries it.

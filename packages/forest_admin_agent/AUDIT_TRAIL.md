@@ -199,8 +199,21 @@ untouched. The row itself is always returned: what happened, by whom and when st
 
 A snapshot only answers for the writable columns it captured, so a scope reaching for anything else — a
 read-only column, a relation, a value stored redacted — is not evaluated against it at all and the values
-are withheld: `nil` there is a missing answer, not a passing one. Primary keys are the exception, read
-back from the row's own id, so a scope on the id still matches the record it belongs to. This is also
+are withheld: `nil` there is a missing answer, not a passing one, and a redacted value answers no better.
+Primary keys are the exception: the packed id fills in whatever the snapshot cannot answer — a read-only key
+it never captured, or a writable one the trail redacts — so a scope on the id still matches the record it
+belongs to. It fills in only what is missing: where a side captured the key itself, that value is the one
+that was true there. Each side of an update is read against the id it was filed under, the row's own id and,
+for the previous side of an update that moved the key, the id it moved from. A `pending` row is filed under
+the id the record had *before* the write, which may not have landed, so its new side is given no id to fill
+from and answers with what it captured or not at all.
+
+Neither failure this can meet is fatal, and each costs only what it actually broke. An id that stopped
+decoding when the primary key changed shape costs the keys it would have filled and nothing more, so a scope
+that never asks about the id is still answered from the columns the row captured. A column captured as `nil`
+that an ordered operator cannot compare withholds that row. Uncaught, either would have failed the whole
+page, and only for the callers a scope applies to, since an unscoped caller never reaches this test. Both
+are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
