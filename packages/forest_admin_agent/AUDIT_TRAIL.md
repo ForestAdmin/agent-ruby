@@ -208,10 +208,12 @@ for the previous side of an update that moved the key, the id it moved from. A `
 the id the record had *before* the write, which may not have landed, so its new side is given no id to fill
 from and answers with what it captured or not at all.
 
-A row the scope cannot be evaluated against at all is withheld, never fatal: an id that stopped decoding
-when the primary key changed shape, or a column captured as `nil` that an ordered operator cannot compare,
-would otherwise fail the whole page — and only for the callers a scope applies to, since an unscoped caller
-never reaches this test. The failure is logged and the row keeps its operation, author and timestamp. This is also
+Neither failure this can meet is fatal, and each costs only what it actually broke. An id that stopped
+decoding when the primary key changed shape costs the keys it would have filled and nothing more, so a scope
+that never asks about the id is still answered from the columns the row captured. A column captured as `nil`
+that an ordered operator cannot compare withholds that row. Uncaught, either would have failed the whole
+page, and only for the callers a scope applies to, since an unscoped caller never reaches this test. Both
+are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 

@@ -158,10 +158,10 @@ module ForestAdminAgent
           scope.match(snapshot, context.collection, context.caller.timezone)
         rescue StandardError => e
           # Key presence is not answerability: a column captured as nil has its key, and an ordered operator
-          # raises on it — as does an id that no longer decodes against today's schema. Uncaught, either would
-          # fail the whole page, and only for the callers a scope applies to. One withheld row is the smaller
-          # loss, and the same answer the field would have got had it been missing outright.
-          Facades::Container.logger.log('Warn', "[ForestAdmin] Audit row not scope-checkable: #{e.message}")
+          # raises on it. Uncaught that would fail the whole page, and only for the callers a scope applies
+          # to. One withheld row is the smaller loss, and the same answer the field would have got had it
+          # been missing outright.
+          Facades::Container.logger&.log('Warn', "[ForestAdmin] Audit row not scope-checkable: #{e.message}")
 
           false
         end
@@ -176,7 +176,16 @@ module ForestAdminAgent
           answered = (values || {}).reject { |_, value| value == ::ForestAdminAgent::AuditTrail::Recording::REDACTED }
           return answered if packed_id.nil?
 
-          Utils::Id.unpack_id(collection, packed_id, with_key: true).merge(answered)
+          begin
+            Utils::Id.unpack_id(collection, packed_id, with_key: true).merge(answered)
+          rescue StandardError => e
+            # An id written under a primary key of another shape costs the keys it would have filled, and
+            # nothing else: the snapshot still answers for the columns it captured, so a scope that never
+            # asks about the id is unaffected.
+            Facades::Container.logger&.log('Warn', "[ForestAdmin] Audit row id not decodable: #{e.message}")
+
+            answered
+          end
         end
 
         def blank(entry, *fields)

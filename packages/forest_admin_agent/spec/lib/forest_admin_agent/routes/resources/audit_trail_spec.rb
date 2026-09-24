@@ -412,14 +412,52 @@ module ForestAdminAgent
           end
 
           # An id written under an older schema stops decoding when the primary key changes arity.
-          it 'withholds a row whose stored id no longer decodes rather than failing the page' do
-            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
-              operation: 'delete', collection: 'projects', record_id: '4|legacy',
-              previous_values: { 'status' => 'mine' }, new_values: {}
-            )
-            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+          describe 'a row whose stored id no longer decodes' do
+            def undecodable_entry
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'delete', collection: 'projects', record_id: '4|legacy',
+                previous_values: { 'status' => 'mine' }, new_values: {}
+              )
+            end
 
-            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+            it 'withholds from a scope on the id rather than failing the page' do
+              data = history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+            end
+
+            # The id is all that could not be read. A scope that never asks about it is still answerable
+            # from the columns the row captured.
+            it 'still answers a scope that never asks about the id' do
+              data = history_of([undecodable_entry],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+
+              expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+            end
+
+            it 'logs the id it could not read' do
+              logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+              allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+              history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(logger).to have_received(:log).with('Warn', a_string_including('id not decodable'))
+            end
+          end
+
+          # The packed id fills in only what the snapshot cannot answer. A moved primary key the trail did
+          # not redact is carried by both sides, so neither needs the row's own id, and letting it win would
+          # judge the previous side by the id the record moved to.
+          it 'lets a side that captured the key keep its own, over the id the row is filed under' do
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '9',
+              previous_values: { 'id' => 4, 'status' => 'was theirs' },
+              new_values: { 'id' => 9, 'status' => 'now mine' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+            expect(data.first['previousValues']).to eq({})
+            expect(data.first['newValues']).to eq({ 'id' => 9, 'status' => 'now mine' })
           end
 
           # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
