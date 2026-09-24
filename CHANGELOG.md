@@ -1,3 +1,10 @@
+## [1.44.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.1...v1.44.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **audit_trail:** let the row's own id outrank a redacted primary key [PRD-1267] ([#394](https://github.com/ForestAdmin/agent-ruby/issues/394)) ([0884f2c](https://github.com/ForestAdmin/agent-ruby/commit/0884f2c9b791accd7e7f2071cc2860fcd1d08ff0))
+
 ## [1.44.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.0...v1.44.1) (2026-09-23)
 
 
