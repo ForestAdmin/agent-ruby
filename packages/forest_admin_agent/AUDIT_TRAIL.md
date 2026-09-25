@@ -217,11 +217,12 @@ are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
-The record is read twice: once before the rows are fetched, to refuse a record that exists outside the
-caller's scope without touching the audit database, and once after, so the answer that decides the
-withholding is never older than the rows it applies to — a record deleted in between would otherwise have
-answered "present and in scope" for rows that already carry its delete. The second read is skipped when no
-scope is in effect.
+The record is read twice. The first read refuses a record that exists outside the caller's scope without
+touching the audit database; the second, once the rows are in hand, is the one that decides, so the answer
+the withholding acts on is never older than the rows it applies to. A record deleted in between would
+otherwise have answered "present and in scope" for rows that already carry its delete — and one recreated in
+between would have answered "gone" for an id that now belongs to somebody else's record, which is a **404**,
+the same as for a request starting a moment later. The second read is skipped when no scope is in effect.
 
 **Every route that serves captured values applies this**, since a rule only one of them applies is one
 lookup away from being no rule at all. The two correlation routes withhold row by row exactly as the history

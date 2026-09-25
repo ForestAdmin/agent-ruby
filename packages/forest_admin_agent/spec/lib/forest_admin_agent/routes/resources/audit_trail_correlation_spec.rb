@@ -125,6 +125,20 @@ module ForestAdminAgent
             expect { route.handle_history(history_params) }.to raise_error(Http::Exceptions::NotFoundError)
           end
 
+          # Gone when the request was authorized, somebody else's by the time the rows came back. The first
+          # check cannot stand in for the second, or this route answers what a request starting a moment
+          # later would refuse.
+          it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+            allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('title',
+                                                                                              Operators::EQUAL,
+                                                                                              'mine'))
+            # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+            allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 2 }])
+            route = route_with_store(history: [audit_entry({ 'title' => 'mine' })])
+
+            expect { route.handle_history(history_params) }.to raise_error(Http::Exceptions::NotFoundError)
+          end
+
           # An empty answer has nothing to withhold, so it does not earn a second read of the record.
           it 'does not read the record again when the history is empty' do
             allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('title',

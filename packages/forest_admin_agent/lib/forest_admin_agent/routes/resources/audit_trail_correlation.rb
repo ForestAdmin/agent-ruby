@@ -35,20 +35,20 @@ module ForestAdminAgent
         end
 
         def handle_history(args = {})
-          context, collection, record_id, scope = assert_scope(args)
+          context, collection, record_id = assert_scope(args)
 
           history = store.list_by_correlation(
             collection: collection.name,
             record_id: record_id,
             correlation_key: args[:params]['correlation_key']
           )
-          data = withhold_gone_record(history, context, collection, record_id, scope)
+          data = withhold_gone_record(history, context, collection, record_id)
 
           { name: collection.name, content: { data: data.map { |record| serialize_record(record) } } }
         end
 
         def handle_batch(args = {})
-          context, collection, record_id, scope = assert_scope(args)
+          context, collection, record_id = assert_scope(args)
           correlation_keys = parse_correlation_keys(args)
 
           history = if correlation_keys.empty?
@@ -60,7 +60,7 @@ module ForestAdminAgent
                         correlation_keys: correlation_keys
                       )
                     end
-          data = withhold_gone_record(history, context, collection, record_id, scope)
+          data = withhold_gone_record(history, context, collection, record_id)
 
           { name: collection.name, content: { data: data.map { |record| serialize_record(record) } } }
         end
@@ -69,13 +69,12 @@ module ForestAdminAgent
 
         # These routes serve the same rows as the per-record history route, so a gone record's captured values
         # are tested against the caller's scope here too — otherwise what that route withholds comes back
-        # through a correlation lookup. Asked again rather than reused from the check that authorized the
-        # request, which ran before these rows were read.
-        def withhold_gone_record(history, context, collection, record_id, scope)
+        # through a correlation lookup.
+        def withhold_gone_record(history, context, collection, record_id)
           # An empty answer has nothing to withhold, so it does not earn a second read of the record.
           return history if history.empty?
 
-          scope ||= scope_if_gone_since(context, collection, record_id)
+          scope = scope_if_gone_since(context, collection, record_id)
 
           withhold_out_of_scope_values(history, Withholding.new(collection, scope, context.caller.timezone))
         end
@@ -90,8 +89,11 @@ module ForestAdminAgent
 
           collection = get_collection(context, name)
           context.permissions.can?(:read, collection)
+          # For the 404 it raises, before the audit database is touched. What it answers about the record is
+          # read again once the rows are in hand, and it is that answer the withholding acts on.
+          assert_record_in_scope(context, collection, record_id)
 
-          [context, collection, record_id, assert_record_in_scope(context, collection, record_id)]
+          [context, collection, record_id]
         end
 
         def get_collection(context, name)

@@ -178,6 +178,18 @@ module ForestAdminAgent
               expect(state).to eq({ 'status' => 'mine' })
             end
 
+            # The same read decides the other way round: an id that was gone at the first check can be taken
+            # by another record before the second, and that record's owner is not this caller.
+            it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'mine' })], record: nil)
+              # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+
+              expect { get_state(route) }.to raise_error(Http::Exceptions::NotFoundError)
+            end
+
             # The record can be deleted while the audit read is in flight: the check that ran first would
             # otherwise gate a reconstruction nothing protects any more.
             it 'withholds a reconstruction whose record was deleted after the first read' do
@@ -358,6 +370,20 @@ module ForestAdminAgent
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
                  .dig(:content, :data)
+          end
+
+          # The check that authorized the request ran before these rows were read: an id that was gone then
+          # can belong to another record now, and this caller has no claim on that one's history.
+          it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+            allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+            route = route_with_store(records: [audit_entry('delete', previous_values: { 'status' => 'mine' })])
+
+            expect do
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+            end.to raise_error(Http::Exceptions::NotFoundError)
           end
 
           it 'withholds a delete row whose previous values fail the scope, keeping the row itself' do
