@@ -426,6 +426,65 @@ module ForestAdminAgent
             expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
           end
 
+          # Matched in SQL, a search would still answer what the withholding hides: whether the row comes back,
+          # and the count, say whether the withheld value holds the term.
+          describe 'searched or filtered by field' do
+            def searched(entries, params)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store(records: entries)
+
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                            **params } })[:content]
+            end
+
+            def secret_delete
+              audit_entry('delete', previous_values: { 'status' => 'someone else secret' })
+                .tap { |entry| entry.user_id = 7 }
+            end
+
+            it 'finds nothing in a withheld value, and counts nothing' do
+              content = searched([secret_delete], 'search' => 'secret')
+
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            it 'matches the values it serves' do
+              content = searched([audit_entry('delete', previous_values: { 'status' => 'mine' })], 'search' => 'MIN')
+
+              expect(content[:data].map { |row| row['previousValues'] }).to eq([{ 'status' => 'mine' }])
+            end
+
+            it 'still matches what stays visible on a withheld row, such as its author' do
+              entry = secret_delete.tap { |row| row.user_email = 'jane@acme.io' }
+
+              content = searched([entry], 'search' => 'acme')
+
+              expect(content[:data].first).to include('userEmail' => 'jane@acme.io', 'previousValues' => {})
+              expect(content[:meta][:availableUsers]).to eq([{ id: 7, firstName: nil, lastName: nil,
+                                                               email: 'jane@acme.io' }])
+            end
+
+            it 'does not match a field only a withheld side touched' do
+              content = searched([secret_delete], 'fields' => 'status')
+
+              expect(content[:data]).to eq([])
+            end
+
+            it 'reads the rows without the value filters and pages what matched' do
+              rows = [audit_entry('create', new_values: { 'status' => 'mine' }),
+                      audit_entry('update', previous_values: { 'status' => 'mine' }, new_values: { 'status' => 'mine' })]
+
+              content = searched(rows, 'search' => 'mine', 'userIds' => '12', 'page' => { 'size' => '1', 'number' => '2' })
+
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search, :skip, :limit))
+              expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [12]))
+              expect(content[:data].map { |row| row['operation'] }).to eq(['update'])
+              expect(content[:meta]).to eq({ count: 2 })
+            end
+          end
+
           it 'keeps a create row whose new values pass the scope, and withholds one that does not' do
             data = history_of([audit_entry('create', new_values: { 'status' => 'mine' }),
                                audit_entry('create', new_values: { 'status' => 'someone else' })])

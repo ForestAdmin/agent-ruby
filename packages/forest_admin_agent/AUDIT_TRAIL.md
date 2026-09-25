@@ -139,6 +139,11 @@ It deliberately does **not** match `operation`, `correlationKey`, `recordId`, `c
 A field masked by `redact` never matches — neither by its `[redacted]` mask nor by the value it hid, which
 was never recorded. A search must not confirm a value the trail refused to keep.
 
+Nor one it withholds (see below). On a record gone for good under a caller's scope, `search` and `fields`
+are matched against the values as served, never as captured — in SQL, which rows come back, `meta.count`
+and `availableUsers` would each say whether a withheld value holds the term. The rows are read without those
+two filters and matched and paged in memory, which only a gone record's history pays for.
+
 `fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
 reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
 only and one it removed in `previousValues` only. The JSON test is per adapter (Postgres, SQLite, MySQL /

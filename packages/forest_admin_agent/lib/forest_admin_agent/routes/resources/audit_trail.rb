@@ -43,7 +43,6 @@ module ForestAdminAgent
           # while the rows below were still being chosen, which the read after them can no longer see.
           gone_at_check = assert_record_in_scope(context, context.collection, args[:params]['id'])
 
-          skip, limit = parse_pagination(args)
           filters = {
             collection: context.collection.name,
             # args[:params]['id'] is already Forest's packed id, the form the audit store keys on — plus any id
@@ -52,21 +51,15 @@ module ForestAdminAgent
             **parse_filters(args)
           }
 
-          history = store.list_by_record(**filters, skip: skip, limit: limit, order: parse_sort(args))
-          # `count` reflects the active filters (not the absolute total) and is independent of the page.
-          count = store.count_by_record(**filters)
-
-          # Asked again now, because the check above ran before these rows were read: a record deleted in
-          # between answered "present and in scope" for rows that already carry its delete.
-          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
-                                                    gone_at_check)
-          data = withhold_out_of_scope_values(
-            history, Withholding.new(context.collection, withholding_scope, context.caller.timezone)
-          )
+          data, count, authors = if gone_at_check && filters.slice(:search, :fields).any?
+                                   history_matched_after_withholding(context, args, filters, gone_at_check)
+                                 else
+                                   history_matched_in_store(context, args, filters, gone_at_check)
+                                 end
 
           {
             name: args[:params]['collection_name'],
-            content: { data: data.map { |record| serialize_record(record) }, meta: meta(args, filters, count) }
+            content: { data: data.map { |record| serialize_record(record) }, meta: meta(args, count, authors) }
           }
         end
 
@@ -119,10 +112,10 @@ module ForestAdminAgent
         # `availableUsers` rides along on the first fetch only — the front keeps the list it saw — and lists the
         # distinct authors of the entries the current filters match, whatever page was asked for. The identity
         # comes from the rows, so someone since renamed or removed still reads as they were when they acted.
-        def meta(args, filters, count)
+        def meta(args, count, authors)
           return { count: count } unless first_fetch?(args)
 
-          { count: count, availableUsers: available_users(filters) }
+          { count: count, availableUsers: authors.call.map { |author| available_user(author) } }
         end
 
         def first_fetch?(args)
@@ -131,11 +124,73 @@ module ForestAdminAgent
           (page.is_a?(Hash) ? page['number'].to_i : 0) <= 1
         end
 
-        def available_users(filters)
-          store.authors_by_record(**filters).map do |author|
-            { id: author[:user_id], firstName: author[:user_first_name],
-              lastName: author[:user_last_name], email: author[:user_email] }
+        def available_user(author)
+          { id: author[:user_id], firstName: author[:user_first_name],
+            lastName: author[:user_last_name], email: author[:user_email] }
+        end
+
+        def history_matched_in_store(context, args, filters, gone_at_check)
+          skip, limit = parse_pagination(args)
+          history = store.list_by_record(**filters, skip: skip, limit: limit, order: parse_sort(args))
+          # `count` reflects the active filters (not the absolute total) and is independent of the page.
+          count = store.count_by_record(**filters)
+
+          [withheld(context, args, history, gone_at_check), count, -> { store.authors_by_record(**filters) }]
+        end
+
+        # Matched in SQL, `search` and `fields` would test the values as captured, so which rows come back, the
+        # count and the authors would still say what the withholding hides — one probe per character. They are
+        # matched against what is served instead, which means paging the whole history here. Only for a record
+        # gone at the check: one in scope then was the caller's to read whole.
+        def history_matched_after_withholding(context, args, filters, gone_at_check)
+          skip, limit = parse_pagination(args)
+          value_filters = filters.slice(:search, :fields)
+          history = store.list_by_record(**filters.except(*value_filters.keys), order: parse_sort(args))
+          matched = withheld(context, args, history, gone_at_check).select do |entry|
+            matches_value_filters?(entry, **value_filters)
           end
+
+          [matched.drop(skip).first(limit), matched.size, -> { authors_of(matched) }]
+        end
+
+        # Asked again now, because the check above ran before these rows were read: a record deleted in
+        # between answered "present and in scope" for rows that already carry its delete.
+        def withheld(context, args, history, gone_at_check)
+          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
+                                                    gone_at_check)
+
+          withhold_out_of_scope_values(
+            history, Withholding.new(context.collection, withholding_scope, context.caller.timezone)
+          )
+        end
+
+        def matches_value_filters?(entry, search: nil, fields: nil)
+          (search.nil? || search_matches?(entry, search)) && (fields.nil? || touches_field?(entry, fields))
+        end
+
+        # `Sql::TextSearch`'s test, on the served values: the term JSON-escaped the way the values serialize,
+        # and a redacted mask removed before matching.
+        def search_matches?(entry, term)
+          text = term.downcase
+          escaped = text.to_json[1..-2]
+
+          ::ForestAdminAgent::AuditTrail::Sql::TextSearch::TEXT_COLUMNS.any? do |column|
+            entry[column].to_s.downcase.include?(text)
+          end || [entry.previous_values, entry.new_values].compact.any? do |values|
+            values.to_json.gsub(::ForestAdminAgent::AuditTrail::Recording::REDACTED, '').downcase.include?(escaped)
+          end
+        end
+
+        def touches_field?(entry, fields)
+          [entry.previous_values, entry.new_values].compact.any? do |values|
+            fields.any? { |field| values.key?(field) }
+          end
+        end
+
+        def authors_of(entries)
+          entries.reject { |entry| entry.user_id.nil? }
+                 .map { |entry| ::ForestAdminAgent::AuditTrail::Store::AUTHOR_COLUMNS.to_h { |column| [column, entry[column]] } }
+                 .uniq
         end
 
         # An ISO-8601 instant, or the same wall-clock forms the history filters accept, read in the request
