@@ -85,19 +85,23 @@ module ForestAdminAgent
           end
 
           # Authorization and read are one query: a scoped check followed by an unscoped read would hand
-          # back a row the check never covered.
-          it 'reads the record through the caller scope, in a single query' do
+          # back a row the check never covered. The record is read again on the way out, which is the
+          # re-check below, not a separate authorization.
+          it 'reads the record through the caller scope, in one query' do
             scope = Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4)
             allow(permissions).to receive(:get_scope).and_return(scope)
             route = state_route
+            reads = []
+            allow(collection).to receive(:list) do |_caller, filter, projection|
+              reads << [filter, projection]
+              [{ 'id' => 4, 'status' => 'shipped' }]
+            end
 
             get_state(route)
 
-            expect(collection).to have_received(:list).once
-            expect(collection).to have_received(:list) do |_caller, filter, projection|
-              expect(filter.condition_tree.conditions).to include(scope)
-              expect(projection).to include('status')
-            end
+            filter, projection = reads.first
+            expect(filter.condition_tree.conditions).to include(scope)
+            expect(projection).to include('status')
           end
 
           it 'refuses a record that exists outside the caller scope' do
@@ -118,6 +122,98 @@ module ForestAdminAgent
             allow(collection).to receive(:list).and_return([], [])
 
             expect(get_state(route)[:content][:data]).to eq({ 'status' => 'shipped' })
+          end
+
+          # The history route withholds a gone record's captured values from a caller whose scope they fail,
+          # and this route is nothing but those values reassembled: without the same test they come back one
+          # request away.
+          describe 'a deleted record whose reconstruction falls outside the caller scope' do
+            def state_of(entries, scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(permissions).to receive(:get_scope).and_return(scope)
+              route = state_route(entries: entries, record: nil)
+              # Empty in scope and empty without it: the record is gone for good.
+              allow(collection).to receive(:list).and_return([])
+
+              get_state(route).dig(:content, :data)
+            end
+
+            it 'returns no data when the reconstruction fails the scope' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })])).to be_nil
+            end
+
+            it 'returns the reconstruction that passes the scope' do
+              expect(state_of([entry('delete', { 'status' => 'mine' })])).to eq({ 'status' => 'mine' })
+            end
+
+            it 'serves it whole to a caller no scope applies to' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })], scope: nil))
+                .to eq({ 'status' => 'someone else' })
+            end
+
+            # Same rule as a row: absent is not the same as passing.
+            it 'returns no data when the scope asks about a column the reconstruction cannot answer' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+              expect(state).to be_nil
+            end
+
+            # The reconstruction can sit on the far side of a primary-key move this route cannot see, so the
+            # requested id does not answer for a key the trail redacted — unlike on a row, which is filed
+            # under an id that was true of the side being tested.
+            it 'does not let the requested id answer for a redacted primary key' do
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              state = state_of([entry('delete', { 'id' => redacted, 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to be_nil
+            end
+
+            # A read-only primary key is never captured, so nothing else can answer for it and the requested
+            # id is what the record was filed under either way.
+            it 'still fills a primary key the capture never kept' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to eq({ 'status' => 'mine' })
+            end
+
+            # A replacement answers for itself, not for the life whose rows these are: the reconstruction is
+            # of a record that was already gone, and the caller's claim on the id today says nothing about it.
+            it 'keeps withholding when an in-scope record has taken the id since' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })], record: nil)
+              # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+              allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
+
+            # The same read decides the other way round: an id that was gone at the first check can be taken
+            # by another record before the second, and that record's owner is not this caller.
+            it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'mine' })], record: nil)
+              # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+
+              expect { get_state(route) }.to raise_error(Http::Exceptions::NotFoundError)
+            end
+
+            # The record can be deleted while the audit read is in flight: the check that ran first would
+            # otherwise gate a reconstruction nothing protects any more.
+            it 'withholds a reconstruction whose record was deleted after the first read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })],
+                                  record: { 'id' => 4, 'status' => 'mine' })
+              # In scope on the way in, gone by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([{ 'id' => 4, 'status' => 'mine' }], [], [])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
           end
 
           # Rows written before an update moved a writable primary key stay under the id they were true of.
@@ -288,6 +384,36 @@ module ForestAdminAgent
                  .dig(:content, :data)
           end
 
+          # The rows are a dead record's. A live one that has since taken the id is a different record, and
+          # being allowed to read it is not a claim on what came before it.
+          it 'keeps withholding when an in-scope record has taken the id since' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+            allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+            route = route_with_store(records: [audit_entry('delete',
+                                                           previous_values: { 'status' => 'someone else' })])
+
+            data = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+                        .dig(:content, :data)
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # The check that authorized the request ran before these rows were read: an id that was gone then
+          # can belong to another record now, and this caller has no claim on that one's history.
+          it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+            allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+            route = route_with_store(records: [audit_entry('delete', previous_values: { 'status' => 'mine' })])
+
+            expect do
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+            end.to raise_error(Http::Exceptions::NotFoundError)
+          end
+
           it 'withholds a delete row whose previous values fail the scope, keeping the row itself' do
             data = history_of([audit_entry('delete', previous_values: { 'status' => 'someone else' })])
 
@@ -298,6 +424,96 @@ module ForestAdminAgent
             data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })])
 
             expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+          end
+
+          # Matched in SQL, a search would still answer what the withholding hides: whether the row comes back,
+          # and the count, say whether the withheld value holds the term.
+          describe 'searched or filtered by field' do
+            def searched(entries, params)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store(records: entries)
+
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                            **params } })[:content]
+            end
+
+            def secret_delete
+              audit_entry('delete', previous_values: { 'status' => 'someone else secret' })
+                .tap { |entry| entry.user_id = 7 }
+            end
+
+            it 'finds nothing in a withheld value, and counts nothing' do
+              content = searched([secret_delete], 'search' => 'secret')
+
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            it 'matches the values it serves' do
+              content = searched([audit_entry('delete', previous_values: { 'status' => 'mine' })], 'search' => 'MIN')
+
+              expect(content[:data].map { |row| row['previousValues'] }).to eq([{ 'status' => 'mine' }])
+            end
+
+            it 'still matches what stays visible on a withheld row, such as its author' do
+              entry = secret_delete.tap { |row| row.user_email = 'jane@acme.io' }
+
+              content = searched([entry], 'search' => 'acme')
+
+              expect(content[:data].first).to include('userEmail' => 'jane@acme.io', 'previousValues' => {})
+              expect(content[:meta][:availableUsers]).to eq([{ id: 7, firstName: nil, lastName: nil,
+                                                               email: 'jane@acme.io' }])
+            end
+
+            it 'lists an author once even when their rows carry different identities' do
+              renamed = [secret_delete.tap { |row| row.user_email = 'jane@acme.io' },
+                         secret_delete.tap { |row| row.user_email = 'jane@acme.com' }]
+
+              content = searched(renamed, 'search' => 'acme')
+
+              expect(content[:meta][:availableUsers].map { |user| user[:id] }).to eq([7])
+            end
+
+            it 'does not match a field only a withheld side touched' do
+              content = searched([secret_delete], 'fields' => 'status')
+
+              expect(content[:data]).to eq([])
+            end
+
+            it 'reads the rows without the value filters and pages what matched' do
+              rows = [audit_entry('create', new_values: { 'status' => 'mine' }),
+                      audit_entry('update', previous_values: { 'status' => 'mine' }, new_values: { 'status' => 'mine' })]
+
+              content = searched(rows, 'search' => 'mine', 'userIds' => '12', 'page' => { 'size' => '1', 'number' => '2' })
+
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search))
+              expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [12]))
+              expect(content[:data].map { |row| row['operation'] }).to eq(['update'])
+              expect(content[:meta]).to eq({ count: 2 })
+            end
+
+            # The page cap bounds what is served, not what is scanned: the history is read in batches so
+            # a long one is never held in memory whole.
+            it 'scans the history in batches, counting across them and keeping only the page' do
+              stub_const("#{described_class}::SCAN_BATCH_SIZE", 2)
+              rows = Array.new(5) { |index| audit_entry('create', new_values: { 'status' => 'mine', 'n' => index }) }
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store
+              allow(store).to receive(:list_by_record) { |skip:, **| rows.drop(skip).first(2) }
+
+              content = route.handle_request(
+                { headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'search' => 'mine',
+                                         'page' => { 'size' => '2', 'number' => '2' } } }
+              )[:content]
+
+              expect(store).to have_received(:list_by_record).exactly(3).times
+              expect(store).to have_received(:list_by_record).with(hash_including(skip: 4, limit: 2))
+              expect(content[:data].map { |row| row['newValues']['n'] }).to eq([2, 3])
+              expect(content[:meta]).to eq({ count: 5 })
+            end
           end
 
           it 'keeps a create row whose new values pass the scope, and withholds one that does not' do

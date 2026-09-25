@@ -139,6 +139,13 @@ It deliberately does **not** match `operation`, `correlationKey`, `recordId`, `c
 A field masked by `redact` never matches — neither by its `[redacted]` mask nor by the value it hid, which
 was never recorded. A search must not confirm a value the trail refused to keep.
 
+Nor one it withholds (see below). On a record gone for good under a caller's scope, `search` and `fields`
+are matched against the values as served, never as captured — in SQL, which rows come back, `meta.count`
+and `availableUsers` would each say whether a withheld value holds the term. The rows are read without those
+two filters, in batches of 500, and matched and paged as they go, keeping only the page asked for. Only a
+gone record's history pays that scan, and it is one record's history — the same rows the SQL search
+would have scanned without an index.
+
 `fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
 reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
 only and one it removed in `previousValues` only. The JSON test is per adapter (Postgres, SQLite, MySQL /
@@ -217,15 +224,30 @@ are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
-The record is read twice: once before the rows are fetched, to refuse a record that exists outside the
-caller's scope without touching the audit database, and once after, so the answer that decides the
-withholding is never older than the rows it applies to — a record deleted in between would otherwise have
-answered "present and in scope" for rows that already carry its delete. The second read is skipped when no
-scope is in effect.
+The record is read twice, and **the values are withheld if either read found it gone**. The first read
+refuses a record that exists outside the caller's scope without touching the audit database, and it is the
+only one that saw the record as it was while the rows were being chosen. The second, once the rows are in
+hand, is the only one that can see a record deleted since — which would otherwise have answered "present and
+in scope" for rows that already carry its delete.
 
-**This covers the history route only.** `/state` reconstructs a gone record from the same rows and serves
-it unfiltered, and the correlation routes check the record but not the values, so a caller the withholding
-above protects against can still read those values one request away. Closing that is tracked separately.
+Neither answer cancels the other, because an id outlives the record that held it. A record that took a freed
+id between the two reads answers for itself and not for the life whose rows these are: if this caller cannot
+read it, that is a **404**, the same as for a request starting a moment later; if they can, the earlier
+life's values stay withheld all the same. The second read is skipped when no scope is in effect, and on the
+correlation routes when the answer holds no rows.
+
+Where the delete and the recreation both happened *before* the request, both reads see the live record and
+its history is served whole, earlier lives included — the documented delete/recreate behaviour, and a
+separate question from the one above.
+
+**Every route that serves captured values applies this**, since a rule only one of them applies is one
+lookup away from being no rule at all. The two correlation routes withhold row by row exactly as the history
+route does. `/state` is nothing but those values reassembled, so the reconstruction is tested as a whole and
+`data` is `null` when it fails — including when the scope asks about something the reconstruction cannot
+answer. One difference there: a reconstruction can sit on the far side of a primary-key move the route cannot
+see, so the requested id does not fill in a key the trail redacted, only one that was never captured at all
+(read-only, so it cannot have moved). All of them take the second read of the record too, and skip it when
+there is nothing to withhold — no scope in effect, or no rows in the answer.
 
 ### State route
 
@@ -239,7 +261,8 @@ after** the timestamp — an entry stamped exactly at it counts as part of that 
 
 `timestamp` accepts an ISO-8601 instant, or the same wall-clock forms as the filters above read in the
 request `timezone`; it is required (**400** otherwise). `data` is `null` when the record did not exist at
-that instant — either created later, or deleted and never recreated.
+that instant — either created later, or deleted and never recreated — and when the reconstruction of a gone
+record falls outside the caller's scope.
 
 Walking back stops being able to help where the trail stops: only audited (writable) columns are
 reconstructed, and a `create` means the record did not exist before it, while a `delete` restores the whole
