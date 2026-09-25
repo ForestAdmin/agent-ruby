@@ -13,6 +13,7 @@ module ForestAdminAgent
 
         DEFAULT_PAGE_SIZE = 20
         MAX_PAGE_SIZE = 100
+        SCAN_BATCH_SIZE = 500
         DATE_ONLY = /\A\d{4}-\d{2}-\d{2}\z/
         # Wall-clock datetime, `T` or space separator, seconds optional: `YYYY-MM-DD[T ]HH:mm[:ss]`.
         DATE_TIME = /\A(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?\z/
@@ -140,28 +141,53 @@ module ForestAdminAgent
 
         # Matched in SQL, `search` and `fields` would test the values as captured, so which rows come back, the
         # count and the authors would still say what the withholding hides — one probe per character. They are
-        # matched against what is served instead, which means paging the whole history here. Only for a record
-        # gone at the check: one in scope then was the caller's to read whole.
+        # matched against what is served instead, which means scanning the whole history here, in batches, so
+        # only the page asked for is kept. Only for a record gone at the check: one in scope then was the
+        # caller's to read whole.
         def history_matched_after_withholding(context, args, filters, gone_at_check)
           skip, limit = parse_pagination(args)
           value_filters = filters.slice(:search, :fields)
-          history = store.list_by_record(**filters.except(*value_filters.keys), order: parse_sort(args))
-          matched = withheld(context, args, history, gone_at_check).select do |entry|
-            matches_value_filters?(entry, **value_filters)
+          page = []
+          count = 0
+          authors = {}
+
+          each_withheld_batch(context, args, filters.except(*value_filters.keys), gone_at_check) do |entry|
+            next unless matches_value_filters?(entry, **value_filters)
+
+            page << entry if count >= skip && page.size < limit
+            count += 1
+            authors[entry.user_id] ||= author_of(entry) unless entry.user_id.nil?
           end
 
-          [matched.drop(skip).first(limit), matched.size, -> { authors_of(matched) }]
+          [page, count, -> { authors.values }]
+        end
+
+        def each_withheld_batch(context, args, filters, gone_at_check, &block)
+          order = parse_sort(args)
+          withholding = nil
+          offset = 0
+
+          loop do
+            rows = store.list_by_record(**filters, skip: offset, limit: SCAN_BATCH_SIZE, order: order)
+            withholding ||= withholding_for(context, args, gone_at_check)
+            withhold_out_of_scope_values(rows, withholding).each(&block)
+            break if rows.size < SCAN_BATCH_SIZE
+
+            offset += SCAN_BATCH_SIZE
+          end
+        end
+
+        def withheld(context, args, history, gone_at_check)
+          withhold_out_of_scope_values(history, withholding_for(context, args, gone_at_check))
         end
 
         # Asked again now, because the check above ran before these rows were read: a record deleted in
         # between answered "present and in scope" for rows that already carry its delete.
-        def withheld(context, args, history, gone_at_check)
+        def withholding_for(context, args, gone_at_check)
           withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
                                                     gone_at_check)
 
-          withhold_out_of_scope_values(
-            history, Withholding.new(context.collection, withholding_scope, context.caller.timezone)
-          )
+          Withholding.new(context.collection, withholding_scope, context.caller.timezone)
         end
 
         def matches_value_filters?(entry, search: nil, fields: nil)
@@ -187,10 +213,8 @@ module ForestAdminAgent
           end
         end
 
-        def authors_of(entries)
-          entries.reject { |entry| entry.user_id.nil? }
-                 .map { |entry| ::ForestAdminAgent::AuditTrail::Store::AUTHOR_COLUMNS.to_h { |column| [column, entry[column]] } }
-                 .uniq { |author| author[:user_id] }
+        def author_of(entry)
+          ::ForestAdminAgent::AuditTrail::Store::AUTHOR_COLUMNS.to_h { |column| [column, entry[column]] }
         end
 
         # An ISO-8601 instant, or the same wall-clock forms the history filters accept, read in the request

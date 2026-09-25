@@ -487,10 +487,32 @@ module ForestAdminAgent
 
               content = searched(rows, 'search' => 'mine', 'userIds' => '12', 'page' => { 'size' => '1', 'number' => '2' })
 
-              expect(store).to have_received(:list_by_record).with(hash_excluding(:search, :skip, :limit))
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search))
               expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [12]))
               expect(content[:data].map { |row| row['operation'] }).to eq(['update'])
               expect(content[:meta]).to eq({ count: 2 })
+            end
+
+            # The page cap bounds what is served, not what is scanned: the history is read in batches so
+            # a long one is never held in memory whole.
+            it 'scans the history in batches, counting across them and keeping only the page' do
+              stub_const("#{described_class}::SCAN_BATCH_SIZE", 2)
+              rows = Array.new(5) { |index| audit_entry('create', new_values: { 'status' => 'mine', 'n' => index }) }
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store
+              allow(store).to receive(:list_by_record) { |skip:, **| rows.drop(skip).first(2) }
+
+              content = route.handle_request(
+                { headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'search' => 'mine',
+                                         'page' => { 'size' => '2', 'number' => '2' } } }
+              )[:content]
+
+              expect(store).to have_received(:list_by_record).exactly(3).times
+              expect(store).to have_received(:list_by_record).with(hash_including(skip: 4, limit: 2))
+              expect(content[:data].map { |row| row['newValues']['n'] }).to eq([2, 3])
+              expect(content[:meta]).to eq({ count: 5 })
             end
           end
 
