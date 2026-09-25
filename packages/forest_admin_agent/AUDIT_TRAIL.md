@@ -223,9 +223,14 @@ withholding is never older than the rows it applies to — a record deleted in b
 answered "present and in scope" for rows that already carry its delete. The second read is skipped when no
 scope is in effect.
 
-**This covers the history route only.** `/state` reconstructs a gone record from the same rows and serves
-it unfiltered, and the correlation routes check the record but not the values, so a caller the withholding
-above protects against can still read those values one request away. Closing that is tracked separately.
+**Every route that serves captured values applies this**, since a rule only one of them applies is one
+lookup away from being no rule at all. The two correlation routes withhold row by row exactly as the history
+route does. `/state` is nothing but those values reassembled, so the reconstruction is tested as a whole and
+`data` is `null` when it fails — including when the scope asks about something the reconstruction cannot
+answer. One difference there: a reconstruction can sit on the far side of a primary-key move the route cannot
+see, so the requested id does not fill in a key the trail redacted, only one that was never captured at all
+(read-only, so it cannot have moved). All of them take the second read of the record too, and skip it when
+there is nothing to withhold — no scope in effect, or no rows in the answer.
 
 ### State route
 
@@ -239,7 +244,8 @@ after** the timestamp — an entry stamped exactly at it counts as part of that 
 
 `timestamp` accepts an ISO-8601 instant, or the same wall-clock forms as the filters above read in the
 request `timezone`; it is required (**400** otherwise). `data` is `null` when the record did not exist at
-that instant — either created later, or deleted and never recreated.
+that instant — either created later, or deleted and never recreated — and when the reconstruction of a gone
+record falls outside the caller's scope.
 
 Walking back stops being able to help where the trail stops: only audited (writable) columns are
 reconstructed, and a `create` means the record did not exist before it, while a `delete` restores the whole

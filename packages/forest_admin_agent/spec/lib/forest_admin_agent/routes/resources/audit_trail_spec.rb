@@ -85,19 +85,23 @@ module ForestAdminAgent
           end
 
           # Authorization and read are one query: a scoped check followed by an unscoped read would hand
-          # back a row the check never covered.
-          it 'reads the record through the caller scope, in a single query' do
+          # back a row the check never covered. The record is read again on the way out, which is the
+          # re-check below, not a separate authorization.
+          it 'reads the record through the caller scope, in one query' do
             scope = Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4)
             allow(permissions).to receive(:get_scope).and_return(scope)
             route = state_route
+            reads = []
+            allow(collection).to receive(:list) do |_caller, filter, projection|
+              reads << [filter, projection]
+              [{ 'id' => 4, 'status' => 'shipped' }]
+            end
 
             get_state(route)
 
-            expect(collection).to have_received(:list).once
-            expect(collection).to have_received(:list) do |_caller, filter, projection|
-              expect(filter.condition_tree.conditions).to include(scope)
-              expect(projection).to include('status')
-            end
+            filter, projection = reads.first
+            expect(filter.condition_tree.conditions).to include(scope)
+            expect(projection).to include('status')
           end
 
           it 'refuses a record that exists outside the caller scope' do
@@ -118,6 +122,74 @@ module ForestAdminAgent
             allow(collection).to receive(:list).and_return([], [])
 
             expect(get_state(route)[:content][:data]).to eq({ 'status' => 'shipped' })
+          end
+
+          # The history route withholds a gone record's captured values from a caller whose scope they fail,
+          # and this route is nothing but those values reassembled: without the same test they come back one
+          # request away.
+          describe 'a deleted record whose reconstruction falls outside the caller scope' do
+            def state_of(entries, scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(permissions).to receive(:get_scope).and_return(scope)
+              route = state_route(entries: entries, record: nil)
+              # Empty in scope and empty without it: the record is gone for good.
+              allow(collection).to receive(:list).and_return([])
+
+              get_state(route).dig(:content, :data)
+            end
+
+            it 'returns no data when the reconstruction fails the scope' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })])).to be_nil
+            end
+
+            it 'returns the reconstruction that passes the scope' do
+              expect(state_of([entry('delete', { 'status' => 'mine' })])).to eq({ 'status' => 'mine' })
+            end
+
+            it 'serves it whole to a caller no scope applies to' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })], scope: nil))
+                .to eq({ 'status' => 'someone else' })
+            end
+
+            # Same rule as a row: absent is not the same as passing.
+            it 'returns no data when the scope asks about a column the reconstruction cannot answer' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+              expect(state).to be_nil
+            end
+
+            # The reconstruction can sit on the far side of a primary-key move this route cannot see, so the
+            # requested id does not answer for a key the trail redacted — unlike on a row, which is filed
+            # under an id that was true of the side being tested.
+            it 'does not let the requested id answer for a redacted primary key' do
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              state = state_of([entry('delete', { 'id' => redacted, 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to be_nil
+            end
+
+            # A read-only primary key is never captured, so nothing else can answer for it and the requested
+            # id is what the record was filed under either way.
+            it 'still fills a primary key the capture never kept' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to eq({ 'status' => 'mine' })
+            end
+
+            # The record can be deleted while the audit read is in flight: the check that ran first would
+            # otherwise gate a reconstruction nothing protects any more.
+            it 'withholds a reconstruction whose record was deleted after the first read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })],
+                                  record: { 'id' => 4, 'status' => 'mine' })
+              # In scope on the way in, gone by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([{ 'id' => 4, 'status' => 'mine' }], [], [])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
           end
 
           # Rows written before an update moved a writable primary key stay under the id they were true of.

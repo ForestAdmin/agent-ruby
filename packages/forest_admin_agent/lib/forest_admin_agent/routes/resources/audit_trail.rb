@@ -56,8 +56,10 @@ module ForestAdminAgent
 
           # Asked again now: the check above ran before these rows were read, so a record deleted in between
           # answered "present and in scope" for rows that already carry its delete.
-          withholding_scope ||= scope_if_gone_since(context, args)
-          data = withhold_out_of_scope_values(history, withholding_scope, context)
+          withholding_scope ||= scope_if_gone_since(context, context.collection, args[:params]['id'])
+          data = withhold_out_of_scope_values(
+            history, Withholding.new(context.collection, withholding_scope, context.caller.timezone)
+          )
 
           {
             name: args[:params]['collection_name'],
@@ -76,6 +78,9 @@ module ForestAdminAgent
             context, context.collection, args[:params]['id'], audited_projection(context.collection)
           )
 
+          # Nothing left to evaluate a scope against, so the reconstruction is tested in its own right below.
+          withholding_scope = current.nil? ? context.permissions.get_scope(context.collection) : nil
+
           timestamp = parse_state_timestamp(args)
           entries = store.list_since(
             collection: context.collection.name,
@@ -84,112 +89,26 @@ module ForestAdminAgent
           )
           # Fully qualified: inside this class, `AuditTrail` is the route itself.
           state = ::ForestAdminAgent::AuditTrail::RecordState.at(current, entries)
+          # Asked again now, for the same reason the history route asks: the record can be deleted while the
+          # audit read is in flight, and the check above then gated a reconstruction nothing protects any more.
+          withholding_scope ||= scope_if_gone_since(context, context.collection, args[:params]['id'])
 
-          { name: args[:params]['collection_name'], content: { data: state } }
+          { name: args[:params]['collection_name'],
+            content: { data: answerable_state(state, withholding_scope, context, args[:params]['id']) } }
         end
 
         private
 
-        # Second read of the record, once the rows are in hand, so the answer that decides the withholding is
-        # never older than what it decides on. Skipped without a scope in effect — there is nothing to withhold
-        # then, and nothing to ask. A record moved out of scope rather than deleted raises the 404 it would
-        # raise for a request starting a moment later.
-        def scope_if_gone_since(context, args)
-          return nil if context.permissions.get_scope(context.collection).nil?
+        # The history route withholds a gone record's captured values from a caller whose scope they fail, and
+        # this route is nothing but those values reassembled: without the same test they come back one request
+        # away. A reconstruction the scope cannot answer withholds too — absent is not the same as passing.
+        def answerable_state(state, scope, context, packed_id)
+          return state if state.nil? || scope.nil?
 
-          assert_record_in_scope(context, context.collection, args[:params]['id'])
-        end
-
-        # A record that is gone for good bypasses the scope check — there is nothing left to check it against
-        # — but its rows still carry the column values captured while it existed. When those values would
-        # themselves have failed the caller's scope, withhold them; the row itself stays visible either way,
-        # so that it happened, by whom and when still reads.
-        def withhold_out_of_scope_values(entries, scope, context)
-          return entries if scope.nil?
-
-          entries.map { |entry| withhold(entry, scope, context) }
-        end
-
-        def withhold(entry, scope, context)
-          case entry.operation
-          # `delete`'s previous_values and `create`'s new_values both capture every writable column.
-          when 'delete'
-            in_scope?(entry.previous_values, entry.record_id, scope, context) ? entry : blank(entry, :previous_values)
-          when 'create'
-            in_scope?(entry.new_values, entry.record_id, scope, context) ? entry : blank(entry, :new_values)
-          when 'update'
-            withhold_each_side(entry, scope, context)
-          # `action`/`action_failed` rows hold a submitted form and a result summary, not column values, so
-          # the scope doesn't apply to them.
-          else
-            entry
-          end
-        end
-
-        # An update's two sides are a partial diff, so each is tested against its own values: a diff that never
-        # carried the scoped column answers for neither and is withheld by `in_scope?` anyway. Gating the sides
-        # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
-        # row whose new value is out of scope, since that side is tested on its own.
-        def withhold_each_side(entry, scope, context)
-          # An update that moved a writable primary key files its row under the id the record ended up with,
-          # and keeps the one it had on `previous_record_id`. Each side is tested against the id it was true
-          # of, or the new state's id would decide whether the old state is in scope.
-          before = entry.previous_record_id || entry.record_id
-          kept = in_scope?(entry.previous_values, before, scope, context) ? entry : blank(entry, :previous_values)
-
-          in_scope?(kept.new_values, after_id(kept), scope, context) ? kept : blank(kept, :new_values)
-        end
-
-        # A pending row is filed under the id the record had *before* the write, since the write may not have
-        # landed: it says nothing about the state the update was moving to, so the new side gets no id to fill
-        # from and falls back on what it captured itself.
-        def after_id(entry)
-          entry.status == ::ForestAdminAgent::AuditTrail::Recording::PENDING ? nil : entry.record_id
-        end
-
-        # Only a snapshot that answers every field the scope asks about, with what was really stored, is worth
-        # matching. The capture keeps the writable columns, so a scope on anything else — a read-only column, a
-        # relation — reads as nil there and would answer for a value the row never held: `status != 'private'`
-        # would match, and an ordered operator would raise on the nil. A redacted value answers no better.
-        def in_scope?(values, packed_id, scope, context)
-          snapshot = answerable_snapshot(values, packed_id, context.collection)
-          return false unless scope.projection.all? { |field| snapshot.key?(field) }
-
-          scope.match(snapshot, context.collection, context.caller.timezone)
-        rescue StandardError => e
-          # Key presence is not answerability: a column captured as nil has its key, and an ordered operator
-          # raises on it. Uncaught that would fail the whole page, and only for the callers a scope applies
-          # to. One withheld row is the smaller loss, and the same answer the field would have got had it
-          # been missing outright.
-          Facades::Container.logger&.log('Warn', "[ForestAdmin] Audit row not scope-checkable: #{e.message}")
-
-          false
-        end
-
-        # What this side of the row can answer about. A redacted value answers nothing, so it is dropped rather
-        # than matched against the placeholder — leaving the field unanswered, which withholds. The packed id
-        # then fills in the primary keys: a read-only one never lands in the snapshot at all, and a writable one
-        # the trail redacts was just dropped, while the id the row was filed under proves what the key was.
-        # It only fills what the snapshot cannot answer: on the side of a row that captured the key itself,
-        # that value is the one that was true there.
-        def answerable_snapshot(values, packed_id, collection)
-          answered = (values || {}).reject { |_, value| value == ::ForestAdminAgent::AuditTrail::Recording::REDACTED }
-          return answered if packed_id.nil?
-
-          begin
-            Utils::Id.unpack_id(collection, packed_id, with_key: true).merge(answered)
-          rescue StandardError => e
-            # An id written under a primary key of another shape costs the keys it would have filled, and
-            # nothing else: the snapshot still answers for the columns it captured, so a scope that never
-            # asks about the id is unaffected.
-            Facades::Container.logger&.log('Warn', "[ForestAdmin] Audit row id not decodable: #{e.message}")
-
-            answered
-          end
-        end
-
-        def blank(entry, *fields)
-          entry.dup.tap { |copy| fields.each { |field| copy[field] = {} } }
+          withholding = Withholding.new(context.collection, scope, context.caller.timezone)
+          # The reconstruction can sit on the far side of a primary-key move this route cannot see, so the
+          # requested id does not answer for a key the trail redacted — only for one never captured at all.
+          in_scope?(state, packed_id, withholding, id_answers_for_keys: false) ? state : nil
         end
 
         # `availableUsers` rides along on the first fetch only — the front keeps the list it saw — and lists the
