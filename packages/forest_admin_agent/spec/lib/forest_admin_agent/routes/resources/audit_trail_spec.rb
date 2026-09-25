@@ -466,6 +466,15 @@ module ForestAdminAgent
                                                                email: 'jane@acme.io' }])
             end
 
+            it 'lists an author once even when their rows carry different identities' do
+              renamed = [secret_delete.tap { |row| row.user_email = 'jane@acme.io' },
+                         secret_delete.tap { |row| row.user_email = 'jane@acme.com' }]
+
+              content = searched(renamed, 'search' => 'acme')
+
+              expect(content[:meta][:availableUsers].map { |user| user[:id] }).to eq([7])
+            end
+
             it 'does not match a field only a withheld side touched' do
               content = searched([secret_delete], 'fields' => 'status')
 

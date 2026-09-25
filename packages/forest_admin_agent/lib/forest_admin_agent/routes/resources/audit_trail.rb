@@ -190,7 +190,7 @@ module ForestAdminAgent
         def authors_of(entries)
           entries.reject { |entry| entry.user_id.nil? }
                  .map { |entry| ::ForestAdminAgent::AuditTrail::Store::AUTHOR_COLUMNS.to_h { |column| [column, entry[column]] } }
-                 .uniq
+                 .uniq { |author| author[:user_id] }
         end
 
         # An ISO-8601 instant, or the same wall-clock forms the history filters accept, read in the request
