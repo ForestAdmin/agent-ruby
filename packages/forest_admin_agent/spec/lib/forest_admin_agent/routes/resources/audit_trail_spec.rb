@@ -178,6 +178,18 @@ module ForestAdminAgent
               expect(state).to eq({ 'status' => 'mine' })
             end
 
+            # A replacement answers for itself, not for the life whose rows these are: the reconstruction is
+            # of a record that was already gone, and the caller's claim on the id today says nothing about it.
+            it 'keeps withholding when an in-scope record has taken the id since' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })], record: nil)
+              # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+              allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
+
             # The same read decides the other way round: an id that was gone at the first check can be taken
             # by another record before the second, and that record's owner is not this caller.
             it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
@@ -370,6 +382,22 @@ module ForestAdminAgent
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
                  .dig(:content, :data)
+          end
+
+          # The rows are a dead record's. A live one that has since taken the id is a different record, and
+          # being allowed to read it is not a claim on what came before it.
+          it 'keeps withholding when an in-scope record has taken the id since' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+            allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+            route = route_with_store(records: [audit_entry('delete',
+                                                           previous_values: { 'status' => 'someone else' })])
+
+            data = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+                        .dig(:content, :data)
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
           end
 
           # The check that authorized the request ran before these rows were read: an id that was gone then

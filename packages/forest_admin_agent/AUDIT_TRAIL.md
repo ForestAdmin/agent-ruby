@@ -217,12 +217,21 @@ are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
-The record is read twice. The first read refuses a record that exists outside the caller's scope without
-touching the audit database; the second, once the rows are in hand, is the one that decides, so the answer
-the withholding acts on is never older than the rows it applies to. A record deleted in between would
-otherwise have answered "present and in scope" for rows that already carry its delete — and one recreated in
-between would have answered "gone" for an id that now belongs to somebody else's record, which is a **404**,
-the same as for a request starting a moment later. The second read is skipped when no scope is in effect.
+The record is read twice, and **the values are withheld if either read found it gone**. The first read
+refuses a record that exists outside the caller's scope without touching the audit database, and it is the
+only one that saw the record as it was while the rows were being chosen. The second, once the rows are in
+hand, is the only one that can see a record deleted since — which would otherwise have answered "present and
+in scope" for rows that already carry its delete.
+
+Neither answer cancels the other, because an id outlives the record that held it. A record that took a freed
+id between the two reads answers for itself and not for the life whose rows these are: if this caller cannot
+read it, that is a **404**, the same as for a request starting a moment later; if they can, the earlier
+life's values stay withheld all the same. The second read is skipped when no scope is in effect, and on the
+correlation routes when the answer holds no rows.
+
+Where the delete and the recreation both happened *before* the request, both reads see the live record and
+its history is served whole, earlier lives included — the documented delete/recreate behaviour, and a
+separate question from the one above.
 
 **Every route that serves captured values applies this**, since a rule only one of them applies is one
 lookup away from being no rule at all. The two correlation routes withhold row by row exactly as the history

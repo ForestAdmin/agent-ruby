@@ -125,6 +125,20 @@ module ForestAdminAgent
             expect { route.handle_history(history_params) }.to raise_error(Http::Exceptions::NotFoundError)
           end
 
+          # A replacement answers for itself: these rows belong to the record that held the id before it.
+          it 'keeps withholding when an in-scope record has taken the id since' do
+            allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('title',
+                                                                                              Operators::EQUAL,
+                                                                                              'mine'))
+            # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+            allow(collection).to receive(:list).and_return([], [], [{ 'id' => 2, 'title' => 'mine' }])
+            route = route_with_store(history: [audit_entry({ 'title' => 'someone else' })])
+
+            data = route.handle_history(history_params).dig(:content, :data)
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
           # Gone when the request was authorized, somebody else's by the time the rows came back. The first
           # check cannot stand in for the second, or this route answers what a request starting a moment
           # later would refuse.

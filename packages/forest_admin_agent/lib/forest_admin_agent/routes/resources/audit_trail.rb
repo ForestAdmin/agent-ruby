@@ -39,9 +39,9 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           context.permissions.can?(:read, context.collection)
-          # For the 404 it raises, before the audit database is touched. What it answers about the record is
-          # read again below, and it is that answer the withholding acts on.
-          assert_record_in_scope(context, context.collection, args[:params]['id'])
+          # Before the audit database is touched, for the 404 it raises — and for what it saw of the record
+          # while the rows below were still being chosen, which the read after them can no longer see.
+          gone_at_check = assert_record_in_scope(context, context.collection, args[:params]['id'])
 
           skip, limit = parse_pagination(args)
           filters = {
@@ -56,11 +56,10 @@ module ForestAdminAgent
           # `count` reflects the active filters (not the absolute total) and is independent of the page.
           count = store.count_by_record(**filters)
 
-          # Asked again now, and this answer is the one that decides: the check above ran before these rows
-          # were read, so a record deleted in between answered "present and in scope" for rows that already
-          # carry its delete — and one recreated in between answered "gone" for an id that is now somebody
-          # else's, which a request starting a moment later would refuse outright.
-          withholding_scope = scope_if_gone_since(context, context.collection, args[:params]['id'])
+          # Asked again now, because the check above ran before these rows were read: a record deleted in
+          # between answered "present and in scope" for rows that already carry its delete.
+          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
+                                                    gone_at_check)
           data = withhold_out_of_scope_values(
             history, Withholding.new(context.collection, withholding_scope, context.caller.timezone)
           )
@@ -81,6 +80,9 @@ module ForestAdminAgent
           current = scoped_record(
             context, context.collection, args[:params]['id'], audited_projection(context.collection)
           )
+          # Nothing left to evaluate a scope against, so the reconstruction is tested in its own right below
+          # — whatever the read after the rows finds under this id by then.
+          gone_at_check = current.nil? ? context.permissions.get_scope(context.collection) : nil
 
           timestamp = parse_state_timestamp(args)
           entries = store.list_since(
@@ -93,7 +95,8 @@ module ForestAdminAgent
           # Asked again now, for the same reason the history route asks, and the same way: the record read
           # above can be deleted — or an id that was gone then be taken by somebody else's record — while the
           # audit read is in flight.
-          withholding_scope = scope_if_gone_since(context, context.collection, args[:params]['id'])
+          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
+                                                    gone_at_check)
 
           { name: args[:params]['collection_name'],
             content: { data: answerable_state(state, withholding_scope, context, args[:params]['id']) } }
