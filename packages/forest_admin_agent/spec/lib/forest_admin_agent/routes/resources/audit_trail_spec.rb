@@ -475,6 +475,19 @@ module ForestAdminAgent
               expect(content[:meta][:availableUsers].map { |user| user[:id] }).to eq([7])
             end
 
+            def renamed_oldest_first
+              [secret_delete.tap { |row| row.user_email = 'jane@acme.io' },
+               secret_delete.tap { |row| row.user_email = 'jane@acme.com' }]
+            end
+
+            it 'lists an author as their latest identity whichever way the history is sorted' do
+              newest_first = searched(renamed_oldest_first.reverse, 'search' => 'acme')
+              oldest_first = searched(renamed_oldest_first, 'search' => 'acme', 'sort' => 'timestamp')
+
+              expect([newest_first, oldest_first].map { |content| content[:meta][:availableUsers].first[:email] })
+                .to eq(%w[jane@acme.com jane@acme.com])
+            end
+
             it 'does not match a field only a withheld side touched' do
               content = searched([secret_delete], 'fields' => 'status')
 

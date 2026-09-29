@@ -146,6 +146,7 @@ module ForestAdminAgent
         # caller's to read whole.
         def history_matched_after_withholding(context, args, filters, gone_at_check)
           skip, limit = parse_pagination(args)
+          oldest_first = parse_sort(args) == 'asc'
           value_filters = filters.slice(:search, :fields)
           page = []
           count = 0
@@ -156,7 +157,10 @@ module ForestAdminAgent
 
             page << entry if count >= skip && page.size < limit
             count += 1
-            authors[entry.user_id] ||= author_of(entry) unless entry.user_id.nil?
+            next if entry.user_id.nil?
+
+            # An author reads as their latest identity whichever way the history is sorted.
+            authors[entry.user_id] = author_of(entry) if oldest_first || !authors.key?(entry.user_id)
           end
 
           [page, count, -> { authors.values }]
