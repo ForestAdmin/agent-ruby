@@ -1,3 +1,3 @@
 module ForestAdminRpcAgent
-  VERSION = "1.44.2"
+  VERSION = "1.44.3"
 end

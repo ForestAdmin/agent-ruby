@@ -1,3 +1,10 @@
+## [1.44.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.2...v1.44.3) (2026-09-29)
+
+
+### Bug Fixes
+
+* **ci:** call notify-ci-failure from the public ForestAdmin/.github repo ([#397](https://github.com/ForestAdmin/agent-ruby/issues/397)) ([12a3155](https://github.com/ForestAdmin/agent-ruby/commit/12a3155bc0b7185438e819bc561376cdac47dca9))
+
 ## [1.44.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.1...v1.44.2) (2026-09-24)
 
 
