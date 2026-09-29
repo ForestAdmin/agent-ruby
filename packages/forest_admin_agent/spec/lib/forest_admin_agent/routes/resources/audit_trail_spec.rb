@@ -493,16 +493,30 @@ module ForestAdminAgent
               expect(content[:meta]).to eq({ count: 2 })
             end
 
+            def scanned_rows(count)
+              Array.new(count) do |index|
+                audit_entry('create', new_values: { 'status' => 'mine', 'n' => index })
+                  .tap do |row|
+                    row.id = index
+                    row.timestamp = "t#{index}"
+                  end
+              end
+            end
+
+            def past(rows, cursor)
+              cursor ? rows.drop_while { |row| row.id != cursor[:id] }.drop(1) : rows
+            end
+
             # The page cap bounds what is served, not what is scanned: the history is read in batches so
             # a long one is never held in memory whole.
             it 'scans the history in batches, counting across them and keeping only the page' do
               stub_const("#{described_class}::SCAN_BATCH_SIZE", 2)
-              rows = Array.new(5) { |index| audit_entry('create', new_values: { 'status' => 'mine', 'n' => index }) }
+              rows = scanned_rows(5)
               allow(permissions).to receive(:get_scope)
                 .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
               allow(collection).to receive(:list).and_return([])
               route = route_with_store
-              allow(store).to receive(:list_by_record) { |skip:, **| rows.drop(skip).first(2) }
+              allow(store).to receive(:list_by_record) { |after:, **| past(rows, after).first(2) }
 
               content = route.handle_request(
                 { headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'search' => 'mine',
@@ -510,9 +524,42 @@ module ForestAdminAgent
               )[:content]
 
               expect(store).to have_received(:list_by_record).exactly(3).times
-              expect(store).to have_received(:list_by_record).with(hash_including(skip: 4, limit: 2))
+              expect(store).to have_received(:list_by_record).with(hash_including(after: { timestamp: 't3', id: 3 },
+                                                                                  limit: 2))
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:skip)).exactly(3).times
               expect(content[:data].map { |row| row['newValues']['n'] }).to eq([2, 3])
               expect(content[:meta]).to eq({ count: 5 })
+            end
+
+            # An id taken by another record since would keep an oldest-first scan chasing its new rows, so every
+            # batch reads the log as it stood when the scan started.
+            it 'bounds every batch at the instant the scan started' do
+              stub_const("#{described_class}::SCAN_BATCH_SIZE", 1)
+              ends = []
+              rows = scanned_rows(2)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store
+              allow(store).to receive(:list_by_record) do |after:, end_timestamp:, **|
+                ends << end_timestamp
+                past(rows, after).first(1)
+              end
+
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                            'search' => 'mine' } })
+
+              expect(ends.size).to eq(3)
+              expect(ends.uniq.size).to eq(1)
+              expect(Time.iso8601(ends.first)).to be_within(5).of(Time.now)
+            end
+
+            it 'keeps an end date the caller asked for when it is earlier' do
+              content = searched([], 'search' => 'mine', 'endDate' => '2020-01-01')
+
+              expect(content[:data]).to eq([])
+              expect(store).to have_received(:list_by_record)
+                .with(hash_including(end_timestamp: '2020-01-01T23:59:59.999Z'))
             end
           end
 

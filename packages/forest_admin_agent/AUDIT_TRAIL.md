@@ -142,7 +142,8 @@ was never recorded. A search must not confirm a value the trail refused to keep.
 Nor one it withholds (see below). On a record gone for good under a caller's scope, `search` and `fields`
 are matched against the values as served, never as captured — in SQL, which rows come back, `meta.count`
 and `availableUsers` would each say whether a withheld value holds the term. The rows are read without those
-two filters, in batches of 500, and matched and paged as they go, keeping only the page asked for. Only a
+two filters, in batches of 500 that each continue past the last row read, never at an offset, and bounded at
+the instant the scan starts. They are matched and paged as they go, keeping only the page asked for. Only a
 gone record's history pays that scan, and it is one record's history — the same rows the SQL search
 would have scanned without an index.
 

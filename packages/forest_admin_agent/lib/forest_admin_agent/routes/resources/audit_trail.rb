@@ -162,18 +162,22 @@ module ForestAdminAgent
           [page, count, -> { authors.values }]
         end
 
+        # Each batch continues past the last row read rather than at an offset, which entries written between
+        # batches would shift. Bounded at the instant the scan starts too, so an id taken by another record
+        # since cannot keep an oldest-first scan chasing its new rows.
         def each_withheld_batch(context, args, filters, gone_at_check, &block)
           order = parse_sort(args)
+          snapshot = filters.merge(end_timestamp: [filters[:end_timestamp], Time.now.utc.iso8601(3)].compact.min)
           withholding = nil
-          offset = 0
+          cursor = nil
 
           loop do
-            rows = store.list_by_record(**filters, skip: offset, limit: SCAN_BATCH_SIZE, order: order)
+            rows = store.list_by_record(**snapshot, limit: SCAN_BATCH_SIZE, order: order, after: cursor)
             withholding ||= withholding_for(context, args, gone_at_check)
             withhold_out_of_scope_values(rows, withholding).each(&block)
             break if rows.size < SCAN_BATCH_SIZE
 
-            offset += SCAN_BATCH_SIZE
+            cursor = rows.last.to_h.slice(:timestamp, :id)
           end
         end
 
