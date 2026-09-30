@@ -152,11 +152,10 @@ module ForestAdminAgent
         # only the page asked for is kept. Only for a gone record: one in scope was the caller's to read whole.
         def history_matched_after_withholding(context, args, filters, gone_at_check, withholding = nil)
           skip, limit = parse_pagination(args)
-          oldest_first = parse_sort(args) == 'asc'
           value_filters = filters.slice(:search, :fields)
           page = []
           count = 0
-          authors = {}
+          latest = {}
 
           each_withheld_batch(context, args, filters.except(*value_filters.keys), gone_at_check,
                               withholding) do |entry|
@@ -166,11 +165,10 @@ module ForestAdminAgent
             count += 1
             next if entry.user_id.nil?
 
-            # An author reads as their latest identity whichever way the history is sorted.
-            authors[entry.user_id] = author_of(entry) if oldest_first || !authors.key?(entry.user_id)
+            latest[entry.user_id] = entry if newer?(entry, latest[entry.user_id])
           end
 
-          [page, count, -> { authors.values }]
+          [page, count, -> { latest.values.map { |entry| author_of(entry) } }]
         end
 
         # Each batch continues past the last row read rather than at an offset, which entries written between
@@ -221,6 +219,12 @@ module ForestAdminAgent
           [entry.previous_values, entry.new_values].compact.any? do |values|
             fields.any? { |field| values.key?(field) }
           end
+        end
+
+        # An author reads as their latest identity. Not simply the first or last row read: rows sharing a
+        # timestamp come id-ascending whichever way the history is sorted.
+        def newer?(entry, kept)
+          kept.nil? || ([entry.timestamp, entry.id] <=> [kept.timestamp, kept.id]).positive?
         end
 
         def author_of(entry)

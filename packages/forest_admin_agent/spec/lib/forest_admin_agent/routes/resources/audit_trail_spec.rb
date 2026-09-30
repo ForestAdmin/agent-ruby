@@ -475,9 +475,17 @@ module ForestAdminAgent
               expect(content[:meta][:availableUsers].map { |user| user[:id] }).to eq([7])
             end
 
+            def renamed(email, id:, timestamp:)
+              secret_delete.tap do |row|
+                row.user_email = email
+                row.id = id
+                row.timestamp = timestamp
+              end
+            end
+
             def renamed_oldest_first
-              [secret_delete.tap { |row| row.user_email = 'jane@acme.io' },
-               secret_delete.tap { |row| row.user_email = 'jane@acme.com' }]
+              [renamed('jane@acme.io', id: 1, timestamp: '2026-01-01T00:00:00.000Z'),
+               renamed('jane@acme.com', id: 2, timestamp: '2026-01-02T00:00:00.000Z')]
             end
 
             it 'lists an author as their latest identity whichever way the history is sorted' do
@@ -486,6 +494,17 @@ module ForestAdminAgent
 
               expect([newest_first, oldest_first].map { |content| content[:meta][:availableUsers].first[:email] })
                 .to eq(%w[jane@acme.com jane@acme.com])
+            end
+
+            # The store breaks a timestamp tie by id ascending in both directions, so newest first reads the
+            # older of two same-millisecond rows first.
+            it 'lists an author as their latest identity when their rows share a timestamp' do
+              tied = [renamed('jane@acme.io', id: 1, timestamp: '2026-01-01T00:00:00.000Z'),
+                      renamed('jane@acme.com', id: 2, timestamp: '2026-01-01T00:00:00.000Z')]
+
+              content = searched(tied, 'search' => 'acme')
+
+              expect(content[:meta][:availableUsers].map { |user| user[:email] }).to eq(['jane@acme.com'])
             end
 
             it 'does not match a field only a withheld side touched' do
