@@ -9,6 +9,10 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      USERS_RELOAD_INTERVAL_IN_SECONDS = 60
+
+      @users_reload_mutex = Mutex.new
+
       attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
@@ -28,11 +32,24 @@ module ForestAdminAgent
           Facades::Container.config_from_cache[:permission_expiration]
         )
 
-        cache.clear if id_cache.nil?
+        if id_cache.nil?
+          cache.clear
+          @users_reload_mutex.synchronize { @users_reloaded_at = nil }
+        end
 
         cache.delete(id_cache) unless cache.get(id_cache).nil?
 
         ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
+      end
+
+      def self.users_reload_allowed?
+        @users_reload_mutex.synchronize do
+          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          return false if @users_reloaded_at && now - @users_reloaded_at < USERS_RELOAD_INTERVAL_IN_SECONDS
+
+          @users_reloaded_at = now
+          true
+        end
       end
 
       def can?(action, collection, allow_fetch: false)
@@ -45,6 +62,7 @@ module ForestAdminAgent
 
         unless is_allowed
           collections_data = get_collections_permissions_data(force_fetch: true)
+          user_data = get_user_data(caller.id, reload: true)
           is_allowed = permission_allowed?(collections_data, collection, action, user_data)
         end
 
@@ -246,7 +264,22 @@ module ForestAdminAgent
         permissions[:segments][collection.name.to_sym]
       end
 
-      def get_user_data(user_id)
+      def get_user_data(user_id, reload: false)
+        users = cached_users
+        return users[user_id.to_s] if users.key?(user_id.to_s) && !reload
+
+        reload_users[user_id.to_s]
+      end
+
+      def get_team(rendering_id)
+        permissions = get_rendering_data(rendering_id)
+
+        permissions[:team]
+      end
+
+      private
+
+      def cached_users
         cache.get_or_set('forest.users') do
           response = fetch('/liana/v4/permissions/users')
           users = {}
@@ -258,16 +291,15 @@ module ForestAdminAgent
           ForestAdminAgent::Facades::Container.logger.log('Debug', 'Refreshing user permissions cache')
 
           users
-        end[user_id.to_s]
+        end
       end
 
-      def get_team(rendering_id)
-        permissions = get_rendering_data(rendering_id)
+      def reload_users
+        return cached_users unless self.class.users_reload_allowed?
 
-        permissions[:team]
+        self.class.invalidate_cache('forest.users')
+        cached_users
       end
-
-      private
 
       # An empty list of leaves resolves to no collection at all — a polymorphic relation declaring
       # no `foreign_collections`. `[].all?` would allow it unconditionally, which is the one answer
