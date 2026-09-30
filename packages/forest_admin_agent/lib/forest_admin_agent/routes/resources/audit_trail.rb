@@ -135,16 +135,22 @@ module ForestAdminAgent
           history = store.list_by_record(**filters, skip: skip, limit: limit, order: parse_sort(args))
           # `count` reflects the active filters (not the absolute total) and is independent of the page.
           count = store.count_by_record(**filters)
+          withholding = withholding_for(context, args, gone_at_check)
 
-          [withheld(context, args, history, gone_at_check), count, -> { store.authors_by_record(**filters) }]
+          # Gone between the check and the read: this answer withholds, so the rows, count and authors matched
+          # in SQL above must not decide what is served either.
+          if withholding.scope && filters.slice(:search, :fields).any?
+            return history_matched_after_withholding(context, args, filters, gone_at_check, withholding)
+          end
+
+          [withhold_out_of_scope_values(history, withholding), count, -> { store.authors_by_record(**filters) }]
         end
 
         # Matched in SQL, `search` and `fields` would test the values as captured, so which rows come back, the
         # count and the authors would still say what the withholding hides — one probe per character. They are
         # matched against what is served instead, which means scanning the whole history here, in batches, so
-        # only the page asked for is kept. Only for a record gone at the check: one in scope then was the
-        # caller's to read whole.
-        def history_matched_after_withholding(context, args, filters, gone_at_check)
+        # only the page asked for is kept. Only for a gone record: one in scope was the caller's to read whole.
+        def history_matched_after_withholding(context, args, filters, gone_at_check, withholding = nil)
           skip, limit = parse_pagination(args)
           oldest_first = parse_sort(args) == 'asc'
           value_filters = filters.slice(:search, :fields)
@@ -152,7 +158,8 @@ module ForestAdminAgent
           count = 0
           authors = {}
 
-          each_withheld_batch(context, args, filters.except(*value_filters.keys), gone_at_check) do |entry|
+          each_withheld_batch(context, args, filters.except(*value_filters.keys), gone_at_check,
+                              withholding) do |entry|
             next unless matches_value_filters?(entry, **value_filters)
 
             page << entry if count >= skip && page.size < limit
@@ -169,10 +176,9 @@ module ForestAdminAgent
         # Each batch continues past the last row read rather than at an offset, which entries written between
         # batches would shift. Bounded at the instant the scan starts too, so an id taken by another record
         # since cannot keep an oldest-first scan chasing its new rows.
-        def each_withheld_batch(context, args, filters, gone_at_check, &block)
+        def each_withheld_batch(context, args, filters, gone_at_check, withholding, &block)
           order = parse_sort(args)
           snapshot = filters.merge(end_timestamp: [filters[:end_timestamp], Time.now.utc.iso8601(3)].compact.min)
-          withholding = nil
           cursor = nil
 
           loop do
@@ -183,10 +189,6 @@ module ForestAdminAgent
 
             cursor = rows.last.to_h.slice(:timestamp, :id)
           end
-        end
-
-        def withheld(context, args, history, gone_at_check)
-          withhold_out_of_scope_values(history, withholding_for(context, args, gone_at_check))
         end
 
         # Asked again now, because the check above ran before these rows were read: a record deleted in

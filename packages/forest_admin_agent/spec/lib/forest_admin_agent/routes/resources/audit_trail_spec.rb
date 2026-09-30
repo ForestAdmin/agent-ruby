@@ -506,6 +506,21 @@ module ForestAdminAgent
               expect(content[:meta]).to eq({ count: 2 })
             end
 
+            it 'matches served values for a record deleted while the audit read was in flight' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = route_with_store(records: [secret_delete])
+              # In scope on the way in, gone by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([{ 'id' => 4, 'status' => 'mine' }], [], [])
+
+              content = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                                      'search' => 'secret' } })[:content]
+
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search, :skip))
+              expect(collection).to have_received(:list).exactly(3).times
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
             def scanned_rows(count)
               Array.new(count) do |index|
                 audit_entry('create', new_values: { 'status' => 'mine', 'n' => index })

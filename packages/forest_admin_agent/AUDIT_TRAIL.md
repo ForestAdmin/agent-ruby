@@ -145,7 +145,9 @@ and `availableUsers` would each say whether a withheld value holds the term. The
 two filters, in batches of 500 that each continue past the last row read, never at an offset, and bounded at
 the instant the scan starts. They are matched and paged as they go, keeping only the page asked for. Only a
 gone record's history pays that scan, and it is one record's history — the same rows the SQL search
-would have scanned without an index.
+would have scanned without an index. That holds too for a record deleted while the request was in flight: the second read
+of the record decides the withholding, so the SQL-matched answer is discarded and the history scanned the
+same way.
 
 `fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
 reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
