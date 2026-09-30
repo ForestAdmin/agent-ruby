@@ -325,6 +325,7 @@ module ForestAdminAgent
 
         @read_permissions_refetched = true
         refetched = get_collections_permissions_data(force_fetch: true)
+        user_data = get_user_data(caller.id, reload: true)
 
         names.to_h { |name| [name, read_allowed?(refetched, name, user_data)] }
       end
