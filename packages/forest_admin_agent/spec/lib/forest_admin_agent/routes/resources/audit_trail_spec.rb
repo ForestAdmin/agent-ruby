@@ -158,6 +158,13 @@ module ForestAdminAgent
               expect(state).to be_nil
             end
 
+            it 'returns no data for a NULL the scope negates, as the database would have refused the record' do
+              state = state_of([entry('delete', { 'status' => nil })],
+                               scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+              expect(state).to be_nil
+            end
+
             # The reconstruction can sit on the far side of a primary-key move this route cannot see, so the
             # requested id does not answer for a key the trail redacted — unlike on a row, which is filed
             # under an id that was true of the side being tested.
@@ -526,17 +533,37 @@ module ForestAdminAgent
             end
 
             it 'matches served values for a record deleted while the audit read was in flight' do
-              allow(permissions).to receive(:get_scope)
-                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              scope = Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine')
+              allow(permissions).to receive(:get_scope).and_return(scope)
               route = route_with_store(records: [secret_delete])
               # In scope on the way in, gone by the time the rows are in hand.
-              allow(collection).to receive(:list).and_return([{ 'id' => 4, 'status' => 'mine' }], [], [])
+              answers = [[{ 'id' => 4, 'status' => 'mine' }], [], []]
+              reads = []
+              allow(collection).to receive(:list) do |_caller, filter, _projection|
+                reads << filter.condition_tree
+                answers[reads.size - 1]
+              end
 
               content = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
                                                                       'search' => 'secret' } })[:content]
 
+              # The re-check asks for this record in the caller's scope, then for it at all.
+              _first_check, recheck_in_scope, recheck_at_all = reads
+              expect(recheck_in_scope.conditions).to include(scope, have_attributes(field: 'id', value: 4))
+              expect(recheck_at_all).to have_attributes(field: 'id', value: 4)
               expect(store).to have_received(:list_by_record).with(hash_excluding(:search, :skip))
-              expect(collection).to have_received(:list).exactly(3).times
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            # A masked value never matches, neither by its mask nor by the value it hid: the SQL search strips
+            # the mask, and so must the served-value scan.
+            it 'never matches the redaction mask of a served value' do
+              row = audit_entry('delete', previous_values: {
+                                  'status' => 'mine', 'email' => ::ForestAdminAgent::AuditTrail::Recording::REDACTED
+                                })
+
+              content = searched([row], 'search' => 'redacted')
+
               expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
             end
 
@@ -719,6 +746,49 @@ module ForestAdminAgent
                               scope: Nodes::ConditionTreeLeaf.new('budget', Operators::GREATER_THAN, 1000))
 
             expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # In memory `!=` holds for a nil, while the database leaves a NULL out of `!=`: a record the caller
+          # could never read alive must not become readable once deleted.
+          describe 'a captured nil under a negated scope' do
+            it 'withholds the values, as the database would have left the record out' do
+              not_private = Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private')
+              not_listed = Nodes::ConditionTreeLeaf.new('status', Operators::NOT_IN, ['private'])
+
+              withheld = [not_private, not_listed].map do |scope|
+                history_of([audit_entry('delete', previous_values: { 'status' => nil })], scope: scope)
+                  .first['previousValues']
+              end
+
+              expect(withheld).to eq([{}, {}])
+            end
+
+            it 'withholds when the negation sits inside a branch' do
+              scope = Nodes::ConditionTreeBranch.new('And', [
+                                                       Nodes::ConditionTreeLeaf.new('budget', Operators::EQUAL, 1),
+                                                       Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL,
+                                                                                    'private')
+                                                     ])
+
+              data = history_of([audit_entry('delete', previous_values: { 'budget' => 1, 'status' => nil })],
+                                scope: scope)
+
+              expect(data.first['previousValues']).to eq({})
+            end
+
+            it 'keeps the values a scope asking for the nil itself covers' do
+              data = history_of([audit_entry('delete', previous_values: { 'status' => nil })],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::MISSING))
+
+              expect(data.first['previousValues']).to eq({ 'status' => nil })
+            end
+
+            it 'keeps a non-nil value the negation covers' do
+              data = history_of([audit_entry('delete', previous_values: { 'status' => 'open' })],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+              expect(data.first['previousValues']).to eq({ 'status' => 'open' })
+            end
           end
 
           # An id written under an older schema stops decoding when the primary key changes arity.

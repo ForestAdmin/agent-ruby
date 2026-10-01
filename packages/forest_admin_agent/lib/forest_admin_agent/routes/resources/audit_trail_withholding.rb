@@ -11,6 +11,12 @@ module ForestAdminAgent
         # comparisons read in.
         Withholding = Struct.new(:collection, :scope, :timezone)
 
+        NULL_EXCLUDING_OPERATORS = [
+          ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_EQUAL,
+          ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_IN,
+          ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_CONTAINS
+        ].freeze
+
         # A record that is gone for good bypasses the scope check — there is nothing left to check it against
         # — but its rows still carry the column values captured while it existed. When those values would
         # themselves have failed the caller's scope, withhold them; the row itself stays visible either way,
@@ -67,7 +73,7 @@ module ForestAdminAgent
                                          id_answers_for_keys: id_answers_for_keys)
           return false unless withholding.scope.projection.all? { |field| snapshot.key?(field) }
 
-          withholding.scope.match(snapshot, withholding.collection, withholding.timezone)
+          matches_as_stored?(withholding.scope, snapshot, withholding)
         rescue StandardError => e
           # Key presence is not answerability: a column captured as nil has its key, and an ordered operator
           # raises on it. Uncaught that would fail the whole page, and only for the callers a scope applies
@@ -76,6 +82,21 @@ module ForestAdminAgent
           Facades::Container.logger&.log('Warn', "[ForestAdmin] Audit row not scope-checkable: #{e.message}")
 
           false
+        end
+
+        # `scope.match`, except that a negated comparison never matches a NULL. In memory `status != 'private'`
+        # holds for a nil status, while the database leaves a NULL out of it: a record the caller could never
+        # read alive would become readable once deleted. Stricter than a datasource that matches NULL there
+        # (Mongo's `$ne`), never looser.
+        def matches_as_stored?(tree, snapshot, withholding)
+          if tree.is_a?(ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch)
+            evaluate = ->(condition) { matches_as_stored?(condition, snapshot, withholding) }
+
+            return tree.aggregator == 'And' ? tree.conditions.all?(&evaluate) : tree.conditions.any?(&evaluate)
+          end
+          return false if snapshot[tree.field].nil? && NULL_EXCLUDING_OPERATORS.include?(tree.operator)
+
+          tree.match(snapshot, withholding.collection, withholding.timezone)
         end
 
         # What this side of the row can answer about. A redacted value answers nothing, so it is dropped rather

@@ -227,6 +227,13 @@ are logged, and the row keeps its operation, author and timestamp. This is also
 what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
 neither side, so both are withheld.
 
+A captured `nil` is tested the way the database tests a `NULL`: a negated comparison (`!=`, not in, does not
+contain) never matches it. In memory `status != 'private'` holds for a nil status, while the scoped read that
+guarded the live record left that record out, so without this a record the caller could never read alive
+would become readable once deleted. A scope that asks for the nil itself (`status` is missing) still matches
+it. On a datasource whose own `!=` keeps a NULL (Mongo's `$ne`), this is stricter than the live read, never
+looser.
+
 The record is read twice, and **the values are withheld if either read found it gone**. The first read
 refuses a record that exists outside the caller's scope without touching the audit database, and it is the
 only one that saw the record as it was while the rows were being chosen. The second, once the rows are in
