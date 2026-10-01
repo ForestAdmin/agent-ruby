@@ -1,3 +1,10 @@
+## [1.44.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.3...v1.44.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **permissions:** reload the users list on an unknown id or a denied access [PRD-1404] ([#398](https://github.com/ForestAdmin/agent-ruby/issues/398)) ([d375cb6](https://github.com/ForestAdmin/agent-ruby/commit/d375cb65e4d163cf78590f1cc1c73ee7d2e7a838))
+
 ## [1.44.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.2...v1.44.3) (2026-09-29)
 
 
