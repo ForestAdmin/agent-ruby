@@ -210,6 +210,77 @@ module ForestAdminAgent
         end
       end
 
+      context 'when the users list may be stale' do
+        let(:john) do
+          { 'id' => 1, 'firstName' => 'John', 'lastName' => 'Doe', 'fullName' => 'John Doe',
+            'email' => 'john.doe@domain.com', 'tags' => [], 'roleId' => 1, 'permissionLevel' => 'user' }
+        end
+        let(:admin) do
+          { 'id' => 3, 'firstName' => 'Admin', 'lastName' => 'test', 'fullName' => 'Admin test',
+            'email' => 'admin@forestadmin.com', 'tags' => [], 'roleId' => 13, 'permissionLevel' => 'admin' }
+        end
+
+        def users_response(*users)
+          instance_double(Faraday::Response, status: 200, body: users.to_json)
+        end
+
+        def stub_users(*responses)
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/users').and_return(*responses)
+        end
+
+        it 'reloads the users once when the id is unknown' do
+          stub_users(users_response(admin), users_response(admin, john))
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'does not reload the users when the id is known' do
+          stub_users(users_response(admin, john))
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+
+        it 'reloads the users at most once per interval for an id that stays unknown' do
+          stub_users(users_response(admin))
+
+          2.times { expect(@permissions.get_user_data(42)).to be_nil }
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'reloads the users again once the interval has elapsed' do
+          stub_users(users_response(admin))
+          allow(Process).to receive(:clock_gettime).and_call_original
+          allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(
+            1_000.0,
+            1_000.0 + described_class::USERS_RELOAD_INTERVAL_IN_SECONDS + 1
+          )
+
+          2.times { @permissions.get_user_data(42) }
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').exactly(3).times
+        end
+
+        it 'reloads the users on a denial so a role granted since the last load applies' do
+          stub_users(users_response(john.merge('roleId' => 99)), users_response(john))
+
+          expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'denies without reloading the users when a reload already ran within the interval' do
+          stub_users(users_response(john.merge('roleId' => 99)), users_response(john))
+          described_class.users_reload_allowed?
+
+          expect do
+            @permissions.can?(:browse, @datasource.collections['Book'])
+          end.to raise_error(ForbiddenError)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+      end
+
       context 'when can? is called' do
         it 'returns true when user is allowed' do
           expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
