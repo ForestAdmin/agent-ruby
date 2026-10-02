@@ -74,13 +74,15 @@ module ForestAdminAgent
       end
 
       def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, start_timestamp: nil,
-                         end_timestamp: nil, fields: nil, search: nil, order: 'asc')
+                         end_timestamp: nil, fields: nil, search: nil, order: 'asc', after: nil)
+        descending = order.to_s == 'desc'
         # `id` (insertion order) breaks ties on equal timestamps in both directions, keeping pages
         # deterministic and stable.
         relation = scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
                                                 end_timestamp: end_timestamp, fields: fields, search: search)
-                   .order(timestamp: order.to_s == 'desc' ? :desc : :asc, id: :asc)
+                   .order(timestamp: descending ? :desc : :asc, id: :asc)
                    .offset(skip || 0)
+        relation = relation.where(*past_row_condition(after, descending)) if after
         relation = relation.limit(limit) unless limit.nil?
 
         relation.map { |row| from_row(row) }
@@ -165,6 +167,15 @@ module ForestAdminAgent
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp
         relation = relation.where('timestamp <= ?', as_time(end_timestamp)) if end_timestamp
         relation
+      end
+
+      # Rows strictly past `row` in the history's own order, so a scan keyed on the last row it read neither
+      # repeats nor skips one when entries are written between its reads, as an offset would.
+      def past_row_condition(row, descending)
+        at = as_time(row[:timestamp])
+        past = descending ? '<' : '>'
+
+        ["timestamp #{past} ? OR (timestamp = ? AND id > ?)", at, at, row[:id]]
       end
 
       def as_time(value)

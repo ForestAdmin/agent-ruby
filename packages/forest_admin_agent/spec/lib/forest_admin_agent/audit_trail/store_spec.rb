@@ -79,6 +79,24 @@ module ForestAdminAgent
         expect(history.map(&:correlation_key)).to eq(%w[b a a2])
       end
 
+      # A cursor survives writes between reads that would shift an offset: nothing repeats, nothing is skipped.
+      it 'continues past a given row in either order, whatever was written since' do
+        store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a'))
+        store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'b'))
+        store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a2'))
+
+        newest = store.list_by_record(collection: 'accounts', record_id: '1', order: 'desc', limit: 2)
+        store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'late'))
+        rest = store.list_by_record(collection: 'accounts', record_id: '1', order: 'desc',
+                                    after: newest.last.to_h.slice(:timestamp, :id))
+        oldest = store.list_by_record(collection: 'accounts', record_id: '1', limit: 1)
+        later = store.list_by_record(collection: 'accounts', record_id: '1',
+                                     after: oldest.last.to_h.slice(:timestamp, :id))
+
+        expect((newest + rest).map(&:correlation_key)).to eq(%w[b a a2])
+        expect((oldest + later).map(&:correlation_key)).to eq(%w[a a2 b late])
+      end
+
       it 'filters by user_ids and inclusive timestamp range' do
         store.append(record(timestamp: '2026-01-02T03:04:05.000Z', user_id: 7, correlation_key: 'keep'))
         store.append(record(timestamp: '2026-01-02T03:04:09.000Z', user_id: 7, correlation_key: 'late'))
