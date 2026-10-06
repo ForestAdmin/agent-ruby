@@ -1,3 +1,10 @@
+## [1.44.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.4...v1.44.5) (2026-10-06)
+
+
+### Bug Fixes
+
+* **audit-trail:** withhold on every route that serves captured values [PRD-1295] ([#396](https://github.com/ForestAdmin/agent-ruby/issues/396)) ([75568a6](https://github.com/ForestAdmin/agent-ruby/commit/75568a62ae92f300f795ed9c7d113c4113e4f136))
+
 ## [1.44.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.3...v1.44.4) (2026-10-01)
 
 
