@@ -8,6 +8,7 @@ module ForestAdminAgent
       # and they all serialize audit records the same way.
       module AuditTrailRoute
         include ForestAdminDatasourceToolkit::Components::Query
+        include AuditTrailWithholding
 
         # The caller's scope when the record is gone for good, nil otherwise — no scope in effect, or a record
         # still there and in scope. A scope can't be evaluated against a record that no longer exists, so its
@@ -41,6 +42,29 @@ module ForestAdminAgent
           return nil if scope.nil? || first_record(context, collection, condition, key_projection(collection)).nil?
 
           raise Http::Exceptions::NotFoundError, 'Record does not exists'
+        end
+
+        # The scope to withhold with: the caller's own, if the record was gone at either look at it.
+        #
+        # Both looks count, and neither can clear the other. The first is the only one that saw the record as
+        # it was when the rows were chosen, so a replacement the second finds — an id freed by a delete and
+        # taken by another record since — answers for itself, never for the life whose rows these are. The
+        # second is the only one that can see a record deleted since, and it is where the 404 comes from when
+        # that replacement is one this caller cannot read.
+        def withholding_scope_for(context, collection, packed_id, gone_at_check)
+          gone_since = scope_if_gone_since(context, collection, packed_id)
+
+          gone_at_check || gone_since
+        end
+
+        # Second read of the record, once the rows are in hand, so the answer that decides the withholding is
+        # never older than what it decides on. Skipped without a scope in effect — there is nothing to withhold
+        # then, and nothing to ask. A record moved out of scope rather than deleted raises the 404 it would
+        # raise for a request starting a moment later.
+        def scope_if_gone_since(context, collection, packed_id)
+          return nil if context.permissions.get_scope(collection).nil?
+
+          assert_record_in_scope(context, collection, packed_id)
         end
 
         # Camelize only the top-level keys — the row `id` included, which the front uses as the tiebreaker when
