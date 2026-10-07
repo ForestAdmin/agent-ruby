@@ -1227,7 +1227,7 @@ module ForestAdminAgent
             described_class.parse_condition_tree(collection_category, args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-            "The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
+            "The given operator 'not_equal' is not supported by the column: 'id'. The allowed types are: equal"
           )
         end
       end

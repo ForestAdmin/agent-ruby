@@ -167,6 +167,32 @@ module ForestAdminDatasourceToolkit
           end
         end
 
+        context 'when the column has no operator' do
+          it 'raises that the column is not filterable' do
+            collection = build_collection({ schema: { fields: { 'target' => ColumnSchema.new(column_type: 'String') } } })
+            condition_tree = ConditionTreeLeaf.new('target', Operators::EQUAL, 'value')
+
+            expect { described_class.validate(condition_tree, collection) }.to raise_error(
+              Exceptions::ValidationError,
+              "The given operator 'equal' is not supported by the column: 'target'. The column is not filterable"
+            )
+          end
+        end
+
+        context 'when the column does not support the operator' do
+          it 'raises with the allowed operators' do
+            collection = build_collection(
+              { schema: { fields: { 'target' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL, Operators::IN]) } } }
+            )
+            condition_tree = ConditionTreeLeaf.new('target', Operators::CONTAINS, 'value')
+
+            expect { described_class.validate(condition_tree, collection) }.to raise_error(
+              Exceptions::ValidationError,
+              "The given operator 'contains' is not supported by the column: 'target'. The allowed types are: equal,in"
+            )
+          end
+        end
+
         context 'when the field has an operator incompatible with the schema type' do
           it 'raise an error' do
             collection = build_collection({
@@ -226,6 +252,94 @@ module ForestAdminDatasourceToolkit
               Exceptions::ValidationError,
               "The given value has a wrong type for 'target': 1.\n Expects [\"String\", nil]"
             )
+          end
+        end
+
+        context 'when the condition goes through a relation that is not filterable' do
+          let(:datasource) do
+            build_datasource_with_collections(
+              [
+                build_collection(
+                  name: 'book',
+                  schema: {
+                    fields: {
+                      'id' => ColumnSchema.new(column_type: 'String', is_primary_key: true),
+                      'author_id' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
+                      'author' => Relations::ManyToOneSchema.new(
+                        foreign_key: 'author_id',
+                        foreign_collection: 'person',
+                        foreign_key_target: 'id',
+                        is_filterable: false
+                      ),
+                      'editor' => Relations::ManyToOneSchema.new(
+                        foreign_key: 'author_id',
+                        foreign_collection: 'person',
+                        foreign_key_target: 'id'
+                      )
+                    }
+                  }
+                ),
+                build_collection(
+                  name: 'person',
+                  schema: {
+                    fields: {
+                      'id' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
+                      'passport' => Relations::OneToOneSchema.new(
+                        origin_key: 'person_id',
+                        origin_key_target: 'id',
+                        foreign_collection: 'passport',
+                        is_filterable: false
+                      )
+                    }
+                  }
+                ),
+                build_collection(
+                  name: 'passport',
+                  schema: {
+                    fields: {
+                      'person_id' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL])
+                    }
+                  }
+                )
+              ]
+            )
+          end
+          let(:book) { datasource.get_collection('book') }
+
+          it 'raises on a many to one' do
+            condition_tree = ConditionTreeLeaf.new('author:id', Operators::EQUAL, '1')
+
+            expect { described_class.validate(condition_tree, book) }.to raise_error(
+              Exceptions::ValidationError, "The relation 'book.author' is not filterable"
+            )
+          end
+
+          it 'raises on a one to one reached through a filterable relation' do
+            condition_tree = ConditionTreeLeaf.new('editor:passport:person_id', Operators::EQUAL, '1')
+
+            expect { described_class.validate(condition_tree, book) }.to raise_error(
+              Exceptions::ValidationError, "The relation 'person.passport' is not filterable"
+            )
+          end
+
+          it 'raises when the leaf is nested in a branch' do
+            condition_tree = ConditionTreeBranch.new(
+              'Or',
+              [
+                ConditionTreeLeaf.new('editor:id', Operators::EQUAL, '1'),
+                ConditionTreeLeaf.new('author:id', Operators::EQUAL, '1')
+              ]
+            )
+
+            expect { described_class.validate(condition_tree, book) }.to raise_error(
+              Exceptions::ValidationError, "The relation 'book.author' is not filterable"
+            )
+          end
+
+          it 'still accepts the foreign key column of the relation' do
+            condition_tree = ConditionTreeLeaf.new('author_id', Operators::EQUAL, '1')
+
+            expect(described_class.validate(condition_tree, book)).to be_nil
           end
         end
       end
