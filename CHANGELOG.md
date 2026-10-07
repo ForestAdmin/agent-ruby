@@ -1,3 +1,10 @@
+# [1.45.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.5...v1.45.0) (2026-10-07)
+
+
+### Features
+
+* add disable field filtering option ([#399](https://github.com/ForestAdmin/agent-ruby/issues/399)) ([b537254](https://github.com/ForestAdmin/agent-ruby/commit/b537254648f2d7038e1c1ace1d5d7bebe152bbfa))
+
 ## [1.44.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.4...v1.44.5) (2026-10-06)
 
 
