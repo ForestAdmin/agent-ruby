@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.homepage    = 'https://www.forestadmin.com'
   spec.summary     = 'Pylon datasource for Forest Admin Ruby agent.'
   spec.description = 'Surface Pylon issues, accounts, contacts, users and teams as Forest Admin collections.'
-  spec.license     = 'GPL-3.0'
+  spec.license     = 'Apache-2.0'
   spec.required_ruby_version = '>= 3.0.0'
 
   spec.metadata['homepage_uri']    = spec.homepage
