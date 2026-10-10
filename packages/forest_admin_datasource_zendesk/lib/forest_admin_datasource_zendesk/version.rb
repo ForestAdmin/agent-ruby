@@ -1,3 +1,3 @@
 module ForestAdminDatasourceZendesk
-  VERSION = "1.45.0"
+  VERSION = "1.45.1"
 end

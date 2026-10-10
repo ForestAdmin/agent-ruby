@@ -1,3 +1,10 @@
+## [1.45.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.0...v1.45.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **license:** relicense from GPL-3.0 to Apache-2.0 ([#401](https://github.com/ForestAdmin/agent-ruby/issues/401)) ([465ff60](https://github.com/ForestAdmin/agent-ruby/commit/465ff60eb477033e6ae664c7d2edd75bd91a655e))
+
 # [1.45.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.5...v1.45.0) (2026-10-07)
 
 
