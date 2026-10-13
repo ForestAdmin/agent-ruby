@@ -1,8 +1,6 @@
 module ForestAdminDatasourceToolkit
   module Components
     module Query
-      # Frozen snapshot of a Projection's columns / relations, built once and walked for every record.
-      # Projection itself is a mutable Array and cannot memoize them.
       ProjectionTree = Struct.new(:columns, :relations) do
         def self.build(projection)
           new(projection.columns.freeze, projection.relations.transform_values { |sub| build(sub) }.freeze).freeze

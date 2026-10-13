@@ -81,6 +81,8 @@ module ForestAdminDatasourceToolkit
         end
 
         def re_project(record)
+          return if record.nil?
+
           ProjectionTree.build(self).re_project(record)
         end
 

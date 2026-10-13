@@ -2,7 +2,6 @@ module ForestAdminDatasourceActiveRecord
   module Utils
     # Relations in `joined_relations` (see Query#collect_joined_selects) are hydrated from the flat
     # row's aliased columns; every other relation is read from its preloaded ActiveRecord association.
-    # One instance serializes every record of a list, so the projection tree and reflections are resolved once.
     class ActiveRecordSerializer
       ONE_ASSOCIATIONS = %i[has_one belongs_to].freeze
       MANY_ASSOCIATIONS = %i[has_many has_and_belongs_to_many].freeze
@@ -19,7 +18,6 @@ module ForestAdminDatasourceActiveRecord
         hash_object(object, object, @tree)
       end
 
-      # Target model of a JOINed relation path (only belongs_to / has_one :through are ever JOINed).
       def target_model(root_model, relation_path)
         @target_models.fetch([root_model, relation_path]) do |key|
           @target_models[key] = resolve_target_model(root_model, relation_path)

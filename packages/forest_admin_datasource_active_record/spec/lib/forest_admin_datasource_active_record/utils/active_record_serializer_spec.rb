@@ -50,6 +50,10 @@ module ForestAdminDatasourceActiveRecord
 
       it 'computes Projection#relations as many times for one row as for many on a JOINed list', :db_truncation do
         create_account = -> { Account.create!(supplier: Supplier.create!(name: 'ACME'), account_history: AccountHistory.create!) }
+        query = Utils::Query.new(Collection.new(Datasource.new({ adapter: 'sqlite3', database: 'db/database.db' }), Account),
+                                 Projection.new(['id', 'supplier:name', 'account_history:id']), Filter.new)
+        query.build
+        expect(query.joined_relations.keys).to include('supplier', 'account_history')
 
         create_account.call
         one_row = count_relations_calls { |list_projection| list_accounts(list_projection) }

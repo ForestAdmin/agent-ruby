@@ -12,6 +12,7 @@ module ForestAdminDatasourcePylon
     module RelationEmbedder
       ManyToOneSchema = BaseCollection::ManyToOneSchema
       Projection      = BaseCollection::Projection
+      ProjectionTree  = ForestAdminDatasourceToolkit::Components::Query::ProjectionTree
 
       private
 
@@ -56,9 +57,10 @@ module ForestAdminDatasourcePylon
         indexed = ids.empty? ? {} : foreign.records_indexed_by_id(ids)
         relations.each do |name, relation|
           wanted = projected_fields(sub_projections[name], foreign)
+          tree = wanted && ProjectionTree.build(wanted)
           rows.each_with_index do |row, index|
             related = indexed[records[index][relation.foreign_key]]
-            row[name] = wanted ? wanted.re_project(related) : related
+            row[name] = tree ? tree.re_project(related) : related
           end
         end
       end
