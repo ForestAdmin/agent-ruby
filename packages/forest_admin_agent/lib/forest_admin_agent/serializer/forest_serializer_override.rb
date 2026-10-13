@@ -17,7 +17,6 @@ module ForestAdminAgent
               next if attribute_name == :_include
 
               serializer = JSONAPI::Serializer.find_serializer(root_object, options)
-              serializer.relationships
               unformatted_attr_name = serializer.unformat_name(attribute_name).to_sym
 
               # We know the name of this relationship, but we don't know where it is stored internally.
@@ -55,9 +54,7 @@ module ForestAdminAgent
               # in the response.
               objects = is_collection ? object : [object]
 
-              relation = ForestAdminAgent::Facades::Container.datasource
-                                                             .get_collection(options[:class_name].gsub('::', '__'))
-                                                             .schema[:fields][attribute_name]
+              relation = serializer.layout[:fields][attribute_name]
               if relation.type == 'PolymorphicManyToOne'
                 relation_class_name = root_object[relation.foreign_key_type_field]
               else
