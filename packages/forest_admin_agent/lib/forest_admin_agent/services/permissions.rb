@@ -10,6 +10,9 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
       USERS_RELOAD_INTERVAL_IN_SECONDS = 60
+      # Renderings live in their own domain because FileCache cannot delete by key prefix: clearing
+      # the domain is the only way to drop every rendering when the server does not say which one.
+      RENDERINGS_CACHE_DOMAIN = 'permissions-renderings'.freeze
 
       @users_reload_mutex = Mutex.new
 
@@ -18,28 +21,50 @@ module ForestAdminAgent
       def initialize(caller)
         @caller = caller
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        @cache = FileCache.new(
-          'permissions',
+        @cache = self.class.build_cache('permissions')
+      end
+
+      def rendering_cache
+        @rendering_cache ||= self.class.build_cache(RENDERINGS_CACHE_DOMAIN)
+      end
+
+      def self.build_cache(domain)
+        FileCache.new(
+          domain,
           Facades::Container.config_from_cache[:cache_dir].to_s,
           Facades::Container.config_from_cache[:permission_expiration]
         )
       end
 
       def self.invalidate_cache(id_cache = nil)
-        cache = FileCache.new(
-          'permissions',
-          Facades::Container.config_from_cache[:cache_dir].to_s,
-          Facades::Container.config_from_cache[:permission_expiration]
-        )
+        cache = build_cache('permissions')
 
         if id_cache.nil?
           cache.clear
+          build_cache(RENDERINGS_CACHE_DOMAIN).clear
           @users_reload_mutex.synchronize { @users_reloaded_at = nil }
         end
 
         cache.delete(id_cache) unless cache.get(id_cache).nil?
 
         ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
+      end
+
+      def self.invalidate_rendering_cache(rendering_id = nil)
+        cache = build_cache(RENDERINGS_CACHE_DOMAIN)
+
+        if rendering_id.nil?
+          cache.clear
+        else
+          begin
+            cache.delete(rendering_id.to_s)
+          rescue Errno::ENOENT
+            nil
+          end
+        end
+
+        target = rendering_id.nil? ? 'every rendering' : "rendering #{rendering_id}"
+        ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{target} permissions cache..")
       end
 
       def self.users_reload_allowed?
@@ -484,9 +509,9 @@ module ForestAdminAgent
       end
 
       def get_rendering_data(rendering_id, force_fetch: false)
-        self.class.invalidate_cache('forest.rendering') if force_fetch == true
+        self.class.invalidate_rendering_cache(rendering_id) if force_fetch == true
 
-        cache.get_or_set('forest.rendering') do
+        rendering_cache.get_or_set(rendering_id.to_s) do
           data = {}
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
 
