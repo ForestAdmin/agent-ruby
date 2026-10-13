@@ -11,7 +11,7 @@ module ForestAdminAgent
       let(:faraday_connection) { instance_double(Faraday::Connection) }
 
       before do
-        cache = FileCache.new('auth_issuer', Facades::Container.cache(:cache_dir).to_s)
+        cache = ForestAdminAgent::Utils::SafeFileCache.new('auth_issuer', Facades::Container.cache(:cache_dir).to_s)
         cache.clear
       end
 
@@ -60,6 +60,21 @@ module ForestAdminAgent
           expect(cache).to be_a Hash
           expect(cache.key?(:client_id)).to be true
           expect(cache[:redirect_uri]).to eq 'redirect_uri'
+        end
+
+        it 'registers the client once and serves it from the cache afterwards' do
+          2.times { described_class.new.make_forest_provider :rendering_id }
+
+          expect(faraday_connection).to have_received(:post).once
+        end
+
+        it 'stores the client data through the safe file cache' do
+          allow(ForestAdminAgent::Utils::SafeFileCache).to receive(:new).and_call_original
+
+          oidc_client_manager.make_forest_provider :rendering_id
+
+          expect(ForestAdminAgent::Utils::SafeFileCache).to have_received(:new)
+            .with('auth_issuer', Facades::Container.cache(:cache_dir).to_s, described_class::TTL)
         end
       end
     end
