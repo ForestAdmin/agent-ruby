@@ -1498,6 +1498,24 @@ module ForestAdminAgent
 
           expect(File).not_to have_received(:read).with(Facades::Container.config_from_cache[:schema_path])
         end
+
+        it 'returns false when the smart action checker denies the execution' do
+          declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'single') })
+          grant_trigger
+          allow(SmartActionChecker).to receive(:new).and_return(instance_double(SmartActionChecker, can_execute?: false))
+
+          expect(
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
+          ).to be false
+        end
+
+        it 'raises a ForbiddenError when the action is missing from the permissions' do
+          grant_trigger
+
+          expect do
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'unknown-action')
+          end.to raise_error(ForbiddenError, "Smart action 'unknown-action' is not configured")
+        end
       end
     end
   end
