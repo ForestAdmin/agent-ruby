@@ -7,7 +7,7 @@ module ForestAdminDatasourceActiveRecord
       MANY_ASSOCIATIONS = %i[has_many has_and_belongs_to_many].freeze
 
       def initialize(projection, joined_relations = nil)
-        @tree = ForestAdminDatasourceToolkit::Components::Query::ProjectionTree.build(projection)
+        @tree = ForestAdminDatasourceToolkit::Components::Query::ProjectionTree.build(projection || ForestAdminDatasourceToolkit::Components::Query::Projection.new)
         @joined_relations = joined_relations || {}
         @join_aliases = @joined_relations.values.flat_map { |meta| meta[:columns].values }.uniq
         @polymorphic_belongs_to = {}

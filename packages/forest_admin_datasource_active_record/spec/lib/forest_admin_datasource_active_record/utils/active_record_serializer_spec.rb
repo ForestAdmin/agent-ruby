@@ -18,6 +18,19 @@ module ForestAdminDatasourceActiveRecord
       it 'returns nil when a hop is not an association' do
         expect(serializer.target_model(Account, ['not_a_relation'])).to be_nil
       end
+
+      it 'keys its memo by root model as well as relation path' do
+        expect(serializer.target_model(Account, ['supplier'])).to eq(Supplier)
+        expect(serializer.target_model(Supplier, ['supplier'])).to be_nil
+      end
+    end
+
+    describe '#serialize' do
+      it 'serializes the base attributes when the projection is nil' do
+        account = Account.new(supplier: Supplier.new(name: 'ACME'))
+
+        expect(described_class.new(nil).serialize(account)).to eq(account.attributes)
+      end
     end
 
     describe 'per-list footprint' do
@@ -25,14 +38,18 @@ module ForestAdminDatasourceActiveRecord
       let(:accounts) do
         Array.new(20) { Account.new(supplier: Supplier.new(name: 'ACME'), account_history: AccountHistory.new) }
       end
+      let(:expected) do
+        accounts.map do |account|
+          account.attributes.merge('supplier' => { 'name' => 'ACME' }, 'account_history' => { 'id' => nil })
+        end
+      end
 
       it 'resolves the projection tree once, whatever the row count' do
         allow(projection).to receive(:relations).and_call_original
         serializer = described_class.new(projection, {})
         allow(Projection).to receive(:new).and_call_original
 
-        accounts.each { |account| serializer.serialize(account) }
-
+        expect(accounts.map { |account| serializer.serialize(account) }).to eq(expected)
         expect(projection).to have_received(:relations).once
         expect(Projection).not_to have_received(:new)
       end
@@ -42,8 +59,7 @@ module ForestAdminDatasourceActiveRecord
         allow(Supplier).to receive(:reflect_on_all_associations).and_call_original
         serializer = described_class.new(projection, {})
 
-        accounts.each { |account| serializer.serialize(account) }
-
+        expect(accounts.map { |account| serializer.serialize(account) }).to eq(expected)
         expect(Account).to have_received(:reflect_on_all_associations).with(:belongs_to).once
         expect(Supplier).to have_received(:reflect_on_all_associations).with(:belongs_to).once
       end
