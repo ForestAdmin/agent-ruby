@@ -136,7 +136,8 @@ module ForestAdminDatasourcePylon
 
         issues.list(nil, filter, %w[id account:name])
 
-        expect(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree).to have_received(:build).once
+        expect(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree)
+          .to have_received(:build).with(contain_exactly('id', 'name')).once
       end
 
       # Pylon documents no maximum on an `in` filter; the chunk keeps the request
