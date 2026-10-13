@@ -101,6 +101,16 @@ module ForestAdminAgent
             )
           end
 
+          it 'checks the action the route serves, from a record selection built once' do
+            allow(@action_collection).to receive(:execute).and_return({})
+            allow(ForestAdminAgent::Utils::QueryStringParser).to receive(:parse_condition_tree).and_call_original
+
+            action.handle_request(args)
+
+            expect(permissions).to have_received(:can_smart_action?).with(anything, anything, anything, action_name: 'foo')
+            expect(ForestAdminAgent::Utils::QueryStringParser).to have_received(:parse_condition_tree).once
+          end
+
           context 'when the request contains requester_id' do
             it 'reject with UnprocessableError (prevent forged request)' do
               args[:params][:data][:attributes][:requester_id] = 'requester_id'

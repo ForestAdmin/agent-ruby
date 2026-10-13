@@ -50,9 +50,8 @@ module ForestAdminAgent
           context = build(args)
           args = middleware_custom_action_approval_request_data(args)
           filter_for_caller = get_record_selection(args, context)
-          get_record_selection(args, context, include_user_scope: false)
 
-          context.permissions.can_smart_action?(args, context.collection, filter_for_caller)
+          context.permissions.can_smart_action?(args, context.collection, filter_for_caller, action_name: @action_name)
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
@@ -211,11 +210,11 @@ module ForestAdminAgent
           )[0])
         end
 
-        def get_record_selection(args, context, include_user_scope: true)
+        def get_record_selection(args, context)
           attributes = args.dig(:params, :data, :attributes)
 
           # Match user filter + search + scope? + segment
-          scope = include_user_scope ? context.permissions.get_scope(context.collection) : nil
+          scope = context.permissions.get_scope(context.collection)
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
