@@ -107,7 +107,7 @@ module ForestAdminAgent
 
             action.handle_request(args)
 
-            expect(permissions).to have_received(:can_smart_action?).with(anything, anything, anything, action_name: 'foo')
+            expect(permissions).to(have_received(:can_smart_action?) { |*, action_name:| expect(action_name).to eq('foo') })
             expect(ForestAdminAgent::Utils::QueryStringParser).to have_received(:parse_condition_tree).once
           end
 

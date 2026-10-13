@@ -263,6 +263,16 @@ module ForestAdminAgent
           expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').exactly(3).times
         end
 
+        it 'rereads the users file during the throttle, as another process may have refreshed it' do
+          stub_users(users_response(admin))
+          @permissions.get_user_data(3)
+          described_class.users_reload_allowed?
+          @permissions.cache.set('forest.users', { '1' => { id: 1, roleId: 1 }, '3' => { id: 3, roleId: 13 } })
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+
         it 'reloads the users on a denial so a role granted since the last load applies' do
           stub_users(users_response(john.merge('roleId' => 99)), users_response(john))
 

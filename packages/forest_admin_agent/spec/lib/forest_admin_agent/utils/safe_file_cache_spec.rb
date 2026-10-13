@@ -73,6 +73,13 @@ module ForestAdminAgent
         expect(cache.get('forest.users')).to be_nil
       end
 
+      it 'propagates a read error other than a missing or corrupted file' do
+        cache.set('forest.users', 'value')
+        allow(File).to receive(:open).and_raise(Errno::EACCES)
+
+        expect { cache.get('forest.users') }.to raise_error(Errno::EACCES)
+      end
+
       it 'answers nil for a file truncated by a writer that does not rename' do
         cache.set('forest.users', { '1' => { roleId: 1 } })
         path = cache_files.first
@@ -95,6 +102,16 @@ module ForestAdminAgent
         expect { cache.clear }.not_to raise_error
         expect(cache.get('forest.users')).to be_nil
         expect(Dir.exist?(File.join(root_dir, 'permissions'))).to be true
+      end
+
+      it 'drops the write when a concurrent clear removes the directory before the rename' do
+        allow(File).to receive(:rename).and_wrap_original do |original, *paths|
+          FileUtils.rm_rf(File.join(root_dir, 'permissions'))
+          original.call(*paths)
+        end
+
+        expect { cache.get_or_set('forest.users') { 'value' } }.not_to raise_error
+        expect(cache.get('forest.users')).to be_nil
       end
 
       it 'deletes a key that is not cached without raising' do

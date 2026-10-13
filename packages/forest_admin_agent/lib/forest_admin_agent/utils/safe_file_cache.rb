@@ -21,6 +21,8 @@ module ForestAdminAgent
 
         File.open(temp_path, 'wb') { |file| Marshal.dump(value, file) }
         File.rename(temp_path, path)
+      rescue Errno::ENOENT
+        nil
       ensure
         FileUtils.rm_f(temp_path) if temp_path
       end
