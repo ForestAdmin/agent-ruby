@@ -148,6 +148,65 @@ module ForestAdminAgent
           expect(result['included'].map { |resource| resource['type'] }).to contain_exactly('Author', 'Company')
         end
 
+        describe 'the field lists of a collection' do
+          let(:books) { [1, 2, 3].map { |id| record.merge('id' => id) } }
+
+          def serialize_books
+            JSONAPI::Serializer.serialize(
+              books, is_collection: true, class_name: 'Book', serializer: described_class, include: ['author']
+            )
+          end
+
+          # Counted by name: a matcher on the collection itself inspects it on failure, and a collection
+          # reaches every other one through its datasource, so the suite would hang instead of failing.
+          it 'are resolved once per collection whatever the number of records' do
+            built = Hash.new(0)
+            allow(described_class).to receive(:build_layout).and_wrap_original do |method, collection|
+              built[collection.name] += 1
+              method.call(collection)
+            end
+
+            serialize_books
+
+            expect(built).to eq('Book' => 1, 'Author' => 1)
+          end
+
+          it 'are not rebuilt through relationships to find the includes' do
+            calls = 0
+            allow(described_class).to receive(:new).and_wrap_original do |new_method, *args|
+              new_method.call(*args).tap do |serializer|
+                allow(serializer).to receive(:relationships).and_wrap_original do |method|
+                  calls += 1
+                  method.call
+                end
+              end
+            end
+
+            serialize_books
+
+            # One per serialized resource: three books and their shared author.
+            expect(calls).to eq 4
+          end
+
+          it 'are frozen so a serializer cannot alter them for the next record' do
+            layout = described_class.layout_for(@datasource.get_collection('Book'))
+
+            expect(layout[:attributes]).to be_frozen
+            expect(layout[:attributes]['title']).to be_frozen
+            expect(layout[:to_one]['author'][:options]).to be_frozen
+          end
+
+          it 'are kept apart for two collections of the same name' do
+            first = build_collection(name: 'Thing', schema: { fields: { 'a' => ColumnSchema.new(column_type: 'String') } })
+            second = build_collection(name: 'Thing', schema: { fields: { 'b' => ColumnSchema.new(column_type: 'String') } })
+
+            first_keys = described_class.layout_for(first)[:attributes].keys
+            second_keys = described_class.layout_for(second)[:attributes].keys
+
+            expect([first_keys, second_keys]).to eq([['a'], ['b']])
+          end
+        end
+
         it 'skips a level whose related record is absent' do
           result = JSONAPI::Serializer.serialize(
             record.merge('author' => { 'id' => 10, 'name' => 'Asimov', 'company_id' => nil, 'company' => nil }),
