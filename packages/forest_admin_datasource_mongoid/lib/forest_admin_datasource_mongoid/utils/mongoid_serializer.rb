@@ -1,5 +1,7 @@
 module ForestAdminDatasourceMongoid
   module Utils
+    # Not used by Collection#list (records come from an aggregation pipeline, see AddNullValues).
+    # Kept because it is a public constant of the published gem.
     MongoidSerializer = Struct.new(:object) do
       def to_hash(projection)
         hash_object(object, projection)

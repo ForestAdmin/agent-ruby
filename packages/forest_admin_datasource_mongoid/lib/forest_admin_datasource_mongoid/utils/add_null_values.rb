@@ -19,39 +19,42 @@ module ForestAdminDatasourceMongoid
       end
 
       def add_null_values_on_record(record, projection)
+        add_null_values_on_tree(record, projection_tree(projection))
+      end
+
+      def add_null_values(records, projection)
+        tree = projection_tree(projection)
+        records.filter_map { |record| add_null_values_on_tree(record, tree) }
+      end
+
+      private
+
+      def projection_tree(projection)
+        ForestAdminDatasourceToolkit::Components::Query::ProjectionTree.build(
+          ForestAdminDatasourceToolkit::Components::Query::Projection.new(projection)
+        )
+      end
+
+      def add_null_values_on_tree(record, tree)
         return nil if record.nil?
 
         result = record.dup
 
-        projection.each do |field|
-          field_prefix = field.split(':').first
-          result[field_prefix] ||= nil
-        end
+        tree.columns.each { |column| result[column] ||= nil }
 
-        nested_prefixes = projection.filter_map { |field| field.split(':').first if field.include?(':') }.uniq
+        tree.relations.each do |relation, sub_tree|
+          value = result[relation]
 
-        nested_prefixes.each do |nested_prefix|
-          prefix_with_colon = "#{nested_prefix}:"
-          child_paths = projection.filter_map do |field|
-            field[(nested_prefix.size + 1)..] if field.start_with?(prefix_with_colon)
-          end
-
-          next unless result[nested_prefix] && !result[nested_prefix].nil?
-
-          if result[nested_prefix].is_a?(Array)
-            result[nested_prefix] = result[nested_prefix].map do |child_record|
-              add_null_values_on_record(child_record, child_paths)
-            end
-          elsif result[nested_prefix].is_a?(Hash)
-            result[nested_prefix] = add_null_values_on_record(result[nested_prefix], child_paths)
+          if value.is_a?(Array)
+            result[relation] = value.map { |child_record| add_null_values_on_tree(child_record, sub_tree) }
+          elsif value.is_a?(Hash)
+            result[relation] = add_null_values_on_tree(value, sub_tree)
+          else
+            result[relation] ||= nil
           end
         end
 
         remove_not_exist_record(result)
-      end
-
-      def add_null_values(records, projection)
-        records.filter_map { |record| add_null_values_on_record(record, projection) }
       end
     end
   end
