@@ -18,7 +18,7 @@ module ForestAdminAgent
 
         def handle_request(args)
           build(args)
-          Permissions.invalidate_cache('forest.rendering')
+          Permissions.invalidate_rendering_cache(args.dig(:params, 'renderingId'))
 
           { content: nil, status: 204 }
         end

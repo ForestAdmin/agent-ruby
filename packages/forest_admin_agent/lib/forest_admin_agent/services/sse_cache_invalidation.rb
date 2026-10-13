@@ -9,7 +9,7 @@ module ForestAdminAgent
       MESSAGE_CACHE_KEYS = {
         'refresh-users': %w[forest.users],
         'refresh-roles': %w[forest.collections],
-        'refresh-renderings': %w[forest.collections forest.rendering]
+        'refresh-renderings': %w[forest.collections]
         # TODO: add one for ip whitelist when server implement it
       }.freeze
 
@@ -32,6 +32,7 @@ module ForestAdminAgent
                   "invalidate cache #{MESSAGE_CACHE_KEYS[event.type]} for event #{event.type}"
                 )
               end
+              invalidate_renderings(event.data) if event.type == :'refresh-renderings'
 
               ForestAdminAgent::Facades::Container.logger.log(
                 'Info',
@@ -57,6 +58,22 @@ module ForestAdminAgent
           )
         end
       end
+
+      # An event that does not name its renderings could concern any of them, so all are dropped.
+      def self.invalidate_renderings(data)
+        rendering_ids = begin
+          JSON.parse(data.to_s)['renderingIds']
+        rescue JSON::ParserError, TypeError
+          nil
+        end
+
+        if rendering_ids.is_a?(Array) && rendering_ids.any?
+          rendering_ids.each { |rendering_id| Permissions.invalidate_rendering_cache(rendering_id) }
+        else
+          Permissions.invalidate_rendering_cache
+        end
+      end
+      private_class_method :invalidate_renderings
     end
   end
 end

@@ -29,6 +29,7 @@ module ForestAdminAgent
           before do
             allow(permissions).to receive(:new).and_return(instance_double(ForestAdminAgent::Services::Permissions))
             allow(permissions).to receive(:invalidate_cache).with(any_args).and_return(nil)
+            allow(permissions).to receive(:invalidate_rendering_cache).with(any_args).and_return(nil)
           end
 
           it 'return 204 response' do
@@ -37,17 +38,23 @@ module ForestAdminAgent
             expect(result[:status]).to eq 204
           end
 
-          it 'call the invalidate_cache method' do
+          it 'invalidates the rendering named by the request' do
+            scope_invalidation.handle_request(args.merge(params: args[:params].merge('renderingId' => 114)))
+
+            expect(permissions).to have_received(:invalidate_rendering_cache).with(114)
+          end
+
+          it 'invalidates every rendering when the request names none' do
             scope_invalidation.handle_request(args)
 
-            expect(permissions).to have_received(:invalidate_cache).with('forest.rendering')
+            expect(permissions).to have_received(:invalidate_rendering_cache).with(nil)
           end
 
           it 'rejects the request with no Authorization header' do
             expect { scope_invalidation.handle_request(args.merge(headers: {})) }.to raise_error(
               ForestAdminAgent::Http::Exceptions::UnauthorizedError
             )
-            expect(permissions).not_to have_received(:invalidate_cache)
+            expect(permissions).not_to have_received(:invalidate_rendering_cache)
           end
 
           it 'checks the ip against the whitelist when the request carries a remote ip' do

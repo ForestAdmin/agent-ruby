@@ -1324,6 +1324,87 @@ module ForestAdminAgent
         end
       end
 
+      context 'when two renderings share the cache' do
+        def rendering_response(scope_value)
+          instance_double(
+            Faraday::Response,
+            status: 200,
+            body: {
+              'collections' => {
+                'Book' => {
+                  'scope' => { aggregator: 'and', conditions: [{ field: 'id', operator: 'equal', value: scope_value }] },
+                  'segments' => [],
+                  'liveQuerySegments' => []
+                }
+              },
+              'stats' => [],
+              'team' => {}
+            }.to_json
+          )
+        end
+
+        def scope_value_for(permissions)
+          permissions.get_scope(@datasource.collections['Book']).to_h[:value]
+        end
+
+        let(:other_permissions) do
+          other_caller = ForestAdminDatasourceToolkit::Components::Caller.new(
+            id: 1, email: 'john.doe@domain.com', first_name: 'John', last_name: 'Doe', team: 'Sales',
+            rendering_id: 115, tags: [], timezone: 'Europe/Paris', permission_level: 'admin', role: 'dev',
+            request: { ip: '127.0.0.1' }, project: 'terminator', environment: 'Development'
+          )
+          described_class.new(other_caller).tap do |permissions|
+            allow(permissions).to receive(:forest_api).and_return(forest_api_requester)
+          end
+        end
+
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114')
+                                                      .and_return(rendering_response(114))
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/115')
+                                                      .and_return(rendering_response(115))
+        end
+
+        it 'gives each rendering its own scope' do
+          expect(scope_value_for(@permissions)).to eq 114
+
+          expect(scope_value_for(other_permissions)).to eq 115
+        end
+
+        it 'invalidates one rendering without refetching the other' do
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          described_class.invalidate_rendering_cache(115)
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').once
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/115').twice
+        end
+
+        it 'invalidates every rendering when no id is given' do
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          described_class.invalidate_rendering_cache
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').twice
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/115').twice
+        end
+
+        it 'invalidates every rendering on a full cache clear' do
+          scope_value_for(@permissions)
+
+          described_class.invalidate_cache
+          scope_value_for(@permissions)
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').twice
+        end
+      end
+
       context 'when can_smart_action? is called' do
         it 'returns true when the permissions system is deactivate' do
           args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
