@@ -76,20 +76,12 @@ module ForestAdminDatasourceToolkit
         end
 
         def apply(records)
-          records.map { |record| re_project(record) }
+          tree = ProjectionTree.build(self)
+          records.map { |record| tree.re_project(record) }
         end
 
         def re_project(record)
-          result = nil
-
-          if record
-            record = HashHelper.convert_keys(record, :to_s)
-            result = {}
-            columns.each { |column| result[column.to_s] = record[column.to_s] }
-            relations.each { |relation, projection| result[relation] = projection.re_project(record[relation]) }
-          end
-
-          result
+          ProjectionTree.build(self).re_project(record)
         end
 
         def union(*other_arrays)
