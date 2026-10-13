@@ -163,6 +163,23 @@ module ForestAdminDatasourceToolkit
               ]
             )
           end
+
+          it 'stringifies nested keys of related records' do
+            projection = described_class.new(%w[id author:name author:address:city])
+
+            expect(projection.apply([{ id: 1, author: { name: 'ana', address: { city: 'Paris', zip: '75' } } }])).to eq(
+              [{ 'id' => 1, 'author' => { 'name' => 'ana', 'address' => { 'city' => 'Paris' } } }]
+            )
+          end
+
+          it 'computes the relations once, whatever the row count' do
+            projection = described_class.new(%w[id author:name author:address:city])
+            allow(projection).to receive(:relations).and_call_original
+
+            projection.apply(Array.new(20) { |i| { id: i, author: { name: 'ana', address: { city: 'Paris' } } } })
+
+            expect(projection).to have_received(:relations).once
+          end
         end
       end
     end
