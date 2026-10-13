@@ -1403,6 +1403,39 @@ module ForestAdminAgent
 
           expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').twice
         end
+
+        it 'does not raise when another worker drops the rendering at the same time' do
+          scope_value_for(@permissions)
+          rendering_cache = described_class.build_cache(described_class::RENDERINGS_CACHE_DOMAIN)
+          other_worker_cache = described_class.build_cache(described_class::RENDERINGS_CACHE_DOMAIN)
+          allow(rendering_cache).to receive(:get).and_wrap_original do |original, key|
+            original.call(key).tap { other_worker_cache.delete(key) }
+          end
+          allow(described_class).to receive(:build_cache).and_call_original
+          allow(described_class).to receive(:build_cache)
+            .with(described_class::RENDERINGS_CACHE_DOMAIN).and_return(rendering_cache)
+
+          expect { described_class.invalidate_rendering_cache(114) }.not_to raise_error
+        end
+
+        it 'does not build the renderings cache for a request that never reads a rendering' do
+          allow(FileCache).to receive(:new).and_call_original
+
+          described_class.new(QueryStringParser.parse_caller(args))
+
+          expect(FileCache).to have_received(:new).with('permissions', 'tmp/cache/forest_admin', 100)
+          expect(FileCache).not_to have_received(:new).with('permissions-renderings', any_args)
+        end
+
+        it 'builds the renderings cache once a rendering is read' do
+          permissions = described_class.new(QueryStringParser.parse_caller(args))
+          allow(permissions).to receive(:forest_api).and_return(forest_api_requester)
+          allow(FileCache).to receive(:new).and_call_original
+
+          scope_value_for(permissions)
+
+          expect(FileCache).to have_received(:new).with('permissions-renderings', 'tmp/cache/forest_admin', 100).once
+        end
       end
 
       context 'when can_smart_action? is called' do

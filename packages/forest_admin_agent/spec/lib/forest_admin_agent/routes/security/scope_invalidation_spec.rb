@@ -50,6 +50,12 @@ module ForestAdminAgent
             expect(permissions).to have_received(:invalidate_rendering_cache).with(nil)
           end
 
+          it 'invalidates every rendering when the request names a blank one' do
+            scope_invalidation.handle_request(args.merge(params: args[:params].merge('renderingId' => '')))
+
+            expect(permissions).to have_received(:invalidate_rendering_cache).with(nil)
+          end
+
           it 'rejects the request with no Authorization header' do
             expect { scope_invalidation.handle_request(args.merge(headers: {})) }.to raise_error(
               ForestAdminAgent::Http::Exceptions::UnauthorizedError

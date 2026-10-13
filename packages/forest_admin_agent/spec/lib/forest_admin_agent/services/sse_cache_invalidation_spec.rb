@@ -82,6 +82,14 @@ module ForestAdminAgent
         expect(permissions).to have_received(:invalidate_rendering_cache).with(no_args)
       end
 
+      ['{"renderingIds":[]}', '{}', 'null', 'true', '1', '[1]', '{"renderingIds":47}'].each do |data|
+        it "invalidates every rendering when a refresh-renderings event carries #{data}" do
+          run_with(SSE::StreamEvent.new(:'refresh-renderings', data, nil))
+
+          expect(permissions).to have_received(:invalidate_rendering_cache).with(no_args)
+        end
+      end
+
       it 'does not invalidate renderings on other events' do
         run_with(sse_refresh_roles)
 

@@ -62,8 +62,9 @@ module ForestAdminAgent
       # An event that does not name its renderings could concern any of them, so all are dropped.
       def self.invalidate_renderings(data)
         rendering_ids = begin
-          JSON.parse(data.to_s)['renderingIds']
-        rescue JSON::ParserError, TypeError
+          parsed = JSON.parse(data.to_s)
+          parsed['renderingIds'] if parsed.is_a?(Hash)
+        rescue JSON::ParserError
           nil
         end
 

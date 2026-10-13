@@ -16,13 +16,16 @@ module ForestAdminAgent
 
       @users_reload_mutex = Mutex.new
 
-      attr_reader :caller, :forest_api, :cache, :rendering_cache
+      attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
         @caller = caller
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
         @cache = self.class.build_cache('permissions')
-        @rendering_cache = self.class.build_cache(RENDERINGS_CACHE_DOMAIN)
+      end
+
+      def rendering_cache
+        @rendering_cache ||= self.class.build_cache(RENDERINGS_CACHE_DOMAIN)
       end
 
       def self.build_cache(domain)
@@ -53,7 +56,11 @@ module ForestAdminAgent
         if rendering_id.nil?
           cache.clear
         else
-          cache.delete(rendering_id.to_s) unless cache.get(rendering_id.to_s).nil?
+          begin
+            cache.delete(rendering_id.to_s)
+          rescue Errno::ENOENT
+            nil
+          end
         end
 
         target = rendering_id.nil? ? 'every rendering' : "rendering #{rendering_id}"
