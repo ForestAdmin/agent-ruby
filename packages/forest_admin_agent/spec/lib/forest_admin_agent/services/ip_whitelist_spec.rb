@@ -313,6 +313,23 @@ module ForestAdminAgent
 
           expect(forest_api_requester).to have_received(:get).once
         end
+
+        it 'refetches the rules after an invalidation, without loading the cached ones to drop them' do
+          described_class.new.use_ip_whitelist
+          allow(Marshal).to receive(:load).and_call_original
+
+          described_class.invalidate_cache
+
+          expect(Marshal).not_to have_received(:load)
+
+          described_class.new.use_ip_whitelist
+
+          expect(forest_api_requester).to have_received(:get).twice
+        end
+
+        it 'does not raise when invalidating rules that were never cached' do
+          expect { 2.times { described_class.invalidate_cache } }.not_to raise_error
+        end
       end
     end
   end

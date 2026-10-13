@@ -48,11 +48,11 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           args = middleware_custom_action_approval_request_data(args)
           filter_for_caller = get_record_selection(args, context)
-          get_record_selection(args, context, include_user_scope: false)
 
-          context.permissions.can_smart_action?(args, context.collection, filter_for_caller)
+          context.permissions.can_smart_action?(args, context.collection, filter_for_caller, action_name: @action_name)
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
@@ -82,6 +82,7 @@ module ForestAdminAgent
 
         def handle_hook_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           forest_fields = args.dig(:params, :data, :attributes, :fields)
           data = (if forest_fields
                     Schema::ForestValueConverter.make_form_data_from_fields(context.datasource,
@@ -116,6 +117,14 @@ module ForestAdminAgent
         end
 
         private
+
+        def ensure_served_action(context)
+          served_index = @route_collection.schema[:actions].keys.index(@action_name)
+          return if context.collection.schema[:actions].keys.index(@action_name) == served_index
+
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                "The collection #{context.collection.name} does not have this smart action"
+        end
 
         # Recorded as pending before the action runs and confirmed after, so an action that takes the process
         # down with it still leaves evidence that it started. A failed run is worth recording too — "who tried
@@ -211,11 +220,11 @@ module ForestAdminAgent
           )[0])
         end
 
-        def get_record_selection(args, context, include_user_scope: true)
+        def get_record_selection(args, context)
           attributes = args.dig(:params, :data, :attributes)
 
           # Match user filter + search + scope? + segment
-          scope = include_user_scope ? context.permissions.get_scope(context.collection) : nil
+          scope = context.permissions.get_scope(context.collection)
           filter = Filter.new(
             condition_tree: ConditionTreeFactory.intersect(
               [
