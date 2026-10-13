@@ -234,10 +234,6 @@ module ForestAdminAgent
       def can_smart_action?(request, collection, filter, action_name:, allow_fetch: true)
         return true unless permission_system?
 
-        unless collection.schema[:actions]&.key?(action_name)
-          raise BadRequestError, "The collection #{collection.name} does not have this smart action"
-        end
-
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
 
@@ -326,7 +322,6 @@ module ForestAdminAgent
         end
       end
 
-      # Throttled, the file is still read again: another process may have refreshed it.
       def reload_users
         self.class.invalidate_cache('forest.users') if self.class.users_reload_allowed?
         forget(cache, 'forest.users')

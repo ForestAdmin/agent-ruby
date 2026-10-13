@@ -48,6 +48,7 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           args = middleware_custom_action_approval_request_data(args)
           filter_for_caller = get_record_selection(args, context)
 
@@ -81,6 +82,7 @@ module ForestAdminAgent
 
         def handle_hook_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           forest_fields = args.dig(:params, :data, :attributes, :fields)
           data = (if forest_fields
                     Schema::ForestValueConverter.make_form_data_from_fields(context.datasource,
@@ -115,6 +117,14 @@ module ForestAdminAgent
         end
 
         private
+
+        def ensure_served_action(context)
+          served_index = @route_collection.schema[:actions].keys.index(@action_name)
+          return if context.collection.schema[:actions].keys.index(@action_name) == served_index
+
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                "The collection #{context.collection.name} does not have this smart action"
+        end
 
         # Recorded as pending before the action runs and confirmed after, so an action that takes the process
         # down with it still leaves evidence that it started. A failed run is worth recording too — "who tried

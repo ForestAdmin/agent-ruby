@@ -73,6 +73,30 @@ module ForestAdminAgent
         expect(cache.get('forest.users')).to be_nil
       end
 
+      it 'answers nil for a file truncated by a writer that does not rename' do
+        cache.set('forest.users', { '1' => { roleId: 1 } })
+        path = cache_files.first
+        File.binwrite(path, File.binread(path)[0, 5])
+
+        expect(cache.get('forest.users')).to be_nil
+      end
+
+      it 'answers nil for an empty file' do
+        cache.set('forest.users', 'value')
+        File.write(cache_files.first, '')
+
+        expect(cache.get('forest.users')).to be_nil
+      end
+
+      it 'clears even when another process already removed the cache' do
+        cache.set('forest.users', 'value')
+        FileUtils.rm_rf(File.join(root_dir, 'permissions'))
+
+        expect { cache.clear }.not_to raise_error
+        expect(cache.get('forest.users')).to be_nil
+        expect(Dir.exist?(File.join(root_dir, 'permissions'))).to be true
+      end
+
       it 'deletes a key that is not cached without raising' do
         expect { cache.delete('forest.users') }.not_to raise_error
       end
@@ -80,13 +104,16 @@ module ForestAdminAgent
       context 'with an expiry' do
         let(:expiry) { 60 }
 
-        it 'drops an expired value' do
+        it 'ignores an expired value and leaves it for the next write to replace' do
           cache.set('forest.users', 'value')
           path = cache_files.first
           File.utime(Time.now - 61, Time.now - 61, path)
 
           expect(cache.get('forest.users')).to be_nil
-          expect(File.exist?(path)).to be false
+          expect(File.exist?(path)).to be true
+
+          cache.set('forest.users', 'fresh')
+          expect(cache.get('forest.users')).to eq('fresh')
         end
 
         it 'keeps a fresh value' do

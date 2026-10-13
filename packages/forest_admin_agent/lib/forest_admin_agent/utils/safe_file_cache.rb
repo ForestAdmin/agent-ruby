@@ -7,14 +7,10 @@ module ForestAdminAgent
     class SafeFileCache < FileCache
       def get(key)
         path = path_for(key)
-
-        if expired?(path)
-          FileUtils.rm_f(path)
-          return nil
-        end
+        return nil if expired?(path)
 
         File.open(path, 'rb') { |file| Marshal.load(file) } # rubocop:disable Security/MarshalLoad
-      rescue Errno::ENOENT
+      rescue Errno::ENOENT, ArgumentError, TypeError, EOFError
         nil
       end
 
@@ -31,6 +27,11 @@ module ForestAdminAgent
 
       def delete(key)
         FileUtils.rm_f(path_for(key))
+      end
+
+      def clear
+        FileUtils.rm_rf(get_root)
+        FileUtils.mkdir_p(get_root)
       end
 
       private

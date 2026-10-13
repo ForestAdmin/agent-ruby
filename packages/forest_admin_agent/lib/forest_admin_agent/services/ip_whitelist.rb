@@ -13,7 +13,11 @@ module ForestAdminAgent
 
       def initialize
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        @cache = ForestAdminAgent::Utils::SafeFileCache.new(
+        @cache = self.class.build_cache
+      end
+
+      def self.build_cache
+        ForestAdminAgent::Utils::SafeFileCache.new(
           'ip_whitelist',
           Facades::Container.config_from_cache[:cache_dir].to_s,
           Facades::Container.config_from_cache[:permission_expiration]
@@ -21,12 +25,7 @@ module ForestAdminAgent
       end
 
       def self.invalidate_cache
-        cache = ForestAdminAgent::Utils::SafeFileCache.new(
-          'ip_whitelist',
-          Facades::Container.config_from_cache[:cache_dir].to_s,
-          Facades::Container.config_from_cache[:permission_expiration]
-        )
-        cache.delete(CACHE_KEY)
+        build_cache.delete(CACHE_KEY)
       end
 
       def use_ip_whitelist

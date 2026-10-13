@@ -1473,24 +1473,6 @@ module ForestAdminAgent
           ).to be true
         end
 
-        it 'throws when the action is unknown' do
-          declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'single') })
-          grant_trigger
-
-          expect do
-            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'fake-smart-action')
-          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
-        end
-
-        it 'throws when the collection declares no action' do
-          declare_actions(book, {})
-          grant_trigger
-
-          expect do
-            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
-          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
-        end
-
         it 'hands the collection schema action scope to the smart action checker' do
           declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'global') })
           grant_trigger
