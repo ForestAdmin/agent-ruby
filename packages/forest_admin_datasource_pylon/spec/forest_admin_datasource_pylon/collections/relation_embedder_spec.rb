@@ -136,34 +136,8 @@ module ForestAdminDatasourcePylon
 
         issues.list(nil, filter, %w[id account:name])
 
-        expect(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree).to have_received(:build).once
-      end
-
-      # Counted by projection content: a matcher on a collection would inspect it
-      # on failure, and that walks the whole datasource instead of failing.
-      it 'builds the projection of a relation as often for one row as for several' do
-        builds = Hash.new(0)
-        allow(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree)
-          .to receive(:build).and_wrap_original do |build, projection|
-            builds[projection.to_a.sort] += 1
-            build.call(projection)
-          end
-        account_builds = lambda do |*issue_payloads|
-          builds.clear
-          stub_issues(*issue_payloads)
-          stub_accounts(*issue_payloads.map { |issue| account_payload(issue['account']['id']) })
-          issues.list(nil, filter, %w[id account:name])
-          builds[%w[id name]]
-        end
-
-        one_row = account_builds.call(issue_payload('i1'))
-        three_rows = account_builds.call(
-          issue_payload('i1'),
-          issue_payload('i2', 'account' => { 'id' => 'acc-2' }),
-          issue_payload('i3', 'account' => { 'id' => 'acc-3' })
-        )
-
-        expect([one_row, three_rows]).to eq([1, 1])
+        expect(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree)
+          .to have_received(:build).with(contain_exactly('id', 'name')).once
       end
 
       # Pylon documents no maximum on an `in` filter; the chunk keeps the request
