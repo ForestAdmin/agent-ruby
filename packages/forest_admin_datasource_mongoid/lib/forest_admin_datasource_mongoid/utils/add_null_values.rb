@@ -43,17 +43,18 @@ module ForestAdminDatasourceMongoid
 
         tree.each do |key, sub_tree|
           result[key] ||= nil
-          value = result[key]
-          next unless sub_tree
-
-          if value.is_a?(Array)
-            result[key] = value.map { |item| item.is_a?(Hash) ? fill_null_values(item, sub_tree) : item }
-          elsif value.is_a?(Hash)
-            result[key] = fill_null_values(value, sub_tree)
-          end
+          result[key] = fill_nested_null_values(result[key], sub_tree) if sub_tree
         end
 
         remove_not_exist_record(result)
+      end
+
+      def fill_nested_null_values(value, sub_tree)
+        case value
+        when Array then value.map { |item| item.is_a?(Hash) ? fill_null_values(item, sub_tree) : item }
+        when Hash then fill_null_values(value, sub_tree)
+        else value
+        end
       end
     end
   end
