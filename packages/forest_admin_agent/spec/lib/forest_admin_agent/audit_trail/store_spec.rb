@@ -32,7 +32,7 @@ module ForestAdminAgent
         store.append(record)
 
         expect(store.send(:model).column_names.sort).to eq(
-          %w[action_name collection correlation_key id new_values operation previous_record_id previous_values
+          %w[action_name collection correlation_key id new_values operation previous_values
              record_id status timestamp user_email user_first_name user_id user_last_name]
         )
       end
@@ -219,7 +219,22 @@ module ForestAdminAgent
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_logs_migration ORDER BY name')
-        expect(names).to eq(['001-create-audit-logs'])
+        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id])
+      end
+
+      # A table created by a release that still kept the column loses it on the next boot, rows intact.
+      it 'drops previous_record_id from a table an earlier release created' do
+        Sql::AuditConnectionBase.connect_to(adapter: 'sqlite3', database: db.path)
+        Sql::Migrations::ALL.first[:up].call(connection, 'audit_logs')
+        connection.create_table('audit_logs_migration', id: false) { |t| t.string :name, null: false }
+        connection.execute("INSERT INTO audit_logs_migration (name) VALUES ('001-create-audit-logs')")
+        connection.execute('INSERT INTO audit_logs (timestamp, operation, collection, record_id, status) ' \
+                           "VALUES ('2026-01-02 03:04:05', 'update', 'accounts', '1', 'done')")
+
+        store.connect!
+
+        expect(connection.column_exists?('audit_logs', :previous_record_id)).to be false
+        expect(store.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
       end
 
       # One tracker per audited table, so a second store does not read the first one's history as its own.
@@ -230,7 +245,8 @@ module ForestAdminAgent
         expect { other.append(record) }.not_to raise_error
         expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
         expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
-        expect(connection.select_values('SELECT name FROM other_logs_migration')).to eq(['001-create-audit-logs'])
+        expect(connection.select_values('SELECT name FROM other_logs_migration'))
+          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id])
       end
 
       # Every write sets it, so a row without one is a bug rather than a row quietly claiming to be done.

@@ -185,8 +185,8 @@ Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent tr
 
 **A record whose primary key moved starts its history at the move**, as on the Node agent. An update that
 moves a writable primary key files its row under the record's new id, and the rows written before stay under
-the id they were true of; the history and state routes read the requested id only. The `previous_record_id`
-column is still created and left empty, since deployed tables have it.
+the id they were true of; the history and state routes read the requested id only. Migration `002` drops the
+`previous_record_id` column an earlier version kept for this.
 
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
@@ -399,7 +399,6 @@ one table nobody deletes from.
 | `operation`       | `create` / `update` / `delete`                              |
 | `collection`      | audited collection name                                     |
 | `record_id`       | packed record id (primary keys joined by `\|`), TEXT and nullable — a create's pending row has none yet, and a composite id outgrows a varchar |
-| `previous_record_id` | no longer written or read; kept because deployed tables have it |
 | `user_id`         | the Forest user who made the change                         |
 | `user_first_name`, `user_last_name`, `user_email` | denormalised from the caller at write time: who acted then, not whoever holds that id today |
 | `action_name`     | smart-action rows only                                       |
