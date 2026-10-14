@@ -48,11 +48,15 @@ module ForestAdminAgent
         # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
         # row whose new value is out of scope, since that side is tested on its own.
         def withhold_each_side(entry, withholding)
-          # An update that moved a writable primary key files its row under the id the record ended up with,
-          # and keeps the one it had on `previous_record_id`. Each side is tested against the id it was true
-          # of, or the new state's id would decide whether the old state is in scope.
-          before = entry.previous_record_id || entry.record_id
-          kept = in_scope?(entry.previous_values, before, withholding) ? entry : blank(entry, :previous_values)
+          # The row is filed under the id the record ended up with, which says nothing about a writable key the
+          # update may have moved: on the previous side the id answers only for a key never captured, read-only
+          # and so unmoved. A redacted key stays unanswered, which over-withholds an update that kept its key —
+          # the safe side of a move the trail cannot see.
+          kept = if in_scope?(entry.previous_values, entry.record_id, withholding, id_answers_for_keys: false)
+                   entry
+                 else
+                   blank(entry, :previous_values)
+                 end
 
           in_scope?(kept.new_values, after_id(kept), withholding) ? kept : blank(kept, :new_values)
         end

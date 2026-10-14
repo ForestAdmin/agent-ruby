@@ -11,7 +11,7 @@ module ForestAdminAgent
     class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
-      COLUMNS = %i[timestamp operation collection record_id previous_record_id status user_id user_first_name
+      COLUMNS = %i[timestamp operation collection record_id status user_id user_first_name
                    user_last_name user_email action_name correlation_key previous_values new_values].freeze
       AUTHOR_COLUMNS = %i[user_id user_first_name user_last_name user_email].freeze
 
@@ -124,24 +124,6 @@ module ForestAdminAgent
         authors(timeline_scope(collections, **filters))
       end
 
-      # The ids this record was renamed from, each with the moment it stopped being that id. Walking those back
-      # is what lets a history query reach rows written before a rename — they stay under the id they were
-      # written with, since that is the id they were true of — and the moment bounds how far: the id it left may
-      # have been taken by another record afterwards, whose rows are none of this record's business.
-      def renamed_from(collection:, record_id:)
-        model.where(collection: collection, record_id: record_id)
-             .where.not(previous_record_id: nil)
-             .pluck(:previous_record_id, :timestamp, :id)
-             .group_by(&:first)
-             .map do |id, rows|
-               # The row id comes along as the tie-breaker: the trail orders itself by (timestamp, id), so a
-               # bound that knew only the timestamp would mean something slightly different from "before".
-               _, at, row = rows.max_by { |(_, timestamp, row_id)| [timestamp, row_id] }
-
-               { id: id, until: as_iso(at), until_row: row }
-             end
-      end
-
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
       # Strictly after, so an entry stamped exactly at the requested instant counts as part of that state
       # instead of being reverted out of it.
@@ -151,7 +133,7 @@ module ForestAdminAgent
       # cannot act on them.
       def list_since(collection:, record_id:, timestamp:)
         model.where(collection: collection, status: Recording::DONE)
-             .where(*segments_condition(record_id))
+             .where(record_id: record_id)
              .where('timestamp > ?', as_time(timestamp))
              .order(timestamp: :desc, id: :desc)
              .map { |row| from_row(row) }
@@ -174,7 +156,7 @@ module ForestAdminAgent
       # Every filter is an AND, so the count matches exactly what a page of this history holds.
       def scope(collection, record_id, user_ids: nil, operations: nil, start_timestamp: nil, end_timestamp: nil,
                 fields: nil, search: nil)
-        relation = model.where(collection: collection).where(*segments_condition(record_id))
+        relation = model.where(collection: collection).where(record_id: record_id)
         relation = relation.where(user_id: user_ids) if user_ids
         relation = relation.where(operation: operations) if operations
         relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
@@ -220,34 +202,6 @@ module ForestAdminAgent
 
       def as_time(value)
         value.is_a?(::Time) ? value : ::Time.iso8601(value.to_s)
-      end
-
-      def as_iso(value)
-        value.respond_to?(:iso8601) ? value.iso8601(3) : value.to_s
-      end
-
-      # One record's history is its current id plus every id it was renamed from, each earlier one only up to
-      # the rename: `record_id = '7' OR (record_id = '1' AND timestamp <= …)`. A plain `IN` would hand over the
-      # rows of whichever record holds that id now.
-      #
-      # Takes an id, several, or segments — `{ id:, until: }` — so a caller that has no rename to care about
-      # simply passes the id.
-      def segments_condition(record_id)
-        binds = []
-        sql = Array(record_id).map { |value| value.is_a?(Hash) ? value : { id: value, until: nil } }.map do |segment|
-          binds << segment[:id]
-          next 'record_id = ?' unless segment[:until]
-
-          binds << as_time(segment[:until])
-          # Same millisecond as the rename, and the id says which side of it a row falls on: another record
-          # taking the abandoned key that fast would otherwise land in this record's history.
-          next '(record_id = ? AND timestamp <= ?)' unless segment[:until_row]
-
-          binds << as_time(segment[:until]) << segment[:until_row]
-          '(record_id = ? AND (timestamp < ? OR (timestamp = ? AND id <= ?)))'
-        end
-
-        [sql.join(' OR '), *binds]
       end
 
       def model

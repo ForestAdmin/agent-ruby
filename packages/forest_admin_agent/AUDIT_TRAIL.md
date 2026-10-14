@@ -183,21 +183,10 @@ the merge tiebreaker.
 Inside the value objects: a record's column names pass through untouched, while an action answer's keys are
 Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent transforms them on write.
 
-**A record that was renamed keeps one timeline** — on this agent. The Node agent files an update under the
-record's new id too, but has no `previous_record_id` and so cannot walk back past the rename: the same record
-shows a complete chain here and a history beginning at the rename there, until that column is ported.
- An update that moves a writable primary key files its row
-under the record's new id — the id later lookups use — and remembers the one it left. Both the history and the
-state routes walk that back, so asking for the current id returns everything the record has ever been filed
-under, rather than starting the story at the rename.
-
-Each earlier id counts only **up to the moment it was left**, because a primary key a record abandons can be
-taken by another record afterwards, and those rows are none of this record's business. What the trail cannot
-separate is the opposite case: rows written under an id *before* the record that holds it now arrived — a
-reused key, or a delete followed by a recreate — since the packed id is the only identity the trail has. That
-is deliberate for delete/recreate (the state reconstruction walks into an earlier life on purpose) and the
-same limitation for a reused key. Telling those apart needs a lineage of its own on every row, which is a
-bigger change than this one.
+**A record whose primary key moved starts its history at the move**, as on the Node agent. An update that
+moves a writable primary key files its row under the record's new id, and the rows written before stay under
+the id they were true of; the history and state routes read the requested id only. The `previous_record_id`
+column is still created and left empty, since deployed tables have it.
 
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
@@ -216,10 +205,11 @@ are withheld: `nil` there is a missing answer, not a passing one, and a redacted
 Primary keys are the exception: the packed id fills in whatever the snapshot cannot answer — a read-only key
 it never captured, or a writable one the trail redacts — so a scope on the id still matches the record it
 belongs to. It fills in only what is missing: where a side captured the key itself, that value is the one
-that was true there. Each side of an update is read against the id it was filed under, the row's own id and,
-for the previous side of an update that moved the key, the id it moved from. A `pending` row is filed under
-the id the record had *before* the write, which may not have landed, so its new side is given no id to fill
-from and answers with what it captured or not at all.
+that was true there. The row's id answers only for the side it was filed under, as on the Node agent: a
+create, a delete, an update's new side. On an update's previous side it fills a key never captured (read-only,
+so it cannot have moved) but not a redacted one (writable, so it may have), and that side is withheld from a
+scope on a redacted key. A `pending` row is filed under the id the record had *before* the write, which may
+not have landed, so its new side is given no id to fill from and answers with what it captured or not at all.
 
 Neither failure this can meet is fatal, and each costs only what it actually broke. An id that stopped
 decoding when the primary key changed shape costs the keys it would have filled and nothing more, so a scope
@@ -373,7 +363,7 @@ one table nobody deletes from.
 | `operation`       | `create` / `update` / `delete`                              |
 | `collection`      | audited collection name                                     |
 | `record_id`       | packed record id (primary keys joined by `\|`), TEXT and nullable — a create's pending row has none yet, and a composite id outgrows a varchar |
-| `previous_record_id` | set only on an update that moved a writable primary key: the id the row was filed under before |
+| `previous_record_id` | no longer written or read; kept because deployed tables have it |
 | `user_id`         | the Forest user who made the change                         |
 | `user_first_name`, `user_last_name`, `user_email` | denormalised from the caller at write time: who acted then, not whoever holds that id today |
 | `action_name`     | smart-action rows only                                       |
