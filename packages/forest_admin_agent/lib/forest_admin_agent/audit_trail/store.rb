@@ -124,6 +124,18 @@ module ForestAdminAgent
         authors(timeline_scope(collections, **filters))
       end
 
+      # The id's latest confirmed `delete` or `create`, in the trail's (timestamp, id) order: where the life of
+      # the record holding the id now began. Nil when no life under that id ever ended or began. A pending row
+      # may never have landed, so it marks nothing.
+      def life_boundary_of(collection:, record_id:)
+        row = model.where(collection: collection, record_id: record_id, operation: %w[delete create],
+                          status: Recording::DONE)
+                   .order(timestamp: :desc, id: :desc)
+                   .first
+
+        row && from_row(row)
+      end
+
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
       # Strictly after, so an entry stamped exactly at the requested instant counts as part of that state
       # instead of being reverted out of it.

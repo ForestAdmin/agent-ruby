@@ -7,9 +7,10 @@ module ForestAdminAgent
       # since a rule only one of them applies is one lookup away from being no rule at all.
       module AuditTrailWithholding
         # Everything a withholding decision needs, and nothing a request context would drag along: the
-        # collection the rows belong to, the scope to test them against, and the timezone its date
-        # comparisons read in.
-        Withholding = Struct.new(:collection, :scope, :timezone)
+        # collection the rows belong to, the scope to test them against, the timezone its date comparisons read
+        # in, and — for a live record whose id another record held before — the row where its own life began,
+        # so only the rows before it are tested. No boundary means every row is.
+        Withholding = Struct.new(:collection, :scope, :timezone, :boundary)
 
         NULL_EXCLUDING_OPERATORS = [
           ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_EQUAL,
@@ -24,7 +25,16 @@ module ForestAdminAgent
         def withhold_out_of_scope_values(entries, withholding)
           return entries if withholding.scope.nil?
 
-          entries.map { |entry| withhold(entry, withholding) }
+          entries.map { |entry| of_withheld_life?(entry, withholding.boundary) ? withhold(entry, withholding) : entry }
+        end
+
+        # A boundary `delete` is the earlier record's last row, a boundary `create` the current record's first.
+        def of_withheld_life?(entry, boundary)
+          return true if boundary.nil?
+          return boundary.operation == 'delete' if entry.id == boundary.id
+
+          ([::Time.iso8601(entry.timestamp.to_s), entry.id.to_i] <=>
+            [::Time.iso8601(boundary.timestamp.to_s), boundary.id.to_i]).negative?
         end
 
         def withhold(entry, withholding)

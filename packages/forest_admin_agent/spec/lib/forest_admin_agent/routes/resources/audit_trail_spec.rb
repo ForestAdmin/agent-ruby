@@ -33,7 +33,7 @@ module ForestAdminAgent
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
           allow(store).to receive_messages(list_by_record: records, count_by_record: records.length,
-                                           authors_by_record: [])
+                                           authors_by_record: [], life_boundary_of: nil)
 
           route = described_class.new
           context = double('context', collection: collection, caller: build_caller, permissions: permissions)
@@ -45,7 +45,7 @@ module ForestAdminAgent
           def state_route(entries: [], record: { 'id' => 4, 'status' => 'shipped' })
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
               .and_return({ audit_trail: { store: store } })
-            allow(store).to receive(:list_since).and_return(entries)
+            allow(store).to receive_messages(list_since: entries, life_boundary_of: nil)
             allow(collection).to receive(:list).and_return([record].compact)
 
             route = described_class.new
@@ -232,6 +232,38 @@ module ForestAdminAgent
               collection: 'projects', record_id: '4',
               timestamp: '2026-01-02T10:00:00.000Z'
             )
+          end
+
+          # The reconstruction before the id was freed and taken is the earlier record's state, and the current
+          # record's scope says nothing about it.
+          describe 'a live record whose id an earlier record held' do
+            let(:boundary) do
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                id: 3, timestamp: '2026-01-02T10:00:00.000Z', operation: 'delete', collection: 'projects',
+                record_id: '4', status: ForestAdminAgent::AuditTrail::Recording::DONE
+              )
+            end
+
+            def state_at(timestamp)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(record: { 'id' => 4, 'status' => 'theirs' })
+              allow(store).to receive(:life_boundary_of).and_return(boundary)
+
+              get_state(route, timestamp: timestamp).dig(:content, :data)
+            end
+
+            it 'withholds a state from before the boundary that fails the scope' do
+              expect(state_at('2026-01-02T09:59:59.999Z')).to be_nil
+            end
+
+            it 'serves a state from after the id was taken' do
+              expect(state_at('2026-01-02T10:00:00.001Z')).to eq({ 'id' => 4, 'status' => 'theirs' })
+            end
+
+            it 'serves the state at the boundary instant, which a replacement create shares' do
+              expect(state_at('2026-01-02T10:00:00.000Z')).to eq({ 'id' => 4, 'status' => 'theirs' })
+            end
           end
 
           it 'returns no data when the record did not exist yet' do
@@ -889,18 +921,97 @@ module ForestAdminAgent
           expect(result[:content][:data].first).to include('operation' => 'delete', 'previousValues' => {})
         end
 
-        it 'does not withhold anything when the record still exists in scope' do
+        it 'does not withhold anything when the record still exists in scope and its id was never freed' do
           scope = Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine')
           allow(permissions).to receive(:get_scope).and_return(scope)
           entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
-            operation: 'delete', collection: 'projects', record_id: '4',
-            previous_values: { 'status' => 'archived' }, new_values: {}
+            operation: 'update', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'archived' }, new_values: { 'status' => 'mine' }
           )
           route = route_with_store(records: [entry])
 
           result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
           expect(result[:content][:data].first['previousValues']).to eq({ 'status' => 'archived' })
+        end
+
+        # A delete frees the id and a later record can take it. Being allowed to read the record that holds it
+        # now is no claim on the rows filed under it before.
+        describe 'a live record whose id an earlier record held' do
+          let(:scope) { Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine') }
+          let(:earlier_update) do
+            audit_row(2, '2026-01-02T10:00:00.000Z', 'update', previous_values: { 'status' => 'their secret' },
+                                                               new_values: { 'status' => 'their other secret' })
+          end
+          let(:earlier_delete) do
+            audit_row(3, '2026-01-02T11:00:00.000Z', 'delete', previous_values: { 'status' => 'their other secret' })
+          end
+          let(:current_create) do
+            audit_row(4, '2026-01-02T12:00:00.000Z', 'create', new_values: { 'status' => 'mine' })
+          end
+          let(:current_update) do
+            audit_row(5, '2026-01-02T13:00:00.000Z', 'update', previous_values: { 'status' => 'mine' },
+                                                               new_values: { 'status' => 'mine' })
+          end
+          let(:rows) { [current_update, current_create, earlier_delete, earlier_update] }
+
+          def audit_row(id, timestamp, operation, previous_values: {}, new_values: {})
+            ForestAdminAgent::AuditTrail::AuditRecord.new(
+              id: id, timestamp: timestamp, operation: operation, collection: 'projects', record_id: '4',
+              status: ForestAdminAgent::AuditTrail::Recording::DONE,
+              previous_values: previous_values, new_values: new_values
+            )
+          end
+
+          def history(boundary, params = {})
+            allow(permissions).to receive(:get_scope).and_return(scope)
+            route = route_with_store(records: rows)
+            allow(store).to receive(:life_boundary_of).and_return(boundary)
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', **params } })
+          end
+
+          def values_by_id(result)
+            result[:content][:data].to_h { |row| [row['id'], [row['previousValues'], row['newValues']]] }
+          end
+
+          it 'withholds the earlier record values and serves the current record' do
+            served = values_by_id(history(current_create))
+
+            expect(served[2]).to eq([{}, {}])
+            expect(served[3]).to eq([{}, {}])
+            expect(served[4]).to eq([{}, { 'status' => 'mine' }])
+            expect(served[5]).to eq([{ 'status' => 'mine' }, { 'status' => 'mine' }])
+          end
+
+          it 'counts a confirmed delete as the earlier record last row' do
+            served = values_by_id(history(earlier_delete))
+
+            expect(served[3]).to eq([{}, {}])
+            expect(served[4]).to eq([{}, { 'status' => 'mine' }])
+          end
+
+          it 'matches a search on the values served, so it cannot find the earlier record values' do
+            content = history(current_create, 'search' => 'secret')[:content]
+
+            expect(content[:data]).to be_empty
+            expect(content[:meta][:count]).to eq(0)
+          end
+
+          it 'serves the whole history of an id that was never freed' do
+            served = values_by_id(history(nil))
+
+            expect(served[2]).to eq([{ 'status' => 'their secret' }, { 'status' => 'their other secret' }])
+          end
+
+          it 'does not look for a boundary without a scope in effect' do
+            allow(permissions).to receive(:get_scope).and_return(nil)
+            route = route_with_store(records: rows)
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+            expect(store).not_to have_received(:life_boundary_of)
+          end
         end
 
         describe 'meta.availableUsers' do

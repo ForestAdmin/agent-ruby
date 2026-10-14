@@ -78,6 +78,21 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
+        # How to withhold the rows served for this id. A record gone at either look has all its rows tested
+        # against the caller's scope. A live one in scope still has the rows filed before it took the id: a
+        # delete frees an id, and a confirmed `create` marks where a record took one freed without a confirmed
+        # delete — a primary-key move, or a delete that never confirmed. Those rows are another record's, which
+        # the current one's scope says nothing about.
+        def withholding_of(context, collection, packed_id, gone_at_check)
+          gone_scope = withholding_scope_for(context, collection, packed_id, gone_at_check)
+          return Withholding.new(collection, gone_scope, context.caller.timezone) if gone_scope
+
+          scope = context.permissions.get_scope(collection)
+          boundary = scope && store.life_boundary_of(collection: collection.name, record_id: packed_id)
+
+          Withholding.new(collection, boundary && scope, context.caller.timezone, boundary)
+        end
+
         def available_user(author)
           { id: author[:user_id], firstName: author[:user_first_name],
             lastName: author[:user_last_name], email: author[:user_email] }

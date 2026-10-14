@@ -84,14 +84,23 @@ module ForestAdminAgent
           # Asked again now, for the same reason the history route asks, and the same way: the record read
           # above can be deleted — or an id that was gone then be taken by somebody else's record — while the
           # audit read is in flight.
-          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
-                                                    gone_at_check)
+          withholding = withholding_of(context, context.collection, args[:params]['id'], gone_at_check)
 
           { name: args[:params]['collection_name'],
-            content: { data: answerable_state(state, withholding_scope, context, args[:params]['id']) } }
+            content: { data: answerable_state(state, state_scope(withholding, timestamp), context,
+                                              args[:params]['id']) } }
         end
 
         private
+
+        # The whole reconstruction belongs to an earlier record when it stands strictly before the boundary. At
+        # the boundary's own instant it already reflects every row there, a replacement `create` sharing it
+        # included, so it is the current record's.
+        def state_scope(withholding, timestamp)
+          return withholding.scope if withholding.boundary.nil?
+
+          withholding.scope if ::Time.iso8601(timestamp) < ::Time.iso8601(withholding.boundary.timestamp.to_s)
+        end
 
         # The history route withholds a gone record's captured values from a caller whose scope they fail, and
         # this route is nothing but those values reassembled: without the same test they come back one request
@@ -127,8 +136,8 @@ module ForestAdminAgent
           count = store.count_by_record(**filters)
           withholding = withholding_for(context, args, gone_at_check)
 
-          # Gone between the check and the read: this answer withholds, so the rows, count and authors matched
-          # in SQL above must not decide what is served either.
+          # Gone between the check and the read, or carrying an earlier record's rows: this answer withholds, so
+          # the rows, count and authors matched in SQL above must not decide what is served either.
           if withholding.scope && filters.slice(:search, :fields).any?
             return history_matched_after_withholding(context, args, filters, gone_at_check, withholding)
           end
@@ -182,10 +191,7 @@ module ForestAdminAgent
         # Asked again now, because the check above ran before these rows were read: a record deleted in
         # between answered "present and in scope" for rows that already carry its delete.
         def withholding_for(context, args, gone_at_check)
-          withholding_scope = withholding_scope_for(context, context.collection, args[:params]['id'],
-                                                    gone_at_check)
-
-          Withholding.new(context.collection, withholding_scope, context.caller.timezone)
+          withholding_of(context, context.collection, args[:params]['id'], gone_at_check)
         end
 
         def matches_value_filters?(entry, search: nil, fields: nil)

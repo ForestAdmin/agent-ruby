@@ -28,7 +28,8 @@ module ForestAdminAgent
         def route_with_store(history: [])
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
-          allow(store).to receive_messages(list_by_correlation: history, list_by_correlations: history)
+          allow(store).to receive_messages(list_by_correlation: history, list_by_correlations: history,
+                                           life_boundary_of: nil)
 
           route = described_class.new
           datasource = double('datasource')
@@ -50,6 +51,32 @@ module ForestAdminAgent
           end.to raise_error(Http::Exceptions::NotFoundError)
 
           expect(store).not_to have_received(:list_by_correlation)
+        end
+
+        # A live record in scope does not vouch for the rows filed under its id before it took the id.
+        it 'withholds the rows of an earlier record that held the id, on a live record in scope' do
+          allow(permissions).to receive(:get_scope)
+            .and_return(Nodes::ConditionTreeLeaf.new('title', Operators::EQUAL, 'mine'))
+          done = ForestAdminAgent::AuditTrail::Recording::DONE
+          earlier = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            id: 1, timestamp: '2026-01-02T10:00:00.000Z', operation: 'update', collection: 'books', record_id: '2',
+            status: done, previous_values: { 'title' => 'theirs' }, new_values: { 'title' => 'still theirs' }
+          )
+          current = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            id: 3, timestamp: '2026-01-02T12:00:00.000Z', operation: 'update', collection: 'books', record_id: '2',
+            status: done, previous_values: { 'title' => 'mine' }, new_values: { 'title' => 'mine' }
+          )
+          boundary = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            id: 2, timestamp: '2026-01-02T11:00:00.000Z', operation: 'create', collection: 'books', record_id: '2'
+          )
+          route = route_with_store(history: [earlier, current])
+          allow(store).to receive(:life_boundary_of).and_return(boundary)
+
+          data = route.handle_history(
+            { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }
+          )[:content][:data]
+
+          expect(data.map { |row| row['previousValues'] }).to eq([{}, { 'title' => 'mine' }])
         end
 
         # These routes serve the same rows as the per-record history route, so what that route withholds must

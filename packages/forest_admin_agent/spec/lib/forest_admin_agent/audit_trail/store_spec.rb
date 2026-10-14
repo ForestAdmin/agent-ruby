@@ -373,6 +373,36 @@ module ForestAdminAgent
         end
       end
 
+      describe '#life_boundary_of' do
+        def boundary
+          store.life_boundary_of(collection: 'accounts', record_id: '1')&.correlation_key
+        end
+
+        it 'is the latest confirmed delete or create, in (timestamp, id) order' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'delete', timestamp: '2026-01-03T00:00:00.000Z', correlation_key: 'freed'))
+          store.append(record(operation: 'create', timestamp: '2026-01-03T00:00:00.000Z', correlation_key: 'retaken'))
+          store.append(record(operation: 'update', timestamp: '2026-01-04T00:00:00.000Z', correlation_key: 'later'))
+
+          expect(boundary).to eq('retaken')
+        end
+
+        it 'ignores a pending row, which may never have landed' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'delete', status: Recording::PENDING, timestamp: '2026-01-03T00:00:00.000Z',
+                              correlation_key: 'unconfirmed'))
+
+          expect(boundary).to eq('first')
+        end
+
+        it 'is nil for an id no life ever began or ended under, and for another id' do
+          store.append(record(operation: 'update'))
+          store.append(record(operation: 'delete', record_id: '2'))
+
+          expect(boundary).to be_nil
+        end
+      end
+
       describe 'searching free text' do
         def matching_search(term)
           store.list_by_record(collection: 'accounts', record_id: '1', search: term).map(&:correlation_key)
