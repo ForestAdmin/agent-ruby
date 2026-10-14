@@ -312,6 +312,13 @@ module ForestAdminAgent
           expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
         end
 
+        it 'allows every collection without reading the permissions when the permission system is off' do
+          @permissions.cache.set('forest.has_permission', { enable: false })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable, unreadable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data)
+        end
+
         it 'does not refetch when every collection is allowed' do
           @permissions.allowed_collections(:read, [readable])
 

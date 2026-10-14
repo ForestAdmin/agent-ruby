@@ -125,15 +125,16 @@ module ForestAdminAgent
       end
 
       # The id's latest confirmed `delete` or `create`, in the trail's (timestamp, id) order: where the life of
-      # the record holding the id now began. Nil when no life under that id ever ended or began. A pending row
-      # may never have landed, so it marks nothing.
+      # the record holding the id now began. A pending row may never have landed, so it marks nothing. Nil when
+      # the id has had one life only — no boundary at all, or a `create` with nothing filed before it — so a
+      # record created through Forest does not pay for the earlier-life withholding it can never need.
       def life_boundary_of(collection:, record_id:)
-        row = model.where(collection: collection, record_id: record_id, operation: %w[delete create],
-                          status: Recording::DONE)
-                   .order(timestamp: :desc, id: :desc)
-                   .first
+        rows = model.where(collection: collection, record_id: record_id)
+        row = rows.where(operation: %w[delete create], status: Recording::DONE).order(timestamp: :desc, id: :desc).first
+        return nil if row.nil?
+        return nil if row.operation == 'create' && !rows.where(*before_row_condition(row)).exists?
 
-        row && from_row(row)
+        from_row(row)
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
@@ -165,33 +166,33 @@ module ForestAdminAgent
 
       private
 
-      # Every filter is an AND, so the count matches exactly what a page of this history holds.
-      def scope(collection, record_id, user_ids: nil, operations: nil, start_timestamp: nil, end_timestamp: nil,
-                fields: nil, search: nil)
-        relation = model.where(collection: collection).where(record_id: record_id)
+      def scope(collection, record_id, fields: nil, **filters)
+        relation = filtered(model.where(collection: collection, record_id: record_id), **filters)
+        relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
+        relation
+      end
+
+      # Each cursor bound and the date filter on its side are both inclusive, so the tighter one wins.
+      def timeline_scope(collections, before: nil, after: nil, exclude_ids: nil, start_timestamp: nil,
+                         end_timestamp: nil, **filters)
+        relation = filtered(model.where(collection: collections),
+                            start_timestamp: [start_timestamp, after].compact.max_by { |bound| as_time(bound) },
+                            end_timestamp: [end_timestamp, before].compact.min_by { |bound| as_time(bound) },
+                            **filters)
+        relation = relation.where.not(id: exclude_ids) if exclude_ids&.any?
+        relation
+      end
+
+      # The filters the per-record history and the timeline share, so they cannot drift apart. Every one is an
+      # AND, so the count matches exactly what a page holds.
+      def filtered(relation, user_ids: nil, operations: nil, search: nil, start_timestamp: nil, end_timestamp: nil)
         relation = relation.where(user_id: user_ids) if user_ids
         relation = relation.where(operation: operations) if operations
-        relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
         relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
         # Compare as Time so ActiveRecord casts the bound to the datetime column's storage format
         # (raw ISO strings with a `Z` would compare lexically against the cast rows and never match).
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp
         relation = relation.where('timestamp <= ?', as_time(end_timestamp)) if end_timestamp
-        relation
-      end
-
-      # Each cursor bound and the date filter on its side are both inclusive, so the tighter one wins.
-      def timeline_scope(collections, before: nil, after: nil, exclude_ids: nil, user_ids: nil, operations: nil,
-                         start_timestamp: nil, end_timestamp: nil, search: nil)
-        relation = model.where(collection: collections)
-        relation = relation.where(user_id: user_ids) if user_ids
-        relation = relation.where(operation: operations) if operations
-        relation = relation.where.not(id: exclude_ids) if exclude_ids&.any?
-        relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
-        lower = [start_timestamp, after].compact.map { |bound| as_time(bound) }.max
-        upper = [end_timestamp, before].compact.map { |bound| as_time(bound) }.min
-        relation = relation.where('timestamp >= ?', lower) if lower
-        relation = relation.where('timestamp <= ?', upper) if upper
         relation
       end
 
@@ -201,6 +202,13 @@ module ForestAdminAgent
                 .pluck(*AUTHOR_COLUMNS)
                 .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
                 .uniq { |author| author[:user_id] }
+      end
+
+      # Rows strictly before `row` in the trail's (timestamp, id) order.
+      def before_row_condition(row)
+        at = as_time(row.timestamp)
+
+        ['timestamp < ? OR (timestamp = ? AND id < ?)', at, at, row.id]
       end
 
       # Rows strictly past `row` in the history's own order, so a scan keyed on the last row it read neither

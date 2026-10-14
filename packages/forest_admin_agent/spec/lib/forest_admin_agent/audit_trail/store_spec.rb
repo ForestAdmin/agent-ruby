@@ -404,11 +404,27 @@ module ForestAdminAgent
         end
 
         it 'ignores a pending row, which may never have landed' do
+          store.append(record(operation: 'update', timestamp: '2026-01-01T00:00:00.000Z', correlation_key: 'earlier'))
           store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
           store.append(record(operation: 'delete', status: Recording::PENDING, timestamp: '2026-01-03T00:00:00.000Z',
                               correlation_key: 'unconfirmed'))
 
           expect(boundary).to eq('first')
+        end
+
+        # A record created through Forest has its own create as the latest boundary. It began the only life the
+        # id has had, so treating it as a boundary would only cost every scoped search a full-history scan.
+        it 'is nil for a create with nothing filed before it' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z'))
+          store.append(record(operation: 'update', timestamp: '2026-01-03T00:00:00.000Z'))
+
+          expect(boundary).to be_nil
+        end
+
+        it 'counts a delete as a boundary even with nothing before it, since it ends a life' do
+          store.append(record(operation: 'delete', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'freed'))
+
+          expect(boundary).to eq('freed')
         end
 
         it 'is nil for an id no life ever began or ended under, and for another id' do
