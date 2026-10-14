@@ -80,6 +80,11 @@ module ForestAdminAgent
           ::ForestAdminAgent::AuditTrail.store
         end
 
+        def available_user(author)
+          { id: author[:user_id], firstName: author[:user_first_name],
+            lastName: author[:user_last_name], email: author[:user_email] }
+        end
+
         # Every id this record has been filed under, each with the moment it stopped being that id. Rows
         # written before an update moved a writable primary key stay under the id they were true of, so a
         # history query that asked for the current id alone would start at the rename and call that the whole

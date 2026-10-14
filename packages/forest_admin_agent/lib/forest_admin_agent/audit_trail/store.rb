@@ -100,13 +100,28 @@ module ForestAdminAgent
       # as they were when they acted.
       def authors_by_record(collection:, record_id:, user_ids: nil, operations: nil, start_timestamp: nil,
                             end_timestamp: nil, fields: nil, search: nil)
-        scope(collection, record_id, user_ids: user_ids, operations: operations, start_timestamp: start_timestamp,
-                                     end_timestamp: end_timestamp, fields: fields, search: search)
-          .where.not(user_id: nil)
-          .distinct
-          .pluck(*AUTHOR_COLUMNS)
-          .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
-          .uniq { |author| author[:user_id] }
+        authors(scope(collection, record_id, user_ids: user_ids, operations: operations,
+                                             start_timestamp: start_timestamp, end_timestamp: end_timestamp,
+                                             fields: fields, search: search))
+      end
+
+      # The project-level timeline across `collections`, the ones the caller may read: newest first, or oldest
+      # first with `order: 'asc'`, ties broken by id in the same direction. `before` / `after` are the cursor's
+      # inclusive bound and `exclude_ids` the rows already served at it.
+      def list_timeline(collections:, limit:, order: 'desc', **filters)
+        return [] if collections.empty?
+
+        direction = order.to_s == 'asc' ? :asc : :desc
+
+        timeline_scope(collections, **filters).order(timestamp: direction, id: direction).limit(limit)
+                                              .map { |row| from_row(row) }
+      end
+
+      # The distinct authors of the timeline the filters match, whatever the cursor.
+      def timeline_users(collections:, **filters)
+        return [] if collections.empty?
+
+        authors(timeline_scope(collections, **filters))
       end
 
       # The ids this record was renamed from, each with the moment it stopped being that id. Walking those back
@@ -169,6 +184,29 @@ module ForestAdminAgent
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp
         relation = relation.where('timestamp <= ?', as_time(end_timestamp)) if end_timestamp
         relation
+      end
+
+      # Each cursor bound and the date filter on its side are both inclusive, so the tighter one wins.
+      def timeline_scope(collections, before: nil, after: nil, exclude_ids: nil, user_ids: nil, operations: nil,
+                         start_timestamp: nil, end_timestamp: nil, search: nil)
+        relation = model.where(collection: collections)
+        relation = relation.where(user_id: user_ids) if user_ids
+        relation = relation.where(operation: operations) if operations
+        relation = relation.where.not(id: exclude_ids) if exclude_ids&.any?
+        relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
+        lower = [start_timestamp, after].compact.map { |bound| as_time(bound) }.max
+        upper = [end_timestamp, before].compact.map { |bound| as_time(bound) }.min
+        relation = relation.where('timestamp >= ?', lower) if lower
+        relation = relation.where('timestamp <= ?', upper) if upper
+        relation
+      end
+
+      def authors(relation)
+        relation.where.not(user_id: nil)
+                .distinct
+                .pluck(*AUTHOR_COLUMNS)
+                .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
+                .uniq { |author| author[:user_id] }
       end
 
       # Rows strictly past `row` in the history's own order, so a scan keyed on the last row it read neither

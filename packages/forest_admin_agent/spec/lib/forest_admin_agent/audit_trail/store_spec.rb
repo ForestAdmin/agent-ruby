@@ -121,6 +121,62 @@ module ForestAdminAgent
         expect(store.authors_by_record(**filters).map { |author| author[:user_id] }).to contain_exactly(7, 9)
       end
 
+      describe '#list_timeline' do
+        def timeline(**query)
+          store.list_timeline(collections: %w[accounts orders], limit: 10, **query).map(&:correlation_key)
+        end
+
+        before do
+          store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a'))
+          store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'b', collection: 'orders'))
+          store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'c'))
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'hidden', collection: 'staff'))
+        end
+
+        it 'lists every given collection newest first, ties by descending id' do
+          expect(timeline).to eq(%w[c b a])
+        end
+
+        it 'walks oldest first on order asc, ties by ascending id' do
+          expect(timeline(order: 'asc')).to eq(%w[a b c])
+        end
+
+        it 'matches nothing for an empty collection list' do
+          expect(store.list_timeline(collections: [], limit: 10)).to eq([])
+        end
+
+        it 'keeps the rows at an inclusive bound, minus the ids already served there' do
+          served = store.list_timeline(collections: %w[accounts orders], limit: 10)
+                        .find { |row| row.correlation_key == 'c' }
+
+          expect(timeline(before: '2026-01-02T03:04:06.000Z', exclude_ids: [served.id])).to eq(%w[b a])
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:06.000Z')).to eq(%w[b c])
+        end
+
+        it 'keeps the tighter of a cursor bound and the date filter on its side' do
+          expect(timeline(before: '2026-01-02T03:04:06.000Z', end_timestamp: '2026-01-02T03:04:05.000Z')).to eq(%w[a])
+          expect(timeline(before: '2026-01-02T03:04:05.000Z', end_timestamp: '2026-01-02T03:04:06.000Z')).to eq(%w[a])
+        end
+
+        it 'applies the operations and author filters' do
+          store.append(record(operation: 'delete', user_id: 7, correlation_key: 'd'))
+
+          expect(timeline(operations: %w[delete])).to eq(%w[d])
+          expect(timeline(user_ids: [7])).to eq(%w[d])
+        end
+      end
+
+      it 'lists the distinct authors of the timeline across the given collections only' do
+        store.append(record(user_id: 7, user_first_name: 'Jane'))
+        store.append(record(user_id: 8, collection: 'orders'))
+        store.append(record(user_id: 9, collection: 'staff'))
+
+        authors = store.timeline_users(collections: %w[accounts orders])
+
+        expect(authors.map { |author| author[:user_id] }).to contain_exactly(7, 8)
+        expect(authors.find { |author| author[:user_id] == 7 }).to include(user_first_name: 'Jane')
+      end
+
       it 'counts matches independently of skip/limit, respecting filters' do
         store.append(record(user_id: 7))
         store.append(record(user_id: 7))
