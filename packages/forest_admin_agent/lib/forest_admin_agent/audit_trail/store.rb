@@ -73,13 +73,14 @@ module ForestAdminAgent
         model.where(id: ids).delete_all unless ids.empty?
       end
 
-      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, start_timestamp: nil,
-                         end_timestamp: nil, fields: nil, search: nil, order: 'asc', after: nil)
+      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, operations: nil,
+                         start_timestamp: nil, end_timestamp: nil, fields: nil, search: nil, order: 'asc', after: nil)
         descending = order.to_s == 'desc'
         # `id` (insertion order) breaks ties on equal timestamps in both directions, keeping pages
         # deterministic and stable.
-        relation = scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
-                                                end_timestamp: end_timestamp, fields: fields, search: search)
+        relation = scope(collection, record_id, user_ids: user_ids, operations: operations,
+                                                start_timestamp: start_timestamp, end_timestamp: end_timestamp,
+                                                fields: fields, search: search)
                    .order(timestamp: descending ? :desc : :asc, id: :asc)
                    .offset(skip || 0)
         relation = relation.where(*past_row_condition(after, descending)) if after
@@ -88,18 +89,18 @@ module ForestAdminAgent
         relation.map { |row| from_row(row) }
       end
 
-      def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+      def count_by_record(collection:, record_id:, user_ids: nil, operations: nil, start_timestamp: nil,
                           end_timestamp: nil, fields: nil, search: nil)
-        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+        scope(collection, record_id, user_ids: user_ids, operations: operations, start_timestamp: start_timestamp,
                                      end_timestamp: end_timestamp, fields: fields, search: search).count
       end
 
       # The distinct authors of the entries the current filters match, whatever page is being asked for. The
       # identity comes from the rows themselves, so a user who has since been renamed or removed still reads
       # as they were when they acted.
-      def authors_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+      def authors_by_record(collection:, record_id:, user_ids: nil, operations: nil, start_timestamp: nil,
                             end_timestamp: nil, fields: nil, search: nil)
-        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+        scope(collection, record_id, user_ids: user_ids, operations: operations, start_timestamp: start_timestamp,
                                      end_timestamp: end_timestamp, fields: fields, search: search)
           .where.not(user_id: nil)
           .distinct
@@ -156,10 +157,11 @@ module ForestAdminAgent
       private
 
       # Every filter is an AND, so the count matches exactly what a page of this history holds.
-      def scope(collection, record_id, user_ids: nil, start_timestamp: nil, end_timestamp: nil,
+      def scope(collection, record_id, user_ids: nil, operations: nil, start_timestamp: nil, end_timestamp: nil,
                 fields: nil, search: nil)
         relation = model.where(collection: collection).where(*segments_condition(record_id))
         relation = relation.where(user_id: user_ids) if user_ids
+        relation = relation.where(operation: operations) if operations
         relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
         relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
         # Compare as Time so ActiveRecord casts the bound to the datetime column's storage format

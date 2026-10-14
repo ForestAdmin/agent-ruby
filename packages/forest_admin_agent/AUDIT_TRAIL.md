@@ -122,6 +122,7 @@ or removed still reads as they were when they acted. Optional filters (all combi
 | query param | format                           | effect                                          |
 | ----------- | -------------------------------- | ----------------------------------------------- |
 | `userIds`   | comma-separated integers `12,45` | keep only entries whose `user_id` is in the list |
+| `operations` | comma-separated, from `create`, `update`, `delete`, `action`, `action_failed` | keep only entries recorded under one of them |
 | `startDate` | `YYYY-MM-DD` or datetime (incl.) | keep entries from this lower bound onward       |
 | `endDate`   | `YYYY-MM-DD` or datetime (incl.) | keep entries up to this upper bound             |
 | `fields`    | comma-separated field names      | keep only entries whose diff touched one of them |
@@ -164,7 +165,9 @@ happens in SQL. Two shapes are accepted:
 
 Both bounds are **inclusive**. Defensive parsing: non-numeric `userIds` tokens are dropped
 (`12,abc,45` → `12,45`), and a `startDate` / `endDate` matching no accepted format returns **HTTP
-400** (`ValidationError`); an invalid `timezone` likewise returns **400**.
+400** (`ValidationError`); an invalid `timezone` likewise returns **400**. An unrecognized
+`operations` value returns **400** rather than being dropped: a silently ignored filter would hand back
+unfiltered rows into a list the caller believes is filtered.
 
 Pagination follows JSON:API: `page[number]` is 1-based (default `1`), `page[size]` defaults to `20`
 and is capped at `100`; out-of-bound or non-numeric values fall back to the defaults rather than

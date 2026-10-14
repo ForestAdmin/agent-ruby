@@ -17,6 +17,7 @@ module ForestAdminAgent
         DATE_ONLY = /\A\d{4}-\d{2}-\d{2}\z/
         # Wall-clock datetime, `T` or space separator, seconds optional: `YYYY-MM-DD[T ]HH:mm[:ss]`.
         DATE_TIME = /\A(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?\z/
+        OPERATIONS = %w[create update delete action action_failed].freeze
 
         def setup_routes
           return self unless store
@@ -284,6 +285,7 @@ module ForestAdminAgent
 
           {
             user_ids: parse_user_ids(args.dig(:params, 'userIds')),
+            operations: parse_operations(args.dig(:params, 'operations')),
             fields: parse_fields(args.dig(:params, 'fields')),
             search: parse_search(args.dig(:params, 'search')),
             start_timestamp: parse_date_boundary(args.dig(:params, 'startDate'), timezone, :start),
@@ -304,6 +306,20 @@ module ForestAdminAgent
 
           names = (raw.is_a?(Array) ? raw : raw.to_s.split(',')).map { |name| name.to_s.strip }.reject(&:empty?)
           names.empty? ? nil : names
+        end
+
+        # Comma-separated, from a closed set. An unrecognized value is rejected rather than dropped: a silently
+        # ignored filter returns unfiltered rows into a list the caller believes is filtered.
+        def parse_operations(raw)
+          tokens = raw.to_s.split(',').map(&:strip).reject(&:empty?)
+          unknown = tokens.find { |token| !OPERATIONS.include?(token) }
+
+          if unknown
+            raise Http::Exceptions::ValidationError,
+                  "Invalid operation: \"#{unknown}\" (expected one of #{OPERATIONS.join(", ")})"
+          end
+
+          tokens.empty? ? nil : tokens
         end
 
         # Comma-separated integer ids; non-numeric tokens are dropped. Empty after parsing → no filter.

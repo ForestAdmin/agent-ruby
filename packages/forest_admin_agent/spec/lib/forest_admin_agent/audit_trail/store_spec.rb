@@ -109,6 +109,18 @@ module ForestAdminAgent
         expect(history.map(&:correlation_key)).to eq(['keep'])
       end
 
+      it 'keeps only the given operations, in the rows, the count and the authors alike' do
+        store.append(record(operation: 'update', user_id: 7, correlation_key: 'u'))
+        store.append(record(operation: 'delete', user_id: 8, correlation_key: 'd'))
+        store.append(record(operation: 'action', user_id: 9, correlation_key: 'a'))
+
+        filters = { collection: 'accounts', record_id: '1', operations: %w[update action] }
+
+        expect(store.list_by_record(**filters).map(&:correlation_key)).to eq(%w[u a])
+        expect(store.count_by_record(**filters)).to eq(2)
+        expect(store.authors_by_record(**filters).map { |author| author[:user_id] }).to contain_exactly(7, 9)
+      end
+
       it 'counts matches independently of skip/limit, respecting filters' do
         store.append(record(user_id: 7))
         store.append(record(user_id: 7))

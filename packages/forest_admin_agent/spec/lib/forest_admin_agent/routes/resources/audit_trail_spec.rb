@@ -1100,6 +1100,36 @@ module ForestAdminAgent
           expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [7, 9]))
         end
 
+        it 'passes an operations filter through to the rows, the count and the authors' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'operations' => 'update, action_failed ,' } })
+
+          %i[list_by_record count_by_record authors_by_record].each do |read|
+            expect(store).to have_received(read).with(hash_including(operations: %w[update action_failed]))
+          end
+        end
+
+        it 'sends no operations filter when the param is absent or empty' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4', 'operations' => ' , ' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_excluding(:operations))
+        end
+
+        it 'rejects an unrecognized operation rather than ignoring it' do
+          route = route_with_store
+
+          expect do
+            route.handle_request({ headers: {},
+                                   params: { 'collection_name' => 'projects', 'id' => '4',
+                                             'operations' => 'update,rename' } })
+          end.to raise_error(Http::Exceptions::ValidationError, /Invalid operation: "rename"/)
+          expect(store).not_to have_received(:list_by_record)
+        end
+
         it 'parses a date range into inclusive UTC boundaries' do
           route = route_with_store
           route.handle_request({ headers: {},
