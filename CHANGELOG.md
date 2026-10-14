@@ -1,3 +1,10 @@
+## [1.45.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.1...v1.45.2) (2026-10-14)
+
+
+### Bug Fixes
+
+* **permissions:** key the rendering cache by rendering id and cut agent v2 per-record and per-request overhead [PRD-1555] ([#407](https://github.com/ForestAdmin/agent-ruby/issues/407)) ([902ebdc](https://github.com/ForestAdmin/agent-ruby/commit/902ebdcd4bc3569c194ffd360c63c629d97e5de7))
+
 ## [1.45.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.0...v1.45.1) (2026-10-10)
 
 
