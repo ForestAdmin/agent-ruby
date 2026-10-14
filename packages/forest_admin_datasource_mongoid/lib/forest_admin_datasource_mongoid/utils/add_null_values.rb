@@ -19,38 +19,37 @@ module ForestAdminDatasourceMongoid
       end
 
       def add_null_values_on_record(record, projection)
-        add_null_values_on_tree(record, projection_tree(projection))
+        fill_null_values(record, build_null_values_tree(projection))
       end
 
       def add_null_values(records, projection)
-        tree = projection_tree(projection)
-        records.filter_map { |record| add_null_values_on_tree(record, tree) }
+        tree = build_null_values_tree(projection)
+        records.filter_map { |record| fill_null_values(record, tree) }
       end
 
       private
 
-      def projection_tree(projection)
-        ForestAdminDatasourceToolkit::Components::Query::ProjectionTree.build(
-          ForestAdminDatasourceToolkit::Components::Query::Projection.new(projection)
-        )
+      def build_null_values_tree(paths)
+        paths.group_by { |path| path.split(':', 2).first }.to_h do |key, key_paths|
+          child_paths = key_paths.filter_map { |path| path.split(':', 2)[1] }
+          [key, child_paths.empty? ? nil : build_null_values_tree(child_paths)]
+        end
       end
 
-      def add_null_values_on_tree(record, tree)
+      def fill_null_values(record, tree)
         return nil if record.nil?
 
         result = record.dup
 
-        tree.columns.each { |column| result[column] ||= nil }
-
-        tree.relations.each do |relation, sub_tree|
-          value = result[relation]
+        tree.each do |key, sub_tree|
+          result[key] ||= nil
+          value = result[key]
+          next unless sub_tree
 
           if value.is_a?(Array)
-            result[relation] = value.map { |child_record| add_null_values_on_tree(child_record, sub_tree) }
+            result[key] = value.map { |item| item.is_a?(Hash) ? fill_null_values(item, sub_tree) : item }
           elsif value.is_a?(Hash)
-            result[relation] = add_null_values_on_tree(value, sub_tree)
-          else
-            result[relation] ||= nil
+            result[key] = fill_null_values(value, sub_tree)
           end
         end
 

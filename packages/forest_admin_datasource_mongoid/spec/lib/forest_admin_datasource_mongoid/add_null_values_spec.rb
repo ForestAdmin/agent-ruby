@@ -107,25 +107,36 @@ module ForestAdminDatasourceMongoid
           expect(result).to eq([{ 'name' => 'John', 'extra' => 1, 'author' => 'raw' }])
         end
 
-        it 'splits the projection paths as many times for one row as for many' do
+        it 'keeps the projection order of the keys at every depth' do
+          result = add_null_values_module.add_null_values([{ 'author' => {} }], ['author:name', 'id', 'author:age'])
+          expect(result.first.keys).to eq(%w[author id])
+          expect(result.first['author'].keys).to eq(%w[name age])
+        end
+
+        it 'leaves array items that are not records as is' do
+          records = [{ 'tags' => ['raw', 1, nil, { 'other' => 1 }] }]
+          result = add_null_values_module.add_null_values(records, ['tags:label'])
+          expect(result.first['tags']).to eq(['raw', 1, nil, { 'other' => 1, 'label' => nil }])
+        end
+
+        it 'resolves the projection paths as many times for one row as for many' do
           build_records = lambda do |count|
             Array.new(count) { { 'id' => 1, 'author' => { 'address' => {} }, 'tags' => [{}, {}] } }
           end
-          count_splits = lambda do |records|
+          count_tree_builds = lambda do |records|
             count = 0
-            projection = ['id', 'name', 'author:name', 'author:address:city', 'tags:label'].map(&:dup)
-            projection.each do |path|
-              allow(path).to receive(:split).and_wrap_original do |original, *args|
-                count += 1
-                original.call(*args)
-              end
+            allow(add_null_values_module).to receive(:build_null_values_tree).and_wrap_original do |original, *args|
+              count += 1
+              original.call(*args)
             end
+            projection = ['id', 'name', 'author:name', 'author:address:city', 'tags:label']
             add_null_values_module.add_null_values(records, projection)
             count
           end
-          one_row = count_splits.call(build_records.call(1))
+          one_row = count_tree_builds.call(build_records.call(1))
 
-          expect(count_splits.call(build_records.call(50))).to eq(one_row)
+          expect(one_row).to be_positive
+          expect(count_tree_builds.call(build_records.call(50))).to eq(one_row)
         end
       end
     end
