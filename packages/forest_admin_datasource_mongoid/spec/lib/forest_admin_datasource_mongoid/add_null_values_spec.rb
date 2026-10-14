@@ -108,9 +108,16 @@ module ForestAdminDatasourceMongoid
         end
 
         it 'keeps the projection order of the keys at every depth' do
-          result = add_null_values_module.add_null_values([{ 'author' => {} }], ['author:name', 'id', 'author:age'])
-          expect(result.first.keys).to eq(%w[author id])
-          expect(result.first['author'].keys).to eq(%w[name age])
+          expect(add_null_values_module.add_null_values([{}], ['author:name', 'id', 'author:age']).first.keys)
+            .to eq(%w[author id])
+
+          result = add_null_values_module.add_null_values([{ 'author' => {} }], ['author:address:city', 'author:name'])
+          expect(result.first['author'].keys).to eq(%w[address name])
+        end
+
+        it 'returns an empty list or nil without a projection when there is nothing to fill' do
+          expect(add_null_values_module.add_null_values([], nil)).to eq([])
+          expect(add_null_values_module.add_null_values_on_record(nil, nil)).to be_nil
         end
 
         it 'leaves array items that are not records as is' do

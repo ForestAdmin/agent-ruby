@@ -19,10 +19,14 @@ module ForestAdminDatasourceMongoid
       end
 
       def add_null_values_on_record(record, projection)
+        return nil if record.nil?
+
         fill_null_values(record, build_null_values_tree(projection))
       end
 
       def add_null_values(records, projection)
+        return [] if records.empty?
+
         tree = build_null_values_tree(projection)
         records.filter_map { |record| fill_null_values(record, tree) }
       end
