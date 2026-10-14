@@ -101,6 +101,47 @@ module ForestAdminAgent
             )
           end
 
+          it 'checks the action the route serves, from a record selection built once' do
+            allow(@action_collection).to receive(:execute).and_return({})
+            allow(ForestAdminAgent::Utils::QueryStringParser).to receive(:parse_condition_tree).and_call_original
+
+            action.handle_request(args)
+
+            expect(permissions).to(have_received(:can_smart_action?) { |*, action_name:| expect(action_name).to eq('foo') })
+            expect(ForestAdminAgent::Utils::QueryStringParser).to have_received(:parse_condition_tree).once
+          end
+
+          describe 'when the collection of the URL does not serve this action' do
+            let(:published_book) { @datasource.get_collection('book') }
+
+            def declare_actions(actions)
+              allow(published_book).to receive(:schema).and_wrap_original do |original|
+                original.call.merge(actions: actions)
+              end
+            end
+
+            it 'refuses a collection without the action' do
+              declare_actions({})
+
+              expect { action.handle_request(args) }.to raise_error(
+                Http::Exceptions::BadRequestError, 'The collection book does not have this smart action'
+              )
+              expect(permissions).not_to have_received(:can_smart_action?)
+            end
+
+            it 'refuses a collection serving the action under another index' do
+              declare_actions({ 'bar' => published_book.schema[:actions]['foo'], 'foo' => published_book.schema[:actions]['foo'] })
+
+              expect { action.handle_request(args) }.to raise_error(Http::Exceptions::BadRequestError)
+            end
+
+            it 'refuses the form hooks too' do
+              declare_actions({})
+
+              expect { action.handle_hook_request(args) }.to raise_error(Http::Exceptions::BadRequestError)
+            end
+          end
+
           context 'when the request contains requester_id' do
             it 'reject with UnprocessableError (prevent forged request)' do
               args[:params][:data][:attributes][:requester_id] = 'requester_id'

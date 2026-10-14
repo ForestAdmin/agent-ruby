@@ -69,6 +69,14 @@ module ForestAdminAgent
           )
         end
 
+        it 'decorates the fields matching the search, whatever their case' do
+          records = [{ 'id' => 1, 'first_name' => 'FooBar', 'last_name' => 'baz' }]
+
+          decorator = list.send(:handle_search_decorator, 'OOb', records, @datasource.get_collection('user'))
+
+          expect(decorator).to eq(decorators: [{ id: '1', search: ['first_name'] }])
+        end
+
         it 'adds the route forest_list' do
           list.setup_routes
           expect(list.routes.include?('forest_list')).to be true
