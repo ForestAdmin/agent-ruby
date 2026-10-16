@@ -274,6 +274,11 @@ module ForestAdminAgent
           .to eq(%w[main other])
       end
 
+      # The ActiveRecord datasource skips nameless models: a name would expose the audit table as a collection.
+      it 'keeps its model anonymous' do
+        expect(store.send(:model).name).to be_nil
+      end
+
       it 'lists only entries whose diff touched one of the given fields' do
         store.append(record(previous_values: { 'status' => 'open' }, new_values: { 'status' => 'closed' }))
         store.append(record(previous_values: { 'note' => 'a' }, new_values: { 'note' => 'b' }))
