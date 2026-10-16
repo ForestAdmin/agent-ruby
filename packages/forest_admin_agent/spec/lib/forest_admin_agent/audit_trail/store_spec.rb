@@ -158,6 +158,13 @@ module ForestAdminAgent
           expect(timeline(before: '2026-01-02T03:04:05.000Z', end_timestamp: '2026-01-02T03:04:06.000Z')).to eq(%w[a])
         end
 
+        it 'keeps the tighter of the after bound and the start date on the oldest-first walk' do
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:06.000Z', start_timestamp: '2026-01-02T03:04:05.000Z'))
+            .to eq(%w[b c])
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:05.000Z', start_timestamp: '2026-01-02T03:04:06.000Z'))
+            .to eq(%w[b c])
+        end
+
         it 'applies the operations and author filters' do
           store.append(record(operation: 'delete', user_id: 7, correlation_key: 'd'))
 
@@ -219,7 +226,7 @@ module ForestAdminAgent
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_logs_migration ORDER BY name')
-        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id])
+        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id])
       end
 
       # A table created by a release that still kept the column loses it on the next boot, rows intact.
@@ -246,7 +253,7 @@ module ForestAdminAgent
         expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
         expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
         expect(connection.select_values('SELECT name FROM other_logs_migration'))
-          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id])
+          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id])
       end
 
       # Every write sets it, so a row without one is a bug rather than a row quietly claiming to be done.
@@ -589,13 +596,15 @@ module ForestAdminAgent
         )
       end
 
-      it 'indexes record_id, correlation_key and user_id' do
+      it 'indexes record_id, correlation_key, user_id and the (timestamp, id) order' do
         store.append(record)
 
         index_names = connection.indexes('audit_logs').map(&:name)
         expect(index_names).to include(
-          'audit_logs_record_id', 'audit_logs_correlation_key', 'audit_logs_user_id'
+          'audit_logs_record_id', 'audit_logs_correlation_key', 'audit_logs_user_id', 'audit_logs_timestamp_id'
         )
+        expect(connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_timestamp_id' }.columns)
+          .to eq(%w[timestamp id])
       end
     end
   end

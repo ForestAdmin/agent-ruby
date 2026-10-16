@@ -248,7 +248,7 @@ module ForestAdminAgent
               allow(permissions).to receive(:get_scope)
                 .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
               route = state_route(record: { 'id' => 4, 'status' => 'theirs' })
-              allow(store).to receive(:life_boundary_of).and_return(boundary)
+              allow(store).to receive(:life_boundary_of).with(collection: 'projects', record_id: '4').and_return(boundary)
 
               get_state(route, timestamp: timestamp).dig(:content, :data)
             end
@@ -966,7 +966,7 @@ module ForestAdminAgent
           def history(boundary, params = {})
             allow(permissions).to receive(:get_scope).and_return(scope)
             route = route_with_store(records: rows)
-            allow(store).to receive(:life_boundary_of).and_return(boundary)
+            allow(store).to receive(:life_boundary_of).with(collection: 'projects', record_id: '4').and_return(boundary)
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', **params } })
           end

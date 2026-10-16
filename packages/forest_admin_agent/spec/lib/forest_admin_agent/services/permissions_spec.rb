@@ -324,6 +324,25 @@ module ForestAdminAgent
 
           expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
         end
+
+        it 'does not refetch for a denial the cached payload accounts for while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {}, Secret: {} })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'refetches when the payload does not know a collection, even while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {} })
+
+          @permissions.allowed_collections(:read, [readable, unreadable])
+
+          expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
       end
 
       context 'when can? is called' do

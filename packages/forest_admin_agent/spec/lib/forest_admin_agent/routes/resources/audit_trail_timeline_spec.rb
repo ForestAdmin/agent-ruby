@@ -23,7 +23,7 @@ module ForestAdminAgent
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
           allow(store).to receive_messages(list_timeline: rows, timeline_users: authors)
-          allow(permissions).to receive(:allowed_collections) { |_action, collections| collections - [staff] }
+          allow(permissions).to receive(:allowed_collections).with(:read, anything) { |_action, collections| collections - [staff] }
           allow(permissions).to receive(:get_scope) do |collection|
             collection == scoped ? Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 1) : nil
           end

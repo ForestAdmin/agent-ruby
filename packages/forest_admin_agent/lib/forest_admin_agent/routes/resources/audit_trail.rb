@@ -148,7 +148,8 @@ module ForestAdminAgent
         # Matched in SQL, `search` and `fields` would test the values as captured, so which rows come back, the
         # count and the authors would still say what the withholding hides — one probe per character. They are
         # matched against what is served instead, which means scanning the whole history here, in batches, so
-        # only the page asked for is kept. Only for a gone record: one in scope was the caller's to read whole.
+        # only the page asked for is kept. Whenever a withholding scope applies: a gone record, or the rows an earlier
+        # record filed under a live one's id. Otherwise the history was the caller's to read whole.
         def history_matched_after_withholding(context, args, filters, gone_at_check, withholding = nil)
           skip, limit = parse_pagination(args)
           value_filters = filters.slice(:search, :fields)

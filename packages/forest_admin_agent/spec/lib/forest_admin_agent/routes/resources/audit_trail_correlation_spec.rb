@@ -70,7 +70,7 @@ module ForestAdminAgent
             id: 2, timestamp: '2026-01-02T11:00:00.000Z', operation: 'create', collection: 'books', record_id: '2'
           )
           route = route_with_store(history: [earlier, current])
-          allow(store).to receive(:life_boundary_of).and_return(boundary)
+          allow(store).to receive(:life_boundary_of).with(collection: 'books', record_id: '2').and_return(boundary)
 
           data = route.handle_history(
             { headers: {}, params: { 'collection' => 'books', 'recordId' => '2', 'correlation_key' => 'req-1' } }

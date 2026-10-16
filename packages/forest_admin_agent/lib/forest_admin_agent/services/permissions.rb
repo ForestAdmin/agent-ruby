@@ -92,15 +92,17 @@ module ForestAdminAgent
         is_allowed
       end
 
-      # The collections the caller may perform +action+ on, without raising. A denial is retried once against
-      # fresh permissions for all of them together, as {#can?} retries each one: asking {#can?} per collection
-      # would refetch the permissions once for every collection the caller cannot read.
+      # The collections the caller may perform +action+ on, without raising. A sweep over every collection
+      # meets a denial for most roles, so a denial is retried against fresh permissions only when
+      # {#refetch_denied_reads?} says staleness could explain it, and then once for all of them together.
       def allowed_collections(action, collections)
         return collections unless permission_system?
 
         allowed = select_allowed(action, collections, reload: false)
         return allowed if allowed.size == collections.size
+        return allowed unless refetch_denied_reads?(collections.map(&:name), get_collections_permissions_data)
 
+        @read_permissions_refetched = true
         select_allowed(action, collections, reload: true)
       end
 

@@ -54,6 +54,14 @@ module ForestAdminAgent
 
               connection.remove_column(table, :previous_record_id, if_exists: true)
             end
+          },
+          {
+            # The timeline pages the whole table in (timestamp, id) order, which no other index serves.
+            name: '003-index-timestamp-id',
+            up: lambda do |connection, table|
+              connection.add_index(table, %i[timestamp id], name: "#{table.split(".").last}_timestamp_id",
+                                                            if_not_exists: true)
+            end
           }
         ].freeze
       end
