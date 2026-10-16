@@ -1,3 +1,10 @@
+## [1.46.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.0...v1.46.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **datasource_active_record:** skip anonymous models when building collections ([#413](https://github.com/ForestAdmin/agent-ruby/issues/413)) ([c721960](https://github.com/ForestAdmin/agent-ruby/commit/c7219607751a262c878039a7e920a9b9afce844f))
+
 # [1.46.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.2...v1.46.0) (2026-10-16)
 
 
