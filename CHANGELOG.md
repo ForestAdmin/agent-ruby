@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.2...v1.46.0) (2026-10-16)
+
+
+### Features
+
+* **audit_trail:** operations filter, cross-collection timeline, earlier-life withholding [PRD-1258] ([#410](https://github.com/ForestAdmin/agent-ruby/issues/410)) ([292424c](https://github.com/ForestAdmin/agent-ruby/commit/292424ce6b118b515923dfc0e0a11cf347767403))
+
 ## [1.45.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.1...v1.45.2) (2026-10-14)
 
 
