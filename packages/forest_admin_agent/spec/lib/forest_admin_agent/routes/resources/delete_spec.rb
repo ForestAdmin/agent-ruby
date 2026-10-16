@@ -22,7 +22,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: nil)
+          allow(permissions).to receive_messages(can?: true, get_scope: nil, assert_can_read_query_fields: nil)
         end
 
         it 'adds the route forest_store' do
@@ -56,7 +56,8 @@ module ForestAdminAgent
                   ),
                   'first_name' => ColumnSchema.new(column_type: 'String'),
                   'last_name' => ColumnSchema.new(column_type: 'String')
-                }
+                },
+                segments: ['active']
               },
               delete: true
             )
@@ -148,6 +149,40 @@ module ForestAdminAgent
                 expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_IN, value: [1, 2, 3])
               end
             end
+
+            context 'when every record of a searched, segmented list is selected' do
+              before do
+                args[:params][:data][:attributes][:all_records] = true
+                args[:params][:data][:attributes][:all_records_ids_excluded] = %w[3]
+                args[:params][:data][:attributes][:all_records_subset_query].merge!(
+                  search: 'jo', searchExtended: '1', segment: 'active'
+                )
+              end
+
+              it 'deletes only the records the search and the segment match, minus the excluded ones' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    search: 'jo',
+                    search_extended: true,
+                    segment: 'active',
+                    page: nil,
+                    sort: nil
+                  )
+                  expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 3)
+                end
+              end
+
+              it 'rejects a segment the collection does not have, deleting nothing' do
+                args[:params][:data][:attributes][:all_records_subset_query][:segment] = 'unknown'
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid segment: unknown')
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
+              end
+            end
           end
 
           context 'with polymorphic relations' do
@@ -224,6 +259,7 @@ module ForestAdminAgent
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('user')).to receive(:delete)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([{ 'id' => 42 }])
               allow(@datasource.get_collection('address')).to receive(:update)
             end
 
@@ -253,6 +289,72 @@ module ForestAdminAgent
 
                   expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
                 end
+              end
+            end
+
+            describe 'polymorphic relation cleanup on a searched select-all' do
+              let(:params) do
+                {
+                  'collection_name' => 'user',
+                  'timezone' => 'Europe/Paris',
+                  data: {
+                    attributes: {
+                      ids: [],
+                      all_records: true,
+                      all_records_ids_excluded: ['7'],
+                      all_records_subset_query: { search: 'jo' }
+                    },
+                    type: 'action-requests'
+                  }
+                }
+              end
+
+              it 'nullifies the references of the records the search matched, not of the excluded ids' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    search: 'jo', search_extended: false, segment: nil, sort: nil, page: nil
+                  )
+                  expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 7)
+                  expect(projection).to eq(['id'])
+                end
+                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, patch|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(search: nil, search_extended: nil, segment: nil, sort: nil, page: nil)
+                  expect(filter.condition_tree.to_h).to eq(
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'addressable_id', operator: Operators::IN, value: [42] },
+                      { field: 'addressable_type', operator: Operators::EQUAL, value: 'user' }
+                    ]
+                  )
+                  expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+                end
+              end
+
+              it 'nullifies nothing when the search matches no record' do
+                allow(@datasource.get_collection('user')).to receive(:list).and_return([])
+
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
+              end
+
+              it 'keeps the references attached when the delete itself fails' do
+                allow(@datasource.get_collection('user')).to receive(:delete).and_raise(StandardError, 'hook refused')
+
+                expect { delete.handle_request_bulk(args) }.to raise_error(StandardError, 'hook refused')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
+              end
+
+              it 'nullifies nothing when the select-all filter is rejected' do
+                args[:params][:data][:attributes][:all_records_subset_query][:segment] = 'unknown'
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid segment: unknown')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
             end
           end
@@ -337,6 +439,9 @@ module ForestAdminAgent
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('composite_model')).to receive(:delete)
+              allow(@datasource.get_collection('composite_model')).to receive(:list).and_return(
+                [{ 'key1' => 'abc', 'key2' => 1 }, { 'key1' => 'def', 'key2' => 2 }, { 'key1' => 'ghi', 'key2' => 3 }]
+              )
               allow(@datasource.get_collection('composite_address')).to receive(:update)
             end
 

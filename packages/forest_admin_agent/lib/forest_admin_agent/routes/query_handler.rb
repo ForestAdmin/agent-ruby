@@ -23,29 +23,54 @@ module ForestAdminAgent
       end
 
       def parse_query_segment(collection, args, permissions, caller)
-        return unless args[:params][:segmentQuery]
+        segment_query = QueryStringParser.subset_or_query(args, :segmentQuery)
+        return unless segment_query
 
-        unless args[:params][:connectionName]
+        connection_name = QueryStringParser.subset_or_query(args, :connectionName)
+        unless connection_name
           raise ForestAdminAgent::Http::Exceptions::UnprocessableError, 'Missing native query connection attribute'
         end
 
-        QueryValidator.valid?(args[:params][:segmentQuery])
+        QueryValidator.valid?(segment_query)
 
-        permissions.can_execute_query_segment?(collection, args[:params][:segmentQuery], args[:params][:connectionName])
+        permissions.can_execute_query_segment?(collection, segment_query, connection_name)
 
         ids = execute_query(
           collection.datasource,
-          args[:params][:segmentQuery],
-          args[:params][:connectionName],
+          segment_query,
+          connection_name,
           permissions,
           caller,
-          args[:params][:contextVariables]
+          QueryStringParser.subset_or_query(args, :contextVariables)
         ).map(&:values)
 
         condition_tree_segment = ConditionTree::ConditionTreeFactory.match_ids(collection, ids)
         ConditionTreeValidator.validate(condition_tree_segment, collection)
 
         condition_tree_segment
+      end
+
+      def build_context_filter(collection, args, permissions, caller, sort: nil)
+        condition_tree = QueryStringParser.parse_condition_tree(collection, args)
+        search = QueryStringParser.parse_search(collection, args)
+        search_extended = QueryStringParser.parse_search_extended(args)
+        applied = { condition_tree: condition_tree, search: search, search_extended: search_extended }
+        applied[:sort] = sort if sort
+        permissions.assert_can_read_query_fields(collection, **applied)
+
+        Filter.new(
+          condition_tree: ConditionTree::ConditionTreeFactory.intersect(
+            [
+              permissions.get_scope(collection),
+              condition_tree,
+              parse_query_segment(collection, args, permissions, caller)
+            ]
+          ),
+          search: search,
+          search_extended: search_extended,
+          sort: sort,
+          segment: QueryStringParser.parse_segment(collection, args)
+        )
       end
     end
   end

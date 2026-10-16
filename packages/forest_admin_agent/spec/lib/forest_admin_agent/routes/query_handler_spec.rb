@@ -83,6 +83,23 @@ module ForestAdminAgent
           expect(condition_tree.to_h).to eq({ field: 'id', operator: Operators::IN, value: [1, 2] })
         end
 
+        it 'reads the segment query a select-all sends in its body' do
+          args = {
+            params: {
+              data: {
+                attributes: {
+                  all_records_subset_query: { segmentQuery: 'SELECT id from user', connectionName: 'primary' }
+                }
+              }
+            }
+          }
+
+          condition_tree = dummy_class.parse_query_segment(collection, args, permission, caller)
+          expect(condition_tree.to_h).to eq({ field: 'id', operator: Operators::IN, value: [1, 2] })
+          expect(permission).to have_received(:can_execute_query_segment?)
+            .with(collection, 'SELECT id from user', 'primary')
+        end
+
         it 'work with inject context variable' do
           args = {
             params: {

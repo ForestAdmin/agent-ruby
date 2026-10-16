@@ -43,9 +43,11 @@ module ForestAdminAgent
                 'id' => ColumnSchema.new(
                   column_type: 'Uuid',
                   is_primary_key: true,
-                  filter_operators: [Operators::EQUAL, Operators::IN]
-                )
-              }
+                  filter_operators: [Operators::EQUAL, Operators::IN, Operators::NOT_EQUAL]
+                ),
+                'title' => ColumnSchema.new(column_type: 'String')
+              },
+              segments: ['recent']
             }
           )
 
@@ -62,6 +64,7 @@ module ForestAdminAgent
           allow(permissions).to receive_messages(
             can_smart_action?: true,
             get_scope: nil,
+            assert_can_read_query_fields: nil,
             get_user_data: {
               id: 1,
               firstName: 'John',
@@ -167,6 +170,49 @@ module ForestAdminAgent
                 expect(args[:params][:data][:attributes][:signed_approval_request]).to eq(unsigned_request)
               end
             end
+          end
+        end
+
+        context 'with a bulk action run on a searched, segmented select-all' do
+          before do
+            @action_collection.add_action(
+              'foo',
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::BULK
+              ) do |_context, result_builder|
+                result_builder.success
+              end
+            )
+            args[:params][:data][:attributes].merge!(
+              ids: [],
+              all_records: true,
+              all_records_ids_excluded: ['123e4567-e89b-12d3-a456-426614174000'],
+              all_records_subset_query: { search: 'tolkien', segment: 'recent' }
+            )
+            allow(@action_collection).to receive(:get_form).and_return([])
+          end
+
+          it 'hands the action the search and the segment of the list, minus the excluded ids' do
+            action.handle_hook_request(args)
+
+            expect(@action_collection).to have_received(:get_form) do |caller, action_name, data, filter, _meta|
+              expect(caller).to be_instance_of(Components::Caller)
+              expect(action_name).to eq('foo')
+              expect(data).to be_nil
+              expect(filter).to have_attributes(
+                search: 'tolkien', search_extended: false, segment: 'recent', sort: nil, page: nil
+              )
+              expect(filter.condition_tree.to_h).to eq(
+                { field: 'id', operator: Operators::NOT_EQUAL, value: '123e4567-e89b-12d3-a456-426614174000' }
+              )
+            end
+          end
+
+          it 'checks the caller can read the fields the search reaches' do
+            action.handle_hook_request(args)
+
+            expect(permissions).to have_received(:assert_can_read_query_fields)
+              .with(@datasource.get_collection('book'), condition_tree: nil, search: 'tolkien', search_extended: false)
           end
         end
 
