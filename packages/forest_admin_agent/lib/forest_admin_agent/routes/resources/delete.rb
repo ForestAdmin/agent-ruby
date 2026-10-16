@@ -10,6 +10,8 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminAgent::Routes::QueryHandler
 
+        NULLIFIED_POLYMORPHIC_TYPES = %w[PolymorphicOneToOne PolymorphicOneToMany].freeze
+
         def setup_routes
           add_route('forest_delete_bulk', 'delete', '/:collection_name', ->(args) { handle_request_bulk(args) })
           add_route('forest_delete', 'delete', '/:collection_name/:id', ->(args) { handle_request(args) })
@@ -40,19 +42,29 @@ module ForestAdminAgent
                                                                                  selection_ids[:ids])
           condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
 
-          context.collection.schema[:fields].each_value do |field_schema|
-            next unless ['PolymorphicOneToOne', 'PolymorphicOneToMany'].include?(field_schema.type)
-            next if field_schema.respond_to?(:cascade_on_delete) && field_schema.cascade_on_delete
+          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
+          filter = filter.override(
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, condition_tree_ids])
+          )
 
-            origin_values = selection_ids[:ids].map do |pk_hash|
-              if pk_hash.is_a?(Hash)
-                pk_hash[field_schema.origin_key_target]
-              else
-                pk_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(context.collection)
-                index = pk_names.index(field_schema.origin_key_target)
-                pk_hash[index] if index
-              end
-            end
+          nullify_polymorphic_references(context, filter)
+          context.collection.delete(context.caller, filter)
+        end
+
+        def nullify_polymorphic_references(context, filter)
+          relations = context.collection.schema[:fields].values.select do |field_schema|
+            NULLIFIED_POLYMORPHIC_TYPES.include?(field_schema.type) &&
+              !(field_schema.respond_to?(:cascade_on_delete) && field_schema.cascade_on_delete)
+          end
+          return if relations.empty?
+
+          # ponytail: loads every deleted record's keys at once, page it if select-all deletes outgrow memory
+          records = context.collection.list(context.caller, filter,
+                                            Projection.new(relations.map(&:origin_key_target).uniq))
+
+          relations.each do |field_schema|
+            origin_values = records.map { |record| record[field_schema.origin_key_target] }
+            next if origin_values.empty?
 
             condition_tree = Nodes::ConditionTreeBranch.new(
               'And',
@@ -62,18 +74,10 @@ module ForestAdminAgent
                                              context.collection.name.gsub('__', '::'))
               ]
             )
-            filter = Filter.new(condition_tree: condition_tree)
             context.datasource.get_collection(field_schema.foreign_collection)
-                   .update(context.caller, filter, { field_schema.origin_key => nil,
-                                                     field_schema.origin_type_field => nil })
+                   .update(context.caller, Filter.new(condition_tree: condition_tree),
+                           { field_schema.origin_key => nil, field_schema.origin_type_field => nil })
           end
-
-          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
-          filter = filter.override(
-            condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, condition_tree_ids])
-          )
-
-          context.collection.delete(context.caller, filter)
         end
       end
     end

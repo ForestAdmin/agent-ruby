@@ -318,7 +318,7 @@ module ForestAdminAgent
       end
 
       def self.parse_segment(collection, args)
-        segment = subset_or_query(args, :segment)
+        segment = subset_or_query(args, :segment) || args.dig(:params, :segment)
 
         return unless segment
 

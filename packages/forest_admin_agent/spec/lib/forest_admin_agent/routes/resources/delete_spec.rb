@@ -259,6 +259,7 @@ module ForestAdminAgent
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('user')).to receive(:delete)
+              allow(@datasource.get_collection('user')).to receive(:list).and_return([{ 'id' => 42 }])
               allow(@datasource.get_collection('address')).to receive(:update)
             end
 
@@ -288,6 +289,52 @@ module ForestAdminAgent
 
                   expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
                 end
+              end
+            end
+
+            describe 'polymorphic relation cleanup on a searched select-all' do
+              let(:params) do
+                {
+                  'collection_name' => 'user',
+                  'timezone' => 'Europe/Paris',
+                  data: {
+                    attributes: {
+                      ids: [],
+                      all_records: true,
+                      all_records_ids_excluded: ['7'],
+                      all_records_subset_query: { search: 'jo' }
+                    },
+                    type: 'action-requests'
+                  }
+                }
+              end
+
+              it 'nullifies the references of the records the search matched, not of the excluded ids' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, filter, projection|
+                  expect(filter.search).to eq('jo')
+                  expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 7)
+                  expect(projection).to eq(['id'])
+                end
+                expect(@datasource.get_collection('address')).to have_received(:update) do |_caller, filter, patch|
+                  expect(filter.condition_tree.to_h).to eq(
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'addressable_id', operator: Operators::IN, value: [42] },
+                      { field: 'addressable_type', operator: Operators::EQUAL, value: 'user' }
+                    ]
+                  )
+                  expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
+                end
+              end
+
+              it 'nullifies nothing when the select-all filter is rejected' do
+                args[:params][:data][:attributes][:all_records_subset_query][:segment] = 'unknown'
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid segment: unknown')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
             end
           end
@@ -372,6 +419,9 @@ module ForestAdminAgent
 
               @datasource = ForestAdminAgent::Facades::Container.datasource
               allow(@datasource.get_collection('composite_model')).to receive(:delete)
+              allow(@datasource.get_collection('composite_model')).to receive(:list).and_return(
+                [{ 'key1' => 'abc', 'key2' => 1 }, { 'key1' => 'def', 'key2' => 2 }, { 'key1' => 'ghi', 'key2' => 3 }]
+              )
               allow(@datasource.get_collection('composite_address')).to receive(:update)
             end
 
