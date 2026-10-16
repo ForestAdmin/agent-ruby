@@ -291,6 +291,60 @@ module ForestAdminAgent
         end
       end
 
+      describe '#allowed_collections' do
+        let(:readable) { @datasource.collections['Book'] }
+        let(:unreadable) { instance_double(Collection, name: 'Secret') }
+
+        before do
+          allow(@permissions).to receive(:permission_allowed?) do |_data, collection, _action, _user|
+            collection == readable
+          end
+          allow(@permissions).to receive(:get_collections_permissions_data).and_call_original
+        end
+
+        it 'keeps the allowed collections without raising for the others' do
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable])
+        end
+
+        it 'refetches the permissions once for all the denied collections, not once each' do
+          @permissions.allowed_collections(:read, [readable, unreadable, instance_double(Collection, name: 'Other')])
+
+          expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+
+        it 'allows every collection without reading the permissions when the permission system is off' do
+          @permissions.cache.set('forest.has_permission', { enable: false })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable, unreadable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data)
+        end
+
+        it 'does not refetch when every collection is allowed' do
+          @permissions.allowed_collections(:read, [readable])
+
+          expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'does not refetch for a denial the cached payload accounts for while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {}, Secret: {} })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'refetches when the payload does not know a collection, even while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {} })
+
+          @permissions.allowed_collections(:read, [readable, unreadable])
+
+          expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+      end
+
       context 'when can? is called' do
         it 'returns true when user is allowed' do
           expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true

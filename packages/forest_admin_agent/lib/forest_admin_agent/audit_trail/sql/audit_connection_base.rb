@@ -1,8 +1,4 @@
-begin
-  require 'active_record'
-rescue LoadError
-  raise LoadError, 'config.audit_trail needs the activerecord gem: add `gem "activerecord"` to your Gemfile.'
-end
+require 'active_record'
 
 module ForestAdminAgent
   module AuditTrail

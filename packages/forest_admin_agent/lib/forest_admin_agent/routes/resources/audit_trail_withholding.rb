@@ -7,9 +7,10 @@ module ForestAdminAgent
       # since a rule only one of them applies is one lookup away from being no rule at all.
       module AuditTrailWithholding
         # Everything a withholding decision needs, and nothing a request context would drag along: the
-        # collection the rows belong to, the scope to test them against, and the timezone its date
-        # comparisons read in.
-        Withholding = Struct.new(:collection, :scope, :timezone)
+        # collection the rows belong to, the scope to test them against, the timezone its date comparisons read
+        # in, and — for a live record whose id another record held before — the row where its own life began,
+        # so only the rows before it are tested. No boundary means every row is.
+        Withholding = Struct.new(:collection, :scope, :timezone, :boundary)
 
         NULL_EXCLUDING_OPERATORS = [
           ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators::NOT_EQUAL,
@@ -24,7 +25,16 @@ module ForestAdminAgent
         def withhold_out_of_scope_values(entries, withholding)
           return entries if withholding.scope.nil?
 
-          entries.map { |entry| withhold(entry, withholding) }
+          entries.map { |entry| of_withheld_life?(entry, withholding.boundary) ? withhold(entry, withholding) : entry }
+        end
+
+        # A boundary `delete` is the earlier record's last row, a boundary `create` the current record's first.
+        def of_withheld_life?(entry, boundary)
+          return true if boundary.nil?
+          return boundary.operation == 'delete' if entry.id == boundary.id
+
+          ([::Time.iso8601(entry.timestamp.to_s), entry.id.to_i] <=>
+            [::Time.iso8601(boundary.timestamp.to_s), boundary.id.to_i]).negative?
         end
 
         def withhold(entry, withholding)
@@ -48,11 +58,15 @@ module ForestAdminAgent
         # separately releases the ones that can be proven in scope — "it used to be X" can't escape through a
         # row whose new value is out of scope, since that side is tested on its own.
         def withhold_each_side(entry, withholding)
-          # An update that moved a writable primary key files its row under the id the record ended up with,
-          # and keeps the one it had on `previous_record_id`. Each side is tested against the id it was true
-          # of, or the new state's id would decide whether the old state is in scope.
-          before = entry.previous_record_id || entry.record_id
-          kept = in_scope?(entry.previous_values, before, withholding) ? entry : blank(entry, :previous_values)
+          # The row is filed under the id the record ended up with, which says nothing about a writable key the
+          # update may have moved: on the previous side the id answers only for a key never captured, read-only
+          # and so unmoved. A redacted key stays unanswered, which over-withholds an update that kept its key —
+          # the safe side of a move the trail cannot see.
+          kept = if in_scope?(entry.previous_values, entry.record_id, withholding, id_answers_for_keys: false)
+                   entry
+                 else
+                   blank(entry, :previous_values)
+                 end
 
           in_scope?(kept.new_values, after_id(kept), withholding) ? kept : blank(kept, :new_values)
         end

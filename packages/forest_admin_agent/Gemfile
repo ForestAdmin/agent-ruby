@@ -3,7 +3,6 @@ source "https://rubygems.org"
 gemspec
 
 group :development, :test do
-  gem 'activerecord', '>= 6.1'
   gem 'forest_admin_datasource_customizer', path: '../forest_admin_datasource_customizer'
   gem 'forest_admin_datasource_toolkit', path: '../forest_admin_datasource_toolkit'
   gem 'forest_admin_test_toolkit', path: '../forest_admin_test_toolkit'

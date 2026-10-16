@@ -74,9 +74,7 @@ module ForestAdminAgent
           # An empty answer has nothing to withhold, so it does not earn a second read of the record.
           return history if history.empty?
 
-          scope = withholding_scope_for(context, collection, record_id, gone_at_check)
-
-          withhold_out_of_scope_values(history, Withholding.new(collection, scope, context.caller.timezone))
+          withhold_out_of_scope_values(history, withholding_of(context, collection, record_id, gone_at_check))
         end
 
         def assert_scope(args)

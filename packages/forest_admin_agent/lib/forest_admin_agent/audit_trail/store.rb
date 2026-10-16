@@ -11,7 +11,7 @@ module ForestAdminAgent
     class Store
       DEFAULT_SCHEMA = 'forest'.freeze
       DEFAULT_TABLE = 'audit_logs'.freeze
-      COLUMNS = %i[timestamp operation collection record_id previous_record_id status user_id user_first_name
+      COLUMNS = %i[timestamp operation collection record_id status user_id user_first_name
                    user_last_name user_email action_name correlation_key previous_values new_values].freeze
       AUTHOR_COLUMNS = %i[user_id user_first_name user_last_name user_email].freeze
 
@@ -73,13 +73,14 @@ module ForestAdminAgent
         model.where(id: ids).delete_all unless ids.empty?
       end
 
-      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, start_timestamp: nil,
-                         end_timestamp: nil, fields: nil, search: nil, order: 'asc', after: nil)
+      def list_by_record(collection:, record_id:, skip: 0, limit: nil, user_ids: nil, operations: nil,
+                         start_timestamp: nil, end_timestamp: nil, fields: nil, search: nil, order: 'asc', after: nil)
         descending = order.to_s == 'desc'
         # `id` (insertion order) breaks ties on equal timestamps in both directions, keeping pages
         # deterministic and stable.
-        relation = scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
-                                                end_timestamp: end_timestamp, fields: fields, search: search)
+        relation = scope(collection, record_id, user_ids: user_ids, operations: operations,
+                                                start_timestamp: start_timestamp, end_timestamp: end_timestamp,
+                                                fields: fields, search: search)
                    .order(timestamp: descending ? :desc : :asc, id: :asc)
                    .offset(skip || 0)
         relation = relation.where(*past_row_condition(after, descending)) if after
@@ -88,42 +89,52 @@ module ForestAdminAgent
         relation.map { |row| from_row(row) }
       end
 
-      def count_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+      def count_by_record(collection:, record_id:, user_ids: nil, operations: nil, start_timestamp: nil,
                           end_timestamp: nil, fields: nil, search: nil)
-        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
+        scope(collection, record_id, user_ids: user_ids, operations: operations, start_timestamp: start_timestamp,
                                      end_timestamp: end_timestamp, fields: fields, search: search).count
       end
 
       # The distinct authors of the entries the current filters match, whatever page is being asked for. The
       # identity comes from the rows themselves, so a user who has since been renamed or removed still reads
       # as they were when they acted.
-      def authors_by_record(collection:, record_id:, user_ids: nil, start_timestamp: nil,
+      def authors_by_record(collection:, record_id:, user_ids: nil, operations: nil, start_timestamp: nil,
                             end_timestamp: nil, fields: nil, search: nil)
-        scope(collection, record_id, user_ids: user_ids, start_timestamp: start_timestamp,
-                                     end_timestamp: end_timestamp, fields: fields, search: search)
-          .where.not(user_id: nil)
-          .distinct
-          .pluck(*AUTHOR_COLUMNS)
-          .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
-          .uniq { |author| author[:user_id] }
+        authors(scope(collection, record_id, user_ids: user_ids, operations: operations,
+                                             start_timestamp: start_timestamp, end_timestamp: end_timestamp,
+                                             fields: fields, search: search))
       end
 
-      # The ids this record was renamed from, each with the moment it stopped being that id. Walking those back
-      # is what lets a history query reach rows written before a rename — they stay under the id they were
-      # written with, since that is the id they were true of — and the moment bounds how far: the id it left may
-      # have been taken by another record afterwards, whose rows are none of this record's business.
-      def renamed_from(collection:, record_id:)
-        model.where(collection: collection, record_id: record_id)
-             .where.not(previous_record_id: nil)
-             .pluck(:previous_record_id, :timestamp, :id)
-             .group_by(&:first)
-             .map do |id, rows|
-               # The row id comes along as the tie-breaker: the trail orders itself by (timestamp, id), so a
-               # bound that knew only the timestamp would mean something slightly different from "before".
-               _, at, row = rows.max_by { |(_, timestamp, row_id)| [timestamp, row_id] }
+      # The project-level timeline across `collections`, the ones the caller may read: newest first, or oldest
+      # first with `order: 'asc'`, ties broken by id in the same direction. `before` / `after` are the cursor's
+      # inclusive bound and `exclude_ids` the rows already served at it.
+      def list_timeline(collections:, limit:, order: 'desc', **filters)
+        return [] if collections.empty?
 
-               { id: id, until: as_iso(at), until_row: row }
-             end
+        direction = order.to_s == 'asc' ? :asc : :desc
+
+        timeline_scope(collections, **filters).order(timestamp: direction, id: direction).limit(limit)
+                                              .map { |row| from_row(row) }
+      end
+
+      # The distinct authors of the timeline the filters match, whatever the cursor.
+      def timeline_users(collections:, **filters)
+        return [] if collections.empty?
+
+        authors(timeline_scope(collections, **filters))
+      end
+
+      # The id's latest confirmed `delete` or `create`, in the trail's (timestamp, id) order: where the life of
+      # the record holding the id now began. A pending row may never have landed, so it marks nothing. Nil when
+      # the id has had one life only — no boundary at all, or a `create` with nothing filed before it — so a
+      # record created through Forest does not pay for the earlier-life withholding it can never need.
+      def life_boundary_of(collection:, record_id:)
+        rows = model.where(collection: collection, record_id: record_id)
+        row = rows.where(operation: %w[delete create], status: Recording::DONE).order(timestamp: :desc, id: :desc).first
+        return nil if row.nil?
+        return nil if row.operation == 'create' && !rows.where(*before_row_condition(row)).exists?
+
+        from_row(row)
       end
 
       # Entries recorded strictly after `timestamp`, newest first: what a state reconstruction has to undo.
@@ -135,7 +146,7 @@ module ForestAdminAgent
       # cannot act on them.
       def list_since(collection:, record_id:, timestamp:)
         model.where(collection: collection, status: Recording::DONE)
-             .where(*segments_condition(record_id))
+             .where(record_id: record_id)
              .where('timestamp > ?', as_time(timestamp))
              .order(timestamp: :desc, id: :desc)
              .map { |row| from_row(row) }
@@ -155,18 +166,49 @@ module ForestAdminAgent
 
       private
 
-      # Every filter is an AND, so the count matches exactly what a page of this history holds.
-      def scope(collection, record_id, user_ids: nil, start_timestamp: nil, end_timestamp: nil,
-                fields: nil, search: nil)
-        relation = model.where(collection: collection).where(*segments_condition(record_id))
-        relation = relation.where(user_id: user_ids) if user_ids
+      def scope(collection, record_id, fields: nil, **filters)
+        relation = filtered(model.where(collection: collection, record_id: record_id), **filters)
         relation = relation.where(Sql::FieldFilter.new(model.connection).condition(fields)) if fields&.any?
+        relation
+      end
+
+      # Each cursor bound and the date filter on its side are both inclusive, so the tighter one wins.
+      def timeline_scope(collections, before: nil, after: nil, exclude_ids: nil, start_timestamp: nil,
+                         end_timestamp: nil, **filters)
+        relation = filtered(model.where(collection: collections),
+                            start_timestamp: [start_timestamp, after].compact.max_by { |bound| as_time(bound) },
+                            end_timestamp: [end_timestamp, before].compact.min_by { |bound| as_time(bound) },
+                            **filters)
+        relation = relation.where.not(id: exclude_ids) if exclude_ids&.any?
+        relation
+      end
+
+      # The filters the per-record history and the timeline share, so they cannot drift apart. Every one is an
+      # AND, so the count matches exactly what a page holds.
+      def filtered(relation, user_ids: nil, operations: nil, search: nil, start_timestamp: nil, end_timestamp: nil)
+        relation = relation.where(user_id: user_ids) if user_ids
+        relation = relation.where(operation: operations) if operations
         relation = relation.where(Sql::TextSearch.new(model.connection).condition(search)) if search
         # Compare as Time so ActiveRecord casts the bound to the datetime column's storage format
         # (raw ISO strings with a `Z` would compare lexically against the cast rows and never match).
         relation = relation.where('timestamp >= ?', as_time(start_timestamp)) if start_timestamp
         relation = relation.where('timestamp <= ?', as_time(end_timestamp)) if end_timestamp
         relation
+      end
+
+      def authors(relation)
+        relation.where.not(user_id: nil)
+                .distinct
+                .pluck(*AUTHOR_COLUMNS)
+                .map { |values| AUTHOR_COLUMNS.zip(values).to_h }
+                .uniq { |author| author[:user_id] }
+      end
+
+      # Rows strictly before `row` in the trail's (timestamp, id) order.
+      def before_row_condition(row)
+        at = as_time(row.timestamp)
+
+        ['timestamp < ? OR (timestamp = ? AND id < ?)', at, at, row.id]
       end
 
       # Rows strictly past `row` in the history's own order, so a scan keyed on the last row it read neither
@@ -180,34 +222,6 @@ module ForestAdminAgent
 
       def as_time(value)
         value.is_a?(::Time) ? value : ::Time.iso8601(value.to_s)
-      end
-
-      def as_iso(value)
-        value.respond_to?(:iso8601) ? value.iso8601(3) : value.to_s
-      end
-
-      # One record's history is its current id plus every id it was renamed from, each earlier one only up to
-      # the rename: `record_id = '7' OR (record_id = '1' AND timestamp <= …)`. A plain `IN` would hand over the
-      # rows of whichever record holds that id now.
-      #
-      # Takes an id, several, or segments — `{ id:, until: }` — so a caller that has no rename to care about
-      # simply passes the id.
-      def segments_condition(record_id)
-        binds = []
-        sql = Array(record_id).map { |value| value.is_a?(Hash) ? value : { id: value, until: nil } }.map do |segment|
-          binds << segment[:id]
-          next 'record_id = ?' unless segment[:until]
-
-          binds << as_time(segment[:until])
-          # Same millisecond as the rename, and the id says which side of it a row falls on: another record
-          # taking the abandoned key that fast would otherwise land in this record's history.
-          next '(record_id = ? AND timestamp <= ?)' unless segment[:until_row]
-
-          binds << as_time(segment[:until]) << segment[:until_row]
-          '(record_id = ? AND (timestamp < ? OR (timestamp = ? AND id <= ?)))'
-        end
-
-        [sql.join(' OR '), *binds]
       end
 
       def model

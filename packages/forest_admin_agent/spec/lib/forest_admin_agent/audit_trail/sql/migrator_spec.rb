@@ -20,6 +20,8 @@ module ForestAdminAgent
             add_column: nil,
             remove_index: nil,
             change_column: nil,
+            remove_column: nil,
+            column_exists?: true,
             select_values: ['001-create-audit-logs'],
             quote_schema_name: '"forest"',
             quote_table_name: '"forest.audit_logs_migration"',

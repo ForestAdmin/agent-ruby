@@ -92,6 +92,20 @@ module ForestAdminAgent
         is_allowed
       end
 
+      # The collections the caller may perform +action+ on, without raising. A sweep over every collection
+      # meets a denial for most roles, so a denial is retried against fresh permissions only when
+      # {#refetch_denied_reads?} says staleness could explain it, and then once for all of them together.
+      def allowed_collections(action, collections)
+        return collections unless permission_system?
+
+        allowed = select_allowed(action, collections, reload: false)
+        return allowed if allowed.size == collections.size
+        return allowed unless refetch_denied_reads?(collections.map(&:name), get_collections_permissions_data)
+
+        @read_permissions_refetched = true
+        select_allowed(action, collections, reload: true)
+      end
+
       # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
       # listing, +read+ a get, and the signed hash a chart.
       #
@@ -454,6 +468,13 @@ module ForestAdminAgent
         raise ForbiddenError,
               "You cannot search on '#{field[:path]}': the '#{unexposed.join("' or '")}' collection " \
               'is not exposed by this agent.'
+      end
+
+      def select_allowed(action, collections, reload:)
+        user_data = get_user_data(caller.id, reload: reload)
+        collections_data = get_collections_permissions_data(force_fetch: reload)
+
+        collections.select { |collection| permission_allowed?(collections_data, collection, action, user_data) }
       end
 
       def permission_allowed?(collections_data, collection, action, user_data)

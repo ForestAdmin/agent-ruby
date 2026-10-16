@@ -33,6 +33,7 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "activerecord", ">= 6.1"
   spec.add_dependency "activesupport", ">= 6.1"
   spec.add_dependency "base64"
   spec.add_dependency "benchmark"
@@ -52,6 +53,7 @@ admin work on any Ruby application."
   spec.add_dependency "ld-eventsource", "~> 2.2"
   spec.add_dependency "mono_logger", "~> 1.1"
   spec.add_dependency "openid_connect", "~> 2.2"
+  spec.add_dependency "pg", "~> 1.1"
   spec.add_dependency "rake", "~> 13.0"
   spec.add_dependency "rack-cors", "~> 3.0"
   spec.add_dependency "zeitwerk", "~> 2.3"
