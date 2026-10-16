@@ -13,8 +13,9 @@ Two parts, both internal:
   schema and creates/evolves the `audit_logs` table through versioned migrations, and reads the
   per-record history back for the routes below.
 
-Storage uses ActiveRecord: outside Rails, add `gem 'activerecord'` (and the adapter gem) to your
-Gemfile. Nothing is loaded and no connection is opened until the feature is configured.
+Storage uses ActiveRecord on a PostgreSQL database. The agent depends on `activerecord` and `pg`, so
+there is nothing to add to the Gemfile, even in an app whose main datasource is not SQL. Nothing is loaded
+and no connection is opened until the feature is configured.
 
 ## Turn it on
 
