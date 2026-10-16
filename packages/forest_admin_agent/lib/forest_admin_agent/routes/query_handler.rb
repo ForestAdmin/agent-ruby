@@ -50,19 +50,25 @@ module ForestAdminAgent
         condition_tree_segment
       end
 
-      def build_context_filter(collection, args, permissions, caller)
+      def build_context_filter(collection, args, permissions, caller, sort: nil)
+        condition_tree = QueryStringParser.parse_condition_tree(collection, args)
         search = QueryStringParser.parse_search(collection, args)
+        search_extended = QueryStringParser.parse_search_extended(args)
+        applied = { condition_tree: condition_tree, search: search, search_extended: search_extended }
+        applied[:sort] = sort if sort
+        permissions.assert_can_read_query_fields(collection, **applied)
 
         Filter.new(
           condition_tree: ConditionTree::ConditionTreeFactory.intersect(
             [
               permissions.get_scope(collection),
-              QueryStringParser.parse_condition_tree(collection, args),
+              condition_tree,
               parse_query_segment(collection, args, permissions, caller)
             ]
           ),
           search: search,
-          search_extended: search && QueryStringParser.parse_search_extended(args),
+          search_extended: search_extended,
+          sort: sort,
           segment: QueryStringParser.parse_segment(collection, args)
         )
       end

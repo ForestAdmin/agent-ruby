@@ -102,7 +102,7 @@ module ForestAdminAgent
             @datasource = ForestAdminAgent::Facades::Container.datasource
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: nil)
+            allow(permissions).to receive_messages(can?: true, get_scope: nil, assert_can_read_query_fields: nil)
           end
 
           it 'adds the route forest_related_dissociate' do
@@ -154,7 +154,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -188,7 +188,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -227,7 +227,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -288,7 +288,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -322,7 +322,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -340,7 +340,7 @@ module ForestAdminAgent
                   ),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
@@ -375,7 +375,7 @@ module ForestAdminAgent
                     ),
                     page: nil,
                     search: nil,
-                    search_extended: nil,
+                    search_extended: false,
                     segment: nil,
                     sort: nil
                   )
@@ -410,7 +410,7 @@ module ForestAdminAgent
                     ),
                     page: nil,
                     search: nil,
-                    search_extended: nil,
+                    search_extended: false,
                     segment: nil,
                     sort: nil
                   )

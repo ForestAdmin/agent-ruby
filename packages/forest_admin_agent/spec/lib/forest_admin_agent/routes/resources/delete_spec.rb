@@ -22,7 +22,7 @@ module ForestAdminAgent
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-          allow(permissions).to receive_messages(can?: true, get_scope: nil)
+          allow(permissions).to receive_messages(can?: true, get_scope: nil, assert_can_read_query_fields: nil)
         end
 
         it 'adds the route forest_store' do
@@ -312,12 +312,17 @@ module ForestAdminAgent
               it 'nullifies the references of the records the search matched, not of the excluded ids' do
                 delete.handle_request_bulk(args)
 
-                expect(@datasource.get_collection('user')).to have_received(:list) do |_caller, filter, projection|
-                  expect(filter.search).to eq('jo')
+                expect(@datasource.get_collection('user')).to have_received(:list) do |caller, filter, projection|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    search: 'jo', search_extended: false, segment: nil, sort: nil, page: nil
+                  )
                   expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 7)
                   expect(projection).to eq(['id'])
                 end
-                expect(@datasource.get_collection('address')).to have_received(:update) do |_caller, filter, patch|
+                expect(@datasource.get_collection('address')).to have_received(:update) do |caller, filter, patch|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(search: nil, search_extended: nil, segment: nil, sort: nil, page: nil)
                   expect(filter.condition_tree.to_h).to eq(
                     aggregator: 'And',
                     conditions: [
@@ -327,6 +332,21 @@ module ForestAdminAgent
                   )
                   expect(patch).to eq({ 'addressable_id' => nil, 'addressable_type' => nil })
                 end
+              end
+
+              it 'nullifies nothing when the search matches no record' do
+                allow(@datasource.get_collection('user')).to receive(:list).and_return([])
+
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
+              end
+
+              it 'keeps the references attached when the delete itself fails' do
+                allow(@datasource.get_collection('user')).to receive(:delete).and_raise(StandardError, 'hook refused')
+
+                expect { delete.handle_request_bulk(args) }.to raise_error(StandardError, 'hook refused')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
 
               it 'nullifies nothing when the select-all filter is rejected' do

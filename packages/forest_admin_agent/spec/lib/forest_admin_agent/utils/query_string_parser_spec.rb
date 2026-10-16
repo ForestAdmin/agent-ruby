@@ -1384,7 +1384,7 @@ module ForestAdminAgent
       describe 'when parse_segment' do
         let(:segmented) { build_collection(schema: { segments: ['active'] }) }
 
-        it 'reads the segment of a select-all body sent as an array of ids without raising' do
+        it 'falls back to the query string segment when data is an array of picked ids' do
           args = { params: { data: [{ 'id' => 1 }], segment: 'active' } }
 
           expect(described_class.parse_segment(segmented, args)).to eq('active')
