@@ -90,6 +90,7 @@ module ForestAdminAgent
                 )
               }
             )
+            collection_address.add_segments(['billing'])
 
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
             datasource.add_collection(collection_user)
@@ -416,6 +417,43 @@ module ForestAdminAgent
                 end
 
                 expect(result).to eq({ content: nil, status: 204 })
+              end
+
+              it 'deletes only the related records a select-all search and segment match' do
+                allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
+
+                args[:params][:delete] = true
+                args[:params]['relation_name'] = 'address_poly'
+                args[:params]['id'] = 1
+                args[:params][:data] = {
+                  attributes: {
+                    ids: [],
+                    all_records: true,
+                    all_records_ids_excluded: ['2'],
+                    all_records_subset_query: { search: 'paris', segment: 'billing' }
+                  }
+                }
+
+                dissociate.handle_request(args)
+
+                expect(@datasource.get_collection('address')).to have_received(:delete) do |caller, filter|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    condition_tree: have_attributes(
+                      aggregator: 'And',
+                      conditions: [
+                        have_attributes(field: 'id', operator: Operators::NOT_EQUAL, value: 2),
+                        have_attributes(field: 'addressable_id', operator: Operators::EQUAL, value: 1),
+                        have_attributes(field: 'addressable_type', operator: Operators::EQUAL, value: 'user')
+                      ]
+                    ),
+                    page: nil,
+                    search: 'paris',
+                    search_extended: false,
+                    segment: 'billing',
+                    sort: nil
+                  )
+                end
               end
             end
           end

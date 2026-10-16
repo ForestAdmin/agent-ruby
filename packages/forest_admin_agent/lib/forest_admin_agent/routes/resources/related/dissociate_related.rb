@@ -8,6 +8,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query
+          include ForestAdminAgent::Routes::QueryHandler
 
           def setup_routes
             add_route(
@@ -126,14 +127,9 @@ module ForestAdminAgent
               raise ForestAdminDatasourceToolkit::Exceptions::ForestException, 'Expected no empty id list'
             end
 
-            Filter.new(
-              condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-                [
-                  context.permissions.get_scope(context.child_collection),
-                  Utils::QueryStringParser.parse_condition_tree(context.child_collection, args),
-                  selected_ids
-                ]
-              )
+            filter = build_context_filter(context.child_collection, args, context.permissions, context.caller)
+            filter.override(
+              condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, selected_ids])
             )
           end
         end

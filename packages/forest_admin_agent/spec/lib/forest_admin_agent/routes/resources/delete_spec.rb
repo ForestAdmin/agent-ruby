@@ -56,7 +56,8 @@ module ForestAdminAgent
                   ),
                   'first_name' => ColumnSchema.new(column_type: 'String'),
                   'last_name' => ColumnSchema.new(column_type: 'String')
-                }
+                },
+                segments: ['active']
               },
               delete: true
             )
@@ -146,6 +147,40 @@ module ForestAdminAgent
               expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
                 expect(caller).to be_instance_of(Components::Caller)
                 expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_IN, value: [1, 2, 3])
+              end
+            end
+
+            context 'when every record of a searched, segmented list is selected' do
+              before do
+                args[:params][:data][:attributes][:all_records] = true
+                args[:params][:data][:attributes][:all_records_ids_excluded] = %w[3]
+                args[:params][:data][:attributes][:all_records_subset_query].merge!(
+                  search: 'jo', searchExtended: '1', segment: 'active'
+                )
+              end
+
+              it 'deletes only the records the search and the segment match, minus the excluded ones' do
+                delete.handle_request_bulk(args)
+
+                expect(@datasource.get_collection('user')).to have_received(:delete) do |caller, filter|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    search: 'jo',
+                    search_extended: true,
+                    segment: 'active',
+                    page: nil,
+                    sort: nil
+                  )
+                  expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 3)
+                end
+              end
+
+              it 'rejects a segment the collection does not have, deleting nothing' do
+                args[:params][:data][:attributes][:all_records_subset_query][:segment] = 'unknown'
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid segment: unknown')
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
               end
             end
           end

@@ -8,6 +8,7 @@ module ForestAdminAgent
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminAgent::Routes::QueryHandler
 
         def setup_routes
           add_route('forest_delete_bulk', 'delete', '/:collection_name', ->(args) { handle_request_bulk(args) })
@@ -67,14 +68,9 @@ module ForestAdminAgent
                                                      field_schema.origin_type_field => nil })
           end
 
-          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-            condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-              [
-                Utils::QueryStringParser.parse_condition_tree(context.collection, args),
-                condition_tree_ids,
-                context.permissions.get_scope(context.collection)
-              ]
-            )
+          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
+          filter = filter.override(
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, condition_tree_ids])
           )
 
           context.collection.delete(context.caller, filter)

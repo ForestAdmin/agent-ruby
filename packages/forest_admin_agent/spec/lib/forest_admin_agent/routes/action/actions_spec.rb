@@ -75,6 +75,48 @@ module ForestAdminAgent
           end
         end
 
+        describe 'the records a select-all runs on' do
+          let(:collection) do
+            build_collection(
+              name: 'orders',
+              schema: {
+                fields: {
+                  'id' => ColumnSchema.new(
+                    column_type: 'Number', is_primary_key: true,
+                    filter_operators: [Operators::IN, Operators::EQUAL]
+                  )
+                },
+                actions: { 'Refund' => double('action', scope: action_scope) },
+                segments: ['unpaid']
+              },
+              is_searchable?: true
+            )
+          end
+          let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions, get_scope: nil) }
+          let(:context) { double('context', collection: collection, caller: build_caller, permissions: permissions) }
+          let(:args) do
+            {
+              params: {
+                data: {
+                  attributes: {
+                    ids: [],
+                    all_records: true,
+                    all_records_ids_excluded: ['4'],
+                    all_records_subset_query: { search: 'refund me', searchExtended: 'true', segment: 'unpaid' }
+                  }
+                }
+              }
+            }
+          end
+
+          it 'keeps the search and the segment of the list the selection was made on' do
+            filter = route.send(:get_record_selection, args, context)
+
+            expect(filter).to have_attributes(search: 'refund me', search_extended: true, segment: 'unpaid')
+            expect(filter.condition_tree.to_h).to eq(field: 'id', operator: Operators::NOT_EQUAL, value: 4)
+          end
+        end
+
         describe 'auditing the run' do
           let(:store) { double('store', append_all: [10, 11], confirm: nil) }
 
