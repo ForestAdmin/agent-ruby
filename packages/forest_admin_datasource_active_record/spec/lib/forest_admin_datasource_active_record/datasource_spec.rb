@@ -15,6 +15,21 @@ module ForestAdminDatasourceActiveRecord
       expect(collections).to all(be_a(String))
     end
 
+    describe 'with an anonymous model' do
+      let!(:anonymous_model) { Class.new(ActiveRecord::Base) { self.table_name = 'accounts' } }
+
+      it 'boots instead of failing on the nameless model' do
+        expect { described_class.new({ adapter: 'sqlite3', database: 'db/database.db' }) }.not_to raise_error
+      end
+
+      it 'leaves the nameless model out of the collections and keeps the named ones' do
+        datasource = described_class.new({ adapter: 'sqlite3', database: 'db/database.db' })
+
+        expect(datasource.collections.values.map(&:model)).not_to include(anonymous_model)
+        expect(datasource.collections.keys).to include('Account')
+      end
+    end
+
     describe '#init_orm' do
       it 'uses connection_pool.db_config instead of deprecated connection_db_config' do
         mock_db_config = instance_double(ActiveRecord::DatabaseConfigurations::HashConfig, env_name: 'test')
