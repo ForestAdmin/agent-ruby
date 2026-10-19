@@ -32,6 +32,7 @@
     "pacote": "^21.5.1",
     "**/@semantic-release/github/undici": "^7.29.1",
     "**/@actions/http-client/undici": "^6.28.1",
-    "**/node-gyp/undici": "^6.28.1"
+    "**/node-gyp/undici": "^6.28.1",
+    "handlebars": "^4.7.10"
   }
 }
