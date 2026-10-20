@@ -6,6 +6,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Utils
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+          include ForestAdminAgent::Routes::QueryHandler
 
           def setup_routes
             add_route(
@@ -23,18 +24,7 @@ module ForestAdminAgent
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
             context.permissions.can?(:export, context.child_collection)
-            condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-              context.child_collection, args
-            )
-            context.permissions.assert_can_read_query_fields(
-              context.child_collection, condition_tree: condition_tree
-            )
-
-            filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-              condition_tree: ConditionTreeFactory.intersect(
-                [context.permissions.get_scope(context.child_collection), condition_tree]
-              )
-            )
+            filter = build_context_filter(context.child_collection, args, context.permissions, context.caller)
             requested = ForestAdminAgent::Utils::QueryStringParser.parse_requested_projection(
               context.child_collection, args
             )

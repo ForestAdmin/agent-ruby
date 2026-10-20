@@ -8,6 +8,9 @@ module ForestAdminAgent
         include ForestAdminAgent::Builder
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+        include ForestAdminAgent::Routes::QueryHandler
+
+        NULLIFIED_POLYMORPHIC_TYPES = %w[PolymorphicOneToOne PolymorphicOneToMany].freeze
 
         def setup_routes
           add_route('forest_delete_bulk', 'delete', '/:collection_name', ->(args) { handle_request_bulk(args) })
@@ -39,45 +42,44 @@ module ForestAdminAgent
                                                                                  selection_ids[:ids])
           condition_tree_ids = condition_tree_ids.inverse if selection_ids[:are_excluded]
 
-          context.collection.schema[:fields].each_value do |field_schema|
-            next unless ['PolymorphicOneToOne', 'PolymorphicOneToMany'].include?(field_schema.type)
-            next if field_schema.respond_to?(:cascade_on_delete) && field_schema.cascade_on_delete
-
-            origin_values = selection_ids[:ids].map do |pk_hash|
-              if pk_hash.is_a?(Hash)
-                pk_hash[field_schema.origin_key_target]
-              else
-                pk_names = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(context.collection)
-                index = pk_names.index(field_schema.origin_key_target)
-                pk_hash[index] if index
-              end
-            end
-
-            condition_tree = Nodes::ConditionTreeBranch.new(
-              'And',
-              [
-                Nodes::ConditionTreeLeaf.new(field_schema.origin_key, Operators::IN, origin_values),
-                Nodes::ConditionTreeLeaf.new(field_schema.origin_type_field, Operators::EQUAL,
-                                             context.collection.name.gsub('__', '::'))
-              ]
-            )
-            filter = Filter.new(condition_tree: condition_tree)
-            context.datasource.get_collection(field_schema.foreign_collection)
-                   .update(context.caller, filter, { field_schema.origin_key => nil,
-                                                     field_schema.origin_type_field => nil })
-          end
-
-          filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-            condition_tree: ConditionTree::ConditionTreeFactory.intersect(
-              [
-                Utils::QueryStringParser.parse_condition_tree(context.collection, args),
-                condition_tree_ids,
-                context.permissions.get_scope(context.collection)
-              ]
-            )
+          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
+          filter = filter.override(
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, condition_tree_ids])
           )
 
+          relations = nullified_polymorphic_relations(context.collection)
+          # ponytail: loads every deleted record's keys at once, page it if select-all deletes outgrow memory
+          records = if relations.any?
+                      context.collection.list(context.caller, filter,
+                                              Projection.new(relations.map(&:origin_key_target).uniq))
+                    end
+
           context.collection.delete(context.caller, filter)
+          relations.each { |relation| nullify_polymorphic_references(context, relation, records) }
+        end
+
+        def nullified_polymorphic_relations(collection)
+          collection.schema[:fields].values.select do |field_schema|
+            NULLIFIED_POLYMORPHIC_TYPES.include?(field_schema.type) &&
+              !(field_schema.respond_to?(:cascade_on_delete) && field_schema.cascade_on_delete)
+          end
+        end
+
+        def nullify_polymorphic_references(context, relation, records)
+          origin_values = records.map { |record| record[relation.origin_key_target] }
+          return if origin_values.empty?
+
+          condition_tree = Nodes::ConditionTreeBranch.new(
+            'And',
+            [
+              Nodes::ConditionTreeLeaf.new(relation.origin_key, Operators::IN, origin_values),
+              Nodes::ConditionTreeLeaf.new(relation.origin_type_field, Operators::EQUAL,
+                                           context.collection.name.gsub('__', '::'))
+            ]
+          )
+          context.datasource.get_collection(relation.foreign_collection)
+                 .update(context.caller, Filter.new(condition_tree: condition_tree),
+                         { relation.origin_key => nil, relation.origin_type_field => nil })
         end
       end
     end

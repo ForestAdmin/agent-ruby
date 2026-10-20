@@ -57,8 +57,9 @@ module ForestAdminAgent
               schema: {
                 fields: {
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                  'label' => ColumnSchema.new(column_type: 'String')
-                }
+                  'label' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::I_CONTAINS])
+                },
+                segments: ['popular']
               },
               list: [Category.new(1, 'bar'), Category.new(2, 'baz'), Category.new(3, 'qux')]
             )
@@ -87,7 +88,7 @@ module ForestAdminAgent
 
             csv.handle_request(args)
 
-            expect(read_guard_calls[:query_fields]).to eq([{ collection: 'category', applies: %i[filter] }])
+            expect(read_guard_calls[:query_fields]).to eq([{ collection: 'category', applies: %i[filter search search_extended] }])
             expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
           end
 
@@ -148,6 +149,24 @@ module ForestAdminAgent
               expect(captured_filter.condition_tree).to have_attributes(
                 field: 'label', operator: Operators::EQUAL, value: 'active'
               )
+            end
+
+            it 'exports only the related records the search and the segment match' do
+              args[:params].merge!('relation_name' => 'category', 'id' => 1, search: 'bar', segment: 'popular')
+              allow(csv_generator_stream).to receive(:stream).and_return(["id,label\n"].to_enum)
+
+              csv.handle_request(args)
+
+              expect(csv_generator_stream).to have_received(:stream) do |_header, filter, _projection, _list_records, _limit|
+                expect(filter).to have_attributes(
+                  condition_tree: have_attributes(aggregator: 'Or', conditions: []),
+                  page: nil,
+                  search: 'bar',
+                  search_extended: false,
+                  segment: 'popular',
+                  sort: nil
+                )
+              end
             end
 
             it 'passes a lambda to stream that calls list_relation with correct parameters' do

@@ -11,6 +11,7 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceCustomizer::Decorators::Action
+        include ForestAdminAgent::Routes::QueryHandler
 
         def initialize(collection, action)
           @action_name = action
@@ -223,18 +224,7 @@ module ForestAdminAgent
         def get_record_selection(args, context)
           attributes = args.dig(:params, :data, :attributes)
 
-          # Match user filter + search + scope? + segment
-          scope = context.permissions.get_scope(context.collection)
-          filter = Filter.new(
-            condition_tree: ConditionTreeFactory.intersect(
-              [
-                scope,
-                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  context.collection, args
-                )
-              ]
-            )
-          )
+          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
 
           # Restrict the filter to the selected records for single or bulk actions
           if context.collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL

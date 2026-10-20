@@ -53,8 +53,9 @@ module ForestAdminAgent
               schema: {
                 fields: {
                   'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true),
-                  'label' => ColumnSchema.new(column_type: 'String')
-                }
+                  'label' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::I_CONTAINS])
+                },
+                segments: ['popular']
               }
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
@@ -64,7 +65,7 @@ module ForestAdminAgent
             ForestAdminAgent::Builder::AgentFactory.instance.build
 
             allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
-            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []))
+            allow(permissions).to receive_messages(can?: true, get_scope: Nodes::ConditionTreeBranch.new('Or', []), assert_can_read_query_fields: nil)
           end
 
           it 'adds the route forest_related_count' do
@@ -92,11 +93,39 @@ module ForestAdminAgent
                   condition_tree: have_attributes(aggregator: 'Or', conditions: []),
                   page: nil,
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: nil
                 )
                 expect(aggregation).to be_instance_of(Components::Query::Aggregation)
+                expect(aggregation).to have_attributes(operation: 'Count')
+              end
+            end
+          end
+
+          context 'when the related list is searched and segmented' do
+            it 'counts only the related records the search and the segment match' do
+              args[:params].merge!('relation_name' => 'category', 'id' => 1, search: 'bar', segment: 'popular')
+              ForestAdminAgent::Facades::Container.datasource.get_collection('category').enable_count
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:aggregate_relation)
+                .and_return([{ value: 1 }])
+
+              count.handle_request(args)
+
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:aggregate_relation) do
+              |collection, id, relation_name, caller, foreign_filter, aggregation|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(collection.name).to eq('user')
+                expect(id).to eq({ 'id' => 1 })
+                expect(relation_name).to eq('category')
+                expect(foreign_filter).to have_attributes(
+                  condition_tree: have_attributes(aggregator: 'Or', conditions: []),
+                  page: nil,
+                  search: 'bar',
+                  search_extended: false,
+                  segment: 'popular',
+                  sort: nil
+                )
                 expect(aggregation).to have_attributes(operation: 'Count')
               end
             end

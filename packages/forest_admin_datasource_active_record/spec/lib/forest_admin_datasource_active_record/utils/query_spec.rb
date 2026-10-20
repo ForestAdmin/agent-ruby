@@ -375,6 +375,66 @@ module ForestAdminDatasourceActiveRecord
         end
       end
 
+      describe 'nested condition branches' do
+        let(:nodes) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes }
+        let(:operators) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators }
+
+        def sql_for(condition_tree)
+          query_builder = described_class.new(collection, nil, Filter.new(condition_tree: condition_tree))
+          query_builder.build
+          query_builder.query.to_sql
+        end
+
+        # Car's default_scope (id > 10) is still applied to filtered queries, as on main.
+        it 'groups an Or nested in an And, so a search cannot widen the other conditions' do
+          sql = sql_for(nodes::ConditionTreeBranch.new('And', [
+                                                         nodes::ConditionTreeLeaf.new('id', operators::NOT_EQUAL, 3),
+                                                         nodes::ConditionTreeBranch.new('Or', [
+                                                                                          nodes::ConditionTreeLeaf.new('brand', operators::CONTAINS, 'a'),
+                                                                                          nodes::ConditionTreeLeaf.new('model', operators::CONTAINS, 'b')
+                                                                                        ])
+                                                       ]))
+
+          expect(sql).to end_with(
+            'WHERE (id > 10) AND "cars"."id" != 3 AND ("cars"."brand" LIKE \'%a%\' OR "cars"."model" LIKE \'%b%\')'
+          )
+        end
+
+        it 'groups an And nested in an Or' do
+          sql = sql_for(nodes::ConditionTreeBranch.new('Or', [
+                                                         nodes::ConditionTreeLeaf.new('id', operators::EQUAL, 1),
+                                                         nodes::ConditionTreeBranch.new('And', [
+                                                                                          nodes::ConditionTreeLeaf.new('brand', operators::EQUAL, 'a'),
+                                                                                          nodes::ConditionTreeLeaf.new('model', operators::EQUAL, 'b')
+                                                                                        ])
+                                                       ]))
+
+          expect(sql).to end_with(
+            'WHERE (id > 10) AND ("cars"."id" = 1 OR "cars"."brand" = \'a\' AND "cars"."model" = \'b\')'
+          )
+        end
+
+        it 'keeps the join of a related field used inside a nested Or' do
+          sql = sql_for(nodes::ConditionTreeBranch.new('And', [
+                                                         nodes::ConditionTreeLeaf.new('id', operators::NOT_EQUAL, 3),
+                                                         nodes::ConditionTreeBranch.new('Or', [
+                                                                                          nodes::ConditionTreeLeaf.new('brand', operators::CONTAINS, 'a'),
+                                                                                          nodes::ConditionTreeLeaf.new('category:label', operators::CONTAINS, 'b')
+                                                                                        ])
+                                                       ]))
+
+          expect(sql).to include('LEFT OUTER JOIN "categories"')
+          expect(sql).to end_with(
+            'WHERE (id > 10) AND "cars"."id" != 3 AND ("cars"."brand" LIKE \'%a%\' OR "categories"."label" LIKE \'%b%\')'
+          )
+        end
+
+        it 'matches nothing on an empty Or and everything on an empty And' do
+          expect(sql_for(nodes::ConditionTreeBranch.new('Or', []))).to end_with('WHERE (id > 10) AND (1 = 0)')
+          expect(sql_for(nodes::ConditionTreeBranch.new('And', []))).to end_with('WHERE (id > 10) AND (1 = 1)')
+        end
+      end
+
       describe 'sorting on related fields' do
         it 'uses the related table name for sorting' do
           sort = [{ field: 'category:label', ascending: true }]

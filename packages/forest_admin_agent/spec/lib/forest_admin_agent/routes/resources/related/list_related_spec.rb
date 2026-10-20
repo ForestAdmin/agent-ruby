@@ -59,7 +59,8 @@ module ForestAdminAgent
                     is_primary_key: true
                   ),
                   'label' => ColumnSchema.new(column_type: 'String')
-                }
+                },
+                segments: ['popular']
               }
             )
             allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
@@ -80,8 +81,8 @@ module ForestAdminAgent
             expect(list.routes.length).to eq 1
           end
 
-          # The only routes resolving against the foreign collection rather than their own, and a
-          # related listing applies no search — so neither is checked against the parent.
+          # The only routes resolving against the foreign collection rather than their own, so none of
+          # their components is checked against the parent.
           it 'checks the components it applies against the foreign collection' do
             args[:params]['relation_name'] = 'category'
             args[:params]['id'] = 1
@@ -90,9 +91,35 @@ module ForestAdminAgent
             list.handle_request(args)
 
             expect(read_guard_calls[:query_fields]).to eq(
-              [{ collection: 'category', applies: %i[filter sort] }]
+              [{ collection: 'category', applies: %i[filter sort search search_extended] }]
             )
             expect(read_guard_calls[:projections]).to eq([{ collection: 'category', named_by_caller: false }])
+          end
+
+          context 'when the related list is searched and segmented' do
+            it 'lists only the related records the search and the segment match' do
+              args[:params].merge!('relation_name' => 'category', 'id' => 1, search: 'bar', segment: 'popular')
+              allow(ForestAdminDatasourceToolkit::Utils::Collection).to receive(:list_relation).and_return([])
+
+              list.handle_request(args)
+
+              expect(ForestAdminDatasourceToolkit::Utils::Collection).to have_received(:list_relation) do
+              |collection, id, relation_name, caller, foreign_filter, projection|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(collection.name).to eq('user')
+                expect(id).to eq({ 'id' => 1 })
+                expect(relation_name).to eq('category')
+                expect(foreign_filter).to have_attributes(
+                  condition_tree: have_attributes(aggregator: 'Or', conditions: []),
+                  page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
+                  search: 'bar',
+                  search_extended: false,
+                  segment: 'popular',
+                  sort: [{ ascending: true, field: 'id' }]
+                )
+                expect(projection).to eq(%w[id label])
+              end
+            end
           end
 
           context 'when call without filters' do
@@ -112,7 +139,7 @@ module ForestAdminAgent
                   condition_tree: have_attributes(aggregator: 'Or', conditions: []),
                   page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: [{ ascending: true, field: 'id' }]
                 )
@@ -196,7 +223,7 @@ module ForestAdminAgent
                   ),
                   page: be_instance_of(ForestAdminDatasourceToolkit::Components::Query::Page),
                   search: nil,
-                  search_extended: nil,
+                  search_extended: false,
                   segment: nil,
                   sort: [{ ascending: true, field: 'id' }]
                 )

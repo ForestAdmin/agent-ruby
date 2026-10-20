@@ -1381,6 +1381,22 @@ module ForestAdminAgent
         end
       end
 
+      describe 'when parse_segment' do
+        let(:segmented) { build_collection(schema: { segments: ['active'] }) }
+
+        it 'falls back to the query string segment when data is an array of picked ids' do
+          args = { params: { data: [{ 'id' => 1 }], segment: 'active' } }
+
+          expect(described_class.parse_segment(segmented, args)).to eq('active')
+        end
+
+        it 'falls back to the query string segment when the select-all body sends false' do
+          args = { params: { segment: 'active', data: { attributes: { all_records_subset_query: { segment: false } } } } }
+
+          expect(described_class.parse_segment(segmented, args)).to eq('active')
+        end
+      end
+
       describe 'when parse_search_extended' do
         it 'returns the query searchExtended parameter' do
           args = { params: { searchExtended: true } }
