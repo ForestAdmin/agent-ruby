@@ -1,3 +1,10 @@
+## [1.46.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.1...v1.46.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* **agent:** keep the search and segments of a select-all in delete, actions and dissociate [PRD-1667] ([#414](https://github.com/ForestAdmin/agent-ruby/issues/414)) ([8d4db0f](https://github.com/ForestAdmin/agent-ruby/commit/8d4db0fdc814cd82dc69012bd816734fc329b777))
+
 ## [1.46.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.0...v1.46.1) (2026-10-16)
 
 
