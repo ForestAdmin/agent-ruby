@@ -1,3 +1,10 @@
+## [1.46.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.2...v1.46.3) (2026-10-21)
+
+
+### Performance Improvements
+
+* **audit_trail:** index a record's history and its life boundaries ([#416](https://github.com/ForestAdmin/agent-ruby/issues/416)) ([c33c5b9](https://github.com/ForestAdmin/agent-ruby/commit/c33c5b9a3b1d59002783386f573f5bc9e6465d4a))
+
 ## [1.46.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.1...v1.46.2) (2026-10-20)
 
 
