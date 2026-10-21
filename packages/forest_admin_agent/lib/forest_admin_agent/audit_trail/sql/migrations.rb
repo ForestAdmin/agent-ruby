@@ -62,6 +62,27 @@ module ForestAdminAgent
               connection.add_index(table, %i[timestamp id], name: "#{table.split(".").last}_timestamp_id",
                                                             if_not_exists: true)
             end
+          },
+          {
+            # A record's history is read by (collection, record_id) in (timestamp, id) order. With only
+            # `record_id` and `(timestamp, id)` to choose from, Postgres either reads every row the id holds
+            # across all collections, or walks the whole table's (timestamp, id) index under a LIMIT: the life
+            # boundary lookup discarded 2.1M rows (486 ms) on a 2.1M-row table for a record created long ago.
+            name: '004-index-record-history',
+            up: lambda do |connection, table|
+              base = table.split('.').last
+              columns = %i[collection record_id timestamp id]
+              options = { if_not_exists: true }
+              options[:length] = { record_id: 255 } if connection.adapter_name.downcase.match?(/mysql|maria/)
+
+              connection.add_index(table, columns, name: "#{base}_record_history", **options)
+              next unless connection.supports_partial_index?
+
+              # The life boundary keeps a record's `create` and `delete` rows only: without this, a record
+              # updated 100k times is read whole to find its one `create`.
+              connection.add_index(table, columns, name: "#{base}_life_boundaries",
+                                                   where: "operation IN ('create', 'delete')", **options)
+            end
           }
         ].freeze
       end

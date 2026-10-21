@@ -226,7 +226,8 @@ module ForestAdminAgent
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_logs_migration ORDER BY name')
-        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id])
+        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id
+                               004-index-record-history])
       end
 
       # A table created by a release that still kept the column loses it on the next boot, rows intact.
@@ -253,7 +254,8 @@ module ForestAdminAgent
         expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
         expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
         expect(connection.select_values('SELECT name FROM other_logs_migration'))
-          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id])
+          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id
+                    004-index-record-history])
       end
 
       # Every write sets it, so a row without one is a bug rather than a row quietly claiming to be done.
@@ -429,6 +431,20 @@ module ForestAdminAgent
         it 'is nil for a create with nothing filed before it' do
           store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z'))
           store.append(record(operation: 'update', timestamp: '2026-01-03T00:00:00.000Z'))
+
+          expect(boundary).to be_nil
+        end
+
+        it 'counts a create as a boundary when a row sharing its instant was filed before it' do
+          store.append(record(operation: 'update', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'earlier'))
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'retaken'))
+
+          expect(boundary).to eq('retaken')
+        end
+
+        it 'is nil for a create when the row sharing its instant was filed after it' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'update', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'same'))
 
           expect(boundary).to be_nil
         end
@@ -610,6 +626,34 @@ module ForestAdminAgent
         )
         expect(connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_timestamp_id' }.columns)
           .to eq(%w[timestamp id])
+      end
+
+      it "indexes a record's history by collection, record_id, then timestamp and id" do
+        store.append(record)
+
+        history = connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_record_history' }
+        expect([history.columns, history.where]).to eq([%w[collection record_id timestamp id], nil])
+      end
+
+      it 'indexes the same columns over create and delete rows only, for the life boundary' do
+        store.append(record)
+
+        boundaries = connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_life_boundaries' }
+        expect([boundaries.columns, boundaries.where])
+          .to eq([%w[collection record_id timestamp id], "operation IN ('create', 'delete')"])
+      end
+
+      it 'skips the partial index on an adapter that cannot filter one' do
+        Sql::AuditConnectionBase.connect_to(adapter: 'sqlite3', database: db.path)
+        Sql::Migrations::ALL.first[:up].call(connection, 'audit_logs')
+        allow(connection).to receive(:supports_partial_index?).and_return(false)
+
+        Sql::Migrations::ALL.find { |migration| migration[:name] == '004-index-record-history' }[:up]
+                            .call(connection, 'audit_logs')
+
+        index_names = connection.indexes('audit_logs').map(&:name)
+        expect(index_names).to include('audit_logs_record_history')
+        expect(index_names).not_to include('audit_logs_life_boundaries')
       end
     end
   end

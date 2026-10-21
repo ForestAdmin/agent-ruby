@@ -204,11 +204,12 @@ module ForestAdminAgent
                 .uniq { |author| author[:user_id] }
       end
 
-      # Rows strictly before `row` in the trail's (timestamp, id) order.
+      # Rows strictly before `row` in the trail's (timestamp, id) order. A row value rather than the equivalent
+      # `timestamp < ? OR (timestamp = ? AND id < ?)`, which Postgres cannot turn into a range on the
+      # (collection, record_id, timestamp, id) index: on a 50k-row history the OR read all of it (7 ms), the row
+      # value a single entry (0.06 ms).
       def before_row_condition(row)
-        at = as_time(row.timestamp)
-
-        ['timestamp < ? OR (timestamp = ? AND id < ?)', at, at, row.id]
+        ['(timestamp, id) < (?, ?)', as_time(row.timestamp), row.id]
       end
 
       # Rows strictly past `row` in the history's own order, so a scan keyed on the last row it read neither
