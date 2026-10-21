@@ -159,6 +159,67 @@ module ForestAdminAgent
             expect(execute).to eq({ type: 'Success', message: 'done' })
           end
         end
+
+        # A single action context only ever reads the first record, so a selection naming more than one
+        # would run on that record alone and still answer success.
+        describe 'a single action given more than one record' do
+          let(:action_scope) { ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE }
+          let(:permissions) { instance_spy(ForestAdminAgent::Services::Permissions) }
+          let(:context) do
+            double('context', collection: collection, caller: build_caller, permissions: permissions,
+                              datasource: collection.datasource)
+          end
+          let(:message) { 'This action can only be triggered on one record at a time.' }
+
+          def request(attributes)
+            { params: { data: { attributes: { values: {} }.merge(attributes) } } }
+          end
+
+          before do
+            allow(route).to receive_messages(build: context, build_context_filter: filter)
+            allow(collection).to receive_messages(get_form: [], execute: { type: 'Success', message: 'done' })
+          end
+
+          it 'refuses two ids with a 422 and runs nothing' do
+            expect { route.handle_request(request(ids: %w[4 7])) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(collection).not_to have_received(:execute)
+          end
+
+          it 'refuses two ids before checking the permissions, so no approval is asked for' do
+            expect { route.handle_request(request(ids: %w[4 7])) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(permissions).not_to have_received(:can_smart_action?)
+          end
+
+          it 'refuses the approval of a request naming two ids and runs nothing' do
+            allow(route).to receive(:decode_signed_approval_request).and_return({ data: { attributes: {} } })
+
+            expect { route.handle_request(request(ids: %w[4 7], signed_approval_request: 'signed')) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(collection).not_to have_received(:execute)
+          end
+
+          it 'refuses a select-all selection with a 422 and runs nothing' do
+            expect { route.handle_request(request(ids: [], all_records: true, all_records_ids_excluded: [])) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(collection).not_to have_received(:execute)
+          end
+
+          it 'refuses loading the form with two ids and computes no form' do
+            expect { route.handle_hook_request(request(ids: %w[4 7])) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(collection).not_to have_received(:get_form)
+          end
+
+          it 'still runs on exactly one id' do
+            route.handle_request(request(ids: %w[4]))
+
+            expect(collection).to have_received(:execute).with(
+              context.caller, 'Refund', {}, having_attributes(condition_tree: having_attributes(field: 'id', value: 4))
+            )
+          end
+        end
       end
     end
   end
