@@ -127,10 +127,10 @@ module ForestAdminAgent
                 "The collection #{context.collection.name} does not have this smart action"
         end
 
-        # A single action only ever runs on the first record: refuse rather than skip the others.
+        # A single action runs on its first record, or on nothing: refuse any selection but one id.
         def ensure_single_record(context, selection_ids)
           return unless context.collection.schema[:actions][@action_name].scope == Types::ActionScope::SINGLE
-          return unless selection_ids[:are_excluded] || selection_ids[:ids].size > 1
+          return unless selection_ids[:are_excluded] || selection_ids[:ids].size != 1
 
           raise Http::Exceptions::UnprocessableError, 'This action can only be triggered on one record at a time.'
         end

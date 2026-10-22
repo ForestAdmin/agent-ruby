@@ -162,7 +162,7 @@ module ForestAdminAgent
 
         # A single action context only ever reads the first record, so a selection naming more than one
         # would run on that record alone and still answer success.
-        describe 'a single action given more than one record' do
+        describe 'a single action given anything but one record' do
           let(:action_scope) { ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::SINGLE }
           let(:permissions) { instance_spy(ForestAdminAgent::Services::Permissions) }
           let(:context) do
@@ -196,6 +196,12 @@ module ForestAdminAgent
             signed = JWT.encode({ data: { attributes: { ids: %w[4 7] } } }, Facades::Container.cache(:env_secret), 'HS256')
 
             expect { route.handle_request(request(ids: %w[4 7], signed_approval_request: signed)) }
+              .to raise_error(Http::Exceptions::UnprocessableError, message)
+            expect(collection).not_to have_received(:execute)
+          end
+
+          it 'refuses an empty selection with a 422 and runs nothing' do
+            expect { route.handle_request(request(ids: [])) }
               .to raise_error(Http::Exceptions::UnprocessableError, message)
             expect(collection).not_to have_received(:execute)
           end
