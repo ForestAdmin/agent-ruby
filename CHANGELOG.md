@@ -1,3 +1,10 @@
+## [1.46.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.3...v1.46.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **agent:** refuse a single-record action given several records [PRD-1704] ([#417](https://github.com/ForestAdmin/agent-ruby/issues/417)) ([cdbbc7b](https://github.com/ForestAdmin/agent-ruby/commit/cdbbc7b7338ca722f6221c55d569e11ab0301f25))
+
 ## [1.46.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.2...v1.46.3) (2026-10-21)
 
 
