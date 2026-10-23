@@ -1,0 +1,181 @@
+module ForestAdminDatasourceIntercom
+  module Query
+    # Turns a Forest condition tree into the query `POST /conversations/search`
+    # and `POST /tickets/search` take:
+    #
+    #   leaf   -> { 'field' => ..., 'operator' => ..., 'value' => ... }
+    #   branch -> { 'operator' => 'AND' | 'OR', 'value' => [...] }
+    #
+    # What it will not translate, it refuses. A condition dropped on the way to
+    # Intercom comes back as a page of unfiltered records that looks filtered,
+    # and every refusal below therefore names the field, the operator, or the
+    # thing to change -- an operator reads that message and nothing else.
+    #
+    # Which field the endpoint filters, and with which operator, is not decided
+    # here: it is `search_fields.yml`, measured against a real workspace. This
+    # walks the tree and formats what the table allows.
+    class ConditionTreeTranslator
+      Branch = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
+      Leaf = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
+
+      AGGREGATORS = { 'and' => 'AND', 'or' => 'OR' }.freeze
+
+      # Intercom nests a search two levels deep and takes fifteen conditions per
+      # group. Both are checked here rather than left to the API: over either,
+      # Intercom answers a 400 whose body names neither the limit nor the part of
+      # the filter that reached it, and an operator reading it has no way of
+      # knowing that their segment plus their scope plus their own filter is what
+      # went over.
+      MAX_DEPTH = 2
+      MAX_GROUP_SIZE = 15
+
+      def self.call(condition_tree, endpoint:, collection:, timezone: nil, attribute_columns: [])
+        return nil if condition_tree.nil?
+
+        new(endpoint: endpoint, collection: collection, timezone: timezone,
+            attribute_columns: attribute_columns).translate(condition_tree)
+      end
+
+      # `attribute_columns` are the columns a workspace's own attributes became,
+      # which no row of the table can name: they are discovered at boot. They
+      # share one refusal, carried by the endpoint, and passing them here is
+      # what lets it be read instead of the generic message.
+      def initialize(endpoint:, collection:, timezone: nil, attribute_columns: [])
+        @endpoint = endpoint
+        @collection = collection
+        @attribute_columns = Array(attribute_columns).map(&:to_s)
+        @value = FilterValue.new(collection: collection, timezone: timezone)
+      end
+
+      def translate(node, depth = 1)
+        case node
+        when Branch then translate_branch(node, depth)
+        when Leaf then translate_leaf(node)
+        else raise UnsupportedOperatorError, "#{@collection} cannot read #{node.class} as a condition."
+        end
+      end
+
+      private
+
+      def translate_branch(branch, depth)
+        conditions = Array(branch.conditions)
+        refuse_empty_branch!(branch) if conditions.empty?
+
+        # Read before the unwrap below, so a branch is refused on the aggregator
+        # it carries rather than on how many conditions it holds.
+        operator = aggregator(branch)
+
+        # A branch holding one condition needs no group of its own. The agent
+        # builds a tree one branch at a time -- a scope, then a segment, then the
+        # operator's own filter -- and the nesting Intercom allows is shallow
+        # enough that a wrapper around nothing is a level worth not spending.
+        return translate(conditions.first, depth) if conditions.size == 1
+
+        refuse_too_deep!(branch, depth) if depth > MAX_DEPTH
+        refuse_too_wide!(branch, conditions.size) if conditions.size > MAX_GROUP_SIZE
+
+        { 'operator' => operator, 'value' => conditions.map { |condition| translate(condition, depth + 1) } }
+      end
+
+      # What reaches this depth is a group inside a group inside a group. The
+      # message names the shape rather than a number, since the tree an operator
+      # can act on is the segment and the scope they wrote, not the one the agent
+      # assembled out of them.
+      def refuse_too_deep!(branch, depth)
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot answer this filter: Intercom nests a search #{MAX_DEPTH} levels deep and this " \
+              "one reaches #{depth}. #{deepening_cause(branch)}"
+      end
+
+      # A group the operator wrote is theirs to flatten. A group a relation
+      # expanded into is not: it is the several records the relation matched,
+      # written one equality each because Intercom takes no membership operator
+      # on a foreign key -- and telling them to flatten a nesting they never
+      # wrote is a refusal they cannot act on.
+      def deepening_cause(branch)
+        field = branch.respond_to?(:relation_field) ? branch.relation_field : nil
+
+        if field.nil?
+          'A group inside a group inside a group is one level too many -- flatten the segment, the scope or the ' \
+            'filter carrying the innermost one.'
+        else
+          "The innermost group is what #{field.inspect} expanded into, one equality per record it matched: narrow " \
+            'that condition until it names a single record, or lift it out of the groups nesting it.'
+        end
+      end
+
+      # Fifteen is reached without trying: a scope, a segment and a filter add up,
+      # and a condition naming several values is expanded into one condition per
+      # value on the way here, Intercom taking no membership operator on these
+      # fields.
+      def refuse_too_wide!(branch, size)
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot answer this filter: Intercom takes #{MAX_GROUP_SIZE} conditions per group and " \
+              "this #{branch.aggregator} carries #{size}. A filter naming several values counts one condition per " \
+              'value here, so narrowing the list, the segment or the scope is what brings it back under the limit.'
+      end
+
+      def aggregator(branch)
+        AGGREGATORS[branch.aggregator.to_s.downcase] ||
+          raise(UnsupportedOperatorError,
+                "#{@collection} cannot read #{branch.aggregator.inspect} as a condition tree aggregator; " \
+                "expected 'And' or 'Or'.")
+      end
+
+      def translate_leaf(leaf)
+        field = @endpoint.field(leaf.field.to_s) || refuse_unfilterable!(leaf.field.to_s)
+        spelling = OperatorTable.intercom_operator(field, leaf.operator) || refuse_operator!(leaf, field)
+
+        { 'field' => field.field, 'operator' => spelling, 'value' => @value.call(leaf, field, spelling) }
+      end
+
+      # A column the endpoint does not filter, and the reason it does not, taken
+      # from the table when it carries one: those reasons are the difference
+      # between "no" and a message an operator can do something with.
+      def refuse_unfilterable!(column)
+        raise UnsupportedOperatorError, "#{@collection} cannot filter #{column.inspect}: #{unfilterable_reason(column)}"
+      end
+
+      def unfilterable_reason(column)
+        return relation_reason(column) if column.include?(':')
+
+        refusal = @endpoint.refusal(column) || attribute_refusal(column)
+        return refusal.reason if refusal
+
+        "#{@endpoint.path} takes no filter on it. Filter on one of: #{@endpoint.filterable_columns.join(", ")}."
+      end
+
+      # A relation reaches the translator as `relation:field`, and it should not:
+      # `Relations#rewrite_relation_conditions` trades every one of them for a
+      # condition on the foreign key before a tree gets this far, or refuses it
+      # by name -- with the relations the collection does declare. So this is
+      # the message for a caller that skipped that pass, and it names what this
+      # endpoint filters rather than a relation nobody resolved.
+      def relation_reason(_column)
+        "#{@endpoint.path} filters columns, not paths through a relation -- those are resolved against the " \
+          'collection they point at before a condition reaches here. Filter on one of: ' \
+          "#{@endpoint.filterable_columns.join(", ")}."
+      end
+
+      # A column the table cannot carry a row for, the workspace having named it:
+      # the endpoint's one refusal for the whole family answers for it.
+      def attribute_refusal(column)
+        @attribute_columns.include?(column) ? @endpoint.attribute_refusal : nil
+      end
+
+      def refuse_operator!(leaf, field)
+        supported = OperatorTable.forest_operators(field)
+
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot filter #{leaf.field.inspect} with #{leaf.operator.inspect}: " \
+              "#{@endpoint.path} answers #{supported.join(", ")} on #{field.field.inspect} and nothing else."
+      end
+
+      def refuse_empty_branch!(branch)
+        raise UnsupportedOperatorError,
+              "#{@collection} was given a #{branch.aggregator} branch carrying no condition, which names no record " \
+              'and no filter.'
+      end
+    end
+  end
+end
