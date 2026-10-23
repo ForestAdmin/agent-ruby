@@ -127,6 +127,14 @@ module ForestAdminAgent
                 "The collection #{context.collection.name} does not have this smart action"
         end
 
+        # A single action runs on its first record, or on nothing: refuse any selection but one id.
+        def ensure_single_record(context, selection_ids)
+          return unless context.collection.schema[:actions][@action_name].scope == Types::ActionScope::SINGLE
+          return unless selection_ids[:are_excluded] || selection_ids[:ids].size != 1
+
+          raise Http::Exceptions::UnprocessableError, 'This action can only be triggered on one record at a time.'
+        end
+
         # Recorded as pending before the action runs and confirmed after, so an action that takes the process
         # down with it still leaves evidence that it started. A failed run is worth recording too — "who tried
         # to run this" is usually the interesting part — and an action answering with an Error result failed
@@ -229,6 +237,7 @@ module ForestAdminAgent
           # Restrict the filter to the selected records for single or bulk actions
           if context.collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL
             selection_ids = Utils::Id.parse_selection_ids(context.collection, args[:params])
+            ensure_single_record(context, selection_ids)
             selected_ids = ConditionTreeFactory.match_ids(context.collection, selection_ids[:ids])
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
             filter = filter.override(
