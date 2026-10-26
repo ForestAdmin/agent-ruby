@@ -1,166 +1,121 @@
-# Forest Admin agent Ruby
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/header-agent-ruby-dark.svg">
+    <img alt="Forest agent for Ruby: your data, workflows and AI agents, running on your infrastructure." src="./assets/header-agent-ruby-light.svg" width="100%">
+  </picture>
+</p>
 
+<p align="center">
+  <a href="https://rubygems.org/gems/forest_admin_rails"><img alt="gem" src="https://img.shields.io/gem/v/forest_admin_rails?color=3f5b1e&labelColor=262d1e"></a>
+  <a href="https://github.com/ForestAdmin/agent-ruby/actions/workflows/build.yml"><img alt="CI" src="https://github.com/ForestAdmin/agent-ruby/actions/workflows/build.yml/badge.svg?branch=main"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/ForestAdmin/agent-ruby?color=3f5b1e&labelColor=262d1e"></a>
+</p>
 
-Forest Admin provides an off-the-shelf administration panel based on a highly-extensible API plugged into your application.
+**Forest is the back office for operations teams in regulated companies.** Ops teams review, decide and act on your data from one interface, or let AI agents do it, within the roles, permissions and audit logs you define.
 
-This project has been designed with scalability in mind to fit requirements from small projects to mature companies.
+This repository is the **Ruby agent**: the part of Forest that runs inside your Rails application, connects to your databases and services, and exposes them to the Forest interface. Your business data never goes through Forest.
 
-## Who Uses Forest Admin
+> [!NOTE]
+> **Forest v2.** This is the current Ruby SDK. Using the `forest_liana` gem? You are on v1: see [forest-rails](https://github.com/ForestAdmin/forest-rails) and the [migration guide](https://docs.forest.app/guides/migration/from-v1/overview).
 
-- [Apartmentlist](https://www.apartmentlist.com)
-- [Carbon Health](https://carbonhealth.com)
-- [Ebanx](https://www.ebanx.com)
-- [First circle](https://www.firstcircle.ph)
-- [Forest Admin](https://www.forestadmin.com) of course :-)
-- [Heetch](https://www.heetch.com)
-- [Lunchr](https://www.lunchr.co)
-- [Pillow](https://www.pillow.com)
-- [Qonto](https://www.qonto.eu)
-- [Shadow](https://shadow.tech)
-- And hundreds more…
+## Quick start
 
-## Getting started
+```ruby
+# Gemfile
+gem 'forest_admin_rails'
+```
 
-[https://docs.forestadmin.com/documentation/how-tos/setup/install](https://docs.forestadmin.com/documentation/how-tos/setup/install)
+```bash
+bundle install
+bundle exec rails generate forest_admin_rails:install <FOREST_ENV_SECRET>
+```
 
-## Documentation
+The generator mounts the engine, and creates the initializer and the agent entry point:
 
-[https://docs.forestadmin.com/documentation/](https://docs.forestadmin.com/documentation/)
+```ruby
+# config/initializers/forest_admin_rails.rb
+ForestAdminRails.configure do |config|
+  config.auth_secret = ENV['FOREST_AUTH_SECRET']
+  config.env_secret  = ENV['FOREST_ENV_SECRET']
+end
+```
+
+```ruby
+# lib/forest_admin_rails/create_agent.rb
+module ForestAdminRails
+  class CreateAgent
+    def self.setup!
+      database_configuration = Rails.configuration.database_configuration
+      datasource = ForestAdminDatasourceActiveRecord::Datasource.new(database_configuration[Rails.env])
+
+      @create_agent = ForestAdminAgent::Builder::AgentFactory.instance.add_datasource(datasource)
+      customize
+      @create_agent.build
+    end
+
+    def self.customize
+      # Add computed fields, actions, segments and hooks here
+    end
+  end
+end
+```
+
+Environment variables: `FOREST_ENV_SECRET`, `FOREST_AUTH_SECRET`, and `FOREST_SERVER_URL` if you target a dedicated instance.
+Full guide: [docs.forest.app/get-started/quickstart](https://docs.forest.app/get-started/quickstart)
+
+## Requirements
+
+| | |
+|---|---|
+| Ruby | `>= 3.0` (CI tests 3.4 and 4.0) |
+| Rails | `>= 6.1` |
+
+## What the agent gives you
+
+| | |
+|---|---|
+| **Data** | ActiveRecord, Mongoid, Snowflake, Zendesk, GraphQL/Hasura, Mambu, Pylon, RPC: one data source package per source. |
+| **Customization** | Computed fields, actions, segments, hooks and relationships through `forest_admin_datasource_customizer`. |
+| **Permissions and audit** | Roles, scopes and activity logs defined in Forest, enforced on every request. |
+| **Testing** | `forest_admin_test_toolkit` to test your customizations. |
 
 ## How it works
 
-<p align="center" style="margin: 60px 0">
-  <img width="100%" src="https://forest-assets.s3.amazonaws.com/Github+README+assets/howitworks.png" alt="Howitworks">
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/arch-agent-ruby-dark.svg">
+  <img alt="The Ruby agent runs on your infrastructure. Forest calls it over HTTPS; the agent queries your databases and services." src="./assets/arch-agent-ruby-light.svg" width="100%">
+</picture>
 
-Forest Admin consists of two components:
+The agent runs **on your infrastructure**. The Forest interface calls your agent, and your agent queries your sources: Forest does not store your business data.
 
-- The Admin Frontend is the user interface where you'll manage your data and configuration.
-- The Admin Backend API hosted on your servers where you can find and extend your data models and all the business logic (routes, actions, …) related to your admin panel.
+## Documentation
 
-The Forest Admin package (aka Forest Liana) introspects all your data model
-and dynamically generates the Admin API hosted on your servers. The Forest Admin
-interface is a web application that handles communication between the admin
-user and your application data through the Admin API.
+| | |
+|---|---|
+| Get started | https://docs.forest.app/get-started/quickstart |
+| Connect a data source | https://docs.forest.app/get-started/connect/data-sources/overview |
+| Ruby API reference | https://docs.forest.app/reference/agent-api/ruby |
+| Migrating from v1 | https://docs.forest.app/guides/migration/from-v1/overview |
 
-## Features
+<details>
+<summary><b>Packages in this monorepo</b></summary>
 
-### CRUD
+`forest_admin_rails` · `forest_admin_agent` · `forest_admin_rpc_agent` · `forest_admin_datasource_toolkit` · `forest_admin_datasource_customizer` · `forest_admin_datasource_active_record` · `forest_admin_datasource_mongoid` · `forest_admin_datasource_snowflake` · `forest_admin_datasource_zendesk` · `forest_admin_datasource_graphql_hasura` · `forest_admin_datasource_mambu_payments` · `forest_admin_datasource_pylon` · `forest_admin_datasource_rpc` · `forest_admin_test_toolkit`
 
-All of your CRUD operations are natively supported. The API automatically
-supports your data models' validation and allows you to easily extend or
-override any API routes' with your very own custom logic.
+A complete demo application lives in [`packages/_examples/demo`](./packages/_examples/demo).
 
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/crud.jpeg" alt="CRUD">
+</details>
 
-### Search & Filters
+## Contributing
 
-Forest Admin has a built-in search allowing you to run basic queries to
-retrieve your application's data. Set advanced filters based on fields and
-relationships to handle complex search use cases.
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, tests and commit conventions.
 
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/search+filters.jpeg" alt="Search and Filters">
+```bash
+cd packages/<package>
+BUNDLE_GEMFILE=Gemfile-test bundle install
+BUNDLE_GEMFILE=Gemfile-test bundle exec rspec
+```
 
-### Sorting & Pagination
+## License
 
-Sorting and pagination features are natively handled by the Admin API. We're
-continuously optimizing how queries are run in order to display results faster
-and reduce the load of your servers.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/sorting+pagination.jpeg" alt="Sorting and Pagination">
-
-### Custom action
-
-A custom action is a button which allows you to trigger an API call to execute
-a custom logic. With virtually no limitations, you can extend the way you
-manipulate data and trigger actions (e.g. refund a customer, apply a coupon,
-ban a user, etc.)
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/custom+actions.jpeg" alt="Custom action">
-
-### Export
-
-Sometimes you need to export your data to a good old fashioned CSV. Yes, we
-know this can come in handy sometimes :-)
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/exports.jpeg" alt="Export">
-
-### Segments
-
-Get in app access to a subset of your application data by doing a basic search
-or typing an SQL query or implementing an API route.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/segments.jpeg" alt="Segments">
-
-### Dashboards
-
-Forest Admin is able to tap into your actual data to chart out your metrics
-using a simple UI panel, a SQL query or a custom API call.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/dashboards.jpeg" alt="Dashboard">
-
-### WYSIWYG
-
-The WYSIWYG interface saves you a tremendous amount of frontend development
-time using drag'n'drop as well as advanced widgets to build customizable views.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/wysiwyg.jpeg" alt="WYSIWYG">
-
-### Custom HTML/JS/CSS
-
-Code your own views using JS, HTML, and CSS to display your application data in
-a more appropriate way (e.g. Kanban, Map, Calendar, Gallery, etc.).
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/smart+views.jpeg" alt="Custom views">
-
-### Team-based permissions
-
-Without any lines of code, manage directly from the UI who has access or can
-act on which data using a team-based permission system.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/teams.jpeg" alt="Team based permissions">
-
-### Third-party integrations
-
-Leverage data from third-party services by reconciling it with your
-application’s data and providing it directly to your Admin Panel. All your
-actions can be performed at the same place, bringing additional intelligence to
-your Admin Panel and ensuring consistency.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/integrations.jpeg" alt="Third-party integrations">
-
-### Notes & Comments
-
-Assign your teammates to specific tasks, leave a note or simply comment a
-record, thereby simplifying collaboration all across your organization.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/notes+comments.jpeg" alt="Notes and Comments">
-
-### Activity logs
-
-Monitor each action executed and follow the trail of modification on any data
-with an extensive activity log system.
-
-<img src="https://forest-assets.s3.amazonaws.com/Github+README+assets/activity+logs.jpeg" alt="Activity logs">
-
-## How to contribute
-
-This repository is officially maintained by Forest Admin.
-We're always happy to get contributions for other fellow lumberjacks.
-All contributions will be reviewed by Forest Admin's team before being merged into main.
-
-Here is the contribution workflow:
-
-1. **Fork** the repo on GitHub
-2. **Clone** the project to your own machine
-3. **Commit** changes to your own branch
-4. **Push** your work back up to your fork
-5. Submit a **Pull request** so that we can review your changes
-
-Please ensure that the **tests** are passing before submitting any pull request.
-
-## Community
-
-👇 Join our Developers community for support and more
-
-[![Discourse developers community](https://img.shields.io/discourse/posts?label=discourse&server=https%3A%2F%2Fcommunity.forestadmin.com)](https://community.forestadmin.com)
+Apache 2.0. See [LICENSE](./LICENSE).
