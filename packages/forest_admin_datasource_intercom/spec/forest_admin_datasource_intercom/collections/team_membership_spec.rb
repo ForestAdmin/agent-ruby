@@ -101,6 +101,33 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # The leaderboard of a team's teammates is this aggregation: the through
+    # collection grouped by the far side's label.
+    describe 'a group through a relation' do
+      it 'groups by the related record, not into one nil bucket' do
+        stub_teams({ 'id' => '814865', 'name' => 'Support', 'admin_ids' => [493_881, 493_882] },
+                   { 'id' => '814866', 'name' => 'Billing', 'admin_ids' => [493_882] })
+        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(
+          operation: 'Count', groups: [{ field: 'team:name' }]
+        )
+
+        expect(collection.aggregate(nil, filter, aggregation))
+          .to contain_exactly({ 'group' => { 'team:name' => 'Support' }, 'value' => 2 },
+                              { 'group' => { 'team:name' => 'Billing' }, 'value' => 1 })
+      end
+
+      it 'reads no relation the aggregation does not name' do
+        stub_teams('id' => '814865', 'admin_ids' => [493_881])
+        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(
+          operation: 'Count', groups: [{ field: 'team_id' }]
+        )
+
+        collection.aggregate(nil, filter, aggregation)
+
+        expect(WebMock).not_to have_requested(:get, "#{base}/admins")
+      end
+    end
+
     # This tier filters in memory, over every record Intercom holds, so a
     # condition through a relation becomes a plain membership on the foreign key
     # -- none of the limits of Intercom's search DSL apply here, nothing going

@@ -78,9 +78,19 @@ module ForestAdminDatasourceIntercom
       #
       # Rows come back keyed with strings because that is how the agent reads
       # them, while `Aggregation#apply` hands them back keyed with symbols.
+      #
+      # A group or a field through a relation (`team:name`) reads the target
+      # nested under the relation name, the way `list` serves it; left on the
+      # flat records it would read nil and fold every row into one group.
       def aggregate(caller, filter, aggregation, limit = nil)
-        aggregation.apply(filtered_records(caller, filter), timezone_for(caller), limit)
-                   .map { |row| { 'group' => row[:group], 'value' => row[:value] } }
+        client.with_read_scope do
+          records = filtered_records(caller, filter)
+          rows = records.map(&:dup)
+          embed_relations(caller, records, rows, aggregation.projection)
+
+          aggregation.apply(rows, timezone_for(caller), limit)
+                     .map { |row| { 'group' => row[:group], 'value' => row[:value] } }
+        end
       end
 
       protected
