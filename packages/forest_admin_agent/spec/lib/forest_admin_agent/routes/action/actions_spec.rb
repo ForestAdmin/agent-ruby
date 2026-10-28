@@ -193,7 +193,10 @@ module ForestAdminAgent
           end
 
           it 'refuses the approval of a request naming two ids and runs nothing' do
-            signed = JWT.encode({ data: { attributes: { ids: %w[4 7] } } }, Facades::Container.cache(:env_secret), 'HS256')
+            signed = JWT.encode(
+              { data: { attributes: { ids: %w[4 7], collection_name: 'orders' } } },
+              Facades::Container.cache(:env_secret), 'HS256'
+            )
 
             expect { route.handle_request(request(ids: %w[4 7], signed_approval_request: signed)) }
               .to raise_error(Http::Exceptions::UnprocessableError, message)

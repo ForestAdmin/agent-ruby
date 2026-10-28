@@ -155,20 +155,191 @@ module ForestAdminAgent
           end
 
           context 'when the request is an approval' do
-            it 'get the signed parameters and change body' do
-              unsigned_request = { foo: 'value' }
+            it 'hands the checker the decoded request and uses the signed payload' do
+              unsigned_request = {
+                data: {
+                  attributes: {
+                    requester_id: 20,
+                    ids: ['123e4567-e89b-12d3-a456-426614174999'],
+                    collection_name: 'book',
+                    values: {}
+                  }
+                }
+              }
               signed_request = JWT.encode(
                 unsigned_request,
                 Facades::Container.cache(:env_secret),
                 'HS256'
               )
               args[:params][:data][:attributes][:signed_approval_request] = signed_request
+              args[:params][:data][:attributes][:values] = { 'firstname' => 'John' }
               allow(@action_collection).to receive(:execute).and_return({})
               action.handle_request(args)
 
               expect(permissions).to have_received(:can_smart_action?) do |args, _collection, _filter_for_caller|
-                expect(args[:params][:data][:attributes][:signed_approval_request]).to eq(unsigned_request)
+                expect(args[:params][:data][:attributes][:signed_approval_request][:data][:attributes][:requester_id]).to eq(20)
+                expect(args[:params][:data][:attributes][:ids]).to eq(['123e4567-e89b-12d3-a456-426614174999'])
               end
+              expect(@action_collection).to have_received(:execute) do |_caller, _action, data, _filter|
+                expect(data).to eq({})
+              end
+            end
+          end
+        end
+
+        context 'when the request carries a signed approval request' do
+          let(:book_id) { '123e4567-e89b-12d3-a456-426614174000' }
+          let(:signed_id) { '123e4567-e89b-12d3-a456-426614174999' }
+          let(:other_id) { '123e4567-e89b-12d3-a456-426614174888' }
+
+          def approval_token(attributes = {}, requester_id: 20, exp: Time.now.to_i + 600)
+            JWT.encode(
+              {
+                data: {
+                  type: 'custom-action-requests',
+                  id: 42,
+                  attributes: {
+                    requester_id: requester_id,
+                    ids: [signed_id],
+                    collection_name: 'book',
+                    smart_action_id: 'smartActionId',
+                    values: {},
+                    parent_collection_name: nil,
+                    parent_collection_id: nil,
+                    parent_association_name: nil,
+                    all_records: false,
+                    all_records_subset_query: nil
+                  }.merge(attributes)
+                },
+                approver: 1,
+                iat: Time.now.to_i,
+                exp: exp
+              },
+              Facades::Container.cache(:env_secret),
+              'HS256'
+            )
+          end
+
+          def approval_request(token, body_attributes = {})
+            args[:params][:data][:attributes][:signed_approval_request] = token
+            args[:params][:data][:attributes].merge!(body_attributes)
+            args
+          end
+
+          before do
+            @action_collection.add_action(
+              'foo',
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::BULK,
+                form: [
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::NUMBER,
+                    label: 'amount' },
+                  { type: ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType::COLLECTION,
+                    label: 'customer', collection_name: 'book' }
+                ]
+              ) { |_context, result_builder| result_builder.success }
+            )
+            allow(@action_collection).to receive(:execute).and_return({})
+          end
+
+          it 'runs the action on the signed ids and hands the checker the signed requester' do
+            action.handle_request(approval_request(approval_token, ids: [other_id]))
+
+            expect(@action_collection).to have_received(:execute) do |_caller, _name, _data, filter|
+              expect(filter.condition_tree.to_h).to eq({ field: 'id', operator: Operators::EQUAL, value: signed_id })
+            end
+            expect(permissions).to have_received(:can_smart_action?) do |a, _collection, _filter|
+              expect(a.dig(:params, :data, :attributes, :signed_approval_request, :data, :attributes, :requester_id)).to eq(20)
+            end
+          end
+
+          it 'runs the action with the signed values' do
+            action.handle_request(approval_request(approval_token({ 'values' => { 'amount' => 10 } }), values: { 'amount' => 999_999 }))
+
+            expect(@action_collection).to have_received(:execute) do |_caller, _name, data, _filter|
+              expect(data).to eq('amount' => 10)
+            end
+          end
+
+          it 'parses the signed values like the frontend ones: a collection field is unpacked, not passed through' do
+            action.handle_request(approval_request(approval_token({ 'values' => { 'customer' => book_id } })))
+
+            expect(@action_collection).to have_received(:execute) do |_caller, _name, data, _filter|
+              expect(data).to eq('customer' => [book_id])
+            end
+          end
+
+          it 'refuses a token signed for another collection before any permission check' do
+            expect do
+              action.handle_request(approval_request(approval_token({ 'collection_name' => 'other_collection' })))
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+
+            expect(permissions).not_to have_received(:can_smart_action?)
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'refuses a token that does not say which collection it was signed for' do
+            expect do
+              action.handle_request(approval_request(approval_token({ 'collection_name' => nil })))
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'refuses a token whose data does not carry server-shaped attributes' do
+            [JWT.encode({ data: { type: 'custom-action-requests' } }, Facades::Container.cache(:env_secret), 'HS256'),
+             JWT.encode({ data: [] }, Facades::Container.cache(:env_secret), 'HS256')].each do |token|
+              expect { action.handle_request(approval_request(token)) }
+                .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+            end
+
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'refuses a token that selects all records instead of naming them' do
+            token = approval_token({ 'all_records' => true, 'all_records_subset_query' => { 'search' => 'needle' } })
+
+            expect { action.handle_request(approval_request(token)) }
+              .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+
+            expect(permissions).not_to have_received(:can_smart_action?)
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'refuses an expired token with a 403-class error, not a 500' do
+            expect do
+              action.handle_request(approval_request(approval_token(exp: Time.now.to_i - 10)))
+            end.to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'refuses a token signed with another secret, or not a token at all' do
+            other_secret_token = JWT.encode({ data: { attributes: { ids: [signed_id], collection_name: 'book' } } }, 'not-the-env-secret', 'HS256')
+
+            [other_secret_token, 'abc', true, 123, [], {}, false].each do |token|
+              expect { action.handle_request(approval_request(token)) }
+                .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+            end
+
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'applies the outer query filters within the signed selection' do
+            args[:params][:filters] = { field: 'id', operator: Operators::EQUAL, value: book_id }
+
+            action.handle_request(approval_request(approval_token({ 'ids' => [book_id, signed_id] }), ids: [book_id]))
+
+            expect(@action_collection).to have_received(:execute) do |_caller, _name, _data, filter|
+              expect(filter.condition_tree.to_h).to eq(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'id', operator: Operators::EQUAL, value: book_id },
+                    { field: 'id', operator: Operators::IN, value: [book_id, signed_id] }
+                  ]
+                }
+              )
             end
           end
         end
