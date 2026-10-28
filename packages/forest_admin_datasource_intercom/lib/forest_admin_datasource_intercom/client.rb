@@ -427,16 +427,21 @@ module ForestAdminDatasourceIntercom
     # `JSON::ParserError` alongside Faraday's own errors: on its own it would
     # reach the catch-all below, whose message is the exception's -- and a JSON
     # parser opens its message with what it choked on.
+    #
+    # `cause: nil` on both re-raises: Ruby would otherwise chain the original
+    # error onto what error trackers and `full_message` print -- its message
+    # quotes the payload or the request URL, and Faraday's carries the request,
+    # bearer token included.
     def must_succeed(operation)
       yield
     rescue Faraday::Error, JSON::ParserError => e
-      raise api_error(operation, e)
+      raise api_error(operation, e), cause: nil
     rescue APIError
       # Already mapped, with its status intact; re-wrapping would erase it --
       # a 404 read as "no such record" rather than as a failure, above all.
       raise
     rescue StandardError => e
-      raise APIError, "Intercom API call failed: #{operation}: #{e.class}: #{e.message}"
+      raise APIError, "Intercom API call failed: #{operation}: #{e.class}: #{e.message}", cause: nil
     end
 
     # Builds an APIError preserving the HTTP status and Intercom's own error body

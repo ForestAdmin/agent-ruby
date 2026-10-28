@@ -186,6 +186,34 @@ module ForestAdminDatasourceIntercom
 
         expect { client.me }.to raise_error(APIError, /me: ArgumentError: unexpected/)
       end
+
+      # Ruby chains the rescued error as `cause`, which `full_message` and error
+      # trackers print: the parser's message quotes the payload, and Faraday's
+      # error carries the request, bearer token included.
+      it 'chains neither the payload nor the token through the cause' do
+        stub_request(:get, "#{base}/me")
+          .to_return(json('Bonjour, voici mon RIB FR76 3000 4000 0500 0012 3456 789'))
+
+        expect { client.me }.to raise_error(APIError) { |error|
+          expect(error.cause).to be_nil
+          expect(error.full_message).not_to include('RIB')
+        }
+      end
+
+      it 'chains no cause on an HTTP failure either' do
+        stub_request(:get, "#{base}/me").to_return(json({ 'errors' => [{ 'code' => 'unauthorized' }] }, 401))
+
+        expect { client.me }.to raise_error(APIError) { |error|
+          expect(error.cause).to be_nil
+          expect(error.full_message).not_to include('s3cr3t')
+        }
+      end
+
+      it 'chains no cause from the catch-all' do
+        stub_request(:get, "#{base}/me").to_raise(ArgumentError.new('unexpected'))
+
+        expect { client.me }.to raise_error(APIError) { |error| expect(error.cause).to be_nil }
+      end
     end
 
     describe '#list_page' do
