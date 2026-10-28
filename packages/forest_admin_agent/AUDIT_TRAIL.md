@@ -13,8 +13,9 @@ Two parts, both internal:
   schema and creates/evolves the `audit_logs` table through versioned migrations, and reads the
   per-record history back for the routes below.
 
-Storage uses ActiveRecord: outside Rails, add `gem 'activerecord'` (and the adapter gem) to your
-Gemfile. Nothing is loaded and no connection is opened until the feature is configured.
+Storage uses ActiveRecord on a PostgreSQL database. The agent depends on `activerecord` and `pg`, so
+there is nothing to add to the Gemfile, even in an app whose main datasource is not SQL. Nothing is loaded
+and no connection is opened until the feature is configured.
 
 ## Turn it on
 
@@ -122,6 +123,7 @@ or removed still reads as they were when they acted. Optional filters (all combi
 | query param | format                           | effect                                          |
 | ----------- | -------------------------------- | ----------------------------------------------- |
 | `userIds`   | comma-separated integers `12,45` | keep only entries whose `user_id` is in the list |
+| `operations` | comma-separated, from `create`, `update`, `delete`, `action`, `action_failed` | keep only entries recorded under one of them |
 | `startDate` | `YYYY-MM-DD` or datetime (incl.) | keep entries from this lower bound onward       |
 | `endDate`   | `YYYY-MM-DD` or datetime (incl.) | keep entries up to this upper bound             |
 | `fields`    | comma-separated field names      | keep only entries whose diff touched one of them |
@@ -139,6 +141,16 @@ It deliberately does **not** match `operation`, `correlationKey`, `recordId`, `c
 A field masked by `redact` never matches — neither by its `[redacted]` mask nor by the value it hid, which
 was never recorded. A search must not confirm a value the trail refused to keep.
 
+Nor one it withholds (see below). On a record gone for good under a caller's scope, `search` and `fields`
+are matched against the values as served, never as captured — in SQL, which rows come back, `meta.count`
+and `availableUsers` would each say whether a withheld value holds the term. The rows are read without those
+two filters, in batches of 500 that each continue past the last row read, never at an offset, and bounded at
+the instant the scan starts. They are matched and paged as they go, keeping only the page asked for. Only a
+gone record's history pays that scan, and it is one record's history — the same rows the SQL search
+would have scanned without an index. That holds too for a record deleted while the request was in flight: the second read
+of the record decides the withholding, so the SQL-matched answer is discarded and the history scanned the
+same way.
+
 `fields` matches whole keys, never paths, so a name holding a dot (`address.city`) is quoted before it
 reaches SQL. Both sides of the diff are searched, since a field the change added exists in `newValues`
 only and one it removed in `previousValues` only. The JSON test is per adapter (Postgres, SQLite, MySQL /
@@ -154,7 +166,9 @@ happens in SQL. Two shapes are accepted:
 
 Both bounds are **inclusive**. Defensive parsing: non-numeric `userIds` tokens are dropped
 (`12,abc,45` → `12,45`), and a `startDate` / `endDate` matching no accepted format returns **HTTP
-400** (`ValidationError`); an invalid `timezone` likewise returns **400**.
+400** (`ValidationError`); an invalid `timezone` likewise returns **400**. An unrecognized
+`operations` value returns **400** rather than being dropped: a silently ignored filter would hand back
+unfiltered rows into a list the caller believes is filtered.
 
 Pagination follows JSON:API: `page[number]` is 1-based (default `1`), `page[size]` defaults to `20`
 and is capped at `100`; out-of-bound or non-numeric values fall back to the defaults rather than
@@ -170,25 +184,82 @@ the merge tiebreaker.
 Inside the value objects: a record's column names pass through untouched, while an action answer's keys are
 Forest's own and so are camelCase (`mimeType`, not `mime_type`) — the agent transforms them on write.
 
-**A record that was renamed keeps one timeline** — on this agent. The Node agent files an update under the
-record's new id too, but has no `previous_record_id` and so cannot walk back past the rename: the same record
-shows a complete chain here and a history beginning at the rename there, until that column is ported.
- An update that moves a writable primary key files its row
-under the record's new id — the id later lookups use — and remembers the one it left. Both the history and the
-state routes walk that back, so asking for the current id returns everything the record has ever been filed
-under, rather than starting the story at the rename.
-
-Each earlier id counts only **up to the moment it was left**, because a primary key a record abandons can be
-taken by another record afterwards, and those rows are none of this record's business. What the trail cannot
-separate is the opposite case: rows written under an id *before* the record that holds it now arrived — a
-reused key, or a delete followed by a recreate — since the packed id is the only identity the trail has. That
-is deliberate for delete/recreate (the state reconstruction walks into an earlier life on purpose) and the
-same limitation for a reused key. Telling those apart needs a lineage of its own on every row, which is a
-bigger change than this one.
+**A record whose primary key moved starts its history at the move**, as on the Node agent. An update that
+moves a writable primary key files its row under the record's new id, and the rows written before stay under
+the id they were true of; the history and state routes read the requested id only. Migration `002` drops the
+`previous_record_id` column an earlier version kept for this.
 
 A record that no longer exists keeps its history: only a record that still exists *outside* the
 caller's permission scope is refused (404). Inspecting what was deleted is much of the point of an
 audit trail, and the delete event itself is the last thing recorded.
+
+Those rows still carry the column values captured while the record existed, and a scope that can no
+longer be evaluated against the record is evaluated against the values instead: a `delete` row keeps
+its `previousValues` only if they match the scope, a `create` row its `newValues`, and an `update`
+row — whose two sides are a partial diff — is tested side by side, so each is kept only if its own
+values match. Action rows hold a submitted form and a result summary, not column values, so they are
+untouched. The row itself is always returned: what happened, by whom and when stays visible either way.
+
+A snapshot only answers for the writable columns it captured, so a scope reaching for anything else — a
+read-only column, a relation, a value stored redacted — is not evaluated against it at all and the values
+are withheld: `nil` there is a missing answer, not a passing one, and a redacted value answers no better.
+Primary keys are the exception: the packed id fills in whatever the snapshot cannot answer — a read-only key
+it never captured, or a writable one the trail redacts — so a scope on the id still matches the record it
+belongs to. It fills in only what is missing: where a side captured the key itself, that value is the one
+that was true there. The row's id answers only for the side it was filed under, as on the Node agent: a
+create, a delete, an update's new side. On an update's previous side it fills a key never captured (read-only,
+so it cannot have moved) but not a redacted one (writable, so it may have), and that side is withheld from a
+scope on a redacted key. A `pending` row is filed under the id the record had *before* the write, which may
+not have landed, so its new side is given no id to fill from and answers with what it captured or not at all.
+
+Neither failure this can meet is fatal, and each costs only what it actually broke. An id that stopped
+decoding when the primary key changed shape costs the keys it would have filled and nothing more, so a scope
+that never asks about the id is still answered from the columns the row captured. A column captured as `nil`
+that an ordered operator cannot compare withholds that row. Uncaught, either would have failed the whole
+page, and only for the callers a scope applies to, since an unscoped caller never reaches this test. Both
+are logged, and the row keeps its operation, author and timestamp. This is also
+what makes an update's partial diff safe to test: a diff that never carried the scoped column answers for
+neither side, so both are withheld.
+
+A captured `nil` is tested the way the database tests a `NULL`: a negated comparison (`!=`, not in, does not
+contain) never matches it. In memory `status != 'private'` holds for a nil status, while the scoped read that
+guarded the live record left that record out, so without this a record the caller could never read alive
+would become readable once deleted. A scope that asks for the nil itself (`status` is missing) still matches
+it. On a datasource whose own `!=` keeps a NULL (Mongo's `$ne`), this is stricter than the live read, never
+looser.
+
+The record is read twice, and **the values are withheld if either read found it gone**. The first read
+refuses a record that exists outside the caller's scope without touching the audit database, and it is the
+only one that saw the record as it was while the rows were being chosen. The second, once the rows are in
+hand, is the only one that can see a record deleted since — which would otherwise have answered "present and
+in scope" for rows that already carry its delete.
+
+Neither answer cancels the other, because an id outlives the record that held it. A record that took a freed
+id between the two reads answers for itself and not for the life whose rows these are: if this caller cannot
+read it, that is a **404**, the same as for a request starting a moment later; if they can, the earlier
+life's values stay withheld all the same. The second read is skipped when no scope is in effect, and on the
+correlation routes when the answer holds no rows.
+
+**An id freed and taken since has two lives.** Where the delete and the recreation both happened *before*
+the request, both reads see the live record, and a live record in the caller's scope says nothing about the
+rows filed under its id before it took the id: they are an earlier record's. The boundary is the id's latest
+confirmed `delete` (the earlier record's last row) or `create` (the current record's first), whichever is
+later; the `create` covers an id freed with no confirmed `delete`, by a primary-key move or a delete that was
+never confirmed. A `pending` row marks no boundary, since it may never have landed. The rows before the
+boundary go through the same withholding as a record gone for good — on the history route (with `search` and
+`fields` matched against the served values, so the count and the authors cannot leak them either), on the
+correlation routes, and on `/state`, whose reconstruction at an instant **strictly before** the boundary is
+tested against the scope: at the boundary's own instant the state already includes a replacement `create`
+sharing it. The lookup runs only for a scoped caller on a live record. Same rule as the Node agent.
+
+**Every route that serves captured values applies this**, since a rule only one of them applies is one
+lookup away from being no rule at all. The two correlation routes withhold row by row exactly as the history
+route does. `/state` is nothing but those values reassembled, so the reconstruction is tested as a whole and
+`data` is `null` when it fails — including when the scope asks about something the reconstruction cannot
+answer. One difference there: a reconstruction can sit on the far side of a primary-key move the route cannot
+see, so the requested id does not fill in a key the trail redacted, only one that was never captured at all
+(read-only, so it cannot have moved). All of them take the second read of the record too, and skip it when
+there is nothing to withhold — no scope in effect, or no rows in the answer.
 
 ### State route
 
@@ -202,11 +273,40 @@ after** the timestamp — an entry stamped exactly at it counts as part of that 
 
 `timestamp` accepts an ISO-8601 instant, or the same wall-clock forms as the filters above read in the
 request `timezone`; it is required (**400** otherwise). `data` is `null` when the record did not exist at
-that instant — either created later, or deleted and never recreated.
+that instant — either created later, or deleted and never recreated — and when the reconstruction of a gone
+record falls outside the caller's scope.
 
 Walking back stops being able to help where the trail stops: only audited (writable) columns are
 reconstructed, and a `create` means the record did not exist before it, while a `delete` restores the whole
 row it recorded and the walk carries on into any earlier life of the same id.
+
+### Timeline route
+
+`GET /forest/_audit-trail` is the project-level timeline: the audit rows of every collection the caller can
+read, in one walk, for the project's Activity Logs page. It mirrors the Node agent's route, and the capability
+payload announces it as `canUseAuditTrailTimeline` and `canSortAuditTrailTimeline`, both true wherever the
+trail is configured.
+
+```json
+{ "data": [...], "meta": { "cursor": { "before": "2026-01-02T03:04:05.000Z", "excludeIds": [42] },
+                           "availableUsers": [...] } }
+```
+
+- Values follow the per-record history's rule: a caller who can read a collection reads its rows' values,
+  whatever their permission level. Who may open the page at all is the team's Activity Logs setting, enforced
+  by Forest, not by the agent.
+- A collection the caller sees only through a record-level scope is left out entirely: a scope cannot be
+  evaluated across the whole timeline, and a row alone would say that a record they cannot read was touched.
+- `sort=timestamp` walks oldest first; anything else newest first. Ties follow `id` in the same direction.
+- Paged by cursor, not page number, since the front merges this walk with the activity logs and no count spans
+  both. `before` (newest first) or `after` (oldest first) is an **inclusive** ISO instant, and `excludeIds`
+  drops the rows already served at it; the other direction's bound is ignored, and a bound that is not an ISO
+  instant is a **400**. The bound and the date filter on its side combine, the tighter winning. `meta.cursor`
+  is `null` on the last page, and when the walk would not progress.
+- `page[size]` as on the history route. `userIds`, `operations`, `startDate`, `endDate`, `timezone` and
+  `search` as on the history route; no `fields`, since a column name means nothing across collections.
+- `meta.availableUsers` on the first page only (neither `before` nor `after`): the distinct authors the
+  filters match across the readable collections. Later pages omit the key.
 
 ### Correlation route
 
@@ -300,7 +400,6 @@ one table nobody deletes from.
 | `operation`       | `create` / `update` / `delete`                              |
 | `collection`      | audited collection name                                     |
 | `record_id`       | packed record id (primary keys joined by `\|`), TEXT and nullable — a create's pending row has none yet, and a composite id outgrows a varchar |
-| `previous_record_id` | set only on an update that moved a writable primary key: the id the row was filed under before |
 | `user_id`         | the Forest user who made the change                         |
 | `user_first_name`, `user_last_name`, `user_email` | denormalised from the caller at write time: who acted then, not whoever holds that id today |
 | `action_name`     | smart-action rows only                                       |

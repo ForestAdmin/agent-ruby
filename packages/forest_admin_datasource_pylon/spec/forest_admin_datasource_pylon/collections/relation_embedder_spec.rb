@@ -129,6 +129,17 @@ module ForestAdminDatasourcePylon
           .with(body: hash_including('filter' => id_filter(%w[acc-1 acc-2]))).once
       end
 
+      it 'builds the projection tree once per relation however many rows it embeds into' do
+        stub_issues(issue_payload('i1'), issue_payload('i2'), issue_payload('i3', 'account' => { 'id' => 'acc-2' }))
+        stub_accounts(account_payload('acc-1'), account_payload('acc-2'))
+        allow(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree).to receive(:build).and_call_original
+
+        issues.list(nil, filter, %w[id account:name])
+
+        expect(ForestAdminDatasourceToolkit::Components::Query::ProjectionTree)
+          .to have_received(:build).with(contain_exactly('id', 'name')).once
+      end
+
       # Pylon documents no maximum on an `in` filter; the chunk keeps the request
       # body and the page answering it bounded.
       it 'chunks the ids, and asks for no more records than the chunk holds' do

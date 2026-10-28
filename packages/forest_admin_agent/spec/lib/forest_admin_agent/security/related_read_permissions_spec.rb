@@ -594,6 +594,19 @@ module ForestAdminAgent
           expect(permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
         end
 
+        it 'reloads the caller on a denial so a role changed since the last load reads at once' do
+          with_instant_cache_refresh(false)
+          permissions = build_permissions([])
+          allow(permissions).to receive(:get_collections_permissions_data).and_return(
+            { cards: { read: [7, 8] }, accounts: { read: [8] } }
+          )
+          allow(permissions).to receive(:get_user_data).with(anything, reload: true).and_return({ id: 1, roleId: 8 })
+
+          expect(permissions.read_permissions('cards', %w[accounts])).to eq(
+            { 'cards' => true, 'accounts' => true }
+          )
+        end
+
         it 'refetches once for the whole request when the payload does not know a collection' do
           with_instant_cache_refresh(true)
           permissions = build_permissions([])

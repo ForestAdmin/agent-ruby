@@ -1227,7 +1227,7 @@ module ForestAdminAgent
             described_class.parse_condition_tree(collection_category, args)
           end.to raise_error(
             ForestAdminDatasourceToolkit::Exceptions::ValidationError,
-            "The given operator 'not_equal' is not supported by the column: 'id'. The column is not filterable"
+            "The given operator 'not_equal' is not supported by the column: 'id'. The allowed types are: equal"
           )
         end
       end
@@ -1378,6 +1378,22 @@ module ForestAdminAgent
           }
 
           expect(described_class.parse_search(collection_user, args)).to eq('searched argument')
+        end
+      end
+
+      describe 'when parse_segment' do
+        let(:segmented) { build_collection(schema: { segments: ['active'] }) }
+
+        it 'falls back to the query string segment when data is an array of picked ids' do
+          args = { params: { data: [{ 'id' => 1 }], segment: 'active' } }
+
+          expect(described_class.parse_segment(segmented, args)).to eq('active')
+        end
+
+        it 'falls back to the query string segment when the select-all body sends false' do
+          args = { params: { segment: 'active', data: { attributes: { all_records_subset_query: { segment: false } } } } }
+
+          expect(described_class.parse_segment(segmented, args)).to eq('active')
         end
       end
 

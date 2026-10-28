@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary      = "Ruby agent for Forest Admin."
   spec.description  = "Forest is a modern admin interface that works on all major web frameworks. This gem makes Forest
 admin work on any Ruby application."
-  spec.license = "GPL-3.0"
+  spec.license = "Apache-2.0"
   spec.required_ruby_version = ">= 3.0.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
@@ -25,7 +25,7 @@ admin work on any Ruby application."
   spec.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
       (File.expand_path(f) == __FILE__) ||
-        f.start_with?(*%w[bin/ test/ spec/ .git Gemfile LICENSE])
+        f.start_with?(*%w[bin/ test/ spec/ .git Gemfile])
     end
   end
 
@@ -33,6 +33,7 @@ admin work on any Ruby application."
   spec.executables = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
+  spec.add_dependency "activerecord", ">= 6.1"
   spec.add_dependency "activesupport", ">= 6.1"
   spec.add_dependency "base64"
   spec.add_dependency "benchmark"
@@ -52,6 +53,7 @@ admin work on any Ruby application."
   spec.add_dependency "ld-eventsource", "~> 2.2"
   spec.add_dependency "mono_logger", "~> 1.1"
   spec.add_dependency "openid_connect", "~> 2.2"
+  spec.add_dependency "pg", "~> 1.1"
   spec.add_dependency "rake", "~> 13.0"
   spec.add_dependency "rack-cors", "~> 3.0"
   spec.add_dependency "zeitwerk", "~> 2.3"

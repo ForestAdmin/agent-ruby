@@ -68,6 +68,12 @@ module ForestAdminAgent
             }
           end
 
+          def relation_filterable?(relation, foreign_collection)
+            return false if relation.respond_to?(:is_filterable) && relation.is_filterable == false
+
+            foreign_collection_filterable?(foreign_collection)
+          end
+
           def foreign_collection_filterable?(foreign_collection)
             foreign_collection.schema[:fields].values.any? do |field|
               field.type == 'Column' && FrontendFilterable.filterable?(field.filter_operators)
@@ -124,7 +130,7 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: nil,
-                isFilterable: foreign_collection_filterable?(foreign_collection),
+                isFilterable: relation_filterable?(relation, foreign_collection),
                 isPrimaryKey: false,
                 isRequired: false,
                 isReadOnly: relation.is_read_only || key_field.is_read_only,
@@ -142,7 +148,7 @@ module ForestAdminAgent
               {
                 type: key_field.column_type,
                 defaultValue: key_field.default_value,
-                isFilterable: foreign_collection_filterable?(foreign_collection),
+                isFilterable: relation_filterable?(relation, foreign_collection),
                 isPrimaryKey: false,
                 isRequired: key_field.validation.any? { |v| v[:operator] == 'Present' },
                 isReadOnly: key_field.is_read_only,

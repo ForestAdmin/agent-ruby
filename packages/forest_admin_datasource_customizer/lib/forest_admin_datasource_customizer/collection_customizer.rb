@@ -67,6 +67,17 @@ module ForestAdminDatasourceCustomizer
       push_customization { @stack.search.get_collection(@name).disable_search }
     end
 
+    # Disable filtering on a column, or on a many to one / one to one relation, for the end-user.
+    # Filters coming from the UI or the API (including UI segments and saved views) are rejected.
+    # Customizations still filter on it: a column can be the key of a custom relation, and a
+    # relation can be used by code segments and search.
+    # Example:
+    #   collection.disable_field_filtering('reference_code')
+    #   collection.disable_field_filtering('author')
+    def disable_field_filtering(name)
+      push_customization { @stack.schema.get_collection(@name).disable_field_filtering(name) }
+    end
+
     def add_field(name, definition)
       push_customization do
         collection_before_relations = @stack.early_computed.get_collection(@name)

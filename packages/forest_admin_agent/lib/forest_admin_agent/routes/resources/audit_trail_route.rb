@@ -8,11 +8,18 @@ module ForestAdminAgent
       # and they all serialize audit records the same way.
       module AuditTrailRoute
         include ForestAdminDatasourceToolkit::Components::Query
+        include AuditTrailWithholding
 
+        # The caller's scope when the record is gone for good, nil otherwise — no scope in effect, or a record
+        # still there and in scope. A scope can't be evaluated against a record that no longer exists, so its
+        # history is served, but the values its rows captured while it existed still have to be tested against
+        # that scope before being handed back.
         def assert_record_in_scope(context, collection, packed_id)
-          scoped_record(context, collection, packed_id)
+          return nil if scoped_record(context, collection, packed_id)
 
-          nil
+          # Nothing there: gone for good, since an out-of-scope record raised above. Without a scope in
+          # effect this reads nil, which is the same answer.
+          context.permissions.get_scope(collection)
         end
 
         # The record as it stands, read through the caller's permission scope. nil when it no longer exists
@@ -37,58 +44,58 @@ module ForestAdminAgent
           raise Http::Exceptions::NotFoundError, 'Record does not exists'
         end
 
+        # The scope to withhold with: the caller's own, if the record was gone at either look at it.
+        #
+        # Both looks count, and neither can clear the other. The first is the only one that saw the record as
+        # it was when the rows were chosen, so a replacement the second finds — an id freed by a delete and
+        # taken by another record since — answers for itself, never for the life whose rows these are. The
+        # second is the only one that can see a record deleted since, and it is where the 404 comes from when
+        # that replacement is one this caller cannot read.
+        def withholding_scope_for(context, collection, packed_id, gone_at_check)
+          gone_since = scope_if_gone_since(context, collection, packed_id)
+
+          gone_at_check || gone_since
+        end
+
+        # Second read of the record, once the rows are in hand, so the answer that decides the withholding is
+        # never older than what it decides on. Skipped without a scope in effect — there is nothing to withhold
+        # then, and nothing to ask. A record moved out of scope rather than deleted raises the 404 it would
+        # raise for a request starting a moment later.
+        def scope_if_gone_since(context, collection, packed_id)
+          return nil if context.permissions.get_scope(collection).nil?
+
+          assert_record_in_scope(context, collection, packed_id)
+        end
+
         # Camelize only the top-level keys — the row `id` included, which the front uses as the tiebreaker when
         # merging pages ordered by (timestamp, id). Value hashes keep the keys they were stored with: a record's
         # own column names, or an action answer's camelCase Forest names.
         def serialize_record(record)
-          # `previous_record_id` stays out: it is how the agent follows a record across a rename, not something
-          # the payload contract carries.
-          record.to_h.except(:previous_record_id).transform_keys { |key| key.to_s.camelize(:lower) }
+          record.to_h.transform_keys { |key| key.to_s.camelize(:lower) }
         end
 
         def store
           ::ForestAdminAgent::AuditTrail.store
         end
 
-        # Every id this record has been filed under, each with the moment it stopped being that id. Rows
-        # written before an update moved a writable primary key stay under the id they were true of, so a
-        # history query that asked for the current id alone would start at the rename and call that the whole
-        # story — and one that asked for the bare ids would sweep up whatever record holds an abandoned id now.
-        #
-        # Breadth-first, and no depth limit: every hop adds an id not already seen and there are finitely many
-        # of those, so skipping what we hold is both the cycle guard and the terminator. A cap would have
-        # truncated a record renamed often enough, which reads exactly like missing history.
-        def record_segments(collection, packed_id)
-          segments = [{ id: packed_id, until: nil, until_row: nil }]
-          queue = segments.dup
+        # How to withhold the rows served for this id. A record gone at either look has all its rows tested
+        # against the caller's scope. A live one in scope still has the rows filed before it took the id: a
+        # delete frees an id, and a confirmed `create` marks where a record took one freed without a confirmed
+        # delete — a primary-key move, or a delete that never confirmed. Those rows are another record's, which
+        # the current one's scope says nothing about.
+        def withholding_of(context, collection, packed_id, gone_at_check)
+          gone_scope = withholding_scope_for(context, collection, packed_id, gone_at_check)
+          return Withholding.new(collection, gone_scope, context.caller.timezone) if gone_scope
 
-          until queue.empty?
-            segment = queue.shift
+          scope = context.permissions.get_scope(collection)
+          boundary = scope && store.life_boundary_of(collection: collection.name, record_id: packed_id)
 
-            store.renamed_from(collection: collection.name, record_id: segment[:id]).each do |previous|
-              next if segments.any? { |seen| seen[:id] == previous[:id] }
-
-              # Bounded by its own rename and by everything walked through to reach it: an id abandoned twice
-              # only belongs to this record up to the earlier of them.
-              found = earlier_bound(previous, segment).merge(id: previous[:id])
-              segments << found
-              queue << found
-            end
-          end
-
-          segments
+          Withholding.new(collection, boundary && scope, context.caller.timezone, boundary)
         end
 
-        # Bounds compare as the trail orders, (timestamp, row id); nil is "no bound yet", which is later than
-        # any of them. Through `<=>`, since Array is not Comparable and `<=` on one raises.
-        def earlier_bound(one, other)
-          return other.slice(:until, :until_row) if one[:until].nil?
-          return one.slice(:until, :until_row) if other[:until].nil?
-
-          pair = ->(bound) { [bound[:until], bound[:until_row].to_i] }
-          earlier = (pair[one] <=> pair[other]) <= 0 ? one : other
-
-          earlier.slice(:until, :until_row)
+        def available_user(author)
+          { id: author[:user_id], firstName: author[:user_first_name],
+            lastName: author[:user_last_name], email: author[:user_email] }
         end
 
         # What the audit trail actually records: primary keys, so a state can be identified, plus the writable

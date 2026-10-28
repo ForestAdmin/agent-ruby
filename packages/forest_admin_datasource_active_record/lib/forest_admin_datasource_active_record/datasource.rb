@@ -76,6 +76,9 @@ module ForestAdminDatasourceActiveRecord
     end
 
     def fetch_model(model)
+      # A collection is named after its model, so an anonymous one (such as the audit trail's) can't be one.
+      return if model.name.nil?
+
       if model.name.start_with?('HABTM_')
         build_habtm(model)
       else

@@ -125,7 +125,7 @@ module ForestAdminDatasourceCustomizer
 
                 expect do
                   @decorated_book.list(caller, filter, projection)
-                end.to raise_error(Exceptions::ForestException, "The given operator 'like' is not supported by the column: 'title'. The column is not filterable")
+                end.to raise_error(Exceptions::ForestException, "The given operator 'like' is not supported by the column: 'title'. The allowed types are: starts_with")
               end
             end
 

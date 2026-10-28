@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary      = "Ruby agent for Forest Admin."
   spec.description  = "Forest is a modern admin interface that works on all major web frameworks. This gem makes Forest
 admin work on any Ruby application."
-  spec.license = "GPL-3.0"
+  spec.license = "Apache-2.0"
   spec.required_ruby_version = ">= 3.0.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
@@ -39,6 +39,7 @@ admin work on any Ruby application."
   spec.add_dependency "bigdecimal"
   spec.add_dependency "cgi"
   spec.add_dependency "csv"
+  spec.add_dependency "forest_admin_datasource_toolkit", ">= #{ForestAdminDatasourceActiveRecord::VERSION}"
   spec.add_dependency "logger"
   spec.add_dependency "mutex_m"
   spec.add_dependency "ostruct"

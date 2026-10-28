@@ -1,3 +1,101 @@
+## [1.46.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.3...v1.46.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **agent:** refuse a single-record action given several records [PRD-1704] ([#417](https://github.com/ForestAdmin/agent-ruby/issues/417)) ([cdbbc7b](https://github.com/ForestAdmin/agent-ruby/commit/cdbbc7b7338ca722f6221c55d569e11ab0301f25))
+
+## [1.46.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.2...v1.46.3) (2026-10-21)
+
+
+### Performance Improvements
+
+* **audit_trail:** index a record's history and its life boundaries ([#416](https://github.com/ForestAdmin/agent-ruby/issues/416)) ([c33c5b9](https://github.com/ForestAdmin/agent-ruby/commit/c33c5b9a3b1d59002783386f573f5bc9e6465d4a))
+
+## [1.46.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.1...v1.46.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* **agent:** keep the search and segments of a select-all in delete, actions and dissociate [PRD-1667] ([#414](https://github.com/ForestAdmin/agent-ruby/issues/414)) ([8d4db0f](https://github.com/ForestAdmin/agent-ruby/commit/8d4db0fdc814cd82dc69012bd816734fc329b777))
+
+## [1.46.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.0...v1.46.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **datasource_active_record:** skip anonymous models when building collections ([#413](https://github.com/ForestAdmin/agent-ruby/issues/413)) ([c721960](https://github.com/ForestAdmin/agent-ruby/commit/c7219607751a262c878039a7e920a9b9afce844f))
+
+# [1.46.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.2...v1.46.0) (2026-10-16)
+
+
+### Features
+
+* **audit_trail:** operations filter, cross-collection timeline, earlier-life withholding [PRD-1258] ([#410](https://github.com/ForestAdmin/agent-ruby/issues/410)) ([292424c](https://github.com/ForestAdmin/agent-ruby/commit/292424ce6b118b515923dfc0e0a11cf347767403))
+
+## [1.45.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.1...v1.45.2) (2026-10-14)
+
+
+### Bug Fixes
+
+* **permissions:** key the rendering cache by rendering id and cut agent v2 per-record and per-request overhead [PRD-1555] ([#407](https://github.com/ForestAdmin/agent-ruby/issues/407)) ([902ebdc](https://github.com/ForestAdmin/agent-ruby/commit/902ebdcd4bc3569c194ffd360c63c629d97e5de7))
+
+## [1.45.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.45.0...v1.45.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* **license:** relicense from GPL-3.0 to Apache-2.0 ([#401](https://github.com/ForestAdmin/agent-ruby/issues/401)) ([465ff60](https://github.com/ForestAdmin/agent-ruby/commit/465ff60eb477033e6ae664c7d2edd75bd91a655e))
+
+# [1.45.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.5...v1.45.0) (2026-10-07)
+
+
+### Features
+
+* add disable field filtering option ([#399](https://github.com/ForestAdmin/agent-ruby/issues/399)) ([b537254](https://github.com/ForestAdmin/agent-ruby/commit/b537254648f2d7038e1c1ace1d5d7bebe152bbfa))
+
+## [1.44.5](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.4...v1.44.5) (2026-10-06)
+
+
+### Bug Fixes
+
+* **audit-trail:** withhold on every route that serves captured values [PRD-1295] ([#396](https://github.com/ForestAdmin/agent-ruby/issues/396)) ([75568a6](https://github.com/ForestAdmin/agent-ruby/commit/75568a62ae92f300f795ed9c7d113c4113e4f136))
+
+## [1.44.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.3...v1.44.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **permissions:** reload the users list on an unknown id or a denied access [PRD-1404] ([#398](https://github.com/ForestAdmin/agent-ruby/issues/398)) ([d375cb6](https://github.com/ForestAdmin/agent-ruby/commit/d375cb65e4d163cf78590f1cc1c73ee7d2e7a838))
+
+## [1.44.3](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.2...v1.44.3) (2026-09-29)
+
+
+### Bug Fixes
+
+* **ci:** call notify-ci-failure from the public ForestAdmin/.github repo ([#397](https://github.com/ForestAdmin/agent-ruby/issues/397)) ([12a3155](https://github.com/ForestAdmin/agent-ruby/commit/12a3155bc0b7185438e819bc561376cdac47dca9))
+
+## [1.44.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.1...v1.44.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* **audit_trail:** let the row's own id outrank a redacted primary key [PRD-1267] ([#394](https://github.com/ForestAdmin/agent-ruby/issues/394)) ([0884f2c](https://github.com/ForestAdmin/agent-ruby/commit/0884f2c9b791accd7e7f2071cc2860fcd1d08ff0))
+
+## [1.44.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.44.0...v1.44.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **audit_trail:** withhold out-of-scope values on a deleted record's history [PRD-1226] ([#393](https://github.com/ForestAdmin/agent-ruby/issues/393)) ([85156dc](https://github.com/ForestAdmin/agent-ruby/commit/85156dca2ac0d1f67adeb9f010e6e1c9cb2fd1f0))
+
+# [1.44.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.1...v1.44.0) (2026-09-15)
+
+
+### Features
+
+* **rpc:** mark collection as rpc handles regex ([#255](https://github.com/ForestAdmin/agent-ruby/issues/255)) ([a7f15ae](https://github.com/ForestAdmin/agent-ruby/commit/a7f15ae32c705a4a91fe4215c8a535755b3c7f33))
+
 ## [1.43.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.43.0...v1.43.1) (2026-09-15)
 
 

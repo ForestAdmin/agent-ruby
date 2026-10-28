@@ -89,7 +89,9 @@ module ForestAdminAgent
             )
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache).and_return(configured)
 
-            expect(result[:content][:agentCapabilities][:canUseAuditTrail]).to be true
+            expect(result[:content][:agentCapabilities]).to include(
+              canUseAuditTrail: true, canUseAuditTrailTimeline: true, canSortAuditTrailTimeline: true
+            )
           end
 
           # The frontend prunes projections on this flag, so announcing it wrong either hides
@@ -111,6 +113,8 @@ module ForestAdminAgent
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
                 canUseAuditTrail: false,
+                canUseAuditTrailTimeline: false,
+                canSortAuditTrailTimeline: false,
                 checksRelationReadPermissions: true
               }
             )
@@ -165,6 +169,8 @@ module ForestAdminAgent
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
                 canUseAuditTrail: false,
+                canUseAuditTrailTimeline: false,
+                canSortAuditTrailTimeline: false,
                 checksRelationReadPermissions: true
               }
             )

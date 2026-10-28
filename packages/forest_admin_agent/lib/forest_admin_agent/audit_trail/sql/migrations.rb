@@ -1,10 +1,9 @@
 module ForestAdminAgent
   module AuditTrail
     module Sql
-      # The audit table's schema, as an ordered, append-only list. Nothing has shipped yet, so this is still a
-      # single entry; once a release is out, never edit one — add another, since a database out there has
-      # already recorded the earlier ones as applied. Every statement tolerates being replayed
-      # (`if_not_exists`), which is what makes a lost race harmless.
+      # The audit table's schema, as an ordered, append-only list. Never edit a released entry — add another,
+      # since a database out there has already recorded the earlier ones as applied. Every statement tolerates
+      # being replayed (`if_not_exists` / `if_exists`), which is what makes a lost race harmless.
       module Migrations
         ALL = [
           {
@@ -26,8 +25,7 @@ module ForestAdminAgent
                 t.text :user_first_name
                 t.text :user_last_name
                 t.text :user_email
-                # Set only on an update that moved a writable primary key: the id the row was filed under
-                # before. What lets a history query follow a record across a rename.
+                # Dropped by 002.
                 t.text :previous_record_id
                 # Smart-action rows only.
                 t.text :action_name
@@ -44,6 +42,46 @@ module ForestAdminAgent
               connection.add_index(table, :record_id, **record_id_index)
               connection.add_index(table, :correlation_key, name: "#{base}_correlation_key", if_not_exists: true)
               connection.add_index(table, :user_id, name: "#{base}_user_id", if_not_exists: true)
+            end
+          },
+          {
+            # The agent no longer follows a record across a primary-key move, so nothing writes or reads the
+            # column. No released version wrote it to a row a client relies on.
+            name: '002-drop-previous-record-id',
+            up: lambda do |connection, table|
+              # Checked first as well: older ActiveRecord versions accept `if_exists` here but ignore it.
+              next unless connection.column_exists?(table, :previous_record_id)
+
+              connection.remove_column(table, :previous_record_id, if_exists: true)
+            end
+          },
+          {
+            # The timeline pages the whole table in (timestamp, id) order, which no other index serves.
+            name: '003-index-timestamp-id',
+            up: lambda do |connection, table|
+              connection.add_index(table, %i[timestamp id], name: "#{table.split(".").last}_timestamp_id",
+                                                            if_not_exists: true)
+            end
+          },
+          {
+            # A record's history is read by (collection, record_id) in (timestamp, id) order. With only
+            # `record_id` and `(timestamp, id)` to choose from, Postgres either reads every row the id holds
+            # across all collections, or walks the whole table's (timestamp, id) index under a LIMIT: the life
+            # boundary lookup discarded 2.1M rows (486 ms) on a 2.1M-row table for a record created long ago.
+            name: '004-index-record-history',
+            up: lambda do |connection, table|
+              base = table.split('.').last
+              columns = %i[collection record_id timestamp id]
+              options = { if_not_exists: true }
+              options[:length] = { record_id: 255 } if connection.adapter_name.downcase.match?(/mysql|maria/)
+
+              connection.add_index(table, columns, name: "#{base}_record_history", **options)
+              next unless connection.supports_partial_index?
+
+              # The life boundary keeps a record's `create` and `delete` rows only: without this, a record
+              # updated 100k times is read whole to find its one `create`.
+              connection.add_index(table, columns, name: "#{base}_life_boundaries",
+                                                   where: "operation IN ('create', 'delete')", **options)
             end
           }
         ].freeze

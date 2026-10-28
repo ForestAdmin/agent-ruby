@@ -5,9 +5,8 @@ module ForestAdminAgent
     class ForestSerializer
       include JSONAPI::Serializer
 
-      attr_accessor :attributes_map
-      attr_accessor :to_one_associations
-      attr_accessor :to_many_associations
+      TO_ONE_TYPES = %w[OneToOne ManyToOne PolymorphicManyToOne PolymorphicOneToOne].freeze
+      TO_MANY_TYPES = %w[OneToMany ManyToMany PolymorphicOneToMany].freeze
 
       JSONAPI::Serializer.send(:include, ForestSerializerOverride)
 
@@ -26,6 +25,50 @@ module ForestAdminAgent
 
       def self.reset_cache!
         @@primary_keys = {}
+        @@layouts = {}.compare_by_identity
+      end
+
+      # Keyed by the collection object, not its name: two datasources can expose a collection under
+      # the same name, and the decorator stack returns the same object for a name once built.
+      def self.layout_for(collection)
+        @@layouts ||= {}.compare_by_identity
+        @@layouts[collection] ||= build_layout(collection)
+      end
+
+      def self.build_layout(collection)
+        fields = collection.schema[:fields]
+        relation = lambda do |types|
+          fields.each_with_object({}) do |(name, field), layout|
+            next unless types.include?(field.type)
+
+            layout[name] = { attr_or_block: name, options: { include_links: true, include_data: false }.freeze }.freeze
+          end.freeze
+        end
+
+        {
+          fields: fields,
+          attributes: fields.each_with_object({}) do |(name, field), layout|
+            layout[name] = { attr_or_block: name, options: {}.freeze }.freeze if field.type == 'Column'
+          end.freeze,
+          to_one: relation.call(TO_ONE_TYPES),
+          to_many: relation.call(TO_MANY_TYPES)
+        }.freeze
+      end
+
+      def layout
+        @layout ||= self.class.layout_for(ForestAdminAgent::Facades::Container.datasource.get_collection(type))
+      end
+
+      def attributes_map
+        layout[:attributes]
+      end
+
+      def to_one_associations
+        layout[:to_one]
+      end
+
+      def to_many_associations
+        layout[:to_many]
       end
 
       def id
@@ -40,25 +83,7 @@ module ForestAdminAgent
         attribute_name.to_s
       end
 
-      def add_attribute(name, options = {}, &block)
-        @attributes_map ||= {}
-        @attributes_map[name] = format_field(name, options)
-      end
-
-      def format_field(name, options)
-        {
-          attr_or_block: block_given? ? block : name,
-          options: options,
-        }
-      end
-
       def attributes
-        forest_collection = ForestAdminAgent::Facades::Container.datasource.get_collection(
-          @options[:class_name].gsub('::', '__')
-        )
-        fields = forest_collection.schema[:fields].select { |_field_name, field| field.type == 'Column' }
-        fields.each { |field_name, _field| add_attribute(field_name) }
-        return {} if attributes_map.nil?
         attributes = {}
 
         attributes_map.each do |attribute_name, attr_data|
@@ -86,22 +111,13 @@ module ForestAdminAgent
         end
       end
 
-      def add_to_one_association(name, options = {}, &block)
-        options[:include_links] = options.fetch(:include_links, true)
-        options[:include_data] = options.fetch(:include_data, false)
-        @to_one_associations ||= {}
-        @to_one_associations[name] = format_field(name, options)
-      end
-
       # A PolymorphicManyToOne can't be SQL-joined, so list projections return a phantom object with no
       # primary key. Rebuild the id from the foreign key on the owner record.
       def has_one_relationship(attribute_name, attr_data)
         object = super
         return object if object.nil? # relation not projected (e.g. update/store responses)
 
-        field = ForestAdminAgent::Facades::Container.datasource
-                                                    .get_collection(@options[:class_name].gsub('::', '__'))
-                                                    .schema[:fields][attribute_name.to_s]
+        field = layout[:fields][attribute_name.to_s]
         return object unless field&.type == 'PolymorphicManyToOne'
 
         foreign_key = @object[field.foreign_key]
@@ -115,9 +131,8 @@ module ForestAdminAgent
       end
 
       def has_one_relationships
-        return {} if @to_one_associations.nil?
         data = {}
-        @to_one_associations.each do |attribute_name, attr_data|
+        to_one_associations.each do |attribute_name, attr_data|
           next if !should_include_attr?(attribute_name, attr_data)
           data[attribute_name.to_sym] = attr_data
         end
@@ -125,34 +140,16 @@ module ForestAdminAgent
       end
 
       def has_many_relationships
-        return {} if @to_many_associations.nil?
         data = {}
-        @to_many_associations.each do |attribute_name, attr_data|
+        to_many_associations.each do |attribute_name, attr_data|
           next if !should_include_attr?(attribute_name, attr_data)
           data[attribute_name.to_sym] = attr_data
         end
         data
       end
 
-      def add_to_many_association(name, options = {}, &block)
-        options[:include_links] = options.fetch(:include_links, true)
-        options[:include_data] = options.fetch(:include_data, false)
-        @to_many_associations ||= {}
-        @to_many_associations[name] = format_field(name, options)
-      end
-
       def relationships
         datasource = ForestAdminAgent::Facades::Container.datasource
-        forest_collection = datasource.get_collection(@options[:class_name].gsub('::', '__'))
-        relations_to_many = forest_collection.schema[:fields].select do |_field_name, field|
-          %w[OneToMany ManyToMany PolymorphicOneToMany].include?(field.type)
-        end
-        relations_to_one = forest_collection.schema[:fields].select do |_field_name, field|
-          %w[OneToOne ManyToOne PolymorphicManyToOne PolymorphicOneToOne].include?(field.type)
-        end
-
-        relations_to_one.each { |field_name, _field| add_to_one_association(field_name) }
-
         data = {}
         has_one_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
@@ -170,8 +167,7 @@ module ForestAdminAgent
           # Only include 'data' key if the relationship object exists
           # Omit 'data' key entirely when null instead of setting it to null
           unless object.nil? || (object.respond_to?(:empty?) && object.empty?)
-            relation = datasource.get_collection(@options[:class_name].gsub('::', '__'))
-                                 .schema[:fields][attribute_name.to_s]
+            relation = layout[:fields][attribute_name.to_s]
             options = @options.clone
             if relation.type == 'PolymorphicManyToOne'
               options[:class_name] = @object[relation.foreign_key_type_field]
@@ -191,8 +187,6 @@ module ForestAdminAgent
           end
         end
 
-        relations_to_many.each { |field_name, _field| add_to_many_association(field_name) }
-
         has_many_relationships.each do |attribute_name, attr_data|
           formatted_attribute_name = format_name(attribute_name)
           data[formatted_attribute_name] = {}
@@ -208,7 +202,7 @@ module ForestAdminAgent
           if @_include_linkages.include?(formatted_attribute_name) || attr_data[:options][:include_data]
             data[formatted_attribute_name]['data'] = []
             objects = has_many_relationship(attribute_name, attr_data) || []
-            relation = datasource.get_collection(@options[:class_name].gsub('::', '__')).schema[:fields][attribute_name.to_s]
+            relation = layout[:fields][attribute_name.to_s]
             options = @options.clone
             options[:class_name] = datasource.get_collection(relation.foreign_collection).name
             objects.each do |obj|

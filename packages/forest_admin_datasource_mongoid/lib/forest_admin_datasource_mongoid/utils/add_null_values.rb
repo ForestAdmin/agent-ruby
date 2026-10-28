@@ -21,37 +21,44 @@ module ForestAdminDatasourceMongoid
       def add_null_values_on_record(record, projection)
         return nil if record.nil?
 
+        fill_null_values(record, build_null_values_tree(projection))
+      end
+
+      def add_null_values(records, projection)
+        return [] if records.empty?
+
+        tree = build_null_values_tree(projection)
+        records.filter_map { |record| fill_null_values(record, tree) }
+      end
+
+      private
+
+      def build_null_values_tree(paths)
+        paths.group_by { |path| path.split(':', 2).first }.to_h do |key, key_paths|
+          child_paths = key_paths.filter_map { |path| path.split(':', 2)[1] }
+          [key, child_paths.empty? ? nil : build_null_values_tree(child_paths)]
+        end
+      end
+
+      def fill_null_values(record, tree)
+        return nil if record.nil?
+
         result = record.dup
 
-        projection.each do |field|
-          field_prefix = field.split(':').first
-          result[field_prefix] ||= nil
-        end
-
-        nested_prefixes = projection.filter_map { |field| field.split(':').first if field.include?(':') }.uniq
-
-        nested_prefixes.each do |nested_prefix|
-          prefix_with_colon = "#{nested_prefix}:"
-          child_paths = projection.filter_map do |field|
-            field[(nested_prefix.size + 1)..] if field.start_with?(prefix_with_colon)
-          end
-
-          next unless result[nested_prefix] && !result[nested_prefix].nil?
-
-          if result[nested_prefix].is_a?(Array)
-            result[nested_prefix] = result[nested_prefix].map do |child_record|
-              add_null_values_on_record(child_record, child_paths)
-            end
-          elsif result[nested_prefix].is_a?(Hash)
-            result[nested_prefix] = add_null_values_on_record(result[nested_prefix], child_paths)
-          end
+        tree.each do |key, sub_tree|
+          result[key] ||= nil
+          result[key] = fill_nested_null_values(result[key], sub_tree) if sub_tree
         end
 
         remove_not_exist_record(result)
       end
 
-      def add_null_values(records, projection)
-        records.filter_map { |record| add_null_values_on_record(record, projection) }
+      def fill_nested_null_values(value, sub_tree)
+        case value
+        when Array then value.map { |item| item.is_a?(Hash) ? fill_null_values(item, sub_tree) : item }
+        when Hash then fill_null_values(value, sub_tree)
+        else value
+        end
       end
     end
   end

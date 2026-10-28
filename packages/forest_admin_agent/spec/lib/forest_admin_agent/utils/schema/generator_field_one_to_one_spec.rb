@@ -117,6 +117,66 @@ module ForestAdminAgent
             )
           end
         end
+
+        context 'when the relations target a filterable collection' do
+          let(:datasource) do
+            datasource = Datasource.new
+            collection_book = Collection.new(datasource, 'Book')
+            collection_book.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'Number', is_primary_key: true, filter_operators: ['equal']),
+                'author_id' => ColumnSchema.new(column_type: 'String', filter_operators: ['equal']),
+                'author' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'author_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'Person',
+                  is_filterable: relations_filterable
+                )
+              }
+            )
+
+            collection_person = Collection.new(datasource, 'Person')
+            collection_person.add_fields(
+              {
+                'id' => ColumnSchema.new(column_type: 'String', is_primary_key: true, filter_operators: ['equal']),
+                'book' => Relations::OneToOneSchema.new(
+                  origin_key: 'author_id',
+                  origin_key_target: 'id',
+                  foreign_collection: 'Book',
+                  is_filterable: relations_filterable
+                )
+              }
+            )
+
+            datasource.add_collection(collection_book)
+            datasource.add_collection(collection_person)
+            datasource
+          end
+
+          context 'when the relations are filterable' do
+            let(:relations_filterable) { true }
+
+            it 'marks the many to one as filterable' do
+              expect(described_class.build_schema(datasource.get_collection('Book'), 'author')[:isFilterable]).to be true
+            end
+
+            it 'marks the one to one as filterable' do
+              expect(described_class.build_schema(datasource.get_collection('Person'), 'book')[:isFilterable]).to be true
+            end
+          end
+
+          context 'when the relations are not filterable' do
+            let(:relations_filterable) { false }
+
+            it 'marks the many to one as not filterable' do
+              expect(described_class.build_schema(datasource.get_collection('Book'), 'author')[:isFilterable]).to be false
+            end
+
+            it 'marks the one to one as not filterable' do
+              expect(described_class.build_schema(datasource.get_collection('Person'), 'book')[:isFilterable]).to be false
+            end
+          end
+        end
       end
     end
   end

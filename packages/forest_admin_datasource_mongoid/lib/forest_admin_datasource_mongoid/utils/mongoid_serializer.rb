@@ -1,5 +1,6 @@
 module ForestAdminDatasourceMongoid
   module Utils
+    # Unused internally; kept because it is a public constant of the published gem.
     MongoidSerializer = Struct.new(:object) do
       def to_hash(projection)
         hash_object(object, projection)

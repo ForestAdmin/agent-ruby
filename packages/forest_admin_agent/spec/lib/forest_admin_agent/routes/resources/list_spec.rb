@@ -69,6 +69,14 @@ module ForestAdminAgent
           )
         end
 
+        it 'decorates the fields matching the search, whatever their case' do
+          records = [{ 'id' => 1, 'first_name' => 'FooBar', 'last_name' => 'baz' }]
+
+          decorator = list.send(:handle_search_decorator, 'OOb', records, @datasource.get_collection('user'))
+
+          expect(decorator).to eq(decorators: [{ id: '1', search: ['first_name'] }])
+        end
+
         it 'adds the route forest_list' do
           list.setup_routes
           expect(list.routes.include?('forest_list')).to be true
@@ -204,7 +212,7 @@ module ForestAdminAgent
 
         it 'throws an error when the filter operator is not allowed' do
           args[:params][:filters] = JSON.generate({ field: 'id', operator: 'shorter_than', value: 7 })
-          expect { list.handle_request(args) }.to raise_error(ForestException, "The given operator 'shorter_than' is not supported by the column: 'id'. The column is not filterable")
+          expect { list.handle_request(args) }.to raise_error(ForestException, /\AThe given operator 'shorter_than' is not supported by the column: 'id'\. The allowed types are: \w/)
         end
       end
 

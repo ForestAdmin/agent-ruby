@@ -8,6 +8,7 @@ module ForestAdminAgent
           include ForestAdminAgent::Builder
           include ForestAdminDatasourceToolkit::Utils
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+          include ForestAdminAgent::Routes::QueryHandler
 
           def setup_routes
             add_route(
@@ -23,21 +24,10 @@ module ForestAdminAgent
           def handle_request(args = {})
             context = build(args)
             context.permissions.can?(:browse, context.child_collection)
-            condition_tree = ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-              context.child_collection, args
-            )
             sort = ForestAdminAgent::Utils::QueryStringParser.parse_sort(context.child_collection, args)
-            context.permissions.assert_can_read_query_fields(
-              context.child_collection, condition_tree: condition_tree, sort: sort
-            )
-
-            filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(
-              condition_tree: ConditionTreeFactory.intersect(
-                [context.permissions.get_scope(context.child_collection), condition_tree]
-              ),
-              page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args),
-              sort: sort
-            )
+            filter = build_context_filter(context.child_collection, args, context.permissions, context.caller,
+                                          sort: sort)
+                     .override(page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args))
             projection = redacted_projection_with_pks(context, context.child_collection, args)
             primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
             records = Collection.list_relation(

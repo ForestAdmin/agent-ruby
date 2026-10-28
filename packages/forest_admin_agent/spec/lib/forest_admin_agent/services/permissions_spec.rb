@@ -210,6 +210,141 @@ module ForestAdminAgent
         end
       end
 
+      context 'when the users list may be stale' do
+        let(:john) do
+          { 'id' => 1, 'firstName' => 'John', 'lastName' => 'Doe', 'fullName' => 'John Doe',
+            'email' => 'john.doe@domain.com', 'tags' => [], 'roleId' => 1, 'permissionLevel' => 'user' }
+        end
+        let(:admin) do
+          { 'id' => 3, 'firstName' => 'Admin', 'lastName' => 'test', 'fullName' => 'Admin test',
+            'email' => 'admin@forestadmin.com', 'tags' => [], 'roleId' => 13, 'permissionLevel' => 'admin' }
+        end
+
+        def users_response(*users)
+          instance_double(Faraday::Response, status: 200, body: users.to_json)
+        end
+
+        def stub_users(*responses)
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/users').and_return(*responses)
+        end
+
+        it 'reloads the users once when the id is unknown' do
+          stub_users(users_response(admin), users_response(admin, john))
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'does not reload the users when the id is known' do
+          stub_users(users_response(admin, john))
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+
+        it 'reloads the users at most once per interval for an id that stays unknown' do
+          stub_users(users_response(admin))
+
+          2.times { expect(@permissions.get_user_data(42)).to be_nil }
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'reloads the users again once the interval has elapsed' do
+          stub_users(users_response(admin))
+          allow(Process).to receive(:clock_gettime).and_call_original
+          allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(
+            1_000.0,
+            1_000.0 + described_class::USERS_RELOAD_INTERVAL_IN_SECONDS + 1
+          )
+
+          2.times { @permissions.get_user_data(42) }
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').exactly(3).times
+        end
+
+        it 'rereads the users file during the throttle, as another process may have refreshed it' do
+          stub_users(users_response(admin))
+          @permissions.get_user_data(3)
+          described_class.users_reload_allowed?
+          @permissions.cache.set('forest.users', { '1' => { id: 1, roleId: 1 }, '3' => { id: 3, roleId: 13 } })
+
+          expect(@permissions.get_user_data(1)).to include(id: 1, roleId: 1)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+
+        it 'reloads the users on a denial so a role granted since the last load applies' do
+          stub_users(users_response(john.merge('roleId' => 99)), users_response(john))
+
+          expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').twice
+        end
+
+        it 'denies without reloading the users when a reload already ran within the interval' do
+          stub_users(users_response(john.merge('roleId' => 99)), users_response(john))
+          described_class.users_reload_allowed?
+
+          expect do
+            @permissions.can?(:browse, @datasource.collections['Book'])
+          end.to raise_error(ForbiddenError)
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/users').once
+        end
+      end
+
+      describe '#allowed_collections' do
+        let(:readable) { @datasource.collections['Book'] }
+        let(:unreadable) { instance_double(Collection, name: 'Secret') }
+
+        before do
+          allow(@permissions).to receive(:permission_allowed?) do |_data, collection, _action, _user|
+            collection == readable
+          end
+          allow(@permissions).to receive(:get_collections_permissions_data).and_call_original
+        end
+
+        it 'keeps the allowed collections without raising for the others' do
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable])
+        end
+
+        it 'refetches the permissions once for all the denied collections, not once each' do
+          @permissions.allowed_collections(:read, [readable, unreadable, instance_double(Collection, name: 'Other')])
+
+          expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+
+        it 'allows every collection without reading the permissions when the permission system is off' do
+          @permissions.cache.set('forest.has_permission', { enable: false })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable, unreadable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data)
+        end
+
+        it 'does not refetch when every collection is allowed' do
+          @permissions.allowed_collections(:read, [readable])
+
+          expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'does not refetch for a denial the cached payload accounts for while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {}, Secret: {} })
+
+          expect(@permissions.allowed_collections(:read, [readable, unreadable])).to eq([readable])
+          expect(@permissions).not_to have_received(:get_collections_permissions_data).with(force_fetch: true)
+        end
+
+        it 'refetches when the payload does not know a collection, even while the channel is up' do
+          config = Facades::Container.config_from_cache.merge(instant_cache_refresh: true)
+          allow(Facades::Container).to receive(:config_from_cache).and_return(config)
+          allow(@permissions).to receive(:get_collections_permissions_data).and_return({ Book: {} })
+
+          @permissions.allowed_collections(:read, [readable, unreadable])
+
+          expect(@permissions).to have_received(:get_collections_permissions_data).with(force_fetch: true).once
+        end
+      end
+
       context 'when can? is called' do
         it 'returns true when user is allowed' do
           expect(@permissions.can?(:browse, @datasource.collections['Book'])).to be true
@@ -1253,142 +1388,197 @@ module ForestAdminAgent
         end
       end
 
+      context 'when two renderings share the cache' do
+        def rendering_response(scope_value)
+          instance_double(
+            Faraday::Response,
+            status: 200,
+            body: {
+              'collections' => {
+                'Book' => {
+                  'scope' => { aggregator: 'and', conditions: [{ field: 'id', operator: 'equal', value: scope_value }] },
+                  'segments' => [],
+                  'liveQuerySegments' => []
+                }
+              },
+              'stats' => [],
+              'team' => {}
+            }.to_json
+          )
+        end
+
+        def scope_value_for(permissions)
+          permissions.get_scope(@datasource.collections['Book']).to_h[:value]
+        end
+
+        let(:other_caller) do
+          ForestAdminDatasourceToolkit::Components::Caller.new(
+            id: 1, email: 'john.doe@domain.com', first_name: 'John', last_name: 'Doe', team: 'Sales',
+            rendering_id: 115, tags: [], timezone: 'Europe/Paris', permission_level: 'admin', role: 'dev',
+            request: { ip: '127.0.0.1' }, project: 'terminator', environment: 'Development'
+          )
+        end
+        let(:other_permissions) { next_request(other_caller) }
+
+        def next_request(caller)
+          described_class.new(caller).tap do |permissions|
+            allow(permissions).to receive(:forest_api).and_return(forest_api_requester)
+          end
+        end
+
+        before do
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/114')
+                                                      .and_return(rendering_response(114))
+          allow(forest_api_requester).to receive(:get).with('/liana/v4/permissions/renderings/115')
+                                                      .and_return(rendering_response(115))
+        end
+
+        it 'gives each rendering its own scope' do
+          expect(scope_value_for(@permissions)).to eq 114
+
+          expect(scope_value_for(other_permissions)).to eq 115
+        end
+
+        it 'invalidates one rendering without refetching the other' do
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          described_class.invalidate_rendering_cache(115)
+          scope_value_for(next_request(@permissions.caller))
+          scope_value_for(next_request(other_caller))
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').once
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/115').twice
+        end
+
+        it 'invalidates every rendering when no id is given' do
+          scope_value_for(@permissions)
+          scope_value_for(other_permissions)
+
+          described_class.invalidate_rendering_cache
+          scope_value_for(next_request(@permissions.caller))
+          scope_value_for(next_request(other_caller))
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').twice
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/115').twice
+        end
+
+        it 'invalidates every rendering on a full cache clear' do
+          scope_value_for(@permissions)
+
+          described_class.invalidate_cache
+          scope_value_for(next_request(@permissions.caller))
+
+          expect(forest_api_requester).to have_received(:get).with('/liana/v4/permissions/renderings/114').twice
+        end
+
+        it 'does not raise when the rendering is not cached' do
+          expect { described_class.invalidate_rendering_cache(999) }.not_to raise_error
+        end
+
+        it 'does not build the renderings cache for a request that never reads a rendering' do
+          allow(ForestAdminAgent::Utils::SafeFileCache).to receive(:new).and_call_original
+
+          described_class.new(QueryStringParser.parse_caller(args))
+
+          expect(ForestAdminAgent::Utils::SafeFileCache).to have_received(:new).with('permissions', 'tmp/cache/forest_admin', 100)
+          expect(ForestAdminAgent::Utils::SafeFileCache).not_to have_received(:new).with('permissions-renderings', any_args)
+        end
+
+        it 'builds the renderings cache once a rendering is read' do
+          permissions = described_class.new(QueryStringParser.parse_caller(args))
+          allow(permissions).to receive(:forest_api).and_return(forest_api_requester)
+          allow(ForestAdminAgent::Utils::SafeFileCache).to receive(:new).and_call_original
+
+          scope_value_for(permissions)
+
+          expect(ForestAdminAgent::Utils::SafeFileCache).to have_received(:new).with('permissions-renderings', 'tmp/cache/forest_admin', 100).once
+        end
+      end
+
       context 'when can_smart_action? is called' do
-        it 'returns true when the permissions system is deactivate' do
-          args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
-          args[:headers]['REQUEST_METHOD'] = 'POST'
-          args[:params] = {
-            data: {
-              attributes: {
-                'values' => [],
-                'ids' => [1],
-                'collection_name' => 'Book',
-                'parent_collection_name' => nil,
-                'parent_collection_id' => nil,
-                'parent_association_name' => nil,
-                'all_records' => false,
-                'all_records_subset_query' => {
-                  'fields[Book]' => 'id,title',
-                  'page[number]' => 1,
-                  'page[size]' => 15,
-                  'sort' => '-id',
-                  'timezone' => 'Europe/Paris'
+        let(:book) { @datasource.collections['Book'] }
+        let(:smart_action_args) do
+          {
+            headers: { 'HTTP_AUTHORIZATION' => bearer },
+            params: {
+              data: {
+                attributes: {
+                  'ids' => [1],
+                  'collection_name' => 'Book',
+                  'all_records' => false,
+                  'all_records_ids_excluded' => [],
+                  'smart_action_id' => 'make-photocopy',
+                  'signed_approval_request' => nil
                 },
-                'all_records_ids_excluded' => [],
-                'smart_action_id' => 'make-photocopy',
-                'signed_approval_request' => nil
-              },
-              'type' => 'custom-action-requests'
+                'type' => 'custom-action-requests'
+              }
             }
           }
-
-          @permissions.cache.set('forest.has_permission', { enable: false })
-
-          expect(@permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)).to be true
         end
 
-        it 'throws when the action is unknown' do
-          args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/fake-smart-action'
-          args[:headers]['REQUEST_METHOD'] = 'POST'
-          args[:params] = {
-            data: {
-              attributes: {
-                'values' => [],
-                'ids' => [1],
-                'collection_name' => 'FakeCollection',
-                'parent_collection_name' => nil,
-                'parent_collection_id' => nil,
-                'parent_association_name' => nil,
-                'all_records' => false,
-                'all_records_subset_query' => {
-                  'fields[Book]' => 'id,title',
-                  'page[number]' => 1,
-                  'page[size]' => 15,
-                  'sort' => '-id',
-                  'timezone' => 'Europe/Paris'
-                },
-                'all_records_ids_excluded' => [],
-                'smart_action_id' => 'FakeCollection-fake-smart-action',
-                'signed_approval_request' => nil
-              },
-              'type' => 'custom-action-requests'
-            }
-          }
-
-          expect do
-            @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
-          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
+        def declare_actions(collection, actions)
+          allow(collection).to receive(:schema).and_return({ actions: actions })
         end
 
-        it "throws when the forest schema doesn't have any actions" do
-          args[:headers]['REQUEST_PATH'] = '/forest/_actions/FakeCollection/0/fake-smart-action'
-          args[:headers]['REQUEST_METHOD'] = 'POST'
-          args[:params] = {
-            data: {
-              attributes: {
-                'values' => [],
-                'ids' => [1],
-                'collection_name' => 'FakeCollection',
-                'parent_collection_name' => nil,
-                'parent_collection_id' => nil,
-                'parent_association_name' => nil,
-                'all_records' => false,
-                'all_records_subset_query' => {
-                  'fields[Book]' => 'id,title',
-                  'page[number]' => 1,
-                  'page[size]' => 15,
-                  'sort' => '-id',
-                  'timezone' => 'Europe/Paris'
-                },
-                'all_records_ids_excluded' => [],
-                'smart_action_id' => 'FakeCollection-fake-smart-action',
-                'signed_approval_request' => nil
-              },
-              'type' => 'custom-action-requests'
-            }
-          }
-
-          expect do
-            @permissions.can_smart_action?(args, @datasource.collections['Book'], Filter.new)
-          end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'The collection Book does not have this smart action')
-        end
-
-        it 'hands the collection schema action scope to the smart action checker' do
-          args[:headers]['REQUEST_PATH'] = '/forest/_actions/Book/0/make-photocopy'
-          args[:headers]['REQUEST_METHOD'] = 'POST'
-          args[:params] = {
-            data: {
-              attributes: {
-                'ids' => [],
-                'collection_name' => 'Book',
-                'all_records' => true,
-                'all_records_ids_excluded' => [],
-                'smart_action_id' => 'make-photocopy',
-                'signed_approval_request' => nil
-              },
-              'type' => 'custom-action-requests'
-            }
-          }
-
-          collection = @datasource.collections['Book']
-          schema_action = instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'global')
-          allow(collection).to receive(:schema).and_return({ actions: { 'make-photocopy' => schema_action } })
-
+        def grant_trigger
           @permissions.cache.set('forest.has_permission', { enable: true })
           allow(@permissions).to receive_messages(
             get_user_data: { roleId: 15 },
-            get_collections_permissions_data: { Book: { actions: { 'make-photocopy': { triggerEnabled: [15] } } } },
-            find_action_from_endpoint: { 'name' => 'make-photocopy' }
+            get_collections_permissions_data: { Book: { actions: { 'make-photocopy': { triggerEnabled: [15] } } } }
           )
+        end
 
+        it 'returns true when the permissions system is deactivate' do
+          @permissions.cache.set('forest.has_permission', { enable: false })
+
+          expect(
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
+          ).to be true
+        end
+
+        it 'hands the collection schema action scope to the smart action checker' do
+          declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'global') })
+          grant_trigger
           checker = instance_double(SmartActionChecker, can_execute?: true)
           allow(SmartActionChecker).to receive(:new).and_return(checker)
 
-          expect(@permissions.can_smart_action?(args, collection, Filter.new)).to be true
+          expect(
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
+          ).to be true
           # The schema scope must reach the checker: without it a global action would be resolved.
           expect(SmartActionChecker).to have_received(:new).with(
-            anything, collection, hash_including(scope: 'global', triggerEnabled: [15]), anything, 15, anything
+            anything, book, hash_including(scope: 'global', triggerEnabled: [15]), anything, 15, anything
           )
+        end
+
+        it 'does not read the schema file' do
+          declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'single') })
+          grant_trigger
+          allow(SmartActionChecker).to receive(:new).and_return(instance_double(SmartActionChecker, can_execute?: true))
+          allow(File).to receive(:read).and_call_original
+
+          @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
+
+          expect(File).not_to have_received(:read).with(Facades::Container.config_from_cache[:schema_path])
+        end
+
+        it 'returns false when the smart action checker denies the execution' do
+          declare_actions(book, { 'make-photocopy' => instance_double(ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction, scope: 'single') })
+          grant_trigger
+          allow(SmartActionChecker).to receive(:new).and_return(instance_double(SmartActionChecker, can_execute?: false))
+
+          expect(
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'make-photocopy')
+          ).to be false
+        end
+
+        it 'raises a ForbiddenError when the action is missing from the permissions' do
+          grant_trigger
+
+          expect do
+            @permissions.can_smart_action?(smart_action_args, book, Filter.new, action_name: 'unknown-action')
+          end.to raise_error(ForbiddenError, "Smart action 'unknown-action' is not configured")
         end
       end
     end

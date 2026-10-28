@@ -32,7 +32,7 @@ module ForestAdminAgent
         store.append(record)
 
         expect(store.send(:model).column_names.sort).to eq(
-          %w[action_name collection correlation_key id new_values operation previous_record_id previous_values
+          %w[action_name collection correlation_key id new_values operation previous_values
              record_id status timestamp user_email user_first_name user_id user_last_name]
         )
       end
@@ -79,6 +79,24 @@ module ForestAdminAgent
         expect(history.map(&:correlation_key)).to eq(%w[b a a2])
       end
 
+      # A cursor survives writes between reads that would shift an offset: nothing repeats, nothing is skipped.
+      it 'continues past a given row in either order, whatever was written since' do
+        store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a'))
+        store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'b'))
+        store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a2'))
+
+        newest = store.list_by_record(collection: 'accounts', record_id: '1', order: 'desc', limit: 2)
+        store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'late'))
+        rest = store.list_by_record(collection: 'accounts', record_id: '1', order: 'desc',
+                                    after: newest.last.to_h.slice(:timestamp, :id))
+        oldest = store.list_by_record(collection: 'accounts', record_id: '1', limit: 1)
+        later = store.list_by_record(collection: 'accounts', record_id: '1',
+                                     after: oldest.last.to_h.slice(:timestamp, :id))
+
+        expect((newest + rest).map(&:correlation_key)).to eq(%w[b a a2])
+        expect((oldest + later).map(&:correlation_key)).to eq(%w[a a2 b late])
+      end
+
       it 'filters by user_ids and inclusive timestamp range' do
         store.append(record(timestamp: '2026-01-02T03:04:05.000Z', user_id: 7, correlation_key: 'keep'))
         store.append(record(timestamp: '2026-01-02T03:04:09.000Z', user_id: 7, correlation_key: 'late'))
@@ -89,6 +107,81 @@ module ForestAdminAgent
           start_timestamp: '2026-01-02T03:04:04.000Z', end_timestamp: '2026-01-02T03:04:06.000Z'
         )
         expect(history.map(&:correlation_key)).to eq(['keep'])
+      end
+
+      it 'keeps only the given operations, in the rows, the count and the authors alike' do
+        store.append(record(operation: 'update', user_id: 7, correlation_key: 'u'))
+        store.append(record(operation: 'delete', user_id: 8, correlation_key: 'd'))
+        store.append(record(operation: 'action', user_id: 9, correlation_key: 'a'))
+
+        filters = { collection: 'accounts', record_id: '1', operations: %w[update action] }
+
+        expect(store.list_by_record(**filters).map(&:correlation_key)).to eq(%w[u a])
+        expect(store.count_by_record(**filters)).to eq(2)
+        expect(store.authors_by_record(**filters).map { |author| author[:user_id] }).to contain_exactly(7, 9)
+      end
+
+      describe '#list_timeline' do
+        def timeline(**query)
+          store.list_timeline(collections: %w[accounts orders], limit: 10, **query).map(&:correlation_key)
+        end
+
+        before do
+          store.append(record(timestamp: '2026-01-02T03:04:05.000Z', correlation_key: 'a'))
+          store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'b', collection: 'orders'))
+          store.append(record(timestamp: '2026-01-02T03:04:06.000Z', correlation_key: 'c'))
+          store.append(record(timestamp: '2026-01-02T03:04:07.000Z', correlation_key: 'hidden', collection: 'staff'))
+        end
+
+        it 'lists every given collection newest first, ties by descending id' do
+          expect(timeline).to eq(%w[c b a])
+        end
+
+        it 'walks oldest first on order asc, ties by ascending id' do
+          expect(timeline(order: 'asc')).to eq(%w[a b c])
+        end
+
+        it 'matches nothing for an empty collection list' do
+          expect(store.list_timeline(collections: [], limit: 10)).to eq([])
+        end
+
+        it 'keeps the rows at an inclusive bound, minus the ids already served there' do
+          served = store.list_timeline(collections: %w[accounts orders], limit: 10)
+                        .find { |row| row.correlation_key == 'c' }
+
+          expect(timeline(before: '2026-01-02T03:04:06.000Z', exclude_ids: [served.id])).to eq(%w[b a])
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:06.000Z')).to eq(%w[b c])
+        end
+
+        it 'keeps the tighter of a cursor bound and the date filter on its side' do
+          expect(timeline(before: '2026-01-02T03:04:06.000Z', end_timestamp: '2026-01-02T03:04:05.000Z')).to eq(%w[a])
+          expect(timeline(before: '2026-01-02T03:04:05.000Z', end_timestamp: '2026-01-02T03:04:06.000Z')).to eq(%w[a])
+        end
+
+        it 'keeps the tighter of the after bound and the start date on the oldest-first walk' do
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:06.000Z', start_timestamp: '2026-01-02T03:04:05.000Z'))
+            .to eq(%w[b c])
+          expect(timeline(order: 'asc', after: '2026-01-02T03:04:05.000Z', start_timestamp: '2026-01-02T03:04:06.000Z'))
+            .to eq(%w[b c])
+        end
+
+        it 'applies the operations and author filters' do
+          store.append(record(operation: 'delete', user_id: 7, correlation_key: 'd'))
+
+          expect(timeline(operations: %w[delete])).to eq(%w[d])
+          expect(timeline(user_ids: [7])).to eq(%w[d])
+        end
+      end
+
+      it 'lists the distinct authors of the timeline across the given collections only' do
+        store.append(record(user_id: 7, user_first_name: 'Jane'))
+        store.append(record(user_id: 8, collection: 'orders'))
+        store.append(record(user_id: 9, collection: 'staff'))
+
+        authors = store.timeline_users(collections: %w[accounts orders])
+
+        expect(authors.map { |author| author[:user_id] }).to contain_exactly(7, 8)
+        expect(authors.find { |author| author[:user_id] == 7 }).to include(user_first_name: 'Jane')
       end
 
       it 'counts matches independently of skip/limit, respecting filters' do
@@ -133,7 +226,23 @@ module ForestAdminAgent
         described_class.new(database: { adapter: 'sqlite3', database: db.path }).append(record)
 
         names = connection.select_values('SELECT name FROM audit_logs_migration ORDER BY name')
-        expect(names).to eq(['001-create-audit-logs'])
+        expect(names).to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id
+                               004-index-record-history])
+      end
+
+      # A table created by a release that still kept the column loses it on the next boot, rows intact.
+      it 'drops previous_record_id from a table an earlier release created' do
+        Sql::AuditConnectionBase.connect_to(adapter: 'sqlite3', database: db.path)
+        Sql::Migrations::ALL.first[:up].call(connection, 'audit_logs')
+        connection.create_table('audit_logs_migration', id: false) { |t| t.string :name, null: false }
+        connection.execute("INSERT INTO audit_logs_migration (name) VALUES ('001-create-audit-logs')")
+        connection.execute('INSERT INTO audit_logs (timestamp, operation, collection, record_id, status) ' \
+                           "VALUES ('2026-01-02 03:04:05', 'update', 'accounts', '1', 'done')")
+
+        store.connect!
+
+        expect(connection.column_exists?('audit_logs', :previous_record_id)).to be false
+        expect(store.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
       end
 
       # One tracker per audited table, so a second store does not read the first one's history as its own.
@@ -144,7 +253,9 @@ module ForestAdminAgent
         expect { other.append(record) }.not_to raise_error
         expect(other.list_by_record(collection: 'accounts', record_id: '1').size).to eq(1)
         expect(connection.indexes('other_logs').map(&:name)).to include('other_logs_record_id')
-        expect(connection.select_values('SELECT name FROM other_logs_migration')).to eq(['001-create-audit-logs'])
+        expect(connection.select_values('SELECT name FROM other_logs_migration'))
+          .to eq(%w[001-create-audit-logs 002-drop-previous-record-id 003-index-timestamp-id
+                    004-index-record-history])
       end
 
       # Every write sets it, so a row without one is a bug rather than a row quietly claiming to be done.
@@ -163,6 +274,11 @@ module ForestAdminAgent
         expect(store.send(:model).table_name).to eq('audit_logs')
         expect(store.list_by_record(collection: 'accounts', record_id: '1').map(&:correlation_key))
           .to eq(%w[main other])
+      end
+
+      # The ActiveRecord datasource skips nameless models: a name would expose the audit table as a collection.
+      it 'keeps its model anonymous' do
+        expect(store.send(:model).name).to be_nil
       end
 
       it 'lists only entries whose diff touched one of the given fields' do
@@ -287,68 +403,63 @@ module ForestAdminAgent
         end
       end
 
-      describe '#renamed_from' do
-        it 'returns each id it was renamed from, with the moment it stopped being that id' do
-          store.append(record(record_id: '7', previous_record_id: '1', timestamp: '2026-01-02T00:00:01.000Z'))
-          store.append(record(record_id: '7', previous_record_id: '1', timestamp: '2026-01-02T00:00:09.000Z'))
-          store.append(record(record_id: '7'))
-
-          renamed = store.renamed_from(collection: 'accounts', record_id: '7')
-
-          expect(renamed.map { |segment| segment.slice(:id, :until) }).to eq(
-            [{ id: '1', until: '2026-01-02T00:00:09.000Z' }]
-          )
-          # The row id of that rename, so an equal-timestamp row can be placed either side of it.
-          expect(renamed.first[:until_row]).to be_a(Integer)
+      describe '#life_boundary_of' do
+        def boundary
+          store.life_boundary_of(collection: 'accounts', record_id: '1')&.correlation_key
         end
 
-        it 'returns nothing for a record that was never renamed' do
-          store.append(record)
+        it 'is the latest confirmed delete or create, in (timestamp, id) order' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'delete', timestamp: '2026-01-03T00:00:00.000Z', correlation_key: 'freed'))
+          store.append(record(operation: 'create', timestamp: '2026-01-03T00:00:00.000Z', correlation_key: 'retaken'))
+          store.append(record(operation: 'update', timestamp: '2026-01-04T00:00:00.000Z', correlation_key: 'later'))
 
-          expect(store.renamed_from(collection: 'accounts', record_id: '1')).to be_empty
-        end
-      end
-
-      # An id a record left may since have been taken by another record: its rows are none of this one's
-      # business, so an earlier segment only reaches up to the rename.
-      describe 'reading a renamed record' do
-        it 'takes the earlier id only up to the moment it was left' do
-          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:01.000Z', correlation_key: 'mine'))
-          store.append(record(record_id: '7', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'renamed',
-                              previous_record_id: '1'))
-          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:09.000Z', correlation_key: 'someone-else'))
-
-          history = store.list_by_record(
-            collection: 'accounts',
-            record_id: [{ id: '7', until: nil }, { id: '1', until: '2026-01-02T00:00:05.000Z' }]
-          )
-
-          expect(history.map(&:correlation_key)).to eq(%w[mine renamed])
+          expect(boundary).to eq('retaken')
         end
 
-        # Same millisecond as the rename: the trail orders by (timestamp, id), so the bound does too.
-        it 'places a row written in the very millisecond of the rename by insertion order' do
-          mine = store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'mine'))
-          rename = store.append(record(record_id: '7', timestamp: '2026-01-02T00:00:05.000Z',
-                                       previous_record_id: '1', correlation_key: 'renamed'))
-          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:05.000Z', correlation_key: 'theirs'))
+        it 'ignores a pending row, which may never have landed' do
+          store.append(record(operation: 'update', timestamp: '2026-01-01T00:00:00.000Z', correlation_key: 'earlier'))
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'delete', status: Recording::PENDING, timestamp: '2026-01-03T00:00:00.000Z',
+                              correlation_key: 'unconfirmed'))
 
-          history = store.list_by_record(
-            collection: 'accounts',
-            record_id: [{ id: '7', until: nil }, { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: rename }]
-          )
-
-          expect(history.map(&:correlation_key)).to eq(%w[mine renamed])
-          expect(mine).to be < rename
+          expect(boundary).to eq('first')
         end
 
-        it 'counts the same rows it lists' do
-          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:01.000Z'))
-          store.append(record(record_id: '1', timestamp: '2026-01-02T00:00:09.000Z'))
+        # A record created through Forest has its own create as the latest boundary. It began the only life the
+        # id has had, so treating it as a boundary would only cost every scoped search a full-history scan.
+        it 'is nil for a create with nothing filed before it' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z'))
+          store.append(record(operation: 'update', timestamp: '2026-01-03T00:00:00.000Z'))
 
-          segments = [{ id: '1', until: '2026-01-02T00:00:05.000Z' }]
+          expect(boundary).to be_nil
+        end
 
-          expect(store.count_by_record(collection: 'accounts', record_id: segments)).to eq(1)
+        it 'counts a create as a boundary when a row sharing its instant was filed before it' do
+          store.append(record(operation: 'update', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'earlier'))
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'retaken'))
+
+          expect(boundary).to eq('retaken')
+        end
+
+        it 'is nil for a create when the row sharing its instant was filed after it' do
+          store.append(record(operation: 'create', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'first'))
+          store.append(record(operation: 'update', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'same'))
+
+          expect(boundary).to be_nil
+        end
+
+        it 'counts a delete as a boundary even with nothing before it, since it ends a life' do
+          store.append(record(operation: 'delete', timestamp: '2026-01-02T00:00:00.000Z', correlation_key: 'freed'))
+
+          expect(boundary).to eq('freed')
+        end
+
+        it 'is nil for an id no life ever began or ended under, and for another id' do
+          store.append(record(operation: 'update'))
+          store.append(record(operation: 'delete', record_id: '2'))
+
+          expect(boundary).to be_nil
         end
       end
 
@@ -506,13 +617,43 @@ module ForestAdminAgent
         )
       end
 
-      it 'indexes record_id, correlation_key and user_id' do
+      it 'indexes record_id, correlation_key, user_id and the (timestamp, id) order' do
         store.append(record)
 
         index_names = connection.indexes('audit_logs').map(&:name)
         expect(index_names).to include(
-          'audit_logs_record_id', 'audit_logs_correlation_key', 'audit_logs_user_id'
+          'audit_logs_record_id', 'audit_logs_correlation_key', 'audit_logs_user_id', 'audit_logs_timestamp_id'
         )
+        expect(connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_timestamp_id' }.columns)
+          .to eq(%w[timestamp id])
+      end
+
+      it "indexes a record's history by collection, record_id, then timestamp and id" do
+        store.append(record)
+
+        history = connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_record_history' }
+        expect([history.columns, history.where]).to eq([%w[collection record_id timestamp id], nil])
+      end
+
+      it 'indexes the same columns over create and delete rows only, for the life boundary' do
+        store.append(record)
+
+        boundaries = connection.indexes('audit_logs').find { |index| index.name == 'audit_logs_life_boundaries' }
+        expect([boundaries.columns, boundaries.where])
+          .to eq([%w[collection record_id timestamp id], "operation IN ('create', 'delete')"])
+      end
+
+      it 'skips the partial index on an adapter that cannot filter one' do
+        Sql::AuditConnectionBase.connect_to(adapter: 'sqlite3', database: db.path)
+        Sql::Migrations::ALL.first[:up].call(connection, 'audit_logs')
+        allow(connection).to receive(:supports_partial_index?).and_return(false)
+
+        Sql::Migrations::ALL.find { |migration| migration[:name] == '004-index-record-history' }[:up]
+                            .call(connection, 'audit_logs')
+
+        index_names = connection.indexes('audit_logs').map(&:name)
+        expect(index_names).to include('audit_logs_record_history')
+        expect(index_names).not_to include('audit_logs_life_boundaries')
       end
     end
   end

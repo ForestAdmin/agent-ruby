@@ -11,6 +11,7 @@ module ForestAdminAgent
         include ForestAdminDatasourceToolkit::Components::Query
         include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
         include ForestAdminDatasourceCustomizer::Decorators::Action
+        include ForestAdminAgent::Routes::QueryHandler
 
         def initialize(collection, action)
           @action_name = action
@@ -48,11 +49,11 @@ module ForestAdminAgent
 
         def handle_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           args = middleware_custom_action_approval_request_data(args)
           filter_for_caller = get_record_selection(args, context)
-          get_record_selection(args, context, include_user_scope: false)
 
-          context.permissions.can_smart_action?(args, context.collection, filter_for_caller)
+          context.permissions.can_smart_action?(args, context.collection, filter_for_caller, action_name: @action_name)
 
           raw_data = args.dig(:params, :data, :attributes, :values)
 
@@ -82,6 +83,7 @@ module ForestAdminAgent
 
         def handle_hook_request(args = {})
           context = build(args)
+          ensure_served_action(context)
           forest_fields = args.dig(:params, :data, :attributes, :fields)
           data = (if forest_fields
                     Schema::ForestValueConverter.make_form_data_from_fields(context.datasource,
@@ -116,6 +118,22 @@ module ForestAdminAgent
         end
 
         private
+
+        def ensure_served_action(context)
+          served_index = @route_collection.schema[:actions].keys.index(@action_name)
+          return if context.collection.schema[:actions].keys.index(@action_name) == served_index
+
+          raise ForestAdminAgent::Http::Exceptions::BadRequestError,
+                "The collection #{context.collection.name} does not have this smart action"
+        end
+
+        # A single action runs on its first record, or on nothing: refuse any selection but one id.
+        def ensure_single_record(context, selection_ids)
+          return unless context.collection.schema[:actions][@action_name].scope == Types::ActionScope::SINGLE
+          return unless selection_ids[:are_excluded] || selection_ids[:ids].size != 1
+
+          raise Http::Exceptions::UnprocessableError, 'This action can only be triggered on one record at a time.'
+        end
 
         # Recorded as pending before the action runs and confirmed after, so an action that takes the process
         # down with it still leaves evidence that it started. A failed run is worth recording too — "who tried
@@ -211,25 +229,15 @@ module ForestAdminAgent
           )[0])
         end
 
-        def get_record_selection(args, context, include_user_scope: true)
+        def get_record_selection(args, context)
           attributes = args.dig(:params, :data, :attributes)
 
-          # Match user filter + search + scope? + segment
-          scope = include_user_scope ? context.permissions.get_scope(context.collection) : nil
-          filter = Filter.new(
-            condition_tree: ConditionTreeFactory.intersect(
-              [
-                scope,
-                ForestAdminAgent::Utils::QueryStringParser.parse_condition_tree(
-                  context.collection, args
-                )
-              ]
-            )
-          )
+          filter = build_context_filter(context.collection, args, context.permissions, context.caller)
 
           # Restrict the filter to the selected records for single or bulk actions
           if context.collection.schema[:actions][@action_name].scope != Types::ActionScope::GLOBAL
             selection_ids = Utils::Id.parse_selection_ids(context.collection, args[:params])
+            ensure_single_record(context, selection_ids)
             selected_ids = ConditionTreeFactory.match_ids(context.collection, selection_ids[:ids])
             selected_ids = selected_ids.inverse if selection_ids[:are_excluded]
             filter = filter.override(

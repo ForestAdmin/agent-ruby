@@ -321,6 +321,58 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    context 'when using disable_field_filtering' do
+      let(:customizer) { described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book') }
+
+      it 'removes the operators of a column from the published schema only' do
+        customizer.disable_field_filtering('title')
+        published_book = @datasource_customizer.datasource({}).get_collection('book')
+
+        expect(published_book.schema[:fields]['title'].filter_operators).to eq([])
+        expect(@datasource_customizer.stack.segment.get_collection('book').schema[:fields]['title'].filter_operators)
+          .to include(Operators::EQUAL)
+      end
+
+      it 'marks a relation as not filterable in the published schema' do
+        customizer.disable_field_filtering('author')
+        published_book = @datasource_customizer.datasource({}).get_collection('book')
+
+        expect(published_book.schema[:fields]['author'].is_filterable).to be false
+      end
+
+      it 'rejects an end-user filter through the disabled relation' do
+        customizer.disable_field_filtering('author')
+        published_book = @datasource_customizer.datasource({}).get_collection('book')
+        condition_tree = Nodes::ConditionTreeLeaf.new('author:id', Operators::EQUAL, 1)
+
+        expect do
+          ForestAdminDatasourceToolkit::Validations::ConditionTreeValidator.validate(condition_tree, published_book)
+        end.to raise_error(ForestAdminDatasourceToolkit::Exceptions::ValidationError, "The relation 'book.author' is not filterable")
+      end
+
+      it 'still lets a code segment filter through the disabled relation' do
+        segment_tree = Nodes::ConditionTreeLeaf.new('author:id', Operators::EQUAL, 1)
+        customizer.disable_field_filtering('author').add_segment('by_author') { segment_tree }
+        published_book = @datasource_customizer.datasource({}).get_collection('book')
+        filter = ForestAdminDatasourceToolkit::Components::Query::Filter.new(segment: 'by_author')
+
+        refined = @datasource_customizer.stack.segment.get_collection('book').refine_filter(caller, filter)
+
+        expect(published_book.schema[:fields]['author'].is_filterable).to be false
+        expect(refined.condition_tree).to eq(segment_tree)
+        expect(refined.segment).to be_nil
+      end
+
+      it 'raises on a many to many when the customizations are applied' do
+        customizer.disable_field_filtering('persons')
+
+        expect { @datasource_customizer.datasource({}) }.to raise_error(
+          ForestAdminDatasourceToolkit::Exceptions::ValidationError,
+          "Unexpected field type: 'book.persons' (found 'ManyToMany' expected 'Column', 'ManyToOne' or 'OneToOne')"
+        )
+      end
+    end
+
     context 'when adding a relation' do
       it 'adds a many to one' do
         customizer = described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')

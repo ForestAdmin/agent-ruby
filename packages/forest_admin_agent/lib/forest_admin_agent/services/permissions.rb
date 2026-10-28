@@ -1,4 +1,3 @@
-require 'filecache'
 require 'deepsort'
 
 module ForestAdminAgent
@@ -9,30 +8,69 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Exceptions
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
 
+      USERS_RELOAD_INTERVAL_IN_SECONDS = 60
+      # Renderings live in their own domain because FileCache cannot delete by key prefix: clearing
+      # the domain is the only way to drop every rendering when the server does not say which one.
+      RENDERINGS_CACHE_DOMAIN = 'permissions-renderings'.freeze
+
+      @users_reload_mutex = Mutex.new
+
       attr_reader :caller, :forest_api, :cache
 
       def initialize(caller)
         @caller = caller
         @forest_api = ForestAdminAgent::Http::ForestAdminApiRequester.new
-        @cache = FileCache.new(
-          'permissions',
+        @cache = self.class.build_cache('permissions')
+        @memo = {}
+      end
+
+      def rendering_cache
+        @rendering_cache ||= self.class.build_cache(RENDERINGS_CACHE_DOMAIN)
+      end
+
+      def self.build_cache(domain)
+        ForestAdminAgent::Utils::SafeFileCache.new(
+          domain,
           Facades::Container.config_from_cache[:cache_dir].to_s,
           Facades::Container.config_from_cache[:permission_expiration]
         )
       end
 
       def self.invalidate_cache(id_cache = nil)
-        cache = FileCache.new(
-          'permissions',
-          Facades::Container.config_from_cache[:cache_dir].to_s,
-          Facades::Container.config_from_cache[:permission_expiration]
-        )
+        cache = build_cache('permissions')
 
-        cache.clear if id_cache.nil?
+        if id_cache.nil?
+          cache.clear
+          build_cache(RENDERINGS_CACHE_DOMAIN).clear
+          @users_reload_mutex.synchronize { @users_reloaded_at = nil }
+        end
 
-        cache.delete(id_cache) unless cache.get(id_cache).nil?
+        cache.delete(id_cache)
 
         ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{id_cache} cache..")
+      end
+
+      def self.invalidate_rendering_cache(rendering_id = nil)
+        cache = build_cache(RENDERINGS_CACHE_DOMAIN)
+
+        if rendering_id.nil?
+          cache.clear
+        else
+          cache.delete(rendering_id.to_s)
+        end
+
+        target = rendering_id.nil? ? 'every rendering' : "rendering #{rendering_id}"
+        ForestAdminAgent::Facades::Container.logger.log('Info', "Invalidating #{target} permissions cache..")
+      end
+
+      def self.users_reload_allowed?
+        @users_reload_mutex.synchronize do
+          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          return false if @users_reloaded_at && now - @users_reloaded_at < USERS_RELOAD_INTERVAL_IN_SECONDS
+
+          @users_reloaded_at = now
+          true
+        end
       end
 
       def can?(action, collection, allow_fetch: false)
@@ -45,12 +83,27 @@ module ForestAdminAgent
 
         unless is_allowed
           collections_data = get_collections_permissions_data(force_fetch: true)
+          user_data = get_user_data(caller.id, reload: true)
           is_allowed = permission_allowed?(collections_data, collection, action, user_data)
         end
 
         raise ForbiddenError, "You don't have permission to #{action} this collection." unless is_allowed
 
         is_allowed
+      end
+
+      # The collections the caller may perform +action+ on, without raising. A sweep over every collection
+      # meets a denial for most roles, so a denial is retried against fresh permissions only when
+      # {#refetch_denied_reads?} says staleness could explain it, and then once for all of them together.
+      def allowed_collections(action, collections)
+        return collections unless permission_system?
+
+        allowed = select_allowed(action, collections, reload: false)
+        return allowed if allowed.size == collections.size
+        return allowed unless refetch_denied_reads?(collections.map(&:name), get_collections_permissions_data)
+
+        @read_permissions_refetched = true
+        select_allowed(action, collections, reload: true)
       end
 
       # +root_collection_name+ is pinned to readable and never looked up: +browse+ already gates a
@@ -192,20 +245,19 @@ module ForestAdminAgent
         is_allowed
       end
 
-      def can_smart_action?(request, collection, filter, allow_fetch: true)
+      def can_smart_action?(request, collection, filter, action_name:, allow_fetch: true)
         return true unless permission_system?
 
         user_data = get_user_data(caller.id)
         collections_data = get_collections_permissions_data(force_fetch: allow_fetch)
-        action = find_action_from_endpoint(collection.name, request[:headers]['REQUEST_PATH'], request[:headers]['REQUEST_METHOD'])
 
-        collection_actions = validate_smart_action_permissions(collections_data, collection, action)
+        collection_actions = validate_smart_action_permissions(collections_data, collection, action_name)
 
         smart_action_approval = SmartActionChecker.new(
           request[:params],
           collection,
           # The schema scope lets the checker skip select-all resolution for global actions.
-          collection_actions[action['name'].to_sym].merge(scope: collection.schema[:actions][action['name']]&.scope),
+          collection_actions[action_name.to_sym].merge(scope: collection.schema[:actions][action_name]&.scope),
           caller,
           user_data[:roleId],
           filter
@@ -214,7 +266,7 @@ module ForestAdminAgent
         is_allowed = smart_action_approval.can_execute?
         ForestAdminAgent::Facades::Container.logger.log(
           'Debug',
-          "User #{user_data[:roleId]} is #{"not" unless is_allowed} allowed to perform #{action["name"]}"
+          "User #{user_data[:roleId]} is #{"not" unless is_allowed} allowed to perform #{action_name}"
         )
 
         is_allowed
@@ -246,8 +298,31 @@ module ForestAdminAgent
         permissions[:segments][collection.name.to_sym]
       end
 
-      def get_user_data(user_id)
-        cache.get_or_set('forest.users') do
+      def get_user_data(user_id, reload: false)
+        users = cached_users
+        return users[user_id.to_s] if users.key?(user_id.to_s) && !reload
+
+        reload_users[user_id.to_s]
+      end
+
+      def get_team(rendering_id)
+        permissions = get_rendering_data(rendering_id)
+
+        permissions[:team]
+      end
+
+      private
+
+      def cached(store, key, &fetch)
+        @memo.fetch([store, key]) { @memo[[store, key]] = store.get_or_set(key, &fetch) }
+      end
+
+      def forget(store, key)
+        @memo.delete([store, key])
+      end
+
+      def cached_users
+        cached(cache, 'forest.users') do
           response = fetch('/liana/v4/permissions/users')
           users = {}
 
@@ -258,16 +333,14 @@ module ForestAdminAgent
           ForestAdminAgent::Facades::Container.logger.log('Debug', 'Refreshing user permissions cache')
 
           users
-        end[user_id.to_s]
+        end
       end
 
-      def get_team(rendering_id)
-        permissions = get_rendering_data(rendering_id)
-
-        permissions[:team]
+      def reload_users
+        self.class.invalidate_cache('forest.users') if self.class.users_reload_allowed?
+        forget(cache, 'forest.users')
+        cached_users
       end
-
-      private
 
       # An empty list of leaves resolves to no collection at all — a polymorphic relation declaring
       # no `foreign_collections`. `[].all?` would allow it unconditionally, which is the one answer
@@ -293,6 +366,7 @@ module ForestAdminAgent
 
         @read_permissions_refetched = true
         refetched = get_collections_permissions_data(force_fetch: true)
+        user_data = get_user_data(caller.id, reload: true)
 
         names.to_h { |name| [name, read_allowed?(refetched, name, user_data)] }
       end
@@ -396,6 +470,13 @@ module ForestAdminAgent
               'is not exposed by this agent.'
       end
 
+      def select_allowed(action, collections, reload:)
+        user_data = get_user_data(caller.id, reload: reload)
+        collections_data = get_collections_permissions_data(force_fetch: reload)
+
+        collections.select { |collection| permission_allowed?(collections_data, collection, action, user_data) }
+      end
+
       def permission_allowed?(collections_data, collection, action, user_data)
         return false unless user_data_valid?(user_data)
 
@@ -409,9 +490,12 @@ module ForestAdminAgent
       end
 
       def get_collections_permissions_data(force_fetch: false)
-        self.class.invalidate_cache('forest.collections') if force_fetch == true
+        if force_fetch == true
+          self.class.invalidate_cache('forest.collections')
+          forget(cache, 'forest.collections')
+        end
 
-        cache.get_or_set('forest.collections') do
+        cached(cache, 'forest.collections') do
           response = fetch('/liana/v4/permissions/environment')
           collections = {}
 
@@ -451,9 +535,12 @@ module ForestAdminAgent
       end
 
       def get_rendering_data(rendering_id, force_fetch: false)
-        self.class.invalidate_cache('forest.rendering') if force_fetch == true
+        if force_fetch == true
+          self.class.invalidate_rendering_cache(rendering_id)
+          forget(rendering_cache, rendering_id.to_s)
+        end
 
-        cache.get_or_set('forest.rendering') do
+        cached(rendering_cache, rendering_id.to_s) do
           data = {}
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
 
@@ -468,24 +555,10 @@ module ForestAdminAgent
       end
 
       def permission_system?
-        cache.get_or_set('forest.has_permission') do
+        cached(cache, 'forest.has_permission') do
           response = fetch('/liana/v4/permissions/environment')
           { enable: response != true }
         end[:enable]
-      end
-
-      def find_action_from_endpoint(collection_name, path, http_method)
-        endpoint = path.partition('/forest/')[1..].join
-        schema_file = JSON.parse(File.read(Facades::Container.config_from_cache[:schema_path]))
-        actions = schema_file['collections']&.find { |collection| collection['name'] == collection_name }&.dig('actions')
-
-        return nil if actions.nil? || actions.empty?
-
-        action = actions.find { |a| a['endpoint'] == endpoint && a['httpMethod'].casecmp(http_method).zero? }
-
-        raise BadRequestError, "The collection #{collection_name} does not have this smart action" if action.nil?
-
-        action
       end
 
       def decode_crud_permissions(collection)
@@ -660,7 +733,7 @@ module ForestAdminAgent
         has_permission
       end
 
-      def validate_smart_action_permissions(collections_data, collection, action)
+      def validate_smart_action_permissions(collections_data, collection, action_name)
         collection_key = collection.name.to_sym
 
         unless collections_data.key?(collection_key)
@@ -680,13 +753,13 @@ module ForestAdminAgent
           raise ForbiddenError, "No actions configured for collection '#{collection.name}'"
         end
 
-        action_key = action['name'].to_sym
+        action_key = action_name.to_sym
         unless collection_actions.key?(action_key)
           ForestAdminAgent::Facades::Container.logger.log(
             'Warn',
-            "Smart action '#{action["name"]}' not found in permissions for collection '#{collection.name}'"
+            "Smart action '#{action_name}' not found in permissions for collection '#{collection.name}'"
           )
-          raise ForbiddenError, "Smart action '#{action["name"]}' is not configured"
+          raise ForbiddenError, "Smart action '#{action_name}' is not configured"
         end
 
         collection_actions

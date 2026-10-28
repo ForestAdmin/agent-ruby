@@ -69,6 +69,10 @@ module ForestAdminAgent
                 canUseProjectionViaHeaderOnList: true,
                 canUseMultipleFieldsProjectionOnRelation: true,
                 canUseAuditTrail: audit_trail_enabled?,
+                # The store always lists the timeline, both ways, so the cross-collection route is mounted
+                # wherever the trail is.
+                canUseAuditTrailTimeline: audit_trail_enabled?,
+                canSortAuditTrailTimeline: audit_trail_enabled?,
                 checksRelationReadPermissions: !skip_relation_read_permissions?
               }
             },

@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
   spec.description = 'Exposes Snowflake tables and views as Forest Admin collections via ODBC. ' \
                      'Queries are translated from Forest ConditionTrees to parameterized SQL; ' \
                      'no ActiveRecord involvement on the Snowflake side.'
-  spec.license     = 'GPL-3.0'
+  spec.license     = 'Apache-2.0'
   spec.required_ruby_version = '>= 3.0.0'
 
   spec.metadata['homepage_uri']         = spec.homepage

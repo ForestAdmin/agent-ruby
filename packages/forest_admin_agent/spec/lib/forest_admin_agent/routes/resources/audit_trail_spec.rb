@@ -18,7 +18,11 @@ module ForestAdminAgent
                   column_type: 'Number', is_primary_key: true,
                   filter_operators: [Operators::IN, Operators::EQUAL]
                 ),
-                'status' => ColumnSchema.new(column_type: 'String')
+                'status' => ColumnSchema.new(column_type: 'String'),
+                # Read-only, so the capture never records it: the audit snapshots hold writable columns only.
+                'created_at' => ColumnSchema.new(column_type: 'Number', is_read_only: true),
+                # Nullable, so a row can capture it as nil and still hold the key.
+                'budget' => ColumnSchema.new(column_type: 'Number')
               }
             },
             list: [{ 'id' => 4 }]
@@ -29,7 +33,7 @@ module ForestAdminAgent
           allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
             .and_return({ audit_trail: { store: store } })
           allow(store).to receive_messages(list_by_record: records, count_by_record: records.length,
-                                           authors_by_record: [], renamed_from: [])
+                                           authors_by_record: [], life_boundary_of: nil)
 
           route = described_class.new
           context = double('context', collection: collection, caller: build_caller, permissions: permissions)
@@ -41,7 +45,7 @@ module ForestAdminAgent
           def state_route(entries: [], record: { 'id' => 4, 'status' => 'shipped' })
             allow(ForestAdminAgent::Facades::Container).to receive(:config_from_cache)
               .and_return({ audit_trail: { store: store } })
-            allow(store).to receive_messages(list_since: entries, renamed_from: [])
+            allow(store).to receive_messages(list_since: entries, life_boundary_of: nil)
             allow(collection).to receive(:list).and_return([record].compact)
 
             route = described_class.new
@@ -81,19 +85,23 @@ module ForestAdminAgent
           end
 
           # Authorization and read are one query: a scoped check followed by an unscoped read would hand
-          # back a row the check never covered.
-          it 'reads the record through the caller scope, in a single query' do
+          # back a row the check never covered. The record is read again on the way out, which is the
+          # re-check below, not a separate authorization.
+          it 'reads the record through the caller scope, in one query' do
             scope = Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4)
             allow(permissions).to receive(:get_scope).and_return(scope)
             route = state_route
+            reads = []
+            allow(collection).to receive(:list) do |_caller, filter, projection|
+              reads << [filter, projection]
+              [{ 'id' => 4, 'status' => 'shipped' }]
+            end
 
             get_state(route)
 
-            expect(collection).to have_received(:list).once
-            expect(collection).to have_received(:list) do |_caller, filter, projection|
-              expect(filter.condition_tree.conditions).to include(scope)
-              expect(projection).to include('status')
-            end
+            filter, projection = reads.first
+            expect(filter.condition_tree.conditions).to include(scope)
+            expect(projection).to include('status')
           end
 
           it 'refuses a record that exists outside the caller scope' do
@@ -116,17 +124,103 @@ module ForestAdminAgent
             expect(get_state(route)[:content][:data]).to eq({ 'status' => 'shipped' })
           end
 
-          # Rows written before an update moved a writable primary key stay under the id they were true of.
-          it 'reconstructs state from every id the record has been filed under' do
-            route = state_route
-            allow(store).to receive(:renamed_from).and_return([{ id: '1', until: nil, until_row: nil }], [])
+          # The history route withholds a gone record's captured values from a caller whose scope they fail,
+          # and this route is nothing but those values reassembled: without the same test they come back one
+          # request away.
+          describe 'a deleted record whose reconstruction falls outside the caller scope' do
+            def state_of(entries, scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(permissions).to receive(:get_scope).and_return(scope)
+              route = state_route(entries: entries, record: nil)
+              # Empty in scope and empty without it: the record is gone for good.
+              allow(collection).to receive(:list).and_return([])
 
-            get_state(route)
+              get_state(route).dig(:content, :data)
+            end
 
-            expect(store).to have_received(:list_since).with(
-              hash_including(record_id: [{ id: '4', until: nil, until_row: nil },
-                                         { id: '1', until: nil, until_row: nil }])
-            )
+            it 'returns no data when the reconstruction fails the scope' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })])).to be_nil
+            end
+
+            it 'returns the reconstruction that passes the scope' do
+              expect(state_of([entry('delete', { 'status' => 'mine' })])).to eq({ 'status' => 'mine' })
+            end
+
+            it 'serves it whole to a caller no scope applies to' do
+              expect(state_of([entry('delete', { 'status' => 'someone else' })], scope: nil))
+                .to eq({ 'status' => 'someone else' })
+            end
+
+            # Same rule as a row: absent is not the same as passing.
+            it 'returns no data when the scope asks about a column the reconstruction cannot answer' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+              expect(state).to be_nil
+            end
+
+            it 'returns no data for a NULL the scope negates, as the database would have refused the record' do
+              state = state_of([entry('delete', { 'status' => nil })],
+                               scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+              expect(state).to be_nil
+            end
+
+            # The reconstruction can sit on the far side of a primary-key move this route cannot see, so the
+            # requested id does not answer for a key the trail redacted — unlike on a row, which is filed
+            # under an id that was true of the side being tested.
+            it 'does not let the requested id answer for a redacted primary key' do
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              state = state_of([entry('delete', { 'id' => redacted, 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to be_nil
+            end
+
+            # A read-only primary key is never captured, so nothing else can answer for it and the requested
+            # id is what the record was filed under either way.
+            it 'still fills a primary key the capture never kept' do
+              state = state_of([entry('delete', { 'status' => 'mine' })],
+                               scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(state).to eq({ 'status' => 'mine' })
+            end
+
+            # A replacement answers for itself, not for the life whose rows these are: the reconstruction is
+            # of a record that was already gone, and the caller's claim on the id today says nothing about it.
+            it 'keeps withholding when an in-scope record has taken the id since' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })], record: nil)
+              # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+              allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
+
+            # The same read decides the other way round: an id that was gone at the first check can be taken
+            # by another record before the second, and that record's owner is not this caller.
+            it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'mine' })], record: nil)
+              # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+
+              expect { get_state(route) }.to raise_error(Http::Exceptions::NotFoundError)
+            end
+
+            # The record can be deleted while the audit read is in flight: the check that ran first would
+            # otherwise gate a reconstruction nothing protects any more.
+            it 'withholds a reconstruction whose record was deleted after the first read' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(entries: [entry('delete', { 'status' => 'someone else' })],
+                                  record: { 'id' => 4, 'status' => 'mine' })
+              # In scope on the way in, gone by the time the rows are in hand.
+              allow(collection).to receive(:list).and_return([{ 'id' => 4, 'status' => 'mine' }], [], [])
+
+              expect(get_state(route).dig(:content, :data)).to be_nil
+            end
           end
 
           # Strictly after the requested instant: an entry stamped exactly at it belongs to that state.
@@ -135,9 +229,41 @@ module ForestAdminAgent
             get_state(route)
 
             expect(store).to have_received(:list_since).with(
-              collection: 'projects', record_id: [{ id: '4', until: nil, until_row: nil }],
+              collection: 'projects', record_id: '4',
               timestamp: '2026-01-02T10:00:00.000Z'
             )
+          end
+
+          # The reconstruction before the id was freed and taken is the earlier record's state, and the current
+          # record's scope says nothing about it.
+          describe 'a live record whose id an earlier record held' do
+            let(:boundary) do
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                id: 3, timestamp: '2026-01-02T10:00:00.000Z', operation: 'delete', collection: 'projects',
+                record_id: '4', status: ForestAdminAgent::AuditTrail::Recording::DONE
+              )
+            end
+
+            def state_at(timestamp)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              route = state_route(record: { 'id' => 4, 'status' => 'theirs' })
+              allow(store).to receive(:life_boundary_of).with(collection: 'projects', record_id: '4').and_return(boundary)
+
+              get_state(route, timestamp: timestamp).dig(:content, :data)
+            end
+
+            it 'withholds a state from before the boundary that fails the scope' do
+              expect(state_at('2026-01-02T09:59:59.999Z')).to be_nil
+            end
+
+            it 'serves a state from after the id was taken' do
+              expect(state_at('2026-01-02T10:00:00.001Z')).to eq({ 'id' => 4, 'status' => 'theirs' })
+            end
+
+            it 'serves the state at the boundary instant, which a replacement create shares' do
+              expect(state_at('2026-01-02T10:00:00.000Z')).to eq({ 'id' => 4, 'status' => 'theirs' })
+            end
           end
 
           it 'returns no data when the record did not exist yet' do
@@ -213,10 +339,10 @@ module ForestAdminAgent
           )
 
           expect(store).to have_received(:list_by_record).with(
-            collection: 'projects', record_id: [{ id: '4', until: nil, until_row: nil }], skip: 0, limit: 20, order: 'desc'
+            collection: 'projects', record_id: '4', skip: 0, limit: 20, order: 'desc'
           )
           expect(store).to have_received(:count_by_record)
-            .with(collection: 'projects', record_id: [{ id: '4', until: nil, until_row: nil }])
+            .with(collection: 'projects', record_id: '4')
           # Top-level keys are camelCased for the frontend; nested value hashes keep the column names.
           expect(result[:content]).to eq(
             {
@@ -233,7 +359,9 @@ module ForestAdminAgent
 
           route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-          expect(collection).to have_received(:list) do |_caller, filter, _projection|
+          # Twice: once before the store read to refuse an out-of-scope record, once after it so the
+          # withholding decision is not older than the rows it applies to.
+          expect(collection).to have_received(:list).twice do |_caller, filter, _projection|
             expect(filter.condition_tree.conditions).to include(scope)
           end
         end
@@ -254,82 +382,635 @@ module ForestAdminAgent
         it 'still serves the history of a deleted record, which is much of the point of an audit trail' do
           allow(permissions).to receive(:get_scope).and_return(Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
           allow(collection).to receive(:list).and_return([])
-          route = route_with_store(records: [double('entry', to_h: { operation: 'delete', record_id: '4' })])
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(operation: 'delete', record_id: '4')
+          route = route_with_store(records: [entry])
 
           result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-          expect(result[:content][:data]).to eq([{ 'operation' => 'delete', 'recordId' => '4' }])
+          expect(result[:content][:data].first).to include('operation' => 'delete', 'recordId' => '4')
         end
 
-        # Rows written before an update moved a writable primary key stay under the id they were true of, so
-        # asking for the current id alone would start the story at the rename.
-        describe 'a record that was renamed' do
-          it 'reads the history of every id it has been filed under' do
-            route = route_with_store
-            allow(store).to receive(:renamed_from)
-              .and_return([{ id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 12 }], [])
+        # A scope can't be evaluated against a record that is gone, so the rows come back — but the column
+        # values they captured while it existed still have to pass that scope.
+        describe 'a deleted record whose captured values fall outside the caller scope' do
+          def audit_entry(operation, previous_values: {}, new_values: {})
+            ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: operation, collection: 'projects', record_id: '4',
+              previous_values: previous_values, new_values: new_values
+            )
+          end
+
+          def history_of(entries, scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            allow(permissions).to receive(:get_scope).and_return(scope)
+            # Empty in scope and empty without it: the record is gone for good.
+            allow(collection).to receive(:list).and_return([])
+            route = route_with_store(records: entries)
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+                 .dig(:content, :data)
+          end
+
+          # The rows are a dead record's. A live one that has since taken the id is a different record, and
+          # being allowed to read it is not a claim on what came before it.
+          it 'keeps withholding when an in-scope record has taken the id since' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; a record of the caller's own under that id after.
+            allow(collection).to receive(:list).and_return([], [], [{ 'id' => 4, 'status' => 'mine' }])
+            route = route_with_store(records: [audit_entry('delete',
+                                                           previous_values: { 'status' => 'someone else' })])
+
+            data = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+                        .dig(:content, :data)
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # The check that authorized the request ran before these rows were read: an id that was gone then
+          # can belong to another record now, and this caller has no claim on that one's history.
+          it 'answers 404 when the id was taken by an out-of-scope record while the rows were being read' do
+            allow(permissions).to receive(:get_scope)
+              .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+            # Gone on the way in, in scope and without it; someone else's by the time the rows are in hand.
+            allow(collection).to receive(:list).and_return([], [], [], [{ 'id' => 4 }])
+            route = route_with_store(records: [audit_entry('delete', previous_values: { 'status' => 'mine' })])
+
+            expect do
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+            end.to raise_error(Http::Exceptions::NotFoundError)
+          end
+
+          it 'withholds a delete row whose previous values fail the scope, keeping the row itself' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'someone else' })])
+
+            expect(data.first).to include('operation' => 'delete', 'recordId' => '4', 'previousValues' => {})
+          end
+
+          it 'keeps a delete row whose previous values pass the scope' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })])
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+          end
+
+          # Matched in SQL, a search would still answer what the withholding hides: whether the row comes back,
+          # and the count, say whether the withheld value holds the term.
+          describe 'searched or filtered by field' do
+            def searched(entries, params)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store(records: entries)
+
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                            **params } })[:content]
+            end
+
+            def secret_delete
+              audit_entry('delete', previous_values: { 'status' => 'someone else secret' })
+                .tap { |entry| entry.user_id = 7 }
+            end
+
+            it 'finds nothing in a withheld value, and counts nothing' do
+              content = searched([secret_delete], 'search' => 'secret')
+
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            it 'matches the values it serves' do
+              content = searched([audit_entry('delete', previous_values: { 'status' => 'mine' })], 'search' => 'MIN')
+
+              expect(content[:data].map { |row| row['previousValues'] }).to eq([{ 'status' => 'mine' }])
+            end
+
+            it 'still matches what stays visible on a withheld row, such as its author' do
+              entry = secret_delete.tap { |row| row.user_email = 'jane@acme.io' }
+
+              content = searched([entry], 'search' => 'acme')
+
+              expect(content[:data].first).to include('userEmail' => 'jane@acme.io', 'previousValues' => {})
+              expect(content[:meta][:availableUsers]).to eq([{ id: 7, firstName: nil, lastName: nil,
+                                                               email: 'jane@acme.io' }])
+            end
+
+            it 'lists an author once even when their rows carry different identities' do
+              renamed = [secret_delete.tap { |row| row.user_email = 'jane@acme.io' },
+                         secret_delete.tap { |row| row.user_email = 'jane@acme.com' }]
+
+              content = searched(renamed, 'search' => 'acme')
+
+              expect(content[:meta][:availableUsers].map { |user| user[:id] }).to eq([7])
+            end
+
+            def renamed(email, id:, timestamp:)
+              secret_delete.tap do |row|
+                row.user_email = email
+                row.id = id
+                row.timestamp = timestamp
+              end
+            end
+
+            def renamed_oldest_first
+              [renamed('jane@acme.io', id: 1, timestamp: '2026-01-01T00:00:00.000Z'),
+               renamed('jane@acme.com', id: 2, timestamp: '2026-01-02T00:00:00.000Z')]
+            end
+
+            it 'lists an author as their latest identity whichever way the history is sorted' do
+              newest_first = searched(renamed_oldest_first.reverse, 'search' => 'acme')
+              oldest_first = searched(renamed_oldest_first, 'search' => 'acme', 'sort' => 'timestamp')
+
+              expect([newest_first, oldest_first].map { |content| content[:meta][:availableUsers].first[:email] })
+                .to eq(%w[jane@acme.com jane@acme.com])
+            end
+
+            # The store breaks a timestamp tie by id ascending in both directions, so newest first reads the
+            # older of two same-millisecond rows first.
+            it 'lists an author as their latest identity when their rows share a timestamp' do
+              tied = [renamed('jane@acme.io', id: 1, timestamp: '2026-01-01T00:00:00.000Z'),
+                      renamed('jane@acme.com', id: 2, timestamp: '2026-01-01T00:00:00.000Z')]
+
+              content = searched(tied, 'search' => 'acme')
+
+              expect(content[:meta][:availableUsers].map { |user| user[:email] }).to eq(['jane@acme.com'])
+            end
+
+            it 'does not match a field only a withheld side touched' do
+              content = searched([secret_delete], 'fields' => 'status')
+
+              expect(content[:data]).to eq([])
+            end
+
+            it 'reads the rows without the value filters and pages what matched' do
+              rows = [audit_entry('create', new_values: { 'status' => 'mine' }),
+                      audit_entry('update', previous_values: { 'status' => 'mine' }, new_values: { 'status' => 'mine' })]
+
+              content = searched(rows, 'search' => 'mine', 'userIds' => '12', 'page' => { 'size' => '1', 'number' => '2' })
+
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search))
+              expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [12]))
+              expect(content[:data].map { |row| row['operation'] }).to eq(['update'])
+              expect(content[:meta]).to eq({ count: 2 })
+            end
+
+            it 'matches served values for a record deleted while the audit read was in flight' do
+              scope = Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine')
+              allow(permissions).to receive(:get_scope).and_return(scope)
+              route = route_with_store(records: [secret_delete])
+              # In scope on the way in, gone by the time the rows are in hand.
+              answers = [[{ 'id' => 4, 'status' => 'mine' }], [], []]
+              reads = []
+              allow(collection).to receive(:list) do |_caller, filter, _projection|
+                reads << filter.condition_tree
+                answers[reads.size - 1]
+              end
+
+              content = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                                      'search' => 'secret' } })[:content]
+
+              # The re-check asks for this record in the caller's scope, then for it at all.
+              _first_check, recheck_in_scope, recheck_at_all = reads
+              expect(recheck_in_scope.conditions).to include(scope, have_attributes(field: 'id', value: 4))
+              expect(recheck_at_all).to have_attributes(field: 'id', value: 4)
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:search, :skip))
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            # A masked value never matches, neither by its mask nor by the value it hid: the SQL search strips
+            # the mask, and so must the served-value scan.
+            it 'never matches the redaction mask of a served value' do
+              row = audit_entry('delete', previous_values: {
+                                  'status' => 'mine', 'email' => ::ForestAdminAgent::AuditTrail::Recording::REDACTED
+                                })
+
+              content = searched([row], 'search' => 'redacted')
+
+              expect(content).to include(data: [], meta: { count: 0, availableUsers: [] })
+            end
+
+            def scanned_rows(count)
+              Array.new(count) do |index|
+                audit_entry('create', new_values: { 'status' => 'mine', 'n' => index })
+                  .tap do |row|
+                    row.id = index
+                    row.timestamp = "t#{index}"
+                  end
+              end
+            end
+
+            def past(rows, cursor)
+              cursor ? rows.drop_while { |row| row.id != cursor[:id] }.drop(1) : rows
+            end
+
+            # The page cap bounds what is served, not what is scanned: the history is read in batches so
+            # a long one is never held in memory whole.
+            it 'scans the history in batches, counting across them and keeping only the page' do
+              stub_const("#{described_class}::SCAN_BATCH_SIZE", 2)
+              rows = scanned_rows(5)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store
+              allow(store).to receive(:list_by_record) { |after:, **| past(rows, after).first(2) }
+
+              content = route.handle_request(
+                { headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', 'search' => 'mine',
+                                         'page' => { 'size' => '2', 'number' => '2' } } }
+              )[:content]
+
+              expect(store).to have_received(:list_by_record).exactly(3).times
+              expect(store).to have_received(:list_by_record).with(hash_including(after: { timestamp: 't3', id: 3 },
+                                                                                  limit: 2))
+              expect(store).to have_received(:list_by_record).with(hash_excluding(:skip)).exactly(3).times
+              expect(content[:data].map { |row| row['newValues']['n'] }).to eq([2, 3])
+              expect(content[:meta]).to eq({ count: 5 })
+            end
+
+            # An id taken by another record since would keep an oldest-first scan chasing its new rows, so every
+            # batch reads the log as it stood when the scan started.
+            it 'bounds every batch at the instant the scan started' do
+              stub_const("#{described_class}::SCAN_BATCH_SIZE", 1)
+              ends = []
+              rows = scanned_rows(2)
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+              allow(collection).to receive(:list).and_return([])
+              route = route_with_store
+              allow(store).to receive(:list_by_record) do |after:, end_timestamp:, **|
+                ends << end_timestamp
+                past(rows, after).first(1)
+              end
+
+              route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4',
+                                                            'search' => 'mine' } })
+
+              expect(ends.size).to eq(3)
+              expect(ends.uniq.size).to eq(1)
+              expect(Time.iso8601(ends.first)).to be_within(5).of(Time.now)
+            end
+
+            it 'keeps an end date the caller asked for when it is earlier' do
+              content = searched([], 'search' => 'mine', 'endDate' => '2020-01-01')
+
+              expect(content[:data]).to eq([])
+              expect(store).to have_received(:list_by_record)
+                .with(hash_including(end_timestamp: '2020-01-01T23:59:59.999Z'))
+            end
+          end
+
+          it 'keeps a create row whose new values pass the scope, and withholds one that does not' do
+            data = history_of([audit_entry('create', new_values: { 'status' => 'mine' }),
+                               audit_entry('create', new_values: { 'status' => 'someone else' })])
+
+            expect(data.map { |row| row['newValues'] }).to eq([{ 'status' => 'mine' }, {}])
+          end
+
+          # Each side of an update is tested on its own values, so the one that can be proven in scope is
+          # released and the other is not.
+          it 'keeps the side of an update that passes the scope and blanks the one that does not' do
+            data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
+                                                     new_values: { 'status' => 'someone else' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' }, 'newValues' => {})
+          end
+
+          it 'keeps both sides of an update that stayed in scope' do
+            data = history_of([audit_entry('update', previous_values: { 'status' => 'mine' },
+                                                     new_values: { 'status' => 'mine' })])
+
+            expect(data.first).to include('previousValues' => { 'status' => 'mine' },
+                                          'newValues' => { 'status' => 'mine' })
+          end
+
+          # A diff that never carried the scoped column answers for neither side.
+          it 'withholds both sides of an update whose diff never touched the scoped column' do
+            data = history_of([audit_entry('update', previous_values: { 'created_at' => 1 },
+                                                     new_values: { 'created_at' => 2 })])
+
+            expect(data.first).to include('previousValues' => {}, 'newValues' => {})
+          end
+
+          # A read-only column is never captured, so the snapshot answers nil for it — `!=` would match and an
+          # ordered operator would raise. Neither is an answer about the record that was deleted.
+          it 'withholds when the scope asks about a column the snapshot never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          it 'withholds rather than comparing an ordered operator against a column it never captured' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('created_at', Operators::LESS_THAN, 10))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # A placeholder is not the value the scope asked about.
+          it 'withholds when the scoped column was captured redacted' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'status' => redacted })],
+                              scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+            expect(data.first['previousValues']).to eq({})
+          end
+
+          # An update files its row under the id the record ended up with. A redacted key is writable, so it may
+          # have moved: the row's id answers for it on the new side only, or the new state would decide about the
+          # old one.
+          describe 'an update whose primary key is redacted' do
+            def update_entry(previous_id)
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'update', collection: 'projects', record_id: '9',
+                previous_values: { 'id' => previous_id, 'status' => 'was theirs' },
+                new_values: { 'id' => redacted, 'status' => 'now mine' }
+              )
+            end
+
+            it 'withholds the previous side rather than judge it by the id the record moved to' do
+              redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+              data = history_of([update_entry(redacted)], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+              expect(data.first['previousValues']).to eq({})
+              expect(data.first['newValues']).to include('status' => 'now mine')
+            end
+
+            it 'still answers the previous side when the key was captured in clear' do
+              data = history_of([update_entry(4)], scope: Nodes::ConditionTreeLeaf.new('id', Operators::IN, [4, 9]))
+
+              expect(data.first['previousValues']).to include('status' => 'was theirs')
+            end
+          end
+
+          # A primary key never captured is read-only, so it cannot have moved: the row's id answers for it on
+          # both sides of an update.
+          it 'fills a read-only primary key from the row id on both sides of an update' do
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '4',
+              previous_values: { 'status' => 'was mine' }, new_values: { 'status' => 'still mine' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to include('status' => 'was mine')
+            expect(data.first['newValues']).to include('status' => 'still mine')
+          end
+
+          # A pending row is filed under the id the record had before the write, so it cannot answer for the
+          # state the update was moving to.
+          it 'gives neither side of a pending update the id for a redacted key' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '4',
+              status: ForestAdminAgent::AuditTrail::Recording::PENDING,
+              previous_values: { 'id' => redacted, 'status' => 'was mine' },
+              new_values: { 'id' => redacted, 'status' => 'now theirs' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({})
+            expect(data.first['newValues']).to eq({})
+          end
+
+          # A captured nil holds its key, so the answerability test passes it through to an operator that
+          # cannot compare it. Failing the whole page over one row would take the other rows with it.
+          it 'withholds a row whose captured nil an ordered operator cannot compare' do
+            data = history_of([audit_entry('delete', previous_values: { 'budget' => nil, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('budget', Operators::GREATER_THAN, 1000))
+
+            expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+          end
+
+          # In memory `!=` holds for a nil, while the database leaves a NULL out of `!=`: a record the caller
+          # could never read alive must not become readable once deleted.
+          describe 'a captured nil under a negated scope' do
+            it 'withholds the values, as the database would have left the record out' do
+              not_private = Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private')
+              not_listed = Nodes::ConditionTreeLeaf.new('status', Operators::NOT_IN, ['private'])
+
+              withheld = [not_private, not_listed].map do |scope|
+                history_of([audit_entry('delete', previous_values: { 'status' => nil })], scope: scope)
+                  .first['previousValues']
+              end
+
+              expect(withheld).to eq([{}, {}])
+            end
+
+            it 'withholds when the negation sits inside a branch' do
+              scope = Nodes::ConditionTreeBranch.new('And', [
+                                                       Nodes::ConditionTreeLeaf.new('budget', Operators::EQUAL, 1),
+                                                       Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL,
+                                                                                    'private')
+                                                     ])
+
+              data = history_of([audit_entry('delete', previous_values: { 'budget' => 1, 'status' => nil })],
+                                scope: scope)
+
+              expect(data.first['previousValues']).to eq({})
+            end
+
+            it 'keeps the values a scope asking for the nil itself covers' do
+              data = history_of([audit_entry('delete', previous_values: { 'status' => nil })],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::MISSING))
+
+              expect(data.first['previousValues']).to eq({ 'status' => nil })
+            end
+
+            it 'keeps a non-nil value the negation covers' do
+              data = history_of([audit_entry('delete', previous_values: { 'status' => 'open' })],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::NOT_EQUAL, 'private'))
+
+              expect(data.first['previousValues']).to eq({ 'status' => 'open' })
+            end
+          end
+
+          # An id written under an older schema stops decoding when the primary key changes arity.
+          describe 'a row whose stored id no longer decodes' do
+            def undecodable_entry
+              ForestAdminAgent::AuditTrail::AuditRecord.new(
+                operation: 'delete', collection: 'projects', record_id: '4|legacy',
+                previous_values: { 'status' => 'mine' }, new_values: {}
+              )
+            end
+
+            it 'withholds from a scope on the id rather than failing the page' do
+              data = history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(data.first).to include('operation' => 'delete', 'previousValues' => {})
+            end
+
+            # The id is all that could not be read. A scope that never asks about it is still answerable
+            # from the columns the row captured.
+            it 'still answers a scope that never asks about the id' do
+              data = history_of([undecodable_entry],
+                                scope: Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+
+              expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+            end
+
+            it 'logs the id it could not read' do
+              logger = instance_double(ForestAdminAgent::Services::LoggerService, log: nil)
+              allow(ForestAdminAgent::Facades::Container).to receive(:logger).and_return(logger)
+
+              history_of([undecodable_entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+              expect(logger).to have_received(:log).with('Warn', a_string_including('id not decodable'))
+            end
+          end
+
+          # The packed id fills in only what the snapshot cannot answer. A moved primary key the trail did
+          # not redact is carried by both sides, so neither needs the row's own id, and letting it win would
+          # judge the previous side by the id the record moved to.
+          it 'lets a side that captured the key keep its own, over the id the row is filed under' do
+            entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+              operation: 'update', collection: 'projects', record_id: '9',
+              previous_values: { 'id' => 4, 'status' => 'was theirs' },
+              new_values: { 'id' => 9, 'status' => 'now mine' }
+            )
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 9))
+
+            expect(data.first['previousValues']).to eq({})
+            expect(data.first['newValues']).to eq({ 'id' => 9, 'status' => 'now mine' })
+          end
+
+          # A writable primary key the trail redacts is the one case where the two disagree: the placeholder
+          # would read as unanswered, while the id the row is filed under proves what the key was.
+          it 'reads a redacted primary key back from the packed id rather than the snapshot' do
+            redacted = ForestAdminAgent::AuditTrail::Recording::REDACTED
+            data = history_of([audit_entry('delete', previous_values: { 'id' => redacted, 'status' => 'mine' })],
+                              scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'id' => redacted, 'status' => 'mine' })
+          end
+
+          # A read-only primary key never lands in the snapshot; the row's own packed id carries it.
+          it 'matches a scope on the primary key through the row id' do
+            entry = audit_entry('delete', previous_values: { 'status' => 'mine' })
+            data = history_of([entry], scope: Nodes::ConditionTreeLeaf.new('id', Operators::EQUAL, 4))
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'mine' })
+          end
+
+          # A submitted form and a result summary, not column values.
+          it 'leaves action rows untouched' do
+            data = history_of([audit_entry('action', previous_values: { 'amount' => 12 })])
+
+            expect(data.first['previousValues']).to eq({ 'amount' => 12 })
+          end
+
+          it 'leaves every value alone when no scope applies' do
+            data = history_of([audit_entry('delete', previous_values: { 'status' => 'someone else' })], scope: nil)
+
+            expect(data.first['previousValues']).to eq({ 'status' => 'someone else' })
+          end
+        end
+
+        # The scope check runs before the store read, so the record can be deleted in between — and the rows
+        # that come back then already carry its delete.
+        it 'withholds a record deleted between the scope check and the store read' do
+          allow(permissions).to receive(:get_scope)
+            .and_return(Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine'))
+          # Present and in scope when checked; gone, in scope and out, when asked again after the read.
+          allow(collection).to receive(:list).and_return([{ 'id' => 4 }], [], [])
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            operation: 'delete', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'someone else' }, new_values: {}
+          )
+          route = route_with_store(records: [entry])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data].first).to include('operation' => 'delete', 'previousValues' => {})
+        end
+
+        it 'does not withhold anything when the record still exists in scope and its id was never freed' do
+          scope = Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine')
+          allow(permissions).to receive(:get_scope).and_return(scope)
+          entry = ForestAdminAgent::AuditTrail::AuditRecord.new(
+            operation: 'update', collection: 'projects', record_id: '4',
+            previous_values: { 'status' => 'archived' }, new_values: { 'status' => 'mine' }
+          )
+          route = route_with_store(records: [entry])
+
+          result = route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
+
+          expect(result[:content][:data].first['previousValues']).to eq({ 'status' => 'archived' })
+        end
+
+        # A delete frees the id and a later record can take it. Being allowed to read the record that holds it
+        # now is no claim on the rows filed under it before.
+        describe 'a live record whose id an earlier record held' do
+          let(:scope) { Nodes::ConditionTreeLeaf.new('status', Operators::EQUAL, 'mine') }
+          let(:earlier_update) do
+            audit_row(2, '2026-01-02T10:00:00.000Z', 'update', previous_values: { 'status' => 'their secret' },
+                                                               new_values: { 'status' => 'their other secret' })
+          end
+          let(:earlier_delete) do
+            audit_row(3, '2026-01-02T11:00:00.000Z', 'delete', previous_values: { 'status' => 'their other secret' })
+          end
+          let(:current_create) do
+            audit_row(4, '2026-01-02T12:00:00.000Z', 'create', new_values: { 'status' => 'mine' })
+          end
+          let(:current_update) do
+            audit_row(5, '2026-01-02T13:00:00.000Z', 'update', previous_values: { 'status' => 'mine' },
+                                                               new_values: { 'status' => 'mine' })
+          end
+          let(:rows) { [current_update, current_create, earlier_delete, earlier_update] }
+
+          def audit_row(id, timestamp, operation, previous_values: {}, new_values: {})
+            ForestAdminAgent::AuditTrail::AuditRecord.new(
+              id: id, timestamp: timestamp, operation: operation, collection: 'projects', record_id: '4',
+              status: ForestAdminAgent::AuditTrail::Recording::DONE,
+              previous_values: previous_values, new_values: new_values
+            )
+          end
+
+          def history(boundary, params = {})
+            allow(permissions).to receive(:get_scope).and_return(scope)
+            route = route_with_store(records: rows)
+            allow(store).to receive(:life_boundary_of).with(collection: 'projects', record_id: '4').and_return(boundary)
+
+            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4', **params } })
+          end
+
+          def values_by_id(result)
+            result[:content][:data].to_h { |row| [row['id'], [row['previousValues'], row['newValues']]] }
+          end
+
+          it 'withholds the earlier record values and serves the current record' do
+            served = values_by_id(history(current_create))
+
+            expect(served[2]).to eq([{}, {}])
+            expect(served[3]).to eq([{}, {}])
+            expect(served[4]).to eq([{}, { 'status' => 'mine' }])
+            expect(served[5]).to eq([{ 'status' => 'mine' }, { 'status' => 'mine' }])
+          end
+
+          it 'counts a confirmed delete as the earlier record last row' do
+            served = values_by_id(history(earlier_delete))
+
+            expect(served[3]).to eq([{}, {}])
+            expect(served[4]).to eq([{}, { 'status' => 'mine' }])
+          end
+
+          it 'matches a search on the values served, so it cannot find the earlier record values' do
+            content = history(current_create, 'search' => 'secret')[:content]
+
+            expect(content[:data]).to be_empty
+            expect(content[:meta][:count]).to eq(0)
+          end
+
+          it 'serves the whole history of an id that was never freed' do
+            served = values_by_id(history(nil))
+
+            expect(served[2]).to eq([{ 'status' => 'their secret' }, { 'status' => 'their other secret' }])
+          end
+
+          it 'does not look for a boundary without a scope in effect' do
+            allow(permissions).to receive(:get_scope).and_return(nil)
+            route = route_with_store(records: rows)
 
             route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
 
-            expected = [{ id: '4', until: nil, until_row: nil },
-                        { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 12 }]
-            expect(store).to have_received(:list_by_record).with(hash_including(record_id: expected))
-            expect(store).to have_received(:count_by_record).with(hash_including(record_id: expected))
-          end
-
-          # Two hops means two real bounds to compare, which is the path a single rename never reaches.
-          it 'carries the earlier bound down a chain of two renames' do
-            route = route_with_store
-            allow(store).to receive(:renamed_from).and_return(
-              [{ id: '7', until: '2026-01-02T00:00:09.000Z', until_row: 20 }],
-              [{ id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }],
-              []
-            )
-
-            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '9' } })
-
-            expect(store).to have_received(:list_by_record).with(
-              hash_including(record_id: [
-                               { id: '9', until: nil, until_row: nil },
-                               { id: '7', until: '2026-01-02T00:00:09.000Z', until_row: 20 },
-                               { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }
-                             ])
-            )
-          end
-
-          # The middle id was left later than the one before it, so the older segment keeps its own, earlier
-          # bound rather than inheriting the looser one.
-          it 'keeps the earlier of the two bounds when the chain reports a later one' do
-            route = route_with_store
-            allow(store).to receive(:renamed_from).and_return(
-              [{ id: '7', until: '2026-01-02T00:00:05.000Z', until_row: 10 }],
-              [{ id: '1', until: '2026-01-02T00:00:09.000Z', until_row: 20 }],
-              []
-            )
-
-            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '9' } })
-
-            expect(store).to have_received(:list_by_record).with(
-              hash_including(record_id: [
-                               { id: '9', until: nil, until_row: nil },
-                               { id: '7', until: '2026-01-02T00:00:05.000Z', until_row: 10 },
-                               { id: '1', until: '2026-01-02T00:00:05.000Z', until_row: 10 }
-                             ])
-            )
-          end
-
-          it 'stops walking rather than looping on a chain that comes back to itself' do
-            route = route_with_store
-            allow(store).to receive(:renamed_from).and_return(
-              [{ id: '1', until: nil, until_row: nil }], [{ id: '4', until: nil, until_row: nil }]
-            )
-
-            route.handle_request({ headers: {}, params: { 'collection_name' => 'projects', 'id' => '4' } })
-
-            expect(store).to have_received(:list_by_record).with(
-              hash_including(record_id: [{ id: '4', until: nil, until_row: nil },
-                                         { id: '1', until: nil, until_row: nil }])
-            )
+            expect(store).not_to have_received(:life_boundary_of)
           end
         end
 
@@ -350,7 +1031,7 @@ module ForestAdminAgent
               [{ id: 12, firstName: 'Ada', lastName: 'L', email: 'ada@test' }]
             )
             expect(store).to have_received(:authors_by_record)
-              .with(collection: 'projects', record_id: [{ id: '4', until: nil, until_row: nil }])
+              .with(collection: 'projects', record_id: '4')
           end
 
           # The front keeps the list it saw, so later pages leave it out.
@@ -455,6 +1136,36 @@ module ForestAdminAgent
                                  params: { 'collection_name' => 'projects', 'id' => '4', 'userIds' => '7, x ,9' } })
 
           expect(store).to have_received(:list_by_record).with(hash_including(user_ids: [7, 9]))
+        end
+
+        it 'passes an operations filter through to the rows, the count and the authors' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4',
+                                           'operations' => 'update, action_failed ,' } })
+
+          %i[list_by_record count_by_record authors_by_record].each do |read|
+            expect(store).to have_received(read).with(hash_including(operations: %w[update action_failed]))
+          end
+        end
+
+        it 'sends no operations filter when the param is absent or empty' do
+          route = route_with_store
+          route.handle_request({ headers: {},
+                                 params: { 'collection_name' => 'projects', 'id' => '4', 'operations' => ' , ' } })
+
+          expect(store).to have_received(:list_by_record).with(hash_excluding(:operations))
+        end
+
+        it 'rejects an unrecognized operation rather than ignoring it' do
+          route = route_with_store
+
+          expect do
+            route.handle_request({ headers: {},
+                                   params: { 'collection_name' => 'projects', 'id' => '4',
+                                             'operations' => 'update,rename' } })
+          end.to raise_error(Http::Exceptions::ValidationError, /Invalid operation: "rename"/)
+          expect(store).not_to have_received(:list_by_record)
         end
 
         it 'parses a date range into inclusive UTC boundaries' do

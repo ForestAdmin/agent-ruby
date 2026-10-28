@@ -32,6 +32,7 @@ module ForestAdminDatasourceToolkit
       def self.validate_leaf(leaf, collection)
         field_schema = Utils::Collection.get_field_schema(collection, leaf.field)
 
+        throw_if_relation_not_filterable(leaf, collection)
         throw_if_operator_not_allowed_with_column(leaf, field_schema)
         throw_if_value_not_allowed_with_operator(leaf, field_schema)
         throw_if_operator_not_allowed_with_column_type(leaf, field_schema)
@@ -40,13 +41,27 @@ module ForestAdminDatasourceToolkit
         nil
       end
 
+      def self.throw_if_relation_not_filterable(leaf, collection)
+        current = collection
+
+        leaf.field.split(':')[0...-1].each do |relation_name|
+          relation = current.schema[:fields][relation_name]
+
+          if relation.respond_to?(:is_filterable) && relation.is_filterable == false
+            raise Exceptions::ValidationError, "The relation '#{current.name}.#{relation_name}' is not filterable"
+          end
+
+          current = current.datasource.get_collection(relation.foreign_collection)
+        end
+      end
+
       def self.throw_if_operator_not_allowed_with_column(leaf, column_schema)
         operators = column_schema.filter_operators
         return if operators.include?(leaf.operator)
 
         raise Exceptions::ValidationError,
               "The given operator '#{leaf.operator}' is not supported by the column: '#{leaf.field}'." \
-              "#{operators.empty? ? " The allowed types are: #{operators.join(",")}" : " The column is not filterable"}"
+              "#{operators.empty? ? " The column is not filterable" : " The allowed types are: #{operators.join(",")}"}"
       end
 
       def self.throw_if_value_not_allowed_with_operator(leaf, column_schema)
