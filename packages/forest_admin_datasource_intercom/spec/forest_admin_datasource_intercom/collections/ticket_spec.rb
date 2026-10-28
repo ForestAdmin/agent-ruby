@@ -637,6 +637,13 @@ module ForestAdminDatasourceIntercom
           .to raise_error(UnsupportedOperatorError, %r{resolves to "state_id", on which tickets/search takes no})
         expect(WebMock).not_to have_requested(:get, /ticket_states/)
       end
+
+      it 'publishes unfilterable the relations the endpoint filters nothing on' do
+        filterable = collection.fields.select { |_, f| f.respond_to?(:is_filterable) }.transform_values(&:is_filterable)
+
+        expect(filterable).to include('state' => false, 'previous_state' => false,
+                                      'admin_assignee' => true, 'ticket_type' => true)
+      end
     end
 
     describe '#aggregate' do

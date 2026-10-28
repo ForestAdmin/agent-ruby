@@ -261,9 +261,11 @@ module ForestAdminDatasourceIntercom
       # A relation this endpoint filters nothing through. It is navigable all the
       # same -- the read costs nothing, the target being read whole -- and saying
       # which of the two it is, is the whole point of the message.
+      def relation_key_filterable?(key) = !search_endpoint.field(key).nil?
+
       def check_relation_filterable!(leaf, relation)
         key = relation.foreign_key
-        refuse_unfilterable_key!(leaf, key) if search_endpoint.field(key).nil?
+        refuse_unfilterable_key!(leaf, key) unless relation_key_filterable?(key)
       end
 
       def refuse_unfilterable_key!(leaf, key)

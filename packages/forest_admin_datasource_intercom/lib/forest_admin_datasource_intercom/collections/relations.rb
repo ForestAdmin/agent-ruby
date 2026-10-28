@@ -9,8 +9,9 @@ module ForestAdminDatasourceIntercom
     #
     # Declaring a relation obliges both halves below, and the second is not
     # optional: a many-to-one is published filterable as soon as *any* column of
-    # its target is (`GeneratorField#build_many_to_one_schema`), so the interface
-    # offers `assignee:name` the moment the relation exists. Left unanswered,
+    # its target is (`GeneratorField#build_many_to_one_schema`) and it does not
+    # opt out, so the interface offers `assignee:name` the moment the relation
+    # exists. Left unanswered,
     # that filter reaches a translator refusing every traversing field -- the
     # interface offering a filter the datasource then refuses, which is the one
     # thing this package is built not to do.
@@ -60,11 +61,16 @@ module ForestAdminDatasourceIntercom
       # Every relation of this package points at a collection keyed by `id` and
       # is read-only: nothing in this lot writes, and an editable relation would
       # offer an association the collection cannot perform.
+      #
+      # Published unfilterable where the endpoint filters nothing on the key, so
+      # the interface does not offer the traversal `check_relation_filterable!`
+      # would refuse.
       def add_many_to_one(name, foreign_collection:, foreign_key:)
         add_field(name, ManyToOneSchema.new(foreign_collection: foreign_collection,
                                             foreign_key: foreign_key,
                                             foreign_key_target: 'id',
-                                            is_read_only: true))
+                                            is_read_only: true,
+                                            is_filterable: relation_key_filterable?(foreign_key)))
       end
 
       # The other side of a many-to-one, and the whole point of the 360 degrees:
@@ -290,9 +296,11 @@ module ForestAdminDatasourceIntercom
         yield(relation.foreign_key, ids, leaf)
       end
 
-      # Hook for a tier that cannot filter on every foreign key it declares a
+      # Hooks for a tier that cannot filter on every foreign key it declares a
       # relation on. Answered before the target is read: a refusal that spends a
       # request first costs exactly what it refuses to do.
+      def relation_key_filterable?(_key) = true
+
       def check_relation_filterable!(_leaf, _relation); end
 
       # Which records of the target the condition names, asked of the target

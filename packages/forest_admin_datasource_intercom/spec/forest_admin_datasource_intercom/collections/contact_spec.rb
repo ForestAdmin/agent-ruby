@@ -122,6 +122,11 @@ module ForestAdminDatasourceIntercom
         expect(collection.fields['tickets'].origin_key).to eq('contact_id')
       end
 
+      it 'publishes the company unfilterable, contacts/search filtering no company field' do
+        expect(collection.fields['owner'].is_filterable).to be(true)
+        expect(collection.fields['company'].is_filterable).to be(false)
+      end
+
       it 'is countable, total_count being exact on every answer' do
         expect(collection.is_countable?).to be(true)
       end

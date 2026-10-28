@@ -413,8 +413,11 @@ endpoint matches and refuses a search by name; `IntercomCompany` has no search e
 
 ### Through a relation
 
-A relation is published filterable as soon as *any* column of its target is — the agent decides that,
-not this datasource — so the interface offers `admin_assignee:name` the moment the relation exists.
+A relation is published filterable as soon as *any* column of its target is, so the interface offers
+`admin_assignee:name` the moment the relation exists — unless the endpoint filters nothing on the
+foreign key. `IntercomTicket#state`, `IntercomTicket#previous_state` and `IntercomContact#company` are
+published unfilterable for that reason: they are there to be read and navigated, and the agent refuses
+a condition through them before it reaches this datasource.
 What Intercom is really filtered on is the foreign key: the **target says which of its records
 match**, over every record it holds rather than over a page, and the ids it names become the
 condition the search carries.
