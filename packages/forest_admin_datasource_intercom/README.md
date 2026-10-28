@@ -364,7 +364,9 @@ on:
 
 Intercom matches `~` **per word, not as a substring**: searching `fact` does not find `facture`, and
 searching `acme` does not find `camille@acme.test`. `IntercomTicket` exposes no text column its
-endpoint matches and refuses a search by name; `IntercomCompany` has no search endpoint at all.
+endpoint matches and refuses a search by name; `IntercomCompany` has no search endpoint at all and
+refuses one the same way. Both still show a search bar, which the agent displays for every collection;
+`collection.disable_search` in the agent's customization removes it.
 
 ### What is not filterable, and why
 

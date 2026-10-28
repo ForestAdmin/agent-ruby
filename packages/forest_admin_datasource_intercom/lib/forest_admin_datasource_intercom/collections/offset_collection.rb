@@ -47,9 +47,12 @@ module ForestAdminDatasourceIntercom
       # each one costs a request and the figure is what an operator waits for.
       MAX_RELATION_READS = 100
 
+      # Search is declared only to be refused by name: left to the customizer,
+      # it would be emulated as equalities on columns no lookup answers.
       def initialize(datasource, name)
         super
         enable_count
+        enable_search
       end
 
       def ids_per_read = MAX_ID_READS
@@ -113,6 +116,8 @@ module ForestAdminDatasourceIntercom
       end
 
       def fetch_records(filter)
+        refuse_search! unless blank_search?(filter)
+
         ids = id_lookup(filter)
         return records_by_ids(page_window(ids, filter)) if ids
 
@@ -125,6 +130,8 @@ module ForestAdminDatasourceIntercom
       end
 
       def count_records(filter)
+        refuse_search! unless blank_search?(filter)
+
         ids = id_lookup(filter)
         return count_by_ids(ids) if ids
 
@@ -238,6 +245,13 @@ module ForestAdminDatasourceIntercom
         raise unless e.status == 404
 
         []
+      end
+
+      def refuse_search!
+        raise UnsupportedOperatorError,
+              "#{name} cannot answer a free-text search: Intercom exposes no search endpoint for this collection " \
+              "and looks a record up by #{lookups.keys.join(", ")} alone, one exact value at a time. Filter on " \
+              'one of those instead of searching.'
       end
 
       def refuse_condition!(tree)

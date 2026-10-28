@@ -38,6 +38,10 @@ module ForestAdminDatasourceIntercom
       def initialize(datasource, attributes: [])
         @attributes = attributes
         super(datasource, 'IntercomTicket')
+        # Declared so the search reaches `refuse_search!` instead of being
+        # emulated by the customizer as an equality on every String column,
+        # which `/tickets/search` answers with an empty page.
+        enable_search
       end
 
       protected

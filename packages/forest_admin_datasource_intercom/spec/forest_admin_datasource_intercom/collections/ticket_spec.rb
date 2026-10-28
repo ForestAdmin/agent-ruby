@@ -167,9 +167,11 @@ module ForestAdminDatasourceIntercom
       end
 
       # Intercom matches text field by field, and this endpoint exposes none
-      # this collection carries.
-      it 'is not searchable' do
-        expect(collection).not_to be_is_searchable
+      # this collection carries. Declared searchable all the same, so the search
+      # reaches the collection and its refusal rather than the customizer's
+      # emulation.
+      it 'answers the search itself' do
+        expect(collection).to be_is_searchable
       end
 
       # An attribute overwriting a native column would show the attribute where
