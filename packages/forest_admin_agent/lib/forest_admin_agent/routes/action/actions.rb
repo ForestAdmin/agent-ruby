@@ -1,5 +1,7 @@
 require 'jsonapi-serializers'
 require 'active_support/inflector'
+require 'active_support/core_ext/hash/indifferent_access'
+require 'active_support/core_ext/object/deep_dup'
 require 'jwt'
 
 module ForestAdminAgent
@@ -50,7 +52,7 @@ module ForestAdminAgent
         def handle_request(args = {})
           context = build(args)
           ensure_served_action(context)
-          args = middleware_custom_action_approval_request_data(args)
+          args = middleware_custom_action_approval_request_data(args, context)
           filter_for_caller = get_record_selection(args, context)
 
           context.permissions.can_smart_action?(args, context.collection, filter_for_caller, action_name: @action_name)
@@ -210,23 +212,38 @@ module ForestAdminAgent
           []
         end
 
-        def middleware_custom_action_approval_request_data(args)
+        def middleware_custom_action_approval_request_data(args, context)
           raise Http::Exceptions::UnprocessableError if args.dig(:params, :data, :attributes, :requester_id)
 
-          if (signed_request = args.dig(:params, :data, :attributes, :signed_approval_request))
-            args[:params][:data][:attributes][:signed_approval_request] = decode_signed_approval_request(signed_request)
-          end
+          signed_request = args.dig(:params, :data, :attributes, :signed_approval_request)
+          return args if signed_request.nil?
 
+          payload = decode_signed_approval_request(signed_request)
+          data = payload[:data]
+          attributes = data[:attributes] if data.is_a?(ActiveSupport::HashWithIndifferentAccess)
+
+          unless attributes.is_a?(ActiveSupport::HashWithIndifferentAccess) &&
+                 attributes[:collection_name] == context.collection.name
+            raise Http::Exceptions::ForbiddenError, 'This approval request was not signed for this collection.'
+          end
+          raise Http::Exceptions::ForbiddenError, 'Approval must name its records.' if attributes[:all_records]
+
+          attributes[:signed_approval_request] = payload.deep_dup
+          args[:params][:data] = data
           args
         end
 
         def decode_signed_approval_request(signed_request)
-          ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(JWT.decode(
+          raise Http::Exceptions::ForbiddenError, 'Invalid approval request.' unless signed_request.is_a?(String)
+
+          JWT.decode(
             signed_request,
             Facades::Container.cache(:env_secret),
             true,
             { algorithm: 'HS256' }
-          )[0])
+          )[0].with_indifferent_access
+        rescue JWT::DecodeError
+          raise Http::Exceptions::ForbiddenError, 'Invalid approval request.'
         end
 
         def get_record_selection(args, context)
