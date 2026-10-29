@@ -236,6 +236,19 @@ module ForestAdminDatasourceIntercom
           .to raise_error(UnsupportedOperatorError, /empty list/)
       end
 
+      # Measured: a longer list is a 400 naming neither the field nor the
+      # condition.
+      it 'refuses a list longer than Intercom takes, naming the limit' do
+        expect { call('string', (1..51).map(&:to_s), spelling: 'IN', operator: operators::IN) }
+          .to raise_error(UnsupportedOperatorError, /"c" with in and 51 values: Intercom takes 50 at most/)
+        expect { call('string', (1..51).map(&:to_s), spelling: 'NIN', operator: operators::NOT_IN) }
+          .to raise_error(UnsupportedOperatorError, /51 values/)
+      end
+
+      it 'takes a list of exactly as many values as Intercom does' do
+        expect(call('string', (1..50).map(&:to_s), spelling: 'IN', operator: operators::IN).size).to eq(50)
+      end
+
       # `not_in [nil, 'open']` was asked to exclude the records carrying neither
       # and would come back including the blank ones.
       it 'refuses a list holding a blank, rather than dropping it' do

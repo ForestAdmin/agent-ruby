@@ -8,7 +8,8 @@ module ForestAdminDatasourceIntercom
     # number, a flag is a boolean. A value of the wrong shape is refused with
     # `data_invalid`, the same code an unsupported operator returns, so the
     # conversion belongs here rather than in a rescue reading error codes.
-    class FilterValue
+    # Long by line count only: most of it is the refusals, one per shape.
+    class FilterValue # rubocop:disable Metrics/ClassLength
       # What the frontend sends for a Dateonly column, and what a segment written
       # in Ruby carries: a day with no time of day, which is midnight in the
       # timezone of whoever wrote the filter rather than in the server's.
@@ -18,6 +19,10 @@ module ForestAdminDatasourceIntercom
       DATE_PARTS = %i[year mon mday].freeze
 
       INTEGER = /\A-?\d+\z/
+
+      # Measured: past this, Intercom answers a 400 naming neither the field nor
+      # the condition.
+      MAX_LIST_SIZE = 50
 
       def initialize(collection:, timezone: nil)
         @collection = collection
@@ -43,6 +48,7 @@ module ForestAdminDatasourceIntercom
       def list(leaf, field)
         values = Array(leaf.value)
         refuse_empty_list!(leaf) if values.empty?
+        refuse_long_list!(leaf, values.size) if values.size > MAX_LIST_SIZE
         refuse_absence!(leaf, field) if values.any? { |value| blank?(value) }
 
         values.map { |value| scalar(value, leaf, field) }
@@ -168,6 +174,12 @@ module ForestAdminDatasourceIntercom
         raise UnsupportedOperatorError,
               "#{@collection} was asked to filter #{leaf.field.inspect} with #{leaf.operator} and an empty list, " \
               'which names no record and no filter. Pass at least one value.'
+      end
+
+      def refuse_long_list!(leaf, size)
+        raise UnsupportedOperatorError,
+              "#{@collection} cannot filter #{leaf.field.inspect} with #{leaf.operator} and #{size} values: " \
+              "Intercom takes #{MAX_LIST_SIZE} at most in one list. Narrow the list, or split the filter."
       end
 
       def refuse_value!(leaf, value, expected)

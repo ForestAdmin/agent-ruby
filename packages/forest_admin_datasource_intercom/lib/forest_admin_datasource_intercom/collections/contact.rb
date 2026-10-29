@@ -42,7 +42,7 @@ module ForestAdminDatasourceIntercom
       # the `contact_name` column and the relation reading the contact have to
       # chunk the same way, or the two requests are two bodies and the page pays
       # for both.
-      IDS_PER_READ = 100
+      IDS_PER_READ = Query::FilterValue::MAX_LIST_SIZE
       MAX_IDS_READ = 300
 
       def initialize(datasource, attributes: [])
@@ -54,8 +54,8 @@ module ForestAdminDatasourceIntercom
         enable_search
       end
 
-      # This endpoint answers `id IN [...]`, so a hundred ids cost one request
-      # rather than a hundred: a relation pointing here resolves a whole page of
+      # This endpoint answers `id IN [...]`, so fifty ids cost one request
+      # rather than fifty: a relation pointing here resolves a whole page of
       # rows for a handful of requests, and there is no fan-out to refuse. That
       # is why `max_resolvable_ids` is nil where the other two tiers bound it --
       # the read is proportional to the rows already collected, and the walk
@@ -245,7 +245,7 @@ module ForestAdminDatasourceIntercom
         Client::Page.new(records: [], next_cursor: nil, total_count: 0)
       end
 
-      # One request per hundred ids instead of one per id: this endpoint answers
+      # One request per fifty ids instead of one per id: this endpoint answers
       # `id IN [...]`, which is what lot 1 already reads the contacts of a page
       # through. A contact that was merged away is simply absent from the
       # answer -- the row reads as gone, not as a failure.
