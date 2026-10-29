@@ -354,6 +354,11 @@ answered by a search: `id equals X` and `id in [...]` read the record endpoint d
 per record. The search answers it only when something else is filtered alongside it — a permission
 scope, a segment, or a second filter.
 
+**A ticket's `category`** is filtered on the label the ticket shows — `Customer`, `Back-office`,
+`Tracker` — and sent as the word `/tickets/search` takes for it: `request`, `task`, `tracker`. Any
+other value is refused rather than sent, since Intercom would compare it against a vocabulary the
+column never shows.
+
 **Free-text search** is answered on two collections, each on the one column its endpoint matches text
 on:
 

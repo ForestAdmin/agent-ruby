@@ -14,7 +14,7 @@ module ForestAdminDatasourceIntercom
     # by a script, so a typo in an operator, or a column filed as both filterable
     # and refused, is a defect of this package: it fails at boot rather than
     # producing a schema nobody can explain.
-    module SearchFields
+    module SearchFields # rubocop:disable Metrics/ModuleLength
       PATH = File.expand_path('search_fields.yml', __dir__)
 
       # The operators Intercom's search DSL spells, and nothing else: `=`, `!=`,
@@ -35,7 +35,11 @@ module ForestAdminDatasourceIntercom
       # `/contacts/search` takes a `sort`, the other two take one and ignore it
       # without a word. Absent reads as false, so a table saying nothing leaves
       # a column unsortable rather than promising an order.
-      Field = Struct.new(:column, :field, :type, :operators, :source, :sortable, keyword_init: true) do
+      #
+      # `value_map` (`values` in the file), when present, maps what the column shows onto what the search
+      # takes, for a field Intercom spells differently on each side: a ticket
+      # reads `Customer` and is searched as `request`.
+      Field = Struct.new(:column, :field, :type, :operators, :source, :sortable, :value_map, keyword_init: true) do
         def measured? = source == 'measured'
         def sortable? = sortable == true
       end
@@ -154,7 +158,7 @@ module ForestAdminDatasourceIntercom
           (declared || {}).to_h do |column, row|
             field = Field.new(column: column, field: row.fetch('field'), type: row.fetch('type'),
                               operators: Array(row['operators']).freeze, source: row.fetch('source'),
-                              sortable: row.fetch('sortable', false)).freeze
+                              sortable: row.fetch('sortable', false), value_map: row['values']).freeze
             validate_field!(endpoint, field)
 
             [column, field]
@@ -177,6 +181,7 @@ module ForestAdminDatasourceIntercom
           validate_operators!(endpoint, field)
           validate_publishable!(endpoint, field)
           validate_sortable!(endpoint, field)
+          validate_values!(endpoint, field)
         end
 
         # Operators the DSL spells, none of which this column's *type* can carry:
@@ -200,6 +205,13 @@ module ForestAdminDatasourceIntercom
           return if [true, false].include?(field.sortable)
 
           malformed!(endpoint, field.column, "sortable #{field.sortable.inspect} is neither true nor false")
+        end
+
+        def validate_values!(endpoint, field)
+          map = field.value_map
+          return if map.nil? || (map.is_a?(Hash) && !map.empty? && map.to_a.flatten.all?(String))
+
+          malformed!(endpoint, field.column, "values #{map.inspect} is not a map of strings to strings")
         end
 
         def validate_type!(endpoint, field)

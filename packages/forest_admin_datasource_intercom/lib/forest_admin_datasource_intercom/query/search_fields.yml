@@ -290,6 +290,12 @@ endpoints:
         type: string
         operators: ['=', '!=']
         source: spec
+        # A ticket reads its category as a label; the search takes another
+        # word for each (OpenAPI 2.16, "Searching by Category").
+        values:
+          Customer: request
+          Back-office: task
+          Tracker: tracker
       ticket_type_id:
         field: ticket_type_id
         type: string

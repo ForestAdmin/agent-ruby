@@ -18,7 +18,7 @@ module ForestAdminDatasourceIntercom
     end
 
     def ticket(id)
-      { 'type' => 'ticket', 'id' => id, 'ticket_id' => "1#{id}", 'category' => 'request', 'open' => true,
+      { 'type' => 'ticket', 'id' => id, 'ticket_id' => "1#{id}", 'category' => 'Customer', 'open' => true,
         'created_at' => 1_700_000_000, 'admin_assignee_id' => 493_881, 'team_assignee_id' => 12,
         'ticket_state' => { 'id' => '19', 'internal_label' => 'En cours' },
         'previous_ticket_state_id' => '14',

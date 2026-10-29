@@ -53,8 +53,14 @@ module ForestAdminDatasourceIntercom
         when 'date' then epoch(value, leaf)
         when 'number' then number(value, leaf)
         when 'boolean' then boolean(value, leaf)
-        else value.to_s
+        else field.value_map ? mapped(value.to_s, leaf, field) : value.to_s
         end
+      end
+
+      # A value outside the map is refused rather than sent as typed: Intercom
+      # would compare it against a vocabulary the column never shows.
+      def mapped(value, leaf, field)
+        field.value_map.fetch(value) { refuse_value!(leaf, value, "one of #{field.value_map.keys.join(", ")}") }
       end
 
       # Intercom stores and compares its dates as epoch seconds. What arrives

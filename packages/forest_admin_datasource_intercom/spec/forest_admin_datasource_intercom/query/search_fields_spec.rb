@@ -206,6 +206,15 @@ module ForestAdminDatasourceIntercom
           .to raise_error(ConfigurationError, /sortable "true" is neither true nor false/)
       end
 
+      it 'refuses a value map that does not map strings to strings' do
+        category = { 'field' => 'category', 'type' => 'string', 'operators' => ['='], 'source' => 'spec' }
+
+        [[], {}, { 'Customer' => 1 }].each do |values|
+          expect { table(fields: { 'category' => category.merge('values' => values) }) }
+            .to raise_error(ConfigurationError, /is not a map of strings to strings/)
+        end
+      end
+
       it 'refuses a provenance that is neither measured nor read off the documentation' do
         expect { table(fields: { 'created_at' => field_row('source' => 'guessed') }) }
           .to raise_error(ConfigurationError, /source "guessed" is neither measured nor spec/)

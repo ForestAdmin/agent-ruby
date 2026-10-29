@@ -31,10 +31,10 @@ module ForestAdminDatasourceIntercom
     # This endpoint uses the `data` envelope, unlike /admins and /teams.
     it 'reads the endpoint through the data envelope' do
       stub_types('type' => 'ticket_type', 'id' => '1', 'name' => 'Bug', 'description' => 'A bug',
-                 'category' => 'request', 'icon' => '🐛', 'archived' => false)
+                 'category' => 'Customer', 'icon' => '🐛', 'archived' => false)
 
       expect(collection.list(nil, filter, nil))
-        .to eq([{ 'id' => '1', 'name' => 'Bug', 'description' => 'A bug', 'category' => 'request',
+        .to eq([{ 'id' => '1', 'name' => 'Bug', 'description' => 'A bug', 'category' => 'Customer',
                   'icon' => '🐛', 'archived' => false }])
     end
 

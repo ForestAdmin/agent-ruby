@@ -39,7 +39,7 @@ module ForestAdminDatasourceIntercom
     # Hand-written from the shape measured on a real workspace: the state comes
     # embedded, the company as a bare id, and the parts ride along.
     def ticket(id, overrides = {})
-      { 'type' => 'ticket', 'id' => id, 'ticket_id' => "1#{id}", 'category' => 'request',
+      { 'type' => 'ticket', 'id' => id, 'ticket_id' => "1#{id}", 'category' => 'Customer',
         'open' => true, 'is_shared' => false, 'created_at' => 1_700_000_000, 'updated_at' => 1_700_003_600,
         'admin_assignee_id' => 493_881, 'team_assignee_id' => 0,
         'company_id' => '696dd52099f73812610d9c7b',
@@ -221,7 +221,7 @@ module ForestAdminDatasourceIntercom
         stub_search(ticket('1'))
 
         expect(rows.first)
-          .to include('id' => '1', 'ticket_id' => '11', 'category' => 'request', 'open' => true,
+          .to include('id' => '1', 'ticket_id' => '11', 'category' => 'Customer', 'open' => true,
                       'state_id' => '19', 'state_label' => 'En cours Tech',
                       'previous_state_id' => '14', 'ticket_type_name' => 'Bug',
                       'company_id' => '696dd52099f73812610d9c7b', 'admin_assignee_id' => '493881')
@@ -283,9 +283,24 @@ module ForestAdminDatasourceIntercom
         search = stub_search(ticket('1'), body: { 'query' => { 'field' => 'category', 'operator' => '=',
                                                                'value' => 'request' } })
 
-        rows(%w[id], condition_tree: leaf('category', operators::EQUAL, 'request'))
+        rows(%w[id], condition_tree: leaf('category', operators::EQUAL, 'Customer'))
 
         expect(search).to have_been_made
+      end
+
+      # The search spells each category differently from the ticket it returns.
+      it 'searches a category by the word the search takes, not the label the ticket shows' do
+        search = stub_search(ticket('1'), body: { 'query' => { 'field' => 'category', 'operator' => '!=',
+                                                               'value' => 'task' } })
+
+        rows(%w[id], condition_tree: leaf('category', operators::NOT_EQUAL, 'Back-office'))
+
+        expect(search).to have_been_made
+      end
+
+      it 'refuses a category the ticket never shows, rather than sending it as typed' do
+        expect { rows(%w[id], condition_tree: leaf('category', operators::EQUAL, 'request')) }
+          .to raise_error(UnsupportedOperatorError, /with "request".*one of Customer, Back-office, Tracker/)
       end
 
       it 'refuses a condition on a column the endpoint does not filter, by name' do
@@ -541,7 +556,7 @@ module ForestAdminDatasourceIntercom
       it 'nests the group inside the condition it was written next to' do
         stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Alice' })
         stub_search(ticket('1'))
-        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+        tree = branch('And', leaf('category', operators::EQUAL, 'Customer'),
                       leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
@@ -567,7 +582,7 @@ module ForestAdminDatasourceIntercom
       it 'inlines the group into a parent that aggregates the same way' do
         stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Alice' })
         stub_search(ticket('1'))
-        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+        tree = branch('And', leaf('category', operators::EQUAL, 'Customer'),
                       branch('Or', leaf('open', operators::EQUAL, true),
                              leaf('admin_assignee:name', operators::EQUAL, 'Alice')))
 
@@ -594,7 +609,7 @@ module ForestAdminDatasourceIntercom
       it 'leaves the group nested when inlining it would pass fifteen conditions' do
         stub_admins(*(1..3).map { |index| { 'id' => index.to_s, 'name' => 'Alice' } })
         stub_search(ticket('1'))
-        others = (1..14).map { |index| leaf('category', operators::NOT_EQUAL, "c#{index}") }
+        others = (1..14).map { |index| leaf('ticket_type_id', operators::NOT_EQUAL, "t#{index}") }
         tree = branch('Or', *others, leaf('admin_assignee:name', operators::EQUAL, 'Alice'))
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
@@ -608,7 +623,7 @@ module ForestAdminDatasourceIntercom
 
       it 'reads nothing when a relation condition inside an and matches nothing' do
         stub_admins('id' => '493881', 'name' => 'Alice')
-        tree = branch('And', leaf('category', operators::EQUAL, 'request'),
+        tree = branch('And', leaf('category', operators::EQUAL, 'Customer'),
                       leaf('admin_assignee:name', operators::EQUAL, 'Zoe'))
 
         expect(collection.list(nil, filter(condition_tree: tree), %w[id])).to be_empty
