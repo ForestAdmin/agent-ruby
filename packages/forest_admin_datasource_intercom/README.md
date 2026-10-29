@@ -197,8 +197,9 @@ Two of these carry a caveat worth reading before scoping a token or writing a se
 side is a `spec` row the probe has not confirmed**: whether `/tickets/search` filters on
 `contact_ids` at all is unmeasured, and if it does not, the relation stays navigable and the filter
 moves to the refusal table — exactly what happened to the ticket `state`. And **the company
-traversal is refused by name**: `/contacts/search` filters no company field, so `company:name` is
-answered with a message saying to filter from the company side instead.
+traversal is not offered**: `/contacts/search` filters no company field, so the relation is
+published unfilterable and the agent refuses `company:name` before it reaches this datasource. Filter
+from the company side instead: open the account and read its `contacts`.
 
 The same rule settled the ticket labels: `state_label` and `ticket_type_name` stay on the row,
 `state_category` and `state_external_label` are gone — they are a hop away, on the `state` relation,
@@ -370,8 +371,9 @@ on:
 Intercom matches `~` **per word, not as a substring**: searching `fact` does not find `facture`, and
 searching `acme` does not find `camille@acme.test`. `IntercomTicket` exposes no text column its
 endpoint matches and refuses a search by name; `IntercomCompany` has no search endpoint at all and
-refuses one the same way. Both still show a search bar, which the agent displays for every collection;
-`collection.disable_search` in the agent's customization removes it.
+refuses one the same way. Both still show a search bar, so a search typed there — on the list, on a
+related list, or in Forest's search across collections — comes back as that refusal rather than as an
+empty page. `collection.disable_search` in the agent's customization removes the bar.
 
 ### What is not filterable, and why
 

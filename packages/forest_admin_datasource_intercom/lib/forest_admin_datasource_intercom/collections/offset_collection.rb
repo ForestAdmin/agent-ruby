@@ -251,8 +251,8 @@ module ForestAdminDatasourceIntercom
       def refuse_search!
         raise UnsupportedOperatorError,
               "#{name} cannot answer a free-text search: Intercom exposes no search endpoint for this collection " \
-              "and looks a record up by #{lookups.keys.join(", ")} alone, one exact value at a time. Filter on " \
-              'one of those instead of searching.'
+              "and looks a record up by id, #{lookups.keys.join(", ")} alone, one exact value at a time. Filter " \
+              'on one of those instead of searching.'
       end
 
       def refuse_condition!(tree)
