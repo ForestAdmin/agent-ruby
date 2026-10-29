@@ -211,14 +211,21 @@ module ForestAdminDatasourceIntercom
         expect(configuration.inspect).to include('https://api.intercom.io', '2.16')
       end
 
-      # A credentialed egress proxy is the other reason to set a base_url, and
-      # `URI` accepts its credentials in the url: printing it verbatim would put
-      # a second secret exactly where this keeps the first one from going.
-      it 'masks the credentials of a base_url that carries them' do
-        configured = described_class.new(access_token: 's3cr3t', base_url: 'https://bob:hunter2@proxy.test/api')
+      # Faraday turns them into a Basic Authorization header, which the bearer
+      # token replaces: they would be dropped on every request without a word.
+      it 'refuses a base_url carrying credentials, without printing them' do
+        expect { described_class.new(access_token: 's3cr3t', base_url: 'https://bob:hunter2@proxy.test/api') }
+          .to raise_error(ConfigurationError) { |error|
+            expect(error.message).to include('https://[FILTERED]@proxy.test/api', 'HTTPS_PROXY')
+            expect(error.message).not_to include('hunter2', 'bob')
+          }
+      end
 
-        expect(configured.inspect).not_to include('hunter2', 'bob')
-        expect(configured.inspect).to include('https://[FILTERED]@proxy.test/api')
+      it 'prints no credentials when refusing a url it cannot parse' do
+        expect { described_class.new(access_token: 's3cr3t', base_url: 'https://bob:hunter2@proxy test/api') }
+          .to raise_error(ConfigurationError, /not a valid url/) { |error|
+            expect(error.message).not_to include('hunter2')
+          }
       end
 
       it 'masks the query string of a base_url, where a gateway takes its key' do

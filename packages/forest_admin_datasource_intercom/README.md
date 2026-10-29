@@ -40,7 +40,7 @@ that verifies the pinned API version was honoured.
 | --- | --- | --- |
 | `access_token` | — | Required. The private app's bearer token. |
 | `region` | `:us` | `:us`, `:eu`, `:au`. A workspace answers in its own region only. |
-| `base_url` | from `region` | Wins over `region`. For an egress proxy or a mock server. |
+| `base_url` | from `region` | Wins over `region`. For a gateway or a mock server. Refused if it carries credentials: the `Authorization` header holds the Intercom token, so a credentialed egress proxy goes in `HTTPS_PROXY` instead. |
 | `api_version` | `'2.16'` | Sent as `Intercom-Version` on every request. |
 | `open_timeout` / `timeout` | `5` / `30` | A request that already has a page on screen. |
 | `boot_open_timeout` / `boot_timeout` | `3` / `10` | The one read performed while the agent starts. |

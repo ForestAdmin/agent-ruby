@@ -120,12 +120,11 @@ module ForestAdminDatasourceIntercom
     end
 
     # The url with any credentials in it masked. `URI` accepts them --
-    # `https://user:pass@proxy/...` -- and a credentialed egress proxy is one of
-    # the two reasons to set a `base_url` at all, so printing the url verbatim
-    # would put a second secret exactly where this class keeps the first one
-    # from going. A query string is masked whole for the same reason: it is
-    # where a gateway takes its key. Read by `Client#inspect` too, which prints
-    # the same url.
+    # `https://user:pass@proxy/...` -- and the refusal that names such a url
+    # would otherwise print a second secret exactly where this class keeps the
+    # first one from going. A query string is masked whole for the same
+    # reason: it is where a gateway takes its key. Read by `Client#inspect`
+    # too, which prints the same url.
     def redacted_url
       @redacted_url ||= url.sub(%r{\A([a-zA-Z][\w+.-]*://)[^/@]*@}, '\1[FILTERED]@')
                            .sub(/\?.*\z/m, '?[FILTERED]')
@@ -218,13 +217,26 @@ module ForestAdminDatasourceIntercom
       return if @base_url.nil?
 
       uri = URI.parse(@base_url)
+      refuse_credentials! if uri.userinfo
       return warn_cleartext!(uri) if uri.is_a?(URI::HTTP) && !blank?(uri.host)
 
       raise ConfigurationError,
-            "ForestAdminDatasourceIntercom base_url must be an absolute http(s) url, got #{@base_url.inspect}"
+            "ForestAdminDatasourceIntercom base_url must be an absolute http(s) url, got #{redacted_url.inspect}"
     rescue URI::InvalidURIError
       raise ConfigurationError,
-            "ForestAdminDatasourceIntercom base_url is not a valid url: #{@base_url.inspect}"
+            "ForestAdminDatasourceIntercom base_url is not a valid url: #{redacted_url.inspect}"
+    end
+
+    # Faraday turns credentials in the url into a Basic `Authorization`
+    # header, which the Intercom bearer token then replaces: they would be
+    # dropped on every request without a word. An egress proxy takes its
+    # credentials from `HTTPS_PROXY`, which Faraday sends as
+    # `Proxy-Authorization` instead.
+    def refuse_credentials!
+      raise ConfigurationError,
+            "ForestAdminDatasourceIntercom base_url #{redacted_url.inspect} carries credentials, which cannot " \
+            'travel: the Authorization header carries the Intercom access token. For a credentialed egress ' \
+            'proxy, set HTTPS_PROXY=https://user:password@proxy:port instead.'
     end
 
     # `URI::HTTPS` is a `URI::HTTP`, so plain http passes above -- and it is
