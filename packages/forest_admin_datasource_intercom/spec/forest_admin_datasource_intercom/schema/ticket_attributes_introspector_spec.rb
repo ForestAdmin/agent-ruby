@@ -138,6 +138,14 @@ module ForestAdminDatasourceIntercom
         expect(introspector.attributes).to be_empty
       end
 
+      # Read at boot, outside the APIError rescue: a malformed element costs that
+      # element, never the agent.
+      it 'skips a ticket type or an attribute that is not an object, keeping the rest' do
+        stub_types(nil, 7, ticket_type('1', 'Bug', nil, attribute('Severity', '9001')))
+
+        expect(introspector.attributes.map(&:name)).to eq(['Severity'])
+      end
+
       it 'reads a ticket type declaring no attribute as declaring none' do
         stub_types({ 'id' => '1', 'name' => 'Bug' })
 

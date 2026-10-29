@@ -68,6 +68,8 @@ module ForestAdminDatasourceIntercom
       end
 
       def collect(ticket_type, union)
+        return unless ticket_type.is_a?(Hash)
+
         type_id = ticket_type['id'].to_s
         definitions(ticket_type).each do |definition|
           entry = entry_for(definition, union, type_id)
@@ -125,13 +127,11 @@ module ForestAdminDatasourceIntercom
       end
 
       def definitions(ticket_type)
-        return [] unless ticket_type.is_a?(Hash)
-
         container = ticket_type['ticket_type_attributes']
         return [] unless container.is_a?(Hash)
 
         list = container['data']
-        list.is_a?(Array) ? list : []
+        list.is_a?(Array) ? list.grep(Hash) : []
       end
 
       # These are declared per ticket type, and that is what the log calls
