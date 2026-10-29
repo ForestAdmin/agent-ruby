@@ -51,16 +51,8 @@ module ForestAdminDatasourceIntercom
       add_collection(Collections::Ticket.new(self, attributes: ticket_attributes))
     end
 
-    # The one boot read that is not about a column, and the only place the
-    # pinned API version can be checked: Intercom serves the workspace's own
-    # default when the pin is not honoured, echoes what it served in a response
-    # header, and the payload shapes differ between versions -- the silent
-    # drift this package refuses everywhere else. `Client#me` reads that echo
-    # and reports a mismatch; nothing else in the datasource calls it, so
-    # leaving it uncalled left the check as code that never ran.
-    #
-    # Degrades like the three attribute reads below: a token that cannot reach
-    # `/me` costs the check, never the boot.
+    # Intercom silently serves the workspace's default API version when the pin is not honoured;
+    # `Client#me` checks the echoed version. A token that cannot reach `/me` costs the check, not the boot.
     def verify_api_version
       @client.me(boot: true)
     rescue APIError => e

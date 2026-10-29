@@ -1,14 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The conversations of the workspace: what a support team actually works on.
-    #
-    # Read through `GET /conversations`, whose records Intercom puts under
-    # `conversations` rather than under the `data` envelope -- `/tickets/search`
-    # does the same with `tickets`, so the key is named rather than assumed.
-    #
-    # `display_as=plaintext` on every read: the bodies are HTML written by end
-    # customers, and rendering third-party HTML inside Forest is neither safe nor
-    # useful (R10).
+    # Records come back under `conversations`, not `data`. Every read sends `display_as=plaintext`: bodies
+    # are customer-written HTML, unsafe to render inside Forest (R10).
     # Long by line count only: most of it declares the columns, one call each.
     class Conversation < CursorCollection
       include ContactIdentity
@@ -79,22 +72,9 @@ module ForestAdminDatasourceIntercom
         define_relations
       end
 
-      # Who the conversation sits with, and who closed it. All three targets are
-      # read whole in one request, and `/conversations/search` takes a filter on
-      # each of the three keys -- so these relations can be read, navigated and
-      # filtered through alike.
-      #
-      # No relation towards the company: a conversation carries its account as a
-      # whole object, so the name is already on the row, and Intercom filters no
-      # company field on this endpoint -- the relation would be navigable and
-      # not filterable, where the column is already readable.
-      #
-      # The contact is a relation as of lot 4, and a filterable one: the
-      # endpoint matches a conversation against one of its contact ids
-      # (measured), so `contact:email` resolves against `/contacts/search` and
-      # is rewritten onto the key. A group conversation names its first contact
-      # here, like the column does; every contact of it is a hop away, through
-      # that contact's own conversations.
+      # /conversations/search filters on all three keys and on a contact id (measured), so `contact:email` is
+      # resolved through /contacts/search. No company relation: Intercom filters no company field here. A group
+      # conversation names its first contact.
       def define_relations
         add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
         add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')

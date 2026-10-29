@@ -1,20 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The thread of a conversation or of a ticket, as a structured list the
-    # record view can render: who said what, when, and through which kind of
-    # event.
-    #
-    # `part_type` is kept on every entry: an assignment, an internal note and a
-    # reply are not the same event, and a thread that flattens them reads as an
-    # exchange that never happened the way it did. Which also means **the
-    # internal notes of the team are in there**, alongside what the customer
-    # was told -- that is what a thread is on Intercom, and hiding half of it
-    # would be the more surprising answer.
-    #
-    # Intercom keeps the 500 most recent parts of either resource, so the entry
-    # count is what is in hand, never necessarily what exists. The two
-    # collections differ in where they read those parts and in whether anything
-    # opens the thread before them -- both are hooks.
+    # The thread of a conversation or ticket. `part_type` is kept, and internal notes are included next to
+    # customer replies -- that is what a thread is on Intercom. Intercom keeps only the 500 most recent parts.
     module Timeline
       private
 

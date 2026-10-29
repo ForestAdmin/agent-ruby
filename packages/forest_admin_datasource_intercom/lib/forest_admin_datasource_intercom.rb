@@ -7,16 +7,8 @@ require 'time'
 require 'uri'
 require 'yaml'
 require 'zeitwerk'
-# `Time.zone` and `Time.use_zone`, which is how a date filter is read in the
-# timezone the caller wrote it in -- see `Query::CallerZone`. Required here
-# rather than relied on: the toolkit happens to pull ActiveSupport in far
-# enough for these to exist, but that is its business and not a contract, and a
-# `require` of this gem on its own left them undefined.
-#
-# Both lines: `active_support/time` brings `Time.zone`, and the bare
-# `active_support` brings the autoload table `Time.use_zone` reaches into for
-# `ActiveSupport::IsolatedExecutionState`. Without the second, the first raises
-# a NameError on the first date filter rather than at load.
+# Required explicitly rather than relied on via the toolkit: `active_support` brings the autoload
+# `Time.use_zone` needs, `active_support/time` brings `Time.zone` (see `Query::CallerZone`).
 require 'active_support'
 require 'active_support/time'
 require 'faraday'
@@ -30,15 +22,8 @@ module ForestAdminDatasourceIntercom
   class Error < StandardError; end
   class ConfigurationError < Error; end
 
-  # A filter Intercom cannot express exactly: an operator its search DSL refuses
-  # on that field, a tree deeper than the two levels it allows, or a group past
-  # its fifteen filters. It descends from the toolkit's ValidationError rather
-  # than from this package's Error so the agent answers 400 carrying the message
-  # instead of a 500 "Unexpected error" -- each one names something the operator
-  # set and can change, and the message is the only place they learn which.
-  #
-  # This datasource refuses rather than approximates: a result that looks
-  # filtered and is not is worse than an explicit refusal.
+  # Descends from the toolkit's ValidationError so the agent answers 400 with the message, not a 500:
+  # the datasource refuses a filter Intercom cannot express exactly rather than approximating it.
   class UnsupportedOperatorError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
   # Raised when an Intercom API call fails. Carries the HTTP status and the

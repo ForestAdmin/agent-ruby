@@ -24,16 +24,8 @@ module ForestAdminDatasourceIntercom
         read('the day boundary') { Time.zone.local(date.year, date.month, date.day).to_i }
       end
 
-      # A timestamp carrying no offset is the caller's wall clock. `FilterFactory`
-      # writes the bounds of a previous period as `%Y-%m-%d %H:%M:%S`, so a chart
-      # comparing to the previous month sent a midnight read in whatever timezone
-      # the process happened to run in -- and a midnight moved by any offset at
-      # all lands on another UTC day once truncated, which is a whole day of rows
-      # beside the ones asked for.
-      #
-      # A timestamp carrying an offset is untouched, which is every operator the
-      # toolkit rewrites into a pair of bounds: those come through as UTC ISO8601
-      # and read the same in any zone.
+      # An offset-less timestamp is the caller's wall clock: FilterFactory writes previous-period bounds as
+      # `%Y-%m-%d %H:%M:%S`, and a midnight shifted by any offset truncates onto another UTC day.
       def timestamp(value)
         read('the timestamp') { Time.zone.parse(value).to_i }
       end

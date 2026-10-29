@@ -1,24 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The third pagination tier, and the only one that maps onto what Forest
-    # asks for without translating anything: Intercom paginates
-    # `POST /companies/list` by **offset**, so page 7 of a list view is one
-    # request rather than six pages walked to reach it. No cursor walker, no
-    # cap, and no truncation warning.
-    #
-    # What it pays for that is filtering. There is no search endpoint for
-    # companies at all -- `GET /companies/scroll` exists and is deliberately
-    # rejected, one open scroll per app expiring in a minute cannot serve
-    # concurrent list views -- so what a filter may say is four exact lookups
-    # and nothing else. Everything past them is **refused by name**, the rule
-    # the cursor tier already set: a page served in answer to a filter it
-    # ignored is the one failure this datasource is built to avoid.
-    #
-    # In memory it does nothing: no filter, no sort, no group. What is in hand
-    # is a page of something larger, exactly like the cursor tier, and the same
-    # reasoning applies.
-    # Long by line count only: half of it is the refusals, and a refusal that
-    # does not say what to do instead is one an operator cannot act on.
+    # `POST /companies/list` paginates by offset. Companies have no search endpoint
+    # (`/companies/scroll` allows one open scroll per app, expiring in a minute), so filters are
+    # limited to exact lookups and everything else is refused. Long by line count only: refusals.
     class OffsetCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       include RecordsById
 
@@ -231,14 +215,8 @@ module ForestAdminDatasourceIntercom
         parameter && { parameter => tree.value.to_s }
       end
 
-      # An exact lookup answers few records -- one, for the keys this publishes
-      # -- so it is read as a single page. More than that page holds is reported
-      # rather than dropped in silence.
-      #
-      # A lookup naming no record is an empty page, not a failure: Intercom
-      # answers this route with a 404 where a search endpoint would answer an
-      # empty list, and a filter matching nothing is the most ordinary thing a
-      # list view does. Read the way a record read by its id already is.
+      # Read as a single page; overflow is reported. Intercom answers a lookup matching nothing
+      # with a 404, read here as an empty page.
       def looked_up_records(params)
         answer = lookup(params)
         return [] unless answer

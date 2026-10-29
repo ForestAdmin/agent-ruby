@@ -1,20 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Schema
-    # The attributes a workspace defines on its contacts and on its companies,
-    # read once while the datasource is being constructed.
-    #
-    # Unlike a ticket attribute, one of these is declared **per model** rather
-    # than per ticket type, so the union is the whole set and a column maps onto
-    # exactly one Intercom attribute -- the ambiguity that keeps ticket
-    # attributes display-only (R7) does not arise here. What keeps these
-    # display-only is narrower and temporary: which operators Intercom answers
-    # on `custom_attributes.{name}` has not been measured, and this package
-    # publishes no filter it has not seen work.
-    #
-    # `api_writable` is read and carried although every column of this lot is
-    # published read-only. It costs nothing now and it is exactly what lot 4b
-    # needs to tell an attribute it may write from one Intercom fills in
-    # itself -- re-reading it later would be a second boot-time round trip.
+    # Declared per model, so each column maps to exactly one attribute. Still display-only: which operators
+    # Intercom answers on `custom_attributes.{name}` is unmeasured. `api_writable` is carried for lot 4b.
     class DataAttributesIntrospector
       include AttributeNaming
 

@@ -1,19 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The tickets of the workspace.
-    #
-    # Read through `POST /tickets/search`: Intercom exposes no `GET /tickets` at
-    # all, so even an unfiltered list view goes through the search endpoint with
-    # a predicate that matches everything. Its records come back under `tickets`
-    # rather than under the `data` envelope -- measured.
-    #
-    # The response carries the whole timeline of every ticket, and there is no
-    # way to ask it not to: Intercom offers no field selection. Measured, one
-    # ticket carried 155 parts, so a page of 150 would move some 23 000 part
-    # objects, customer message bodies included. Two consequences run through
-    # this class: the page size is bounded far below what the API accepts, and
-    # everything derived from those parts is free, since they are paid for
-    # whether or not anything asks.
+    # Read through POST /tickets/search: Intercom has no GET /tickets, and records come under `tickets`.
+    # Every response carries each ticket's whole timeline with no field selection (measured: 155 parts on one
+    # ticket), hence the small page size and the free part-derived columns.
     class Ticket < CursorCollection
       include ContactIdentity
       include Ticket::Serializer
@@ -124,17 +113,8 @@ module ForestAdminDatasourceIntercom
         add_column('ticket_type_name', 'String')
       end
 
-      # The reference collections a ticket points at, and the contact who opened
-      # it. Every reference target is read whole in one request, so those
-      # relations resolve for a page at the price of a single read; the contact
-      # is read from `/contacts/search`, one request for the page as well.
-      #
-      # Which of them can be filtered *through* is the measured table's
-      # business, not this method's: `/tickets/search` takes a filter on
-      # `admin_assignee_id`, `team_assignee_id` and `ticket_type_id`, none on a
-      # state id, and `contact_ids` is a `spec` row the probe has yet to
-      # confirm. Where the endpoint filters nothing, the traversal is refused by
-      # name rather than left for the interface to offer and the API to drop.
+      # /tickets/search filters on admin_assignee_id, team_assignee_id and ticket_type_id, on no state id, and
+      # `contact_ids` is unconfirmed; a traversal the endpoint cannot filter is refused by name, not dropped.
       def define_relations
         add_many_to_one('admin_assignee', foreign_collection: 'IntercomAdmin', foreign_key: 'admin_assignee_id')
         add_many_to_one('team_assignee', foreign_collection: 'IntercomTeam', foreign_key: 'team_assignee_id')
@@ -145,14 +125,8 @@ module ForestAdminDatasourceIntercom
         add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
       end
 
-      # Costs no request, unlike a conversation's: Intercom returns the parts of
-      # a ticket in the search response and offers no way to ask it not to, so
-      # the page pays for them whatever the projection says. Building the thread
-      # out of them is what is guarded here.
-      #
-      # An empty list means an empty thread, and says so -- where a conversation
-      # read from a listing carries no parts at all and its timeline stays nil,
-      # which reads as unknown.
+      # Free: the parts come with the search response regardless. An empty list is an empty thread, unlike a
+      # listed conversation, whose timeline stays nil (unknown).
       def embed_timeline(records, rows, projection)
         return unless column_asked?(projection, 'timeline')
 

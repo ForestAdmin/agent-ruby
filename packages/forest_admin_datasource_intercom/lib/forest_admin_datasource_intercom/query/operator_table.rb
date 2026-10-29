@@ -1,49 +1,24 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # How a Forest operator is spelled in Intercom's search DSL, per kind of
-    # field. Two things read this table and they must never disagree: the schema,
-    # which publishes a column's `filter_operators`, and the translator, which
-    # writes the filter. Both go through `forest_operators` and
-    # `intercom_operator`, so a column cannot advertise a filter the translator
-    # would then refuse.
-    #
-    # What an endpoint really accepts on a given field is not here -- that is
-    # `search_fields.yml`, measured. This is only the spelling, and the set is
-    # narrowed by the table before anything is published.
+    # Read by both the schema and the translator, so a column never advertises an operator the translator
+    # refuses. Which operators an endpoint accepts per field lives in `search_fields.yml`.
     module OperatorTable
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
 
       EQUALITY = { Operators::EQUAL => '=', Operators::NOT_EQUAL => '!=',
                    Operators::IN => 'IN', Operators::NOT_IN => 'NIN' }.freeze
 
-      # `contains` and `i_contains` both land on `~`: Intercom documents one
-      # substring operator and no case semantics for it, and the frontend sends
-      # either spelling depending on the column. Declaring one alone would leave
-      # the other refused at read time on a field Intercom does filter.
-      #
-      # `not_i_contains` is deliberately absent although Intercom would answer it
-      # the same way as `not_contains`: the toolkit's own `Rules` does not allow
-      # it on a String column, so publishing it would put a filter in the
-      # interface that the agent rejects before this datasource is ever reached
-      # -- the failure PRD-989 describes.
+      # `contains` and `i_contains` both map to `~`, Intercom's only substring operator. `not_i_contains` is
+      # absent: the toolkit's `Rules` rejects it on a String column (PRD-989).
       SUBSTRING = { Operators::CONTAINS => '~', Operators::I_CONTAINS => '~',
                     Operators::NOT_CONTAINS => '!~',
                     Operators::STARTS_WITH => '^', Operators::ENDS_WITH => '$' }.freeze
 
       BOUNDS = { Operators::GREATER_THAN => '>', Operators::LESS_THAN => '<' }.freeze
 
-      # A date field carries the two bounds and nothing else, even where the
-      # endpoint accepts `=`, `!=`, `>=` and `<=` -- measured, it does on both
-      # search endpoints. The reason is on the agent's side: declaring `equal` on
-      # a Date column makes the toolkit republish `in`, which its own validator
-      # then refuses (PRD-989), so the interface would offer a date filter
-      # answered by a 400 having nothing to do with Intercom.
-      #
-      # Nothing is lost that an operator can see. From the two bounds the toolkit
-      # derives `before`, `after`, `today`, `yesterday`, `past`, `future` and the
-      # whole `previous_*` family -- twenty operators, all rewritten into a pair
-      # of bounds before they reach here. What stays out is an equality on an
-      # instant, which day-granular filtering could not honour anyway.
+      # Dates publish only the two bounds although both endpoints accept `=`, `!=`, `>=`, `<=` (measured):
+      # declaring `equal` makes the toolkit republish `in`, which its validator refuses (PRD-989). The toolkit
+      # still derives `today`, `past`, `previous_*` and the rest from the two bounds.
       MAPS = {
         'string' => EQUALITY,
         'boolean' => EQUALITY,

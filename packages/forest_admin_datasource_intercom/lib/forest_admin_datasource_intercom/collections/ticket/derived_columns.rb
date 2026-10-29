@@ -1,20 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
     class Ticket < CursorCollection
-      # The two columns a support queue is read for and that Intercom does not
-      # carry: when the ticket was closed, and who spoke last.
-      #
-      # A ticket has no `statistics` block -- measured against a workspace of 81
-      # 142 tickets, confirming the specification -- so neither exists as a
-      # field. Both are derived from the parts, and the parts arrive with the
-      # search response whether or not anything asks for them, so both cost
-      # nothing: this is the one place where deriving a column is cheaper than
-      # reading one.
-      #
-      # Display only, and that is not a temporary state: `/tickets/search`
-      # filters on neither and ignores a sort without reporting it, so a column
-      # advertising either would put in the interface what the read cannot
-      # honour.
+      # Derived from the parts: a ticket has no `statistics` block (measured on 81 142 tickets). Display only
+      # for good: /tickets/search filters on neither and silently ignores a sort on them.
       module DerivedColumns
         # A ticket is not "closed" on Intercom, it enters a state whose category
         # is resolved.

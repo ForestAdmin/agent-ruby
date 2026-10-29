@@ -1,19 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # Turns a Forest condition tree into the query `POST /conversations/search`
-    # and `POST /tickets/search` take:
-    #
-    #   leaf   -> { 'field' => ..., 'operator' => ..., 'value' => ... }
-    #   branch -> { 'operator' => 'AND' | 'OR', 'value' => [...] }
-    #
-    # What it will not translate, it refuses. A condition dropped on the way to
-    # Intercom comes back as a page of unfiltered records that looks filtered,
-    # and every refusal below therefore names the field, the operator, or the
-    # thing to change -- an operator reads that message and nothing else.
-    #
-    # Which field the endpoint filters, and with which operator, is not decided
-    # here: it is `search_fields.yml`, measured against a real workspace. This
-    # walks the tree and formats what the table allows.
+    # Whatever it cannot translate it refuses, naming the field or operator: a dropped condition would serve
+    # an unfiltered page that looks filtered. What each endpoint filters comes from `search_fields.yml`.
     class ConditionTreeTranslator
       Branch = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeBranch
       Leaf = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf

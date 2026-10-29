@@ -1,31 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # How this datasource declares a relation, and how it answers one.
-    #
-    # Intercom joins nothing: a ticket carries an assignee id, and the teammate
-    # behind it is a second read of a second endpoint. What makes that affordable
-    # -- and exact -- is that every collection on the far end of these relations
-    # is read whole in one request, the tier `FetchAllCollection` serves.
-    #
-    # Declaring a relation obliges both halves below, and the second is not
-    # optional: a many-to-one is published filterable as soon as *any* column of
-    # its target is (`GeneratorField#build_many_to_one_schema`) and it does not
-    # opt out, so the interface offers `assignee:name` the moment the relation
-    # exists. Left unanswered,
-    # that filter reaches a translator refusing every traversing field -- the
-    # interface offering a filter the datasource then refuses, which is the one
-    # thing this package is built not to do.
-    #
-    # * a projection through a relation (`assignee:name`) is answered by reading
-    #   the target once per page and nesting its row under the relation name;
-    # * a filter through a relation is answered by asking the target which of its
-    #   records match, and filtering Intercom on the ids it names.
-    #
-    # The second is exact rather than approximate -- the target answers over
-    # every record it holds, not over a page -- with one semantic worth stating
-    # plainly: a row whose foreign key is null matches no relation filter, the
-    # way a join drops it, negated filters included. A ticket with no assignee is
-    # not "assigned to someone other than Marie".
+    # Intercom joins nothing, so relation filters must be answered here: the agent publishes a
+    # many-to-one filterable as soon as any target column is. A null foreign key matches no
+    # relation filter, negated ones included, like a join.
     module Relations # rubocop:disable Metrics/ModuleLength
       ManyToOneSchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToOneSchema
       ManyToManySchema = ForestAdminDatasourceToolkit::Schema::Relations::ManyToManySchema
@@ -73,15 +50,7 @@ module ForestAdminDatasourceIntercom
                                             is_filterable: relation_key_filterable?(foreign_key)))
       end
 
-      # The other side of a many-to-one, and the whole point of the 360 degrees:
-      # a contact's conversations, a company's contacts. The agent serves it by
-      # listing the target on `origin_key equals <this record's id>`, so the
-      # target has to be able to answer that condition -- which is what makes
-      # this declarable here and not everywhere.
-      #
-      # Published unfilterable by the agent (`GeneratorField`), so unlike a
-      # many-to-one it carries no risk of offering a filter this datasource
-      # would then refuse.
+      # Served by the agent as `origin_key equals <id>` on the target, which must answer it.
       def add_one_to_many(name, foreign_collection:, origin_key:)
         add_field(name, OneToManySchema.new(foreign_collection: foreign_collection,
                                             origin_key: origin_key,
@@ -97,15 +66,8 @@ module ForestAdminDatasourceIntercom
                                              is_read_only: true))
       end
 
-      # The rows of one page, with the relations the projection named nested onto
-      # them. `records` are the same rows before projection: that is where the
-      # foreign keys are read, since a projection naming `assignee:name` does not
-      # have to name `admin_assignee_id`.
-      #
-      # One request per target *collection* per page -- never one per row, and
-      # never twice for two relations that point at the same collection: a
-      # ticket's `state` and `previous_state` are one read of `/ticket_states`,
-      # over the ids both of them name.
+      # `records` are the unprojected rows, where the foreign keys live. One read per target
+      # collection per page, shared by every relation pointing at it.
       def embed_relations(caller, records, rows, projection)
         asked = many_to_one_asked(projection)
         return if asked.empty?
@@ -126,14 +88,8 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      # The tree this tier can filter on, every `relation:field` leaf traded for
-      # a condition on the foreign key. The block is handed that key and the ids
-      # the target matched, and answers the node the tier wants: an `in` where
-      # the filtering is done in memory, a group of equalities where Intercom's
-      # DSL takes no membership operator.
-      #
-      # An `and` carrying a leaf that matches nothing matches nothing itself; an
-      # `or` drops that leaf and keeps its siblings.
+      # Trades each `relation:field` leaf for a condition on the foreign key, built by the block
+      # from the ids the target matched.
       def rewrite_relation_conditions(caller, node, &builder)
         case node
         when Branch then rewrite_branch(caller, node, &builder)
@@ -189,17 +145,8 @@ module ForestAdminDatasourceIntercom
              .transform_values { |group| target_rows(caller, records, group) }
       end
 
-      # One read per target collection, over the ids every relation pointing at
-      # it names and the union of the columns they asked for.
-      #
-      # The ids are sliced by what the target resolves in one read, and the
-      # fan-out is refused past what it resolves at all. Neither is a detail:
-      # a bulk read by id is bounded on every tier -- Intercom offers no "read
-      # these records" endpoint, so one of them pays a request per id -- and
-      # handing the whole page's keys to that bound would resolve the first
-      # slice and leave the rest of the rows carrying a nil where a record
-      # exists. A relation answered for part of a page is the failure this
-      # datasource is built to avoid, so it is named instead.
+      # Past what the target resolves at all, refused: a partly resolved page would show nil where
+      # a record exists.
       def target_rows(caller, records, group)
         relation = group.first[1]
         ids = group.flat_map { |_, rel, _| records.filter_map { |record| record[rel.foreign_key] } }.uniq
@@ -256,15 +203,8 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      # A relation group aggregating the way its parent does is inlined into it:
-      # `or(x, or(a, b))` is `or(x, a, b)` and one level shallower. The level it
-      # saves is one nothing budgeted for -- what a tier measured its nesting
-      # limit against is the tree the operator wrote, not the equalities a
-      # relation expands into afterwards.
-      #
-      # Only a relation group is inlined. A group the operator wrote is what
-      # their filter means, and flattening it would spend on one group the
-      # conditions two groups were holding.
+      # `or(x, or(a, b))` becomes `or(x, a, b)`, saving the nesting level a relation expansion
+      # adds. Only relation groups are inlined, never groups the operator wrote.
       def absorb_groups(aggregator, nodes)
         absorbed = nodes.flat_map do |node|
           inlinable_group?(node, aggregator) ? Array(node.conditions) : [node]
@@ -316,15 +256,7 @@ module ForestAdminDatasourceIntercom
           .uniq
       end
 
-      # How much of the target a relation condition may read. Unbounded here:
-      # the tier that answers one in memory holds every record already, and
-      # cutting the read short would drop ids its `in` can carry for free.
-      #
-      # The tier whose target is a page of something larger overrides it -- see
-      # `CursorCollection`. Resolving `contact:email contains "@"` against a
-      # workspace's whole contact list, to then refuse the fan-out it comes to,
-      # would spend a full cursor walk on a filter that was never going to be
-      # answered.
+      # How much of the target a relation condition may read; unbounded for in-memory targets.
       def match_page = nil
 
       # The target as the datasource holds it, undecorated -- so a permission

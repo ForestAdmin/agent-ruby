@@ -1,29 +1,6 @@
 module ForestAdminDatasourceIntercom
-  # A time-bounded store for what Intercom answers about the *workspace* rather
-  # than about its records: the teammates, the teams, the ticket types and the
-  # ticket states -- the tier `FetchAllCollection` reads whole.
-  #
-  # Those four endpoints are what makes a relation affordable, and they are
-  # re-read on every page: a ticket list projecting `admin_assignee:name`,
-  # `team_assignee:name`, `state:internal_label` and `ticket_type:name` spends
-  # four sequential round trips on lists that change a few times a year, and
-  # spends them again on the next page, on the count, and on every filter
-  # traversing one of those relations.
-  #
-  # What the TTL buys is bounded staleness rather than none: a teammate added
-  # while an operator is browsing shows up within the window instead of on the
-  # next request. That is the trade the default is set for -- a minute of
-  # staleness on a list of teams, against four round trips per page. A ttl of
-  # zero takes the store out of the stack entirely, which is what a deployment
-  # that would rather pay the requests sets.
-  #
-  # **Records are never cached here.** What a collection reads through the
-  # search or the listing endpoints is the customer's data, and serving a page
-  # of it from a store would show an operator a row they have just edited in
-  # its previous state. See `Client#with_read_scope` for the other half of the
-  # problem -- the same read issued twice while a single page is being built,
-  # which is deduplicated for the duration of that page and not one instant
-  # longer.
+  # TTL store for workspace reference reads (teammates, teams, ticket types, ticket states), re-read
+  # on every page otherwise. Records are never cached here; see `Client#with_read_scope` for per-page dedup.
   class Cache
     Entry = Struct.new(:value, :expires_at)
 
@@ -43,24 +20,9 @@ module ForestAdminDatasourceIntercom
 
     def enabled? = @ttl.positive?
 
-    # The value for `key`, from the store or from the block.
-    #
-    # The block runs **outside** the mutex, deliberately: it performs an HTTP
-    # request, and holding the lock across it would make every thread of the
-    # process queue behind the first one to miss. The cost is that two threads
-    # missing at once both read, and the second write wins -- a duplicated
-    # request where a lock would have saved one, which is the cheaper of the two
-    # failures by a wide margin.
-    #
-    # A block that raises writes nothing: a failure is not an answer, and
-    # caching one would keep an outage alive for the length of the window.
-    #
-    # The generation is read before the block rather than after, which is what
-    # makes `clear` mean something: a read that started earlier answers what
-    # Intercom held earlier, and writing it once the store has been dropped
-    # would hold that answer for a further window -- defeating the one call
-    # `clear` exists for, a customizer that has just written to the workspace
-    # and wants the next page to show it.
+    # The block runs outside the mutex (it is an HTTP request): two concurrent misses both read, which is
+    # cheaper than serializing every thread. A raising block writes nothing, and the generation is read
+    # before the block so a response in flight across `clear` is not stored.
     def fetch(key)
       return yield unless enabled?
 

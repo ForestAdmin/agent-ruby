@@ -1,28 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # Base for the reference collections Intercom hands back whole in a single
-    # response: admins, teams, ticket types, ticket states. Their endpoints
-    # declare no pagination parameter, no filter and no sort.
-    #
-    # Paradoxically this is the most capable tier of the datasource. Filtering,
-    # sorting, paginating and counting that response in memory is *exact* rather
-    # than approximate, because the records in hand are every record Intercom
-    # holds: a window cut out of them carries the rows a server-side query would
-    # have returned. It is the one place where an in-memory pass does not risk
-    # the thing this datasource refuses everywhere else -- a result that looks
-    # filtered without being filtered -- which only arises when what one holds
-    # is a single page of something larger. The cost is bandwidth, not
-    # correctness.
-    #
-    # The response itself is held for `Configuration#reference_cache_ttl` rather
-    # than re-read by every page: these are the four lists every relation of the
-    # datasource resolves through, and a ticket list projecting four of them
-    # spent four sequential round trips on lists that change a few times a year.
-    # So an operator sees what Intercom held within the window rather than what
-    # it holds at this instant -- bounded staleness, on the workspace's own
-    # configuration and never on its records. `Client#fetch_all` is where that
-    # happens and `Cache` is where the trade is argued; `reference_cache_ttl: 0`
-    # buys the freshness back at the price of the requests.
+    # Collections Intercom returns whole in one unpaginated response, so filtering, sorting and
+    # counting in memory is exact. The response is cached for `reference_cache_ttl` (0 disables).
     class FetchAllCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       # The filters a column may advertise, per column type. Restricted to what
       # the toolkit can evaluate in memory, since the in-memory pass is the only
@@ -73,15 +52,8 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      # Exact, like the filter and the sort above it, which is why these columns
-      # stay groupable.
-      #
-      # Rows come back keyed with strings because that is how the agent reads
-      # them, while `Aggregation#apply` hands them back keyed with symbols.
-      #
-      # A group or a field through a relation (`team:name`) reads the target
-      # nested under the relation name, the way `list` serves it; left on the
-      # flat records it would read nil and fold every row into one group.
+      # Relations are embedded first: a group through one (`team:name`) would otherwise read nil
+      # and fold every row into one group.
       def aggregate(caller, filter, aggregation, limit = nil)
         client.with_read_scope do
           records = filtered_records(caller, filter)
@@ -95,14 +67,7 @@ module ForestAdminDatasourceIntercom
 
       protected
 
-      # Scalar columns are sortable and groupable, the in-memory pass honouring
-      # anything asked of them. A Json column is neither, nor filterable: it
-      # holds a list, and what a filter on it would mean has no in-memory
-      # counterpart.
-      #
-      # Every column is read-only: this lot writes nothing, and an editable
-      # column would offer a Save that reaches an `update` the collection does
-      # not implement.
+      # Read-only: an editable column would offer a Save reaching an unimplemented `update`.
       def add_column(name, type, is_primary_key: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: self.class.operators_for(type),
@@ -121,7 +86,6 @@ module ForestAdminDatasourceIntercom
       # Every record of the collection, straight from its endpoint.
       def fetch_all = raise(NotImplementedError, "#{self.class} did not implement fetch_all")
 
-      # One Intercom entity flattened into a record matching the schema.
       def serialize(_entity) = raise(NotImplementedError, "#{self.class} did not implement serialize")
 
       private
@@ -170,16 +134,8 @@ module ForestAdminDatasourceIntercom
         schema.is_a?(ColumnSchema) && schema.filter_operators.include?(leaf.operator)
       end
 
-      # Neither Ruby's `sort` nor the toolkit's `Sort#apply` can be used as is:
-      # `sort` is not stable, and `<=>` answers nil on a null, on two booleans
-      # and on mixed types, which leaves the comparator undefined and the order
-      # arbitrary. Ties therefore fall back to the position Intercom returned the
-      # record in.
-      #
-      # Every requested order is honoured, the ascending primary-key sort the
-      # agent injects when a request names none included, so there is no
-      # unsortable order to report here -- unlike the cursor collections, where
-      # Intercom ignores a sort without saying so.
+      # Not `sort`/`Sort#apply`: `sort` is unstable and `<=>` answers nil on nulls, booleans and
+      # mixed types. Ties fall back to Intercom's order.
       def sort_in_memory(records, sort)
         clauses = sort_clauses(sort)
         return records if clauses.empty?
@@ -189,16 +145,8 @@ module ForestAdminDatasourceIntercom
         end.map(&:first)
       end
 
-      # A sort clause naming a field this collection does not carry, or cannot
-      # sort on -- a relation, a Json column -- is dropped: either would compare
-      # nil to nil on every row and leave the order to the tie-break. Reported
-      # when it happens,
-      # rather than dropped in silence -- an order asked for and not honoured is
-      # reported everywhere else in this datasource, and there is one route that
-      # reaches this tier with a clause it cannot resolve: a related list through
-      # a many-to-many is served by the collection it travels through, and
-      # `Filter#nest` prefixes the condition tree without prefixing the sort, so
-      # the membership is handed the columns of the collection it reaches.
+      # Unsortable clauses are dropped with a warning. They do arrive: `Filter#nest` prefixes the
+      # condition tree but not the sort, so a many-to-many membership gets the target's columns.
       def sort_clauses(sort)
         known, unknown = Array(sort).partition { |clause| sortable_column?(sort_field(clause)) }
         warn_unsortable(unknown) unless unknown.empty?

@@ -1,36 +1,7 @@
 module ForestAdminDatasourceIntercom
-  # Paces requests on what Intercom says is left of the current window, so the
-  # budget is spent rather than exceeded.
-  #
-  # Intercom meters the app and, above it, the whole workspace -- 25 000
-  # requests a minute shared with every other private app the customer runs --
-  # and it allocates that budget in 10-second windows: the measured
-  # `x-ratelimit-limit` is 1667, not 10 000. A burst of 3 000 requests in two
-  # seconds therefore takes a 429 while the minute's budget is barely touched,
-  # which is why what matters here is the instantaneous rate and not a volume
-  # per minute.
-  #
-  # Unlike an API that only documents its budgets, Intercom reports the state of
-  # the window on every response, so this is driven by those headers rather than
-  # by a table: what is left, and when it refills. This sits in front of the 429
-  # retry rather than replacing it -- the retry stays the backstop for the part
-  # of the workspace budget spent by traffic this process never sees.
-  #
-  # One limiter per Configuration, hence per token, since that is what Intercom
-  # meters.
-  #
-  # **What it does not do**, and deliberately: it paces, it does not queue. A
-  # caller that finds the window spent computes the delay to the reset and
-  # sleeps it, and it reserves nothing while it waits -- so a hundred callers
-  # arriving in a spent window all compute the same delay and all wake at the
-  # reset, and past that instant `remaining` is still zero while the wait
-  # computes as elapsed, which lets them through unmetered until the first
-  # response reports the new window. Two things make that acceptable rather
-  # than a bug to work around: the burst is bounded by the callers that were
-  # already blocked, and the 429 retry behind this is what absorbs it -- this
-  # sits in front of that retry, it does not replace it. A real reservation
-  # would mean guessing the boundaries of a window Intercom has not reported
-  # yet, and a wrong guess suppresses the figures it later sends.
+  # Paces on Intercom's x-ratelimit-* headers. Workspace budget is 25 000/min but allocated in 10s windows
+  # (measured x-ratelimit-limit 1667), so the instantaneous rate matters. Paces, does not queue: callers
+  # woken at a reset can burst unmetered until the next response; the 429 retry behind this absorbs it.
   class RateLimiter
     # Intercom's allocation window. Only used as the ceiling below: the reset
     # instant itself always comes from the response.
@@ -84,18 +55,8 @@ module ForestAdminDatasourceIntercom
 
     private
 
-    # A local decrement per request on top of what the headers report: several
-    # requests can be in flight before any of them comes back, and a `remaining`
-    # that only ever moves on a response lets all of them through on the same
-    # stale figure.
-    #
-    # Returns the wait the caller owes and, when the reset is too far out to be
-    # waited for, the wait that was declined -- nil otherwise. Both are settled
-    # here, the second reading shared state like the first: it is nil on every
-    # bypass but the first of a window, so the log line is not repeated.
-    #
-    # Exhaustion is read before the request is counted: a `remaining` of 1 is a
-    # request the window still allows, not one that has to wait for the next.
+    # Decrements locally so in-flight requests do not all pass on the same stale `remaining`; a
+    # `remaining` of 1 still allows this request. The declined wait is returned only once per window.
     def plan_wait
       unless exhausted?
         @remaining -= 1 if @remaining

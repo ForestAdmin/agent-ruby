@@ -1,22 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The membership of the inbox teams: one record per team-and-teammate pair.
-    #
-    # It exists because Intercom's does not. The workspace carries the membership
-    # on the team (`admin_ids`) and on the teammate (`team_ids`) both, and offers
-    # no resource for the pair -- while a many-to-many needs a collection to
-    # travel through, whose two many-to-one relations are what
-    # `Utils::Collection.get_through_target` looks for. Declared here, Teams and
-    # Admins navigate to each other in both directions; left undeclared, both
-    # sides read as an array of ids.
-    #
-    # Read from `/teams`, keeping only the teammates `/admins` still answers:
-    # one who left is named by `admin_ids` until Intercom drops the pair, and a
-    # pair whose teammate is gone would be counted by a related list that
-    # cannot show it. Both reads share the reference cache.
-    # Read-only, like the relations it carries: Intercom exposes no endpoint that
-    # writes a membership, and an editable relation would offer an association
-    # that could only fail.
+    # Synthetic through-collection for the Team <-> Admin many-to-many, which Intercom has no
+    # resource for. Pairs whose teammate `/admins` no longer answers are dropped: `admin_ids`
+    # keeps naming a teammate who left until Intercom drops the pair.
     class TeamMembership < FetchAllCollection
       def initialize(datasource)
         super(datasource, 'IntercomTeamMembership')

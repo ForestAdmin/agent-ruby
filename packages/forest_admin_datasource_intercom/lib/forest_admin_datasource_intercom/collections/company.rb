@@ -1,23 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The accounts the contacts belong to.
-    #
-    # The one collection Intercom paginates by offset, and the one place R1 --
-    # a window the API cannot express -- does not apply: `POST /companies/list`
-    # takes a page number, which is what a list view asks for. See
-    # `OffsetCollection`.
-    #
-    # In exchange it is the least filterable collection of the datasource.
-    # There is no `/companies/search`, and what `GET /companies` answers is four
-    # exact lookups: by `name`, by `company_id` -- the workspace's own
-    # identifier, not Intercom's -- by `tag_id` and by `segment_id`. Two of them
-    # are published as filters here, the two that name a column of this
-    # collection; a tag and a segment are collections of their own and arrive
-    # with lot 5, which is where filtering by them belongs.
-    #
-    # `GET /companies/scroll` is deliberately rejected rather than used: one
-    # open scroll per application, expiring after a minute, cannot serve two
-    # operators looking at a list at the same time.
+    # No `/companies/search`: `GET /companies` answers exact lookups on `name`, `company_id`,
+    # `tag_id` and `segment_id`. Tag and segment filters wait for those collections (lot 5).
     class Company < OffsetCollection
       include Company::Serializer
       include CustomAttributes

@@ -1,13 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # How the value of a Forest condition reaches Intercom's search DSL, and
-    # every way it can fail to. Split from the translator, which knows the shape
-    # of the tree but not what a field expects on the wire.
-    #
-    # Intercom types its filter values: a date is epoch seconds, a number is a
-    # number, a flag is a boolean. A value of the wrong shape is refused with
-    # `data_invalid`, the same code an unsupported operator returns, so the
-    # conversion belongs here rather than in a rescue reading error codes.
+    # Intercom types its filter values, and a wrongly shaped one fails with `data_invalid`, the same code as an
+    # unsupported operator, so values are converted here rather than by reading error codes.
     # Long by line count only: most of it is the refusals, one per shape.
     class FilterValue # rubocop:disable Metrics/ClassLength
       # What the frontend sends for a Dateonly column, and what a segment written
@@ -97,18 +91,8 @@ module ForestAdminDatasourceIntercom
         refuse_value!(leaf, value, 'a date')
       end
 
-      # What the string names is read before it is trusted, rather than being
-      # handed to a parser that completes what is missing. `Time.zone.parse`
-      # answers today for a string naming no date at all -- a filter on `last
-      # tuesday` coming back as a filter on today is the silent wrong answer
-      # this datasource exists not to give -- and `Time.parse`, which raises on
-      # that one, *accepts* a time of day on its own and fills the date in from
-      # the server's clock: `"12:00"` would have travelled as a bound on
-      # whichever day the request happened to run.
-      #
-      # A date is a year, a month and a day. Anything short of the three is
-      # refused rather than completed, `"Jan 2026"` included -- what it means is
-      # the caller's to say, not this class's to guess.
+      # Refuses a string lacking a year, month or day instead of letting a parser complete it: `Time.zone.parse`
+      # answers today for `last tuesday`, and `Time.parse` fills in the server's date for `12:00`.
       def parse(value, leaf)
         return @zone.start_of_day(Date.parse(value)) if DATE_ONLY.match?(value)
 

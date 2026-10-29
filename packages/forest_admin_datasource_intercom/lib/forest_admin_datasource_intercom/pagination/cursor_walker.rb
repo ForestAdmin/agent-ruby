@@ -1,18 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Pagination
-    # Forest asks for an offset/limit window; Intercom only knows how to hand
-    # out the page after a cursor, and documents that jumping to page N is not
-    # supported. Bridging the two means walking pages until the window is
-    # covered, then slicing it out. Reaching page 20 therefore costs 20
-    # requests -- sequential ones, a cursor only being known once the page
-    # before it came back.
-    #
-    # The walk is capped for that reason rather than for the quota's: 10 000
-    # requests a minute is generous enough that the caps below are about what an
-    # operator is willing to wait for, and about the fact that page 200 of a
-    # list view answers no real question (R9). Every truncation is logged --
-    # never silent, since a page that looks like the whole answer and is not is
-    # the failure this datasource exists to avoid.
+    # Intercom only paginates by cursor (no jump to page N), so an offset/limit window costs one sequential
+    # request per page. Capped for operator patience (R9), and every truncation is logged, never silent.
     class CursorWalker
       # 50 pages of 150 records. Intercom's quota lets these be generous: the
       # walk is bounded by patience, and by the point past which a list view is
@@ -25,15 +14,8 @@ module ForestAdminDatasourceIntercom
         @max_records = max_records
       end
 
-      # Yields `(per_page, cursor)` and expects a Client::Page back.
-      #
-      # A nil limit asks for every record past the offset: the walk then runs
-      # until Intercom says there is no page left, or until a cap stops it. That
-      # distinction is the whole point of accepting nil rather than a huge limit
-      # standing in for "everything": a walk told to collect a thousand records
-      # stops at a thousand having covered the window it was given, and reports
-      # nothing, while a walk told to collect everything and stopped by a cap
-      # knows it is handing back less than it was asked for, and says so.
+      # Yields `(per_page, cursor)` and expects a Client::Page back. A nil limit means every record past
+      # the offset, so a cap stopping the walk is known to be a truncation and is logged.
       def walk(offset:, limit:, &page_source)
         offset = offset.to_i.clamp(0, nil)
         limit = limit&.to_i
@@ -92,30 +74,14 @@ module ForestAdminDatasourceIntercom
         true
       end
 
-      # Intercom documents that "if items are modified between paginated
-      # requests it is possible to see duplicate or missed records" -- and
-      # conversations move constantly, so a deep walk over them will see the
-      # same record twice. A duplicate is dropped here rather than being served
-      # as two rows carrying one id, which is what a list view would render as
-      # two identical lines and a record count that never adds up. The missing
-      # counterpart is inherent to cursor pagination and is documented instead.
-      #
-      # A record with no id is kept: it is not this walk's business to decide
-      # that a payload it does not recognise is not a record.
+      # Intercom documents duplicate or missed records when items change mid-walk; duplicates are dropped
+      # here (missed ones cannot be). A record with no id is kept.
       def fresh(records, seen_ids)
         records.select { |record| record['id'].nil? || seen_ids.add?(record['id']) }
       end
 
-      # A page that advertises a next cursor and holds nothing, and a cursor
-      # already followed. Intercom does neither today -- `pages.next` is simply
-      # absent on the last page -- but a walk driven by a remote value stops on
-      # its own terms rather than on the caps only: a cycle wider than one page
-      # would otherwise collect the same pages until a cap cut it short.
-      #
-      # Which is exactly why it is reported. Stopping here means Intercom said
-      # there was more and this could not follow it, so the answer is short of
-      # what was asked -- a truncation like the caps below, and the same rule
-      # applies: never silent.
+      # An empty page with a next cursor, or a cursor already followed: Intercom does neither today, but a
+      # walk driven by a remote value must stop on its own terms -- and the stop is logged as a truncation.
       def stalled?(page, seen_cursors)
         page.records.empty? || !seen_cursors.add?(page.next_cursor)
       end

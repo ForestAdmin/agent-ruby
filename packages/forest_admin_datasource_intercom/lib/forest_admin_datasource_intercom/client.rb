@@ -1,13 +1,6 @@
 module ForestAdminDatasourceIntercom
-  # Every call to Intercom goes through here. Hand-written on Faraday rather
-  # than through the official `intercom` gem: that one maps the JSON onto
-  # objects, and what this datasource needs is the parts it hides -- the raw
-  # payload, because a custom attribute is a key nobody declared in advance;
-  # the quota headers, because the pacing is driven by them; and Intercom's own
-  # error body, because that text is what an operator reads when an action
-  # fails.
-  # Long by line count only: the public surface is one method per endpoint, and
-  # the rest is the envelope and error handling every one of them shares.
+  # Hand-written on Faraday rather than the `intercom` gem, to keep raw payloads, quota headers and error bodies.
+  # Long by line count only: one method per endpoint plus shared envelope and error handling.
   class Client # rubocop:disable Metrics/ClassLength
     # `per_page=200` is refused with `invalid_per_page` -- "must be an integer
     # between 0 and 150". There is no silent downgrade, so a page size is bounded
@@ -54,36 +47,9 @@ module ForestAdminDatasourceIntercom
                                           open_timeout: @configuration.boot_open_timeout)
     end
 
-    # Deduplicates the reads issued while **one page is being built**, and not
-    # one instant longer.
-    #
-    # A page of tickets asks Intercom for the same contacts twice: once for the
-    # `contact_name` column, once for the `contact` relation, with the same ids
-    # in the same order. The two callers are far apart -- an enrichment and a
-    # relation embed -- and neither can see the other, so the deduplication
-    # happens where both requests pass.
-    #
-    # Scoped to the call rather than timed like `Cache`, because what travels
-    # through here is the customer's own records: reading a contact twice while
-    # rendering one page is waste, and reading it from a store on the next page
-    # would show an operator a row they have just edited in its previous state.
-    #
-    # Held in fiber-local storage, which is what `Thread.current[]` is, and
-    # deliberately: it is the narrower of the two, so two requests served
-    # concurrently never share a scope whether the server gives each of them a
-    # thread or a fiber. A thread-local would be read across the fibers of one
-    # thread, which on a fiber-scheduled server is two pages sharing a scope.
-    # What the narrow choice costs is a read crossing into a fiber of its own --
-    # it opens a scope there and pays the request, which is the behaviour of
-    # before this existed.
-    #
-    # Re-entrant: a nested read joins the scope already open instead of opening
-    # a second one -- a related list resolves relations of its own, and the
-    # innermost `ensure` would otherwise close the outer scope halfway through.
-    #
-    # Two callers are handed the same object back, the records included, so what
-    # travels through here is read and not edited -- the discipline the frozen
-    # reference lists of `fetch_all` make enforceable, and this one asks for.
+    # Deduplicates reads while one page is built (e.g. ticket contacts read for a column and a relation).
+    # Fiber-local (`Thread.current[]`) so concurrent requests on a fiber scheduler never share a scope;
+    # re-entrant; callers share returned objects, which must not be mutated.
     def with_read_scope
       return yield unless Thread.current[@scope_key].nil?
 
@@ -110,15 +76,7 @@ module ForestAdminDatasourceIntercom
       end
     end
 
-    # One page of a cursor-paginated listing. `starting_after` is what the
-    # previous page advertised; nil asks for the first one.
-    #
-    # `CursorWalker` is what turns the offset/limit window a list view asks for
-    # into a sequence of these.
-    #
-    # `list_key` is the key the endpoint puts its records under, and it is not
-    # `data` everywhere: `/tickets/search` answers under `tickets` (measured), so
-    # a caller names its own and `data` stays the fallback.
+    # `/tickets/search` answers under `tickets`, not `data` (measured), so the caller names its `list_key`.
     def list_page(path, per_page:, starting_after: nil, params: {}, list_key: 'data', boot: false)
       query = params.merge('per_page' => self.class.bounded_per_page(per_page))
       query['starting_after'] = starting_after unless blank?(starting_after)
@@ -126,15 +84,8 @@ module ForestAdminDatasourceIntercom
       must_succeed(path) { to_page(get(path, query, boot: boot).body, path, list_key) }
     end
 
-    # One page of a search endpoint. The query is the one the condition-tree
-    # translator wrote, and it travels in the body; `params` is what still
-    # belongs in the query string -- `display_as` above all, which is not part
-    # of the search payload.
-    # `sort` is honoured by `/contacts/search` alone. The other two search
-    # endpoints accept one and ignore it without a word -- measured -- so the
-    # collections that read them never send one, and the parameter is here for
-    # the one that does. `{ field:, ascending: }`, translated to Intercom's own
-    # spelling on the way out.
+    # `params` stays in the query string (`display_as`). `sort` is honoured by `/contacts/search` alone:
+    # the other search endpoints silently ignore it (measured).
     def search_page(path, query:, per_page:, starting_after: nil, list_key: 'data', params: {}, sort: nil)
       pagination = { 'per_page' => self.class.bounded_per_page(per_page) }
       pagination['starting_after'] = starting_after unless blank?(starting_after)
@@ -197,38 +148,9 @@ module ForestAdminDatasourceIntercom
       ids.map { |id| found[id] }
     end
 
-    # Every record of an endpoint that answers in one response: the reference
-    # collections -- admins, teams, ticket types, ticket states -- whose paths
-    # declare no pagination parameter at all.
-    #
-    # `list_key` is the key the endpoint puts its records under. Intercom is not
-    # consistent about it: `/admins` answers `{"type": "admin.list", "admins":
-    # [...]}` where `/ticket_types` answers the `data` envelope every paginated
-    # listing uses, so the collection names its own and `data` is the fallback.
-    #
-    # A cursor is followed if one is advertised, defensively: no pagination
-    # parameter in the specification is not a promise that a large workspace
-    # answers in one response, and a truncated reference collection would show
-    # an operator a state list missing its last states.
-    # `params` is what narrows the endpoint rather than what pages it:
-    # `/data_attributes` answers the attributes of contacts and those of
-    # companies under `?model=`, and both are read whole.
-    #
-    # Held for the configured window rather than re-read on every page: these
-    # are the workspace's own lists, every relation of this datasource resolves
-    # through one of them, and a ticket list projecting four relations spends
-    # four sequential round trips here. See `Cache` for what the window trades,
-    # and `Configuration#reference_cache_ttl` for how to close it.
-    #
-    # `boot` is not part of the key: it selects the connection a read travels
-    # on -- shorter timeouts while the agent starts -- not what comes back. The
-    # ticket types read at boot are the ticket types a list view reads.
-    #
-    # The list is frozen on the way in -- shallowly, which is the depth that
-    # matters: every caller maps or indexes it, so a `<<` or a `sort!` on what
-    # the next page is going to read is the mistake worth making impossible.
-    # The records inside stay mutable and nothing edits them; walking a page of
-    # JSON to freeze it on every read would buy a rule no caller is testing.
+    # Every record of an unpaginated reference endpoint, held in `Cache` for the configured window.
+    # A cursor is still followed defensively. `boot` only picks the connection, so it is not part of the key;
+    # the list is frozen shallowly so no caller mutates what the next page reads.
     def fetch_all(path, list_key: 'data', params: {}, boot: false)
       @configuration.reference_cache.fetch(['fetch_all', path, list_key, params]) do
         must_succeed(path) do
@@ -442,15 +364,8 @@ module ForestAdminDatasourceIntercom
                total_pages: extract_total_pages(body))
     end
 
-    # Absent on the last page, which is how the walk knows it is done. An older
-    # API version spells it as a url instead of an object -- and one can be
-    # served despite the pin, which is what the version echo warns about -- so
-    # the cursor is read out of its query string rather than the page being
-    # taken for the last one.
-    #
-    # Anything else is refused, an advertised page whose cursor cannot be read
-    # included: taking it for the last page would truncate the answer silently,
-    # which is worse than a failure naming what it could not read.
+    # Absent on the last page. An older API version (served despite the pin) spells it as a url, so the
+    # cursor is read from its query string; an unreadable advertised cursor is refused, not taken as the end.
     def next_cursor(body, operation)
       advertised = body.is_a?(Hash) && body['pages'].is_a?(Hash) ? body['pages']['next'] : nil
       return nil if advertised.nil?
@@ -496,14 +411,7 @@ module ForestAdminDatasourceIntercom
       value.nil? || value.to_s.empty?
     end
 
-    # `JSON::ParserError` alongside Faraday's own errors: on its own it would
-    # reach the catch-all below, whose message is the exception's -- and a JSON
-    # parser opens its message with what it choked on.
-    #
-    # `cause: nil` on both re-raises: Ruby would otherwise chain the original
-    # error onto what error trackers and `full_message` print -- its message
-    # quotes the payload or the request URL, and Faraday's carries the request,
-    # bearer token included.
+    # `cause: nil`: the chained original would quote the payload, the URL, or the request with its bearer token.
     def must_succeed(operation)
       yield
     rescue Faraday::Error, JSON::ParserError => e
@@ -556,16 +464,8 @@ module ForestAdminDatasourceIntercom
       error.is_a?(Faraday::ParsingError) || error.is_a?(JSON::ParserError)
     end
 
-    # Intercom answers a failure with `{ "type": "error.list", "request_id":
-    # "...", "errors": [{ "code": ..., "message": ... }] }`. The request id is
-    # what its support asks for first, so it is appended after the truncation
-    # rather than being what a long body pushes out.
-    #
-    # A body of any other shape is *not* echoed here. This message travels into
-    # the interface and into whatever collects the agent's errors, and the body
-    # of a response that failed to parse is a payload rather than an error --
-    # conversation bodies included (R10). Its size is reported instead, and the
-    # body itself stays on the exception for whoever inspects one.
+    # The request id is appended after truncation since Intercom support asks for it. A non-error body is
+    # never echoed -- it may be a payload such as a conversation body (R10); only its size is reported.
     def error_message(parsed)
       return "(unreadable body, #{parsed.to_s.bytesize} bytes)" unless parsed.is_a?(Hash)
 
@@ -612,18 +512,8 @@ module ForestAdminDatasourceIntercom
             'that provides it, or set an adapter this process can load.'
     end
 
-    # Middleware order is deliberate: `raise_error` sits outside the JSON parser
-    # so it raises with an already-parsed body, and `retry` sits innermost so it
-    # inspects raw statuses -- behind `raise_error` it would never see a 429.
-    #
-    # The throttle goes inside `retry`, which is what makes a replay wait for
-    # the window like a first attempt, and what lets the 429's own headers reach
-    # the limiter: outside it, the middleware would run once for a request that
-    # reached Intercom three times.
-    #
-    # How long a request may take is the caller's to state; everything else is
-    # the same on every connection this builds, the limiter included -- a second
-    # limiter would meter in a window of its own and spend the budget twice.
+    # `raise_error` outside the JSON parser (raises with a parsed body); `retry` innermost to see raw 429s;
+    # the throttle inside `retry` so replays wait and 429 headers reach the one shared limiter.
     def build_connection(retry_policy:, timeout:, open_timeout:)
       name, options = @adapter
 

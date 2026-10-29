@@ -27,43 +27,13 @@ module ForestAdminDatasourceIntercom
     # verifies at boot that the pin was honoured.
     DEFAULT_API_VERSION = '2.16'.freeze
 
-    # How long the workspace's reference lists -- teammates, teams, ticket types,
-    # ticket states -- are reused before being read again. They are what every
-    # relation of this datasource resolves through, so without a window a single
-    # ticket list spends four sequential round trips on lists that change a few
-    # times a year, and spends them again on the next page.
-    #
-    # A minute is what keeps a teammate added mid-session from being invisible
-    # for longer than an operator would notice, while collapsing the four reads
-    # of a browsing session into four reads a minute. `0` takes the store out of
-    # the stack. Records are never cached, whatever this says -- see `Cache`.
+    # Reference lists are re-read on every page otherwise (four sequential round trips per ticket list);
+    # a minute bounds staleness. `0` disables the store. Records are never cached -- see `Cache`.
     DEFAULT_REFERENCE_CACHE_TTL = 60
 
-    # Keep-alive, and the reason it is worth a dependency: a ticket list is
-    # seven requests to the same host, and the default adapter opens a TCP
-    # connection and negotiates TLS for every one of them. The handshakes cost
-    # more than several of the requests they carry.
-    #
-    # `adapter: :net_http` opts out of pooling; `adapter: [:net_http_persistent,
-    # { pool_size: 50 }]` sizes the pool for a wider thread pool than this. An
-    # adapter the process cannot load is refused at boot.
-    #
-    # **The pool is read against the server's thread count, not against this
-    # datasource.** net-http-persistent hands out one connection per checkout
-    # and queues the rest; a thread that waits more than half a second for one
-    # gets a `ConnectionPool::TimeoutError`, which reaches the caller as a
-    # Faraday timeout accusing Intercom of being slow. That wait is not
-    # configurable through the adapter, and the POST the searches travel on is
-    # not a verb the retry policy replays -- so a pool narrower than the threads
-    # that can reach it costs an operator their page.
-    #
-    # 25 is therefore set above the thread counts a Rails agent is deployed
-    # with -- Puma's default is 5, and a pool this size still covers a worker
-    # configured well past it -- rather than at the concurrency this datasource
-    # expects. The gem's own default is the open-file limit over four, which
-    # bounds nothing; what the figure here buys is a ceiling on the sockets one
-    # process holds against Intercom, and it is only worth having while it stays
-    # clear of the queueing above.
+    # A ticket list is ~7 requests to one host, so keep-alive saves a TLS handshake each. The pool is sized
+    # against the server's thread count (Puma default 5): a thread waiting >0.5s for a connection gets a
+    # non-retried timeout blamed on Intercom. `adapter: :net_http` opts out; an unloadable adapter is refused.
     DEFAULT_ADAPTER = [:net_http_persistent, { pool_size: 25 }].freeze
 
     # How many records a read by id fetches at once -- a related list of
@@ -77,14 +47,8 @@ module ForestAdminDatasourceIntercom
                 :retry_policy, :rate_limiter, :boot_open_timeout, :boot_timeout, :boot_retry_policy,
                 :reference_cache_ttl, :adapter, :reference_cache, :concurrent_reads
 
-    # `rate_limiter: nil` takes the pacing out of the stack, leaving the 429
-    # retry as the only rate-limit handling. For a deployment that meters on its
-    # own side, or one that would rather see the 429.
-    #
-    # The `boot_` trio governs what the datasource reads while it is being
-    # constructed -- the custom-attribute introspection above all -- where the
-    # wait is a Rails boot the operator sits through rather than a request that
-    # has already returned a page.
+    # `rate_limiter: nil` leaves the 429 retry as the only rate-limit handling. The `boot_` trio governs
+    # reads made while the datasource is constructed (attribute introspection), during the Rails boot.
     def initialize(access_token:, region: nil, base_url: nil, api_version: DEFAULT_API_VERSION,
                    open_timeout: 5, timeout: 30, retry_policy: RetryPolicy.new,
                    rate_limiter: RateLimiter.new, boot_open_timeout: 3, boot_timeout: 10,
@@ -164,15 +128,8 @@ module ForestAdminDatasourceIntercom
             "#{@concurrent_reads.inspect}"
     end
 
-    # A number, and a real one. Coercing first and checking the sign afterwards
-    # is what let every shape nobody thought of through as a window of zero: a
-    # `nil`, an unset environment variable, a string that is not a figure --
-    # each of them turning the store off in silence, where this is the one
-    # option whose whole purpose is to be on. `Infinity` went the other way and
-    # held every list until the process restarted.
-    #
-    # Seconds rather than a duration object, and an Integer is a Numeric: what
-    # this refuses is the typo, not the spelling.
+    # Refuses nil, non-numeric strings and Infinity rather than coercing them into a silent 0 (cache off)
+    # or a never-expiring cache.
     def validate_reference_cache_ttl!
       return if @reference_cache_ttl.is_a?(Numeric) && @reference_cache_ttl.finite? &&
                 !@reference_cache_ttl.negative?
@@ -182,16 +139,8 @@ module ForestAdminDatasourceIntercom
             "more, got #{@reference_cache_ttl.inspect}"
     end
 
-    # Faraday's adapter registry is keyed by symbol, so `adapter:
-    # 'net_http_persistent'` -- the spelling a YAML config hands over, and the
-    # one the README's table invites -- missed every lookup and silently cost
-    # the keep-alive it was asking for, behind a warning saying the adapter it
-    # was falling back to was unavailable. Normalised here, where the region
-    # already is, and the shape refused at boot like every other option rather
-    # than degrading on the first request.
-    #
-    # What is *not* decided here is whether the name resolves: that depends on
-    # what the process can load, and falling back is the client's answer.
+    # Faraday's adapter registry is keyed by symbol: a string name (as YAML hands over) silently lost
+    # keep-alive. Whether the name resolves is left to the client, which falls back.
     def normalize_adapter(adapter)
       return nil if adapter.nil?
 

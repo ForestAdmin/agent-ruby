@@ -1,19 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # Reads `search_fields.yml`, the table of what Intercom's search endpoints
-    # filter, and hands it to the schema and to the translator as objects rather
-    # than as nested hashes.
-    #
-    # The table is data rather than code for one reason: `forest_admin_intercom_probe`
-    # rewrites it from a real workspace. Anything derived from it -- which
-    # columns are filterable, with which Forest operators, and what an operator
-    # is told about the ones that are not -- therefore follows a measurement
-    # instead of a hand-written list that drifts from the endpoint.
-    #
-    # Every row is validated on load. The file ships with the gem and is written
-    # by a script, so a typo in an operator, or a column filed as both filterable
-    # and refused, is a defect of this package: it fails at boot rather than
-    # producing a schema nobody can explain.
+    # Loads `search_fields.yml`, which `forest_admin_intercom_probe` rewrites from a real workspace. Every row
+    # is validated on load, so a bad rewrite fails at boot rather than producing an unexplainable schema.
     module SearchFields # rubocop:disable Metrics/ModuleLength
       PATH = File.expand_path('search_fields.yml', __dir__)
 
@@ -28,17 +16,9 @@ module ForestAdminDatasourceIntercom
       KNOWN_TYPES = OperatorTable.types
       KNOWN_SOURCES = %w[measured spec].freeze
 
-      # `source` says where a row comes from, and `measured?` is what the boot
-      # report and the README section read: a row taken from the documentation is
-      # a candidate the probe has not confirmed.
-      # `sortable` is the one thing here Intercom answers on a single endpoint:
-      # `/contacts/search` takes a `sort`, the other two take one and ignore it
-      # without a word. Absent reads as false, so a table saying nothing leaves
-      # a column unsortable rather than promising an order.
-      #
-      # `value_map` (`values` in the file), when present, maps what the column shows onto what the search
-      # takes, for a field Intercom spells differently on each side: a ticket
-      # reads `Customer` and is searched as `request`.
+      # `source: spec` marks a row the probe has not confirmed. Only `/contacts/search` honours `sortable`; the
+      # other endpoints silently ignore a sort, so absent means unsortable. `value_map` (`values` in the file)
+      # maps a shown value onto the searched one, e.g. a ticket shows `Customer` but searches `request`.
       Field = Struct.new(:column, :field, :type, :operators, :source, :sortable, :value_map, keyword_init: true) do
         def measured? = source == 'measured'
         def sortable? = sortable == true
@@ -105,18 +85,8 @@ module ForestAdminDatasourceIntercom
           ).freeze
         end
 
-        # The refusal that covers a whole family of columns rather than one:
-        # the attributes a workspace defines, whose names are unknown until the
-        # datasource boots and which therefore cannot have a row each. Spelled
-        # `ticket_attributes` on the endpoint that carries them per ticket type
-        # and `custom_attributes` on the ones that carry them per model, since
-        # that is the workspace's own vocabulary and what an operator goes and
-        # renames.
-        #
-        # Read by the translator, which is the point: without it a filter on
-        # such a column falls back on the generic "takes no filter on it",
-        # where this says why -- and the reason is the arbitration, not an
-        # oversight.
+        # One refusal for the workspace-defined attribute columns, whose names are unknown until boot:
+        # `ticket_attributes` (per ticket type) or `custom_attributes` (per model).
         def attribute_refusal(endpoint, definition)
           column = %w[ticket_attributes custom_attributes].find { |key| definition.key?(key) }
           return nil if column.nil?

@@ -1,20 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The columns a workspace's own attributes become, and the two things that
-    # go wrong if they are published as they come.
-    #
-    # **A name can land on a column the collection already carries.** Measured
-    # on a real workspace: a custom contact attribute named `id`. Adding it
-    # would raise on the second declaration -- the toolkit refuses a field twice
-    # -- and, if it did not, the serializer would write the attribute where the
-    # operator expects the record's key. It is skipped, and the log names which
-    # one, since the fix is on Intercom's side.
-    #
-    # Relations count as taken names, which is why every collection here
-    # declares them **before** registering these columns.
-    #
-    # **A date arrives as epoch seconds**, like every other Intercom date, and a
-    # Date column that receives an integer renders as one.
+    # An attribute whose name is already a column or relation (measured: a contact attribute named `id`) is
+    # skipped with a warning, so relations must be declared first. Dates arrive as epoch seconds.
     module CustomAttributes
       private
 
@@ -48,14 +35,7 @@ module ForestAdminDatasourceIntercom
         true
       end
 
-      # The value of each published attribute, read under the name the workspace
-      # gave it and written under the column name the schema publishes -- the
-      # two differ whenever the first could not travel through a Forest query
-      # string.
-      #
-      # Nil rather than absent for an attribute the record does not carry: the
-      # column exists on every row, and an absent key would read as a record
-      # missing it.
+      # Nil rather than absent when the record lacks the attribute: the column exists on every row.
       def attribute_values(values)
         held = values.is_a?(Hash) ? values : {}
 

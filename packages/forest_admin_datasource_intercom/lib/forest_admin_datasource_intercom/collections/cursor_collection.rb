@@ -1,29 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # Base for the collections Intercom paginates by cursor: conversations and
-    # tickets. The opposite tier of `FetchAllCollection` in every way -- what is
-    # in hand is a page of something far larger, so nothing may be filtered,
-    # sorted or counted in memory without answering a fraction as if it were the
-    # whole.
-    #
-    # Three routes, and no fourth:
-    #
-    # * no condition at all -- a list view -- walks the listing endpoint;
-    # * `id equals X` reads the record through its own endpoint, which is what a
-    #   record detail is;
-    # * anything else is translated into Intercom's search DSL and walked
-    #   through the search endpoint. What the translator will not express, it
-    #   refuses by name: an unfiltered page served in answer to a filter is the
-    #   one failure this datasource is built to avoid.
-    #
-    # A condition through a relation is resolved before any of that: the target
-    # collection is asked which of its records match, and what reaches Intercom
-    # is a condition on the foreign key. See `Relations`.
-    #
-    # Counting is the exception that costs nothing: `total_count` is exact on
-    # every response, filter included, so the record counter is one request.
-    # Long by line count only: half of it is the refusals, and a refusal that
-    # does not say what to do instead is a refusal an operator cannot act on.
+    # Cursor-paginated tier: only a page is in hand, so nothing is filtered, sorted or counted in
+    # memory. Whatever the search DSL cannot express is refused, never served unfiltered.
+    # Long by line count only: half of it is the refusals and their remedies.
     class CursorCollection < BaseCollection # rubocop:disable Metrics/ClassLength
       include RecordsById
 
@@ -72,8 +51,6 @@ module ForestAdminDatasourceIntercom
 
       protected
 
-      # The listing endpoint, its record key, and the parameters every read of
-      # this collection carries.
       def list_endpoint = raise(NotImplementedError, "#{self.class} did not implement list_endpoint")
       def record_endpoint = list_endpoint
       def list_key = 'data'
@@ -92,7 +69,6 @@ module ForestAdminDatasourceIntercom
       # answered by a page that ignored it.
       def search_column = nil
 
-      # One Intercom entity flattened into a record matching the schema.
       def serialize(_entity) = raise(NotImplementedError, "#{self.class} did not implement serialize")
 
       # Hook for what a row needs beyond its own payload. Left empty here: what
@@ -124,19 +100,9 @@ module ForestAdminDatasourceIntercom
         end
       end
 
-      # A column advertises exactly the filters the search endpoint answers on
-      # it, taken from the measured table and derived by the operator table --
-      # never written by hand here, so a column cannot offer a filter the
-      # translator would refuse. A column the table does not carry advertises
-      # none, which is how a refusal is spelled in a schema.
-      #
-      # The primary key is the exception, and it is not a filter: `id equals X`
-      # and `id in [...]` are answered by the record endpoint.
-      #
-      # A column is sortable only where the measured table says the endpoint
-      # sorts, which is `/contacts/search` and nowhere else: the other two
-      # accept a `sort` and ignore it without a word, so a sortable column there
-      # would promise an order that never happens.
+      # Operators come from the measured table only, so no column offers a filter the translator
+      # would refuse. Only `/contacts/search` honours a sort; the other search endpoints silently
+      # ignore one, so their columns are never sortable.
       def add_column(name, type, is_primary_key: false)
         add_field(name, ColumnSchema.new(column_type: type,
                                          filter_operators: column_operators(name, is_primary_key),
@@ -157,8 +123,6 @@ module ForestAdminDatasourceIntercom
       # sort is reported as ignored rather than dropped.
       def match_all_query = nil
 
-      # Whether every read of this collection goes through the search, listing
-      # or not.
       def searchable_only? = false
 
       # Bounded, unlike the tier read whole: one more than a group may hold is
@@ -237,18 +201,9 @@ module ForestAdminDatasourceIntercom
                                                   attribute_columns: attribute_column_names)
       end
 
-      # The ids the target matched, written as the filter Intercom does take on
-      # the foreign key: a group of equalities, its DSL offering no membership
-      # operator on these fields.
-      #
-      # That group counts against the fifteen conditions Intercom allows, so a
-      # relation condition matching more records than that is refused rather than
-      # sent -- and refused here, where the message can name the relation the
-      # operator filtered on rather than the key it resolved to.
-      #
-      # It also costs a level of nesting, which is why it is built as the group
-      # `Relations` can tell from one the operator wrote: inlined into a parent
-      # that aggregates the same way, it costs none.
+      # An OR of equalities: the DSL has no IN on foreign keys, and caps a group at 15 conditions,
+      # so a larger match is refused here where the relation can be named. A RelationBranch so it
+      # can be inlined into a same-aggregator parent, saving a nesting level.
       def relation_group(key, ids, leaf)
         refuse_fan_out!(leaf, key, ids) if ids.size > Query::ConditionTreeTranslator::MAX_GROUP_SIZE
         return Leaf.new(key, Operators::EQUAL, ids.first) if ids.size == 1

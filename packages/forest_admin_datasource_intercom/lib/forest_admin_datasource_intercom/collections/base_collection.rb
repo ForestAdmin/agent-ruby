@@ -1,15 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # What every Intercom collection shares: how a schema is declared, how a
-    # record is narrowed to the projection asked for, and how a window is cut
-    # out of records already in hand.
-    #
-    # Read-only for now: the writes and the business actions arrive with lot 3.
-    # The relations towards Contacts and Companies wait for lot 4, those two
-    # collections not existing yet -- a relation whose target collection is
-    # missing is a schema the agent refuses to boot on. The relations between the
-    # collections this datasource already serves are declared and answered here,
-    # through `Relations`.
+    # Read-only for now: writes and business actions arrive with lot 3. A relation to
+    # a collection not served yet is a schema the agent refuses to boot on.
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
       include Relations
 
@@ -27,14 +19,8 @@ module ForestAdminDatasourceIntercom
         datasource.client
       end
 
-      # What one relation read may ask of this collection as its *target*: how
-      # many ids it resolves in a single `list`, and how many it resolves at
-      # all. Both nil here -- the tier read whole answers any number of ids for
-      # the one request it already pays. `Relations` asks the target rather than
-      # assuming, the cost of an id being the target's business.
-      #
-      # Public because that is who calls them: the collection holding the
-      # relation, on the collection at the other end of it.
+      # How many ids this collection resolves per `list`, and in total, as a relation target.
+      # Nil means unbounded: the tier read whole answers any number of ids in one request.
       def ids_per_read = nil
       def max_resolvable_ids = nil
 
@@ -42,19 +28,9 @@ module ForestAdminDatasourceIntercom
 
       def define_schema = raise(NotImplementedError, "#{self.class} did not implement define_schema")
 
-      # A record narrowed to the columns that were asked for. A projection naming
-      # a field the record does not carry yields nil rather than nothing at all:
-      # the agent asked for a column, and an absent key would read as a record
-      # missing it.
-      #
-      # A path through a relation is not a column and is skipped here: it is
-      # answered by `embed_relations`, which nests a whole row under the relation
-      # name once the page is in hand.
-      #
-      # No projection at all asks for every column -- which is not the same as
-      # every key a serialized record happens to carry: a couple of them hold
-      # what a column is read *from*, the ids behind a membership for one, and
-      # publishing those would show the operator the plumbing.
+      # A missing field yields nil rather than an absent key; relation paths are left to
+      # `embed_relations`. No projection means every column, not every serialized key:
+      # some keys are internal plumbing (e.g. the ids behind a membership).
       def project(record, projection)
         asked = Array(projection).map(&:to_s)
         return record.slice(*column_names) if asked.empty?

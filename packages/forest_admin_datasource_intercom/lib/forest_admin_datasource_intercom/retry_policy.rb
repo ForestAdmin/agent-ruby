@@ -19,16 +19,8 @@ module ForestAdminDatasourceIntercom
     # cannot have been raised when nothing defined it.
     PERSISTENT_ADAPTER_ERROR = 'Net::HTTP::Persistent::Error'.freeze
 
-    # faraday-retry's defaults plus ConnectionFailed: a dropped connection is
-    # exactly the transient failure a resilient client should absorb, and it is
-    # not retried out of the box.
-    #
-    # The persistent adapter's own error is in the list because it reaches
-    # Faraday unwrapped for part of its surface: the adapter translates the
-    # messages it recognises -- a timeout, a refused connection -- and
-    # re-raises the rest, so a host found down while a pooled connection is
-    # being reset arrives as itself. Left out, it would reach the client's
-    # catch-all having been retried by nothing.
+    # faraday-retry's defaults plus ConnectionFailed, and the persistent adapter's own error, which it
+    # re-raises unwrapped for messages it does not translate.
     EXCEPTIONS = [
       Errno::ETIMEDOUT, 'Timeout::Error', Faraday::TimeoutError,
       Faraday::RetriableResponse, Faraday::ConnectionFailed,
@@ -47,19 +39,8 @@ module ForestAdminDatasourceIntercom
     # a ticket `POST /tickets` -- so the exemption below cannot reach one.
     READ_ONLY_POST_PATHS = %r{/(search|list)\z}
 
-    # Two things are worth another attempt on a verb the list above leaves
-    # alone, and neither can be spelled in `methods`, which knows verbs and not
-    # what they do. Both travel through retry_if, which faraday-retry ORs with
-    # that list -- so this can only ever widen the set, never restrict it.
-    #
-    # A 429, Intercom having rejected the request before processing it.
-    #
-    # And a dropped connection on a read. Keep-alive is what turns one of those
-    # from impossible into ordinary: a pooled socket the server closed while it
-    # was idle fails the next request that reuses it, where a client opening a
-    # connection per request could not meet the case at all. Every list view of
-    # this datasource is built on one of those POSTs, so left out of here a
-    # closed socket would cost an operator their page.
+    # Widens `methods` (ORed by faraday-retry) to a 429 on any verb, and to a dropped connection on a
+    # read-only POST -- keep-alive makes an idle socket closed by the server an ordinary failure.
     RETRY_IF = lambda do |env, exception|
       env[:status] == 429 || (RetryPolicy.connection_failure?(exception) &&
                               READ_ONLY_POST_PATHS.match?(env[:url]&.path.to_s))

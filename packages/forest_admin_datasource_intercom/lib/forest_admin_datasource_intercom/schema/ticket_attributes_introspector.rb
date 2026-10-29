@@ -1,21 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Schema
-    # The attributes a workspace defines on its ticket types, read once while the
-    # datasource is being constructed.
-    #
-    # They are declared **per ticket type**, so a single Tickets collection can
-    # only carry their union -- and that union is for display. Measured on a real
-    # workspace: two types share the names `_default_title_` and
-    # `_default_description_` while carrying different attribute ids (14162161
-    # against 14162165), and Intercom filters an attribute by id
-    # (`ticket_attribute.{id}`), never by name. A union column therefore has no
-    # single id to translate to unless the type of the row is known, which is why
-    # these ship unfilterable and why filtering on one means a collection per
-    # ticket type (R7).
-    #
-    # The ids are kept per type all the same: they are exactly what the filter
-    # translation of the next lot will need, and reading them again would cost a
-    # second boot-time round trip.
+    # Declared per ticket type: one name has a different id on each type (measured: 14162161 vs 14162165) and
+    # Intercom filters by id only, so the union columns ship unfilterable (R7). Ids are kept per type for a
+    # future per-type filter translation, sparing a second boot-time round trip.
     class TicketAttributesIntrospector
       include AttributeNaming
 

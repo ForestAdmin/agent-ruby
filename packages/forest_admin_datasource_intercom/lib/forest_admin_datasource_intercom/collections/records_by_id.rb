@@ -1,14 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # `id equals X` is a record detail and `id in [...]` a bulk read of related
-    # records, and both are answered by the record endpoint rather than by
-    # whatever the collection is filtered through. What the two paginated tiers
-    # share, and what the tier read whole has no use for -- it holds every
-    # record already, so an id is a lookup in memory rather than a request.
-    #
-    # Which is also why the counting lives here: a count over the pages a read
-    # collected would answer a fraction of the collection as if it were the
-    # whole of it, and that risk only exists where what is in hand is a page.
+    # `id equals X` / `id in [...]` answered by the record endpoint, plus exact counting -- shared
+    # by the two paginated tiers, where a count over collected pages would answer a fraction.
     module RecordsById
       Operators = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators
       Leaf = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes::ConditionTreeLeaf
@@ -29,20 +22,10 @@ module ForestAdminDatasourceIntercom
       # whose records carry bodies written by end customers; nothing elsewhere.
       def record_read_params = {}
 
-      # How many records a bulk read may fetch, as a hook rather than the
-      # constant: the collection that reads its ids in bulk answers far more of
-      # them for the same request count.
       def max_id_reads = MAX_ID_READS
 
-      # Only a bare leaf on the primary key takes this route: an `and` also
-      # carrying a scope names a narrower set than the ids do, and answering it
-      # with the ids alone would serve records the scope excludes. A free-text
-      # search alongside is the same problem -- the ids would answer a question
-      # nobody asked.
-      #
-      # Deduplicated: Intercom reads a record by id, so a value named twice
-      # would be fetched twice and handed back as two rows carrying one id --
-      # where the `in` this comes from is a membership, matching a record once.
+      # A bare primary-key leaf only: answering an `and` carrying a scope, or a search, with the
+      # ids alone would serve records it excludes. Deduplicated so an id is not read twice.
       def id_lookup(filter)
         tree = filter&.condition_tree
         return nil unless tree.is_a?(Leaf) && tree.field.to_s == primary_key

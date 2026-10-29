@@ -1,32 +1,11 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The contact of a conversation or of a ticket, on the row itself.
-    #
-    # Intercom nests only the ids -- `{"type": "contact.list", "contacts":
-    # [{"id": "..."}]}` -- so a name costs a read. That read is done once per
-    # page, for every row at once, and never per row: a page of 25 rows is one
-    # request, not 25.
-    #
-    # **Three columns, where lot 1 published four.** Now that the Contacts
-    # collection exists, the identity is a relation, and the rule lot 2.5 set
-    # for the ticket labels applies here too: one readable label on the row plus
-    # the relation to navigate, rather than two ways to read one fact.
-    # `contact_email` is gone -- it is one hop away, on `contact:email` -- and
-    # `contact_ids` gave way to `contact_id`, which is a foreign key rather than
-    # a Json blob no filter could reach. The list of every contact of a group
-    # conversation is the `contacts` relation.
+    # Intercom nests only contact ids, so `contact_name` costs one bulk read per page, never per row.
     module ContactIdentity
       COLUMNS = %w[contact_name].freeze
 
-      # How many ids one `id in [...]` read carries. A page holds fewer than this
-      # in practice; the chunk keeps the request bounded if it ever does not.
-      #
-      # Taken from the Contacts collection rather than written again, because
-      # the two have to agree for `Client#with_read_scope` to see one request
-      # where there are two: this read and the one the `contact` relation
-      # issues name the same ids, and a different chunk size makes them two
-      # different request bodies. `ticket_list_budget_spec` is the guard, but a
-      # single figure is what keeps it from ever being tripped.
+      # Must match the `contact` relation's chunking so `Client#with_read_scope` dedups the two
+      # reads into one request (guarded by `ticket_list_budget_spec`).
       CONTACT_CHUNK = Contact::IDS_PER_READ
 
       private

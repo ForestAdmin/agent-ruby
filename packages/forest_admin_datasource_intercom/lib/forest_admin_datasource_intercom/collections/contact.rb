@@ -1,27 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # The people who write to the workspace: users and leads alike.
-    #
-    # Cursor-paginated like conversations and tickets, with one thing no other
-    # collection of this datasource has -- **Intercom sorts it**.
-    # `POST /contacts/search` is the only endpoint of the whole API that takes a
-    # `sort` and applies it, so this is the only collection whose columns are
-    # published sortable, and the measured table is what says which ones.
-    #
-    # Two routes of its own, on top of the three the tier already has:
-    #
-    # * a set of ids is read in one request -- `id IN [...]`, which this
-    #   endpoint answers and no other does -- rather than one request per id;
-    # * `company_id equals X` reads `GET /companies/{id}/contacts`, which is
-    #   what serves the contacts of an account. `/contacts/search` filters no
-    #   company field, so without this route the one relation an ops team walks
-    #   the most would be a refusal.
-    #
-    # A contact merged into another **disappears** from the search and from the
-    # listing: a row whose contact was merged reads as gone rather than as an
-    # error, which is what a merge means -- the record still exists, under the
-    # id it was merged into.
-    # Long by line count only: most of it declares the columns, one call each.
+    # `/contacts/search` is the only endpoint that honours a sort and answers `id IN`. It filters
+    # no company field, hence the `GET /companies/{id}/contacts` route. A merged contact vanishes
+    # from search and listing. Long by line count only: most of it declares the columns.
     class Contact < CursorCollection # rubocop:disable Metrics/ClassLength
       include Contact::Serializer
       include CustomAttributes
@@ -33,15 +14,8 @@ module ForestAdminDatasourceIntercom
       # to it harmless. The same predicate `Ticket` sends, for the same reason.
       MATCH_EVERY_CONTACT = { 'field' => 'created_at', 'operator' => '>', 'value' => '0' }.freeze
 
-      # How many ids one bulk read carries, and how many a single `id in [...]`
-      # may name. Both are far above what a page asks for; they keep a scope or
-      # a customizer naming thousands of ids from turning one list view into a
-      # rate limit.
-      #
-      # `ContactIdentity::CONTACT_CHUNK` is this figure: the enrichment reading
-      # the `contact_name` column and the relation reading the contact have to
-      # chunk the same way, or the two requests are two bodies and the page pays
-      # for both.
+      # `ContactIdentity::CONTACT_CHUNK` must equal IDS_PER_READ, or the enrichment and the
+      # relation send different request bodies and the page pays for both.
       IDS_PER_READ = Query::FilterValue::MAX_LIST_SIZE
       MAX_IDS_READ = 300
 
@@ -192,15 +166,8 @@ module ForestAdminDatasourceIntercom
         tree.value&.to_s
       end
 
-      # The same equality, and something filtered alongside it. There is no
-      # request that answers both halves: `GET /companies/{id}/contacts` narrows
-      # nothing it returns, and `/contacts/search` filters no company field at
-      # all -- which is what the related list of an account runs into the moment
-      # a permission scope or a segment is defined on this collection.
-      #
-      # Refused here rather than left to the translator, whose reason for
-      # `company_id` is "open the company and read its contacts" -- which is
-      # exactly what this caller was doing.
+      # `company_id` plus another condition (e.g. a scope): `GET /companies/{id}/contacts` narrows
+      # nothing and `/contacts/search` filters no company field, so no request answers both.
       def narrowed_company?(filter)
         tree = filter&.condition_tree
         return false if tree.nil? || tree.is_a?(Leaf)

@@ -1,30 +1,8 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # Where a date bound lands once Intercom's day truncation is accounted for.
-    #
-    # Intercom truncates a date search to the day, at the **UTC** boundary --
-    # measured, and it contradicts the documentation, which promises the
-    # workspace's timezone. `> V` answers from the start of the day *after* V,
-    # and `< V` answers before the start of V's own day.
-    #
-    # Sent as they come, the two bounds of an interval cancel each other out:
-    # `today` reaches here as `> 00:00` and `< 23:59` of one day, which Intercom
-    # reads as "from tomorrow" and "before today" -- an empty answer to the most
-    # ordinary filter there is. So each bound is moved to the day boundary that
-    # makes Intercom answer the day the filter named:
-    #
-    #   `>` V  ->  the day before V's day, so the answer starts at V's day;
-    #   `<` V  ->  the day after V's day, so the answer runs through V's day,
-    #              except when V already sits on a boundary, where V's day is
-    #              exactly what was asked to be left out.
-    #
-    # The window is therefore day-granular: a bound naming a time of day matches
-    # from the start of that day, or through the end of it. That is the
-    # granularity the Intercom interface filters on, and the README says so.
-    #
-    # Split from FilterValue, which knows how to read a date out of whatever a
-    # condition carries but has no business knowing that Intercom answers a
-    # different question from the one it was asked.
+    # Intercom truncates a date search to the UTC day (measured; the docs promise the workspace timezone):
+    # `> V` starts at the day after V's, `< V` stops before V's day. Each bound is moved one day outward (a `<`
+    # already on a day boundary stays) so Intercom answers the day the filter named: the window is day-granular.
     class DayBounds
       UTC_DAY = 86_400
 
