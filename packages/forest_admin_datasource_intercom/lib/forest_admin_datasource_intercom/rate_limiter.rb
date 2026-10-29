@@ -93,9 +93,14 @@ module ForestAdminDatasourceIntercom
     # waited for, the wait that was declined -- nil otherwise. Both are settled
     # here, the second reading shared state like the first: it is nil on every
     # bypass but the first of a window, so the log line is not repeated.
+    #
+    # Exhaustion is read before the request is counted: a `remaining` of 1 is a
+    # request the window still allows, not one that has to wait for the next.
     def plan_wait
-      @remaining -= 1 if @remaining
-      return [0, nil] unless exhausted?
+      unless exhausted?
+        @remaining -= 1 if @remaining
+        return [0, nil]
+      end
 
       wait = clamp_wait(@reset_at - @now.call)
       return [0, nil] if wait <= 0

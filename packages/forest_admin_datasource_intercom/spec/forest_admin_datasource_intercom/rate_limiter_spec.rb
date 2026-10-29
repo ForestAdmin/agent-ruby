@@ -61,6 +61,13 @@ module ForestAdminDatasourceIntercom
       expect(slept).to eq([3.0])
     end
 
+    it 'sends the last request a window allows rather than waiting for the next window' do
+      limiter.observe(headers(remaining: 1, reset_in: 3))
+      limiter.acquire
+
+      expect(slept).to be_empty
+    end
+
     it 'ignores a response from a window older than the one it knows' do
       limiter.observe(headers(remaining: 0, reset_in: 5))
       limiter.observe(headers(remaining: 100, reset_in: -10))
