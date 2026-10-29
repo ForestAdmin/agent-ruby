@@ -87,6 +87,20 @@ module ForestAdminDatasourceIntercom
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/is left out/)
       end
 
+      # The same name with another type: one column cannot hold both, so the
+      # second ticket type's value is left out rather than read as the first's.
+      it 'keeps the first type of a name two ticket types declare differently, and says so' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_types(ticket_type('1', 'Bug', attribute('Severity', '9001', data_type: 'integer')),
+                   ticket_type('2', 'Task', attribute('Severity', '9002', data_type: 'string')))
+
+        severity = introspector.attributes.first
+        expect([severity.column_type, severity.ids_by_ticket_type, severity.conflicting_ticket_types])
+          .to eq(['Number', { '1' => '9001' }, ['2']])
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/"Severity" is a String on ticket type 2 and a Number elsewhere/)
+      end
+
       it 'leaves out an attribute whose name is nothing but separators' do
         stub_types(ticket_type('1', 'Bug', attribute(' , : ', '9001')))
 

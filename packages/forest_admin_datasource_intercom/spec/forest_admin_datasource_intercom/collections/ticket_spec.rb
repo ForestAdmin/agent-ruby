@@ -264,6 +264,19 @@ module ForestAdminDatasourceIntercom
         expect(rows.first['Due']).to be_nil
       end
 
+      # The introspector names the ticket types declaring the name with another
+      # type; their value is not what the column holds.
+      it 'leaves empty the value of a ticket type declaring the attribute with another type' do
+        severity = attribute('Severity', column_type: 'Number')
+        severity.conflicting_ticket_types = ['2']
+        collection = described_class.new(datasource, attributes: [severity])
+        stub_search(ticket('1', 'ticket_attributes' => { 'Severity' => 3 }),
+                    ticket('2', 'ticket_type' => { 'id' => '2', 'name' => 'Task' },
+                                'ticket_attributes' => { 'Severity' => 'high' }))
+
+        expect(collection.list(nil, filter, nil).map { |row| row['Severity'] }).to eq([3, nil])
+      end
+
       it 'reads a date attribute as ISO8601 like every other Intercom date' do
         stub_search(ticket('1', 'ticket_attributes' => { 'Due' => 1_700_000_000 }))
 

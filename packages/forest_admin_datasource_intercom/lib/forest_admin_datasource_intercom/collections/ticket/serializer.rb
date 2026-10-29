@@ -19,7 +19,7 @@ module ForestAdminDatasourceIntercom
             .merge(state_of(attrs))
             .merge(type_of(attrs['ticket_type']))
             .merge(contact_columns_for(attrs))
-            .merge(attribute_values(attrs['ticket_attributes']))
+            .merge(ticket_attribute_values(attrs))
             .merge(derived_columns_for(attrs))
         end
 
@@ -47,6 +47,16 @@ module ForestAdminDatasourceIntercom
           { 'state_id' => stringify_id(state['id']),
             'state_label' => state['internal_label'],
             'previous_state_id' => stringify_id(attrs['previous_ticket_state_id']) }
+        end
+
+        def ticket_attribute_values(attrs)
+          values = attribute_values(attrs['ticket_attributes'])
+          type_id = stringify_id(attrs.dig('ticket_type', 'id')) if attrs['ticket_type'].is_a?(Hash)
+
+          attribute_columns.each do |attribute|
+            values[attribute.column_name] = nil if Array(attribute.conflicting_ticket_types).include?(type_id)
+          end
+          values
         end
 
         def type_of(ticket_type)

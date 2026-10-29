@@ -33,8 +33,11 @@ module ForestAdminDatasourceIntercom
       # `name` is the key the payload uses, `column_name` the one the schema
       # publishes; they differ whenever the workspace's own name cannot travel
       # through Forest's query string.
+      #
+      # `conflicting_ticket_types` names the ticket types declaring the same name
+      # with another type: their value would not be what the column holds.
       Attribute = Struct.new(:name, :column_name, :column_type, :data_type, :ids_by_ticket_type,
-                             keyword_init: true)
+                             :conflicting_ticket_types, keyword_init: true)
 
       def initialize(client)
         @client = client
@@ -67,7 +70,7 @@ module ForestAdminDatasourceIntercom
       def collect(ticket_type, union)
         type_id = ticket_type['id'].to_s
         definitions(ticket_type).each do |definition|
-          entry = entry_for(definition, union)
+          entry = entry_for(definition, union, type_id)
           next if entry.nil?
 
           entry.ids_by_ticket_type[type_id] = definition['id'].to_s
@@ -79,7 +82,7 @@ module ForestAdminDatasourceIntercom
       # landing on one column would otherwise share an entry, and the second's
       # values would be read under the first's name -- wrong values rather than
       # missing ones, which is worse.
-      def entry_for(definition, union)
+      def entry_for(definition, union, type_id)
         name = definition['name'].to_s
         # An archived attribute is not offered any more, and a nameless one has
         # nothing to be a column of.
@@ -90,15 +93,35 @@ module ForestAdminDatasourceIntercom
 
         entry = union[column]
         return union[column] = attribute_from(name, column, definition) if entry.nil?
-        return entry if entry.name == name
+        return same_name(entry, definition, type_id) if entry.name == name
 
         warn_collision(name, entry.name, column)
         nil
       end
 
+      # The same name declared with another type by another ticket type: that
+      # ticket type's value is left out of the column rather than shown under a
+      # type it does not have.
+      def same_name(entry, definition, type_id)
+        column_type = column_type_for(definition)
+        return entry if column_type == entry.column_type
+
+        entry.conflicting_ticket_types << type_id
+        warn_type_conflict(entry, column_type, type_id)
+        nil
+      end
+
+      def warn_type_conflict(entry, column_type, type_id)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] the ticket attribute #{entry.name.inspect} is a #{column_type} on " \
+          "ticket type #{type_id} and a #{entry.column_type} elsewhere; the column stays a #{entry.column_type} " \
+          'and reads as empty on that ticket type. Give the two attributes different names to publish both.'
+        )
+      end
+
       def attribute_from(name, column, definition)
         Attribute.new(name: name, column_name: column, column_type: column_type_for(definition),
-                      data_type: definition['data_type'], ids_by_ticket_type: {})
+                      data_type: definition['data_type'], ids_by_ticket_type: {}, conflicting_ticket_types: [])
       end
 
       def definitions(ticket_type)
