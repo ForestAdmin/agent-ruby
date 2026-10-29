@@ -44,11 +44,9 @@ module ForestAdminDatasourceIntercom
     # connection and negotiates TLS for every one of them. The handshakes cost
     # more than several of the requests they carry.
     #
-    # Resolved rather than hardcoded, so a deployment that cannot load the
-    # persistent adapter -- or would rather not pool -- falls back to Faraday's
-    # default instead of failing to boot. `adapter: :net_http` opts out
-    # explicitly; `adapter: [:net_http_persistent, { pool_size: 50 }]` sizes the
-    # pool for a wider thread pool than this.
+    # `adapter: :net_http` opts out of pooling; `adapter: [:net_http_persistent,
+    # { pool_size: 50 }]` sizes the pool for a wider thread pool than this. An
+    # adapter the process cannot load is refused at boot.
     #
     # **The pool is read against the server's thread count, not against this
     # datasource.** net-http-persistent hands out one connection per checkout
@@ -120,12 +118,6 @@ module ForestAdminDatasourceIntercom
     # at a mock server or an egress proxy, neither of which is a region.
     def url
       @url ||= (@base_url || REGION_HOSTS.fetch(@region)).chomp('/')
-    end
-
-    # Whatever precedes the endpoint in the path, for a base url mounted under a
-    # subpath. Empty against the API itself.
-    def base_path
-      @base_path ||= URI.parse(url).path
     end
 
     # The url with any credentials in it masked. `URI` accepts them --

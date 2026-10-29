@@ -39,8 +39,7 @@ module ForestAdminDatasourceIntercom
       # reaches the network -- and what a lazy reader would hand the thread
       # that lost the race is no longer a spare object but a pool of open
       # sockets, nothing left to close it. The adapter is resolved once for the
-      # two of them, so a fallback is reported at boot rather than on whichever
-      # request happened to be first.
+      # two of them.
       @adapter = resolve_adapter
       @connection = build_connection(retry_policy: @configuration.retry_policy,
                                      timeout: @configuration.timeout,
@@ -598,48 +597,19 @@ module ForestAdminDatasourceIntercom
       body
     end
 
-    # Which adapter every connection of this client is built on, resolved once.
-    #
-    # A ticket list is seven requests to one host, and Faraday's default adapter
-    # opens a socket and negotiates TLS for each of them -- handshakes that cost
-    # more than several of the requests they carry. The persistent adapter pools
-    # the connection instead, which is why it is the default here and a runtime
-    # dependency of the gem.
-    #
-    # Resolved rather than assumed: a deployment that excluded the gem falls
-    # back to Faraday's default and says so once, instead of failing to boot
-    # over an optimisation. `Configuration#adapter` overrides both -- a name, or
-    # a `[name, options]` pair, normalised there.
+    # Resolved once, at boot: an adapter this process cannot load is refused
+    # there rather than on the first request. The persistent adapter registers
+    # itself only once its gem is required.
     def resolve_adapter
       name, options = Array(@configuration.adapter || Configuration::DEFAULT_ADAPTER)
-      # The options travel with the name they were written for: a `pool_size`
-      # meant for the persistent adapter says nothing to the one it fell back
-      # to.
-      adapter_registered?(name) ? [name, options || {}] : [fallback_adapter(name), {}]
-    end
-
-    # Registered by Faraday, which is what `f.adapter` looks the name up in --
-    # and `lookup_middleware` raises rather than answering nil when it is not.
-    # The persistent adapter registers itself when its gem is required, and that
-    # require is here rather than at the top of the file so an absent gem is a
-    # fallback rather than a LoadError on the first `require` of this package.
-    def adapter_registered?(name)
       require 'faraday/net_http_persistent' if name == :net_http_persistent
+      Faraday::Adapter.lookup_middleware(name)
 
-      !Faraday::Adapter.lookup_middleware(name).nil?
+      [name, options || {}]
     rescue LoadError, Faraday::Error
-      false
-    end
-
-    def fallback_adapter(name)
-      ForestAdminDatasourceIntercom.logger.warn(
-        "[forest_admin_datasource_intercom] the #{name.inspect} Faraday adapter is not available; falling back " \
-        "to #{Faraday.default_adapter.inspect}. Every request then opens its own connection and negotiates TLS " \
-        'again, which a page resolving several relations pays for once per request. Add the ' \
-        'faraday-net_http_persistent gem, or set an adapter this process can load.'
-      )
-
-      Faraday.default_adapter
+      raise ConfigurationError,
+            "ForestAdminDatasourceIntercom adapter #{name.inspect} cannot be loaded by this process. Add the gem " \
+            'that provides it, or set an adapter this process can load.'
     end
 
     # Middleware order is deliberate: `raise_error` sits outside the JSON parser

@@ -668,19 +668,10 @@ module ForestAdminDatasourceIntercom
         expect(WebMock).to have_requested(:get, "#{base}/me").with(headers: { 'Connection' => 'keep-alive' })
       end
 
-      # An optimisation nothing can load is a warning and a slower request, not
-      # a boot that fails.
-      it 'falls back to Faraday\'s default when the adapter is not registered, and says so' do
-        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
-        unloadable = described_class.new(
-          Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: :no_such_adapter)
-        )
-        stub_request(:get, "#{base}/me").to_return(json('type' => 'admin'))
-
-        unloadable.me
-
-        expect(WebMock).to have_requested(:get, "#{base}/me")
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/adapter is not available/)
+      it 'refuses at boot an adapter this process cannot load, naming it' do
+        expect do
+          described_class.new(Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: :no_such_adapter))
+        end.to raise_error(ConfigurationError, /adapter :no_such_adapter cannot be loaded/)
       end
 
       it 'takes the adapter the configuration names' do
@@ -694,9 +685,8 @@ module ForestAdminDatasourceIntercom
         expect(WebMock).to have_requested(:get, "#{base}/me")
       end
 
-      # Faraday looks a name up by symbol, so a string used to fall through to
-      # the default adapter -- keep-alive lost, and the warning naming the
-      # adapter it fell back to as the one that was unavailable.
+      # Faraday looks a name up by symbol: a string has to be normalised to
+      # reach the persistent adapter.
       it 'keeps the connection alive for a name spelled as a string' do
         configured = described_class.new(
           Configuration.new(access_token: 's3cr3t', rate_limiter: nil, adapter: 'net_http_persistent')

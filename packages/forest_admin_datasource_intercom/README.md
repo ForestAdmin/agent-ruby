@@ -655,8 +655,8 @@ no longer.
 
 **Connections are reused.** Several requests to one host means several TLS handshakes on Faraday's
 default adapter, and they cost more than some of the requests they carry, so the client builds on
-the persistent adapter. A deployment that cannot load it falls back with a warning rather than
-failing to boot.
+the persistent adapter. An adapter the process cannot load, named in `adapter` or the persistent
+one itself, is refused when the agent starts.
 
 The pool holds 25 connections, and that figure is read against **the web server's thread count**
 rather than against this datasource. A thread that finds the pool full waits half a second for a

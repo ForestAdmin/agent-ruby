@@ -24,16 +24,6 @@ module ForestAdminDatasourceIntercom
       expect(configured.url).to eq('https://intercom.test/api')
     end
 
-    it 'reports the subpath a base_url is mounted under' do
-      configured = described_class.new(access_token: 's3cr3t', base_url: 'https://intercom.test/api')
-
-      expect(configured.base_path).to eq('/api')
-    end
-
-    it 'reports no subpath against the API itself' do
-      expect(configuration.base_path).to eq('')
-    end
-
     describe 'validation' do
       it 'refuses a missing access token' do
         expect { described_class.new(access_token: nil) }
