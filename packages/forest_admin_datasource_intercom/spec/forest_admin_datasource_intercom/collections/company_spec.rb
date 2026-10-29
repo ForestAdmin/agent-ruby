@@ -158,6 +158,11 @@ module ForestAdminDatasourceIntercom
           .with(query: { 'page' => '3', 'per_page' => '15' }).once
       end
 
+      it 'reads a zero limit as an empty window, without a request' do
+        expect(rows(%w[id], page: page(0, 0))).to be_empty
+        expect(WebMock).not_to have_requested(:post, "#{base}/companies/list")
+      end
+
       # An offset that does not fall on a page boundary is served exactly, by
       # reading the page it lands in and the next -- never by rounding the
       # window to something the API likes better.

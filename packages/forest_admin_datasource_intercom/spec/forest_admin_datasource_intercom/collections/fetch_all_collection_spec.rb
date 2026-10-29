@@ -241,7 +241,12 @@ module ForestAdminDatasourceIntercom
       end
 
       it 'reads a page with no limit as every record past the offset' do
-        expect(ids(collection.list(nil, filter(page: page(1, 0)), nil))).to eq(%w[2 3])
+        expect(ids(collection.list(nil, filter(page: page(1, nil)), nil))).to eq(%w[2 3])
+      end
+
+      # What the toolkit's `Page#apply` answers for a zero limit.
+      it 'reads a zero limit as an empty window, not as every record' do
+        expect(collection.list(nil, filter(page: page(1, 0)), nil)).to be_empty
       end
 
       it 'answers an offset past the end with no record' do

@@ -324,8 +324,7 @@ module ForestAdminDatasourceIntercom
       def translate_page(page)
         return [0, nil] if page.nil?
 
-        limit = page.limit.to_i
-        [page.offset.to_i.clamp(0, nil), limit.positive? ? limit : nil]
+        [page.offset.to_i.clamp(0, nil), page_limit(page)]
       end
 
       # Exact, and one request: `total_count` counts what the filter names, not

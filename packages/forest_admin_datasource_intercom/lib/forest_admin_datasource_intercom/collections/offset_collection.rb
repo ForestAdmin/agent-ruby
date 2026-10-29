@@ -149,6 +149,8 @@ module ForestAdminDatasourceIntercom
       # exactly, rather than by rounding the offset to something the API likes.
       def listed_records(filter)
         offset, limit = window(filter&.page)
+        return [] if limit&.zero?
+
         per_page = Client.bounded_per_page(limit || UNBOUNDED_PAGE_SIZE)
         skip = offset % per_page
 
@@ -216,8 +218,7 @@ module ForestAdminDatasourceIntercom
       def window(page)
         return [0, nil] if page.nil?
 
-        limit = page.limit.to_i
-        [page.offset.to_i.clamp(0, nil), limit.positive? ? limit : nil]
+        [page.offset.to_i.clamp(0, nil), page_limit(page)]
       end
 
       def lookup_condition(filter)

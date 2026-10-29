@@ -323,6 +323,13 @@ module ForestAdminDatasourceIntercom
 
         expect(ids(collection.list(nil, filter(page: page), %w[id]))).to eq(%w[3])
       end
+
+      it 'reads a zero limit as an empty window, without a request' do
+        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 0, limit: 0)
+
+        expect(collection.list(nil, filter(page: page), %w[id])).to be_empty
+        expect(WebMock).not_to have_requested(:get, /conversations/)
+      end
     end
 
     describe '#list of one record' do

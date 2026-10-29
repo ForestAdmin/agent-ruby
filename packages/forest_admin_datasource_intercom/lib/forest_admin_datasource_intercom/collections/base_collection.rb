@@ -91,10 +91,16 @@ module ForestAdminDatasourceIntercom
         return records if page.nil?
 
         offset = page.offset.to_i.clamp(0, nil)
-        limit = page.limit.to_i
-        return records.drop(offset) unless limit.positive?
+        limit = page_limit(page)
+        return records.drop(offset) if limit.nil?
 
         records[offset, limit] || []
+      end
+
+      # Nil when the page names no limit, and an explicit zero kept as one: the
+      # toolkit's `Page#apply` reads it as an empty window, never as "all".
+      def page_limit(page)
+        page.limit&.to_i&.clamp(0, nil)
       end
 
       def column_names
