@@ -274,14 +274,28 @@ module ForestAdminDatasourceIntercom
       end
 
       def refuse_condition!(tree)
-        offender = nil
-        tree.some_leaf { |leaf| offender = leaf }
+        leaves = []
+        tree.some_leaf do |leaf|
+          leaves << leaf
+          false
+        end
+        offender = leaves.find { |leaf| !published?(leaf) }
+        refused = if offender
+                    "filter #{offender.field.inspect}"
+                  else
+                    "combine conditions on #{leaves.map(&:field).uniq.join(", ")}"
+                  end
 
         raise UnsupportedOperatorError,
-              "#{name} cannot filter #{(offender&.field).inspect}: Intercom exposes no search endpoint for this " \
+              "#{name} cannot #{refused}: Intercom exposes no search endpoint for this " \
               "collection and looks a record up by #{lookups.keys.join(", ")} alone -- one exact value at a time, " \
               'with no combination and no other operator. Filter on one of those, or reach the record from the ' \
               'collection next door.'
+      end
+
+      def published?(leaf)
+        schema = fields[leaf.field]
+        schema.respond_to?(:filter_operators) && schema.filter_operators.include?(leaf.operator)
       end
 
       # Intercom takes no order on this listing at all -- there is no parameter

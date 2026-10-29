@@ -485,7 +485,14 @@ module ForestAdminDatasourceIntercom
         expect do
           rows(%w[id], condition_tree: branch('And', leaf('name', operators::EQUAL, 'Acme'),
                                               leaf('company_id', operators::EQUAL, 'erp-co1')))
-        end.to raise_error(UnsupportedOperatorError, /one exact value at a time/)
+        end.to raise_error(UnsupportedOperatorError, /cannot combine conditions on name, company_id.*one exact value/m)
+      end
+
+      it 'names the condition it cannot look up, not the lookup standing next to it' do
+        expect do
+          rows(%w[id], condition_tree: branch('And', leaf('name', operators::EQUAL, 'Acme'),
+                                              leaf('plan_name', operators::EQUAL, 'Pro')))
+        end.to raise_error(UnsupportedOperatorError, /cannot filter "plan_name"/)
       end
 
       it 'refuses to count what it refuses to list' do
