@@ -123,9 +123,12 @@ module ForestAdminDatasourceIntercom
     # `https://user:pass@proxy/...` -- and a credentialed egress proxy is one of
     # the two reasons to set a `base_url` at all, so printing the url verbatim
     # would put a second secret exactly where this class keeps the first one
-    # from going. Read by `Client#inspect` too, which prints the same url.
+    # from going. A query string is masked whole for the same reason: it is
+    # where a gateway takes its key. Read by `Client#inspect` too, which prints
+    # the same url.
     def redacted_url
       @redacted_url ||= url.sub(%r{\A([a-zA-Z][\w+.-]*://)[^/@]*@}, '\1[FILTERED]@')
+                           .sub(/\?.*\z/m, '?[FILTERED]')
     end
 
     # `access_token` is a bearer credential, and nothing prints a Configuration

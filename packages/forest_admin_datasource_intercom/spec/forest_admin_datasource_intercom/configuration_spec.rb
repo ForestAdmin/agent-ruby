@@ -220,6 +220,13 @@ module ForestAdminDatasourceIntercom
         expect(configured.inspect).not_to include('hunter2', 'bob')
         expect(configured.inspect).to include('https://[FILTERED]@proxy.test/api')
       end
+
+      it 'masks the query string of a base_url, where a gateway takes its key' do
+        configured = described_class.new(access_token: 's3cr3t', base_url: 'https://proxy.test/api?api_key=hunter2')
+
+        expect(configured.inspect).not_to include('hunter2')
+        expect(configured.inspect).to include('https://proxy.test/api?[FILTERED]')
+      end
     end
   end
 end
