@@ -223,8 +223,9 @@ module ForestAdminDatasourceIntercom
       raise ConfigurationError,
             "ForestAdminDatasourceIntercom base_url must be an absolute http(s) url, got #{redacted_url.inspect}"
     rescue URI::InvalidURIError
+      # Without the parser's error, whose message quotes the url unredacted.
       raise ConfigurationError,
-            "ForestAdminDatasourceIntercom base_url is not a valid url: #{redacted_url.inspect}"
+            "ForestAdminDatasourceIntercom base_url is not a valid url: #{redacted_url.inspect}", cause: nil
     end
 
     # Faraday turns credentials in the url into a Basic `Authorization`

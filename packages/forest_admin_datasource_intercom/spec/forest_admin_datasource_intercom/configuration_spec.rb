@@ -225,6 +225,7 @@ module ForestAdminDatasourceIntercom
         expect { described_class.new(access_token: 's3cr3t', base_url: 'https://bob:hunter2@proxy test/api') }
           .to raise_error(ConfigurationError, /not a valid url/) { |error|
             expect(error.message).not_to include('hunter2')
+            expect(error.cause).to be_nil
           }
       end
 
