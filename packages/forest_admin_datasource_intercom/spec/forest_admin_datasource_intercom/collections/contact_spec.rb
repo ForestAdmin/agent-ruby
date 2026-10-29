@@ -385,6 +385,15 @@ module ForestAdminDatasourceIntercom
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/sort on "name" while reading/)
       end
 
+      # The window was cut on the ids, so the rows keep their order rather than
+      # the one the search answered in.
+      it 'answers in the order the ids were named, whatever order the search used' do
+        stub_search(contact('3'), contact('1'), contact('2'))
+
+        expect(rows(%w[id], condition_tree: leaf('id', operators::IN, %w[1 2 3])).map { |row| row['id'] })
+          .to eq(%w[1 2 3])
+      end
+
       # The `in` this comes from is a membership: it matches a record once.
       it 'reads a value named twice once' do
         stub_search(contact('1'))

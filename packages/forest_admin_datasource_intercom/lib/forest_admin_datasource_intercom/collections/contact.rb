@@ -248,15 +248,20 @@ module ForestAdminDatasourceIntercom
       # `id IN [...]`, which is what lot 1 already reads the contacts of a page
       # through. A contact that was merged away is simply absent from the
       # answer -- the row reads as gone, not as a failure.
+      #
+      # Put back in the order the ids were named: the search answers in its own,
+      # and the window was cut on the ids.
       def records_by_ids(ids)
         wanted = ids.first(max_id_reads)
         warn_truncated_ids(ids.size) if ids.size > wanted.size
 
-        wanted.each_slice(IDS_PER_READ).flat_map do |chunk|
+        records = wanted.each_slice(IDS_PER_READ).flat_map do |chunk|
           client.search_page(search_endpoint.path, per_page: chunk.size,
                                                    query: { 'field' => 'id', 'operator' => 'IN',
                                                             'value' => chunk }).records
         end
+        position = wanted.each_with_index.to_h
+        records.sort_by { |record| position.fetch(record['id'].to_s, wanted.size) }
       end
 
       # `sort` here is the clause `server_sort` found `/contacts/search` does
