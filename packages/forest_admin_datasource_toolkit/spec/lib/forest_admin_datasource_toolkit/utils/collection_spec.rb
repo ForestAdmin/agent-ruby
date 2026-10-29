@@ -311,11 +311,6 @@ module ForestAdminDatasourceToolkit
                                                ForestAdminDatasourceToolkit::Components::Query::Projection.new)).to eq([1])
         end
 
-        # A through row whose target the foreign collection no longer answers --
-        # deleted, outside the caller's reach, or dropped by a datasource that
-        # reads its targets in bounded pages -- carries a nil where a record was
-        # expected, and every consumer down to the JSON:API serializer reads a
-        # row by key. A join whose other side is gone yields no row.
         it 'list_relation should drop a through row whose target resolved to nothing' do
           book_person_class = Struct.new(:bookId, :personId, :myPerson, :myBook)
           stub_const('BookPerson', book_person_class)

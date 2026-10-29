@@ -56,11 +56,7 @@ module ForestAdminDatasourceToolkit
           field.origin_key == relation_field.foreign_key
       end
 
-      # ValidationError rather than a bare ForestException, for the same reason as
-      # below: every one of these three names a field the request asked for -- a
-      # filter, a sort, a scope written against another schema, a condition
-      # reaching through a relation that is not one this can traverse. That is a
-      # 400 the caller can read and fix, not a 500 saying the agent broke.
+      # ValidationError: an unknown field comes from the request, so it is a 400, not a 500.
       def self.get_field_schema(collection, field_name)
         fields = collection.schema[:fields]
         unless field_name.include?(':')
@@ -167,13 +163,7 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            # Compacted: a through row whose target the foreign collection no
-            # longer answers -- a record deleted, outside the caller's reach, or
-            # dropped by a datasource that reads its targets in bounded pages --
-            # carries a nil where a record was expected, and every consumer of a
-            # related list down to the JSON:API serializer reads a row by key.
-            # A join whose other side is gone yields no row, it does not yield an
-            # empty one.
+            # A through row whose target is gone yields no row, not a nil the serializer would read.
             return records.filter_map { |r| r[foreign_relation] }
           end
         end
