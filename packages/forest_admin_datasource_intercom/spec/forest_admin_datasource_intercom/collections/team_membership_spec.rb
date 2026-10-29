@@ -32,6 +32,8 @@ module ForestAdminDatasourceIntercom
       stub_request(:get, "#{base}/admins").to_return(json('type' => 'admin.list', 'admins' => admins))
     end
 
+    before { stub_admins({ 'id' => '493881', 'name' => 'Alice' }, { 'id' => '493882', 'name' => 'Bruno' }) }
+
     it 'is named IntercomTeamMembership' do
       expect(collection.name).to eq('IntercomTeamMembership')
     end
@@ -43,7 +45,7 @@ module ForestAdminDatasourceIntercom
     # One record per pair, keyed by both ids: a related list is read over two
     # requests, and a key that changed in between would move the rows under the
     # operator.
-    it 'reads one record per pair from the team side alone' do
+    it 'reads one record per pair from the team side' do
       stub_teams({ 'id' => '814865', 'name' => 'Support', 'admin_ids' => [493_881, 493_882] },
                  { 'id' => '814866', 'name' => 'Billing', 'admin_ids' => [493_882] })
 
@@ -51,7 +53,17 @@ module ForestAdminDatasourceIntercom
         .to eq([{ 'id' => '814865:493881', 'team_id' => '814865', 'admin_id' => '493881' },
                 { 'id' => '814865:493882', 'team_id' => '814865', 'admin_id' => '493882' },
                 { 'id' => '814866:493882', 'team_id' => '814866', 'admin_id' => '493882' }])
-      expect(WebMock).not_to have_requested(:get, "#{base}/admins")
+    end
+
+    # A teammate who left the workspace is still named by `admin_ids` until
+    # Intercom drops the pair. Kept, the pair would be counted by a related
+    # list that cannot show it.
+    it 'drops a pair whose teammate /admins no longer answers, from the list and the count' do
+      stub_teams('id' => '814865', 'admin_ids' => [493_881, 493_883])
+      aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+
+      expect(collection.list(nil, filter, %w[id])).to eq([{ 'id' => '814865:493881' }])
+      expect(collection.aggregate(nil, filter, aggregation)).to eq([{ 'group' => {}, 'value' => 1 }])
     end
 
     it 'holds no record for a team nobody belongs to' do
@@ -79,25 +91,6 @@ module ForestAdminDatasourceIntercom
           .to eq([{ 'id' => '814865:493881', 'admin' => { 'name' => 'Alice', 'id' => '493881' } },
                   { 'id' => '814865:493882', 'admin' => { 'name' => 'Bruno', 'id' => '493882' } }])
         expect(WebMock).to have_requested(:get, "#{base}/admins").once
-      end
-
-      # A teammate who left the workspace is still named by the membership until
-      # Intercom drops the pair. The row reads as having no teammate rather than
-      # as a broken record.
-      it 'nests nothing when the id names no record' do
-        stub_teams('id' => '814865', 'admin_ids' => [493_881])
-        stub_admins('id' => '493882', 'name' => 'Bruno')
-
-        expect(collection.list(nil, filter, ['id', 'admin:name']).first)
-          .to eq({ 'id' => '814865:493881', 'admin' => nil })
-      end
-
-      it 'reads no relation the projection did not name' do
-        stub_teams('id' => '814865', 'admin_ids' => [493_881])
-
-        collection.list(nil, filter, %w[id team_id])
-
-        expect(WebMock).not_to have_requested(:get, "#{base}/admins")
       end
     end
 
@@ -127,17 +120,6 @@ module ForestAdminDatasourceIntercom
         expect(collection.aggregate(nil, filter, aggregation))
           .to contain_exactly({ 'group' => { 'team:name' => 'Support' }, 'value' => 2 },
                               { 'group' => { 'team:name' => 'Billing' }, 'value' => 1 })
-      end
-
-      it 'reads no relation the aggregation does not name' do
-        stub_teams('id' => '814865', 'admin_ids' => [493_881])
-        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(
-          operation: 'Count', groups: [{ field: 'team_id' }]
-        )
-
-        collection.aggregate(nil, filter, aggregation)
-
-        expect(WebMock).not_to have_requested(:get, "#{base}/admins")
       end
     end
 

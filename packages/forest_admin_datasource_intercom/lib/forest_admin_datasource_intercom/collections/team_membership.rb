@@ -10,8 +10,10 @@ module ForestAdminDatasourceIntercom
     # Admins navigate to each other in both directions; left undeclared, both
     # sides read as an array of ids.
     #
-    # Read from `/teams` alone. The admin side names the same pairs, so reading
-    # it too would spend a request confirming what the first answer already said.
+    # Read from `/teams`, keeping only the teammates `/admins` still answers:
+    # one who left is named by `admin_ids` until Intercom drops the pair, and a
+    # pair whose teammate is gone would be counted by a related list that
+    # cannot show it. Both reads share the reference cache.
     # Read-only, like the relations it carries: Intercom exposes no endpoint that
     # writes a membership, and an editable relation would offer an association
     # that could only fail.
@@ -23,7 +25,9 @@ module ForestAdminDatasourceIntercom
       protected
 
       def fetch_all
-        client.fetch_all('teams', list_key: 'teams').flat_map { |team| pairs_of(team) }
+        admin_ids = client.fetch_all('admins', list_key: 'admins')
+                          .filter_map { |admin| stringify_id(admin['id']) if admin.is_a?(Hash) }.to_set
+        client.fetch_all('teams', list_key: 'teams').flat_map { |team| pairs_of(team, admin_ids) }
       end
 
       # Keyed by both ids rather than by a counter: a related list is read over
@@ -37,7 +41,7 @@ module ForestAdminDatasourceIntercom
 
       private
 
-      def pairs_of(team)
+      def pairs_of(team, admin_ids)
         return [] unless team.is_a?(Hash)
 
         team_id = stringify_id(team['id'])
@@ -45,7 +49,7 @@ module ForestAdminDatasourceIntercom
 
         Array(team['admin_ids']).filter_map do |admin_id|
           id = stringify_id(admin_id)
-          { 'team_id' => team_id, 'admin_id' => id } unless id.nil?
+          { 'team_id' => team_id, 'admin_id' => id } if admin_ids.include?(id)
         end
       end
 

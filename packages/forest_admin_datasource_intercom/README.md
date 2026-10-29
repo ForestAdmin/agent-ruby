@@ -82,7 +82,7 @@ denied. Scope the token to the endpoints in the table below, or to none of them.
 | `IntercomTicket` | `POST /tickets/search`, `GET /tickets/{id}` | cursor | yes, exactly |
 | `IntercomAdmin` | `GET /admins` | read whole | yes, exactly |
 | `IntercomTeam` | `GET /teams` | read whole | yes, exactly |
-| `IntercomTeamMembership` | `GET /teams` | read whole | yes, exactly |
+| `IntercomTeamMembership` | `GET /teams`, `GET /admins` | read whole | yes, exactly |
 | `IntercomTicketType` | `GET /ticket_types` | read whole | yes, exactly |
 | `IntercomTicketState` | `GET /ticket_states` | read whole | yes, exactly |
 | `IntercomContact` | `GET /contacts`, `POST /contacts/search`, `GET /companies/{id}/contacts` | cursor | yes, exactly |
@@ -171,8 +171,9 @@ Two consequences of travelling through it are worth knowing. A **related list of
 ordered by the membership, not by the teammate**: the agent hands the through collection the columns
 of the collection the relation reaches, so an order on `name` or `email` cannot be resolved there and
 is logged rather than silently dropped. And a `admin_ids` entry naming a teammate `/admins` does not
-answer -- one who left, one outside the token's reach -- **drops out of the related list** instead of
-appearing as an empty row.
+answer -- one who left, one outside the token's reach -- **drops out of the related list and of its
+count** instead of appearing as an empty row: the memberships are read against `/admins`, which the
+reference cache shares with `IntercomAdmin`.
 
 Alongside it, a team names its teammates (`admin_names`) and a teammate its teams (`team_names`) on
 the row itself, so a list view reads without a join. **Those replace the arrays of ids** the first
