@@ -175,7 +175,9 @@ module ForestAdminDatasourceIntercom
           page += 1
         end
 
-        records
+        # Intercom numbers its pages by `per_page`, so the last one read cannot
+        # be asked smaller: what it brings past the budget is cut here instead.
+        wanted ? records.first(MAX_COLLECTED_RECORDS) : records
       end
 
       def read_offset_page(page:, per_page:)

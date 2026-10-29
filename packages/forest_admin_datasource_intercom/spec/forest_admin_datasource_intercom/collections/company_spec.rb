@@ -238,6 +238,16 @@ module ForestAdminDatasourceIntercom
           .to have_received(:warn).with(/named a window larger than one answer may hold/)
       end
 
+      it 'answers no more than the record budget when the last page read goes past it' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_const('ForestAdminDatasourceIntercom::Collections::OffsetCollection::MAX_COLLECTED_RECORDS', 3)
+        (1..3).each do |number|
+          stub_page(company("a#{number}"), company("b#{number}"), page: number, per_page: 150, total_pages: 99)
+        end
+
+        expect(rows(%w[id], page: page(0, 1800)).map { |row| row['id'] }).to eq(%w[a1 b1 a2])
+      end
+
       it 'counts what Intercom counted, in one request' do
         stub_page(company('a'), page: 1, per_page: 1, total_pages: 40, total: 597)
 
