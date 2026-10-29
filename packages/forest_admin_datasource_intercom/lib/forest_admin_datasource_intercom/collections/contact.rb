@@ -70,6 +70,7 @@ module ForestAdminDatasourceIntercom
       def search_column = 'email'
       def match_all_query = MATCH_EVERY_CONTACT
       def max_id_reads = MAX_IDS_READ
+      def routed_operators = { 'company_id' => [Operators::EQUAL] }
 
       private
 

@@ -100,9 +100,16 @@ module ForestAdminDatasourceIntercom
       # A column the table does not carry advertises nothing, which is how a
       # refusal is spelled in a schema.
       it 'advertises no filter on a column the endpoint does not filter' do
-        %w[avatar company_id company_count session_count].each do |column|
+        %w[avatar company_count session_count].each do |column|
           expect(collection.fields[column].filter_operators).to be_empty, "#{column} advertises a filter"
         end
+      end
+
+      # The search filters no company field, but the account endpoint answers a
+      # bare equality -- and the agent sends exactly that to open the related
+      # list of an account.
+      it 'offers an equality on company_id, which the account endpoint answers' do
+        expect(collection.fields['company_id'].filter_operators).to eq(%w[equal])
       end
 
       # The one collection of the whole API Intercom sorts, and the reason this

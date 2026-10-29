@@ -179,10 +179,15 @@ module ForestAdminDatasourceIntercom
       # more of them for the same request count.
       def max_id_reads = MAX_ID_READS
 
+      # Columns answered by a route of the collection's own rather than by its
+      # search endpoint, with the operators that route takes.
+      def routed_operators = {}
+
       private
 
       def column_operators(name, is_primary_key)
         return [Operators::EQUAL, Operators::IN] if is_primary_key
+        return routed_operators[name] if routed_operators.key?(name)
 
         field = search_endpoint.field(name)
 

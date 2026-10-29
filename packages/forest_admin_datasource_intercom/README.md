@@ -383,9 +383,10 @@ empty page. `collection.disable_search` in the agent's customization removes the
   first two are the ones that name a column of the collection. Everything else — the industry, the
   plan, the monthly spend — is refused by name. Filtering by tag or by segment belongs with the lot
   that adds those collections;
-- **a contact's `company_id`, `company_count`, `avatar` and `session_count`** — the endpoint filters
-  none of them. Reach the contacts of an account from the account instead, through its `contacts`
-  relation, which `GET /companies/{id}/contacts` answers in one request — **and answers alone**. That
+- **a contact's `company_count`, `avatar` and `session_count`**, which the endpoint does not filter,
+  and **its `company_id` beyond a bare `equals`** — the search filters no company field, so
+  `company_id equals X` is answered by `GET /companies/{id}/contacts`, which is also what serves the
+  account's `contacts` relation, in one request — **and answers alone**. That
   endpoint returns the contacts of the account whole and narrows nothing, so a `company_id equals X`
   carrying anything else cannot be answered at all: there is no request that takes both halves.
   Which means the related list of an account **is refused as soon as a permission scope or a segment

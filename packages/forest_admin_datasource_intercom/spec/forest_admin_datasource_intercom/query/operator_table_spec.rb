@@ -86,7 +86,7 @@ module ForestAdminDatasourceIntercom
 
           collection.fields.each do |column, schema|
             published = Array(schema.respond_to?(:filter_operators) ? schema.filter_operators : nil)
-            next if published.empty?
+            next if published.empty? || collection.send(:routed_operators).key?(column)
 
             searchable = endpoint.field(column)
             expect(searchable).not_to be_nil,
