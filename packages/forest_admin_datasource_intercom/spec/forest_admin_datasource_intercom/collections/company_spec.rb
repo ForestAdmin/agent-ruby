@@ -429,6 +429,35 @@ module ForestAdminDatasourceIntercom
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/advertised more records/)
       end
 
+      it 'counts a lookup spread over several pages by the total Intercom gave' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Acme' })
+                                               .to_return(json('type' => 'list', 'data' => [company('co1')],
+                                                               'total_count' => 3,
+                                                               'pages' => { 'next' => { 'starting_after' => 'zzz' } }))
+
+        expect(count(condition_tree: leaf('name', operators::EQUAL, 'Acme')))
+          .to eq([{ 'group' => {}, 'value' => 3 }])
+      end
+
+      it 'counts a single-page lookup with no total by what it holds' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Acme' })
+                                               .to_return(json('type' => 'list',
+                                                               'data' => [company('co1'), company('co2')],
+                                                               'pages' => {}))
+
+        expect(count(condition_tree: leaf('name', operators::EQUAL, 'Acme')))
+          .to eq([{ 'group' => {}, 'value' => 2 }])
+      end
+
+      it 'refuses to count a lookup spread over several pages with no total' do
+        stub_request(:get, "#{base}/companies").with(query: { 'name' => 'Acme' })
+                                               .to_return(json('type' => 'list', 'data' => [company('co1')],
+                                                               'pages' => { 'next' => { 'starting_after' => 'zzz' } }))
+
+        expect { count(condition_tree: leaf('name', operators::EQUAL, 'Acme')) }
+          .to raise_error(UnsupportedOperatorError, /cannot be counted/)
+      end
+
       # A filter this collection cannot look up is refused by name. A page
       # served in answer to a filter it ignored is the one failure this
       # datasource is built to avoid.

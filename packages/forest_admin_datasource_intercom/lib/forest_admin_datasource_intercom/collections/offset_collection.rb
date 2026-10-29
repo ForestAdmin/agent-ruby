@@ -136,7 +136,7 @@ module ForestAdminDatasourceIntercom
         return count_by_ids(ids) if ids
 
         lookup = lookup_condition(filter)
-        return looked_up_records(lookup).size if lookup
+        return looked_up_count(lookup) if lookup
 
         refuse_condition!(filter.condition_tree) unless filter&.condition_tree.nil?
 
@@ -238,14 +238,30 @@ module ForestAdminDatasourceIntercom
       # empty list, and a filter matching nothing is the most ordinary thing a
       # list view does. Read the way a record read by its id already is.
       def looked_up_records(params)
-        answer = client.lookup_page(lookup_path, params: params)
-        warn_truncated_lookup(params) if answer.next_cursor
+        answer = lookup(params)
+        return [] unless answer
 
+        warn_truncated_lookup(params) if answer.next_cursor
         answer.records
+      end
+
+      # Intercom's own count when it gave one. A lookup spread over several
+      # pages without one cannot be counted from the first page alone.
+      def looked_up_count(params)
+        answer = lookup(params)
+        return 0 unless answer
+        return answer.total_count if answer.total_count
+        return exact_count(answer) if answer.next_cursor
+
+        answer.records.size
+      end
+
+      def lookup(params)
+        client.lookup_page(lookup_path, params: params)
       rescue APIError => e
         raise unless e.status == 404
 
-        []
+        nil
       end
 
       def refuse_search!
