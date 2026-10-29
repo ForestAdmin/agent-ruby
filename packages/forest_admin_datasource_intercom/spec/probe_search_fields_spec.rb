@@ -98,12 +98,23 @@ module ForestAdminDatasourceIntercom
         expect(result[:operators]['<'][:ok]).to be(false)
       end
 
-      it 'names the failure by its HTTP status when Intercom sends no error code' do
-        stub_request(:post, "#{base}/tickets/search").to_return(json({ 'nope' => true }, 500))
+      it 'names the refusal by its HTTP status when Intercom sends no error code' do
+        stub_request(:post, "#{base}/tickets/search").to_return(json({ 'nope' => true }, 400))
 
         result = probe.run('category', 'string')
 
-        expect(result[:operators]['='][:code]).to eq('http_500')
+        expect(result[:operators]['='][:code]).to eq('http_400')
+      end
+
+      # A failure that is not about the search is not a measurement: recorded,
+      # it would publish a valid filter as refused.
+      [401, 429, 500].each do |status|
+        it "stops on an HTTP #{status} rather than recording it as a refusal" do
+          stub_request(:post, "#{base}/tickets/search").to_return(json({ 'errors' => [{ 'code' => 'x' }] }, status))
+
+          expect { probe.run('category', 'string') }
+            .to raise_error(ProbeSearchFields::Inconclusive, /HTTP #{status}, which says nothing about the field/)
+        end
       end
     end
 
@@ -184,6 +195,18 @@ module ForestAdminDatasourceIntercom
 
         expect { described_class.call(['--token', 's3cr3t', '--out', out]) }.to output(/NOT FILTERABLE/).to_stdout
         expect(YAML.safe_load_file(out)['endpoint']).to eq('conversations')
+      ensure
+        FileUtils.rm_f(out)
+      end
+
+      it 'stops without writing anything when an answer measures nothing' do
+        out = File.join(Dir.tmpdir, 'intercom-probe-inconclusive.yml')
+        stub_request(:post, "#{base}/tickets/search")
+          .to_return(json({ 'errors' => [{ 'code' => 'unauthorized' }] }, 401))
+
+        expect { described_class.call(['--endpoint', 'tickets', '--token', 's3cr3t', '--out', out]) }
+          .to raise_error(SystemExit).and output(/Probe stopped: .*HTTP 401/).to_stderr.and output.to_stdout
+        expect(File).not_to exist(out)
       ensure
         FileUtils.rm_f(out)
       end

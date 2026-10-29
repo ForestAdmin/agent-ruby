@@ -59,6 +59,13 @@ module ProbeSearchFields
 
   LIST_OPERATORS = %w[IN NIN].freeze
 
+  # What Intercom answers a search it refuses: `invalid_field`, `data_invalid`
+  # and `invalid_value` all travel on a 400.
+  REFUSAL_STATUSES = [400, 422].freeze
+
+  # Raised when an answer measures nothing, so the run stops before writing.
+  class Inconclusive < StandardError; end
+
   # A candidate carries no declared type -- discovering it is the point -- so
   # one is guessed from its name, and the fallbacks above cover a wrong guess.
   def self.guess_type(field)
@@ -111,12 +118,23 @@ module ProbeSearchFields
       last
     end
 
+    # Only an answer about the search itself is a measurement. A 401, a 429
+    # that outlasted the retries, a 5xx or a timeout says nothing about the
+    # field, and recorded as a refusal it would be wrong evidence.
     def attempt(field, operator, value)
       @client.search_page(@endpoint.path, query: { 'field' => field, 'operator' => operator, 'value' => value },
                                           per_page: 1, list_key: list_key)
       { ok: true }
     rescue ForestAdminDatasourceIntercom::APIError => e
+      raise Inconclusive, inconclusive_message(field, operator, e) unless REFUSAL_STATUSES.include?(e.status)
+
       { ok: false, code: error_code(e), status: e.status }
+    end
+
+    def inconclusive_message(field, operator, error)
+      "#{@endpoint.path} answered #{field} #{operator} with #{error.status ? "HTTP #{error.status}" : "no status"}, " \
+        'which says nothing about the field. Nothing was written; check the token and the region, then run ' \
+        'the probe again.'
     end
 
     def operator_value(operator, value)
@@ -224,6 +242,8 @@ module ProbeSearchFields
       documents = @options[:endpoints].map { |name| probe_endpoint(SearchFields.fetch(name)) }
       write(documents) if @options[:out]
       0
+    rescue Inconclusive => e
+      abort("Probe stopped: #{e.message}")
     end
 
     private
