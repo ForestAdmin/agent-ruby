@@ -119,7 +119,7 @@ costs to read by id, and the three tiers do not cost the same:
 | Target | Read by id | A page of rows costs | Fan-out |
 | --- | --- | --- | --- |
 | `IntercomAdmin`, `IntercomTeam`, `IntercomTicketState`, `IntercomTicketType` | read whole | **one request**, whatever the page holds | unbounded |
-| `IntercomContact` | `id IN [...]`, 50 at a time | one request per 50 distinct contacts | unbounded |
+| `IntercomContact` | `id IN [...]`, 15 at a time | one request per 15 distinct contacts | unbounded |
 | `IntercomCompany` | `GET /companies/{id}` | **one request per distinct account** | bounded, see below |
 
 The price is per target *collection*, not per relation: a ticket's `state` and `previous_state` are
@@ -399,9 +399,9 @@ empty page. `collection.disable_search` in the agent's customization removes the
 - **a set of ids, counted.** `id in [...]` reads one record per id, so counting a set means reading
   it, and past what a bulk read fetches the count is refused rather than answered with the number
   the truncation left. A collection that advertises an exact count does not answer 25 to a question
-  about forty records. Contacts are the exception: Intercom counts them, 50 ids per search;
-- **a list of more than 50 values** in an `in` or a `not in`. Intercom refuses it with a 400 that
-  names neither the field nor the condition;
+  about forty records. Contacts are the exception: Intercom counts them, 15 ids per search;
+- **a list of more than 15 values** in an `in` or a `not in`, wherever it stands in the filter.
+  Intercom refuses it with a 400 that names neither the field nor the condition;
 - **the custom attributes of a contact or a company.** They are filtered as
   `custom_attributes.{name}`, by name — the ambiguity that keeps ticket attributes display-only does
   not arise here — but which operators Intercom answers on each data type has not been measured, and
@@ -575,7 +575,7 @@ nothing: the read then carries the predicate matching everything that Tickets al
 two bounds alone everywhere in this datasource, but it is why the operator table is per endpoint.
 
 **A set of ids is read in one request** — `id IN [...]`, which this endpoint answers and no other
-does — fifty at a time, the most one `IN` takes, rather than one request per record. It is what
+does — fifteen at a time, the most one `IN` takes, rather than one request per record. It is what
 makes a related list of contacts affordable.
 
 **`company_id equals X` reads `GET /companies/{id}/contacts`.** The search filters no company field,

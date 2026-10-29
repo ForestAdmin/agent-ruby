@@ -54,8 +54,8 @@ module ForestAdminDatasourceIntercom
         enable_search
       end
 
-      # This endpoint answers `id IN [...]`, so fifty ids cost one request
-      # rather than fifty: a relation pointing here resolves a whole page of
+      # This endpoint answers `id IN [...]`, so fifteen ids cost one request
+      # rather than fifteen: a relation pointing here resolves a whole page of
       # rows for a handful of requests, and there is no fan-out to refuse. That
       # is why `max_resolvable_ids` is nil where the other two tiers bound it --
       # the read is proportional to the rows already collected, and the walk
@@ -245,7 +245,7 @@ module ForestAdminDatasourceIntercom
         Client::Page.new(records: [], next_cursor: nil, total_count: 0)
       end
 
-      # One request per fifty ids instead of one per id: this endpoint answers
+      # One request per fifteen ids instead of one per id: this endpoint answers
       # `id IN [...]`, which is what lot 1 already reads the contacts of a page
       # through. A contact that was merged away is simply absent from the
       # answer -- the row reads as gone, not as a failure.

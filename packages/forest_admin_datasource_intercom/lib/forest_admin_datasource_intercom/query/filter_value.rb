@@ -20,9 +20,10 @@ module ForestAdminDatasourceIntercom
 
       INTEGER = /\A-?\d+\z/
 
-      # Measured: past this, Intercom answers a 400 naming neither the field nor
-      # the condition.
-      MAX_LIST_SIZE = 50
+      # Measured on every list, whatever group it stands in: Intercom counts
+      # each value as an element of a composite query and answers a 400 naming
+      # neither the field nor the condition past 15.
+      MAX_LIST_SIZE = 15
 
       def initialize(collection:, timezone: nil)
         @collection = collection

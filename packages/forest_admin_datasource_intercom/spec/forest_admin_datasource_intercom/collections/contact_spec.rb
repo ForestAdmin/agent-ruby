@@ -368,28 +368,28 @@ module ForestAdminDatasourceIntercom
           .to eq([{ 'group' => {}, 'value' => 1 }])
       end
 
-      # Counted by Intercom rather than by reading: each slice of fifty ids --
+      # Counted by Intercom rather than by reading: each slice of fifteen ids --
       # the most one `IN` takes -- is one search asked for a single record, and
       # its `total_count` is the slice's.
       it 'counts a set of ids from the total of each slice, reading one record per search' do
-        stub_search(contact('1'), total: 50)
+        stub_search(contact('1'), total: 15)
 
-        expect(collection.aggregate(nil, filter(condition_tree: leaf('id', operators::IN, (1..250).map(&:to_s))),
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('id', operators::IN, (1..45).map(&:to_s))),
                                     ForestAdminDatasourceToolkit::Components::Query::Aggregation
                                       .new(operation: 'Count')))
-          .to eq([{ 'group' => {}, 'value' => 250 }])
+          .to eq([{ 'group' => {}, 'value' => 45 }])
         expect(WebMock).to have_requested(:post, "#{base}/contacts/search")
-          .with(body: hash_including('pagination' => { 'per_page' => 1 })).times(5)
+          .with(body: hash_including('pagination' => { 'per_page' => 1 })).times(3)
       end
 
       it 'never names more ids in one search than Intercom takes' do
         stub_search(contact('1'))
 
-        rows(%w[id], condition_tree: leaf('id', operators::IN, (1..120).map(&:to_s)))
+        rows(%w[id], condition_tree: leaf('id', operators::IN, (1..40).map(&:to_s)))
 
         expect(WebMock).to have_requested(:post, "#{base}/contacts/search").times(3)
         expect(WebMock).not_to(have_requested(:post, "#{base}/contacts/search").with do |request|
-          JSON.parse(request.body).dig('query', 'value').size > 50
+          JSON.parse(request.body).dig('query', 'value').size > 15
         end)
       end
 
@@ -410,7 +410,7 @@ module ForestAdminDatasourceIntercom
         rows(%w[id], condition_tree: leaf('id', operators::IN, (1..400).map(&:to_s)))
 
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/asked for 400 records by id/)
-        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").times(6)
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").times(20)
       end
 
       # The window is cut in the order the ids were named, so ordering what
