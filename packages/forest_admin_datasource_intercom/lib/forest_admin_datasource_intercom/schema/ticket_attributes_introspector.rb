@@ -1,0 +1,130 @@
+module ForestAdminDatasourceIntercom
+  module Schema
+    # Declared per ticket type: one name has a different id on each type (measured: 14162161 vs 14162165) and
+    # Intercom filters by id only, so the union columns ship unfilterable (R7). Ids are kept per type for a
+    # future per-type filter translation, sparing a second boot-time round trip.
+    class TicketAttributesIntrospector
+      include AttributeNaming
+
+      # Intercom's attribute data types, mapped onto what Forest can render. A
+      # `list` is a single choice among values the workspace defined, so it reads
+      # as a string rather than as a Json blob; `files` is a list of attachments
+      # and has no scalar form at all.
+      COLUMN_TYPES = {
+        'string' => 'String', 'list' => 'String', 'integer' => 'Number', 'decimal' => 'Number',
+        'boolean' => 'Boolean', 'datetime' => 'Date', 'date' => 'Date', 'files' => 'Json'
+      }.freeze
+
+      DEFAULT_COLUMN_TYPE = 'String'.freeze
+
+      # `name` is the key the payload uses, `column_name` the one the schema
+      # publishes; they differ whenever the workspace's own name cannot travel
+      # through Forest's query string.
+      #
+      # `conflicting_ticket_types` names the ticket types declaring the same name
+      # with another type: their value would not be what the column holds.
+      Attribute = Struct.new(:name, :column_name, :column_type, :data_type, :ids_by_ticket_type,
+                             :conflicting_ticket_types, keyword_init: true)
+
+      def initialize(client)
+        @client = client
+      end
+
+      # The union, one entry per attribute name. Degrades to nothing rather than
+      # to a failure: a token without the ticket-types permission costs the
+      # attribute columns, never the boot of the agent.
+      def attributes
+        @attributes ||= build
+      rescue APIError => e
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] could not read the ticket types (HTTP #{e.status || "-"}); " \
+          'the Tickets collection boots without its attribute columns.'
+        )
+        @attributes = []
+      end
+
+      private
+
+      def build
+        # Read on the boot connection: this happens while Rails is starting, and
+        # a slow Intercom must not turn that into minutes the operator sits
+        # through.
+        @client.fetch_all('ticket_types', boot: true)
+               .each_with_object({}) { |ticket_type, union| collect(ticket_type, union) }
+               .values
+      end
+
+      def collect(ticket_type, union)
+        return unless ticket_type.is_a?(Hash)
+
+        type_id = ticket_type['id'].to_s
+        definitions(ticket_type).each do |definition|
+          entry = entry_for(definition, union, type_id)
+          next if entry.nil?
+
+          entry.ids_by_ticket_type[type_id] = definition['id'].to_s
+        end
+      end
+
+      # The union is keyed by column name rather than by the workspace's own,
+      # since that is what has to be unique in a schema. Two different attributes
+      # landing on one column would otherwise share an entry, and the second's
+      # values would be read under the first's name -- wrong values rather than
+      # missing ones, which is worse.
+      def entry_for(definition, union, type_id)
+        name = definition['name'].to_s
+        # An archived attribute is not offered any more, and a nameless one has
+        # nothing to be a column of.
+        return nil if name.empty? || definition['archived']
+
+        column = column_name_for(name)
+        return nil if column.empty?
+
+        entry = union[column]
+        return union[column] = attribute_from(name, column, definition) if entry.nil?
+        return same_name(entry, definition, type_id) if entry.name == name
+
+        warn_collision(name, entry.name, column)
+        nil
+      end
+
+      # The same name declared with another type by another ticket type: that
+      # ticket type's value is left out of the column rather than shown under a
+      # type it does not have.
+      def same_name(entry, definition, type_id)
+        column_type = column_type_for(definition)
+        return entry if column_type == entry.column_type
+
+        entry.conflicting_ticket_types << type_id
+        warn_type_conflict(entry, column_type, type_id)
+        nil
+      end
+
+      def warn_type_conflict(entry, column_type, type_id)
+        ForestAdminDatasourceIntercom.logger.warn(
+          "[forest_admin_datasource_intercom] the ticket attribute #{entry.name.inspect} is a #{column_type} on " \
+          "ticket type #{type_id} and a #{entry.column_type} elsewhere; the column stays a #{entry.column_type} " \
+          'and reads as empty on that ticket type. Give the two attributes different names to publish both.'
+        )
+      end
+
+      def attribute_from(name, column, definition)
+        Attribute.new(name: name, column_name: column, column_type: column_type_for(definition),
+                      data_type: definition['data_type'], ids_by_ticket_type: {}, conflicting_ticket_types: [])
+      end
+
+      def definitions(ticket_type)
+        container = ticket_type['ticket_type_attributes']
+        return [] unless container.is_a?(Hash)
+
+        list = container['data']
+        list.is_a?(Array) ? list.grep(Hash) : []
+      end
+
+      # These are declared per ticket type, and that is what the log calls
+      # them: the workspace's own vocabulary, and where the operator goes to
+      # rename the one that was left out.
+      def attribute_kind = 'ticket'
+    end
+  end
+end

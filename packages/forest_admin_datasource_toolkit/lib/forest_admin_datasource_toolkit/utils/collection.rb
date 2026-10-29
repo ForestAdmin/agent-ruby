@@ -56,10 +56,11 @@ module ForestAdminDatasourceToolkit
           field.origin_key == relation_field.foreign_key
       end
 
+      # ValidationError: an unknown field comes from the request, so it is a 400, not a 500.
       def self.get_field_schema(collection, field_name)
         fields = collection.schema[:fields]
         unless field_name.include?(':')
-          raise ForestException, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
+          raise ValidationError, "Column not found #{collection.name}.#{field_name}" unless fields.key?(field_name)
 
           return fields[field_name]
         end
@@ -67,10 +68,11 @@ module ForestAdminDatasourceToolkit
         association_name = field_name.split(':')[0]
         relation_schema = fields[association_name]
 
-        raise ForestException, "Relation not found #{collection.name}.#{association_name}" unless relation_schema
+        raise ValidationError, "Relation not found #{collection.name}.#{association_name}" unless relation_schema
 
         if relation_schema.type != 'ManyToOne' && relation_schema.type != 'OneToOne'
-          raise ForestException, "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
+          raise ValidationError,
+                "Unexpected field type #{relation_schema.type}: #{collection.name}.#{association_name}"
         end
 
         get_field_schema(
@@ -161,7 +163,8 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            return records.map { |r| r[foreign_relation] }
+            # A through row whose target is gone yields no row, not a nil the serializer would read.
+            return records.filter_map { |r| r[foreign_relation] }
           end
         end
 
