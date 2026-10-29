@@ -1,11 +1,12 @@
 # Forest — Intercom datasource
 
-Surface [Intercom](https://www.intercom.com) conversations, tickets, teammates, teams, ticket types
-and ticket states as Forest collections.
+Surface [Intercom](https://www.intercom.com) conversations, tickets, contacts, companies, teammates,
+teams, ticket types and ticket states as Forest collections.
 
-This is **lot 1: read only**. Rows, record details, exact counts and the conversation thread work;
-server-side filtering, writes, business actions, contacts and companies arrive in the lots after it
-— see "What is not here yet".
+This release is **read only**. Rows, record details, exact counts, server-side filtering, the
+relations between collections and the conversation thread work; writes, business actions, notes,
+tags, segments and group-by on the paginated collections arrive in the lots after it — see "What is
+not here yet".
 
 ## Installation
 
