@@ -368,6 +368,30 @@ module ForestAdminDatasourceIntercom
           .to eq([{ 'group' => {}, 'value' => 1 }])
       end
 
+      # Counted by Intercom rather than by reading: each slice of a hundred ids
+      # is one search asked for a single record, and its `total_count` is the
+      # slice's.
+      it 'counts a set of ids from the total of each slice, reading one record per search' do
+        stub_search(contact('1'), total: 100)
+
+        expect(collection.aggregate(nil, filter(condition_tree: leaf('id', operators::IN, (1..250).map(&:to_s))),
+                                    ForestAdminDatasourceToolkit::Components::Query::Aggregation
+                                      .new(operation: 'Count')))
+          .to eq([{ 'group' => {}, 'value' => 300 }])
+        expect(WebMock).to have_requested(:post, "#{base}/contacts/search")
+          .with(body: hash_including('pagination' => { 'per_page' => 1 })).times(3)
+      end
+
+      it 'refuses a count Intercom answered without a total' do
+        stub_request(:post, "#{base}/contacts/search")
+          .to_return(json('type' => 'list', 'data' => [contact('1')], 'pages' => {}))
+
+        expect do
+          collection.aggregate(nil, filter(condition_tree: leaf('id', operators::IN, %w[1 2])),
+                               ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count'))
+        end.to raise_error(UnsupportedOperatorError, /without a total_count/)
+      end
+
       it 'truncates a set larger than it will read, and says so' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         stub_search(contact('1'))

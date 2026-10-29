@@ -265,6 +265,18 @@ module ForestAdminDatasourceIntercom
         records.sort_by { |record| position.fetch(record['id'].to_s, wanted.size) }
       end
 
+      # The same searches, each asked for one record: Intercom counts the slice
+      # in `total_count`, so nothing needs reading to be counted.
+      def count_by_ids(ids)
+        refuse_id_count!(ids.size) if ids.size > max_id_reads
+
+        ids.each_slice(IDS_PER_READ).sum do |chunk|
+          exact_count(client.search_page(search_endpoint.path, per_page: 1,
+                                                               query: { 'field' => 'id', 'operator' => 'IN',
+                                                                        'value' => chunk }))
+        end
+      end
+
       # `sort` here is the clause `server_sort` found `/contacts/search` does
       # honour, which is why nothing has reported it yet: it is this route that
       # cannot carry the order, not the column. Saying Intercom does not sort
