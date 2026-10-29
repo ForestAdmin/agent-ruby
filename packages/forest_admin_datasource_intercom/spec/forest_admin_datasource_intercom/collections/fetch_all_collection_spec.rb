@@ -219,7 +219,18 @@ module ForestAdminDatasourceIntercom
 
         expect(ids(rows)).to eq(%w[2 1 3])
         expect(ForestAdminDatasourceIntercom.logger)
-          .to have_received(:warn).with(/sort on "unknown", which it does not carry/)
+          .to have_received(:warn).with(/sort on "unknown", which it does not carry as a sortable column/)
+      end
+
+      # A Json column holds a list, which has no order of its own.
+      it 'drops a clause on a column it cannot sort, and says so' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+        rows = collection.list(nil, filter(sort: sort({ field: 'team_ids', ascending: true })), nil)
+
+        expect(ids(rows)).to eq(%w[2 1 3])
+        expect(ForestAdminDatasourceIntercom.logger)
+          .to have_received(:warn).with(/sort on "team_ids", which it does not carry as a sortable column/)
       end
 
       it 'keeps the clauses it does carry alongside the one it drops' do

@@ -165,7 +165,7 @@ module ForestAdminDatasourceIntercom
         )
 
         expect(ForestAdminDatasourceIntercom.logger)
-          .to have_received(:warn).with(/sort on "name", which it does not carry/)
+          .to have_received(:warn).with(/sort on "name", which it does not carry as a sortable column/)
       end
     end
   end

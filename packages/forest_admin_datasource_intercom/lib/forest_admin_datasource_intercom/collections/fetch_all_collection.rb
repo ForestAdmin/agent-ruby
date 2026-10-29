@@ -189,9 +189,10 @@ module ForestAdminDatasourceIntercom
         end.map(&:first)
       end
 
-      # A sort clause naming a field this collection does not carry is dropped:
-      # ordering by a column that is not there would compare nil to nil on every
-      # row and leave the order to the tie-break. Reported when it happens,
+      # A sort clause naming a field this collection does not carry, or cannot
+      # sort on -- a relation, a Json column -- is dropped: either would compare
+      # nil to nil on every row and leave the order to the tie-break. Reported
+      # when it happens,
       # rather than dropped in silence -- an order asked for and not honoured is
       # reported everywhere else in this datasource, and there is one route that
       # reaches this tier with a clause it cannot resolve: a related list through
@@ -199,16 +200,22 @@ module ForestAdminDatasourceIntercom
       # `Filter#nest` prefixes the condition tree without prefixing the sort, so
       # the membership is handed the columns of the collection it reaches.
       def sort_clauses(sort)
-        known, unknown = Array(sort).partition { |clause| fields.key?(sort_field(clause)) }
+        known, unknown = Array(sort).partition { |clause| sortable_column?(sort_field(clause)) }
         warn_unsortable(unknown) unless unknown.empty?
 
         known.map { |clause| [sort_field(clause), ascending?(clause) != false] }
       end
 
+      def sortable_column?(field)
+        schema = fields[field]
+        schema.is_a?(ColumnSchema) && schema.is_sortable
+      end
+
       def warn_unsortable(clauses)
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} was asked to sort on " \
-          "#{clauses.map { |clause| sort_field(clause).inspect }.join(", ")}, which it does not carry; the rows " \
+          "#{clauses.map { |clause| sort_field(clause).inspect }.join(", ")}, which it does not carry as a " \
+          'sortable column; the rows ' \
           'come back in the order Intercom returned them. A related list through a many-to-many is ordered by the ' \
           'columns of the collection it travels through, not by those of the collection it reaches.'
         )

@@ -101,6 +101,19 @@ module ForestAdminDatasourceIntercom
       end
     end
 
+    # A relation is not a column: ordering by it would compare nil on every
+    # row, so the clause is dropped and reported.
+    it 'drops a sort on a relation rather than ordering by nil, and says so' do
+      allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+      stub_teams('id' => '814865', 'admin_ids' => [493_882, 493_881])
+      order = ForestAdminDatasourceToolkit::Components::Query::Sort.new([{ field: 'team', ascending: true }])
+
+      rows = collection.list(nil, ForestAdminDatasourceToolkit::Components::Query::Filter.new(sort: order), %w[id])
+
+      expect(rows.map { |row| row['id'] }).to eq(%w[814865:493882 814865:493881])
+      expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/sort on "team"/)
+    end
+
     # The leaderboard of a team's teammates is this aggregation: the through
     # collection grouped by the far side's label.
     describe 'a group through a relation' do
