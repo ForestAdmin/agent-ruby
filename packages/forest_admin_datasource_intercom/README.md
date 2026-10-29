@@ -49,6 +49,7 @@ that verifies the pinned API version was honoured.
 | `rate_limiter` | `RateLimiter.new` | `nil` takes the pacing out of the stack. |
 | `reference_cache_ttl` | `60` | Seconds the workspace's reference lists are held for. `0` re-reads them every time. |
 | `adapter` | persistent, 25 connections | The Faraday adapter. `:net_http` opts out of keep-alive; `[name, options]` sizes the pool, which is read against the server's thread count. |
+| `concurrent_reads` | `1` | How many records a read by id fetches at once. Every read in flight holds a connection of the pool — see [Reading records by id in parallel](#reading-records-by-id-in-parallel). |
 
 **Pin the region explicitly.** `api.intercom.io` does route to the right one, but a workspace under
 GDPR wants its requests reaching the European host and nothing else.
@@ -682,6 +683,34 @@ What none of this touches is the search response itself. Intercom offers no fiel
 page of tickets carries every ticket's whole timeline whatever the projection says — which is why
 [`MAX_TICKETS_PER_PAGE`](lib/forest_admin_datasource_intercom/collections/ticket.rb) is 25, and why
 asking for 50 or 100 rows a page, or for page 5, costs that response two, four or three times over.
+
+### Reading records by id in parallel
+
+Intercom has no bulk read for a company, a conversation or a ticket, so some reads cost one request
+per record: a related list or a page resolving a `company` relation (up to 100 companies), a record
+read by id, and the timelines of a conversation list (up to 10 conversations). By default those
+requests go **one after another** — at about 150 ms each, a page resolving 100 companies waits around
+15 seconds.
+
+`concurrent_reads` sends that many of them at once. At 4, the same page waits around 4 seconds. The
+order of the rows, the caps and the refusals are unchanged, and so is the rate limiting: every
+request still goes through the limiter.
+
+It is 1 by default because **every read in flight holds a connection of the pool** for as long as it
+waits. A request using four of them leaves four fewer for the other threads, and a thread that finds
+the pool full fails as a timeout (see above). Size the pool against both figures together — at
+least the server's thread count times `concurrent_reads`:
+
+```ruby
+# Puma with 5 threads, 4 reads at once: 20 connections at the busiest.
+ForestAdminDatasourceIntercom::Datasource.new(
+  access_token: ENV.fetch('INTERCOM_ACCESS_TOKEN'),
+  concurrent_reads: 4,
+  adapter: [:net_http_persistent, { pool_size: 25 }]
+)
+```
+
+`concurrent_reads: 1` is also the way back to the sequential behaviour if a wider setting misbehaves.
 
 ## Rate limits
 

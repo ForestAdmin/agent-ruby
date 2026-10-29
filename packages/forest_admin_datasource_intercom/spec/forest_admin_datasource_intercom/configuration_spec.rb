@@ -66,6 +66,13 @@ module ForestAdminDatasourceIntercom
         expect { described_class.new(access_token: 's3cr3t', api_version: '') }
           .to raise_error(ConfigurationError, /api_version cannot be empty/)
       end
+
+      it 'refuses a number of concurrent reads that is not a whole number of one or more' do
+        [0, -1, 2.5, '4', nil].each do |width|
+          expect { described_class.new(access_token: 's3cr3t', concurrent_reads: width) }
+            .to raise_error(ConfigurationError, /concurrent_reads must be a whole number/), width.inspect
+        end
+      end
     end
 
     describe 'defaults' do
@@ -77,6 +84,12 @@ module ForestAdminDatasourceIntercom
       it 'is patient on a request and impatient on the boot' do
         expect(configuration).to have_attributes(timeout: 30, open_timeout: 5, boot_timeout: 10,
                                                  boot_open_timeout: 3)
+      end
+
+      # Every read in flight holds a connection of the pool: widening is the
+      # integrator's call.
+      it 'reads records one at a time' do
+        expect(configuration.concurrent_reads).to eq(1)
       end
 
       it 'takes the pacing out of the stack when handed no limiter' do

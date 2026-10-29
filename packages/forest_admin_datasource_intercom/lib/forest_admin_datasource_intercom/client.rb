@@ -175,14 +175,27 @@ module ForestAdminDatasourceIntercom
     # failure: what a missing record means -- a stale link, a record outside the
     # token's scope, a deletion -- is the caller's to decide, not the client's.
     def fetch_record(path, id, params: {}, boot: false)
-      operation = "#{path}/#{id}"
+      within_read_scope(record_key(path, id, params)) { read_record(path, id, params, boot: boot) }
+    end
 
-      within_read_scope(['record', path, id, params]) do
-        must_succeed(operation) do
-          body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
-          body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
-        end
+    # Records read one request each, `concurrent_reads` at a time, in the order
+    # of `ids`; nil for one Intercom no longer answers. The read scope is read
+    # and written here, on the calling thread: a worker sees neither, a Hash
+    # shared between threads being no store.
+    def fetch_records(path, ids, params: {})
+      scope = Thread.current[@scope_key]
+      found = {}
+      pending = []
+      ids.uniq.each do |id|
+        key = record_key(path, id, params)
+        scope&.key?(key) ? found[id] = scope[key] : pending << id
       end
+
+      read_concurrently(pending) { |id| record_or_nil(path, id, params) }.each do |id, record|
+        found[id] = record
+        scope[record_key(path, id, params)] = record if scope && record
+      end
+      ids.map { |id| found[id] }
     end
 
     # Every record of an endpoint that answers in one response: the reference
@@ -257,6 +270,66 @@ module ForestAdminDatasourceIntercom
       return scope[key] if scope.key?(key)
 
       scope[key] = yield
+    end
+
+    def record_key(path, id, params) = ['record', path, id, params]
+
+    def read_record(path, id, params, boot: false)
+      operation = "#{path}/#{id}"
+
+      must_succeed(operation) do
+        body = get("#{path}/#{Faraday::Utils.escape(id)}", params, boot: boot).body
+        body.is_a?(Hash) ? body : refuse_body_shape(operation, 'the response is not a record')
+      end
+    end
+
+    def record_or_nil(path, id, params)
+      read_record(path, id, params)
+    rescue APIError => e
+      raise unless e.status == 404
+
+      nil
+    end
+
+    # `items` mapped through the block, at most `concurrent_reads` at a time.
+    # Inline at a width of one, which is the behaviour of before this existed.
+    # Wider, a failure stops the workers taking new items, every worker is
+    # joined, and the failure raised is the first in the order of `items` --
+    # the same one whatever order the responses came back in.
+    def read_concurrently(items, &read)
+      width = [@configuration.concurrent_reads, items.size].min
+      return items.to_h { |item| [item, yield(item)] } if width <= 1
+
+      outcomes = run_workers(items, width, &read)
+      failure = items.lazy.map { |item| outcomes[item] }.find { |outcome| outcome&.first == :error }
+      raise failure.last if failure
+
+      items.to_h { |item| [item, outcomes[item].last] }
+    end
+
+    def run_workers(items, width, &read)
+      queue = Queue.new
+      items.each { |item| queue << item }
+      queue.close
+      outcomes = {}
+      lock = Mutex.new
+
+      Array.new(width) do
+        Thread.new do
+          while (item = queue.pop)
+            outcome = attempt(item, &read)
+            lock.synchronize { outcomes[item] = outcome }
+            queue.clear if outcome.first == :error
+          end
+        end
+      end.each(&:join)
+      outcomes
+    end
+
+    def attempt(item)
+      [:ok, yield(item)]
+    rescue StandardError => e
+      [:error, e]
     end
 
     # The raw response rather than its body: the quota headers are read by the

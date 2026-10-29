@@ -760,5 +760,106 @@ module ForestAdminDatasourceIntercom
         expect(client.inspect).not_to include('s3cr3t')
       end
     end
+
+    describe 'reading records by id' do
+      def stub_record(id, status = 200)
+        stub_request(:get, "#{base}/companies/#{id}")
+          .to_return(json(status == 200 ? { 'type' => 'company', 'id' => id } : { 'type' => 'error.list' }, status))
+      end
+
+      # A response that waits until `width` requests are in flight together, and
+      # says whether they were: the only way to tell reads issued at once from
+      # reads issued one after another.
+      def stub_overlapping(ids, width, wait: 2)
+        lock = Mutex.new
+        all_in = ConditionVariable.new
+        in_flight = 0
+
+        ids.each do |id|
+          stub_request(:get, "#{base}/companies/#{id}").to_return do
+            overlapped = lock.synchronize do
+              in_flight += 1
+              all_in.broadcast
+              deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+              while in_flight < width && (left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)).positive?
+                all_in.wait(lock, left)
+              end
+              in_flight >= width
+            end
+            json('type' => 'company', 'id' => id, 'overlapped' => overlapped)
+          end
+        end
+      end
+
+      it 'answers in the order of the ids, with nil for a record Intercom no longer answers' do
+        stub_record('a')
+        stub_record('gone', 404)
+        stub_record('b')
+
+        expect(client.fetch_records('companies', %w[a gone b]).map { |record| record&.fetch('id') })
+          .to eq(['a', nil, 'b'])
+      end
+
+      it 'reads them one at a time by default' do
+        stub_overlapping(%w[a b], 2, wait: 0.2)
+
+        expect(client.fetch_records('companies', %w[a b]).map { |record| record['overlapped'] }).to eq([false, true])
+      end
+
+      it 'reads nothing the page already read, and keeps what it read for the rest of the page' do
+        stub_record('a')
+        stub_record('b')
+
+        client.with_read_scope do
+          client.fetch_record('companies', 'a')
+          client.fetch_records('companies', %w[a b])
+          client.fetch_record('companies', 'b')
+        end
+
+        expect(WebMock).to have_requested(:get, "#{base}/companies/a").once
+        expect(WebMock).to have_requested(:get, "#{base}/companies/b").once
+      end
+
+      context 'with concurrent reads' do
+        let(:configuration) do
+          Configuration.new(access_token: 's3cr3t', retry_policy: retry_policy, rate_limiter: nil,
+                            concurrent_reads: 3)
+        end
+
+        it 'has that many requests in flight at once' do
+          stub_overlapping(%w[a b c], 3)
+
+          expect(client.fetch_records('companies', %w[a b c]).map { |record| record['overlapped'] })
+            .to eq([true, true, true])
+        end
+
+        it 'still answers in the order of the ids' do
+          stub_overlapping(%w[a b c], 3)
+
+          expect(client.fetch_records('companies', %w[c a b]).map { |record| record['id'] }).to eq(%w[c a b])
+        end
+
+        it 'reads a record named twice once' do
+          stub_record('a')
+
+          client.fetch_records('companies', %w[a a])
+
+          expect(WebMock).to have_requested(:get, "#{base}/companies/a").once
+        end
+
+        # Whatever order the responses came back in, the failure raised is the
+        # one the earliest id met, and no worker outlives the call.
+        it 'raises the failure of the earliest id once every worker is done' do
+          stub_record('a')
+          stub_record('b', 403)
+          stub_record('c', 404)
+          threads = Thread.list.size
+
+          expect { client.fetch_records('companies', %w[a b c]) }
+            .to raise_error(APIError) { |error| expect(error.status).to eq(403) }
+          expect(Thread.list.size).to eq(threads)
+        end
+      end
+    end
   end
 end

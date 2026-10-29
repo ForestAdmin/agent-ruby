@@ -60,13 +60,7 @@ module ForestAdminDatasourceIntercom
         wanted = ids.first(max_id_reads)
         warn_truncated_ids(ids.size) if ids.size > wanted.size
 
-        wanted.filter_map do |id|
-          client.fetch_record(record_endpoint, id, params: record_read_params)
-        rescue APIError => e
-          raise unless e.status == 404
-
-          nil
-        end
+        client.fetch_records(record_endpoint, wanted, params: record_read_params).compact
       end
 
       # How many of a set of ids name a record, which means reading them:

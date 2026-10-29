@@ -68,9 +68,16 @@ module ForestAdminDatasourceIntercom
     # clear of the queueing above.
     DEFAULT_ADAPTER = [:net_http_persistent, { pool_size: 25 }].freeze
 
+    # How many records a read by id fetches at once -- a related list of
+    # companies, a page of timelines -- Intercom answering those one request
+    # each. One by default: every extra read in flight holds a connection of
+    # the pool above, so widening this is the integrator's call, made against
+    # `pool_size` and the server's thread count together.
+    DEFAULT_CONCURRENT_READS = 1
+
     attr_reader :access_token, :region, :base_url, :api_version, :open_timeout, :timeout,
                 :retry_policy, :rate_limiter, :boot_open_timeout, :boot_timeout, :boot_retry_policy,
-                :reference_cache_ttl, :adapter, :reference_cache
+                :reference_cache_ttl, :adapter, :reference_cache, :concurrent_reads
 
     # `rate_limiter: nil` takes the pacing out of the stack, leaving the 429
     # retry as the only rate-limit handling. For a deployment that meters on its
@@ -84,7 +91,8 @@ module ForestAdminDatasourceIntercom
                    open_timeout: 5, timeout: 30, retry_policy: RetryPolicy.new,
                    rate_limiter: RateLimiter.new, boot_open_timeout: 3, boot_timeout: 10,
                    boot_retry_policy: RetryPolicy.boot,
-                   reference_cache_ttl: DEFAULT_REFERENCE_CACHE_TTL, adapter: nil)
+                   reference_cache_ttl: DEFAULT_REFERENCE_CACHE_TTL, adapter: nil,
+                   concurrent_reads: DEFAULT_CONCURRENT_READS)
       @access_token = access_token
       @region       = (region || DEFAULT_REGION).to_s.downcase.to_sym
       @base_url     = base_url
@@ -98,6 +106,7 @@ module ForestAdminDatasourceIntercom
       @boot_retry_policy = boot_retry_policy
       @reference_cache_ttl = reference_cache_ttl
       @adapter = normalize_adapter(adapter)
+      @concurrent_reads = concurrent_reads
       validate!
       # One store per Configuration, hence per token, like the rate limiter:
       # what it holds is a workspace's own lists, and two workspaces do not
@@ -152,6 +161,15 @@ module ForestAdminDatasourceIntercom
       raise ConfigurationError, 'ForestAdminDatasourceIntercom api_version cannot be empty' if blank?(@api_version)
 
       validate_reference_cache_ttl!
+      validate_concurrent_reads!
+    end
+
+    def validate_concurrent_reads!
+      return if @concurrent_reads.is_a?(Integer) && @concurrent_reads.positive?
+
+      raise ConfigurationError,
+            'ForestAdminDatasourceIntercom concurrent_reads must be a whole number of reads, one or more, got ' \
+            "#{@concurrent_reads.inspect}"
     end
 
     # A number, and a real one. Coercing first and checking the sign afterwards

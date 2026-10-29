@@ -145,30 +145,20 @@ module ForestAdminDatasourceIntercom
       def embed_timeline(records, rows, projection)
         return unless column_asked?(projection, 'timeline')
 
-        budget = MAX_TIMELINE_READS
-        missing = 0
-
+        unread = []
         records.each_with_index do |record, index|
           if parts_of(record)
             rows[index]['timeline'] = build_timeline(record)
-          elsif budget.positive?
-            budget -= 1
-            detail = read_detail(record['id'])
-            rows[index]['timeline'] = detail && build_timeline(detail)
           else
-            missing += 1
+            unread << index
           end
         end
+        read = unread.first(MAX_TIMELINE_READS)
+        details = client.fetch_records(list_endpoint, read.map { |index| records[index]['id'] }, params: read_params)
+        read.zip(details) { |index, detail| rows[index]['timeline'] = detail && build_timeline(detail) }
 
+        missing = unread.size - read.size
         warn_truncated_timelines(missing) if missing.positive?
-      end
-
-      def read_detail(id)
-        client.fetch_record(list_endpoint, id, params: read_params)
-      rescue APIError => e
-        raise unless e.status == 404
-
-        nil
       end
 
       def warn_truncated_timelines(missing)
