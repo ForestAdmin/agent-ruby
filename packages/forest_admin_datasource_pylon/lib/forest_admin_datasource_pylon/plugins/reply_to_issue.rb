@@ -7,6 +7,10 @@ module ForestAdminDatasourcePylon
     # which must name the recipients.
     #
     # SINGLE scope only: the form is built from one issue's thread.
+    #
+    # With `post_as_operator`, a public reply is signed by the Pylon user
+    # sharing the Forest operator's email, and refused when there is none.
+    # Internal notes are always signed by the token's account.
     class ReplyToIssue < ForestAdminDatasourceCustomizer::Plugins::Plugin
       BaseAction      = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope     = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
@@ -23,6 +27,7 @@ module ForestAdminDatasourcePylon
         opts = {
           issue_id_field: options[:issue_id_field],
           allow_internal_note: options.fetch(:allow_internal_note, true) ? true : false,
+          post_as_operator: options[:post_as_operator] ? true : false,
           support_emails: normalize_emails(options[:support_emails])
         }
 
@@ -51,7 +56,7 @@ module ForestAdminDatasourcePylon
           next result_builder.error(message: 'A message is required.') if body.strip.empty?
 
           status, message = if FormBuilder.public_reply?(context, opts)
-                              reply(datasource, state, body, context.form_values, opts)
+                              reply(datasource, state, body, context, opts)
                             else
                               note(datasource, state, body)
                             end
@@ -59,18 +64,23 @@ module ForestAdminDatasourcePylon
         end
       end
 
-      def reply(datasource, state, body, values, opts)
+      def reply(datasource, state, body, context, opts)
         return [:error, no_target_message(state.issue_id, opts)] if state.target.nil?
 
         payload = { 'body_html' => body, 'message_id' => state.target.message_id }
         if state.target.email?
-          to = addresses(values[FormBuilder::TO_LABEL])
+          to = addresses(context.form_values[FormBuilder::TO_LABEL])
           return [:error, 'At least one recipient (To) is required to reply by email.'] if to.empty?
 
-          payload['email_info'] = { 'to_emails' => to, 'cc_emails' => addresses(values[FormBuilder::CC_LABEL]) }
+          payload['email_info'] = { 'to_emails' => to,
+                                    'cc_emails' => addresses(context.form_values[FormBuilder::CC_LABEL]) }
         end
 
-        write(state.issue_id, reply_success(state, payload)) do
+        operator = OperatorLookup.call(datasource, context.caller) if opts[:post_as_operator]
+        return [:error, operator.error] if operator&.error
+
+        payload['user_id'] = operator.user['id'] if operator
+        write(state.issue_id, reply_success(state, payload, operator&.user)) do
           datasource.client.reply_to_issue(state.issue_id, payload)
         end
       end
@@ -104,8 +114,12 @@ module ForestAdminDatasourcePylon
         opts[:allow_internal_note] ? "#{message} Post an internal note instead." : message
       end
 
-      def reply_success(state, payload)
-        signed = 'signed by the account of the Pylon API token'
+      def reply_success(state, payload, operator)
+        signed = if operator
+                   "signed by #{operator["name"] || operator["email"]}"
+                 else
+                   'signed by the account of the Pylon API token'
+                 end
         if payload['email_info']
           return "Reply emailed to #{payload["email_info"]["to_emails"].join(", ")} on Pylon issue " \
                  "#{state.issue_id}, #{signed}."

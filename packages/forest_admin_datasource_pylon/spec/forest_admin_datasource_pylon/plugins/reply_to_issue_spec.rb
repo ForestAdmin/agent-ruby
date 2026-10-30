@@ -1,11 +1,12 @@
 module ForestAdminDatasourcePylon
   class FakeReplyContext
-    attr_reader :form_values, :record_ids
+    attr_reader :form_values, :record_ids, :caller
 
-    def initialize(form_values: {}, record_ids: ['i1'], records: [])
+    def initialize(form_values: {}, record_ids: ['i1'], records: [], caller: nil)
       @form_values = form_values
       @record_ids = record_ids
       @records = records
+      @caller = caller
     end
 
     def get_form_value(key) = @form_values[key]
@@ -351,6 +352,102 @@ module ForestAdminDatasourcePylon
           .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 502', status: 502))
 
         expect { run_action(register, values) }.to raise_error(ForestAdminDatasourcePylon::APIError, /502/)
+      end
+    end
+
+    describe 'signing a reply as the Forest operator' do
+      let(:operator) { Struct.new(:email).new('Ada@Acme.io') }
+      let(:values) { { form::TYPE_LABEL => form::PUBLIC_REPLY, form::MESSAGE_LABEL => '<p>Hi</p>' } }
+
+      def user(id, email:, emails: [], is_deactivated: false, name: nil)
+        { 'id' => id, 'name' => name, 'email' => email, 'emails' => emails, 'is_deactivated' => is_deactivated }
+      end
+
+      def run_as(caller, opts = {})
+        run_action(register({ post_as_operator: true }.merge(opts)), values, caller: caller)
+      end
+
+      before do
+        thread(message('m1', source: 'slack'))
+        allow(client).to receive_messages(reply_to_issue: { 'id' => 'r1' }, create_issue_note: { 'id' => 'n1' })
+      end
+
+      it 'passes the Pylon user sharing the operator email, whatever its case' do
+        allow(client).to receive(:fetch_users).and_return([user('u1', email: 'ada@acme.io', name: 'Ada')])
+
+        result = run_as(operator)
+
+        expect(client).to have_received(:reply_to_issue).with('i1', hash_including('user_id' => 'u1'))
+        expect(result[:message]).to eq('Reply sent via Slack on Pylon issue i1, signed by Ada.')
+      end
+
+      it 'matches one of the other addresses of a Pylon user' do
+        allow(client).to receive(:fetch_users)
+          .and_return([user('u2', email: 'ada@corp.io', emails: ['ada@acme.io'])])
+
+        run_as(operator)
+
+        expect(client).to have_received(:reply_to_issue).with('i1', hash_including('user_id' => 'u2'))
+      end
+
+      it 'never signs as a deactivated Pylon user, and sends nothing' do
+        allow(client).to receive(:fetch_users).and_return([user('u1', email: 'ada@acme.io', is_deactivated: true)])
+
+        result = run_as(operator)
+
+        expect(result[:type]).to eq('Error')
+        expect(result[:message]).to match(/No active Pylon user has the email ada@acme.io.*was not sent/)
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'refuses rather than letting the token sign when no Pylon user matches' do
+        allow(client).to receive(:fetch_users).and_return([user('u1', email: 'grace@acme.io')])
+
+        expect(run_as(operator)[:type]).to eq('Error')
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'refuses when several active Pylon users share the email' do
+        allow(client).to receive(:fetch_users)
+          .and_return([user('u1', email: 'ada@acme.io'), user('u2', email: 'x@acme.io', emails: ['ada@acme.io'])])
+
+        expect(run_as(operator)[:message]).to match(/2 active Pylon users have the email ada@acme.io/)
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'refuses when the Forest user has no email' do
+        allow(client).to receive(:fetch_users)
+
+        expect(run_as(nil)[:message]).to eq('Your Forest user has no email to sign the reply with.')
+        expect(client).not_to have_received(:fetch_users)
+      end
+
+      it 'reports a failed read of the Pylon users, and sends nothing' do
+        allow(client).to receive(:fetch_users)
+          .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 500 boom', status: 500))
+
+        expect(run_as(operator)[:message])
+          .to eq('Could not read the Pylon users to sign the reply in your name: HTTP 500 boom')
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'signs an internal note with the token, without looking the operator up' do
+        allow(client).to receive(:fetch_users)
+
+        run_action(register(post_as_operator: true), values.merge(form::TYPE_LABEL => form::INTERNAL_NOTE),
+                   caller: operator)
+
+        expect(client).to have_received(:create_issue_note).with('i1', 'body_html' => '<p>Hi</p>')
+        expect(client).not_to have_received(:fetch_users)
+      end
+
+      it 'leaves the token signing when the option is off' do
+        allow(client).to receive(:fetch_users)
+
+        run_action(register, values, caller: operator)
+
+        expect(client).to have_received(:reply_to_issue).with('i1', hash_excluding('user_id'))
+        expect(client).not_to have_received(:fetch_users)
       end
     end
   end
