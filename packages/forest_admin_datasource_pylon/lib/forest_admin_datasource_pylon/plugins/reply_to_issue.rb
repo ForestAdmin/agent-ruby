@@ -45,26 +45,34 @@ module ForestAdminDatasourcePylon
                        &executor(datasource, opts))
       end
 
-      # The thread is read again rather than trusted from the form: the
-      # conversation may have moved since it was rendered.
+      # A note needs the issue only. A reply reads the thread again rather than
+      # trusting the form: the conversation may have moved since it rendered.
       def executor(datasource, opts)
         lambda do |context, result_builder|
-          state = ThreadLookup.call(datasource, context, opts)
-          next result_builder.error(message: state.error) if state.error
+          issue_id = ThreadLookup.issue_id(context, opts)
+          next result_builder.error(message: ThreadLookup.no_issue(opts[:issue_id_field])) if issue_id.nil?
 
           body = context.form_values[FormBuilder::MESSAGE_LABEL].to_s
-          next result_builder.error(message: 'A message is required.') if body.strip.empty?
+          next result_builder.error(message: 'A message is required.') if blank_html?(body)
 
           status, message = if FormBuilder.public_reply?(context, opts)
-                              reply(datasource, state, body, context, opts)
+                              reply(datasource, ThreadLookup.read(datasource, issue_id, opts), body, context, opts)
                             else
-                              note(datasource, state, body)
+                              note(datasource, issue_id, body)
                             end
           result_builder.public_send(status, message: message)
         end
       end
 
+      # An emptied rich-text editor still submits markup such as `<p><br></p>`.
+      def blank_html?(body)
+        return false if body.match?(/<img\b/i)
+
+        body.gsub(/<[^>]*>/, ' ').gsub(/&nbsp;|&#160;/i, ' ').strip.empty?
+      end
+
       def reply(datasource, state, body, context, opts)
+        return [:error, state.error] if state.error
         return [:error, no_target_message(state.issue_id, opts)] if state.target.nil?
 
         payload = { 'body_html' => body, 'message_id' => state.target.message_id }
@@ -80,33 +88,35 @@ module ForestAdminDatasourcePylon
         return [:error, operator.error] if operator&.error
 
         payload['user_id'] = operator.user['id'] if operator
-        write(state.issue_id, reply_success(state, payload, operator&.user)) do
+        write(state.issue_id, 'reply', reply_success(state, payload, operator&.user)) do
           datasource.client.reply_to_issue(state.issue_id, payload)
         end
       end
 
-      def note(datasource, state, body)
-        write(state.issue_id, "Internal note added to Pylon issue #{state.issue_id}.") do
-          datasource.client.create_issue_note(state.issue_id, 'body_html' => body)
+      def note(datasource, issue_id, body)
+        write(issue_id, 'internal note', "Internal note added to Pylon issue #{issue_id}.") do
+          datasource.client.create_issue_note(issue_id, 'body_html' => body)
         end
       end
 
-      # A 4xx is Pylon naming what is wrong with this reply, handed to the
-      # operator as the action's error. Anything else stays the failure it is.
-      def write(issue_id, success)
+      # A 4xx is Pylon naming what is wrong, handed over as it is. Anything else
+      # may have failed after Pylon delivered the message, so the operator is
+      # told to check before sending it again rather than shown a bare failure.
+      def write(issue_id, what, success)
         yield
         [:success, success]
       rescue APIError => e
-        raise unless (400..499).cover?(e.status.to_i)
-
         ForestAdminDatasourcePylon.logger.warn(
-          "[forest_admin_datasource_pylon] Pylon refused to write on issue #{issue_id}: #{e.message}"
+          "[forest_admin_datasource_pylon] #{what} on issue #{issue_id} failed: #{e.message}"
         )
-        [:error, e.message]
+        return [:error, e.message] if (400..499).cover?(e.status.to_i)
+
+        [:error, "Pylon did not confirm the #{what} on issue #{issue_id} (#{e.message}). It may have been " \
+                 'delivered: check the issue in Pylon before sending it again.']
       end
 
       def addresses(value)
-        Array(value).map { |address| address.to_s.strip }.reject(&:empty?).uniq(&:downcase)
+        ReplyTarget.unique_addresses(Array(value))
       end
 
       def no_target_message(issue_id, opts)

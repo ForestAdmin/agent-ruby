@@ -194,8 +194,12 @@ read-only. An issue with no customer-visible message — one created as an inter
 instance — cannot get a public reply; only the internal note is offered.
 
 **Email recipients.** Pylon does not infer them, so the form pre-fills To and CC from the latest
-email of the conversation, its sender included, and leaves out the `support_emails`. The operator
+email of the conversation: its sender when the customer wrote it, its recipients when the team did.
+The `support_emails` and the addresses the team wrote from in the thread are left out. The operator
 can edit both; a reply with no To is refused.
+
+**When Pylon does not confirm.** A 4xx is shown as Pylon words it. Any other failure may come after
+Pylon delivered the message, so the action says so and asks to check the issue before sending again.
 
 **Who signs.** By default the account owning the API token signs every reply, and the success
 message says so. With `post_as_operator: true`, a public reply is signed by the active Pylon user
@@ -212,7 +216,7 @@ Three things to know before granting it.
   consistent, and restrict the action to the roles that should answer customers.
 - **The thread is read on every form render and again on submit**, one `GET /issues/{id}/messages`
   each (120 a minute). An unreadable thread is shown as an error, never as an issue without
-  customer message.
+  customer message; an internal note needs no thread and stays available.
 
 ## Development
 

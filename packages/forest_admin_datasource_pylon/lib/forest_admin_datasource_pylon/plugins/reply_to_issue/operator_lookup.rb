@@ -13,7 +13,8 @@ module ForestAdminDatasourcePylon
           email = caller.respond_to?(:email) ? caller.email.to_s.strip.downcase : ''
           return Result.new(error: 'Your Forest user has no email to sign the reply with.') if email.empty?
 
-          matches = datasource.client.fetch_users.select { |user| active?(user) && addresses(user).include?(email) }
+          users   = datasource.client.fetch_users(include_deactivated: false)
+          matches = users.select { |user| active?(user) && addresses(user).include?(email) }
           return Result.new(user: matches.first) if matches.size == 1
 
           Result.new(error: refusal(email, matches.size))

@@ -2,8 +2,9 @@ module ForestAdminDatasourcePylon
   module Plugins
     class ReplyToIssue
       # Every dynamic property of the form reads the same ThreadLookup state,
-      # memoized on the render's context: one thread read per render, however
-      # many fields depend on it.
+      # kept for the render's context: one thread read per render, however many
+      # fields depend on it. One entry per thread, held strongly: a WeakMap would
+      # let the state be collected mid-render, and WeakKeyMap needs Ruby 3.3.
       module FormBuilder
         FieldType = ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType
 
@@ -19,8 +20,13 @@ module ForestAdminDatasourcePylon
         module_function
 
         def build(datasource, opts)
-          states = ObjectSpace::WeakMap.new
-          state  = ->(context) { states[context] ||= ThreadLookup.call(datasource, context, opts) }
+          key   = :"forest_admin_datasource_pylon_reply_state_#{opts.object_id}"
+          state = lambda do |context|
+            cached = Thread.current[key]
+            next cached.last if cached&.first.equal?(context)
+
+            ThreadLookup.call(datasource, context, opts).tap { |fresh| Thread.current[key] = [context, fresh] }
+          end
 
           fields = []
           fields << type_field(state) if opts[:allow_internal_note]
@@ -43,7 +49,7 @@ module ForestAdminDatasourcePylon
 
         def channel_field(state, opts)
           { type: FieldType::STRING, label: CHANNEL_LABEL, is_read_only: true,
-            if_condition: ->(context) { public_reply?(context, opts) },
+            if_condition: ->(context) { public_reply?(context, opts) || state.call(context).target.nil? },
             value: ->(context) { channel_text(state.call(context), opts) },
             description: 'Pylon delivers the reply on the channel the customer used. It cannot be changed here.' }
         end

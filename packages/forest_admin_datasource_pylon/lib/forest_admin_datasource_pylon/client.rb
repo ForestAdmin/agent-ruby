@@ -53,7 +53,7 @@ module ForestAdminDatasourcePylon
     # when asked to, so a future default page size stays handled rather than
     # silently truncating the thread.
     def fetch_issue_messages(issue_id)
-      path = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+      path = issue_messages_path(issue_id)
 
       best_effort("fetch_issue_messages(#{issue_id})", default: nil) { must_succeed(path) { collect_pages(path) } }
     end
@@ -61,10 +61,12 @@ module ForestAdminDatasourcePylon
     # For a caller acting on the thread: a thread that could not be read, or
     # only in part, raises instead of reading as a conversation without it.
     def fetch_complete_issue_messages(issue_id)
-      path = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+      path = issue_messages_path(issue_id)
 
       must_succeed(path) { collect_pages(path, refuse_past_cap: true) }
     end
+
+    def issue_messages_path(issue_id) = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
 
     def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
       search_resource('accounts/search', limit: limit, cursor: cursor, filter: filter, search_text: search_text)

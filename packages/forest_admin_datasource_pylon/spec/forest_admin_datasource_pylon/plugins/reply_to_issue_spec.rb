@@ -134,6 +134,26 @@ module ForestAdminDatasourcePylon
         expect(target.cc).to eq([])
       end
 
+      it 'writes again to whom the team last wrote, not to the team itself' do
+        team = { 'user' => { 'id' => 'u1' } }
+        target = resolve(email_message('m1', from: 'ada@acme.com', to: ['help@us.io']),
+                         email_message('m2', from: 'agent@us.io', to: ['ada@acme.com'], cc: ['bob@acme.com'])
+                           .merge('author' => team))
+
+        expect(target.message_id).to eq('m2')
+        expect(target.to).to eq(['ada@acme.com'])
+        expect(target.cc).to eq(['bob@acme.com'])
+      end
+
+      it 'leaves out the addresses the team wrote from, even when support_emails misses them' do
+        team = { 'user' => { 'id' => 'u1' } }
+        target = resolve(email_message('m1', from: 'Agent@us.io', to: ['ada@acme.com']).merge('author' => team),
+                         email_message('m2', from: 'ada@acme.com', to: ['agent@us.io'], cc: ['agent@us.io']))
+
+        expect(target.to).to eq(['ada@acme.com'])
+        expect(target.cc).to eq([])
+      end
+
       it 'treats a message carrying an email envelope as email, whatever its source says' do
         target = resolve(message('m1', source: 'gmail', email_info: { 'from_email' => 'ada@acme.com' }))
 
@@ -199,10 +219,42 @@ module ForestAdminDatasourcePylon
           .to eq('Could not read the conversation of Pylon issue i1: HTTP 500 boom')
       end
 
-      it 'hides the channel when an internal note is picked' do
+      it 'hides the channel when an internal note is picked on an issue that could get a reply' do
+        thread(message('m1', source: 'slack'))
         note = FakeReplyContext.new(form_values: { form::TYPE_LABEL => form::INTERNAL_NOTE })
 
         expect(field(register, form::CHANNEL_LABEL)[:if_condition].call(note)).to be(false)
+      end
+
+      it 'keeps explaining why a public reply is unavailable, even with an internal note picked' do
+        allow(client).to receive(:fetch_complete_issue_messages)
+          .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 500 boom', status: 500))
+        note = FakeReplyContext.new(form_values: { form::TYPE_LABEL => form::INTERNAL_NOTE })
+        action = register
+
+        expect(field(action, form::TYPE_LABEL)[:enum_values].call(note)).to eq([form::INTERNAL_NOTE])
+        expect(field(action, form::CHANNEL_LABEL)[:if_condition].call(note)).to be(true)
+      end
+
+      it 'keeps the thread it read for the render across a garbage collection' do
+        thread(message('m1', source: 'slack'))
+        channel = field(register, form::CHANNEL_LABEL)
+
+        channel[:value].call(context)
+        GC.start
+        channel[:value].call(context)
+
+        expect(client).to have_received(:fetch_complete_issue_messages).once
+      end
+
+      it 'reads the thread again for the next render' do
+        thread(message('m1', source: 'slack'))
+        channel = field(register, form::CHANNEL_LABEL)
+
+        channel[:value].call(context)
+        channel[:value].call(FakeReplyContext.new(form_values: context.form_values))
+
+        expect(client).to have_received(:fetch_complete_issue_messages).twice
       end
 
       describe 'the recipients' do
@@ -346,12 +398,44 @@ module ForestAdminDatasourcePylon
         expect(result[:message]).to eq('HTTP 400 message_id is not visible')
       end
 
-      it 'lets a Pylon failure that is not the operator\'s to fix stay an error' do
+      # Pylon may have delivered the reply before failing to answer: a bare
+      # failure would invite the operator to send it a second time.
+      it 'tells the operator to check Pylon when it did not confirm the reply' do
         thread(message('m1', source: 'slack'))
         allow(client).to receive(:reply_to_issue)
           .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 502', status: 502))
 
-        expect { run_action(register, values) }.to raise_error(ForestAdminDatasourcePylon::APIError, /502/)
+        result = run_action(register, values)
+
+        expect(result[:type]).to eq('Error')
+        expect(result[:message]).to eq('Pylon did not confirm the reply on issue i1 (HTTP 502). It may have been ' \
+                                       'delivered: check the issue in Pylon before sending it again.')
+      end
+
+      it 'posts an internal note without reading the thread, which may be unreadable' do
+        allow(client).to receive(:fetch_complete_issue_messages)
+
+        run_action(register, values(form::TYPE_LABEL => form::INTERNAL_NOTE))
+
+        expect(client).to have_received(:create_issue_note).with('i1', 'body_html' => '<p>Hi</p>')
+        expect(client).not_to have_received(:fetch_complete_issue_messages)
+      end
+
+      it 'refuses the markup an emptied rich-text editor submits' do
+        thread(message('m1', source: 'slack'))
+
+        ['<p><br></p>', '<p>&nbsp;</p>', '<div> </div>'].each do |body|
+          expect(run_action(register, values(form::MESSAGE_LABEL => body))[:message]).to eq('A message is required.')
+        end
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'sends a message made of an image only' do
+        thread(message('m1', source: 'slack'))
+
+        run_action(register, values(form::MESSAGE_LABEL => '<p><img src="https://cdn/x.png"></p>'))
+
+        expect(client).to have_received(:reply_to_issue)
       end
     end
 

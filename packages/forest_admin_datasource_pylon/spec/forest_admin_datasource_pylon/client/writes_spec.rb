@@ -52,6 +52,14 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
 
         expect(WebMock).to have_requested(:post, "#{base}/issues/a%2Fb/#{action}")
       end
+
+      # Pylon delivered the message once it answers 2xx: refusing the body
+      # would invite a second send.
+      it "#{method} accepts a 2xx whose body carries no record" do
+        stub_request(:post, "#{base}/issues/i1/#{action}").to_return(status: 204)
+
+        expect(client.public_send(method, 'i1', 'body_html' => '<p>Hi</p>')).to be_nil
+      end
     end
 
     { delete_issue: 'issues', delete_account: 'accounts', delete_contact: 'contacts' }.each do |method, path|

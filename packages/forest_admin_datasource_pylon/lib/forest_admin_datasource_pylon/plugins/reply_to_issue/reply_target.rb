@@ -16,14 +16,33 @@ module ForestAdminDatasourcePylon
           return nil if visible.empty?
 
           source = visible.first['source']
-          new(visible.reverse.find { |message| message['source'] == source }, support_emails)
+          excluded = support_emails.map(&:downcase) + team_addresses(visible)
+          new(visible.reverse.find { |message| message['source'] == source }, excluded)
         end
 
-        def initialize(message, support_emails)
+        # The addresses the team itself wrote from, read off the thread: what
+        # keeps a reply out of the support inbox when `support_emails` misses one.
+        def self.team_addresses(messages)
+          messages.select { |message| team_authored?(message) }
+                  .filter_map { |message| message.dig('email_info', 'from_email')&.to_s&.downcase }
+        end
+
+        def self.team_authored?(message)
+          author = message['author']
+          author.is_a?(Hash) && author['user'].is_a?(Hash)
+        end
+
+        def self.unique_addresses(addresses, excluded = [])
+          addresses.map { |address| address.to_s.strip }
+                   .reject { |address| address.empty? || excluded.include?(address.downcase) }
+                   .uniq(&:downcase)
+        end
+
+        def initialize(message, excluded)
           @message_id = message['id']
           @source     = message['source']
           @email_info = message['email_info'].is_a?(Hash) ? message['email_info'] : {}
-          @to, @cc    = recipients(support_emails.map(&:downcase))
+          @to, @cc    = recipients(message, excluded)
         end
 
         def email?
@@ -38,18 +57,13 @@ module ForestAdminDatasourcePylon
 
         private
 
-        # The sender joins To: answering a customer's email means writing back to
-        # them. The support addresses drop out, being the side that replies.
-        def recipients(support)
-          to = unique_addresses([@email_info['from_email'], *Array(@email_info['to_emails'])], support)
-          cc = unique_addresses(Array(@email_info['cc_emails']), support + to.map(&:downcase))
+        # Answering a customer's email writes back to its sender; answering the
+        # team's own last email writes again to whom it went.
+        def recipients(message, excluded)
+          sender = self.class.team_authored?(message) ? [] : [@email_info['from_email']]
+          to = self.class.unique_addresses(sender + Array(@email_info['to_emails']), excluded)
+          cc = self.class.unique_addresses(Array(@email_info['cc_emails']), excluded + to.map(&:downcase))
           [to, cc]
-        end
-
-        def unique_addresses(addresses, excluded)
-          addresses.map { |address| address.to_s.strip }
-                   .reject { |address| address.empty? || excluded.include?(address.downcase) }
-                   .uniq(&:downcase)
         end
       end
     end
