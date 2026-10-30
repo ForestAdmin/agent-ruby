@@ -40,7 +40,10 @@ module ForestAdminDatasourcePylon
         'author_email' => 'String',
         'author_avatar_url' => 'String',
         'author_contact_id' => 'String',
-        'author_user_id' => 'String'
+        'author_user_id' => 'String',
+        'email_from' => 'String',
+        'email_to' => 'Json',
+        'email_cc' => 'Json'
       }.freeze
 
       # One thread is one `GET /issues/{id}/messages`, and a thread is the whole

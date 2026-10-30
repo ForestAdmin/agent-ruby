@@ -169,6 +169,59 @@ The message body is HTML the operator writes and Pylon delivers to the requester
 requester address is a free-text field. Restrict both actions to the roles that should be able to
 send mail on your organization's behalf.
 
+### `ReplyToIssue`
+
+Answers one issue on the channel the customer used — a Slack issue gets a Slack reply, an email
+issue an email — or posts an internal note on it. Single scope only.
+
+```ruby
+@agent.collection :Ticket do |collection|
+  collection.use(ForestAdminDatasourcePylon::Plugins::ReplyToIssue, {
+    datasource: pylon_datasource,          # required
+    issue_id_field: 'pylon_issue_id',      # omit when the action sits on PylonIssue itself
+    action_name: 'Reply to Pylon issue',   # default
+    allow_internal_note: true,             # default
+    support_emails: ['support@example.com'],
+    post_as_operator: false                # default
+  })
+end
+```
+
+**Which channel.** Pylon delivers a reply into the conversation of the message it names, so the
+action picks that message: the channel is the one of the first customer-visible message, and the
+reply answers the latest customer-visible message on that channel. The form shows the channel
+read-only. An issue with no customer-visible message — one created as an internal note, for
+instance — cannot get a public reply; only the internal note is offered.
+
+**Email recipients.** Pylon does not infer them, so the form pre-fills To and CC from the latest
+email of the conversation. When the customer wrote it, To is its sender only: the addresses the
+customer wrote to include your support inbox. When the team wrote it, To is whom it went to. The
+`support_emails` and the addresses the team wrote from in the thread are always left out, from what
+the operator types as well. Set `support_emails`: before the team's first email in a thread, it is
+the only way to know your own addresses. A reply with no To is refused.
+
+**When Pylon does not confirm.** A 4xx is shown as Pylon words it. Any other failure may come after
+Pylon delivered the message, so the action says so and asks to check the issue before sending again.
+
+**Who signs.** By default the account owning the API token signs every reply, and the success
+message says so. With `post_as_operator: true`, a public reply is signed by the active Pylon user
+whose email matches the Forest user's, primary or secondary address. With no such user, or several,
+the reply is refused and nothing is sent: it never falls back to the token. Internal notes are
+always signed by the token.
+
+Three things to know before granting it.
+
+- **The column is the authority.** With `issue_id_field`, as with `CloseIssue`, an operator who can
+  write that column can reply to any Pylon issue, on your organization's behalf.
+- **`post_as_operator` trusts emails.** The token can sign as any agent of the workspace; the only
+  thing tying a Forest user to a Pylon user is that they share an email. Keep both user lists
+  consistent, and restrict the action to the roles that should answer customers.
+- **The thread is read on every form render**, one `GET /issues/{id}/messages` (120 a minute).
+  A submit costs one or two more: the agent renders the form again before running the action, and
+  a public reply reads the thread once more to answer its latest state. An unreadable thread is
+  shown as an error, never as an issue without customer message; an internal note does not depend
+  on it and stays available.
+
 ## Development
 
 ```bash

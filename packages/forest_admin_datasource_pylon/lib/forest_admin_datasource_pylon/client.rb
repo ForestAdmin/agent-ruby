@@ -53,9 +53,17 @@ module ForestAdminDatasourcePylon
     # when asked to, so a future default page size stays handled rather than
     # silently truncating the thread.
     def fetch_issue_messages(issue_id)
-      path = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+      path = issue_messages_path(issue_id)
 
       best_effort("fetch_issue_messages(#{issue_id})", default: nil) { must_succeed(path) { collect_pages(path) } }
+    end
+
+    # For a caller acting on the thread: a thread that could not be read, or
+    # only in part, raises instead of reading as a conversation without it.
+    def fetch_complete_issue_messages(issue_id)
+      path = issue_messages_path(issue_id)
+
+      must_succeed(path) { collect_pages(path, refuse_past_cap: true) }
     end
 
     def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
@@ -143,6 +151,8 @@ module ForestAdminDatasourcePylon
     end
 
     private
+
+    def issue_messages_path(issue_id) = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
 
     def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)
       body = { 'limit' => clamp_limit(limit) }
@@ -241,10 +251,8 @@ module ForestAdminDatasourcePylon
     def refuse_truncated_walk(path, reason, pages, collected)
       raise APIError,
             "Pylon left the walk of #{path} short after #{pages} page(s) / #{collected} record(s): #{reason}. " \
-            'That endpoint is documented as answering with the whole collection in one response, which is what ' \
-            'PylonUser and PylonTeam filter, sort and count in memory as an exact answer. Refusing rather ' \
-            'than answering over a fraction of the collection: reading it needs cursor pagination, the way ' \
-            'PylonIssue reads its own.'
+            'That endpoint is documented as answering with the whole collection in one response, and its ' \
+            'caller needs all of it. Refusing rather than answering over a fraction of it.'
     end
 
     def log_truncated_walk(path, reason, pages, collected)

@@ -40,6 +40,8 @@ module ForestAdminDatasourcePylon
       ['get /issues/:id/messages',      :get,    %r{\A/issues/#{ID}/messages\z},      120],
       ['get /issues',                   :get,    %r{\A/issues\z},                      30],
       ['post /issues',                  :post,   %r{\A/issues\z},                      30],
+      ['post /issues/:id/reply',        :post,   %r{\A/issues/#{ID}/reply\z},         30],
+      ['post /issues/:id/note',         :post,   %r{\A/issues/#{ID}/note\z},          30],
       ['get /issues/:id',               :get,    %r{\A/issues/#{ID}\z},               300],
       ['patch /issues/:id',             :patch,  %r{\A/issues/#{ID}\z},               120],
       ['get /accounts',                 :get,    %r{\A/accounts\z},                   300],

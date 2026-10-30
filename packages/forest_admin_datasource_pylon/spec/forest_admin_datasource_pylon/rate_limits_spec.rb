@@ -24,6 +24,8 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimits do
 
     it 'reads the documented budget of the writes' do
       expect(rule_for(:post, '/issues').limit).to eq(30)
+      expect(rule_for(:post, '/issues/abc/reply').limit).to eq(30)
+      expect(rule_for(:post, '/issues/abc/note').limit).to eq(30)
       expect(rule_for(:patch, '/issues/abc').limit).to eq(120)
       expect(rule_for(:delete, '/issues/abc').limit).to eq(120)
       expect(rule_for(:post, '/teams').limit).to eq(30)
@@ -60,6 +62,7 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimits do
       called = [
         [:get, '/me'], [:post, '/issues/search'], [:get, '/issues/abc'],
         [:get, '/issues/abc/messages'], [:post, '/issues'], [:patch, '/issues/abc'],
+        [:post, '/issues/abc/reply'], [:post, '/issues/abc/note'],
         [:delete, '/issues/abc'], [:post, '/accounts/search'], [:get, '/accounts'],
         [:get, '/accounts/acc_1'], [:post, '/accounts'], [:patch, '/accounts/acc_1'],
         [:delete, '/accounts/acc_1'], [:post, '/contacts/search'], [:get, '/contacts'],
@@ -100,6 +103,12 @@ RSpec.describe ForestAdminDatasourcePylon::RateLimits do
       # share a window: pooling them would throttle at half the granted budget.
       it 'is distinct for two endpoints at the same budget' do
         expect(rule_for(:get, '/users').name).not_to eq(rule_for(:get, '/teams').name)
+      end
+
+      it 'keeps a reply and a note out of the window of creating an issue' do
+        names = [rule_for(:post, '/issues'), rule_for(:post, '/issues/abc/reply'), rule_for(:post, '/issues/abc/note')]
+
+        expect(names.map(&:name).uniq.size).to eq(3)
       end
 
       it 'is the same for two records of one endpoint' do
