@@ -61,6 +61,7 @@ RSpec.shared_context 'with readable related collections' do
       read_guard_calls[:search_extended] << options[:search_extended] if options.key?(:search_extended)
     end
     allow(permissions).to receive(:assert_can_read_usages)
+    allow(permissions).to receive(:relation_scopes).and_return(ForestAdminAgent::Utils::RelationScopes.new)
     allow(permissions).to receive(:redact_projection) do |collection, projection, **options|
       read_guard_calls[:projections] << {
         collection: collection.name,

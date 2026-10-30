@@ -23,7 +23,12 @@ module ForestAdminAgent
                    .override(page: QueryStringParser.parse_pagination(args))
 
           projection = redacted_projection_with_pks(context, context.collection, args)
-          records = context.collection.list(context.caller, filter, projection)
+          relation_scopes = context.permissions.relation_scopes(context.collection, projection)
+          records = relation_scopes.redact(
+            context.collection.list(context.caller, filter, relation_scopes.with_scope_fields(projection)),
+            projection,
+            context.caller.timezone
+          )
 
           {
             name: args[:params]['collection_name'],
