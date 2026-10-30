@@ -36,6 +36,24 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
       end
     end
 
+    { reply_to_issue: 'reply', create_issue_note: 'note' }.each do |method, action|
+      it "#{method} posts to /issues/{id}/#{action}" do
+        url = "#{base}/issues/i1/#{action}"
+        stub_request(:post, url).to_return(json('data' => { 'id' => 'm1', 'issue_id' => 'i1' }))
+
+        expect(client.public_send(method, 'i1', 'body_html' => '<p>Hi</p>')).to eq('id' => 'm1', 'issue_id' => 'i1')
+        expect(WebMock).to have_requested(:post, url).with(body: { 'body_html' => '<p>Hi</p>' })
+      end
+
+      it "#{method} escapes the issue id" do
+        stub_request(:post, "#{base}/issues/a%2Fb/#{action}").to_return(json('data' => { 'id' => 'm1' }))
+
+        client.public_send(method, 'a/b', 'body_html' => '<p>Hi</p>')
+
+        expect(WebMock).to have_requested(:post, "#{base}/issues/a%2Fb/#{action}")
+      end
+    end
+
     { delete_issue: 'issues', delete_account: 'accounts', delete_contact: 'contacts' }.each do |method, path|
       it "#{method} deletes /#{path}/{id}" do
         stub_request(:delete, "#{base}/#{path}/x1").to_return(status: 204)
@@ -134,6 +152,24 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
 
       expect { client.create_issue('title' => 'Boom') }.to raise_error(ForestAdminDatasourcePylon::APIError)
       expect(WebMock).to have_requested(:post, "#{base}/issues").once
+    end
+
+    # A reply that reached the customer and is replayed is a message sent twice.
+    it 'does not retry a reply that failed on a gateway error' do
+      stub_request(:post, "#{base}/issues/i1/reply").to_return(json({ 'message' => 'bad gateway' }, 502))
+
+      expect { client.reply_to_issue('i1', 'body_html' => '<p>Hi</p>') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, %r{create\(issues/i1/reply\).*502}m)
+      expect(WebMock).to have_requested(:post, "#{base}/issues/i1/reply").once
+    end
+
+    it 'retries a rate-limited reply' do
+      stub_request(:post, "#{base}/issues/i1/reply")
+        .to_return(json({ 'message' => 'slow down' }, 429))
+        .then.to_return(json('data' => { 'id' => 'm1' }))
+
+      expect(client.reply_to_issue('i1', 'body_html' => '<p>Hi</p>')).to eq('id' => 'm1')
+      expect(WebMock).to have_requested(:post, "#{base}/issues/i1/reply").twice
     end
 
     it 'retries a rate-limited delete' do

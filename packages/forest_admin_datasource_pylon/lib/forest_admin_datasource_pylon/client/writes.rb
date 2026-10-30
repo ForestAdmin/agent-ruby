@@ -29,7 +29,13 @@ module ForestAdminDatasourcePylon
 
       def update_user(id, attributes) = patch_resource('users', id, attributes)
 
+      # `message_id` picks the customer conversation the reply is delivered to.
+      def reply_to_issue(id, attributes) = post_resource(issue_path(id, 'reply'), attributes)
+      def create_issue_note(id, attributes) = post_resource(issue_path(id, 'note'), attributes)
+
       private
+
+      def issue_path(id, action) = "issues/#{Faraday::Utils.escape(id)}/#{action}"
 
       def post_resource(resource, attributes)
         operation = "create(#{resource})"
