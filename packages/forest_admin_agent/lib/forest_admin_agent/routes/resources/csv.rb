@@ -40,7 +40,14 @@ module ForestAdminAgent
           filename_with_timestamp = filename.gsub('.csv', "_export_#{now}.csv")
 
           # Return streaming enumerator instead of full CSV string
-          list_records = ->(batch_filter) { context.collection.list(context.caller, batch_filter, projection) }
+          relation_scopes = context.permissions.relation_scopes(context.collection, projection)
+          list_records = lambda do |batch_filter|
+            relation_scopes.redact(
+              context.collection.list(context.caller, batch_filter, relation_scopes.with_scope_fields(projection)),
+              projection,
+              context.caller.timezone
+            )
+          end
 
           {
             content: {

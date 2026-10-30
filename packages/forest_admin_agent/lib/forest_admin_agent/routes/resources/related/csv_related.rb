@@ -47,14 +47,19 @@ module ForestAdminAgent
             filename_with_timestamp = "#{collection_name}_#{relation_name}_export_#{now}.csv"
 
             # Create a callable to fetch related records
+            relation_scopes = context.permissions.relation_scopes(context.child_collection, projection)
             list_records = lambda do |batch_filter|
-              ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
-                context.collection,
-                primary_key_values,
-                relation_name,
-                context.caller,
-                batch_filter,
-                projection
+              relation_scopes.redact(
+                ForestAdminDatasourceToolkit::Utils::Collection.list_relation(
+                  context.collection,
+                  primary_key_values,
+                  relation_name,
+                  context.caller,
+                  batch_filter,
+                  relation_scopes.with_scope_fields(projection)
+                ),
+                projection,
+                context.caller.timezone
               )
             end
 

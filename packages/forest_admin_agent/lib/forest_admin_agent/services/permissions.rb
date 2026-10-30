@@ -3,6 +3,8 @@ require 'deepsort'
 module ForestAdminAgent
   module Services
     class Permissions
+      TO_ONE_RELATION_TYPES = %w[ManyToOne OneToOne].freeze
+
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminAgent::Utils
       include ForestAdminDatasourceToolkit::Exceptions
@@ -292,6 +294,11 @@ module ForestAdminAgent
         ContextVariablesInjector.inject_context_in_filter(scope, context_variables)
       end
 
+      # The caller's scope on each collection the projection reaches through a to-one relation.
+      def relation_scopes(collection, projection)
+        Utils::RelationScopes.new(collect_relation_scopes(collection, projection))
+      end
+
       def get_segments(collection, force_fetch: false)
         permissions = get_rendering_data(caller.rendering_id, force_fetch: force_fetch)
 
@@ -312,6 +319,20 @@ module ForestAdminAgent
       end
 
       private
+
+      def collect_relation_scopes(collection, projection, prefix = nil)
+        projection.relations.flat_map do |name, sub_projection|
+          relation = collection.schema[:fields][name]
+          next [] unless TO_ONE_RELATION_TYPES.include?(relation.type)
+
+          foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
+          path = prefix ? "#{prefix}:#{name}" : name
+          scope = get_scope(foreign_collection)
+          nested = collect_relation_scopes(foreign_collection, sub_projection, path)
+
+          scope ? [Utils::RelationScopes::RelationScope.new(path, foreign_collection, scope), *nested] : nested
+        end
+      end
 
       def cached(store, key, &fetch)
         @memo.fetch([store, key]) { @memo[[store, key]] = store.get_or_set(key, &fetch) }
