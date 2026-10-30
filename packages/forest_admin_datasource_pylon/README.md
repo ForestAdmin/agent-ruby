@@ -194,9 +194,11 @@ read-only. An issue with no customer-visible message — one created as an inter
 instance — cannot get a public reply; only the internal note is offered.
 
 **Email recipients.** Pylon does not infer them, so the form pre-fills To and CC from the latest
-email of the conversation: its sender when the customer wrote it, its recipients when the team did.
-The `support_emails` and the addresses the team wrote from in the thread are left out. The operator
-can edit both; a reply with no To is refused.
+email of the conversation. When the customer wrote it, To is its sender only: the addresses the
+customer wrote to include your support inbox. When the team wrote it, To is whom it went to. The
+`support_emails` and the addresses the team wrote from in the thread are always left out, from what
+the operator types as well. Set `support_emails`: before the team's first email in a thread, it is
+the only way to know your own addresses. A reply with no To is refused.
 
 **When Pylon does not confirm.** A 4xx is shown as Pylon words it. Any other failure may come after
 Pylon delivered the message, so the action says so and asks to check the issue before sending again.
@@ -214,9 +216,11 @@ Three things to know before granting it.
 - **`post_as_operator` trusts emails.** The token can sign as any agent of the workspace; the only
   thing tying a Forest user to a Pylon user is that they share an email. Keep both user lists
   consistent, and restrict the action to the roles that should answer customers.
-- **The thread is read on every form render and again on submit**, one `GET /issues/{id}/messages`
-  each (120 a minute). An unreadable thread is shown as an error, never as an issue without
-  customer message; an internal note needs no thread and stays available.
+- **The thread is read on every form render**, one `GET /issues/{id}/messages` (120 a minute).
+  A submit costs one or two more: the agent renders the form again before running the action, and
+  a public reply reads the thread once more to answer its latest state. An unreadable thread is
+  shown as an error, never as an issue without customer message; an internal note does not depend
+  on it and stays available.
 
 ## Development
 

@@ -2,9 +2,8 @@ module ForestAdminDatasourcePylon
   module Plugins
     class ReplyToIssue
       # Every dynamic property of the form reads the same ThreadLookup state,
-      # kept for the render's context: one thread read per render, however many
-      # fields depend on it. One entry per thread, held strongly: a WeakMap would
-      # let the state be collected mid-render, and WeakKeyMap needs Ruby 3.3.
+      # kept on the render's context so it lives exactly as long as the render.
+      # A WeakMap would let the state be collected mid-render.
       module FormBuilder
         FieldType = ForestAdminDatasourceCustomizer::Decorators::Action::Types::FieldType
 
@@ -20,12 +19,11 @@ module ForestAdminDatasourcePylon
         module_function
 
         def build(datasource, opts)
-          key   = :"forest_admin_datasource_pylon_reply_state_#{opts.object_id}"
+          ivar  = :"@forest_admin_datasource_pylon_reply_state_#{opts.object_id}"
           state = lambda do |context|
-            cached = Thread.current[key]
-            next cached.last if cached&.first.equal?(context)
+            next context.instance_variable_get(ivar) if context.instance_variable_defined?(ivar)
 
-            ThreadLookup.call(datasource, context, opts).tap { |fresh| Thread.current[key] = [context, fresh] }
+            context.instance_variable_set(ivar, ThreadLookup.call(datasource, context, opts))
           end
 
           fields = []

@@ -66,8 +66,6 @@ module ForestAdminDatasourcePylon
       must_succeed(path) { collect_pages(path, refuse_past_cap: true) }
     end
 
-    def issue_messages_path(issue_id) = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
-
     def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
       search_resource('accounts/search', limit: limit, cursor: cursor, filter: filter, search_text: search_text)
     end
@@ -153,6 +151,8 @@ module ForestAdminDatasourcePylon
     end
 
     private
+
+    def issue_messages_path(issue_id) = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
 
     def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)
       body = { 'limit' => clamp_limit(limit) }

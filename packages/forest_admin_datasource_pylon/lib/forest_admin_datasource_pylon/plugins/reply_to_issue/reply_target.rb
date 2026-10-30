@@ -9,7 +9,7 @@ module ForestAdminDatasourcePylon
         EMAIL_SOURCE = 'email'.freeze
         CHANNEL_LABELS = { 'email' => 'email', 'slack' => 'Slack' }.freeze
 
-        attr_reader :message_id, :source, :to, :cc
+        attr_reader :message_id, :source, :to, :cc, :excluded
 
         def self.resolve(messages, support_emails: [])
           visible = Array(messages).select { |message| message.is_a?(Hash) && message['is_private'] != true }
@@ -24,7 +24,11 @@ module ForestAdminDatasourcePylon
         # keeps a reply out of the support inbox when `support_emails` misses one.
         def self.team_addresses(messages)
           messages.select { |message| team_authored?(message) }
-                  .filter_map { |message| message.dig('email_info', 'from_email')&.to_s&.downcase }
+                  .filter_map { |message| email_info(message)['from_email']&.to_s&.downcase }
+        end
+
+        def self.email_info(message)
+          message['email_info'].is_a?(Hash) ? message['email_info'] : {}
         end
 
         def self.team_authored?(message)
@@ -41,7 +45,8 @@ module ForestAdminDatasourcePylon
         def initialize(message, excluded)
           @message_id = message['id']
           @source     = message['source']
-          @email_info = message['email_info'].is_a?(Hash) ? message['email_info'] : {}
+          @email_info = self.class.email_info(message)
+          @excluded   = excluded
           @to, @cc    = recipients(message, excluded)
         end
 
@@ -57,11 +62,12 @@ module ForestAdminDatasourcePylon
 
         private
 
-        # Answering a customer's email writes back to its sender; answering the
-        # team's own last email writes again to whom it went.
+        # Answering a customer's email writes back to its sender only: its own
+        # To is where the customer wrote, the support inbox among them. Answering
+        # the team's last email writes again to whom it went.
         def recipients(message, excluded)
-          sender = self.class.team_authored?(message) ? [] : [@email_info['from_email']]
-          to = self.class.unique_addresses(sender + Array(@email_info['to_emails']), excluded)
+          to = self.class.team_authored?(message) ? Array(@email_info['to_emails']) : [@email_info['from_email']]
+          to = self.class.unique_addresses(to, excluded)
           cc = self.class.unique_addresses(Array(@email_info['cc_emails']), excluded + to.map(&:downcase))
           [to, cc]
         end

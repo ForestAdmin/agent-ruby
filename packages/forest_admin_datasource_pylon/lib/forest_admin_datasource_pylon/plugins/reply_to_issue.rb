@@ -1,16 +1,9 @@
+require 'cgi'
+
 module ForestAdminDatasourcePylon
   module Plugins
-    # Answers a Pylon issue from Forest, on the channel the customer used, or
-    # posts an internal note on it. Pylon keeps the channel: a reply is
-    # delivered into the conversation of the message it names, which
-    # ReplyTarget picks. Email is the exception Pylon leaves to the caller,
-    # which must name the recipients.
-    #
-    # SINGLE scope only: the form is built from one issue's thread.
-    #
-    # With `post_as_operator`, a public reply is signed by the Pylon user
-    # sharing the Forest operator's email, and refused when there is none.
-    # Internal notes are always signed by the token's account.
+    # Answers a Pylon issue on the channel the customer used, or posts an
+    # internal note on it. See the README for the channel rule and who signs.
     class ReplyToIssue < ForestAdminDatasourceCustomizer::Plugins::Plugin
       BaseAction      = ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction
       ActionScope     = ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope
@@ -68,7 +61,8 @@ module ForestAdminDatasourcePylon
       def blank_html?(body)
         return false if body.match?(/<img\b/i)
 
-        body.gsub(/<[^>]*>/, ' ').gsub(/&nbsp;|&#160;/i, ' ').strip.empty?
+        text = CGI.unescapeHTML(body.gsub(/<[^>]*>/, ' ').gsub(/&nbsp;/i, ' '))
+        text.gsub(/[[:space:]\u200B-\u200D\u2060\uFEFF]/, '').empty?
       end
 
       def reply(datasource, state, body, context, opts)
@@ -77,11 +71,13 @@ module ForestAdminDatasourcePylon
 
         payload = { 'body_html' => body, 'message_id' => state.target.message_id }
         if state.target.email?
-          to = addresses(context.form_values[FormBuilder::TO_LABEL])
+          excluded = state.target.excluded
+          to = ReplyTarget.unique_addresses(Array(context.form_values[FormBuilder::TO_LABEL]), excluded)
           return [:error, 'At least one recipient (To) is required to reply by email.'] if to.empty?
 
-          payload['email_info'] = { 'to_emails' => to,
-                                    'cc_emails' => addresses(context.form_values[FormBuilder::CC_LABEL]) }
+          cc = ReplyTarget.unique_addresses(Array(context.form_values[FormBuilder::CC_LABEL]),
+                                            excluded + to.map(&:downcase))
+          payload['email_info'] = { 'to_emails' => to, 'cc_emails' => cc }
         end
 
         operator = OperatorLookup.call(datasource, context.caller) if opts[:post_as_operator]
@@ -115,10 +111,6 @@ module ForestAdminDatasourcePylon
                  'delivered: check the issue in Pylon before sending it again.']
       end
 
-      def addresses(value)
-        ReplyTarget.unique_addresses(Array(value))
-      end
-
       def no_target_message(issue_id, opts)
         message = "Pylon issue #{issue_id} has no customer-visible message, so it cannot get a public reply."
         opts[:allow_internal_note] ? "#{message} Post an internal note instead." : message
@@ -126,7 +118,7 @@ module ForestAdminDatasourcePylon
 
       def reply_success(state, payload, operator)
         signed = if operator
-                   "signed by #{operator["name"] || operator["email"]}"
+                   "signed by #{[operator["name"], operator["email"]].find { |v| !v.to_s.strip.empty? }}"
                  else
                    'signed by the account of the Pylon API token'
                  end

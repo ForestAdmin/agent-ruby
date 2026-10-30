@@ -115,19 +115,37 @@ module ForestAdminDatasourcePylon
         expect(target.message_id).to eq('m2')
       end
 
-      it 'pre-fills an email reply from the latest email, its sender included' do
+      it 'answers the sender of the latest customer email, keeping its copies' do
         target = resolve(email_message('m1', from: 'old@acme.com', to: ['support@us.io']),
                          email_message('m2', from: 'ada@acme.com', to: ['support@us.io', 'bob@acme.com'],
                                              cc: ['carol@acme.com']),
                          support: ['support@us.io'])
 
-        expect(target.to).to eq(['ada@acme.com', 'bob@acme.com'])
+        expect(target.to).to eq(['ada@acme.com'])
         expect(target.cc).to eq(['carol@acme.com'])
       end
 
+      # Before the team's first email, nothing in the thread names the support
+      # inbox the customer wrote to: To must not copy the customer's own To.
+      it 'keeps the inbox the customer wrote to out of To, with no support_emails configured' do
+        target = resolve(email_message('m1', from: 'ada@acme.com', to: ['help@us.io']))
+
+        expect(target.to).to eq(['ada@acme.com'])
+      end
+
+      it 'reads a message whose email envelope is not an object as carrying none' do
+        team = { 'user' => { 'id' => 'u1' } }
+        target = resolve(message('m1', source: 'slack', email_info: '').merge('author' => team),
+                         message('m2', source: 'slack', email_info: []))
+
+        expect(target.message_id).to eq('m2')
+        expect(target.email?).to be(false)
+      end
+
       it 'leaves out the support addresses whatever their case, and duplicates across To and CC' do
+        team = { 'user' => { 'id' => 'u1' } }
         target = resolve(email_message('m1', from: 'Support@Us.io', to: ['ada@acme.com', 'ADA@acme.com'],
-                                             cc: ['ada@acme.com', 'support@us.io']),
+                                             cc: ['ada@acme.com', 'support@us.io']).merge('author' => team),
                          support: ['support@us.io'])
 
         expect(target.to).to eq(['ada@acme.com'])
@@ -318,6 +336,18 @@ module ForestAdminDatasourcePylon
         expect(result[:message]).to start_with('Reply emailed to ada@acme.com on Pylon issue i1')
       end
 
+      it 'leaves the support and team addresses out of what the operator typed' do
+        thread(email_message('m1', from: 'ada@acme.com', to: ['support@us.io']))
+
+        run_action(register(support_emails: ['support@us.io']),
+                   values(form::TO_LABEL => ['ada@acme.com', 'Support@us.io'],
+                          form::CC_LABEL => ['ADA@acme.com', 'support@us.io', 'bob@acme.com']))
+
+        expect(client).to have_received(:reply_to_issue).with(
+          'i1', hash_including('email_info' => { 'to_emails' => ['ada@acme.com'], 'cc_emails' => ['bob@acme.com'] })
+        )
+      end
+
       it 'refuses an email reply with no recipient, and sends nothing' do
         thread(email_message('m1', from: 'ada@acme.com', to: []))
 
@@ -424,7 +454,7 @@ module ForestAdminDatasourcePylon
       it 'refuses the markup an emptied rich-text editor submits' do
         thread(message('m1', source: 'slack'))
 
-        ['<p><br></p>', '<p>&nbsp;</p>', '<div> </div>'].each do |body|
+        ['<p><br></p>', '<p>&nbsp;</p>', '<div> </div>', "<p>\u00A0</p>", '<p>&#xa0;&#8203;</p>'].each do |body|
           expect(run_action(register, values(form::MESSAGE_LABEL => body))[:message]).to eq('A message is required.')
         end
         expect(client).not_to have_received(:reply_to_issue)
@@ -472,6 +502,12 @@ module ForestAdminDatasourcePylon
         run_as(operator)
 
         expect(client).to have_received(:reply_to_issue).with('i1', hash_including('user_id' => 'u2'))
+      end
+
+      it 'names the signer by email when the Pylon user has a blank name' do
+        allow(client).to receive(:fetch_users).and_return([user('u1', email: 'ada@acme.io', name: ' ')])
+
+        expect(run_as(operator)[:message]).to end_with('signed by ada@acme.io.')
       end
 
       it 'never signs as a deactivated Pylon user, and sends nothing' do
