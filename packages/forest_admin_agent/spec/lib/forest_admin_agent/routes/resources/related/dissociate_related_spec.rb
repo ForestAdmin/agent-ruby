@@ -349,6 +349,83 @@ module ForestAdminAgent
               expect(result).to eq({ content: nil, status: 204 })
             end
 
+            context 'when the select-all carries the caller filters' do
+              let(:forbidden) do
+                ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
+                  "You cannot filter on 'address:location': you are not allowed to read the 'address' collection."
+                )
+              end
+
+              before do
+                args[:params]['id'] = 1
+                args[:params][:data] = {
+                  attributes: {
+                    ids: [],
+                    all_records: true,
+                    all_records_ids_excluded: [],
+                    all_records_subset_query: {
+                      filters: JSON.generate({ field: 'address:id', operator: 'equal', value: 3 }),
+                      search: 'paris'
+                    }
+                  }
+                }
+              end
+
+              %w[dissociate delete].each do |mode|
+                it "guards the child collection with the very condition tree it then applies (#{mode})" do
+                  allow(@datasource.get_collection('address_user')).to receive_messages(update: true, delete: true)
+                  args[:params][:delete] = true if mode == 'delete'
+                  args[:params]['relation_name'] = 'address_users'
+
+                  dissociate.handle_request(args)
+
+                  guarded_tree = nil
+                  expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
+                    expect(collection.name).to eq('address_user')
+                    expect(applied).to include(search: 'paris', search_extended: false)
+                    expect(applied[:condition_tree].to_h)
+                      .to eq(field: 'address:id', operator: Operators::EQUAL, value: 3)
+                    guarded_tree = applied[:condition_tree]
+                  end
+                  written = mode == 'delete' ? :delete : :update
+                  expect(@datasource.get_collection('address_user')).to have_received(written) do |_caller, filter|
+                    expect(filter.condition_tree.conditions).to include(be(guarded_tree))
+                  end
+                end
+              end
+
+              it 'writes nothing on a one-to-many when the guard refuses a filtered field' do
+                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
+                allow(@datasource.get_collection('address_user')).to receive_messages(update: true, delete: true)
+                args[:params][:delete] = true
+                args[:params]['relation_name'] = 'address_users'
+
+                expect { dissociate.handle_request(args) }.to raise_error(
+                  ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                  /You cannot filter on 'address:location'/
+                )
+                expect(@datasource.get_collection('address_user')).not_to have_received(:delete)
+                expect(@datasource.get_collection('address_user')).not_to have_received(:update)
+              end
+
+              it 'touches neither the through nor the child collection on a many-to-many when refused' do
+                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
+                allow(@datasource.get_collection('address_user')).to receive_messages(list: [], delete: true)
+                allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
+                args[:params][:delete] = true
+                args[:params]['relation_name'] = 'addresses'
+                args[:params][:data][:attributes][:all_records_subset_query][:filters] =
+                  JSON.generate({ field: 'id', operator: 'equal', value: 3 })
+
+                expect { dissociate.handle_request(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+                expect(permissions).to have_received(:assert_can_read_query_fields)
+                  .with(@datasource.get_collection('address'), anything)
+                expect(@datasource.get_collection('address_user')).not_to have_received(:delete)
+                expect(@datasource.get_collection('address')).not_to have_received(:delete)
+              end
+            end
+
             context 'with PolymorphicOneToMany' do
               it 'call dissociate_or_delete_one_to_many without deletion' do
                 allow(@datasource.get_collection('address')).to receive(:update).and_return(true)

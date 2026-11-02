@@ -183,6 +183,46 @@ module ForestAdminAgent
                 expect(@datasource.get_collection('user')).not_to have_received(:delete)
               end
             end
+
+            context 'when the select-all carries the caller filters' do
+              before do
+                args[:params][:data][:attributes][:all_records] = true
+                args[:params][:data][:attributes][:all_records_ids_excluded] = %w[5]
+                args[:params][:data][:attributes][:all_records_subset_query].merge!(
+                  filters: JSON.generate({ field: 'id', operator: 'equal', value: 2 }),
+                  search: 'jo'
+                )
+              end
+
+              it 'hands the guard the very condition tree it then deletes with' do
+                delete.handle_request_bulk(args)
+
+                guarded_tree = nil
+                expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
+                  expect(collection.name).to eq('user')
+                  expect(applied).to include(search: 'jo', search_extended: false)
+                  expect(applied[:condition_tree].to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 2)
+                  guarded_tree = applied[:condition_tree]
+                end
+                expect(@datasource.get_collection('user')).to have_received(:delete) do |_caller, filter|
+                  expect(filter.condition_tree.conditions).to include(be(guarded_tree))
+                end
+              end
+
+              it 'deletes nothing when the guard refuses a filtered field' do
+                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(
+                  ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
+                    "You cannot filter on 'holder:national_id': you are not allowed to read the 'holder' collection."
+                  )
+                )
+
+                expect { delete.handle_request_bulk(args) }.to raise_error(
+                  ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                  /You cannot filter on 'holder:national_id'/
+                )
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
+              end
+            end
           end
 
           context 'with polymorphic relations' do
@@ -346,6 +386,17 @@ module ForestAdminAgent
                 allow(@datasource.get_collection('user')).to receive(:delete).and_raise(StandardError, 'hook refused')
 
                 expect { delete.handle_request_bulk(args) }.to raise_error(StandardError, 'hook refused')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
+              end
+
+              it 'nullifies nothing when the guard refuses a filtered field' do
+                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(
+                  ForestAdminAgent::Http::Exceptions::ForbiddenError.new('You cannot filter on this field.')
+                )
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+                expect(@datasource.get_collection('user')).not_to have_received(:list)
                 expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
 
