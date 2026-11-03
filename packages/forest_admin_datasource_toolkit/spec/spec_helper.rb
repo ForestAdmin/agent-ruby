@@ -3,6 +3,7 @@ require 'simplecov_json_formatter'
 require 'simplecov-html'
 require 'forest_admin_datasource_toolkit'
 require 'forest_admin_test_toolkit'
+require 'active_support/testing/time_helpers'
 
 SimpleCov.formatters = [SimpleCov::Formatter::JSONFormatter, SimpleCov::Formatter::HTMLFormatter]
 SimpleCov.start do
@@ -30,4 +31,5 @@ RSpec.configure do |config|
   config.include ForestAdminTestToolkit::Factory::Caller
   config.include ForestAdminTestToolkit::Factory::Collection
   config.include ForestAdminTestToolkit::Factory::Datasource
+  config.include ActiveSupport::Testing::TimeHelpers
 end
