@@ -385,24 +385,36 @@ module ForestAdminAgent
                   args[:params]['relation_name'] = 'address_users'
                 end
 
-                %w[dissociate delete].each do |mode|
+                { 'dissociate' => [:update, [{ 'user_id' => nil }]], 'delete' => [:delete, []] }
+                  .each do |mode, (written, written_patch)|
                   it "guards the child collection with the very filter it then applies (#{mode})" do
                     args[:params][:delete] = true if mode == 'delete'
 
                     dissociate.handle_request(args)
 
                     guarded_tree = nil
-                    expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                      expect(collection.name).to eq('address_user')
-                      expect(applied).to include(search: 'paris', search_extended: false)
+                    expect(permissions).to have_received(:assert_can_read_query_fields).once do |collection, applied|
+                      expect(collection.equal?(address_user))
+                        .to be(true), "expected the address_user collection, got #{collection.class}"
+                      expect(applied.except(:condition_tree)).to eq(search: 'paris', search_extended: false)
                       expect(applied[:condition_tree].to_h)
                         .to eq(field: 'address:id', operator: Operators::EQUAL, value: 3)
                       guarded_tree = applied[:condition_tree]
                     end
-                    written = mode == 'delete' ? :delete : :update
-                    expect(address_user).to have_received(written) do |_caller, filter|
-                      expect(filter).to have_attributes(search: 'paris', search_extended: false)
+                    expect(address_user).to have_received(written).once do |caller, filter, *patch|
+                      expect(caller).to be_instance_of(Components::Caller)
+                      expect(filter).to have_attributes(
+                        search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
+                      )
                       expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                      expect(filter.condition_tree.to_h).to eq(
+                        aggregator: 'And',
+                        conditions: [
+                          { field: 'address:id', operator: Operators::EQUAL, value: 3 },
+                          { field: 'user_id', operator: Operators::EQUAL, value: 1 }
+                        ]
+                      )
+                      expect(patch).to eq(written_patch)
                     end
                   end
                 end
@@ -424,6 +436,15 @@ module ForestAdminAgent
 
               context 'with a many-to-many' do
                 let(:forbidden) { ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'id'.") }
+                let(:targets_of_parent_tree) do
+                  {
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'id', operator: Operators::EQUAL, value: 3 },
+                      { field: 'id', operator: Operators::IN, value: [9] }
+                    ]
+                  }
+                end
                 let(:filtered_on_id) { have_attributes(field: 'id', operator: Operators::EQUAL, value: 3) }
 
                 before do
@@ -434,21 +455,50 @@ module ForestAdminAgent
                     JSON.generate({ field: 'id', operator: 'equal', value: 3 })
                 end
 
-                it 'unlinks only the targets the guarded filter matched (dissociate)' do
-                  dissociate.handle_request(args)
-
-                  guarded_tree = nil
-                  expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                    expect(collection.name).to eq('address')
-                    expect(applied).to include(search: 'paris', search_extended: false)
+                def guarded_tree
+                  tree = nil
+                  expect(permissions).to have_received(:assert_can_read_query_fields).once do |collection, applied|
+                    expect(collection.equal?(address)).to be(true), "expected the address collection, got #{collection.class}"
+                    expect(applied.except(:condition_tree)).to eq(search: 'paris', search_extended: false)
                     expect(applied[:condition_tree]).to filtered_on_id
-                    guarded_tree = applied[:condition_tree]
+                    tree = applied[:condition_tree]
                   end
-                  expect(address).to have_received(:list) do |_caller, filter, _projection|
-                    expect(filter).to have_attributes(search: 'paris', search_extended: false)
-                    expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                  tree
+                end
+
+                def expect_links_of_parent_read(times)
+                  expect(address_user).to have_received(:list).exactly(times).times do |caller, filter, projection|
+                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(filter).to have_attributes(search: nil, segment: nil, page: nil, sort: nil)
+                    expect(filter.condition_tree.to_h).to eq(
+                      aggregator: 'And',
+                      conditions: [
+                        { field: 'user_id', operator: Operators::EQUAL, value: 1 },
+                        { field: 'address_id', operator: Operators::PRESENT, value: nil }
+                      ]
+                    )
+                    expect(projection).to eq(Components::Query::Projection.new(['address_id']))
                   end
-                  expect(address_user).to have_received(:delete) do |_caller, filter|
+                end
+
+                def expect_targets_listed_with(guarded)
+                  expect(address).to have_received(:list).once do |caller, filter, projection|
+                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(filter).to have_attributes(
+                      search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
+                    )
+                    expect(applies_guarded_tree?(filter.condition_tree, guarded)).to be true
+                    expect(filter.condition_tree.to_h).to eq(targets_of_parent_tree)
+                    expect(projection).to eq(Components::Query::Projection.new(['id']))
+                  end
+                end
+
+                def expect_links_deleted_for_matched_targets
+                  expect(address_user).to have_received(:delete).once do |caller, filter|
+                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(filter).to have_attributes(
+                      search: nil, search_extended: nil, segment: nil, page: nil, sort: nil
+                    )
                     expect(filter.condition_tree.to_h).to eq(
                       aggregator: 'And',
                       conditions: [
@@ -457,6 +507,14 @@ module ForestAdminAgent
                       ]
                     )
                   end
+                end
+
+                it 'unlinks only the targets the guarded filter matched (dissociate)' do
+                  dissociate.handle_request(args)
+
+                  expect_targets_listed_with(guarded_tree)
+                  expect_links_of_parent_read(1)
+                  expect_links_deleted_for_matched_targets
                   expect(address).not_to have_received(:delete)
                 end
 
@@ -465,13 +523,17 @@ module ForestAdminAgent
 
                   dissociate.handle_request(args)
 
-                  guarded_tree = nil
-                  expect(permissions).to have_received(:assert_can_read_query_fields) do |_collection, applied|
-                    guarded_tree = applied[:condition_tree]
-                  end
-                  expect(address).to have_received(:delete) do |_caller, filter|
-                    expect(filter).to have_attributes(search: 'paris', search_extended: false)
-                    expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                  guarded = guarded_tree
+                  expect_targets_listed_with(guarded)
+                  expect_links_of_parent_read(2)
+                  expect_links_deleted_for_matched_targets
+                  expect(address).to have_received(:delete).once do |caller, filter|
+                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(filter).to have_attributes(
+                      search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
+                    )
+                    expect(applies_guarded_tree?(filter.condition_tree, guarded)).to be true
+                    expect(filter.condition_tree.to_h).to eq(targets_of_parent_tree)
                   end
                 end
 

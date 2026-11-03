@@ -205,16 +205,27 @@ module ForestAdminAgent
               it 'hands the guard the very condition tree and search it then deletes with' do
                 delete.handle_request_bulk(args)
 
+                user = @datasource.get_collection('user')
                 guarded_tree = nil
-                expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                  expect(collection.name).to eq('user')
-                  expect(applied).to include(search: 'jo', search_extended: false)
+                expect(permissions).to have_received(:assert_can_read_query_fields).once do |collection, applied|
+                  expect(collection.equal?(user)).to be(true), "expected the user collection, got #{collection.class}"
+                  expect(applied.except(:condition_tree)).to eq(search: 'jo', search_extended: false)
                   expect(applied[:condition_tree].to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 2)
                   guarded_tree = applied[:condition_tree]
                 end
-                expect(@datasource.get_collection('user')).to have_received(:delete) do |_caller, filter|
-                  expect(filter).to have_attributes(search: 'jo', search_extended: false)
+                expect(user).to have_received(:delete).once do |caller, filter|
+                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(filter).to have_attributes(
+                    search: 'jo', search_extended: false, segment: nil, page: nil, sort: nil
+                  )
                   expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                  expect(filter.condition_tree.to_h).to eq(
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'id', operator: Operators::EQUAL, value: 2 },
+                      { field: 'id', operator: Operators::NOT_EQUAL, value: 5 }
+                    ]
+                  )
                 end
               end
 
