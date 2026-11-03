@@ -19,6 +19,14 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:forbidden) do
+          ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'id'.")
+        end
+        let(:filtered_on_id) { have_attributes(field: 'id', operator: Operators::EQUAL, value: 2) }
+
+        def applies_guarded_tree?(tree, guarded_tree)
+          guarded_tree.every_leaf { |guarded| tree.some_leaf { |leaf| leaf.equal?(guarded) } }
+        end
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
@@ -194,7 +202,7 @@ module ForestAdminAgent
                 )
               end
 
-              it 'hands the guard the very condition tree it then deletes with' do
+              it 'hands the guard the very condition tree and search it then deletes with' do
                 delete.handle_request_bulk(args)
 
                 guarded_tree = nil
@@ -205,20 +213,19 @@ module ForestAdminAgent
                   guarded_tree = applied[:condition_tree]
                 end
                 expect(@datasource.get_collection('user')).to have_received(:delete) do |_caller, filter|
-                  expect(filter.condition_tree.conditions).to include(be(guarded_tree))
+                  expect(filter).to have_attributes(search: 'jo', search_extended: false)
+                  expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
                 end
               end
 
               it 'deletes nothing when the guard refuses a filtered field' do
-                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(
-                  ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
-                    "You cannot filter on 'holder:national_id': you are not allowed to read the 'holder' collection."
-                  )
-                )
+                allow(permissions).to receive(:assert_can_read_query_fields)
+                  .with(@datasource.get_collection('user'), hash_including(condition_tree: filtered_on_id))
+                  .and_raise(forbidden)
 
                 expect { delete.handle_request_bulk(args) }.to raise_error(
                   ForestAdminAgent::Http::Exceptions::ForbiddenError,
-                  /You cannot filter on 'holder:national_id'/
+                  /You cannot filter on 'id'/
                 )
                 expect(@datasource.get_collection('user')).not_to have_received(:delete)
               end
@@ -390,13 +397,16 @@ module ForestAdminAgent
               end
 
               it 'nullifies nothing when the guard refuses a filtered field' do
-                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(
-                  ForestAdminAgent::Http::Exceptions::ForbiddenError.new('You cannot filter on this field.')
-                )
+                args[:params][:data][:attributes][:all_records_subset_query][:filters] =
+                  JSON.generate({ field: 'id', operator: 'equal', value: 2 })
+                allow(permissions).to receive(:assert_can_read_query_fields)
+                  .with(@datasource.get_collection('user'), hash_including(condition_tree: filtered_on_id))
+                  .and_raise(forbidden)
 
                 expect { delete.handle_request_bulk(args) }
-                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError, /You cannot filter on 'id'/)
                 expect(@datasource.get_collection('user')).not_to have_received(:list)
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
                 expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
 

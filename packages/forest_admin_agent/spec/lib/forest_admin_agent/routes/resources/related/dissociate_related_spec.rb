@@ -13,6 +13,13 @@ module ForestAdminAgent
           subject(:dissociate) { described_class.new }
 
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+          let(:forbidden) do
+            ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'address:id'.")
+          end
+
+          def applies_guarded_tree?(tree, guarded_tree)
+            guarded_tree.every_leaf { |guarded| tree.some_leaf { |leaf| leaf.equal?(guarded) } }
+          end
 
           before do
             datasource = Datasource.new
@@ -350,11 +357,8 @@ module ForestAdminAgent
             end
 
             context 'when the select-all carries the caller filters' do
-              let(:forbidden) do
-                ForestAdminAgent::Http::Exceptions::ForbiddenError.new(
-                  "You cannot filter on 'address:location': you are not allowed to read the 'address' collection."
-                )
-              end
+              let(:address_user) { @datasource.get_collection('address_user') }
+              let(:address) { @datasource.get_collection('address') }
 
               before do
                 args[:params]['id'] = 1
@@ -371,58 +375,119 @@ module ForestAdminAgent
                 }
               end
 
-              %w[dissociate delete].each do |mode|
-                it "guards the child collection with the very condition tree it then applies (#{mode})" do
-                  allow(@datasource.get_collection('address_user')).to receive_messages(update: true, delete: true)
-                  args[:params][:delete] = true if mode == 'delete'
-                  args[:params]['relation_name'] = 'address_users'
+              context 'with a one-to-many' do
+                let(:filtered_on_address_id) do
+                  have_attributes(field: 'address:id', operator: Operators::EQUAL, value: 3)
+                end
 
+                before do
+                  allow(address_user).to receive_messages(update: true, delete: true)
+                  args[:params]['relation_name'] = 'address_users'
+                end
+
+                %w[dissociate delete].each do |mode|
+                  it "guards the child collection with the very filter it then applies (#{mode})" do
+                    args[:params][:delete] = true if mode == 'delete'
+
+                    dissociate.handle_request(args)
+
+                    guarded_tree = nil
+                    expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
+                      expect(collection.name).to eq('address_user')
+                      expect(applied).to include(search: 'paris', search_extended: false)
+                      expect(applied[:condition_tree].to_h)
+                        .to eq(field: 'address:id', operator: Operators::EQUAL, value: 3)
+                      guarded_tree = applied[:condition_tree]
+                    end
+                    written = mode == 'delete' ? :delete : :update
+                    expect(address_user).to have_received(written) do |_caller, filter|
+                      expect(filter).to have_attributes(search: 'paris', search_extended: false)
+                      expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                    end
+                  end
+                end
+
+                it 'writes nothing when the guard refuses a filtered field' do
+                  allow(permissions).to receive(:assert_can_read_query_fields)
+                    .with(address_user, hash_including(condition_tree: filtered_on_address_id))
+                    .and_raise(forbidden)
+                  args[:params][:delete] = true
+
+                  expect { dissociate.handle_request(args) }.to raise_error(
+                    ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                    /You cannot filter on 'address:id'/
+                  )
+                  expect(address_user).not_to have_received(:delete)
+                  expect(address_user).not_to have_received(:update)
+                end
+              end
+
+              context 'with a many-to-many' do
+                let(:forbidden) { ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'id'.") }
+                let(:filtered_on_id) { have_attributes(field: 'id', operator: Operators::EQUAL, value: 3) }
+
+                before do
+                  allow(address_user).to receive_messages(list: [AddressUser.new(1, 1, 9)], delete: true)
+                  allow(address).to receive_messages(list: [Address.new(9, 'paris')], delete: true)
+                  args[:params]['relation_name'] = 'addresses'
+                  args[:params][:data][:attributes][:all_records_subset_query][:filters] =
+                    JSON.generate({ field: 'id', operator: 'equal', value: 3 })
+                end
+
+                it 'unlinks only the targets the guarded filter matched (dissociate)' do
                   dissociate.handle_request(args)
 
                   guarded_tree = nil
                   expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                    expect(collection.name).to eq('address_user')
+                    expect(collection.name).to eq('address')
                     expect(applied).to include(search: 'paris', search_extended: false)
-                    expect(applied[:condition_tree].to_h)
-                      .to eq(field: 'address:id', operator: Operators::EQUAL, value: 3)
+                    expect(applied[:condition_tree]).to filtered_on_id
                     guarded_tree = applied[:condition_tree]
                   end
-                  written = mode == 'delete' ? :delete : :update
-                  expect(@datasource.get_collection('address_user')).to have_received(written) do |_caller, filter|
-                    expect(filter.condition_tree.conditions).to include(be(guarded_tree))
+                  expect(address).to have_received(:list) do |_caller, filter, _projection|
+                    expect(filter).to have_attributes(search: 'paris', search_extended: false)
+                    expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                  end
+                  expect(address_user).to have_received(:delete) do |_caller, filter|
+                    expect(filter.condition_tree.to_h).to eq(
+                      aggregator: 'And',
+                      conditions: [
+                        { field: 'user_id', operator: Operators::EQUAL, value: 1 },
+                        { field: 'address_id', operator: Operators::IN, value: [9] }
+                      ]
+                    )
+                  end
+                  expect(address).not_to have_received(:delete)
+                end
+
+                it 'deletes the targets with the very filter it guarded (delete)' do
+                  args[:params][:delete] = true
+
+                  dissociate.handle_request(args)
+
+                  guarded_tree = nil
+                  expect(permissions).to have_received(:assert_can_read_query_fields) do |_collection, applied|
+                    guarded_tree = applied[:condition_tree]
+                  end
+                  expect(address).to have_received(:delete) do |_caller, filter|
+                    expect(filter).to have_attributes(search: 'paris', search_extended: false)
+                    expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
                   end
                 end
-              end
 
-              it 'writes nothing on a one-to-many when the guard refuses a filtered field' do
-                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
-                allow(@datasource.get_collection('address_user')).to receive_messages(update: true, delete: true)
-                args[:params][:delete] = true
-                args[:params]['relation_name'] = 'address_users'
+                it 'touches neither the through nor the target collection when refused' do
+                  allow(permissions).to receive(:assert_can_read_query_fields)
+                    .with(address, hash_including(condition_tree: filtered_on_id))
+                    .and_raise(forbidden)
+                  args[:params][:delete] = true
 
-                expect { dissociate.handle_request(args) }.to raise_error(
-                  ForestAdminAgent::Http::Exceptions::ForbiddenError,
-                  /You cannot filter on 'address:location'/
-                )
-                expect(@datasource.get_collection('address_user')).not_to have_received(:delete)
-                expect(@datasource.get_collection('address_user')).not_to have_received(:update)
-              end
-
-              it 'touches neither the through nor the child collection on a many-to-many when refused' do
-                allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
-                allow(@datasource.get_collection('address_user')).to receive_messages(list: [], delete: true)
-                allow(@datasource.get_collection('address')).to receive(:delete).and_return(true)
-                args[:params][:delete] = true
-                args[:params]['relation_name'] = 'addresses'
-                args[:params][:data][:attributes][:all_records_subset_query][:filters] =
-                  JSON.generate({ field: 'id', operator: 'equal', value: 3 })
-
-                expect { dissociate.handle_request(args) }
-                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError)
-                expect(permissions).to have_received(:assert_can_read_query_fields)
-                  .with(@datasource.get_collection('address'), anything)
-                expect(@datasource.get_collection('address_user')).not_to have_received(:delete)
-                expect(@datasource.get_collection('address')).not_to have_received(:delete)
+                  expect { dissociate.handle_request(args) }.to raise_error(
+                    ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                    /You cannot filter on 'id'/
+                  )
+                  expect(address_user).not_to have_received(:delete)
+                  expect(address).not_to have_received(:delete)
+                end
               end
             end
 
