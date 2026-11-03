@@ -1,6 +1,7 @@
 require 'spec_helper'
 require 'active_support/all'
 require 'active_support/core_ext/numeric/time'
+require 'active_support/testing/time_helpers'
 
 module ForestAdminDatasourceToolkit
   module Components
@@ -10,9 +11,13 @@ module ForestAdminDatasourceToolkit
           include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
 
           describe Times do
+            include ActiveSupport::Testing::TimeHelpers
+
             subject(:times) { described_class }
 
             let(:tz) { 'Europe/Paris' }
+
+            around { |example| freeze_time { example.run } }
 
             before do
               @times = times.transforms
