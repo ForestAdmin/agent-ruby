@@ -14,8 +14,7 @@ module ForestAdminDatasourceToolkit
 
             let(:tz) { 'Europe/Paris' }
 
-            # Thursday 2026-05-14 00:30 in Paris, still 2026-05-13 in UTC
-            around { |example| travel_to(Time.utc(2026, 5, 13, 22, 30)) { example.run } }
+            include_context 'with a frozen clock'
 
             def rewrite(operator, value = nil)
               times.transforms[operator][0][:replacer].call(ConditionTreeLeaf.new('column', operator, value), tz).to_h
@@ -23,13 +22,6 @@ module ForestAdminDatasourceToolkit
 
             def leaf(operator, value)
               ConditionTreeLeaf.new('column', operator, value).to_h
-            end
-
-            def between(greater_than, less_than)
-              ConditionTreeBranch.new('And', [
-                                        ConditionTreeLeaf.new('column', Operators::GREATER_THAN, greater_than),
-                                        ConditionTreeLeaf.new('column', Operators::LESS_THAN, less_than)
-                                      ]).to_h
             end
 
             it 'Before should rewrite' do
@@ -60,56 +52,56 @@ module ForestAdminDatasourceToolkit
 
             it 'PreviousMonthToDate should rewrite' do
               expect(rewrite(Operators::PREVIOUS_MONTH_TO_DATE))
-                .to eq(between('2026-04-30T22:00:00Z', '2026-05-13T22:30:00Z'))
+                .to eq(between('column', '2026-04-30T22:00:00Z', '2026-05-13T22:30:00Z'))
             end
 
             it 'PreviousMonth should rewrite' do
-              expect(rewrite(Operators::PREVIOUS_MONTH)).to eq(between('2026-03-31T22:00:00Z', '2026-04-30T22:00:00Z'))
+              expect(rewrite(Operators::PREVIOUS_MONTH)).to eq(between('column', '2026-03-31T22:00:00Z', '2026-04-30T22:00:00Z'))
             end
 
             it 'PreviousQuarterToDate should rewrite' do
               expect(rewrite(Operators::PREVIOUS_QUARTER_TO_DATE))
-                .to eq(between('2026-03-31T22:00:00Z', '2026-05-13T22:30:00Z'))
+                .to eq(between('column', '2026-03-31T22:00:00Z', '2026-05-13T22:30:00Z'))
             end
 
             it 'PreviousQuarter should rewrite' do
-              expect(rewrite(Operators::PREVIOUS_QUARTER)).to eq(between('2025-12-31T23:00:00Z', '2026-03-31T22:00:00Z'))
+              expect(rewrite(Operators::PREVIOUS_QUARTER)).to eq(between('column', '2025-12-31T23:00:00Z', '2026-03-31T22:00:00Z'))
             end
 
             it 'PreviousWeekToDate should rewrite' do
               expect(rewrite(Operators::PREVIOUS_WEEK_TO_DATE))
-                .to eq(between('2026-05-10T22:00:00Z', '2026-05-13T22:30:00Z'))
+                .to eq(between('column', '2026-05-10T22:00:00Z', '2026-05-13T22:30:00Z'))
             end
 
             it 'PreviousWeek should rewrite' do
-              expect(rewrite(Operators::PREVIOUS_WEEK)).to eq(between('2026-05-03T22:00:00Z', '2026-05-10T22:00:00Z'))
+              expect(rewrite(Operators::PREVIOUS_WEEK)).to eq(between('column', '2026-05-03T22:00:00Z', '2026-05-10T22:00:00Z'))
             end
 
             it 'PreviousXDaysToDate should rewrite' do
               expect(rewrite(Operators::PREVIOUS_X_DAYS_TO_DATE, 14))
-                .to eq(between('2026-04-29T22:00:00Z', '2026-05-13T22:30:00Z'))
+                .to eq(between('column', '2026-04-29T22:00:00Z', '2026-05-13T22:30:00Z'))
             end
 
             it 'PreviousXDays should rewrite' do
               expect(rewrite(Operators::PREVIOUS_X_DAYS, 14))
-                .to eq(between('2026-04-29T22:00:00Z', '2026-05-13T22:00:00Z'))
+                .to eq(between('column', '2026-04-29T22:00:00Z', '2026-05-13T22:00:00Z'))
             end
 
             it 'PreviousYearToDate should rewrite' do
               expect(rewrite(Operators::PREVIOUS_YEAR_TO_DATE))
-                .to eq(between('2025-12-31T23:00:00Z', '2026-05-13T22:30:00Z'))
+                .to eq(between('column', '2025-12-31T23:00:00Z', '2026-05-13T22:30:00Z'))
             end
 
             it 'PreviousYear should rewrite' do
-              expect(rewrite(Operators::PREVIOUS_YEAR)).to eq(between('2024-12-31T23:00:00Z', '2025-12-31T23:00:00Z'))
+              expect(rewrite(Operators::PREVIOUS_YEAR)).to eq(between('column', '2024-12-31T23:00:00Z', '2025-12-31T23:00:00Z'))
             end
 
             it 'Today should rewrite' do
-              expect(rewrite(Operators::TODAY)).to eq(between('2026-05-13T22:00:00Z', '2026-05-14T22:00:00Z'))
+              expect(rewrite(Operators::TODAY)).to eq(between('column', '2026-05-13T22:00:00Z', '2026-05-14T22:00:00Z'))
             end
 
             it 'Yesterday should rewrite' do
-              expect(rewrite(Operators::YESTERDAY)).to eq(between('2026-05-12T22:00:00Z', '2026-05-13T22:00:00Z'))
+              expect(rewrite(Operators::YESTERDAY)).to eq(between('column', '2026-05-12T22:00:00Z', '2026-05-13T22:00:00Z'))
             end
           end
 
@@ -120,10 +112,7 @@ module ForestAdminDatasourceToolkit
               expect(described_class.transforms[Operators::TODAY][0][:replacer].call(
                 ConditionTreeLeaf.new('column', Operators::TODAY), 'Europe/Paris'
               ).to_h)
-                .to eq(ConditionTreeBranch.new('And', [
-                                                 ConditionTreeLeaf.new('column', Operators::GREATER_THAN, '2026-05-12T22:00:00Z'),
-                                                 ConditionTreeLeaf.new('column', Operators::LESS_THAN, '2026-05-13T22:00:00Z')
-                                               ]).to_h)
+                .to eq(between('column', '2026-05-12T22:00:00Z', '2026-05-13T22:00:00Z'))
             end
           end
         end
