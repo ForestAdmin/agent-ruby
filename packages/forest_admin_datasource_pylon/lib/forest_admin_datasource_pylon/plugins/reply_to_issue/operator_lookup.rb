@@ -15,9 +15,11 @@ module ForestAdminDatasourcePylon
 
           users   = datasource.client.fetch_users(include_deactivated: false)
           matches = users.select { |user| active?(user) && addresses(user).include?(email) }
-          return Result.new(user: matches.first) if matches.size == 1
+          return Result.new(error: refusal(email, matches.size)) unless matches.size == 1
+          return Result.new(user: matches.first) unless matches.first['id'].to_s.strip.empty?
 
-          Result.new(error: refusal(email, matches.size))
+          Result.new(error: "The Pylon user with the email #{email} has no id, so the reply cannot be signed in " \
+                            'your name and was not sent.')
         rescue APIError => e
           Result.new(error: "Could not read the Pylon users to sign the reply in your name: #{e.message}")
         end

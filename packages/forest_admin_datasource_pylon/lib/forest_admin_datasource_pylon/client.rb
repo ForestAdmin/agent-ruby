@@ -178,12 +178,14 @@ module ForestAdminDatasourcePylon
     # so the walk costs the single request it always did and only does something
     # the day that changes.
     #
-    # Past the cap the walk is refused rather than truncated, unlike the thread
-    # and the custom fields: `FetchAllCollection` filters, sorts, counts and
-    # groups in memory over what this returns, and calls the result exact
-    # BECAUSE it is every record Pylon holds. Truncated, that claim would stand
-    # over a fraction of the collection -- a count answered short and presented
-    # as exact, which is the one answer this datasource refuses everywhere else.
+    # Past the cap the walk is refused rather than truncated, like the thread a
+    # reply acts on (`fetch_complete_issue_messages`) and unlike the thread a
+    # page shows and the custom fields: `FetchAllCollection` filters, sorts,
+    # counts and groups in memory over what this returns, and calls the result
+    # exact BECAUSE it is every record Pylon holds. Truncated, that claim would
+    # stand over a fraction of the collection -- a count answered short and
+    # presented as exact, which is the one answer this datasource refuses
+    # everywhere else.
     def fetch_all(path, params = {})
       must_succeed(path) { collect_pages(path, params, refuse_past_cap: true) }
     end
@@ -203,7 +205,8 @@ module ForestAdminDatasourcePylon
     # Only `next_cursor` being nil is Pylon saying there is nothing more. Every
     # other stop leaves records behind, and `refuse_past_cap` is which of the two
     # answers the caller wants to those: a warning and a short list, or a refusal.
-    # See `fetch_all`, whose answer is only correct whole.
+    # See `fetch_all`, whose answer is only correct whole, and
+    # `fetch_complete_issue_messages`, whose caller acts on the latest message.
     #
     # `conn` is what a caller reading on the boot path hands its own connection
     # through: every page of the walk is then bounded like the first.

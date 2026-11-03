@@ -69,24 +69,32 @@ module ForestAdminDatasourcePylon
         return [:error, state.error] if state.error
         return [:error, no_target_message(state.issue_id, opts)] if state.target.nil?
 
-        payload = { 'body_html' => body, 'message_id' => state.target.message_id }
-        if state.target.email?
-          excluded = state.target.excluded
-          to = ReplyTarget.unique_addresses(Array(context.form_values[FormBuilder::TO_LABEL]), excluded)
-          return [:error, 'At least one recipient (To) is required to reply by email.'] if to.empty?
-
-          cc = ReplyTarget.unique_addresses(Array(context.form_values[FormBuilder::CC_LABEL]),
-                                            excluded + to.map(&:downcase))
-          payload['email_info'] = { 'to_emails' => to, 'cc_emails' => cc }
-        end
+        payload, dropped, refusal = reply_payload(state.target, body, context)
+        return [:error, refusal] if refusal
 
         operator = OperatorLookup.call(datasource, context.caller) if opts[:post_as_operator]
         return [:error, operator.error] if operator&.error
 
         payload['user_id'] = operator.user['id'] if operator
-        write(state.issue_id, 'reply', reply_success(state, payload, operator&.user)) do
+        write(state.issue_id, 'reply', reply_success(state, payload, operator&.user) + left_out(dropped)) do
           datasource.client.reply_to_issue(state.issue_id, payload)
         end
+      end
+
+      def reply_payload(target, body, context)
+        payload = { 'body_html' => body, 'message_id' => target.message_id }
+        return [payload, []] unless target.email?
+
+        to, cc, dropped = target.sanitize(to: context.form_values[FormBuilder::TO_LABEL],
+                                          cc: context.form_values[FormBuilder::CC_LABEL])
+        refusal = "At least one recipient (To) is required to reply by email.#{left_out(dropped)}" if to.empty?
+        return [nil, dropped, refusal] if refusal
+
+        [payload.merge('email_info' => { 'to_emails' => to, 'cc_emails' => cc }), dropped]
+      end
+
+      def left_out(dropped)
+        dropped.empty? ? '' : " Left out as addresses of your team: #{dropped.join(", ")}."
       end
 
       def note(datasource, issue_id, body)

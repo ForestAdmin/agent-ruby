@@ -30,17 +30,23 @@ module ForestAdminDatasourcePylon
       end.new
     end
 
+    # The author shapes Pylon sends: a customer message names its contact, a
+    # team message its user, the other side being nil.
+    let(:customer) { { 'contact' => { 'id' => 'c1' }, 'user' => nil } }
+    let(:team) { { 'contact' => nil, 'user' => { 'id' => 'u1' } } }
+
     def register(opts = {})
       described_class.new.run(nil, collection_customizer, { datasource: datasource }.merge(opts))
       collection_customizer.registered[opts[:action_name] || described_class::NAME]
     end
 
-    def message(id, source:, is_private: false, email_info: nil)
-      { 'id' => id, 'source' => source, 'is_private' => is_private, 'email_info' => email_info }
+    def message(id, source:, is_private: false, email_info: nil, author: customer)
+      { 'id' => id, 'source' => source, 'is_private' => is_private, 'email_info' => email_info, 'author' => author }
     end
 
-    def email_message(id, from:, to:, cc: [])
-      message(id, source: 'email', email_info: { 'from_email' => from, 'to_emails' => to, 'cc_emails' => cc })
+    def email_message(id, from:, to:, cc: [], author: customer)
+      message(id, source: 'email', email_info: { 'from_email' => from, 'to_emails' => to, 'cc_emails' => cc },
+                  author: author)
     end
 
     def thread(*messages, issue_id: 'i1')
@@ -134,8 +140,7 @@ module ForestAdminDatasourcePylon
       end
 
       it 'reads a message whose email envelope is not an object as carrying none' do
-        team = { 'user' => { 'id' => 'u1' } }
-        target = resolve(message('m1', source: 'slack', email_info: '').merge('author' => team),
+        target = resolve(message('m1', source: 'slack', email_info: '', author: team),
                          message('m2', source: 'slack', email_info: []))
 
         expect(target.message_id).to eq('m2')
@@ -143,9 +148,8 @@ module ForestAdminDatasourcePylon
       end
 
       it 'leaves out the support addresses whatever their case, and duplicates across To and CC' do
-        team = { 'user' => { 'id' => 'u1' } }
         target = resolve(email_message('m1', from: 'Support@Us.io', to: ['ada@acme.com', 'ADA@acme.com'],
-                                             cc: ['ada@acme.com', 'support@us.io']).merge('author' => team),
+                                             cc: ['ada@acme.com', 'support@us.io'], author: team),
                          support: ['support@us.io'])
 
         expect(target.to).to eq(['ada@acme.com'])
@@ -153,10 +157,9 @@ module ForestAdminDatasourcePylon
       end
 
       it 'writes again to whom the team last wrote, not to the team itself' do
-        team = { 'user' => { 'id' => 'u1' } }
         target = resolve(email_message('m1', from: 'ada@acme.com', to: ['help@us.io']),
-                         email_message('m2', from: 'agent@us.io', to: ['ada@acme.com'], cc: ['bob@acme.com'])
-                           .merge('author' => team))
+                         email_message('m2', from: 'agent@us.io', to: ['ada@acme.com'], cc: ['bob@acme.com'],
+                                             author: team))
 
         expect(target.message_id).to eq('m2')
         expect(target.to).to eq(['ada@acme.com'])
@@ -164,8 +167,7 @@ module ForestAdminDatasourcePylon
       end
 
       it 'leaves out the addresses the team wrote from, even when support_emails misses them' do
-        team = { 'user' => { 'id' => 'u1' } }
-        target = resolve(email_message('m1', from: 'Agent@us.io', to: ['ada@acme.com']).merge('author' => team),
+        target = resolve(email_message('m1', from: ' Agent@us.io ', to: ['ada@acme.com'], author: team),
                          email_message('m2', from: 'ada@acme.com', to: ['agent@us.io'], cc: ['agent@us.io']))
 
         expect(target.to).to eq(['ada@acme.com'])
@@ -219,7 +221,7 @@ module ForestAdminDatasourcePylon
         channel = field(register, form::CHANNEL_LABEL)
 
         expect(channel[:is_read_only]).to be(true)
-        expect(channel[:value].call(context)).to eq('Reply sent via Slack')
+        expect(channel[:value].call(context)).to eq('Replies via Slack')
       end
 
       it 'explains why there is no public reply' do
@@ -244,14 +246,24 @@ module ForestAdminDatasourcePylon
         expect(field(register, form::CHANNEL_LABEL)[:if_condition].call(note)).to be(false)
       end
 
+      # A transient failure is not an issue without customer message: picking
+      # the public reply renders the form again, and the thread is read again.
+      it 'keeps the public reply offered but not picked when the thread could not be read' do
+        allow(client).to receive(:fetch_complete_issue_messages)
+          .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 429 slow down', status: 429))
+        note = FakeReplyContext.new(form_values: { form::TYPE_LABEL => form::INTERNAL_NOTE })
+        type = field(register, form::TYPE_LABEL)
+
+        expect(type[:enum_values].call(note)).to eq([form::PUBLIC_REPLY, form::INTERNAL_NOTE])
+        expect(type[:default_value].call(note)).to eq(form::INTERNAL_NOTE)
+      end
+
       it 'keeps explaining why a public reply is unavailable, even with an internal note picked' do
         allow(client).to receive(:fetch_complete_issue_messages)
           .and_raise(ForestAdminDatasourcePylon::APIError.new('HTTP 500 boom', status: 500))
         note = FakeReplyContext.new(form_values: { form::TYPE_LABEL => form::INTERNAL_NOTE })
-        action = register
 
-        expect(field(action, form::TYPE_LABEL)[:enum_values].call(note)).to eq([form::INTERNAL_NOTE])
-        expect(field(action, form::CHANNEL_LABEL)[:if_condition].call(note)).to be(true)
+        expect(field(register, form::CHANNEL_LABEL)[:if_condition].call(note)).to be(true)
       end
 
       it 'keeps the thread it read for the render across a garbage collection' do
@@ -348,6 +360,26 @@ module ForestAdminDatasourcePylon
         )
       end
 
+      it 'names the typed addresses it left out' do
+        thread(email_message('m1', from: 'ada@acme.com', to: ['support@us.io']))
+
+        result = run_action(register(support_emails: ['support@us.io']),
+                            values(form::TO_LABEL => ['ada@acme.com'], form::CC_LABEL => ['Support@us.io']))
+
+        expect(result[:type]).to eq('Success')
+        expect(result[:message]).to end_with('Left out as addresses of your team: Support@us.io.')
+      end
+
+      it 'says why To is empty when it only held addresses of the team' do
+        thread(email_message('m1', from: 'ada@acme.com', to: ['support@us.io']))
+
+        result = run_action(register(support_emails: ['support@us.io']), values(form::TO_LABEL => ['support@us.io']))
+
+        expect(result[:message]).to eq('At least one recipient (To) is required to reply by email. Left out as ' \
+                                       'addresses of your team: support@us.io.')
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
       it 'refuses an email reply with no recipient, and sends nothing' do
         thread(email_message('m1', from: 'ada@acme.com', to: []))
 
@@ -442,6 +474,15 @@ module ForestAdminDatasourcePylon
                                        'delivered: check the issue in Pylon before sending it again.')
       end
 
+      it 'tells the operator to check Pylon when the reply timed out, with no status to read' do
+        thread(message('m1', source: 'slack'))
+        allow(client).to receive(:reply_to_issue)
+          .and_raise(ForestAdminDatasourcePylon::APIError.new('execution expired', status: nil))
+
+        expect(run_action(register, values)[:message])
+          .to start_with('Pylon did not confirm the reply on issue i1 (execution expired). It may have been delivered')
+      end
+
       it 'posts an internal note without reading the thread, which may be unreadable' do
         allow(client).to receive(:fetch_complete_issue_messages)
 
@@ -532,6 +573,13 @@ module ForestAdminDatasourcePylon
           .and_return([user('u1', email: 'ada@acme.io'), user('u2', email: 'x@acme.io', emails: ['ada@acme.io'])])
 
         expect(run_as(operator)[:message]).to match(/2 active Pylon users have the email ada@acme.io/)
+        expect(client).not_to have_received(:reply_to_issue)
+      end
+
+      it 'refuses rather than letting the token sign when the matched Pylon user has no id' do
+        allow(client).to receive(:fetch_users).and_return([user(nil, email: 'ada@acme.io')])
+
+        expect(run_as(operator)[:message]).to match(/Pylon user with the email ada@acme.io has no id.*was not sent/)
         expect(client).not_to have_received(:reply_to_issue)
       end
 

@@ -171,6 +171,14 @@ RSpec.describe ForestAdminDatasourcePylon::Client::Writes do
       expect(WebMock).to have_requested(:post, "#{base}/issues/i1/reply").once
     end
 
+    it 'does not retry a reply that timed out, and raises with no status' do
+      stub_request(:post, "#{base}/issues/i1/reply").to_timeout
+
+      expect { client.reply_to_issue('i1', 'body_html' => '<p>Hi</p>') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError) { |error| expect(error.status).to be_nil }
+      expect(WebMock).to have_requested(:post, "#{base}/issues/i1/reply").once
+    end
+
     it 'retries a rate-limited reply' do
       stub_request(:post, "#{base}/issues/i1/reply")
         .to_return(json({ 'message' => 'slow down' }, 429))

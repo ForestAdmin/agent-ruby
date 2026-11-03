@@ -197,11 +197,13 @@ instance — cannot get a public reply; only the internal note is offered.
 email of the conversation. When the customer wrote it, To is its sender only: the addresses the
 customer wrote to include your support inbox. When the team wrote it, To is whom it went to. The
 `support_emails` and the addresses the team wrote from in the thread are always left out, from what
-the operator types as well. Set `support_emails`: before the team's first email in a thread, it is
-the only way to know your own addresses. A reply with no To is refused.
+the operator types as well, and the result message names any typed address left out. Set
+`support_emails`: before the team's first email in a thread, it is the only way to know your own
+addresses. A reply with no To is refused.
 
-**When Pylon does not confirm.** A 4xx is shown as Pylon words it. Any other failure may come after
-Pylon delivered the message, so the action says so and asks to check the issue before sending again.
+**When Pylon does not confirm.** A 4xx is shown with Pylon's own reason. Any other failure, a
+timeout included, may come after Pylon delivered the message, so the action says so and asks to
+check the issue before sending again.
 
 **Who signs.** By default the account owning the API token signs every reply, and the success
 message says so. With `post_as_operator: true`, a public reply is signed by the active Pylon user
@@ -218,9 +220,9 @@ Three things to know before granting it.
   consistent, and restrict the action to the roles that should answer customers.
 - **The thread is read on every form render**, one `GET /issues/{id}/messages` (120 a minute).
   A submit costs one or two more: the agent renders the form again before running the action, and
-  a public reply reads the thread once more to answer its latest state. An unreadable thread is
-  shown as an error, never as an issue without customer message; an internal note does not depend
-  on it and stays available.
+  a public reply reads the thread once more to answer its latest state, plus one `GET /users` with
+  `post_as_operator`. An unreadable thread is shown as an error, never as an issue without customer
+  message: both reply types stay offered, and an internal note does not depend on the thread.
 
 ## Development
 

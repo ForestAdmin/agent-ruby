@@ -40,9 +40,18 @@ module ForestAdminDatasourcePylon
 
         def type_field(state)
           { type: FieldType::ENUM, label: TYPE_LABEL, is_required: true,
-            enum_values: ->(context) { state.call(context).target ? [PUBLIC_REPLY, INTERNAL_NOTE] : [INTERNAL_NOTE] },
+            enum_values: lambda { |context|
+              reply_possible?(state.call(context)) ? [PUBLIC_REPLY, INTERNAL_NOTE] : [INTERNAL_NOTE]
+            },
             default_value: ->(context) { state.call(context).target ? PUBLIC_REPLY : INTERNAL_NOTE },
             description: 'A public reply reaches the customer; an internal note is seen by your team only.' }
+        end
+
+        # A thread that could not be read may well have a customer message: the
+        # public reply stays offered, not picked, and picking it renders the
+        # form again, which reads the thread again.
+        def reply_possible?(state)
+          !state.target.nil? || !state.error.nil?
         end
 
         def channel_field(state, opts)
@@ -54,7 +63,7 @@ module ForestAdminDatasourcePylon
 
         def channel_text(state, opts)
           return state.error if state.error
-          return "Reply sent via #{state.target.channel_label}" if state.target
+          return "Replies via #{state.target.channel_label}" if state.target
 
           no_target = 'This issue has no customer-visible message, so it cannot get a public reply.'
           opts[:allow_internal_note] ? "#{no_target} Post an internal note instead." : no_target

@@ -9,7 +9,7 @@ module ForestAdminDatasourcePylon
         EMAIL_SOURCE = 'email'.freeze
         CHANNEL_LABELS = { 'email' => 'email', 'slack' => 'Slack' }.freeze
 
-        attr_reader :message_id, :source, :to, :cc, :excluded
+        attr_reader :message_id, :source, :to, :cc
 
         def self.resolve(messages, support_emails: [])
           visible = Array(messages).select { |message| message.is_a?(Hash) && message['is_private'] != true }
@@ -24,7 +24,8 @@ module ForestAdminDatasourcePylon
         # keeps a reply out of the support inbox when `support_emails` misses one.
         def self.team_addresses(messages)
           messages.select { |message| team_authored?(message) }
-                  .filter_map { |message| email_info(message)['from_email']&.to_s&.downcase }
+                  .map { |message| email_info(message)['from_email'].to_s.strip.downcase }
+                  .reject(&:empty?)
         end
 
         def self.email_info(message)
@@ -47,7 +48,18 @@ module ForestAdminDatasourcePylon
           @source     = message['source']
           @email_info = self.class.email_info(message)
           @excluded   = excluded
-          @to, @cc    = recipients(message, excluded)
+          @to, @cc    = sanitize(to: default_to(message), cc: @email_info['cc_emails'])
+        end
+
+        # The excluded addresses come back apart, so an operator who typed one
+        # is told it was left out rather than finding it silently gone.
+        def sanitize(to:, cc:)
+          to_kept = self.class.unique_addresses(Array(to), @excluded)
+          cc_kept = self.class.unique_addresses(Array(cc), @excluded + to_kept.map(&:downcase))
+          dropped = (Array(to) + Array(cc)).map { |address| address.to_s.strip }
+                                           .select { |address| @excluded.include?(address.downcase) }
+                                           .uniq(&:downcase)
+          [to_kept, cc_kept, dropped]
         end
 
         def email?
@@ -65,11 +77,8 @@ module ForestAdminDatasourcePylon
         # Answering a customer's email writes back to its sender only: its own
         # To is where the customer wrote, the support inbox among them. Answering
         # the team's last email writes again to whom it went.
-        def recipients(message, excluded)
-          to = self.class.team_authored?(message) ? Array(@email_info['to_emails']) : [@email_info['from_email']]
-          to = self.class.unique_addresses(to, excluded)
-          cc = self.class.unique_addresses(Array(@email_info['cc_emails']), excluded + to.map(&:downcase))
-          [to, cc]
+        def default_to(message)
+          self.class.team_authored?(message) ? @email_info['to_emails'] : [@email_info['from_email']]
         end
       end
     end
