@@ -216,6 +216,79 @@ module ForestAdminAgent
           end
         end
 
+        context 'with a bulk action run on a select-all carrying the caller filters' do
+          let(:forbidden) do
+            Http::Exceptions::ForbiddenError.new(
+              "You cannot filter on 'holder:national_id': you are not allowed to read the 'holder' collection."
+            )
+          end
+
+          before do
+            @action_collection.add_action(
+              'foo',
+              ForestAdminDatasourceCustomizer::Decorators::Action::BaseAction.new(
+                scope: ForestAdminDatasourceCustomizer::Decorators::Action::Types::ActionScope::BULK
+              ) do |_context, result_builder|
+                result_builder.success
+              end
+            )
+            args[:params][:data][:attributes].merge!(
+              ids: [],
+              all_records: true,
+              all_records_ids_excluded: ['123e4567-e89b-12d3-a456-426614174000'],
+              all_records_subset_query: {
+                filters: JSON.generate({ field: 'id', operator: 'equal', value: '123e4567-e89b-12d3-a456-426614174001' })
+              }
+            )
+            allow(@action_collection).to receive_messages(execute: {}, get_form: [])
+          end
+
+          it 'checks the very condition tree the authorization then counts with' do
+            action.handle_request(args)
+
+            guarded_tree = nil
+            expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
+              expect(collection).to eq(@datasource.get_collection('book'))
+              expect(applied[:condition_tree].to_h)
+                .to eq(field: 'id', operator: Operators::EQUAL, value: '123e4567-e89b-12d3-a456-426614174001')
+              guarded_tree = applied[:condition_tree]
+            end
+            expect(permissions).to have_received(:can_smart_action?) do |_args, _collection, filter_for_caller|
+              expect(filter_for_caller.condition_tree.conditions).to include(be(guarded_tree))
+            end
+          end
+
+          it 'refuses before the authorization can count anything, and runs nothing' do
+            allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
+
+            expect { action.handle_request(args) }
+              .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
+            expect(permissions).not_to have_received(:can_smart_action?)
+            expect(@action_collection).not_to have_received(:get_form)
+            expect(@action_collection).not_to have_received(:execute)
+          end
+
+          it 'hands the form hooks only a filter the guard checked' do
+            action.handle_hook_request(args)
+
+            guarded = nil
+            expect(permissions).to have_received(:assert_can_read_query_fields) do |_collection, applied|
+              guarded = applied[:condition_tree].to_h
+            end
+            expect(guarded).to eq(field: 'id', operator: Operators::EQUAL, value: '123e4567-e89b-12d3-a456-426614174001')
+            expect(@action_collection).to have_received(:get_form) do |_caller, _action_name, _data, filter, _meta|
+              expect(filter.condition_tree.conditions.map(&:to_h)).to include(guarded)
+            end
+          end
+
+          it 'refuses the form hooks before they see the filter' do
+            allow(permissions).to receive(:assert_can_read_query_fields).and_raise(forbidden)
+
+            expect { action.handle_hook_request(args) }.to raise_error(Http::Exceptions::ForbiddenError)
+            expect(@action_collection).not_to have_received(:get_form)
+          end
+        end
+
         context 'with a single action used from list-view, detail-view & summary' do
           before do
             @action_collection.add_action(
