@@ -22,8 +22,8 @@ module ForestAdminDatasourceIntercom
 
     # The block runs outside the mutex (it is an HTTP request): two concurrent misses both read, which is
     # cheaper than serializing every thread. A raising block writes nothing, and the generation is read
-    # before the block so a response in flight across `clear` is not stored.
-    def fetch(key)
+    # before the block so a response in flight across `clear` is not stored, nor one `store` declines.
+    def fetch(key, store: -> { true })
       return yield unless enabled?
 
       hit = read(key)
@@ -31,7 +31,7 @@ module ForestAdminDatasourceIntercom
 
       generation = @mutex.synchronize { @generation }
       value = yield
-      write(key, value, generation)
+      write(key, value, generation) if store.call
       value
     end
 

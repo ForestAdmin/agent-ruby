@@ -220,22 +220,21 @@ module ForestAdminDatasourceIntercom
       # Put back in the order the ids were named: the search answers in its own,
       # and the window was cut on the ids.
       def records_by_ids(ids)
-        wanted = ids.first(max_id_reads)
-        warn_truncated_ids(ids.size) if ids.size > wanted.size
+        refuse_id_reads!(ids.size, 'list') if ids.size > max_id_reads
 
-        records = wanted.each_slice(IDS_PER_READ).flat_map do |chunk|
+        records = ids.each_slice(IDS_PER_READ).flat_map do |chunk|
           client.search_page(search_endpoint.path, per_page: chunk.size,
                                                    query: { 'field' => 'id', 'operator' => 'IN',
                                                             'value' => chunk }).records
         end
-        position = wanted.each_with_index.to_h
-        records.sort_by { |record| position.fetch(record['id'].to_s, wanted.size) }
+        position = ids.each_with_index.to_h
+        records.sort_by { |record| position.fetch(record['id'].to_s, ids.size) }
       end
 
       # The same searches, each asked for one record: Intercom counts the slice
       # in `total_count`, so nothing needs reading to be counted.
       def count_by_ids(ids)
-        refuse_id_count!(ids.size) if ids.size > max_id_reads
+        refuse_id_reads!(ids.size, 'count') if ids.size > max_id_reads
 
         ids.each_slice(IDS_PER_READ).sum do |chunk|
           exact_count(client.search_page(search_endpoint.path, per_page: 1,
@@ -256,13 +255,6 @@ module ForestAdminDatasourceIntercom
           "#{clauses.map { |clause| sort_field(clause) }.join(", ")} while reading the contacts of an account, " \
           'which Intercom answers through GET /companies/{id}/contacts -- a route that takes no order, unlike ' \
           'the search this collection is otherwise read through. The rows come back in the order the API imposes.'
-        )
-      end
-
-      def warn_truncated_ids(asked)
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} was asked for #{asked} records by id and read the first " \
-          "#{max_id_reads}: Intercom reads them #{IDS_PER_READ} at a time. The result is truncated."
         )
       end
     end

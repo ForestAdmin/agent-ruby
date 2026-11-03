@@ -403,14 +403,12 @@ module ForestAdminDatasourceIntercom
         end.to raise_error(UnsupportedOperatorError, /without a total_count/)
       end
 
-      it 'truncates a set larger than it will read, and says so' do
-        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+      it 'refuses to list a set larger than it will read, before reading any of it' do
         stub_search(contact('1'))
 
-        rows(%w[id], condition_tree: leaf('id', operators::IN, (1..400).map(&:to_s)))
-
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/asked for 400 records by id/)
-        expect(WebMock).to have_requested(:post, "#{base}/contacts/search").times(20)
+        expect { rows(%w[id], condition_tree: leaf('id', operators::IN, (1..400).map(&:to_s))) }
+          .to raise_error(UnsupportedOperatorError, /cannot list 400 records by id/)
+        expect(WebMock).not_to have_requested(:post, "#{base}/contacts/search")
       end
 
       # The window is cut in the order the ids were named, so ordering what

@@ -72,11 +72,11 @@ module ForestAdminDatasourceIntercom
         # transition that closed it may have fallen out of the window.
         def truncated?(record)
           total = parts_total(record)
-          total ? total > parts_of(record).size : false
+          total ? total > Array(parts_of(record)).size : false
         end
 
         def last_closure(parts)
-          closures = parts.select { |part| state_change?(part) && part['ticket_state'] == RESOLVED }
+          closures = Array(parts).select { |part| state_change?(part) && part['ticket_state'] == RESOLVED }
 
           closures.max_by { |part| part['created_at'].to_i }
         end
@@ -89,7 +89,7 @@ module ForestAdminDatasourceIntercom
         end
 
         def last_reply(parts)
-          parts.select { |part| part['part_type'] == REPLY_PART }.max_by { |part| part['created_at'].to_i }
+          Array(parts).select { |part| part['part_type'] == REPLY_PART }.max_by { |part| part['created_at'].to_i }
         end
 
         def author_of(part)
@@ -97,13 +97,24 @@ module ForestAdminDatasourceIntercom
           author.is_a?(Hash) ? author : {}
         end
 
+        # nil rather than an empty list when the payload carries no parts: an
+        # empty thread would read as a ticket nothing happened to.
         def parts_of(record)
-          nested_list((record || {})['ticket_parts'], 'ticket_parts')
+          container = (record || {})['ticket_parts']
+          parts = container['ticket_parts'] if container.is_a?(Hash)
+          parts.is_a?(Array) ? parts : nil
         end
 
         def parts_total(record)
           container = (record || {})['ticket_parts']
           container.is_a?(Hash) ? container['total_count'] : nil
+        end
+
+        def warn_truncated_timelines(truncated)
+          ForestAdminDatasourceIntercom.logger.warn(
+            "[forest_admin_datasource_intercom] #{name}: the timeline of #{truncated} ticket(s) of this page " \
+            'holds only their 500 most recent parts, Intercom keeping no more. Earlier events are left out.'
+          )
         end
 
         def warn_unknown_closures(unknown)

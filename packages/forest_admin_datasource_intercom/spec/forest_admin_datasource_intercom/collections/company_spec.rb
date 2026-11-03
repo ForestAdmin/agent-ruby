@@ -292,13 +292,9 @@ module ForestAdminDatasourceIntercom
         expect { rows(%w[id], condition_tree: leaf('id', operators::EQUAL, 'co1')) }.to raise_error(APIError)
       end
 
-      it 'truncates a set of ids larger than it will read, and says so' do
-        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
-        stub_request(:get, %r{#{base}/companies/co\d+}).to_return(json(company('co1')))
-
-        rows(%w[id], condition_tree: leaf('id', operators::IN, (1..30).map { |n| "co#{n}" }))
-
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/asked for 30 records by id/)
+      it 'refuses to list a set of ids larger than it will read' do
+        expect { rows(%w[id], condition_tree: leaf('id', operators::IN, (1..30).map { |n| "co#{n}" })) }
+          .to raise_error(UnsupportedOperatorError, /cannot list 30 records by id/)
       end
 
       it 'counts the records the ids named' do
@@ -479,6 +475,20 @@ module ForestAdminDatasourceIntercom
       it 'refuses an operator the lookup has no equivalent for' do
         expect { rows(%w[id], condition_tree: leaf('name', operators::CONTAINS, 'Acm')) }
           .to raise_error(UnsupportedOperatorError, /cannot filter "name"/)
+      end
+
+      # What `ConditionTreeFactory.match_ids` builds for a live-query segment
+      # that returned no ids.
+      it 'answers a tree that matches nothing with no rows, without reading' do
+        expect(rows(%w[id], condition_tree: branch('Or'))).to eq([])
+        expect(WebMock).not_to have_requested(:post, "#{base}/companies/list")
+      end
+
+      it 'counts a tree that matches nothing as zero' do
+        aggregation = ForestAdminDatasourceToolkit::Components::Query::Aggregation.new(operation: 'Count')
+
+        expect(collection.aggregate(nil, filter(condition_tree: branch('Or')), aggregation))
+          .to eq([{ 'group' => {}, 'value' => 0 }])
       end
 
       it 'refuses a combination, the lookup answering one value at a time' do

@@ -181,6 +181,12 @@ module ForestAdminDatasourceIntercom
         expect(introspector.attributes).to eq([])
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/boots without its attribute/)
       end
+
+      it 'fails rather than degrades on anything but a refusal' do
+        stub_request(:get, "#{base}/ticket_types").to_return(json({ 'type' => 'error.list' }, 401))
+
+        expect { introspector.attributes }.to raise_error(APIError, /HTTP 401/)
+      end
     end
   end
 end

@@ -1,19 +1,22 @@
 module ForestAdminDatasourceIntercom
   RSpec.describe Query::FilterValue do
-    subject(:formatter) { described_class.new(collection: 'IntercomConversation', timezone: timezone) }
+    subject(:formatter) { described_class.new(collection: 'IntercomConversation', timezone: timezone, now: -> { now }) }
+
+    # 2026-09-01T08:30:00Z, the present every date below is read against.
+    let(:now) { 1_788_251_400 }
 
     let(:timezone) { 'Europe/Paris' }
     let(:operators) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Operators }
     let(:nodes) { ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes }
 
-    def field(type, operators = ['='])
-      Query::SearchFields::Field.new(column: 'c', field: 'c', type: type, operators: operators, source: 'spec')
+    def field(type, operators = ['='], name: 'c')
+      Query::SearchFields::Field.new(column: name, field: name, type: type, operators: operators, source: 'spec')
     end
 
-    def call(type, value, spelling: '=', operator: nil)
-      leaf = nodes::ConditionTreeLeaf.new('c', operator || operators::EQUAL, value)
+    def call(type, value, spelling: '=', operator: nil, name: 'c')
+      leaf = nodes::ConditionTreeLeaf.new(name, operator || operators::EQUAL, value)
 
-      formatter.call(leaf, field(type), spelling)
+      formatter.call(leaf, field(type, name: name), spelling)
     end
 
     # Intercom truncates a date search to the UTC day -- measured, and against
@@ -22,18 +25,43 @@ module ForestAdminDatasourceIntercom
     # day of the value. Sent as they come, the two bounds of an interval cancel
     # each other out and `today` answers nothing.
     describe 'a date, and the UTC day Intercom truncates it to' do
-      def bound(value, spelling)
-        Time.at(call('date', value, spelling: spelling,
+      def bound(value, spelling, name: 'c')
+        Time.at(call('date', value, spelling: spelling, name: name,
                                     operator: spelling == '>' ? operators::GREATER_THAN : operators::LESS_THAN))
             .utc.iso8601
       end
 
       it 'moves a lower bound back a day, so Intercom answers from the day it names' do
-        expect(bound('2026-09-01T08:30:00Z', '>')).to eq('2026-08-31T00:00:00Z')
+        expect(bound('2026-09-01T00:00:00Z', '>')).to eq('2026-08-31T00:00:00Z')
       end
 
-      it 'moves an upper bound forward a day, so Intercom answers through the day it names' do
+      # `past` and the `*_to_date` family end on the present: widened to the end
+      # of the day, the bound only adds rows dated after now, of which a column
+      # holding past instants has none.
+      it 'moves an upper bound at the present forward a day, so Intercom answers through the day it names' do
         expect(bound('2026-09-01T08:30:00Z', '<')).to eq('2026-09-02T00:00:00Z')
+      end
+
+      it 'takes the present as the toolkit wrote it, a moment before this reads the clock' do
+        expect(bound('2026-09-01T08:29:58Z', '<')).to eq('2026-09-02T00:00:00Z')
+      end
+
+      # Answered for the whole day, `after_x_hours_ago 2` would bring back every
+      # row since midnight UTC, and the page would look filtered.
+      it 'refuses a lower bound inside a day' do
+        expect { bound('2026-09-01T06:30:00Z', '>') }
+          .to raise_error(UnsupportedOperatorError, /cannot filter "c" on 2026-09-01T06:30:00Z, a time inside a day/)
+      end
+
+      it 'refuses an upper bound inside a day that has passed' do
+        expect { bound('2026-09-01T06:30:00Z', '<') }.to raise_error(UnsupportedOperatorError, /inside a day/)
+      end
+
+      # A snooze can end later today, so widening `past` to midnight would
+      # answer snoozes that have not ended yet.
+      it 'refuses an upper bound at the present on a date that can lie ahead of it' do
+        expect { bound('2026-09-01T08:30:00Z', '<', name: 'snoozed_until') }
+          .to raise_error(UnsupportedOperatorError, /"snoozed_until".*inside a day/)
       end
 
       # An upper bound already sitting on a day boundary names the day to leave
@@ -46,11 +74,13 @@ module ForestAdminDatasourceIntercom
       # comes back is that day and nothing else.
       it 'answers the day itself for the two bounds of an interval' do
         expect(bound('2026-09-01T00:00:00Z', '>')).to eq('2026-08-31T00:00:00Z')
-        expect(bound('2026-09-01T23:59:59Z', '<')).to eq('2026-09-02T00:00:00Z')
+        expect(bound('2026-09-02T00:00:00Z', '<')).to eq('2026-09-02T00:00:00Z')
       end
 
-      it 'keeps the offset an ISO8601 timestamp carries' do
-        expect(bound('2026-09-01T10:30:00+02:00', '<')).to eq('2026-09-02T00:00:00Z')
+      # Paris midnight on 2 September is 22:00 UTC on the 1st, a time inside the
+      # UTC day but the day boundary of the caller.
+      it 'keeps the offset an ISO8601 timestamp carries, and takes the midnight of the caller' do
+        expect(bound('2026-09-02T00:00:00+02:00', '<')).to eq('2026-09-02T00:00:00Z')
       end
 
       # `FilterFactory` writes the bounds of a previous period with strftime
@@ -93,7 +123,7 @@ module ForestAdminDatasourceIntercom
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
 
         bound('2026-08-31T22:00:00Z', '>')
-        bound('2026-08-31T23:00:00Z', '>')
+        bound('2026-09-01T22:00:00Z', '>')
 
         expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).once.with(/truncates a date search/)
       end
@@ -101,7 +131,7 @@ module ForestAdminDatasourceIntercom
       it 'stays quiet when the window and the UTC day are the same day anyway' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
 
-        bound('2026-09-01T08:30:00Z', '>')
+        bound('2026-09-01T08:30:00Z', '<')
 
         expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
       end
@@ -116,6 +146,12 @@ module ForestAdminDatasourceIntercom
 
           expect(bound('2026-09-01', '>')).to eq('2026-08-31T00:00:00Z')
           expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/unknown timezone/)
+        end
+
+        it 'refuses a time inside a UTC day, having no other midnight to read it against' do
+          allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+          expect { bound('2026-09-01T06:30:00Z', '>') }.to raise_error(UnsupportedOperatorError, /inside a day/)
         end
 
         it 'reads a timestamp carrying no offset in UTC and says so' do

@@ -412,15 +412,25 @@ module ForestAdminDatasourceIntercom
         expect(ids(collection.list(nil, filter(condition_tree: tree, page: page), %w[id]))).to eq(%w[2])
       end
 
-      it 'reads the first of too many and says the result is truncated' do
-        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+      # The count of the same filter is refused; 25 rows where 28 were named
+      # would look like the whole answer.
+      it 'refuses to list more ids than it reads' do
         asked = (1..(Collections::CursorCollection::MAX_ID_READS + 3)).map(&:to_s)
         stub_request(:get, %r{/conversations/\d+}).to_return(json(conversation('1')))
 
-        rows = collection.list(nil, filter(condition_tree: leaf('id', operators::IN, asked)), %w[id])
+        expect { collection.list(nil, filter(condition_tree: leaf('id', operators::IN, asked)), %w[id]) }
+          .to raise_error(UnsupportedOperatorError, /cannot list 28 records by id/)
+        expect(WebMock).not_to have_requested(:get, %r{/conversations/\d+})
+      end
 
-        expect(rows.size).to eq(Collections::CursorCollection::MAX_ID_READS)
-        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/read the first 25/)
+      it 'lists more ids than it reads when the page asks for no more than it reads' do
+        asked = (1..(Collections::CursorCollection::MAX_ID_READS + 3)).map(&:to_s)
+        stub_request(:get, %r{/conversations/\d+}).to_return(json(conversation('1')))
+        page = ForestAdminDatasourceToolkit::Components::Query::Page.new(offset: 0, limit: 15)
+
+        rows = collection.list(nil, filter(condition_tree: leaf('id', operators::IN, asked), page: page), %w[id])
+
+        expect(rows.size).to eq(15)
       end
     end
 
@@ -491,7 +501,7 @@ module ForestAdminDatasourceIntercom
       # is what makes an interval answer the day it names.
       it 'sends a date bound on the UTC day boundary that answers the day asked for' do
         search = stub_search
-        tree = leaf('created_at', operators::GREATER_THAN, '2026-09-01T08:30:00Z')
+        tree = leaf('created_at', operators::GREATER_THAN, '2026-09-01T00:00:00Z')
 
         collection.list(nil, filter(condition_tree: tree), %w[id])
 

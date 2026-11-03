@@ -30,14 +30,17 @@ module ForestAdminDatasourceIntercom
         @client = client
       end
 
-      # The union, one entry per attribute name. Degrades to nothing rather than
-      # to a failure: a token without the ticket-types permission costs the
-      # attribute columns, never the boot of the agent.
+      # The union, one entry per attribute name. A token without the
+      # ticket-types permission costs the attribute columns, never the boot of
+      # the agent; any other failure fails the boot, for the reason
+      # `DataAttributesIntrospector#attributes` gives.
       def attributes
         @attributes ||= build
       rescue APIError => e
+        raise unless e.status == 403
+
         ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] could not read the ticket types (HTTP #{e.status || "-"}); " \
+          "[forest_admin_datasource_intercom] could not read the ticket types (#{e.message}); " \
           'the Tickets collection boots without its attribute columns.'
         )
         @attributes = []

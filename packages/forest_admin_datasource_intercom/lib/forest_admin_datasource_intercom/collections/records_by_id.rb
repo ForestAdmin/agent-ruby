@@ -40,10 +40,9 @@ module ForestAdminDatasourceIntercom
       # A record the operator can no longer reach -- deleted, or outside the
       # token's scope -- reads as "no record" rather than as a failed page.
       def records_by_ids(ids)
-        wanted = ids.first(max_id_reads)
-        warn_truncated_ids(ids.size) if ids.size > wanted.size
+        refuse_id_reads!(ids.size, 'list') if ids.size > max_id_reads
 
-        client.fetch_records(record_endpoint, wanted, params: record_read_params).compact
+        client.fetch_records(record_endpoint, ids, params: record_read_params).compact
       end
 
       # How many of a set of ids name a record, which means reading them:
@@ -52,7 +51,7 @@ module ForestAdminDatasourceIntercom
       # the truncation left -- both paginated tiers advertise an exact count,
       # and "25" where the question named forty records is not one.
       def count_by_ids(ids)
-        refuse_id_count!(ids.size) if ids.size > max_id_reads
+        refuse_id_reads!(ids.size, 'count') if ids.size > max_id_reads
 
         records_by_ids(ids).size
       end
@@ -78,19 +77,14 @@ module ForestAdminDatasourceIntercom
               'Chart it on a collection read whole, or wait for the bounded group-by of the reporting lot.'
       end
 
-      def refuse_id_count!(asked)
+      # The same refusal for a list as for a count: the first `max_id_reads`
+      # rows of a longer set of ids look like the whole of it.
+      def refuse_id_reads!(asked, verb)
         raise UnsupportedOperatorError,
-              "#{name} cannot count #{asked} records by id: Intercom exposes no endpoint that counts a set of ids, " \
-              "so counting them means reading them, and this reads #{max_id_reads} at most. Counting the ones it " \
-              'read would answer a number smaller than the question. Narrow the condition, or count the ' \
-              'collection with a filter it answers instead of a list of ids.'
-      end
-
-      def warn_truncated_ids(asked)
-        ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] #{name} was asked for #{asked} records by id and read the first " \
-          "#{max_id_reads}: Intercom reads them one request each. The result is truncated."
-        )
+              "#{name} cannot #{verb} #{asked} records by id: a set of ids is read from Intercom record by " \
+              "record or in small batches, and this reads #{max_id_reads} at most. Answering with the ones it read " \
+              'would leave the rest out of an answer that looks whole. Ask for fewer records at a time, or use a ' \
+              'filter this collection answers instead of a list of ids.'
       end
 
       def blank_search?(filter)

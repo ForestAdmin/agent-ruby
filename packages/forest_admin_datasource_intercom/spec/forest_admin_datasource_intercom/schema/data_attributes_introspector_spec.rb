@@ -121,7 +121,16 @@ module ForestAdminDatasourceIntercom
 
         expect(introspector.attributes).to eq([])
         expect(ForestAdminDatasourceIntercom.logger)
-          .to have_received(:warn).with(/could not read the contact attributes \(HTTP 403\)/)
+          .to have_received(:warn).with(/could not read the contact attributes \(.*HTTP 403 forbidden\)/)
+      end
+
+      # A pod booted on a transient failure would publish a schema its siblings
+      # do not, and keep it for the life of the process.
+      it 'fails rather than degrades on anything but a refusal' do
+        stub_request(:get, "#{base}/data_attributes").with(query: { 'model' => 'contact' })
+                                                     .to_return(json({ 'type' => 'error.list' }, 401))
+
+        expect { introspector.attributes }.to raise_error(APIError, /HTTP 401/)
       end
 
       it 'reads Intercom once, however many times it is asked' do

@@ -23,14 +23,17 @@ module ForestAdminDatasourceIntercom
         @model = model
       end
 
-      # Degrades to nothing rather than to a failure: a token without the
-      # permission on this model costs the custom-attribute columns, never the
-      # boot of the agent.
+      # A token without the permission on this model costs the custom-attribute
+      # columns, never the boot of the agent. Any other failure fails the boot:
+      # degraded on a timeout or a 5xx, this pod would publish a schema missing
+      # columns the next one has, and keep it for the life of the process.
       def attributes
         @attributes ||= build
       rescue APIError => e
+        raise unless e.status == 403
+
         ForestAdminDatasourceIntercom.logger.warn(
-          "[forest_admin_datasource_intercom] could not read the #{@model} attributes (HTTP #{e.status || "-"}); " \
+          "[forest_admin_datasource_intercom] could not read the #{@model} attributes (#{e.message}); " \
           'the collection boots without its custom-attribute columns.'
         )
         @attributes = []

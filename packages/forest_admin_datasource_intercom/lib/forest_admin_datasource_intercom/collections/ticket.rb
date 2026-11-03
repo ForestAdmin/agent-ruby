@@ -125,12 +125,14 @@ module ForestAdminDatasourceIntercom
         add_many_to_one('contact', foreign_collection: 'IntercomContact', foreign_key: 'contact_id')
       end
 
-      # Free: the parts come with the search response regardless. An empty list is an empty thread, unlike a
-      # listed conversation, whose timeline stays nil (unknown).
+      # Free: the parts come with the search response regardless. An empty list is an empty thread; a payload
+      # with no parts leaves it nil (unknown), as a listed conversation does.
       def embed_timeline(records, rows, projection)
         return unless column_asked?(projection, 'timeline')
 
-        records.each_with_index { |record, index| rows[index]['timeline'] = build_timeline(record) }
+        records.each_with_index { |record, index| rows[index]['timeline'] = parts_of(record) && build_timeline(record) }
+        truncated = records.count { |record| truncated?(record) }
+        warn_truncated_timelines(truncated) if truncated.positive?
       end
 
       # The attribute columns of every ticket type, in union. Read at boot by

@@ -178,13 +178,21 @@ module ForestAdminDatasourceIntercom
         }
       end
 
-      # Whatever else goes wrong on the way, a caller of this client only ever
-      # has to rescue APIError -- and the message names the operation, since a
-      # failure with no endpoint in it is a failure nobody can place.
-      it 'still names the operation when the failure is not one it expected' do
+      # The persistent adapter re-raises its own error unwrapped once the retries
+      # are spent: still an API failure, named with its operation.
+      it 'names the operation when the adapter fails with its own error' do
+        require 'net/http/persistent'
+        stub_request(:get, "#{base}/me").to_raise(Net::HTTP::Persistent::Error.new('host down'))
+
+        expect { client.me }.to raise_error(APIError, /me: Net::HTTP::Persistent::Error: host down/)
+      end
+
+      # A bug is not an outage: mapped to an APIError, the callers that degrade
+      # would log it as `HTTP -` and carry on.
+      it 'lets an error that is not a transport failure through' do
         stub_request(:get, "#{base}/me").to_raise(ArgumentError.new('unexpected'))
 
-        expect { client.me }.to raise_error(APIError, /me: ArgumentError: unexpected/)
+        expect { client.me }.to raise_error(ArgumentError, 'unexpected')
       end
 
       # Ruby chains the rescued error as `cause`, which `full_message` and error
@@ -209,8 +217,9 @@ module ForestAdminDatasourceIntercom
         }
       end
 
-      it 'chains no cause from the catch-all' do
-        stub_request(:get, "#{base}/me").to_raise(ArgumentError.new('unexpected'))
+      it 'chains no cause from an adapter failure' do
+        require 'net/http/persistent'
+        stub_request(:get, "#{base}/me").to_raise(Net::HTTP::Persistent::Error.new('host down'))
 
         expect { client.me }.to raise_error(APIError) { |error| expect(error.cause).to be_nil }
       end
@@ -392,10 +401,13 @@ module ForestAdminDatasourceIntercom
           .to raise_error(APIError, /neither 'admins' nor 'data' is a list/)
       end
 
-      it 'reads an empty body as no record' do
+      # Cached, an empty answer would leave every assignee and state relation
+      # nil for the whole window.
+      it 'refuses an empty body rather than reading it as no record' do
         stub_request(:get, "#{base}/admins").to_return(status: 200, body: '')
 
-        expect(client.fetch_all('admins', list_key: 'admins')).to eq([])
+        expect { client.fetch_all('admins', list_key: 'admins') }
+          .to raise_error(APIError, /admins: unexpected response shape, the body is empty/)
       end
 
       # No pagination parameter in the specification is not a promise that a
@@ -556,6 +568,21 @@ module ForestAdminDatasourceIntercom
 
         expect { client.fetch_all('admins', list_key: 'admins') }.to raise_error(APIError)
         expect(client.fetch_all('admins', list_key: 'admins').size).to eq(1)
+      end
+
+      # Served for the whole window, a list cut at the cap would be counted as
+      # the workspace on every page, with the warning logged only once.
+      it 'caches no list cut at the page cap' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_request(:get, "#{base}/tags").with(query: hash_including({}))
+                                          .to_return(json('data' => [{ 'id' => '1' }],
+                                                          'pages' => { 'next' => { 'starting_after' => 'c' } }))
+
+        2.times { client.fetch_all('tags') }
+
+        expect(WebMock).to have_requested(:get, "#{base}/tags")
+          .with(query: hash_including({})).times(2 * described_class::MAX_COLLECTED_PAGES)
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/not cached/).twice
       end
 
       context 'with the store off' do

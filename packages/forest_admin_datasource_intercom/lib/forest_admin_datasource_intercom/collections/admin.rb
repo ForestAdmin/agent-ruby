@@ -38,6 +38,8 @@ module ForestAdminDatasourceIntercom
         return unless column_asked?(projection, 'team_names')
 
         names = team_names
+        return if names.nil?
+
         records.each_with_index do |record, index|
           rows[index]['team_names'] = Array(record['team_ids']).filter_map { |id| names[id] }
         end
@@ -51,9 +53,9 @@ module ForestAdminDatasourceIntercom
       rescue APIError => e
         ForestAdminDatasourceIntercom.logger.warn(
           "[forest_admin_datasource_intercom] #{name} could not read the teams of the workspace (HTTP " \
-          "#{e.status || "-"}); the names are left empty. The relation to IntercomTeam is unaffected."
+          "#{e.status || "-"}); the names are left unknown. The relation to IntercomTeam is unaffected."
         )
-        {}
+        nil
       end
 
       def define_schema

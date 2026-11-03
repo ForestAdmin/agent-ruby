@@ -92,13 +92,14 @@ module ForestAdminDatasourceIntercom
 
       # A missing permission costs the column, never the page -- and never the
       # relation, which reads the teams from the other side.
-      it 'leaves the names empty when the teams cannot be read' do
+      # Unknown rather than `[]`, which would read as "in no team".
+      it 'leaves the names unknown when the teams cannot be read' do
         allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
         stub_admins('id' => '1', 'team_ids' => [814_865])
         stub_request(:get, "#{base}/teams").to_return(json({ 'type' => 'error.list' }, 403))
 
         expect(collection.list(nil, filter, %w[id team_names]).first)
-          .to eq({ 'id' => '1', 'team_names' => [] })
+          .to eq({ 'id' => '1', 'team_names' => nil })
       end
 
       it 'reads a teammate with no team as one with no team, not as one with a null' do

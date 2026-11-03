@@ -150,11 +150,14 @@ module ForestAdminDatasourceIntercom
 
     # Every record of an unpaginated reference endpoint, held in `Cache` for the configured window.
     # A cursor is still followed defensively. `boot` only picks the connection, so it is not part of the key;
-    # the list is frozen shallowly so no caller mutates what the next page reads.
+    # the list is frozen shallowly so no caller mutates what the next page reads. A list cut at the page cap
+    # is not held: served for the whole window, it would be counted as the workspace without a word.
     def fetch_all(path, list_key: 'data', params: {}, boot: false)
-      @configuration.reference_cache.fetch(['fetch_all', path, list_key, params]) do
+      complete = true
+      @configuration.reference_cache.fetch(['fetch_all', path, list_key, params], store: -> { complete }) do
         must_succeed(path) do
-          collect_pages(path, list_key: list_key, params: params, boot: boot).freeze
+          records, complete = collect_pages(path, list_key: list_key, params: params, boot: boot)
+          records.freeze
         end
       end
     end
@@ -313,11 +316,11 @@ module ForestAdminDatasourceIntercom
 
         if pages >= MAX_COLLECTED_PAGES
           log_collection_cap(path, pages, records.size)
-          break
+          return [records, false]
         end
       end
 
-      records
+      [records, true]
     end
 
     # The records under the key the endpoint uses, or under `data`. Anything
@@ -327,7 +330,7 @@ module ForestAdminDatasourceIntercom
     # reference collection silently read as empty is a state column with no
     # values and an assignee shown as a raw id.
     def extract_entities(body, operation, list_key)
-      return [] if body.nil? || body == ''
+      refuse_body_shape(operation, 'the body is empty') if body.nil? || body == ''
 
       entities = body.is_a?(Hash) ? (body[list_key] || body['data']) : nil
       return entities if entities.is_a?(Array)
@@ -339,8 +342,8 @@ module ForestAdminDatasourceIntercom
     def log_collection_cap(path, pages, collected)
       ForestAdminDatasourceIntercom.logger.warn(
         "[forest_admin_datasource_intercom] Stopped reading #{path} after #{pages} page(s) / " \
-        "#{collected} record(s); the rest is left out. This endpoint is read whole on purpose, so a workspace " \
-        'this large needs the collection bounded rather than listed.'
+        "#{collected} record(s); the rest is left out, and this partial list is not cached. This endpoint is " \
+        'read whole on purpose, so a workspace this large needs the collection bounded rather than listed.'
       )
     end
 
@@ -421,12 +424,15 @@ module ForestAdminDatasourceIntercom
       # a 404 read as "no such record" rather than as a failure, above all.
       raise
     rescue StandardError => e
+      # A transport failure the adapter did not wrap is an API failure; anything else is a bug here, and
+      # mapping it would have the callers that degrade log it as a transient Intercom outage.
+      raise unless RetryPolicy.connection_failure?(e)
+
       raise APIError, "Intercom API call failed: #{operation}: #{e.class}: #{e.message}", cause: nil
     end
 
     # Builds an APIError preserving the HTTP status and Intercom's own error body
-    # so a smart action can show the operator the real reason instead of
-    # "failed".
+    # so a caller can show the operator the real reason instead of "failed".
     def api_error(operation, error)
       response = response_of(error)
       status = response[:status]

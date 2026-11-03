@@ -101,6 +101,7 @@ module ForestAdminDatasourceIntercom
 
       def fetch_records(filter)
         refuse_search! unless blank_search?(filter)
+        return [] if matches_nothing?(filter)
 
         ids = id_lookup(filter)
         return records_by_ids(page_window(ids, filter)) if ids
@@ -115,6 +116,7 @@ module ForestAdminDatasourceIntercom
 
       def count_records(filter)
         refuse_search! unless blank_search?(filter)
+        return 0 if matches_nothing?(filter)
 
         ids = id_lookup(filter)
         return count_by_ids(ids) if ids
@@ -205,6 +207,13 @@ module ForestAdminDatasourceIntercom
         return [0, nil] if page.nil?
 
         [page.offset.to_i.clamp(0, nil), page_limit(page)]
+      end
+
+      # `Or []`, which `ConditionTreeFactory.match_ids` builds from no ids at all
+      # -- a live-query segment that returned none.
+      def matches_nothing?(filter)
+        tree = filter&.condition_tree
+        tree.is_a?(Branch) && tree.aggregator.to_s.casecmp('or').zero? && Array(tree.conditions).empty?
       end
 
       def lookup_condition(filter)

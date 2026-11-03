@@ -107,10 +107,45 @@ module ForestAdminDatasourceIntercom
     describe 'the two bounds an interval is rewritten into' do
       it 'asks for the day the interval names rather than cancelling out' do
         tree = branch('And', leaf('created_at', operators::GREATER_THAN, '2026-09-01T00:00:00Z'),
-                      leaf('created_at', operators::LESS_THAN, '2026-09-01T23:59:59Z'))
+                      leaf('created_at', operators::LESS_THAN, '2026-09-02T00:00:00Z'))
 
         expect(translate(tree)['value'].map { |bound| Time.at(bound['value']).utc.iso8601 })
           .to eq(['2026-08-31T00:00:00Z', '2026-09-02T00:00:00Z'])
+      end
+    end
+
+    # What each date operator the toolkit derives from the two bounds becomes
+    # once rewritten: answered by day, or refused where a day would answer more
+    # than the window asked for.
+    describe 'the date operators the toolkit rewrites into bounds' do
+      def rewritten(operator, value = nil)
+        equivalent = ForestAdminDatasourceToolkit::Components::Query::ConditionTree::ConditionTreeEquivalent
+        equivalent.get_equivalent_tree(leaf('created_at', operator, value),
+                                       [operators::GREATER_THAN, operators::LESS_THAN], 'Date', 'Europe/Paris')
+      end
+
+      it 'answers every operator whose bounds fall on a day boundary or end at the present' do
+        answered = [[operators::TODAY], [operators::YESTERDAY], [operators::PAST],
+                    [operators::BEFORE, '2026-09-01T00:00:00Z'], [operators::AFTER, '2026-09-01T00:00:00Z'],
+                    [operators::PREVIOUS_WEEK], [operators::PREVIOUS_MONTH], [operators::PREVIOUS_QUARTER],
+                    [operators::PREVIOUS_YEAR], [operators::PREVIOUS_WEEK_TO_DATE],
+                    [operators::PREVIOUS_MONTH_TO_DATE], [operators::PREVIOUS_QUARTER_TO_DATE],
+                    [operators::PREVIOUS_YEAR_TO_DATE], [operators::PREVIOUS_X_DAYS, 3],
+                    [operators::PREVIOUS_X_DAYS_TO_DATE, 3]]
+
+        answered.each do |operator, value|
+          expect { translate(rewritten(operator, value), timezone: 'Europe/Paris') }.not_to raise_error
+        end
+      end
+
+      it 'refuses the operators that name a time inside a day' do
+        refused = [[operators::FUTURE], [operators::AFTER_X_HOURS_AGO, 2], [operators::BEFORE_X_HOURS_AGO, 2],
+                   [operators::AFTER, '2026-09-01T10:30:00Z']]
+
+        refused.each do |operator, value|
+          expect { translate(rewritten(operator, value), timezone: 'Europe/Paris') }
+            .to raise_error(UnsupportedOperatorError, /inside a day/)
+        end
       end
     end
 

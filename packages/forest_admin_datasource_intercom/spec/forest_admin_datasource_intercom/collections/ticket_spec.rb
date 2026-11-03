@@ -494,6 +494,22 @@ module ForestAdminDatasourceIntercom
         expect(rows(%w[id timeline]).first['timeline']).to eq([])
       end
 
+      it 'leaves the thread unknown when the payload carries no parts' do
+        stub_search(ticket('1').except('ticket_parts'))
+
+        expect(rows(%w[id timeline]).first['timeline']).to be_nil
+      end
+
+      # Intercom keeps the 500 most recent parts, so a longer thread opens partway.
+      it 'reports a thread Intercom truncated' do
+        allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+        stub_search(ticket('1', parts(comment(at: 1_700_001_000), total: 501)))
+
+        rows(%w[id timeline])
+
+        expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).with(/timeline of 1 ticket/)
+      end
+
       it 'builds nothing when the projection does not name it' do
         stub_search(ticket('1', parts(comment(at: 1_700_001_000))))
 

@@ -65,8 +65,8 @@ beats not running.
 A read-only token is enough, and is what to recommend for this lot. A permission the token lacks
 costs **columns or a collection, never the boot of the agent**: the three boot-time introspections
 each degrade to no attribute column, a collection whose endpoint answers 403 fails its own page, and
-a token that cannot read `/admins` or `/teams` leaves the `admin_names` / `team_names` column empty
-rather than failing the page it is on. A token denied contacts or companies costs those two
+a token that cannot read `/admins` or `/teams` leaves the `admin_names` / `team_names` column `nil`
+(unknown) rather than failing the page it is on. A token denied contacts or companies costs those two
 collections and the `contact_name` column, and leaves everything else standing.
 
 A **relation is the exception**, and it is worth knowing before scoping a token: resolving one reads
@@ -137,9 +137,10 @@ and a log line nobody reads is not a substitute for it.
 
 *Exactly*, with one more bound worth naming: "read whole" is what the endpoint answers, and
 `fetch_all` stops after [`MAX_COLLECTED_PAGES`](lib/forest_admin_datasource_intercom/client.rb) pages
-if Intercom paginates one of these on its own — it logs when it does. A workspace whose `/admins` or
-`/teams` runs past that cap resolves the relations pointing at the records it dropped as empty. The
-figure is sized for reference collections, which is what the first tier above is.
+if Intercom paginates one of these on its own — it logs when it does, and does not cache the partial
+list, so the next read tries again and logs again. A workspace whose `/admins` or `/teams` runs past
+that cap resolves the relations pointing at the records it dropped as empty. The figure is sized for
+reference collections, which is what the first tier above is.
 
 | Collection | Relation | Target | Filterable through |
 | --- | --- | --- | --- |
@@ -328,21 +329,26 @@ documentation, which promises the workspace's timezone. `> V` answers from the s
 *after* V; `< V` answers before the start of V's own day.
 
 Sent as they come, the two bounds an interval is rewritten into cancel each other out: `today`
-reaches the datasource as `> 00:00` and `< 23:59` of one day, which Intercom reads as "from
-tomorrow" *and* "before today" — no rows at all, to the most ordinary filter there is. So each bound
-is moved to the boundary that makes Intercom answer the day the filter named.
+reaches the datasource as `> 00:00` of one day and `< 00:00` of the next, which Intercom reads as
+"from tomorrow" *and* "before tomorrow" — no rows at all, to the most ordinary filter there is. So
+each bound is moved to the boundary that makes Intercom answer the day the filter named.
 
 What follows from that:
 
-- a bound naming a time of day matches **from the start of that day, or through the end of it**. It
-  is the granularity the Intercom interface itself filters on;
+- a bound naming **a time inside a day is refused**, naming the column and the instant: answered for
+  the whole day, it would return rows outside the window, on a page that looks filtered. That rules
+  out `future`, `after_x_hours_ago`, `before_x_hours_ago`, and `before` / `after` given a time of day;
+- one exception, the upper bound **at the present** that `past` and the `*_to_date` family end on:
+  widened to midnight, it only adds rows dated after now, and every filterable date but
+  `snoozed_until` holds past instants. On `snoozed_until` — a snooze can end later today — it is
+  refused like the others;
 - a caller in UTC gets exactly the day they asked for;
 - a caller in another timezone gets the UTC days their window overlaps — up to a day wider at each
   end — and the agent logs that once per filter;
 - a date column publishes `>` and `<` only, and no equality. Everything an operator actually uses —
-  `before`, `after`, `today`, `yesterday`, `past`, `future`, the whole `previous_*` family — is
-  rewritten by the agent into a pair of those bounds. An equality on an instant is what stays out,
-  and a day-granular filter could not have honoured it anyway.
+  `before`, `after`, `today`, `yesterday`, `past`, the whole `previous_*` family — is rewritten by
+  the agent into a pair of those bounds. An equality on an instant is what stays out, and a
+  day-granular filter could not have honoured it anyway.
 
 ### What is filterable
 
@@ -396,10 +402,11 @@ empty page. `collection.disable_search` in the agent's customization removes the
   refusal names the condition it could not carry alongside the account. Resolving it properly would
   mean reading the account's contact ids first and handing `id IN [...]` plus the rest of the tree to
   `/contacts/search` — which that endpoint does answer, and which is not in this lot;
-- **a set of ids, counted.** `id in [...]` reads one record per id, so counting a set means reading
-  it, and past what a bulk read fetches the count is refused rather than answered with the number
-  the truncation left. A collection that advertises an exact count does not answer 25 to a question
-  about forty records. Contacts are the exception: Intercom counts them, 15 ids per search;
+- **a set of ids larger than a bulk read fetches**, listed or counted. `id in [...]` reads one
+  record per id, 25 at most (300 contacts, read 15 per search), and past that both the page and the
+  count are refused rather than answered with what the truncation left: 25 rows, or "25", where the
+  question named forty records looks like the whole answer. A list view never reaches it, since the
+  ids are cut to the page first; an export or an API caller naming more ids at once does;
 - **a list of more than 15 values** in an `in` or a `not in`, wherever it stands in the filter.
   Intercom refuses it with a 400 that names neither the field nor the condition;
 - **the custom attributes of a contact or a company.** They are filtered as
@@ -535,12 +542,13 @@ sort, so neither advertises an operator.
 
 **The thread is published too, and it is free here.** The same `timeline` column a conversation
 carries — who said what, when, and through which kind of event, internal notes and state changes
-included — built from the parts the response already holds. No request per row and no cap: where a
-conversation read from a listing carries no parts at all and leaves the column `nil` for *unknown*,
-a ticket always carries them, so an empty list means an empty thread. Both reads ask Intercom for
-`display_as=plaintext`: the bodies are HTML written by end customers, and rendering third-party
-markup inside Forest is neither safe nor useful. The 500-part ceiling applies here as well, which is
-the same truncation that can hide a closure date.
+included — built from the parts the response already holds. No request per row and no cap: a
+ticket carries its parts, so an empty list means an empty thread, and a payload that carries none
+leaves the column `nil` for *unknown*, as a conversation read from a listing does. Both reads ask
+Intercom for `display_as=plaintext`: the bodies are HTML written by end customers, and rendering
+third-party markup inside Forest is neither safe nor useful. The 500-part ceiling applies here as
+well, which is the same truncation that can hide a closure date, and a page whose tickets reach it
+says so in the log.
 
 The attributes a workspace declares on its ticket types are introspected once at boot and published
 as the **union** of every type's, keyed by name the way the payload is. Filtering one is a different
@@ -611,8 +619,8 @@ The accounts contacts belong to, and the collection that behaves least like the 
 **Paginated by offset**, which is the tier above. **Looked up, not searched**: `name` and
 `company_id` — the identifier the customer's own system gave the account, not Intercom's — are the
 two filters it publishes, each an exact equality, and anything else is refused by name. A record is
-read through `GET /companies/{id}`, and a set of ids one request each, capped at 25 with the
-truncation logged.
+read through `GET /companies/{id}`, and a set of ids one request each, 25 at most: past that the
+read is refused rather than truncated.
 
 `GET /companies/scroll` exists and is **deliberately rejected**: one open scroll per application,
 expiring after a minute, cannot serve two operators looking at a list at the same time.
@@ -760,21 +768,23 @@ payloads are shaped differently from the ones this expects. That echo is the onl
 substitution shows, so it is checked while the agent starts and reported as a warning.
 
 All four run on the boot connection — short timeouts, one quick retry — so a slow Intercom cannot
-turn a Rails boot into minutes the operator sits through, and each degrades to a warning rather
-than to a failed boot: a token missing a permission costs the columns it could not read, or the
-version check, never the agent.
+turn a Rails boot into minutes the operator sits through. A token missing a permission costs the
+columns it could not read, or the version check, never the agent: a 403 degrades to a warning.
+Any other failure of an attribute read — a timeout, a 5xx, a 429 past the retry, a revoked token —
+fails the boot instead: degraded, that pod would publish a schema missing columns its siblings
+have, and keep it until it restarts.
 
 `api_writable` is read alongside each attribute and kept, although every column of this lot is
 published read-only: it is what tells an attribute the API may write from one Intercom fills in
 itself, and reading it again later would be a second boot-time round trip.
 
-Everything else is read when a collection is listed, so an agent boots whatever Intercom is doing.
+Everything else is read when a collection is listed, so no other endpoint can hold up or fail the boot.
 
 ## What is not here yet
 
 | Lot | What it brings |
 | --- | --- |
-| 3 | Writes and business actions on tickets and conversations: reply, close, snooze, reopen, assign, tag, convert |
+| 3 | Writes on tickets and conversations: reply, close, snooze, reopen, assign, tag, convert. Actions ship as plugins (`collection.use`), as in the Pylon datasource, never declared by a collection |
 | 4b | Writes on contacts and companies: create, update, archive, block, merge, attach and detach |
 | 5 | Notes, tags, segments |
 | 6 | Bounded group-by and the reporting export |

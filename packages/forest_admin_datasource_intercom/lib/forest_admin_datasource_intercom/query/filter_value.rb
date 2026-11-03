@@ -19,10 +19,10 @@ module ForestAdminDatasourceIntercom
       # neither the field nor the condition past 15.
       MAX_LIST_SIZE = 15
 
-      def initialize(collection:, timezone: nil)
+      def initialize(collection:, timezone: nil, now: -> { Time.now.to_i })
         @collection = collection
         @zone = CallerZone.new(timezone)
-        @day_bounds = DayBounds.new(collection: collection, timezone: @zone.name)
+        @day_bounds = DayBounds.new(collection: collection, timezone: @zone.name, now: now)
       end
 
       def call(leaf, field, spelling)
@@ -31,7 +31,7 @@ module ForestAdminDatasourceIntercom
         refuse_absence!(leaf, field) if blank?(leaf.value)
 
         value = scalar(leaf.value, leaf, field)
-        field.type == 'date' ? @day_bounds.call(value, spelling) : value
+        field.type == 'date' ? @day_bounds.call(value, spelling, leaf, field) : value
       end
 
       private

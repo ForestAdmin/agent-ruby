@@ -51,6 +51,12 @@ module ForestAdminDatasourceIntercom
       expect(cache.fetch('key') { 'second' }).to be_nil
     end
 
+    it 'stores nothing the caller declines' do
+      cache.fetch('key', store: -> { false }) { 'partial' }
+
+      expect(cache.fetch('key') { 'whole' }).to eq('whole')
+    end
+
     it 'forgets everything on clear' do
       cache.fetch('key') { 'first' }
       cache.clear
