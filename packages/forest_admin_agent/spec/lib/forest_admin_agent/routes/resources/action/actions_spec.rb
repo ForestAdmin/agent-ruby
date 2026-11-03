@@ -33,6 +33,7 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:published_book) { @datasource.get_collection('book') }
 
         before do
           datasource = Datasource.new
@@ -131,8 +132,6 @@ module ForestAdminAgent
           end
 
           describe 'when the collection of the URL does not serve this action' do
-            let(:published_book) { @datasource.get_collection('book') }
-
             def declare_actions(actions)
               allow(published_book).to receive(:schema).and_wrap_original do |original|
                 original.call.merge(actions: actions)
@@ -190,7 +189,6 @@ module ForestAdminAgent
         end
 
         context 'with a bulk action run on a select-all' do
-          let(:published_book) { @datasource.get_collection('book') }
           let(:subset_query) { {} }
 
           before do
@@ -264,6 +262,15 @@ module ForestAdminAgent
               guarded_tree.every_leaf { |guarded| tree.some_leaf { |leaf| leaf.equal?(guarded) } }
             end
 
+            def guarded_tree
+              tree = nil
+              expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
+                expect(collection).to eq(published_book)
+                tree = applied[:condition_tree]
+              end
+              tree
+            end
+
             def refuse_holder_filters
               allow(permissions).to receive(:assert_can_read_query_fields)
                 .with(published_book, hash_including(condition_tree: reaching_holder))
@@ -273,20 +280,16 @@ module ForestAdminAgent
             it 'checks the very condition tree the authorization then counts with' do
               action.handle_request(args)
 
-              guarded_tree = nil
-              expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                expect(collection).to eq(published_book)
-                expect(applied[:condition_tree].to_h).to eq(
-                  aggregator: 'And',
-                  conditions: [
-                    { field: 'holder:national_id', operator: Operators::STARTS_WITH, value: '1850' },
-                    { field: 'title', operator: Operators::EQUAL, value: 'Dune' }
-                  ]
-                )
-                guarded_tree = applied[:condition_tree]
-              end
+              guarded = guarded_tree
+              expect(guarded.to_h).to eq(
+                aggregator: 'And',
+                conditions: [
+                  { field: 'holder:national_id', operator: Operators::STARTS_WITH, value: '1850' },
+                  { field: 'title', operator: Operators::EQUAL, value: 'Dune' }
+                ]
+              )
               expect(permissions).to have_received(:can_smart_action?) do |_args, _collection, filter_for_caller|
-                expect(applies_guarded_tree?(filter_for_caller.condition_tree, guarded_tree)).to be true
+                expect(applies_guarded_tree?(filter_for_caller.condition_tree, guarded)).to be true
               end
             end
 
@@ -303,13 +306,10 @@ module ForestAdminAgent
             it 'hands the form hooks only a filter the guard checked' do
               action.handle_hook_request(args)
 
-              guarded_tree = nil
-              expect(permissions).to have_received(:assert_can_read_query_fields) do |_collection, applied|
-                guarded_tree = applied[:condition_tree]
-              end
-              expect(guarded_tree).to reaching_holder
+              guarded = guarded_tree
+              expect(guarded).to reaching_holder
               expect(published_book).to have_received(:get_form) do |_caller, _action_name, _data, filter, _meta|
-                expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                expect(applies_guarded_tree?(filter.condition_tree, guarded)).to be true
               end
             end
 
@@ -321,18 +321,44 @@ module ForestAdminAgent
               expect(published_book).not_to have_received(:get_form)
             end
 
-            context 'when the filters come outside the subset query' do
-              let(:subset_query) { {} }
+            context 'when the caller filters are alternatives' do
+              let(:caller_filters) do
+                JSON.generate(
+                  {
+                    aggregator: 'Or',
+                    conditions: [
+                      { field: 'holder:national_id', operator: 'starts_with', value: '1850' },
+                      { field: 'title', operator: 'equal', value: 'Dune' }
+                    ]
+                  }
+                )
+              end
 
-              before { args[:params][:filters] = caller_filters }
+              it 'counts with the guarded branch as is' do
+                action.handle_request(args)
 
-              it 'refuses them all the same' do
-                refuse_holder_filters
+                guarded = guarded_tree
+                expect(guarded).to have_attributes(aggregator: 'Or')
+                expect(permissions).to have_received(:can_smart_action?) do |_args, _collection, filter_for_caller|
+                  expect(filter_for_caller.condition_tree.conditions).to include(be(guarded))
+                end
+              end
+            end
 
-                expect { action.handle_request(args) }
-                  .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
-                expect(permissions).not_to have_received(:can_smart_action?)
-                expect(published_book).not_to have_received(:execute)
+            %i[filters filter].each do |param|
+              context "when the filters come in params[:#{param}] outside the subset query" do
+                let(:subset_query) { {} }
+
+                before { args[:params][param] = caller_filters }
+
+                it 'refuses them all the same' do
+                  refuse_holder_filters
+
+                  expect { action.handle_request(args) }
+                    .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
+                  expect(permissions).not_to have_received(:can_smart_action?)
+                  expect(published_book).not_to have_received(:execute)
+                end
               end
             end
           end
