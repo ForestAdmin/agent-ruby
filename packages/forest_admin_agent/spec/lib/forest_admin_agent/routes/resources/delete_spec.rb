@@ -19,6 +19,11 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:bearer_caller) do
+          be_instance_of(Components::Caller).and have_attributes(
+            id: '1', email: 'nicolasa@forestadmin.com', rendering_id: 114, timezone: 'Europe/Paris'
+          )
+        end
         let(:forbidden) do
           ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'id'.")
         end
@@ -214,7 +219,7 @@ module ForestAdminAgent
                   guarded_tree = applied[:condition_tree]
                 end
                 expect(user).to have_received(:delete).once do |caller, filter|
-                  expect(caller).to be_instance_of(Components::Caller)
+                  expect(caller).to bearer_caller
                   expect(filter).to have_attributes(
                     search: 'jo', search_extended: false, segment: nil, page: nil, sort: nil
                   )

@@ -13,6 +13,11 @@ module ForestAdminAgent
           subject(:dissociate) { described_class.new }
 
           let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+          let(:bearer_caller) do
+            be_instance_of(Components::Caller).and have_attributes(
+              id: '1', email: 'nicolasa@forestadmin.com', rendering_id: 114, timezone: 'Europe/Paris'
+            )
+          end
           let(:forbidden) do
             ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'address:id'.")
           end
@@ -402,7 +407,7 @@ module ForestAdminAgent
                       guarded_tree = applied[:condition_tree]
                     end
                     expect(address_user).to have_received(written).once do |caller, filter, *patch|
-                      expect(caller).to be_instance_of(Components::Caller)
+                      expect(caller).to bearer_caller
                       expect(filter).to have_attributes(
                         search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
                       )
@@ -468,7 +473,7 @@ module ForestAdminAgent
 
                 def expect_links_of_parent_read(times)
                   expect(address_user).to have_received(:list).exactly(times).times do |caller, filter, projection|
-                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(caller).to bearer_caller
                     expect(filter).to have_attributes(search: nil, segment: nil, page: nil, sort: nil)
                     expect(filter.condition_tree.to_h).to eq(
                       aggregator: 'And',
@@ -483,7 +488,7 @@ module ForestAdminAgent
 
                 def expect_targets_listed_with(guarded)
                   expect(address).to have_received(:list).once do |caller, filter, projection|
-                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(caller).to bearer_caller
                     expect(filter).to have_attributes(
                       search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
                     )
@@ -495,7 +500,7 @@ module ForestAdminAgent
 
                 def expect_links_deleted_for_matched_targets
                   expect(address_user).to have_received(:delete).once do |caller, filter|
-                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(caller).to bearer_caller
                     expect(filter).to have_attributes(
                       search: nil, search_extended: nil, segment: nil, page: nil, sort: nil
                     )
@@ -528,7 +533,7 @@ module ForestAdminAgent
                   expect_links_of_parent_read(2)
                   expect_links_deleted_for_matched_targets
                   expect(address).to have_received(:delete).once do |caller, filter|
-                    expect(caller).to be_instance_of(Components::Caller)
+                    expect(caller).to bearer_caller
                     expect(filter).to have_attributes(
                       search: 'paris', search_extended: false, segment: nil, page: nil, sort: nil
                     )
