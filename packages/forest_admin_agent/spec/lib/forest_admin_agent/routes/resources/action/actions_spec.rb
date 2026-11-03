@@ -33,6 +33,11 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:bearer_caller) do
+          be_instance_of(Components::Caller).and have_attributes(
+            id: '1', email: 'nicolasa@forestadmin.com', rendering_id: 114, timezone: 'Europe/Paris'
+          )
+        end
         let(:published_book) { @datasource.get_collection('book') }
 
         before do
@@ -215,8 +220,8 @@ module ForestAdminAgent
             it 'hands the action the search and the segment of the list, minus the excluded ids' do
               action.handle_hook_request(args)
 
-              expect(published_book).to have_received(:get_form) do |caller, action_name, data, filter, _meta|
-                expect(caller).to be_instance_of(Components::Caller)
+              expect(published_book).to have_received(:get_form) do |caller, action_name, data, filter, meta|
+                expect(caller).to bearer_caller
                 expect(action_name).to eq('foo')
                 expect(data).to be_nil
                 expect(filter).to have_attributes(
@@ -224,6 +229,9 @@ module ForestAdminAgent
                 )
                 expect(filter.condition_tree.to_h).to eq(
                   { field: 'id', operator: Operators::NOT_EQUAL, value: '123e4567-e89b-12d3-a456-426614174000' }
+                )
+                expect(meta).to eq(
+                  change_field: nil, search_field: nil, search_values: {}, includeHiddenFields: false
                 )
               end
             end
@@ -319,7 +327,7 @@ module ForestAdminAgent
               guarded = guarded_tree
               expect(guarded).to reaching_holder
               expect(published_book).to have_received(:get_form) do |caller, action_name, data, filter, meta|
-                expect(caller).to be_instance_of(Components::Caller)
+                expect(caller).to bearer_caller
                 expect(action_name).to eq('foo')
                 expect(data).to be_nil
                 expect(filter).to have_attributes(search: nil, search_extended: false, segment: nil)
