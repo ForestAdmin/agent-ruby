@@ -265,10 +265,22 @@ module ForestAdminAgent
             def guarded_tree
               tree = nil
               expect(permissions).to have_received(:assert_can_read_query_fields) do |collection, applied|
-                expect(collection).to eq(published_book)
+                expect(collection.equal?(published_book)).to be(true), "expected the published book, got #{collection.class}"
+                expect(applied.except(:condition_tree)).to eq(search: nil, search_extended: false)
                 tree = applied[:condition_tree]
               end
               tree
+            end
+
+            def counted_filter
+              filter = nil
+              expect(permissions).to have_received(:can_smart_action?) do |caller_args, collection, filter_for_caller, action_name:|
+                expect(caller_args.dig(:params, :data, :attributes, :all_records_subset_query)).to eq(subset_query)
+                expect(collection.equal?(published_book)).to be(true), "expected the published book, got #{collection.class}"
+                expect(action_name).to eq('foo')
+                filter = filter_for_caller
+              end
+              filter
             end
 
             def refuse_holder_filters
@@ -288,9 +300,7 @@ module ForestAdminAgent
                   { field: 'title', operator: Operators::EQUAL, value: 'Dune' }
                 ]
               )
-              expect(permissions).to have_received(:can_smart_action?) do |_args, _collection, filter_for_caller|
-                expect(applies_guarded_tree?(filter_for_caller.condition_tree, guarded)).to be true
-              end
+              expect(applies_guarded_tree?(counted_filter.condition_tree, guarded)).to be true
             end
 
             it 'refuses before the authorization can count anything, and runs nothing' do
@@ -308,8 +318,15 @@ module ForestAdminAgent
 
               guarded = guarded_tree
               expect(guarded).to reaching_holder
-              expect(published_book).to have_received(:get_form) do |_caller, _action_name, _data, filter, _meta|
+              expect(published_book).to have_received(:get_form) do |caller, action_name, data, filter, meta|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(action_name).to eq('foo')
+                expect(data).to be_nil
+                expect(filter).to have_attributes(search: nil, search_extended: false, segment: nil)
                 expect(applies_guarded_tree?(filter.condition_tree, guarded)).to be true
+                expect(meta).to eq(
+                  change_field: nil, search_field: nil, search_values: {}, includeHiddenFields: false
+                )
               end
             end
 
@@ -339,9 +356,7 @@ module ForestAdminAgent
 
                 guarded = guarded_tree
                 expect(guarded).to have_attributes(aggregator: 'Or')
-                expect(permissions).to have_received(:can_smart_action?) do |_args, _collection, filter_for_caller|
-                  expect(filter_for_caller.condition_tree.conditions).to include(be(guarded))
-                end
+                expect(counted_filter.condition_tree.conditions).to include(be(guarded))
               end
             end
 
