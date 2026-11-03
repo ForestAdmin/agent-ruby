@@ -183,7 +183,7 @@ module ForestAdminDatasourceIntercom
     attr_reader :connection, :boot_connection
 
     # The answer already given for `key` while this page was being built, or the
-    # block's. Outside a scope -- a smart action, a boot read -- the block runs
+    # block's. Outside a scope -- a boot read, a customizer calling the client -- the block runs
     # as it always did: nothing is remembered where nothing opened a scope.
     #
     # A block that raises writes nothing, so a failed read is not replayed to

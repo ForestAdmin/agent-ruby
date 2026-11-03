@@ -140,7 +140,7 @@ module ForestAdminDatasourceIntercom
     end
 
     # Faraday's adapter registry is keyed by symbol: a string name (as YAML hands over) silently lost
-    # keep-alive. Whether the name resolves is left to the client, which falls back.
+    # keep-alive. Whether the name resolves is left to the client, which refuses one this process cannot load.
     def normalize_adapter(adapter)
       return nil if adapter.nil?
 

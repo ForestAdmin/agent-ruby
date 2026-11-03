@@ -4,9 +4,9 @@ Surface [Intercom](https://www.intercom.com) conversations, tickets, contacts, c
 teams, ticket types and ticket states as Forest collections.
 
 This release is **read only**. Rows, record details, exact counts, server-side filtering, the
-relations between collections and the conversation thread work; writes, business actions, notes,
-tags, segments and group-by on the paginated collections arrive in the lots after it — see "What is
-not here yet".
+relations between collections and the conversation thread work; writes, notes, tags, segments and
+group-by on the paginated collections arrive in the lots after it, business actions as plugins the
+agent opts into with `collection.use` — see "What is not here yet".
 
 ## Installation
 

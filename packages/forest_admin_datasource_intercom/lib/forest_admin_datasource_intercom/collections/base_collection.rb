@@ -1,6 +1,6 @@
 module ForestAdminDatasourceIntercom
   module Collections
-    # Read-only for now: writes and business actions arrive with lot 3. A relation to
+    # Read-only for now: writes arrive with lots 3 and 4b, actions as plugins, never on a collection. A relation to
     # a collection not served yet is a schema the agent refuses to boot on.
     class BaseCollection < ForestAdminDatasourceToolkit::Collection
       include Relations

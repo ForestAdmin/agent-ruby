@@ -14,7 +14,7 @@
 # `company_id` is documented on a ticket and refused by `/tickets/search` with
 # `invalid_field`. A `spec` row is therefore a candidate, never a promise, and
 # the probe is what turns it into one. Run it against the customer's workspace
-# and commit what it writes.
+# and merge the evidence it writes into this table by hand.
 #
 # `type` decides how a column's Forest operators are derived from the Intercom
 # ones, and how a value reaches the wire:

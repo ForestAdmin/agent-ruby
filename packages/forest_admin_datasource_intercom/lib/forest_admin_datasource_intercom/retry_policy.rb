@@ -12,11 +12,11 @@ module ForestAdminDatasourceIntercom
 
     STATUSES = [429, 500, 502, 503, 504].freeze
 
-    # Named rather than referenced: the persistent adapter is a gem the client
-    # treats as optional -- it falls back to Faraday's default when the process
-    # cannot load it -- so this file cannot name the class outright. Both places
-    # that need it resolve it at the moment they are asked, and answer that it
-    # cannot have been raised when nothing defined it.
+    # Named rather than referenced: the persistent adapter is a gem only loaded
+    # when it is the configured adapter -- `adapter: :net_http` never requires
+    # it -- so this file cannot name the class outright. Both places that need
+    # it resolve it at the moment they are asked, and answer that it cannot have
+    # been raised when nothing defined it.
     PERSISTENT_ADAPTER_ERROR = 'Net::HTTP::Persistent::Error'.freeze
 
     # faraday-retry's defaults plus ConnectionFailed, and the persistent adapter's own error, which it

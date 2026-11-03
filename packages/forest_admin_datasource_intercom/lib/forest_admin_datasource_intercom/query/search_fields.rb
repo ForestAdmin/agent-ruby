@@ -1,7 +1,7 @@
 module ForestAdminDatasourceIntercom
   module Query
-    # Loads `search_fields.yml`, which `forest_admin_intercom_probe` rewrites from a real workspace. Every row
-    # is validated on load, so a bad rewrite fails at boot rather than producing an unexplainable schema.
+    # Loads `search_fields.yml`, edited by hand from what `forest_admin_intercom_probe` measures. Every row
+    # is validated on load, so a bad edit fails at boot rather than producing an unexplainable schema.
     module SearchFields # rubocop:disable Metrics/ModuleLength
       PATH = File.expand_path('search_fields.yml', __dir__)
 
@@ -100,7 +100,7 @@ module ForestAdminDatasourceIntercom
         end
 
         # `filterable: true` is a state nothing here implements: the whole
-        # block is a refusal, and a rewrite flipping the flag would publish
+        # block is a refusal, and an edit flipping the flag would publish
         # nothing new while making the file say the opposite of what it does.
         def validate_attributes_unfilterable!(endpoint, column, row)
           return if row.fetch('filterable') == false
@@ -112,10 +112,10 @@ module ForestAdminDatasourceIntercom
 
         # A column filed as both filterable and refused. `Endpoint#field` is
         # consulted first, so the filterable row would win and the refusal --
-        # with the reason an operator reads -- would be ignored in silence. The
-        # file is rewritten by a script, so this is the shape a bad rewrite
-        # takes, and it fails at load rather than producing a schema nobody can
-        # explain.
+        # with the reason an operator reads -- would be ignored in silence. A
+        # measurement merged by hand next to the row it should have replaced
+        # takes this shape, and it fails at load rather than producing a schema
+        # nobody can explain.
         def validate_no_overlap!(endpoint, filterable, refused)
           both = filterable.keys & refused.keys
           return if both.empty?

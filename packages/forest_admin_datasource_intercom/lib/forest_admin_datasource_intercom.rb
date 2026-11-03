@@ -27,8 +27,8 @@ module ForestAdminDatasourceIntercom
   class UnsupportedOperatorError < ForestAdminDatasourceToolkit::Exceptions::ValidationError; end
 
   # Raised when an Intercom API call fails. Carries the HTTP status and the
-  # parsed response body so callers -- smart actions in particular -- can
-  # surface Intercom's own error message instead of a generic string.
+  # parsed response body so callers can surface Intercom's own error message
+  # instead of a generic string.
   class APIError < Error
     attr_reader :status, :body
 
