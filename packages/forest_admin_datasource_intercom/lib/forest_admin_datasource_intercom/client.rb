@@ -152,12 +152,16 @@ module ForestAdminDatasourceIntercom
     # A cursor is still followed defensively. `boot` only picks the connection, so it is not part of the key;
     # the list is frozen shallowly so no caller mutates what the next page reads. A list cut at the page cap
     # is not held: served for the whole window, it would be counted as the workspace without a word.
+    # Also scoped to the page, so a through-collection and its target read one list even uncached.
     def fetch_all(path, list_key: 'data', params: {}, boot: false)
-      complete = true
-      @configuration.reference_cache.fetch(['fetch_all', path, list_key, params], store: -> { complete }) do
-        must_succeed(path) do
-          records, complete = collect_pages(path, list_key: list_key, params: params, boot: boot)
-          records.freeze
+      key = ['fetch_all', path, list_key, params]
+      within_read_scope(key) do
+        complete = true
+        @configuration.reference_cache.fetch(key, store: -> { complete }) do
+          must_succeed(path) do
+            records, complete = collect_pages(path, list_key: list_key, params: params, boot: boot)
+            records.freeze
+          end
         end
       end
     end

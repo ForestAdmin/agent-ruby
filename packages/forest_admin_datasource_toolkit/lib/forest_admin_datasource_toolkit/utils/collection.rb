@@ -163,8 +163,7 @@ module ForestAdminDatasourceToolkit
               projection.nest(prefix: foreign_relation)
             )
 
-            # A through row whose target is gone yields no row, not a nil the serializer would read.
-            return records.filter_map { |r| r[foreign_relation] }
+            return records.map { |r| r[foreign_relation] }
           end
         end
 

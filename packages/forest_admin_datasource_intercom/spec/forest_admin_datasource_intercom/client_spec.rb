@@ -630,6 +630,31 @@ module ForestAdminDatasourceIntercom
         expect(WebMock).to have_requested(:get, "#{base}/contacts/c1").once
       end
 
+      # TeamMembership keeps the pairs whose admin `/admins` answers, and the `admin`
+      # relation then resolves through `/admins` again: both must read one list.
+      context 'with the reference cache disabled' do
+        let(:configuration) do
+          Configuration.new(access_token: 's3cr3t', retry_policy: retry_policy, rate_limiter: nil,
+                            reference_cache_ttl: 0)
+        end
+
+        before do
+          stub_request(:get, "#{base}/admins").to_return(json('admins' => [{ 'id' => '1' }]), json('admins' => []))
+        end
+
+        it 'issues one request for two reads of a reference list' do
+          lists = client.with_read_scope { Array.new(2) { client.fetch_all('admins', list_key: 'admins') } }
+
+          expect(lists.last).to eq([{ 'id' => '1' }])
+        end
+
+        it 'reads a reference list again in the next scope' do
+          2.times { client.with_read_scope { client.fetch_all('admins', list_key: 'admins') } }
+
+          expect(WebMock).to have_requested(:get, "#{base}/admins").twice
+        end
+      end
+
       it 'tells two searches apart by their query' do
         client.with_read_scope do
           search
