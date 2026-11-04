@@ -340,6 +340,11 @@ the store. A missing `collection` or `recordId` returns **HTTP 400** (`Validatio
 
 ## Smart actions
 
+Writes a smart action makes through Forest (`context.collection` or `context.datasource.get_collection(...)`
+`create` / `update` / `delete`) are audited like any other write, under the same `correlationKey` as the
+action: the audit hooks sit on an internal layer below smart actions. Writes that bypass Forest (raw SQL, a
+direct ActiveRecord call, an external API) only show up through the action row below.
+
 Running a smart action writes one row per selected record, in the same table:
 
 | column           | value                                                                      |

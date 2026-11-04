@@ -43,19 +43,18 @@ module ForestAdminAgent
         add_delete_hooks(collection_customizer, target)
       end
 
-      # The "after" hooks are prepended: `execute_after` stops at the first exception, so a customization
-      # raising in its own after hook would otherwise drop the record of a write that already happened.
-      # The "before" hooks stay appended, so they read the data, filter and patch every other customization
-      # has had its say on.
+      # Hooks sit on the internal layer, below smart actions, so writes made from an action's `execute` are
+      # audited too. The "after" hooks are prepended: `execute_after` stops at the first exception, so another
+      # internal hook raising would otherwise drop the record of a write that already happened.
       def add_create_hooks(collection_customizer, target)
-        collection_customizer.add_hook('Before', 'Create') do |context|
+        collection_customizer.add_internal_hook('Before', 'Create') do |context|
           # No record id yet — that is what the column being nullable is for.
           rows = [{ record_id: nil, new_values: pick(context.data, target[:columns]) }]
 
           @snapshots.push(context.data, ids: pending_rows(context.caller, 'create', target[:name], rows))
         end
 
-        collection_customizer.add_hook('After', 'Create', prepend: true) do |context|
+        collection_customizer.add_internal_hook('After', 'Create', prepend: true) do |context|
           pending = @snapshots.pop_for(context.data)
           next unless pending
 
@@ -66,7 +65,7 @@ module ForestAdminAgent
       end
 
       def add_update_hooks(collection_customizer, target)
-        collection_customizer.add_hook('Before', 'Update') do |context|
+        collection_customizer.add_internal_hook('Before', 'Update') do |context|
           records = @snapshots.take(context, target[:projection])
           @snapshots.push(
             context.filter,
@@ -83,7 +82,7 @@ module ForestAdminAgent
           )
         end
 
-        collection_customizer.add_hook('After', 'Update', prepend: true) do |context|
+        collection_customizer.add_internal_hook('After', 'Update', prepend: true) do |context|
           pending = @snapshots.pop_for(context.filter)
           next unless pending
 
@@ -92,7 +91,7 @@ module ForestAdminAgent
       end
 
       def add_delete_hooks(collection_customizer, target)
-        collection_customizer.add_hook('Before', 'Delete') do |context|
+        collection_customizer.add_internal_hook('Before', 'Delete') do |context|
           records = @snapshots.take(context, target[:projection])
           @snapshots.push(
             context.filter,
@@ -107,7 +106,7 @@ module ForestAdminAgent
           )
         end
 
-        collection_customizer.add_hook('After', 'Delete', prepend: true) do |context|
+        collection_customizer.add_internal_hook('After', 'Delete', prepend: true) do |context|
           pending = @snapshots.pop_for(context.filter)
           next unless pending
 

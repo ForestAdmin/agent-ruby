@@ -305,6 +305,13 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    # Like add_hook, but also fires for writes initiated from inside a smart action. Used by the audit trail.
+    def add_internal_hook(position, type, prepend: false, &handler)
+      push_customization do
+        @stack.internal_hook.get_collection(@name).add_hook(position, type, handler, prepend: prepend)
+      end
+    end
+
     # Add a new segment on the collection.
     # @param name the name of the segment
     # @param definition a function used to generate a condition tree or a condition tree
