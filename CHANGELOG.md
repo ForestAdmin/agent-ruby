@@ -1,3 +1,10 @@
+# [1.49.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.48.0...v1.49.0) (2026-11-04)
+
+
+### Features
+
+* **datasource intercom:** read-only Intercom datasource, phase 1 ([#387](https://github.com/ForestAdmin/agent-ruby/issues/387)) ([8b30efc](https://github.com/ForestAdmin/agent-ruby/commit/8b30efc401b7f0ef6d1e8db4accd944f652a3dbd)), closes [#383](https://github.com/ForestAdmin/agent-ruby/issues/383) [#384](https://github.com/ForestAdmin/agent-ruby/issues/384) [#385](https://github.com/ForestAdmin/agent-ruby/issues/385) [#386](https://github.com/ForestAdmin/agent-ruby/issues/386)
+
 # [1.48.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.47.0...v1.48.0) (2026-11-04)
 
 

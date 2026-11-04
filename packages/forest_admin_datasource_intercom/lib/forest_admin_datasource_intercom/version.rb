@@ -1,3 +1,3 @@
 module ForestAdminDatasourceIntercom
-  VERSION = "0.1.0"
+  VERSION = "1.49.0"
 end
