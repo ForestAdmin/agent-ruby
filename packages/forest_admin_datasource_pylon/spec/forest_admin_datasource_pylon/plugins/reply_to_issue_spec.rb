@@ -405,7 +405,7 @@ module ForestAdminDatasourcePylon
         run_action(register(allow_internal_note: false), values(form::TYPE_LABEL => form::INTERNAL_NOTE))
 
         expect(client).not_to have_received(:create_issue_note)
-        expect(client).to have_received(:reply_to_issue)
+        expect(client).to have_received(:reply_to_issue).with('i1', hash_including('body_html' => '<p>Hi</p>'))
       end
 
       it 'refuses a public reply on an issue with no customer message' do
@@ -507,6 +507,7 @@ module ForestAdminDatasourcePylon
         run_action(register, values(form::MESSAGE_LABEL => '<p><img src="https://cdn/x.png"></p>'))
 
         expect(client).to have_received(:reply_to_issue)
+          .with('i1', hash_including('body_html' => '<p><img src="https://cdn/x.png"></p>'))
       end
     end
 
