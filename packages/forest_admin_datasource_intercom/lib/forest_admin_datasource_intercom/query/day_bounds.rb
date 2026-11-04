@@ -23,10 +23,11 @@ module ForestAdminDatasourceIntercom
       end
 
       def call(seconds, spelling, leaf, field)
-        refuse_inside_a_day!(seconds, leaf) unless midnight?(seconds) || open_ended?(seconds, spelling, field)
+        open_ended = open_ended?(seconds, spelling, field)
+        refuse_inside_a_day!(seconds, leaf) unless midnight?(seconds) || open_ended
 
         day = seconds - (seconds % UTC_DAY)
-        report_utc_day(seconds, day)
+        report_utc_day unless seconds == day || open_ended
 
         return day - UTC_DAY if spelling == '>'
 
@@ -57,12 +58,10 @@ module ForestAdminDatasourceIntercom
               'yesterday, a previous period.'
       end
 
-      # A window written in another timezone is answered on the UTC days it
-      # overlaps, which is up to a day wider at each end. Reported once per
-      # filter rather than per bound: what an operator needs to know is that the
-      # day boundary is not theirs, not how many bounds crossed it.
-      def report_utc_day(seconds, day)
-        return if @reported || same_day_locally?(seconds, day)
+      # A bound on the caller's midnight but not the UTC one is widened to the UTC day, whichever side of UTC
+      # the caller sits. Reported once per filter rather than per bound.
+      def report_utc_day
+        return if @reported
 
         @reported = true
         ForestAdminDatasourceIntercom.logger.warn(
@@ -70,12 +69,6 @@ module ForestAdminDatasourceIntercom
           'Intercom truncates a date search to the UTC day whatever the workspace timezone says. The rows come ' \
           'back for the UTC days the window overlaps, which is up to a day wider at each end.'
         )
-      end
-
-      def same_day_locally?(seconds, day)
-        Time.use_zone(@timezone) { Time.zone.at(seconds).to_date } == Time.at(day).utc.to_date
-      rescue ArgumentError
-        true
       end
     end
   end

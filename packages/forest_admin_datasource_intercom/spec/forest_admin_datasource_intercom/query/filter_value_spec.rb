@@ -136,6 +136,27 @@ module ForestAdminDatasourceIntercom
         expect(ForestAdminDatasourceIntercom.logger).not_to have_received(:warn)
       end
 
+      # New York midnight is 04:00 UTC the same day, so the local and UTC dates
+      # of the bound match while the window still gains four hours.
+      context 'when the caller sits west of UTC' do
+        let(:timezone) { 'America/New_York' }
+
+        it 'reports the UTC day boundary for `today`' do
+          allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+          expect(bound('2026-09-01T04:00:00Z', '>')).to eq('2026-08-31T00:00:00Z')
+          expect(bound('2026-09-02T04:00:00Z', '<')).to eq('2026-09-03T00:00:00Z')
+          expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).once.with(/truncates a date search/)
+        end
+
+        it 'reports the UTC day boundary for an upper bound that has passed' do
+          allow(ForestAdminDatasourceIntercom.logger).to receive(:warn)
+
+          expect(bound('2026-09-01T04:00:00Z', '<')).to eq('2026-09-02T00:00:00Z')
+          expect(ForestAdminDatasourceIntercom.logger).to have_received(:warn).once.with(/truncates a date search/)
+        end
+      end
+
       context 'when the caller names a timezone nothing knows' do
         let(:timezone) { 'Middle-Earth/Shire' }
 
