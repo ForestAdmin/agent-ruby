@@ -1,3 +1,10 @@
+# [1.48.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.47.0...v1.48.0) (2026-11-04)
+
+
+### Features
+
+* **agent:** audit writes made from inside a smart action ([#426](https://github.com/ForestAdmin/agent-ruby/issues/426)) ([13c26c7](https://github.com/ForestAdmin/agent-ruby/commit/13c26c70a47b80847356cc14a602c5c5ca464fac))
+
 # [1.47.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.4...v1.47.0) (2026-11-04)
 
 
