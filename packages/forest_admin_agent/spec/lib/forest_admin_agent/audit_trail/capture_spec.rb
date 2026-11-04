@@ -59,7 +59,7 @@ module ForestAdminAgent
 
       let(:collection_customizer) do
         customizer = double('CollectionCustomizer', name: 'companies', collection: collection)
-        allow(customizer).to receive(:add_hook) do |position, type, prepend: false, &block|
+        allow(customizer).to receive(:add_internal_hook) do |position, type, prepend: false, &block|
           registrations << [position, type, prepend]
           hooks["#{position}_#{type}"] = block
         end

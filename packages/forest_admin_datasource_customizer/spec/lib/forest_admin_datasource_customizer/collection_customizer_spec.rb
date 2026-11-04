@@ -662,6 +662,42 @@ module ForestAdminDatasourceCustomizer
       end
     end
 
+    context 'when using add_internal_hook' do
+      let(:person_customizer) { described_class.new(@datasource_customizer, @datasource_customizer.stack, 'person') }
+      let(:internal_creates) { [] }
+      let(:public_creates) { [] }
+
+      before do
+        @datasource_customizer.stack.apply_queued_customizations({})
+        allow(@datasource_customizer.composite_datasource.get_collection('person')).to receive(:create) { |_caller, data| data }
+        person_customizer.add_internal_hook('Before', 'Create') { |context| internal_creates << context.data }
+        person_customizer.add_hook('Before', 'Create') { |context| public_creates << context.data }
+
+        create_person = BaseAction.new(scope: Types::ActionScope::GLOBAL) do |context, result_builder|
+          context.datasource.get_collection('person').create({ 'name' => 'from action' })
+          result_builder.success
+        end
+        described_class.new(@datasource_customizer, @datasource_customizer.stack, 'book')
+                       .add_action('create person', create_person)
+        @datasource_customizer.stack.apply_queued_customizations({})
+      end
+
+      it 'fires for a write made from inside a smart action, unlike add_hook' do
+        @datasource_customizer.stack.datasource.get_collection('book')
+                              .execute(caller, 'create person', {}, ForestAdminDatasourceToolkit::Components::Query::Filter.new)
+
+        expect(internal_creates).to eq([{ 'name' => 'from action' }])
+        expect(public_creates).to eq([])
+      end
+
+      it 'fires alongside add_hook for a write made through the agent' do
+        @datasource_customizer.stack.datasource.get_collection('person').create(caller, { 'name' => 'direct' })
+
+        expect(internal_creates).to eq([{ 'name' => 'direct' }])
+        expect(public_creates).to eq([{ 'name' => 'direct' }])
+      end
+    end
+
     context 'when using add_segment' do
       it 'add a segment' do
         stack = @datasource_customizer.stack
