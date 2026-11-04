@@ -543,6 +543,14 @@ module ForestAdminDatasourceIntercom
         end.to raise_error(UnsupportedOperatorError, /condition on role/)
       end
 
+      # A search typed in the account's related list: the bare equality
+      # alone would otherwise reach the translator, which blames company_id.
+      it 'names a search typed alongside the account' do
+        expect { rows(%w[id], condition_tree: leaf('company_id', operators::EQUAL, 'co1'), search: 'marie') }
+          .to raise_error(UnsupportedOperatorError, %r{GET /companies/\{id\}/contacts.*search "marie"}m)
+        expect(WebMock).not_to have_requested(:any, /contacts/)
+      end
+
       it 'refuses the count of a narrowed account the same way' do
         expect do
           collection.aggregate(nil,

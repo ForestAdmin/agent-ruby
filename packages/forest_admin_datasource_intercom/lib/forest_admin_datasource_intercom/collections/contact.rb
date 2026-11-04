@@ -166,11 +166,12 @@ module ForestAdminDatasourceIntercom
         tree.value&.to_s
       end
 
-      # `company_id` plus another condition (e.g. a scope): `GET /companies/{id}/contacts` narrows
-      # nothing and `/contacts/search` filters no company field, so no request answers both.
+      # `company_id` plus another condition (e.g. a scope) or a search: `GET /companies/{id}/contacts`
+      # narrows nothing and `/contacts/search` filters no company field, so no request answers both.
       def narrowed_company?(filter)
         tree = filter&.condition_tree
-        return false if tree.nil? || tree.is_a?(Leaf)
+        return false if tree.nil?
+        return false if tree.is_a?(Leaf) && blank_search?(filter)
 
         tree.some_leaf { |leaf| leaf.field.to_s == 'company_id' && leaf.operator == Operators::EQUAL }
       end
@@ -195,7 +196,10 @@ module ForestAdminDatasourceIntercom
           false
         end
 
-        others.empty? ? 'condition filtered alongside it' : "condition on #{others.uniq.join(", ")}"
+        causes = []
+        causes << "condition on #{others.uniq.join(", ")}" unless others.empty?
+        causes << "search #{filter.search.to_s.strip.inspect}" unless blank_search?(filter)
+        causes.empty? ? 'condition filtered alongside it' : causes.join(' and the ')
       end
 
       # An account Intercom no longer answers for -- deleted, or moved outside
