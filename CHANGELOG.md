@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.4...v1.47.0) (2026-11-04)
+
+
+### Features
+
+* **datasource:** reply to a Pylon issue from Forest on the customer's channel [PRD-1873] ([#420](https://github.com/ForestAdmin/agent-ruby/issues/420)) ([fcf628c](https://github.com/ForestAdmin/agent-ruby/commit/fcf628c1f32e5b52769f51e56b26a59e182837fe))
+
 ## [1.46.4](https://github.com/ForestAdmin/agent-ruby/compare/v1.46.3...v1.46.4) (2026-10-23)
 
 
