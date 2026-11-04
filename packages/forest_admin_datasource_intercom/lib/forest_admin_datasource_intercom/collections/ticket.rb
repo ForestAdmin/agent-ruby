@@ -66,9 +66,8 @@ module ForestAdminDatasourceIntercom
         # The number the support team says out loud, next to the id the API
         # answers by.
         add_column('ticket_id', 'String')
-        # `request` / `task` / `tracker` on the wire, never the labels the
-        # Intercom interface shows -- the same mismatch a filter on it will have
-        # to respect.
+        # Read as the label (`Customer` / `Back-office` / `Tracker`); a filter sends
+        # the word `/tickets/search` takes for it (`request` / `task` / `tracker`).
         add_column('category', 'String')
         add_column('open', 'Boolean')
         add_column('is_shared', 'Boolean')

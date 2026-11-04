@@ -36,8 +36,7 @@ module ForestAdminDatasourceIntercom
         add_column('id', 'String', is_primary_key: true)
         add_column('name', 'String')
         add_column('description', 'String')
-        # `request` / `task` / `tracker` on the wire, not the labels the Intercom
-        # interface shows -- the same mismatch the ticket filter has to respect.
+        # The label (`Customer` / `Back-office` / `Tracker`), as on a ticket.
         add_column('category', 'String')
         add_column('icon', 'String')
         add_column('archived', 'Boolean')
