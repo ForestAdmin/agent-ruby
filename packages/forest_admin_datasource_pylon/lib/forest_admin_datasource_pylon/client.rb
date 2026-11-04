@@ -53,9 +53,17 @@ module ForestAdminDatasourcePylon
     # when asked to, so a future default page size stays handled rather than
     # silently truncating the thread.
     def fetch_issue_messages(issue_id)
-      path = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+      path = issue_messages_path(issue_id)
 
       best_effort("fetch_issue_messages(#{issue_id})", default: nil) { must_succeed(path) { collect_pages(path) } }
+    end
+
+    # For a caller acting on the thread: a thread that could not be read, or
+    # only in part, raises instead of reading as a conversation without it.
+    def fetch_complete_issue_messages(issue_id)
+      path = issue_messages_path(issue_id)
+
+      must_succeed(path) { collect_pages(path, refuse_past_cap: true) }
     end
 
     def search_accounts(limit:, cursor: nil, filter: nil, search_text: nil)
@@ -144,6 +152,8 @@ module ForestAdminDatasourcePylon
 
     private
 
+    def issue_messages_path(issue_id) = "issues/#{Faraday::Utils.escape(issue_id)}/messages"
+
     def search_resource(path, limit:, cursor: nil, filter: nil, search_text: nil)
       body = { 'limit' => clamp_limit(limit) }
       body['cursor']      = cursor unless blank?(cursor)
@@ -168,12 +178,14 @@ module ForestAdminDatasourcePylon
     # so the walk costs the single request it always did and only does something
     # the day that changes.
     #
-    # Past the cap the walk is refused rather than truncated, unlike the thread
-    # and the custom fields: `FetchAllCollection` filters, sorts, counts and
-    # groups in memory over what this returns, and calls the result exact
-    # BECAUSE it is every record Pylon holds. Truncated, that claim would stand
-    # over a fraction of the collection -- a count answered short and presented
-    # as exact, which is the one answer this datasource refuses everywhere else.
+    # Past the cap the walk is refused rather than truncated, like the thread a
+    # reply acts on (`fetch_complete_issue_messages`) and unlike the thread a
+    # page shows and the custom fields: `FetchAllCollection` filters, sorts,
+    # counts and groups in memory over what this returns, and calls the result
+    # exact BECAUSE it is every record Pylon holds. Truncated, that claim would
+    # stand over a fraction of the collection -- a count answered short and
+    # presented as exact, which is the one answer this datasource refuses
+    # everywhere else.
     def fetch_all(path, params = {})
       must_succeed(path) { collect_pages(path, params, refuse_past_cap: true) }
     end
@@ -193,7 +205,8 @@ module ForestAdminDatasourcePylon
     # Only `next_cursor` being nil is Pylon saying there is nothing more. Every
     # other stop leaves records behind, and `refuse_past_cap` is which of the two
     # answers the caller wants to those: a warning and a short list, or a refusal.
-    # See `fetch_all`, whose answer is only correct whole.
+    # See `fetch_all`, whose answer is only correct whole, and
+    # `fetch_complete_issue_messages`, whose caller acts on the latest message.
     #
     # `conn` is what a caller reading on the boot path hands its own connection
     # through: every page of the walk is then bounded like the first.
@@ -241,10 +254,8 @@ module ForestAdminDatasourcePylon
     def refuse_truncated_walk(path, reason, pages, collected)
       raise APIError,
             "Pylon left the walk of #{path} short after #{pages} page(s) / #{collected} record(s): #{reason}. " \
-            'That endpoint is documented as answering with the whole collection in one response, which is what ' \
-            'PylonUser and PylonTeam filter, sort and count in memory as an exact answer. Refusing rather ' \
-            'than answering over a fraction of the collection: reading it needs cursor pagination, the way ' \
-            'PylonIssue reads its own.'
+            'That endpoint is documented as answering with the whole collection in one response, and its ' \
+            'caller needs all of it. Refusing rather than answering over a fraction of it.'
     end
 
     def log_truncated_walk(path, reason, pages, collected)

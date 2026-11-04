@@ -129,6 +129,38 @@ module ForestAdminDatasourcePylon
       end
     end
 
+    describe 'the email envelope of a message' do
+      before { stub_issues(issue_payload('i1')) }
+
+      def message_of(payload)
+        stub_messages('i1', payload)
+        issues.list(nil, filter, %w[id messages]).first['messages'].first
+      end
+
+      it 'flattens the sender and recipients of an email' do
+        email_info = { 'from_email' => 'ada@acme.com', 'to_emails' => ['support@acme.io'],
+                       'cc_emails' => ['bob@acme.com'], 'bcc_emails' => ['audit@acme.io'],
+                       'message_id' => '<abc@mail.acme.com>' }
+
+        expect(message_of(message_payload('msg-1', 'email_info' => email_info))).to include(
+          'email_from' => 'ada@acme.com', 'email_to' => ['support@acme.io'], 'email_cc' => ['bob@acme.com']
+        )
+      end
+
+      it 'leaves out the blind copies and the RFC 5322 message id' do
+        email_info = { 'bcc_emails' => ['audit@acme.io'], 'message_id' => '<abc@mail.acme.com>' }
+        message = message_of(message_payload('msg-1', 'email_info' => email_info))
+
+        expect(message.values.flatten).not_to include('audit@acme.io', '<abc@mail.acme.com>')
+      end
+
+      it 'leaves every email field null on a message that is not an email' do
+        expect(message_of(message_payload('msg-1', 'source' => 'slack'))).to include(
+          'email_from' => nil, 'email_to' => nil, 'email_cc' => nil
+        )
+      end
+    end
+
     describe 'the author of a message' do
       before { stub_issues(issue_payload('i1')) }
 

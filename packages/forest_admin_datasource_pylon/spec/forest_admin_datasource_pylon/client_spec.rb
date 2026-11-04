@@ -352,6 +352,53 @@ RSpec.describe ForestAdminDatasourcePylon::Client do
     end
   end
 
+  describe '#fetch_complete_issue_messages' do
+    def page(records, cursor: nil)
+      body = { 'data' => records }
+      body['pagination'] = { 'cursor' => cursor, 'has_next_page' => true } if cursor
+      json(body)
+    end
+
+    it 'returns the whole thread of an issue' do
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(page([{ 'id' => 'm1' }, { 'id' => 'm2' }]))
+
+      expect(client.fetch_complete_issue_messages('i1')).to eq([{ 'id' => 'm1' }, { 'id' => 'm2' }])
+    end
+
+    it 'escapes the issue id' do
+      stub_request(:get, "#{base}/issues/..%2Fme/messages").to_return(page([]))
+
+      client.fetch_complete_issue_messages('../me')
+
+      expect(WebMock).to have_requested(:get, "#{base}/issues/..%2Fme/messages")
+    end
+
+    it 'raises when the thread cannot be read' do
+      stub_request(:get, "#{base}/issues/i1/messages").to_return(json({ 'message' => 'boom' }, 500))
+
+      expect { client.fetch_complete_issue_messages('i1') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, /HTTP 500 boom/)
+    end
+
+    it 'raises on a missing issue' do
+      stub_request(:get, "#{base}/issues/nope/messages").to_return(json({ 'message' => 'not found' }, 404))
+
+      expect { client.fetch_complete_issue_messages('nope') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError) { |error| expect(error.status).to eq(404) }
+    end
+
+    it 'raises rather than answering part of a thread Pylon never stops paginating' do
+      served = 0
+      stub_request(:get, %r{/issues/i1/messages}).to_return do
+        served += 1
+        page([{ 'id' => "m#{served}" }], cursor: "c#{served}")
+      end
+
+      expect { client.fetch_complete_issue_messages('i1') }
+        .to raise_error(ForestAdminDatasourcePylon::APIError, %r{left the walk of issues/i1/messages short})
+    end
+  end
+
   describe '#search_accounts' do
     it 'posts the full search envelope and returns the records' do
       stub_request(:post, "#{base}/accounts/search").to_return(json('data' => [{ 'id' => 'a1' }]))

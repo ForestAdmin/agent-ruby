@@ -29,7 +29,22 @@ module ForestAdminDatasourcePylon
 
       def update_user(id, attributes) = patch_resource('users', id, attributes)
 
+      # `message_id` picks the customer conversation the reply is delivered to.
+      def reply_to_issue(id, attributes) = post_message(issue_path(id, 'reply'), attributes)
+      def create_issue_note(id, attributes) = post_message(issue_path(id, 'note'), attributes)
+
       private
+
+      def issue_path(id, action) = "issues/#{Faraday::Utils.escape(id)}/#{action}"
+
+      # A 2xx means Pylon delivered the message, whatever the body says:
+      # refusing an unexpected body would invite the operator to send it twice.
+      def post_message(path, attributes)
+        must_succeed("create(#{path})") do
+          body = connection.post(path, attributes).body
+          body['data'] if body.is_a?(Hash) && body['data'].is_a?(Hash)
+        end
+      end
 
       def post_resource(resource, attributes)
         operation = "create(#{resource})"

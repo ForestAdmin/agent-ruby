@@ -5,7 +5,7 @@ module ForestAdminDatasourcePylon
       # way the Zendesk datasource embeds a ticket's comments.
       #
       # Pylon has no way to read the threads of several issues at once, so the
-      # thread costs one request per row — against an endpoint allowing 20 per
+      # thread costs one request per row — against an endpoint allowing 120 per
       # minute. The fan-out is therefore bounded like the primary-key lookups of
       # this collection: truncated with a warning rather than turned into a rate
       # limit error halfway through the page. A relation the projection does not
@@ -49,7 +49,19 @@ module ForestAdminDatasourcePylon
             'thread_id' => attrs['thread_id'],
             'file_urls' => attrs['file_urls'],
             'created_at' => attrs['timestamp']
-          }.merge(flatten_author(attrs['author']))
+          }.merge(flatten_author(attrs['author'])).merge(flatten_email(attrs['email_info']))
+        end
+
+        # Null outside email. `bcc_emails` and the RFC 5322 `message_id` header
+        # are left out: neither is something a reply should be built from.
+        def flatten_email(email_info)
+          attrs = email_info.is_a?(Hash) ? email_info : {}
+
+          {
+            'email_from' => attrs['from_email'],
+            'email_to' => attrs['to_emails'],
+            'email_cc' => attrs['cc_emails']
+          }
         end
 
         # Pylon nests the author's contact and user sides side by side, both
