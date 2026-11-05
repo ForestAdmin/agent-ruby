@@ -33,6 +33,12 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:bearer_caller) do
+          be_instance_of(Components::Caller).and have_attributes(
+            id: '1', email: 'nicolasa@forestadmin.com', rendering_id: 114, timezone: 'Europe/Paris'
+          )
+        end
+        let(:published_book) { @datasource.get_collection('book') }
 
         before do
           datasource = Datasource.new
@@ -45,14 +51,30 @@ module ForestAdminAgent
                   is_primary_key: true,
                   filter_operators: [Operators::EQUAL, Operators::IN, Operators::NOT_EQUAL]
                 ),
-                'title' => ColumnSchema.new(column_type: 'String')
+                'title' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::EQUAL]),
+                'holder_id' => ColumnSchema.new(column_type: 'Uuid'),
+                'holder' => Relations::ManyToOneSchema.new(
+                  foreign_key: 'holder_id',
+                  foreign_key_target: 'id',
+                  foreign_collection: 'holder'
+                )
               },
               segments: ['recent']
+            }
+          )
+          collection_holder = build_collection(
+            name: 'holder',
+            schema: {
+              fields: {
+                'id' => ColumnSchema.new(column_type: 'Uuid', is_primary_key: true, filter_operators: [Operators::EQUAL]),
+                'national_id' => ColumnSchema.new(column_type: 'String', filter_operators: [Operators::STARTS_WITH])
+              }
             }
           )
 
           allow(ForestAdminAgent::Builder::AgentFactory.instance).to receive(:send_schema).and_return(nil)
           datasource.add_collection(collection_book)
+          datasource.add_collection(collection_holder)
           @agent = ForestAdminAgent::Builder::AgentFactory.instance
           @agent.add_datasource(datasource)
           @agent.build
@@ -115,8 +137,6 @@ module ForestAdminAgent
           end
 
           describe 'when the collection of the URL does not serve this action' do
-            let(:published_book) { @datasource.get_collection('book') }
-
             def declare_actions(actions)
               allow(published_book).to receive(:schema).and_wrap_original do |original|
                 original.call.merge(actions: actions)
@@ -173,7 +193,9 @@ module ForestAdminAgent
           end
         end
 
-        context 'with a bulk action run on a searched, segmented select-all' do
+        context 'with a bulk action run on a select-all' do
+          let(:subset_query) { {} }
+
           before do
             @action_collection.add_action(
               'foo',
@@ -187,32 +209,197 @@ module ForestAdminAgent
               ids: [],
               all_records: true,
               all_records_ids_excluded: ['123e4567-e89b-12d3-a456-426614174000'],
-              all_records_subset_query: { search: 'tolkien', segment: 'recent' }
+              all_records_subset_query: subset_query
             )
-            allow(@action_collection).to receive(:get_form).and_return([])
+            allow(published_book).to receive_messages(execute: {}, get_form: [])
           end
 
-          it 'hands the action the search and the segment of the list, minus the excluded ids' do
-            action.handle_hook_request(args)
+          context 'when the list is searched and segmented' do
+            let(:subset_query) { { search: 'tolkien', segment: 'recent' } }
 
-            expect(@action_collection).to have_received(:get_form) do |caller, action_name, data, filter, _meta|
-              expect(caller).to be_instance_of(Components::Caller)
-              expect(action_name).to eq('foo')
-              expect(data).to be_nil
-              expect(filter).to have_attributes(
-                search: 'tolkien', search_extended: false, segment: 'recent', sort: nil, page: nil
-              )
-              expect(filter.condition_tree.to_h).to eq(
-                { field: 'id', operator: Operators::NOT_EQUAL, value: '123e4567-e89b-12d3-a456-426614174000' }
-              )
+            it 'hands the action the search and the segment of the list, minus the excluded ids' do
+              action.handle_hook_request(args)
+
+              expect(published_book).to have_received(:get_form).once do |caller, action_name, data, filter, meta|
+                expect(caller).to bearer_caller
+                expect(action_name).to eq('foo')
+                expect(data).to be_nil
+                expect(filter).to have_attributes(
+                  search: 'tolkien', search_extended: false, segment: 'recent', sort: nil, page: nil
+                )
+                expect(filter.condition_tree.to_h).to eq(
+                  { field: 'id', operator: Operators::NOT_EQUAL, value: '123e4567-e89b-12d3-a456-426614174000' }
+                )
+                expect(meta).to eq(
+                  change_field: nil, search_field: nil, search_values: {}, includeHiddenFields: false
+                )
+              end
+            end
+
+            it 'checks the caller can read the fields the search reaches' do
+              action.handle_hook_request(args)
+
+              expect(permissions).to have_received(:assert_can_read_query_fields)
+                .with(published_book, condition_tree: nil, search: 'tolkien', search_extended: false)
             end
           end
 
-          it 'checks the caller can read the fields the search reaches' do
-            action.handle_hook_request(args)
+          context 'when the caller filters on a related collection' do
+            let(:caller_filters) do
+              JSON.generate(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'holder:national_id', operator: 'starts_with', value: '1850' },
+                    { field: 'title', operator: 'equal', value: 'Dune' }
+                  ]
+                }
+              )
+            end
+            let(:subset_query) { { filters: caller_filters } }
+            let(:forbidden) do
+              Http::Exceptions::ForbiddenError.new(
+                "You cannot filter on 'holder:national_id': you are not allowed to read the 'holder' collection."
+              )
+            end
+            let(:reaching_holder) do
+              satisfy { |tree| tree&.some_leaf { |leaf| leaf.field == 'holder:national_id' } }
+            end
+            let(:excluding_selected_id) do
+              { field: 'id', operator: Operators::NOT_EQUAL, value: '123e4567-e89b-12d3-a456-426614174000' }
+            end
+            let(:caller_conditions) do
+              [
+                { field: 'holder:national_id', operator: Operators::STARTS_WITH, value: '1850' },
+                { field: 'title', operator: Operators::EQUAL, value: 'Dune' }
+              ]
+            end
+            let(:list_filter) do
+              have_attributes(search: nil, search_extended: false, segment: nil, sort: nil, page: nil)
+            end
 
-            expect(permissions).to have_received(:assert_can_read_query_fields)
-              .with(@datasource.get_collection('book'), condition_tree: nil, search: 'tolkien', search_extended: false)
+            def applies_guarded_tree?(tree, guarded_tree)
+              guarded_tree.every_leaf { |guarded| tree.some_leaf { |leaf| leaf.equal?(guarded) } }
+            end
+
+            def guarded_tree
+              tree = nil
+              expect(permissions).to have_received(:assert_can_read_query_fields).once do |collection, applied|
+                expect(collection.equal?(published_book)).to be(true), "expected the published book, got #{collection.class}"
+                expect(applied.except(:condition_tree)).to eq(search: nil, search_extended: false)
+                tree = applied[:condition_tree]
+              end
+              tree
+            end
+
+            def counted_filter
+              filter = nil
+              expect(permissions).to have_received(:can_smart_action?).once do |caller_args, collection, filter_for_caller, action_name:|
+                expect(caller_args).to be(args)
+                expect(collection.equal?(published_book)).to be(true), "expected the published book, got #{collection.class}"
+                expect(filter_for_caller).to list_filter
+                expect(action_name).to eq('foo')
+                filter = filter_for_caller
+              end
+              filter
+            end
+
+            def refuse_holder_filters
+              allow(permissions).to receive(:assert_can_read_query_fields)
+                .with(published_book, hash_including(condition_tree: reaching_holder))
+                .and_raise(forbidden)
+            end
+
+            it 'checks the very condition tree the authorization then counts with' do
+              action.handle_request(args)
+
+              guarded = guarded_tree
+              expect(guarded.to_h).to eq(aggregator: 'And', conditions: caller_conditions)
+              counted = counted_filter.condition_tree
+              expect(applies_guarded_tree?(counted, guarded)).to be true
+              expect(counted.to_h).to eq(aggregator: 'And', conditions: caller_conditions + [excluding_selected_id])
+            end
+
+            it 'refuses before the authorization can count anything, and runs nothing' do
+              refuse_holder_filters
+
+              expect { action.handle_request(args) }
+                .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
+              expect(permissions).not_to have_received(:can_smart_action?)
+              expect(published_book).not_to have_received(:get_form)
+              expect(published_book).not_to have_received(:execute)
+            end
+
+            it 'hands the form hooks only a filter the guard checked' do
+              action.handle_hook_request(args)
+
+              guarded = guarded_tree
+              expect(guarded).to reaching_holder
+              expect(published_book).to have_received(:get_form).once do |caller, action_name, data, filter, meta|
+                expect(caller).to bearer_caller
+                expect(action_name).to eq('foo')
+                expect(data).to be_nil
+                expect(filter).to list_filter
+                expect(applies_guarded_tree?(filter.condition_tree, guarded)).to be true
+                expect(filter.condition_tree.to_h)
+                  .to eq(aggregator: 'And', conditions: caller_conditions + [excluding_selected_id])
+                expect(meta).to eq(
+                  change_field: nil, search_field: nil, search_values: {}, includeHiddenFields: false
+                )
+              end
+            end
+
+            it 'refuses the form hooks before they see the filter' do
+              refuse_holder_filters
+
+              expect { action.handle_hook_request(args) }
+                .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
+              expect(published_book).not_to have_received(:get_form)
+            end
+
+            context 'when the caller filters are alternatives' do
+              let(:caller_filters) do
+                JSON.generate(
+                  {
+                    aggregator: 'Or',
+                    conditions: [
+                      { field: 'holder:national_id', operator: 'starts_with', value: '1850' },
+                      { field: 'title', operator: 'equal', value: 'Dune' }
+                    ]
+                  }
+                )
+              end
+
+              it 'counts with the guarded branch as is' do
+                action.handle_request(args)
+
+                guarded = guarded_tree
+                expect(guarded.to_h).to eq(aggregator: 'Or', conditions: caller_conditions)
+                counted = counted_filter.condition_tree
+                expect(counted.conditions).to include(be(guarded))
+                expect(counted.to_h).to eq(
+                  aggregator: 'And',
+                  conditions: [{ aggregator: 'Or', conditions: caller_conditions }, excluding_selected_id]
+                )
+              end
+            end
+
+            %i[filters filter].each do |param|
+              context "when the filters come in params[:#{param}] outside the subset query" do
+                let(:subset_query) { {} }
+
+                before { args[:params][param] = caller_filters }
+
+                it 'refuses them all the same' do
+                  refuse_holder_filters
+
+                  expect { action.handle_request(args) }
+                    .to raise_error(Http::Exceptions::ForbiddenError, /You cannot filter on 'holder:national_id'/)
+                  expect(permissions).not_to have_received(:can_smart_action?)
+                  expect(published_book).not_to have_received(:execute)
+                end
+              end
+            end
           end
         end
 
