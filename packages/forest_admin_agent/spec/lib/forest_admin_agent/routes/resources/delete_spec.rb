@@ -19,6 +19,19 @@ module ForestAdminAgent
           }
         end
         let(:permissions) { instance_double(ForestAdminAgent::Services::Permissions) }
+        let(:bearer_caller) do
+          be_instance_of(Components::Caller).and have_attributes(
+            id: '1', email: 'nicolasa@forestadmin.com', rendering_id: 114, timezone: 'Europe/Paris'
+          )
+        end
+        let(:forbidden) do
+          ForestAdminAgent::Http::Exceptions::ForbiddenError.new("You cannot filter on 'id'.")
+        end
+        let(:filtered_on_id) { have_attributes(field: 'id', operator: Operators::EQUAL, value: 2) }
+
+        def applies_guarded_tree?(tree, guarded_tree)
+          guarded_tree.every_leaf { |guarded| tree.some_leaf { |leaf| leaf.equal?(guarded) } }
+        end
 
         before do
           allow(ForestAdminAgent::Services::Permissions).to receive(:new).and_return(permissions)
@@ -180,6 +193,56 @@ module ForestAdminAgent
 
                 expect { delete.handle_request_bulk(args) }
                   .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Invalid segment: unknown')
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
+              end
+            end
+
+            context 'when the select-all carries the caller filters' do
+              before do
+                args[:params][:data][:attributes][:all_records] = true
+                args[:params][:data][:attributes][:all_records_ids_excluded] = %w[5]
+                args[:params][:data][:attributes][:all_records_subset_query].merge!(
+                  filters: JSON.generate({ field: 'id', operator: 'equal', value: 2 }),
+                  search: 'jo'
+                )
+              end
+
+              it 'hands the guard the very condition tree and search it then deletes with' do
+                delete.handle_request_bulk(args)
+
+                user = @datasource.get_collection('user')
+                guarded_tree = nil
+                expect(permissions).to have_received(:assert_can_read_query_fields).once do |collection, applied|
+                  expect(collection.equal?(user)).to be(true), "expected the user collection, got #{collection.class}"
+                  expect(applied.except(:condition_tree)).to eq(search: 'jo', search_extended: false)
+                  expect(applied[:condition_tree].to_h).to eq(field: 'id', operator: Operators::EQUAL, value: 2)
+                  guarded_tree = applied[:condition_tree]
+                end
+                expect(user).to have_received(:delete).once do |caller, filter|
+                  expect(caller).to bearer_caller
+                  expect(filter).to have_attributes(
+                    search: 'jo', search_extended: false, segment: nil, page: nil, sort: nil
+                  )
+                  expect(applies_guarded_tree?(filter.condition_tree, guarded_tree)).to be true
+                  expect(filter.condition_tree.to_h).to eq(
+                    aggregator: 'And',
+                    conditions: [
+                      { field: 'id', operator: Operators::EQUAL, value: 2 },
+                      { field: 'id', operator: Operators::NOT_EQUAL, value: 5 }
+                    ]
+                  )
+                end
+              end
+
+              it 'deletes nothing when the guard refuses a filtered field' do
+                allow(permissions).to receive(:assert_can_read_query_fields)
+                  .with(@datasource.get_collection('user'), hash_including(condition_tree: filtered_on_id))
+                  .and_raise(forbidden)
+
+                expect { delete.handle_request_bulk(args) }.to raise_error(
+                  ForestAdminAgent::Http::Exceptions::ForbiddenError,
+                  /You cannot filter on 'id'/
+                )
                 expect(@datasource.get_collection('user')).not_to have_received(:delete)
               end
             end
@@ -346,6 +409,20 @@ module ForestAdminAgent
                 allow(@datasource.get_collection('user')).to receive(:delete).and_raise(StandardError, 'hook refused')
 
                 expect { delete.handle_request_bulk(args) }.to raise_error(StandardError, 'hook refused')
+                expect(@datasource.get_collection('address')).not_to have_received(:update)
+              end
+
+              it 'nullifies nothing when the guard refuses a filtered field' do
+                args[:params][:data][:attributes][:all_records_subset_query][:filters] =
+                  JSON.generate({ field: 'id', operator: 'equal', value: 2 })
+                allow(permissions).to receive(:assert_can_read_query_fields)
+                  .with(@datasource.get_collection('user'), hash_including(condition_tree: filtered_on_id))
+                  .and_raise(forbidden)
+
+                expect { delete.handle_request_bulk(args) }
+                  .to raise_error(ForestAdminAgent::Http::Exceptions::ForbiddenError, /You cannot filter on 'id'/)
+                expect(@datasource.get_collection('user')).not_to have_received(:list)
+                expect(@datasource.get_collection('user')).not_to have_received(:delete)
                 expect(@datasource.get_collection('address')).not_to have_received(:update)
               end
 
