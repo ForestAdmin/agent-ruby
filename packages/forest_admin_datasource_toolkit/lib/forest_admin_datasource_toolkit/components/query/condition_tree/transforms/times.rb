@@ -26,25 +26,13 @@ module ForestAdminDatasourceToolkit
                 depends_on: [Operators::LESS_THAN, Operators::GREATER_THAN],
                 for_types: %w[Date Dateonly],
                 replacer: proc do |leaf, tz|
-                  value_greater_than = if leaf.value.nil?
-                                         format(start_fn.call(Time.now.in_time_zone(tz)))
-                                       else
-                                         format(start_fn.call(
-                                                  Time.now.in_time_zone(tz), leaf.value
-                                                ))
-                                       end
-                  value_less_than = if leaf.value.nil?
-                                      format(end_fn.call(Time.now.in_time_zone(tz)))
-                                    else
-                                      format(end_fn.call(
-                                               Time.now.in_time_zone(tz), leaf.value
-                                             ))
-                                    end
+                  now = Time.now.in_time_zone(tz)
+                  args = leaf.value.nil? ? [now] : [now, leaf.value]
 
                   ConditionTreeFactory.intersect(
                     [
-                      leaf.override(operator: Operators::GREATER_THAN, value: value_greater_than),
-                      leaf.override(operator: Operators::LESS_THAN, value: value_less_than)
+                      leaf.override(operator: Operators::GREATER_THAN, value: format(start_fn.call(*args))),
+                      leaf.override(operator: Operators::LESS_THAN, value: format(end_fn.call(*args)))
                     ]
                   )
                 end

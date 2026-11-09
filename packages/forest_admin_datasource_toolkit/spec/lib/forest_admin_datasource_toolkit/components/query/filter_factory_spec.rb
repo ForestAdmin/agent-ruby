@@ -16,6 +16,8 @@ module ForestAdminDatasourceToolkit
         let(:timezone) { 'Europe/Paris' }
 
         context 'when call get_previous_period_filter' do
+          include_context 'with a frozen clock'
+
           it 'when no interval operator is present in the condition tree should not modify the condition tree' do
             leaf = ConditionTreeLeaf.new('someField', 'Like', 'someValue')
             filter = Filter.new(condition_tree: leaf)
@@ -40,79 +42,52 @@ module ForestAdminDatasourceToolkit
 
           it 'replaces baseOperator by a greater/less than operator' do
             operators = [
-              { base: Operators::YESTERDAY, unit: 'Day' },
-              { base: Operators::PREVIOUS_WEEK, unit: 'Week' },
-              { base: Operators::PREVIOUS_MONTH, unit: 'Month' },
-              { base: Operators::PREVIOUS_QUARTER, unit: 'Quarter' },
-              { base: Operators::PREVIOUS_YEAR, unit: 'Year' }
+              { base: Operators::YESTERDAY, from: '2026-05-13 00:00:00', to: '2026-05-13 23:59:59' },
+              { base: Operators::PREVIOUS_WEEK, from: '2026-05-04 00:00:00', to: '2026-05-10 23:59:59' },
+              { base: Operators::PREVIOUS_MONTH, from: '2026-04-01 00:00:00', to: '2026-04-30 23:59:59' },
+              { base: Operators::PREVIOUS_QUARTER, from: '2026-01-01 00:00:00', to: '2026-03-31 23:59:59' },
+              { base: Operators::PREVIOUS_YEAR, from: '2025-01-01 00:00:00', to: '2025-12-31 23:59:59' }
             ]
 
             operators.each do |operator|
               filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', operator[:base], 'someValue'))
-              start = "beginning_of_#{operator[:unit].downcase}"
-              end_ = "end_of_#{operator[:unit].downcase}"
-              start_period = Time.now.in_time_zone(timezone)
-                                 .send(:"prev_#{operator[:unit].downcase}")
-                                 .send(start)
-                                 .to_datetime
-                                 .strftime('%Y-%m-%d %H:%M:%S')
-              end_period = Time.now.in_time_zone(timezone)
-                               .send(:"prev_#{operator[:unit].downcase}")
-                               .send(end_)
-                               .to_datetime
-                               .strftime('%Y-%m-%d %H:%M:%S')
 
               expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
-                .to eq(ConditionTreeBranch.new(
-                  'And',
-                  [
-                    ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
-                    ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
-                  ]
-                ).to_h)
+                .to eq(between('someField', operator[:from], operator[:to]))
             end
           end
 
           it 'replaces PreviousXDaysToDate operator by a greater/less than' do
             filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_X_DAYS_TO_DATE,
                                                                       3))
-            start_period = Time.now.in_time_zone(timezone).prev_day(2 * filter.condition_tree.value)
-                               .beginning_of_day
-                               .to_datetime
-                               .strftime('%Y-%m-%d %H:%M:%S')
-            end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value)
-                             .to_datetime
-                             .strftime('%Y-%m-%d %H:%M:%S')
 
             expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
-              .to eq(ConditionTreeBranch.new(
-                'And',
-                [
-                  ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
-                  ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
-                ]
-              ).to_h)
+              .to eq(between('someField', '2026-05-08 00:00:00', '2026-05-11 00:30:00'))
           end
 
           it 'replaces PreviousXDays operator by a greater/less than' do
             filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_X_DAYS, 3))
-            start_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value * 2)
-                               .beginning_of_day
-                               .to_datetime
-                               .strftime('%Y-%m-%d %H:%M:%S')
-            end_period = Time.now.in_time_zone(timezone).prev_day(filter.condition_tree.value)
-                             .beginning_of_day
-                             .to_datetime
-                             .strftime('%Y-%m-%d %H:%M:%S')
 
             expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
-              .to eq(ConditionTreeBranch.new(
-                'And',
-                [
-                  ConditionTreeLeaf.new('someField', Operators::GREATER_THAN, start_period),
-                  ConditionTreeLeaf.new('someField', Operators::LESS_THAN, end_period)
-                ]
-              ).to_h)
+              .to eq(between('someField', '2026-05-08 00:00:00', '2026-05-11 00:00:00'))
+          end
+        end
+
+        context 'when the clock moves between two reads in get_previous_period_filter' do
+          it 'derives both bounds of PreviousMonth from a single reading of the clock' do
+            allow(Time).to receive(:now).and_return(Time.utc(2026, 5, 31, 21, 59, 59.999r), Time.utc(2026, 5, 31, 22))
+            filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_MONTH, 'someValue'))
+
+            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+              .to eq(between('someField', '2026-04-01 00:00:00', '2026-04-30 23:59:59'))
+          end
+
+          it 'derives both bounds of PreviousXDays from a single reading of the clock' do
+            allow(Time).to receive(:now).and_return(Time.utc(2026, 5, 13, 21, 59, 59.999r), Time.utc(2026, 5, 13, 22))
+            filter = Filter.new(condition_tree: ConditionTreeLeaf.new('someField', Operators::PREVIOUS_X_DAYS, 3))
+
+            expect(described_class.get_previous_period_filter(filter, timezone).condition_tree.to_h)
+              .to eq(between('someField', '2026-05-07 00:00:00', '2026-05-10 00:00:00'))
           end
         end
 
