@@ -30,13 +30,18 @@ module ForestAdminAgent
                      .override(page: ForestAdminAgent::Utils::QueryStringParser.parse_pagination(args))
             projection = redacted_projection_with_pks(context, context.child_collection, args)
             primary_key_values = Utils::Id.unpack_id(context.collection, args[:params]['id'], with_key: true)
-            records = Collection.list_relation(
-              context.collection,
-              primary_key_values,
-              args[:params]['relation_name'],
-              context.caller,
-              filter,
-              projection
+            relation_scopes = context.permissions.relation_scopes(context.child_collection, projection)
+            records = relation_scopes.redact(
+              Collection.list_relation(
+                context.collection,
+                primary_key_values,
+                args[:params]['relation_name'],
+                context.caller,
+                filter,
+                relation_scopes.with_scope_fields(projection)
+              ),
+              projection,
+              context.caller.timezone
             )
 
             {

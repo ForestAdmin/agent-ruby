@@ -524,6 +524,57 @@ module ForestAdminAgent
             )
           end
 
+          describe 'with scopes on the aggregated collections' do
+            let(:scopes) do
+              {
+                'review' => ConditionTreeLeaf.new('author', Operators::EQUAL, 'Isaac Asimov'),
+                'book_review' => ConditionTreeLeaf.new('review_id', Operators::EQUAL, 7)
+              }
+            end
+
+            before do
+              allow(permissions).to receive(:get_scope) { |collection| scopes[collection.name] }
+              allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
+            end
+
+            def aggregated_condition_tree(collection_name)
+              captured = nil
+              allow(@datasource.get_collection(collection_name)).to receive(:aggregate) do |_caller, filter, *|
+                captured = filter
+                []
+              end
+              chart.handle_request(args)
+
+              captured.condition_tree.to_h
+            end
+
+            it 'applies the scope of the aggregated OneToMany collection' do
+              args[:params] = args[:params].merge({ labelFieldName: 'title', relationshipFieldName: 'bookReviews',
+                                                    aggregator: 'Count', aggregateFieldName: 'id',
+                                                    sourceCollectionName: 'book', type: 'Leaderboard' })
+
+              expect(aggregated_condition_tree('review')).to eq(
+                { field: 'author', operator: Operators::EQUAL, value: 'Isaac Asimov' }
+              )
+            end
+
+            it 'applies the scopes of the through and foreign collections of a ManyToMany' do
+              args[:params] = args[:params].merge({ labelFieldName: 'year', relationshipFieldName: 'reviews',
+                                                    aggregator: 'Count', aggregateFieldName: 'id',
+                                                    sourceCollectionName: 'book', type: 'Leaderboard' })
+
+              expect(aggregated_condition_tree('book_review')).to eq(
+                {
+                  aggregator: 'And',
+                  conditions: [
+                    { field: 'review_id', operator: Operators::EQUAL, value: 7 },
+                    { field: 'review:author', operator: Operators::EQUAL, value: 'Isaac Asimov' }
+                  ]
+                }
+              )
+            end
+          end
+
           # A count names no path back to the collection it counts, so nothing above sees it. An empty
           # `aggregateFieldName` is a count too: `can_chart?` cannot tell it from an absent one.
           it 'asserts browse on the counted collection when a OneToMany count names no field' do

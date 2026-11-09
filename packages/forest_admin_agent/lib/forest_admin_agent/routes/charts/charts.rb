@@ -159,6 +159,18 @@ module ForestAdminAgent
           LineChart.new(result).serialize
         end
 
+        # No record of an aggregation can be redacted afterwards, so each aggregated scope filters.
+        def intersect_scopes(context, filter, scoped)
+          scopes = scoped.map do |collection_name, prefix|
+            scope = context.permissions.get_scope(context.datasource.get_collection(collection_name))
+            prefix ? scope&.nest(prefix) : scope
+          end
+
+          filter.override(
+            condition_tree: ConditionTree::ConditionTreeFactory.intersect([filter.condition_tree, *scopes])
+          )
+        end
+
         def make_leaderboard(context, filter, args)
           field = context.collection.schema[:fields][args[:params][:relationshipFieldName]]
 
@@ -169,7 +181,7 @@ module ForestAdminAgent
             )
             if inverse
               collection = field.foreign_collection
-              leaderboard_filter = filter.nest(inverse)
+              leaderboard_filter = intersect_scopes(context, filter.nest(inverse), [[field.foreign_collection, nil]])
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
                 field: aggregate_field_name(args),
@@ -189,7 +201,9 @@ module ForestAdminAgent
             )
             if origin && target
               collection = field.through_collection
-              leaderboard_filter = filter.nest(origin)
+              leaderboard_filter = intersect_scopes(
+                context, filter.nest(origin), [[field.through_collection, nil], [field.foreign_collection, target]]
+              )
               aggregation = Aggregation.new(
                 operation: args[:params][:aggregator],
                 field: aggregate_field_name(args) ? "#{target}:#{aggregate_field_name(args)}" : nil,
