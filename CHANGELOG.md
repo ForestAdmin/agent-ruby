@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.49.0...v1.50.0) (2026-11-16)
+
+
+### Features
+
+* allow nested condition tree ([#428](https://github.com/ForestAdmin/agent-ruby/issues/428)) ([51a5722](https://github.com/ForestAdmin/agent-ruby/commit/51a5722e94a83c7a284eafd1d397914e31664ff6))
+
 # [1.49.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.48.0...v1.49.0) (2026-11-04)
 
 
