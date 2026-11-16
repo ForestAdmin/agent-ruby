@@ -107,7 +107,11 @@ module ForestAdminDatasourceMongoid
           schema = Utils::Schema::MongoidSchema.from_model(model).apply_stack(stack, skip_as_models: true)
 
           if tree.is_a? Nodes::ConditionTreeBranch
-            # to check
+            # MongoDB refuses `$or: []` and `$and: []`; the toolkit's match_none is an empty Or.
+            if tree.conditions.empty?
+              return tree.aggregator.casecmp('or').zero? ? { '$expr' => { '$literal' => false } } : {}
+            end
+
             return {
               "$#{tree.aggregator.downcase}" => tree.conditions.map do |condition|
                 compute_match(model, stack, condition, fields)

@@ -115,7 +115,8 @@ module ForestAdminAgent
                 canUseAuditTrail: false,
                 canUseAuditTrailTimeline: false,
                 canSortAuditTrailTimeline: false,
-                checksRelationReadPermissions: true
+                checksRelationReadPermissions: true,
+                canUseNestedConditionTree: true
               }
             )
           end
@@ -171,7 +172,8 @@ module ForestAdminAgent
                 canUseAuditTrail: false,
                 canUseAuditTrailTimeline: false,
                 canSortAuditTrailTimeline: false,
-                checksRelationReadPermissions: true
+                checksRelationReadPermissions: true,
+                canUseNestedConditionTree: true
               }
             )
           end

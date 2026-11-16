@@ -35,6 +35,57 @@ module ForestAdminAgent
         end.to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Failed to instantiate condition tree')
       end
 
+      context 'with a nested group' do
+        let(:leaf) { { field: 'id', operator: Operators::LESS_THAN, value: 10 } }
+
+        it 'parses a group inside a group' do
+          filters = {
+            aggregator: 'and',
+            conditions: [leaf, { aggregator: 'or', conditions: [leaf, { field: 'id', operator: Operators::GREATER_THAN, value: 5 }] }]
+          }
+
+          result = condition_tree_parser.from_plain_object(collection_category, filters)
+
+          expect(result).to have_attributes(
+            aggregator: 'And',
+            conditions: [
+              have_attributes(field: 'id', operator: Operators::LESS_THAN, value: 10.0),
+              have_attributes(aggregator: 'Or', conditions: contain_exactly(
+                have_attributes(operator: Operators::LESS_THAN), have_attributes(operator: Operators::GREATER_THAN)
+              ))
+            ]
+          )
+        end
+
+        it 'refuses an empty nested group' do
+          filters = { aggregator: 'and', conditions: [leaf, { aggregator: 'or', conditions: [] }] }
+
+          expect { condition_tree_parser.from_plain_object(collection_category, filters) }
+            .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError,
+                            'A nested group of conditions cannot be empty')
+        end
+
+        it 'keeps accepting an empty root group' do
+          result = condition_tree_parser.from_plain_object(collection_category, { aggregator: 'and', conditions: [] })
+
+          expect(result).to have_attributes(aggregator: 'And', conditions: [])
+        end
+
+        it 'refuses a null condition with the parsing error' do
+          filters = { aggregator: 'and', conditions: [leaf, nil] }
+
+          expect { condition_tree_parser.from_plain_object(collection_category, filters) }
+            .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Failed to instantiate condition tree')
+        end
+
+        it 'refuses a group whose conditions are not a list' do
+          filters = { aggregator: 'and', conditions: 'id' }
+
+          expect { condition_tree_parser.from_plain_object(collection_category, filters) }
+            .to raise_error(ForestAdminAgent::Http::Exceptions::BadRequestError, 'Failed to instantiate condition tree')
+        end
+      end
+
       it 'works with aggregator' do
         filters = {
           aggregator: 'And',

@@ -10,6 +10,10 @@ module ForestAdminAgent
       include ForestAdminDatasourceToolkit::Components::Query::ConditionTree::Nodes
 
       def self.from_plain_object(collection, filters)
+        parse(collection, filters, root: true)
+      end
+
+      def self.parse(collection, filters, root:)
         if leaf?(filters)
           operator = filters[:operator].titleize.tr(' ', '_').downcase
           value = parse_value(collection, filters.merge(operator: operator))
@@ -18,9 +22,13 @@ module ForestAdminAgent
         end
 
         if branch?(filters)
+          # An empty nested Or would match nothing and an empty nested And everything: dropping it
+          # widens the filter, keeping it silently empties the result. Either is wrong under a bulk action.
+          raise BadRequestError, 'A nested group of conditions cannot be empty' if !root && filters[:conditions].empty?
+
           aggregator = filters[:aggregator].capitalize
           conditions = filters[:conditions].map do |sub_tree|
-            from_plain_object(collection, sub_tree)
+            parse(collection, sub_tree, root: false)
           end
 
           return conditions.size == 1 ? conditions[0] : ConditionTreeBranch.new(aggregator, conditions)
@@ -80,11 +88,11 @@ module ForestAdminAgent
       end
 
       def self.leaf?(filters)
-        filters.key?(:field) && filters.key?(:operator)
+        filters.is_a?(Hash) && filters.key?(:field) && filters.key?(:operator)
       end
 
       def self.branch?(filters)
-        filters.key?(:aggregator) && filters.key?(:conditions)
+        filters.is_a?(Hash) && filters.key?(:aggregator) && filters[:conditions].is_a?(Array)
       end
     end
   end

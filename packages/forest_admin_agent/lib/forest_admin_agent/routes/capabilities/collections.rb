@@ -73,7 +73,8 @@ module ForestAdminAgent
                 # wherever the trail is.
                 canUseAuditTrailTimeline: audit_trail_enabled?,
                 canSortAuditTrailTimeline: audit_trail_enabled?,
-                checksRelationReadPermissions: !skip_relation_read_permissions?
+                checksRelationReadPermissions: !skip_relation_read_permissions?,
+                canUseNestedConditionTree: true
               }
             },
             status: 200
