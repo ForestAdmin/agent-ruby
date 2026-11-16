@@ -22,8 +22,8 @@ module ForestAdminAgent
         end
 
         if branch?(filters)
-          # An empty nested Or would match nothing and an empty nested And everything: dropping it
-          # widens the filter, keeping it silently empties the result. Either is wrong under a bulk action.
+          # An empty nested group has no safe reading: an empty Or matches nothing, an empty And everything.
+          # Keeping or dropping it can flip a bulk action between no records and the whole collection.
           raise BadRequestError, 'A nested group of conditions cannot be empty' if !root && filters[:conditions].empty?
 
           aggregator = filters[:aggregator].capitalize

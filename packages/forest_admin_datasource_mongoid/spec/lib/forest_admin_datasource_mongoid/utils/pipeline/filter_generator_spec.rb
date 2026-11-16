@@ -36,7 +36,6 @@ module ForestAdminDatasourceMongoid
                                      ])
             end
 
-            # MongoDB refuses `$or: []` and `$and: []`, and the toolkit's match_none is an empty Or.
             it 'matches nothing on an empty Or' do
               filter = Filter.new(condition_tree: ConditionTree::Nodes::ConditionTreeBranch.new('Or', []))
 
