@@ -36,6 +36,25 @@ module ForestAdminDatasourceMongoid
                                      ])
             end
 
+            it 'matches nothing on an empty Or' do
+              filter = Filter.new(condition_tree: ConditionTree::Nodes::ConditionTreeBranch.new('Or', []))
+
+              expect(described_class.filter(model, stack, filter))
+                .to eq([{ '$match' => { '$expr' => { '$literal' => false } } }])
+            end
+
+            it 'matches everything on an empty And' do
+              filter = Filter.new(
+                condition_tree: ConditionTree::Nodes::ConditionTreeBranch.new('And', [
+                                                                                ConditionTree::Nodes::ConditionTreeLeaf.new('title', 'Equal', 'Foundation'),
+                                                                                ConditionTree::Nodes::ConditionTreeBranch.new('And', [])
+                                                                              ])
+              )
+
+              expect(described_class.filter(model, stack, filter))
+                .to eq([{ '$match' => { '$and' => [{ 'title' => { '$eq' => 'Foundation' } }, {}] } }])
+            end
+
             it 'filter should generate a $match stage with $and and $or nodes' do
               filter = Filter.new(
                 condition_tree: ConditionTree::Nodes::ConditionTreeBranch.new('And', [
