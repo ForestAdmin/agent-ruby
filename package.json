@@ -34,6 +34,8 @@
     "**/@semantic-release/github/undici": "^7.30.1",
     "**/@actions/http-client/undici": "^6.29.1",
     "**/node-gyp/undici": "^6.29.1",
-    "handlebars": "^4.7.10"
+    "handlebars": "^4.7.10",
+    "minimatch": "^11.0.1",
+    "glob": "^14.0.2"
   }
 }
