@@ -304,6 +304,22 @@ module ForestAdminAgent
               expect(result).to eq({ content: nil, status: 204 })
             end
 
+            it 'only links the new owner on a one_to_one relation when the count aggregation returns no row' do
+              allow(@datasource.get_collection('book')).to receive_messages(aggregate: [], update: true)
+
+              args[:params]['collection_name'] = 'user'
+              args[:params]['relation_name'] = 'book'
+              args[:params]['data'] = { 'id' => 1 }
+              args[:params]['id'] = 1
+
+              result = update.handle_request(args)
+
+              expect(@datasource.get_collection('book')).to have_received(:update).once do |_caller, _filter, data|
+                expect(data).to eq({ 'author_id' => 1 })
+              end
+              expect(result).to eq({ content: nil, status: 204 })
+            end
+
             it 'refuses to write a read-only one_to_one relation (#379: it would overwrite ' \
                "the foreign collection's own primary key)" do
               allow(@datasource.get_collection('book')).to receive_messages(aggregate: [{ 'value' => 1 }], update: true)
@@ -383,6 +399,23 @@ module ForestAdminAgent
                 expect(caller).to be_instance_of(parameter[0])
                 expect(filter).to have_attributes(parameter[1])
                 expect(data).to eq(parameter[2])
+              end
+              expect(result).to eq({ content: nil, status: 204 })
+            end
+
+            it 'only links the new owner on a polymorphic_one_to_one relation when the count aggregation ' \
+               'returns no row' do
+              allow(@datasource.get_collection('address')).to receive_messages(aggregate: [], update: true)
+
+              args[:params]['collection_name'] = 'user'
+              args[:params]['relation_name'] = 'address'
+              args[:params]['data'] = { 'id' => 1, 'type' => 'user' }
+              args[:params]['id'] = 1
+
+              result = update.handle_request(args)
+
+              expect(@datasource.get_collection('address')).to have_received(:update).once do |_caller, _filter, data|
+                expect(data).to eq({ 'addressable_id' => 1, 'addressable_type' => 'user' })
               end
               expect(result).to eq({ content: nil, status: 204 })
             end
