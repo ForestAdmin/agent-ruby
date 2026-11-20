@@ -305,6 +305,8 @@ module ForestAdminAgent
             end
 
             it 'only links the new owner on a one_to_one relation when the count aggregation returns no row' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('author_id', Operators::NOT_EQUAL, 99))
               allow(@datasource.get_collection('book')).to receive_messages(aggregate: [], update: true)
 
               args[:params]['collection_name'] = 'user'
@@ -314,7 +316,17 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
-              expect(@datasource.get_collection('book')).to have_received(:update).once do |_caller, _filter, data|
+              expect(@datasource.get_collection('book')).to have_received(:update).once do |caller, filter, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(filter).to have_attributes(
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'author_id', operator: Operators::NOT_EQUAL, value: 99),
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                    ]
+                  )
+                )
                 expect(data).to eq({ 'author_id' => 1 })
               end
               expect(result).to eq({ content: nil, status: 204 })
@@ -405,6 +417,8 @@ module ForestAdminAgent
 
             it 'only links the new owner on a polymorphic_one_to_one relation when the count aggregation ' \
                'returns no row' do
+              allow(permissions).to receive(:get_scope)
+                .and_return(Nodes::ConditionTreeLeaf.new('location', Operators::EQUAL, 'paris'))
               allow(@datasource.get_collection('address')).to receive_messages(aggregate: [], update: true)
 
               args[:params]['collection_name'] = 'user'
@@ -414,7 +428,17 @@ module ForestAdminAgent
 
               result = update.handle_request(args)
 
-              expect(@datasource.get_collection('address')).to have_received(:update).once do |_caller, _filter, data|
+              expect(@datasource.get_collection('address')).to have_received(:update).once do |caller, filter, data|
+                expect(caller).to be_instance_of(Components::Caller)
+                expect(filter).to have_attributes(
+                  condition_tree: have_attributes(
+                    aggregator: 'And',
+                    conditions: [
+                      have_attributes(field: 'location', operator: Operators::EQUAL, value: 'paris'),
+                      have_attributes(field: 'id', operator: Operators::EQUAL, value: 1)
+                    ]
+                  )
+                )
                 expect(data).to eq({ 'addressable_id' => 1, 'addressable_type' => 'user' })
               end
               expect(result).to eq({ content: nil, status: 204 })
