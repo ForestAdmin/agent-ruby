@@ -468,6 +468,37 @@ module ForestAdminAgent
         expect(smart_action_checker).to be_can_execute
       end
 
+      it 'refuses to approve the caller own request on the signed payload shape' do
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 1
+            }
+          }
+        }.with_indifferent_access
+        smart_action[:userApprovalEnabled] = [1]
+
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
+                                                   build_caller, 1, Filter.new)
+        expect { smart_action_checker.can_execute? }
+          .to raise_error(ForbiddenError, 'You don\'t have the permission to trigger this action.')
+      end
+
+      it 'approves another requester request on the same shape' do
+        parameters[:data][:attributes][:signed_approval_request] = {
+          data: {
+            attributes: {
+              requester_id: 20
+            }
+          }
+        }.with_indifferent_access
+        smart_action[:userApprovalEnabled] = [1]
+
+        smart_action_checker = described_class.new(parameters, @datasource.get_collection('Book'), smart_action,
+                                                   build_caller, 1, Filter.new)
+        expect(smart_action_checker).to be_can_execute
+      end
+
       it 'returns true when the user can approve and there is no userApprovalConditions and user roleId is present into selfApprovalEnabled' do
         parameters[:data][:attributes][:signed_approval_request] = {
           data: {
