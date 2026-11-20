@@ -1,3 +1,3 @@
 module ForestAdminDatasourceMambuPayments
-  VERSION = "1.50.0"
+  VERSION = "1.50.1"
 end

@@ -1,3 +1,10 @@
+## [1.50.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.50.0...v1.50.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **agent:** return an empty line chart when the aggregation has no row ([#433](https://github.com/ForestAdmin/agent-ruby/issues/433)) ([2ee1974](https://github.com/ForestAdmin/agent-ruby/commit/2ee197428e37d13c27dd65332b5c49286665915e))
+
 # [1.50.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.49.0...v1.50.0) (2026-11-16)
 
 
