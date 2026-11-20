@@ -118,18 +118,20 @@ module ForestAdminDatasourceToolkit
           unit = unit.downcase
           start = "beginning_of_#{unit}"
           end_ = "end_of_#{unit}"
-          start_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(start)
-          end_period = Time.now.in_time_zone(timezone).send(:"prev_#{unit}").send(end_)
+          previous = Time.now.in_time_zone(timezone).send(:"prev_#{unit}")
+          start_period = previous.send(start)
+          end_period = previous.send(end_)
 
           get_previous_condition_tree(field, start_period.to_datetime, end_period.to_datetime)
         end
 
         def self.get_previous_x_days_period(leaf, timezone, operator)
-          start_period = Time.now.in_time_zone(timezone).send(:-, 2 * leaf.value.day).beginning_of_day
+          now = Time.now.in_time_zone(timezone)
+          start_period = (now - (2 * leaf.value).day).beginning_of_day
           end_period = if operator == Operators::PREVIOUS_X_DAYS
-                         Time.now.in_time_zone(timezone).send(:-, leaf.value.day).beginning_of_day
+                         (now - leaf.value.day).beginning_of_day
                        else
-                         Time.now.in_time_zone(timezone).send(:-, leaf.value.day)
+                         now - leaf.value.day
                        end
 
           get_previous_condition_tree(leaf.field, start_period.to_datetime, end_period.to_datetime)
