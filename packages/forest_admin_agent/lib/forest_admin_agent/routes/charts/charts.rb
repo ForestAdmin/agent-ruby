@@ -145,6 +145,8 @@ module ForestAdminAgent
           values = {}
           rows.each { |row| values[row['group'][group_by_field_name]] = row['value'] }
           dates = values.keys.sort
+          return LineChart.new([]).serialize if dates.empty?
+
           current = dates[0]
           last = dates.last
           result = []

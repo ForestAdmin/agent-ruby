@@ -457,6 +457,31 @@ module ForestAdminAgent
               }
             )
           end
+
+          it 'return an empty LineChart when the aggregation has no row' do
+            args[:params] = args[:params].merge({
+                                                  groupByFieldName: 'date',
+                                                  aggregator: 'Count',
+                                                  sourceCollectionName: 'book',
+                                                  timeRange: 'Day',
+                                                  type: 'Line',
+                                                  timezone: 'Europe/Paris'
+                                                })
+            allow(@datasource.get_collection('book')).to receive(:aggregate).and_return([])
+            result = chart.handle_request(args)
+
+            expect(result).to match(
+              content: {
+                data: {
+                  id: be_a(String),
+                  type: 'stats',
+                  attributes: {
+                    value: []
+                  }
+                }
+              }
+            )
+          end
         end
 
         describe 'makeLeaderboard' do
