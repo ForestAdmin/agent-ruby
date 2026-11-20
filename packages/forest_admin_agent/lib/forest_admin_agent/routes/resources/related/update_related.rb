@@ -153,7 +153,7 @@ module ForestAdminAgent
 
             result = context.child_collection.aggregate(context.caller, old_fk_owner_filter,
                                                         Aggregation.new(operation: 'Count'), 1)
-            return unless !(result[0]['value']).nil? && (result[0]['value']).positive?
+            return unless result.first&.[]('value')&.positive?
 
             # Avoids updating records to null if it's not authorized by the ORM
             # and if there is no record to update (the filter returns no record)
@@ -206,7 +206,7 @@ module ForestAdminAgent
 
             result = context.child_collection.aggregate(context.caller, old_fk_owner_filter,
                                                         Aggregation.new(operation: 'Count'), 1)
-            return unless !(result[0]['value']).nil? && (result[0]['value']).positive?
+            return unless result.first&.[]('value')&.positive?
 
             # Avoids updating records to null if it's not authorized by the ORM
             # and if there is no record to update (the filter returns no record)
