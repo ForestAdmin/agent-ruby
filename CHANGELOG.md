@@ -1,3 +1,10 @@
+## [1.50.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.50.1...v1.50.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **agent:** tolerate an empty count when breaking a one-to-one relation ([#434](https://github.com/ForestAdmin/agent-ruby/issues/434)) ([976211b](https://github.com/ForestAdmin/agent-ruby/commit/976211b8979119c11b3ec4b46aa410d4105b9e83))
+
 ## [1.50.1](https://github.com/ForestAdmin/agent-ruby/compare/v1.50.0...v1.50.1) (2026-11-20)
 
 
