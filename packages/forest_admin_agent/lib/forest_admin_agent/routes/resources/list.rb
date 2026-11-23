@@ -26,8 +26,7 @@ module ForestAdminAgent
           relation_scopes = context.permissions.relation_scopes(context.collection, projection)
           records = relation_scopes.redact(
             context.collection.list(context.caller, filter, relation_scopes.with_scope_fields(projection)),
-            projection,
-            context.caller.timezone
+            projection
           )
 
           {

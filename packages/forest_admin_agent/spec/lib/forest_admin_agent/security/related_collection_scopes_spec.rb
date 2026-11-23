@@ -70,63 +70,106 @@ module ForestAdminAgent
 
       let(:permissions) do
         permissions = described_class.new(caller)
-        allow(permissions).to receive(:get_scope) { |collection| scopes[collection.name] }
+        allow(permissions).to receive(:get_scope_for_related_records) { |collection| scopes[collection.name] }
 
         permissions
       end
 
+      # What each related collection's own scoped query returns: the keys its scope keeps.
+      let(:in_scope_keys) { { 'accounts' => [10, 30], 'holders' => [100], 'organizations' => [] } }
+
+      before do
+        in_scope_keys.each_key do |name|
+          allow(datasource.get_collection(name)).to receive(:list) { in_scope_keys[name].map { |id| { 'id' => id } } }
+        end
+      end
+
       let(:cards_records) do
         [
-          { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76', 'organization' => { 'name' => 'OwnOrg' } },
-            'holder' => { 'id' => 100, 'national_id' => 'EU-1', 'region' => 'EU' } },
-          { 'id' => 2, 'account' => { 'id' => 20, 'iban' => 'DE22', 'organization' => { 'name' => 'AnotherTenant' } },
-            'holder' => { 'id' => 100, 'national_id' => 'EU-1', 'region' => 'EU' } },
-          { 'id' => 3, 'account' => { 'id' => 30, 'iban' => 'FR14', 'organization' => { 'name' => 'OwnOrg' } },
-            'holder' => { 'id' => 300, 'national_id' => 'US-3', 'region' => 'US' } },
-          { 'id' => 4, 'account' => nil,
-            'holder' => { 'id' => 100, 'national_id' => 'EU-1', 'region' => 'EU' } }
+          { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
+          { 'id' => 2, 'account' => { 'id' => 20, 'iban' => 'DE22' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
+          { 'id' => 3, 'account' => { 'id' => 30, 'iban' => 'FR14' }, 'holder' => { 'id' => 300, 'national_id' => 'US-3' } },
+          { 'id' => 4, 'account' => nil, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } }
         ]
       end
 
-      let(:projection) { Projection.new(%w[id account:id account:iban holder:id holder:national_id]) }
+      let(:projection) { Projection.new(%w[id account:iban holder:national_id]) }
+
+      describe '#get_scope_for_related_records' do
+        let(:permissions) { described_class.new(caller) }
+        let(:accounts) { datasource.get_collection('accounts') }
+
+        before { allow(permissions).to receive(:get_scope).and_return(scopes['accounts']) }
+
+        it 'returns the scope when the server flags it as applying to related records' do
+          allow(permissions).to receive(:get_rendering_data).and_return({ related_record_scopes: [:accounts] })
+
+          expect(permissions.get_scope_for_related_records(accounts)).to eq(scopes['accounts'])
+        end
+
+        it 'returns nil when the server does not flag the scope' do
+          allow(permissions).to receive(:get_rendering_data).and_return({ related_record_scopes: [] })
+
+          expect(permissions.get_scope_for_related_records(accounts)).to be_nil
+        end
+      end
 
       describe '#relation_scopes' do
-        it 'fetches the scope of every collection the projection reaches through a relation' do
+        it 'asks for the related scope of every collection the projection reaches through a relation' do
           fetched = []
-          allow(permissions).to receive(:get_scope) { |collection| fetched << collection.name and nil }
+          allow(permissions).to receive(:get_scope_for_related_records) { |collection| fetched << collection.name and nil }
 
           permissions.relation_scopes(cards, Projection.new(%w[id account:organization:name holder:national_id]))
 
           expect(fetched).to contain_exactly('accounts', 'organizations', 'holders')
         end
 
-        it 'fetches no scope when the projection reaches no relation' do
+        it 'asks for no scope when the projection reaches no relation' do
           fetched = []
-          allow(permissions).to receive(:get_scope) { |collection| fetched << collection.name and nil }
+          allow(permissions).to receive(:get_scope_for_related_records) { |collection| fetched << collection.name and nil }
 
           permissions.relation_scopes(cards, Projection.new(%w[id]))
 
           expect(fetched).to be_empty
         end
 
-        it 'adds the fields each scope reads, nested under its relation' do
+        it 'adds the primary key of each scoped related record, nested under its relation' do
           relation_scopes = permissions.relation_scopes(cards, projection)
 
           expect(relation_scopes.with_scope_fields(projection)).to eq(
-            %w[id account:id account:iban holder:id holder:national_id account:organization:name holder:region]
+            %w[id account:iban holder:national_id account:id holder:id]
           )
+        end
+
+        it 'checks the related records with one query on their collection, under its scope' do
+          relation_scopes = permissions.relation_scopes(cards, projection)
+
+          relation_scopes.redact(cards_records, projection)
+
+          expect(datasource.get_collection('accounts')).to have_received(:list) do |list_caller, filter, list_projection|
+            expect(list_caller).to eq(caller)
+            expect(filter.condition_tree.to_h).to eq(
+              {
+                aggregator: 'And',
+                conditions: [
+                  { field: 'organization:name', operator: Operators::EQUAL, value: 'OwnOrg' },
+                  { field: 'id', operator: Operators::IN, value: [10, 20, 30] }
+                ]
+              }
+            )
+            expect(list_projection).to eq(%w[id])
+          end
         end
 
         it 'keeps every card and empties the related records outside their scope' do
           relation_scopes = permissions.relation_scopes(cards, projection)
 
-          expect(relation_scopes.redact(cards_records, projection, 'Europe/Paris')).to eq(
+          expect(relation_scopes.redact(cards_records, projection)).to eq(
             [
-              { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76' },
-                'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
-              { 'id' => 2, 'account' => nil, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
-              { 'id' => 3, 'account' => { 'id' => 30, 'iban' => 'FR14' }, 'holder' => nil },
-              { 'id' => 4, 'account' => nil, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } }
+              { 'id' => 1, 'account' => { 'iban' => 'FR76' }, 'holder' => { 'national_id' => 'EU-1' } },
+              { 'id' => 2, 'account' => nil, 'holder' => { 'national_id' => 'EU-1' } },
+              { 'id' => 3, 'account' => { 'iban' => 'FR14' }, 'holder' => nil },
+              { 'id' => 4, 'account' => nil, 'holder' => { 'national_id' => 'EU-1' } }
             ]
           )
         end
@@ -134,14 +177,15 @@ module ForestAdminAgent
         it 'empties a record reached through several relations' do
           scopes['organizations'] = Nodes::ConditionTreeLeaf.new('tier', Operators::EQUAL, 'gold')
           scopes.delete('accounts')
+          in_scope_keys['organizations'] = [1]
           deep_projection = Projection.new(%w[id account:organization:name])
           relation_scopes = permissions.relation_scopes(cards, deep_projection)
           records = [
-            { 'id' => 1, 'account' => { 'organization' => { 'name' => 'OwnOrg', 'tier' => 'gold' } } },
-            { 'id' => 2, 'account' => { 'organization' => { 'name' => 'OwnOrg', 'tier' => 'silver' } } }
+            { 'id' => 1, 'account' => { 'organization' => { 'id' => 1, 'name' => 'OwnOrg' } } },
+            { 'id' => 2, 'account' => { 'organization' => { 'id' => 2, 'name' => 'OwnOrg' } } }
           ]
 
-          expect(relation_scopes.redact(records, deep_projection, 'Europe/Paris')).to eq(
+          expect(relation_scopes.redact(records, deep_projection)).to eq(
             [
               { 'id' => 1, 'account' => { 'organization' => { 'name' => 'OwnOrg' } } },
               { 'id' => 2, 'account' => { 'organization' => nil } }
@@ -149,11 +193,12 @@ module ForestAdminAgent
           )
         end
 
-        it 'returns the records untouched when no relation is scoped' do
+        it 'returns the records untouched and queries nothing when no relation is scoped' do
           scopes.clear
           relation_scopes = permissions.relation_scopes(cards, projection)
 
-          expect(relation_scopes.redact(cards_records, projection, 'Europe/Paris')).to be(cards_records)
+          expect(relation_scopes.redact(cards_records, projection)).to be(cards_records)
+          expect(datasource.get_collection('accounts')).not_to have_received(:list)
         end
       end
     end

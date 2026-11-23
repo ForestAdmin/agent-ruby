@@ -44,8 +44,7 @@ module ForestAdminAgent
           list_records = lambda do |batch_filter|
             relation_scopes.redact(
               context.collection.list(context.caller, batch_filter, relation_scopes.with_scope_fields(projection)),
-              projection,
-              context.caller.timezone
+              projection
             )
           end
 

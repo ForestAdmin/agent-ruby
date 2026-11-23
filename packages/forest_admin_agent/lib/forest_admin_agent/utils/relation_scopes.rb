@@ -3,26 +3,37 @@ module ForestAdminAgent
     # The scope of a collection reached through a to-one relation empties the related record rather
     # than filtering the root rows: a scope on `accounts` restricts which accounts are seen, never
     # which `cards` exist.
+    #
+    # Each related collection is checked with one query under its own scope, so the datasource
+    # compares values exactly as it does when listing that collection.
     class RelationScopes
+      include ForestAdminDatasourceToolkit::Components::Query
+      include ForestAdminDatasourceToolkit::Components::Query::ConditionTree
+
       RelationScope = Struct.new(:path, :collection, :scope)
 
-      def initialize(scopes = [])
+      def initialize(scopes = [], caller = nil)
         @scopes = scopes
+        @caller = caller
       end
 
       def with_scope_fields(projection)
-        scope_fields = @scopes.map { |relation| relation.scope.projection.nest(prefix: relation.path) }
+        key_fields = @scopes.map do |relation|
+          Projection.new(ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(relation.collection))
+                    .nest(prefix: relation.path)
+        end
 
-        projection.union(*scope_fields)
+        projection.union(*key_fields)
       end
 
-      def redact(records, projection, timezone)
+      def redact(records, projection)
         return records if @scopes.empty?
 
-        out_of_scope_paths = records.map { |record| out_of_scope_paths(record, timezone) }
+        stringified = records.map { |record| ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(record, :to_s) }
+        out_of_scope = @scopes.map { |relation_scope| [relation_scope.path, out_of_scope_rows(stringified, relation_scope)] }
 
         projection.apply(records).each_with_index do |record, index|
-          out_of_scope_paths[index].each { |path| self.class.clear(record, path) }
+          out_of_scope.each { |path, rows| self.class.clear(record, path) if rows.include?(index) }
         end
       end
 
@@ -38,13 +49,30 @@ module ForestAdminAgent
 
       private
 
-      def out_of_scope_paths(record, timezone)
-        stringified = ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(record, :to_s)
+      # The indexes of the rows whose related record at this path the scope hides.
+      def out_of_scope_rows(records, relation_scope)
+        collection = relation_scope.collection
+        related = records.map { |record| ForestAdminDatasourceToolkit::Utils::Record.field_value(record, relation_scope.path) }
+        present = related.compact
+        return [] if present.empty?
 
-        @scopes.filter_map do |relation_scope|
-          related = ForestAdminDatasourceToolkit::Utils::Record.field_value(stringified, relation_scope.path)
+        visible = keys_in_scope(collection, relation_scope.scope, present)
 
-          relation_scope.path if related && !relation_scope.scope.match(related, relation_scope.collection, timezone)
+        related.each_index.select do |index|
+          related[index] && !visible.include?(ForestAdminDatasourceToolkit::Utils::Record.primary_keys(collection, related[index]))
+        end
+      end
+
+      def keys_in_scope(collection, scope, related)
+        primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
+        filter = Filter.new(
+          condition_tree: ConditionTreeFactory.intersect([scope, ConditionTreeFactory.match_records(collection, related)])
+        )
+
+        collection.list(@caller, filter, Projection.new(primary_keys)).map do |record|
+          ForestAdminDatasourceToolkit::Utils::Record.primary_keys(
+            collection, ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(record, :to_s)
+          )
         end
       end
     end

@@ -164,7 +164,7 @@ module ForestAdminAgent
         # No record of an aggregation can be redacted afterwards, so each aggregated scope filters.
         def intersect_scopes(context, filter, scoped)
           scopes = scoped.map do |collection_name, prefix|
-            scope = context.permissions.get_scope(context.datasource.get_collection(collection_name))
+            scope = context.permissions.get_scope_for_related_records(context.datasource.get_collection(collection_name))
             prefix ? scope&.nest(prefix) : scope
           end
 

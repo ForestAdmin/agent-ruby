@@ -294,9 +294,17 @@ module ForestAdminAgent
         ContextVariablesInjector.inject_context_in_filter(scope, context_variables)
       end
 
+      # The caller's scope on a collection reached through a relation, when the server flags that scope
+      # as applying there. Unflagged scopes keep filtering their own collection only.
+      def get_scope_for_related_records(collection)
+        flagged = get_rendering_data(caller.rendering_id)[:related_record_scopes] || []
+
+        flagged.include?(collection.name.to_sym) ? get_scope(collection) : nil
+      end
+
       # The caller's scope on each collection the projection reaches through a to-one relation.
       def relation_scopes(collection, projection)
-        Utils::RelationScopes.new(collect_relation_scopes(collection, projection))
+        Utils::RelationScopes.new(collect_relation_scopes(collection, projection), caller)
       end
 
       def get_segments(collection, force_fetch: false)
@@ -327,7 +335,7 @@ module ForestAdminAgent
 
           foreign_collection = collection.datasource.get_collection(relation.foreign_collection)
           path = prefix ? "#{prefix}:#{name}" : name
-          scope = get_scope(foreign_collection)
+          scope = get_scope_for_related_records(foreign_collection)
           nested = collect_relation_scopes(foreign_collection, sub_projection, path)
 
           scope ? [Utils::RelationScopes::RelationScope.new(path, foreign_collection, scope), *nested] : nested
@@ -566,6 +574,9 @@ module ForestAdminAgent
           response = fetch("/liana/v4/permissions/renderings/#{rendering_id}")
 
           data[:scopes] = decode_scope_permissions(response[:collections])
+          data[:related_record_scopes] = response[:collections].select do |_, value|
+            value[:appliesToRelatedRecords] == true
+          end.keys.map(&:to_sym)
           data[:team] = response[:team]
           data[:segments] = decode_segment_permissions(response[:collections])
           data[:charts] = decode_charts_permissions(response[:stats])

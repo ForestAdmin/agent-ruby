@@ -40,8 +40,7 @@ module ForestAdminAgent
                 filter,
                 relation_scopes.with_scope_fields(projection)
               ),
-              projection,
-              context.caller.timezone
+              projection
             )
 
             {

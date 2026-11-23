@@ -110,6 +110,7 @@ module ForestAdminAgent
           allow(permissions).to receive_messages(
             can_chart?: true,
             get_scope: nil,
+            get_scope_for_related_records: nil,
             get_user_data: {
               id: 1,
               firstName: 'John',
@@ -556,7 +557,7 @@ module ForestAdminAgent
             end
 
             before do
-              allow(permissions).to receive(:get_scope) { |collection| scopes[collection.name] }
+              allow(permissions).to receive(:get_scope_for_related_records) { |collection| scopes[collection.name] }
               allow(@datasource.get_collection('book')).to receive(:datasource).and_return(@datasource)
             end
 
@@ -568,7 +569,17 @@ module ForestAdminAgent
               end
               chart.handle_request(args)
 
-              captured.condition_tree.to_h
+              captured.condition_tree&.to_h
+            end
+
+            it 'aggregates under the root scope only when the aggregated scopes are not flagged' do
+              allow(permissions).to receive(:get_scope_for_related_records).and_return(nil)
+              allow(permissions).to receive(:get_scope) { |collection| scopes[collection.name] }
+              args[:params] = args[:params].merge({ labelFieldName: 'title', relationshipFieldName: 'bookReviews',
+                                                    aggregator: 'Count', aggregateFieldName: 'id',
+                                                    sourceCollectionName: 'book', type: 'Leaderboard' })
+
+              expect(aggregated_condition_tree('review')).to be_nil
             end
 
             it 'applies the scope of the aggregated OneToMany collection' do
