@@ -30,7 +30,9 @@ module ForestAdminAgent
         return records if @scopes.empty?
 
         stringified = records.map { |record| ForestAdminDatasourceToolkit::Utils::HashHelper.convert_keys(record, :to_s) }
-        out_of_scope = @scopes.map { |relation_scope| [relation_scope.path, out_of_scope_rows(stringified, relation_scope)] }
+        out_of_scope = @scopes.map do |relation_scope|
+          [relation_scope.path, out_of_scope_rows(stringified, relation_scope)]
+        end
 
         projection.apply(records).each_with_index do |record, index|
           out_of_scope.each { |path, rows| self.class.clear(record, path) if rows.include?(index) }
@@ -59,14 +61,16 @@ module ForestAdminAgent
         visible = keys_in_scope(collection, relation_scope.scope, present)
 
         related.each_index.select do |index|
-          related[index] && !visible.include?(ForestAdminDatasourceToolkit::Utils::Record.primary_keys(collection, related[index]))
+          related[index] && !visible.include?(ForestAdminDatasourceToolkit::Utils::Record.primary_keys(collection,
+                                                                                                       related[index]))
         end
       end
 
       def keys_in_scope(collection, scope, related)
         primary_keys = ForestAdminDatasourceToolkit::Utils::Schema.primary_keys(collection)
         filter = Filter.new(
-          condition_tree: ConditionTreeFactory.intersect([scope, ConditionTreeFactory.match_records(collection, related)])
+          condition_tree: ConditionTreeFactory.intersect([scope,
+                                                          ConditionTreeFactory.match_records(collection, related)])
         )
 
         collection.list(@caller, filter, Projection.new(primary_keys)).map do |record|

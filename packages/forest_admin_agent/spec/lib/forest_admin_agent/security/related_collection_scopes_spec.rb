@@ -11,6 +11,15 @@ module ForestAdminAgent
       include_context 'with caller'
 
       let(:datasource) { build_datasource_with_collections(collections) }
+      let(:cards_records) do
+        [
+          { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
+          { 'id' => 2, 'account' => { 'id' => 20, 'iban' => 'DE22' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
+          { 'id' => 3, 'account' => { 'id' => 30, 'iban' => 'FR14' }, 'holder' => { 'id' => 300, 'national_id' => 'US-3' } },
+          { 'id' => 4, 'account' => nil, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } }
+        ]
+      end
+      let(:projection) { Projection.new(%w[id account:iban holder:national_id]) }
       let(:cards) { datasource.get_collection('cards') }
 
       let(:collections) do
@@ -83,17 +92,6 @@ module ForestAdminAgent
           allow(datasource.get_collection(name)).to receive(:list) { in_scope_keys[name].map { |id| { 'id' => id } } }
         end
       end
-
-      let(:cards_records) do
-        [
-          { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
-          { 'id' => 2, 'account' => { 'id' => 20, 'iban' => 'DE22' }, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } },
-          { 'id' => 3, 'account' => { 'id' => 30, 'iban' => 'FR14' }, 'holder' => { 'id' => 300, 'national_id' => 'US-3' } },
-          { 'id' => 4, 'account' => nil, 'holder' => { 'id' => 100, 'national_id' => 'EU-1' } }
-        ]
-      end
-
-      let(:projection) { Projection.new(%w[id account:iban holder:national_id]) }
 
       describe '#get_scope_for_related_records' do
         let(:permissions) { described_class.new(caller) }
