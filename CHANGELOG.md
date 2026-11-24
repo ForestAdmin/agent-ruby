@@ -1,3 +1,10 @@
+# [1.51.0](https://github.com/ForestAdmin/agent-ruby/compare/v1.50.2...v1.51.0) (2026-11-24)
+
+
+### Features
+
+* **SA form:** add SA field form isPending option ([#437](https://github.com/ForestAdmin/agent-ruby/issues/437)) ([8fe1b5b](https://github.com/ForestAdmin/agent-ruby/commit/8fe1b5b7b615521631d68aac933e095cdef07638))
+
 ## [1.50.2](https://github.com/ForestAdmin/agent-ruby/compare/v1.50.1...v1.50.2) (2026-11-20)
 
 
