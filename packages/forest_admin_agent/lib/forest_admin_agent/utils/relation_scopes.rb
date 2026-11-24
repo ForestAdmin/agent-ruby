@@ -34,8 +34,22 @@ module ForestAdminAgent
           [relation_scope.path, out_of_scope_rows(stringified, relation_scope)]
         end
 
-        projection.apply(records).each_with_index do |record, index|
+        # Only the keys added for the check are removed: the datasource may return others the
+        # serializer needs, such as the foreign key of a polymorphic relation.
+        added_fields = with_scope_fields(projection) - projection
+        stringified.each_with_index do |record, index|
+          added_fields.each { |path| self.class.remove(record, path) }
           out_of_scope.each { |path, rows| self.class.clear(record, path) if rows.include?(index) }
+        end
+      end
+
+      def self.remove(record, path)
+        relation, rest = path.split(':', 2)
+
+        if rest.nil?
+          record.delete(relation)
+        elsif record[relation].is_a?(Hash)
+          remove(record[relation], rest)
         end
       end
 

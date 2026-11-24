@@ -32,7 +32,38 @@ module ForestAdminAgent
                 'account_id' => build_column(column_type: 'Number'),
                 'holder_id' => build_column(column_type: 'Number'),
                 'account' => build_many_to_one(foreign_collection: 'accounts', foreign_key: 'account_id'),
-                'holder' => build_many_to_one(foreign_collection: 'holders', foreign_key: 'holder_id')
+                'holder' => build_many_to_one(foreign_collection: 'holders', foreign_key: 'holder_id'),
+                'note' => Relations::PolymorphicOneToOneSchema.new(
+                  origin_key: 'notable_id', origin_key_target: 'id', foreign_collection: 'notes',
+                  origin_type_field: 'notable_type', origin_type_value: 'cards'
+                )
+              }
+            }
+          ),
+          build_collection(
+            name: 'notes',
+            schema: {
+              fields: {
+                'id' => build_numeric_primary_key,
+                'body' => build_column(column_type: 'String'),
+                'notable_id' => build_column(column_type: 'Number'),
+                'notable_type' => build_column(column_type: 'String')
+              }
+            }
+          ),
+          build_collection(
+            name: 'events',
+            schema: {
+              fields: {
+                'id' => build_numeric_primary_key,
+                'account_id' => build_column(column_type: 'Number'),
+                'subject_id' => build_column(column_type: 'Number'),
+                'subject_type' => build_column(column_type: 'String'),
+                'account' => build_many_to_one(foreign_collection: 'accounts', foreign_key: 'account_id'),
+                'subject' => Relations::PolymorphicManyToOneSchema.new(
+                  foreign_key_type_field: 'subject_type', foreign_key: 'subject_id',
+                  foreign_key_targets: { 'accounts' => 'id' }, foreign_collections: ['accounts']
+                )
               }
             }
           ),
@@ -85,7 +116,7 @@ module ForestAdminAgent
       end
 
       # What each related collection's own scoped query returns: the keys its scope keeps.
-      let(:in_scope_keys) { { 'accounts' => [10, 30], 'holders' => [100], 'organizations' => [] } }
+      let(:in_scope_keys) { { 'accounts' => [10, 30], 'holders' => [100], 'organizations' => [], 'notes' => [7] } }
 
       before do
         in_scope_keys.each_key do |name|
@@ -188,6 +219,35 @@ module ForestAdminAgent
               { 'id' => 1, 'account' => { 'organization' => { 'name' => 'OwnOrg' } } },
               { 'id' => 2, 'account' => { 'organization' => nil } }
             ]
+          )
+        end
+
+        it 'empties a record reached through a polymorphic one-to-one relation outside its scope' do
+          scopes['notes'] = Nodes::ConditionTreeLeaf.new('body', Operators::PRESENT)
+          note_projection = Projection.new(%w[id note:body])
+          relation_scopes = permissions.relation_scopes(cards, note_projection)
+          records = [
+            { 'id' => 1, 'note' => { 'id' => 7, 'body' => 'kept' } },
+            { 'id' => 2, 'note' => { 'id' => 8, 'body' => 'hidden' } }
+          ]
+
+          expect(relation_scopes.redact(records, note_projection)).to eq(
+            [{ 'id' => 1, 'note' => { 'body' => 'kept' } }, { 'id' => 2, 'note' => nil }]
+          )
+        end
+
+        it 'keeps the polymorphic link the datasource returned alongside the projection' do
+          events = datasource.get_collection('events')
+          event_projection = Projection.new(%w[id account:iban subject:* subject_type])
+          relation_scopes = permissions.relation_scopes(events, event_projection)
+          records = [
+            { 'id' => 1, 'account' => { 'id' => 10, 'iban' => 'FR76' },
+              'subject' => { 'id' => 20 }, 'subject_id' => 20, 'subject_type' => 'accounts' }
+          ]
+
+          expect(relation_scopes.redact(records, event_projection)).to eq(
+            [{ 'id' => 1, 'account' => { 'iban' => 'FR76' },
+               'subject' => { 'id' => 20 }, 'subject_id' => 20, 'subject_type' => 'accounts' }]
           )
         end
 

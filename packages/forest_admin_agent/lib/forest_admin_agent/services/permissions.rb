@@ -3,7 +3,7 @@ require 'deepsort'
 module ForestAdminAgent
   module Services
     class Permissions
-      TO_ONE_RELATION_TYPES = %w[ManyToOne OneToOne].freeze
+      TO_ONE_RELATION_TYPES = %w[ManyToOne OneToOne PolymorphicOneToOne].freeze
 
       include ForestAdminAgent::Http::Exceptions
       include ForestAdminAgent::Utils
