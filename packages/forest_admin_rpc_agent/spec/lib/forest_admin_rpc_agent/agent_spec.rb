@@ -144,6 +144,7 @@ module ForestAdminRpcAgent
             static_form: false,
             description: 'Download a report',
             submit_button_label: 'Go',
+            pending_refresh_interval: 10,
             form: [{ id: 'should_not_leak' }],
             execute: -> {}
           )
@@ -169,7 +170,8 @@ module ForestAdminRpcAgent
               is_generate_file: true,
               static_form: false,
               description: 'Download a report',
-              submit_button_label: 'Go'
+              submit_button_label: 'Go',
+              pending_refresh_interval: 10
             }
           )
         end

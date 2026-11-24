@@ -68,7 +68,7 @@ module ForestAdminDatasourceRpc
                 },
                 actions: {
                   static_action: { scope: 'global', static_form: true },
-                  dynamic_action: { scope: 'global', static_form: false }
+                  dynamic_action: { scope: 'global', static_form: false, pending_refresh_interval: 10 }
                 }
               }
             ]
@@ -80,6 +80,11 @@ module ForestAdminDatasourceRpc
           schema = actions_datasource.get_collection('Files').schema[:actions]
           expect(schema['static_action'].static_form).to be(true)
           expect(schema['dynamic_action'].static_form).to be(false)
+        end
+
+        it 'preserves :pending_refresh_interval from the wire' do
+          schema = actions_datasource.get_collection('Files').schema[:actions]
+          expect(schema['dynamic_action'].pending_refresh_interval).to eq(10)
         end
       end
     end

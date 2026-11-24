@@ -67,6 +67,19 @@ module ForestAdminDatasourceCustomizer
         end
       end
 
+      describe '#pending_refresh_interval' do
+        it 'sets the pending refresh interval' do
+          builder = described_class.new(scope: :single)
+          action = builder.instance_eval do
+            pending_refresh_interval 10
+            execute { success 'OK' }
+            to_action
+          end
+
+          expect(action.pending_refresh_interval).to eq(10)
+        end
+      end
+
       describe '#generates_file!' do
         it 'marks action as generating file' do
           builder = described_class.new(scope: :global)

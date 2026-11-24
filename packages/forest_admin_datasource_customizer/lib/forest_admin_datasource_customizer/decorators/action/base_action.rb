@@ -2,16 +2,18 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class BaseAction
-        attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :execute, :static_form
+        attr_reader :scope, :form, :is_generate_file, :description, :submit_button_label, :pending_refresh_interval,
+                    :execute, :static_form
 
         # rubocop:disable Metrics/ParameterLists
         def initialize(scope:, form: nil, is_generate_file: false, description: nil,
-                       submit_button_label: nil, static_form: false, &execute)
+                       submit_button_label: nil, pending_refresh_interval: nil, static_form: false, &execute)
           @scope = scope
           @form = form
           @is_generate_file = is_generate_file
           @description = description
           @submit_button_label = submit_button_label
+          @pending_refresh_interval = pending_refresh_interval
           @execute = execute
           @static_form = static_form
         end
@@ -24,6 +26,7 @@ module ForestAdminDatasourceCustomizer
             is_generate_file: action[:is_generate_file],
             description: action[:description],
             submit_button_label: action[:submit_button_label],
+            pending_refresh_interval: action[:pending_refresh_interval],
             static_form: action[:static_form] || false,
             &action[:execute]
           )

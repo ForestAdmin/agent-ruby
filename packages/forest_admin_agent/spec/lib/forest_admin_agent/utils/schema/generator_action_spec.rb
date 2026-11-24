@@ -107,7 +107,8 @@ module ForestAdminAgent
                       static_form: true,
                       is_generate_file: false,
                       description: nil,
-                      submit_button_label: nil
+                      submit_button_label: nil,
+                      pending_refresh_interval: nil
                     }
                   )
                 }
@@ -133,6 +134,43 @@ module ForestAdminAgent
           end
         end
 
+        describe 'with a pending field' do
+          before do
+            @collection = build_collection(
+              schema: {
+                actions: {
+                  'Fetch documents' => BaseAction.new(
+                    scope: Types::ActionScope::SINGLE,
+                    pending_refresh_interval: 10
+                  ).build_elements
+                }
+              },
+              get_form: [
+                ActionField.new(id: 'documents', label: 'documents', type: 'String', is_pending: true),
+                ActionField.new(id: 'comment', label: 'comment', type: 'String')
+              ]
+            )
+          end
+
+          it 'sends the pending refresh interval in the schema' do
+            schema = described_class.build_schema(@collection, 'Fetch documents')
+
+            expect(schema[:pendingRefreshInterval]).to eq(10)
+          end
+
+          it 'flags the pending field' do
+            field = described_class.build_field_schema(@collection.datasource, @collection.get_form(nil, 'Fetch documents')[0])
+
+            expect(field[:isPending]).to be(true)
+          end
+
+          it 'leaves isPending out of a field that is not pending' do
+            field = described_class.build_field_schema(@collection.datasource, @collection.get_form(nil, 'Fetch documents')[1])
+
+            expect(field).not_to have_key(:isPending)
+          end
+        end
+
         describe 'with widget' do
           it 'set the value null to widgetEdit if no widget is specified' do
             collection = build_collection(
@@ -145,7 +183,8 @@ module ForestAdminAgent
                       static_form: true,
                       is_generate_file: false,
                       description: nil,
-                      submit_button_label: nil
+                      submit_button_label: nil,
+                      pending_refresh_interval: nil
                     }
                   )
                 }
@@ -178,7 +217,8 @@ module ForestAdminAgent
                       static_form: true,
                       is_generate_file: false,
                       description: nil,
-                      submit_button_label: nil
+                      submit_button_label: nil,
+                      pending_refresh_interval: nil
                     }
                   )
                 }

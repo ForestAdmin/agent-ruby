@@ -33,6 +33,7 @@ module ForestAdminDatasourceCustomizer
         @execute_block = nil
         @description = nil
         @submit_button_label = nil
+        @pending_refresh_interval = nil
         @generate_file = false
       end
 
@@ -46,6 +47,12 @@ module ForestAdminDatasourceCustomizer
       # @param label [String] button label
       def submit_button_label(label)
         @submit_button_label = label
+      end
+
+      # Set the delay between two form refreshes while a field is pending
+      # @param seconds [Integer] refresh interval in seconds
+      def pending_refresh_interval(seconds)
+        @pending_refresh_interval = seconds
       end
 
       # Mark action as generating a file
@@ -85,6 +92,7 @@ module ForestAdminDatasourceCustomizer
           is_generate_file: @generate_file,
           description: @description,
           submit_button_label: @submit_button_label,
+          pending_refresh_interval: @pending_refresh_interval,
           &@execute_block
         )
       end

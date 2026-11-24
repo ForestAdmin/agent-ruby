@@ -3,8 +3,8 @@ module ForestAdminDatasourceToolkit
     module Actions
       class ActionField
         attr_accessor :value, :watch_changes
-        attr_reader :type, :label, :description, :is_required, :is_read_only, :enum_values, :collection_name, :widget,
-                    :placeholder, :id
+        attr_reader :type, :label, :description, :is_required, :is_read_only, :is_pending, :enum_values,
+                    :collection_name, :widget, :placeholder, :id
 
         def initialize(
           type:,
@@ -13,6 +13,7 @@ module ForestAdminDatasourceToolkit
           description: nil,
           is_required: false,
           is_read_only: false,
+          is_pending: false,
           value: nil,
           enum_values: nil,
           collection_name: nil,
@@ -26,6 +27,7 @@ module ForestAdminDatasourceToolkit
           @description = description
           @is_required = is_required
           @is_read_only = is_read_only
+          @is_pending = is_pending
           @value = value
           @enum_values = enum_values
           @collection_name = collection_name
