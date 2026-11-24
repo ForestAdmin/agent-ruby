@@ -151,7 +151,7 @@ module ForestAdminRpcAgent
     end
 
     # Only expose the fields needed by an RPC consumer: scope, is_generate_file, static_form,
-    # description, submit_button_label. Drops `form` (computed via /action-form) and `execute`
+    # description, submit_button_label, pending_refresh_interval. Drops `form` (computed via /action-form) and `execute`
     # (server-side callback) — neither belongs on the wire.
     def serialize_actions(actions)
       (actions || {}).transform_values do |action|
@@ -160,7 +160,8 @@ module ForestAdminRpcAgent
           is_generate_file: action.is_generate_file,
           static_form: action.static_form,
           description: action.description,
-          submit_button_label: action.submit_button_label
+          submit_button_label: action.submit_button_label,
+          pending_refresh_interval: action.pending_refresh_interval
         }
       end
     end

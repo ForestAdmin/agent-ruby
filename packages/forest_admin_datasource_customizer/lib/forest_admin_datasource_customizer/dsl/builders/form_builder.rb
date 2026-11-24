@@ -38,6 +38,7 @@ module ForestAdminDatasourceCustomizer
       # @param options [Array<Hash>, Proc] options for dropdown/radio widgets (static or dynamic)
       # @param readonly [Boolean, Proc] whether field is read-only (static or dynamic)
       # @param required [Boolean, Proc] whether field is required (static or dynamic)
+      # @param pending [Boolean, Proc] whether field is waiting for its data (static or dynamic)
       # @param default [Object, Proc] default value (static or dynamic)
       # @param description [String, Proc] field description (static or dynamic)
       # @param placeholder [String, Proc] placeholder text (static or dynamic)
@@ -45,7 +46,7 @@ module ForestAdminDatasourceCustomizer
       # @param enum_values [Array, Proc] enum values for enum fields (static or dynamic)
       # @param collection_name [String, Proc] target collection name (static or dynamic)
       # @param block [Proc] optional proc for computed values
-      def field(name, type:, widget: nil, options: nil, readonly: nil, required: nil, default: nil,
+      def field(name, type:, widget: nil, options: nil, readonly: nil, required: nil, pending: nil, default: nil,
                 description: nil, placeholder: nil, if_condition: nil, enum_values: nil, collection_name: nil, &block)
         field_def = {
           label: name.to_s,
@@ -56,6 +57,7 @@ module ForestAdminDatasourceCustomizer
         field_def[:options] = options if options
         field_def[:is_read_only] = readonly if readonly
         field_def[:is_required] = required if required
+        field_def[:is_pending] = pending if pending
         field_def[:default_value] = default if default
         field_def[:description] = description if description
         field_def[:placeholder] = placeholder if placeholder

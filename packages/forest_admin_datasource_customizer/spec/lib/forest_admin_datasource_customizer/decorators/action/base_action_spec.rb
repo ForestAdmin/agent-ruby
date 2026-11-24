@@ -34,6 +34,24 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe 'pending_refresh_interval' do
+          it 'is nil by default' do
+            expect(described_class.new(scope: scope).pending_refresh_interval).to be_nil
+          end
+
+          it 'keeps the interval when provided' do
+            action = described_class.new(scope: scope, pending_refresh_interval: 10)
+
+            expect(action.pending_refresh_interval).to eq(10)
+          end
+
+          it 'keeps the interval when built from a plain object' do
+            action = described_class.from_plain_object({ scope: scope, pending_refresh_interval: 10 })
+
+            expect(action.pending_refresh_interval).to eq(10)
+          end
+        end
+
         describe 'when check form is static' do
           context 'when form is nil' do
             let(:action) { described_class.new(scope: :single).build_elements }

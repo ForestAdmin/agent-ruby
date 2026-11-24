@@ -58,6 +58,8 @@ module ForestAdminAgent
             }
           }
 
+          schema[:pendingRefreshInterval] = action.pending_refresh_interval if action.pending_refresh_interval
+
           return schema if layout.all? { |element| element.component == 'Input' }
 
           schema[:layout] = build_layout(layout)
@@ -99,6 +101,7 @@ module ForestAdminAgent
             widgetEdit: GeneratorActionFieldWidget.build_widget_options(field)
           }
 
+          output[:isPending] = true if field.is_pending
           output[:hook] = 'changeHook' if field.respond_to?(:watch_changes) && field.watch_changes
 
           if ActionFields.collection_field?(field)

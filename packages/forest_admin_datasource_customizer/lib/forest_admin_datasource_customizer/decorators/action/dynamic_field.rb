@@ -2,8 +2,8 @@ module ForestAdminDatasourceCustomizer
   module Decorators
     module Action
       class DynamicField < BaseFormElement
-        attr_accessor :type, :label, :description, :is_required, :is_read_only, :if_condition, :value, :default_value,
-                      :collection_name, :enum_values, :placeholder, :id
+        attr_accessor :type, :label, :description, :is_required, :is_read_only, :is_pending, :if_condition, :value,
+                      :default_value, :collection_name, :enum_values, :placeholder, :id
 
         def initialize(
           type:,
@@ -12,6 +12,7 @@ module ForestAdminDatasourceCustomizer
           description: nil,
           is_required: false,
           is_read_only: false,
+          is_pending: false,
           if_condition: nil,
           value: nil,
           default_value: nil,
@@ -32,6 +33,7 @@ module ForestAdminDatasourceCustomizer
           @description = description
           @is_required = is_required
           @is_read_only = is_read_only
+          @is_pending = is_pending
           @if_condition = if_condition
           @value = value
           @default_value = default_value

@@ -242,6 +242,48 @@ module ForestAdminDatasourceCustomizer
           end
         end
 
+        describe 'with a single action with a pending field' do
+          before do
+            @decorated_book.add_action(
+              'fetch documents',
+              BaseAction.new(
+                scope: Types::ActionScope::SINGLE,
+                pending_refresh_interval: 10,
+                form: [
+                  { label: 'received', type: Types::FieldType::NUMBER },
+                  {
+                    label: 'documents',
+                    type: Types::FieldType::STRING,
+                    is_pending: proc { |context| context.get_form_value('received') != 5 }
+                  }
+                ]
+              ) { |_context, result_builder| result_builder.success }
+            )
+          end
+
+          it 'exposes the pending refresh interval in the schema' do
+            expect(@decorated_book.schema[:actions]['fetch documents'].pending_refresh_interval).to eq(10)
+          end
+
+          it 'flags the field as pending while its data is not ready' do
+            form = @decorated_book.get_form(caller, 'fetch documents', { 'received' => 3 }, Filter.new)
+
+            expect(form).to include(have_attributes(id: 'documents', is_pending: true))
+          end
+
+          it 'stops flagging the field once its data is ready' do
+            form = @decorated_book.get_form(caller, 'fetch documents', { 'received' => 5 }, Filter.new)
+
+            expect(form).to include(have_attributes(id: 'documents', is_pending: false))
+          end
+
+          it 'does not flag a field that does not declare it' do
+            form = @decorated_book.get_form(caller, 'fetch documents', { 'received' => 3 }, Filter.new)
+
+            expect(form).to include(have_attributes(id: 'received', is_pending: false))
+          end
+        end
+
         describe 'with a single action with default values' do
           before do
             @decorated_book.add_action(

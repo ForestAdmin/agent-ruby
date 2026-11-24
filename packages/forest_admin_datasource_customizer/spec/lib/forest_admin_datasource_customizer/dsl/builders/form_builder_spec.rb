@@ -65,6 +65,21 @@ module ForestAdminDatasourceCustomizer
           expect(field[:is_read_only]).to be true
         end
 
+        it 'adds pending field' do
+          builder = described_class.new
+          builder.field :documents, type: :string, pending: true
+
+          expect(builder.fields[0][:is_pending]).to be true
+        end
+
+        it 'adds field with dynamic pending' do
+          builder = described_class.new
+          pending_proc = proc { |context| context.get_form_value('received') != 5 }
+          builder.field :documents, type: :string, pending: pending_proc
+
+          expect(builder.fields[0][:is_pending]).to eq(pending_proc)
+        end
+
         it 'adds field with default value' do
           builder = described_class.new
           builder.field :status, type: :string, default: 'pending'
